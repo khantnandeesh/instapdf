@@ -1,0 +1,5 @@
+node_modules/
+.next/
+.env*
+*.key.json
+__pycache__/
