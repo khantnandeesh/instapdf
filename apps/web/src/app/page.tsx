@@ -8,10 +8,13 @@ export const metadata: Metadata = {
   description: siteCopy.homeDescription,
 };
 
-/** Home: hero and the tool catalogue (spec docs/specs/f2-home.md). Static. */
+/**
+ * Home: hero and the tool catalogue (spec docs/specs/f2-home.md), on Mint Paper's Home template:
+ * white hero, then the sand wash holding the whole catalogue. Static.
+ */
 export default function Home() {
   return (
-    <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1280px] px-4 outline-none sm:px-6 lg:px-8">
+    <main id="main" tabIndex={-1} className="w-full outline-none">
       <Hero />
       <Catalogue />
     </main>

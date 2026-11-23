@@ -316,7 +316,7 @@ The evaluator does not hold the reference to these, but they must work on stagin
 
 Designed 2026-11-23 by ux-designer. This is the build contract for the home page, the site header and tool menu, the footer, and the coming-soon, placeholder and 404 pages. It extends the F1 design system (`docs/specs/f1-shared-flow.md`, `## UI`): same tokens, primitives, focus style, motion rules and breakpoints. Where this section says "F1 U-x" it means that section of the F1 spec. The look is InstaPDF's own. The reference screenshots are for behavior only and are never a visual guide.
 
-> **Design system:** all visual values (tokens, accent family, dark mode, Inter type, shape, motion, contrast) live in [`docs/design/universal-ui.md`](../design/universal-ui.md); where this section names an older visual, that document wins.
+> **Design system:** all visual values (tokens, category hues, Atkinson Hyperlegible type, shape, motion, measured contrast and the deviations list) live in [`docs/design/mint-paper.md`](../design/mint-paper.md) (the owner's Mint Paper system, light only; dark mode is pending the designer's definition); where this section names an older visual, that document wins.
 
 ### H-1. Design principles for the home page
 
@@ -831,7 +831,7 @@ Transitions only on `opacity` and `transform` (plus `background-color` / `border
 - **Pre-paint Recent reservation (no CLS for returning users).** `RecentPrepaintScript` is a tiny inline script in `<head>` generated at build with the list of usable slugs: it reads `localStorage["instapdf:recent-tools"]` in a try/catch, counts entries that are usable slugs, and if ≥ 1 sets `data-recent` on `<html>`. CSS: `.ip-recent-slot { display: none } :root[data-recent] .ip-recent-slot { display: block; min-height: var(--ip-recent-h) }`. After hydration `RecentRow` renders into that slot; the box size does not change. The same validity rules live in `lib/recent-tools.ts`; a unit test runs both on the AC-43/44 fixtures. `<html suppressHydrationWarning>` covers the added attribute. If a CSP is added later, the script needs a hash or nonce.
 - **Fixed boxes.** Header 56 at every width; trigger and noscript fallback same size; search end slot 44×44; result count `min-w`; card meta line min 20; icons with explicit `width`/`height`; Recent slot reserved; menu content is fixed-position (never in flow).
 - **Accepted shift.** `/?q=…` deep links apply the filter after hydration, which removes cards below the toolbar once. That is a shared-link case, not the Lighthouse target; documented here so QA does not chase it.
-- **Fonts.** Inter, self-hosted via `next/font/local` (see `docs/design/universal-ui.md`): one preloaded latin woff2 from our origin, metric-adjusted fallback, so no third-party requests (AC-54) and no swap shift.
+- **Fonts.** Atkinson Hyperlegible 400/700, self-hosted via `next/font/local` (see `docs/design/mint-paper.md`): two preloaded latin woff2 files from our origin, metric-adjusted fallback, so no third-party requests (AC-54) and no swap shift.
 - **Prefetch.** `next/link` prefetches visible links in production. With 45+ card links that is many prefetches on a slow phone. Set `prefetch={false}` on catalogue cards, tiles, footer links and planned-tool links; keep default prefetch only for usable tools in the header shortcuts and Recent chips. Coming-soon pages are tiny static HTML, so no prefetch is needed.
 
 ### H-11. Decisions for the engineer

@@ -1,4 +1,4 @@
-/** Forced colors (Windows High Contrast): focus and selection stay visible. Design system: docs/design/universal-ui.md */
+/** Forced colors (Windows High Contrast): focus and selection stay visible. Design system: docs/design/mint-paper.md */
 import { expect, test, type Locator } from "@playwright/test";
 import { catalogueSearch, openHydrated } from "../f2/support";
 import { dialog, openRotate, passwordField, pick, pickReady, scope, tabTo } from "../support/flow";

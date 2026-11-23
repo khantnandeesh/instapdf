@@ -238,9 +238,9 @@ These run on `/rotate-pdf` like the others. The evaluator does not compare them 
 
 ## UI
 
-Designed 2026-11-23 by ux-designer. This section is the build contract for the shared flow. Every later tool reuses these components and only adds its own options panel, per-page actions and `process()`. The look is InstaPDF's own, built on the owner's Universal UI system (Lagoon teal accent on quiet warm-neutral grounds, system type, square page tiles, one control dock; re-themed 2026-11-23, see `docs/design/universal-ui.md`). Do not use the reference screenshots as a visual guide; they are for behavior only.
+Designed 2026-11-23 by ux-designer. This section is the build contract for the shared flow. Every later tool reuses these components and only adds its own options panel, per-page actions and `process()`. The look is InstaPDF's own, built on the owner's Mint Paper system (white page, sand wash, one mint action, grey page trays, one control dock; re-themed 2026-11-23, see `docs/design/mint-paper.md`). Do not use the reference screenshots as a visual guide; they are for behavior only.
 
-> **Design system:** all visual values (tokens, accent family, dark mode, Inter type, shape, motion, contrast) live in [`docs/design/universal-ui.md`](../design/universal-ui.md); where this section names an older visual, that document wins.
+> **Design system:** all visual values (tokens, category hues, Atkinson Hyperlegible type, shape, motion, measured contrast and the deviations list) live in [`docs/design/mint-paper.md`](../design/mint-paper.md) (the owner's Mint Paper system, light only; dark mode is pending the designer's definition); where this section names an older visual, that document wins.
 
 ### U-1. Design principles for this flow
 
@@ -253,13 +253,13 @@ Designed 2026-11-23 by ux-designer. This section is the build contract for the s
 
 The tokens existed only as two colors, so this feature defines the full set. Implemented in `apps/web/src/styles/tokens.css` (imported by `apps/web/src/app/globals.css`) as `--ip-*` CSS custom properties and exposed to Tailwind v4 through `@theme inline`. Use the Tailwind utilities (`bg-surface-raised`, `text-fg-muted`, `bg-primary text-on-primary`, `outline-focus`, `shadow-paper`, `rounded-lg` ...) and never raw hex values in components.
 
-Values, the token mapping, dark mode, type and the measured contrast table: see [`docs/design/universal-ui.md`](../design/universal-ui.md) (single source of truth).
+Values, the token mapping, type, the measured contrast table and the deviations: see [`docs/design/mint-paper.md`](../design/mint-paper.md) (single source of truth).
 
 **Spacing.** Tailwind's 4 px scale. Flow rhythm: 4 / 8 / 12 / 16 / 24 / 32 / 48. Page gutters: 16 (≤ 639), 24 (640–1023), 32 (≥ 1024). Grid gap 16 (12 below 640).
 
-**Radius, elevation, motion.** See [`docs/design/universal-ui.md`](../design/universal-ui.md).
+**Radius, elevation, motion.** See [`docs/design/mint-paper.md`](../design/mint-paper.md).
 
-**Layout metrics.** `--ip-header-h` 56 px, `--ip-dock-w` 320 px, `--ip-dock-h` 128 px (< 640), `--ip-dock-h-md` 76 px (640–1023), `--ip-thumb-size` 160 px default, `--ip-tap-min` 44 px (every touch target is at least 44×44 px, including icon buttons).
+**Layout metrics.** `--ip-header-h` 57 px, `--ip-dock-w` 360 px, `--ip-dock-h` 176 px (< 640), `--ip-dock-h-md` 104 px (640–1023), `--ip-thumb-size` 160 px default, `--ip-tap-min` 44 px (every touch target is at least 44×44 px, including icon buttons).
 
 **Z-index.** content 0 · sticky toolbar 10 · dock 20 · notice stack 30 · drop overlay 40 · dialog (native top layer, no z-index needed).
 

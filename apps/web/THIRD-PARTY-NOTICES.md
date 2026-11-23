@@ -3,16 +3,16 @@
 Assets shipped to browsers by `apps/web` that carry their own license terms.
 (npm code dependencies keep their license files in `node_modules`; this file covers bundled assets.)
 
-## Inter (font)
+## Atkinson Hyperlegible (font)
 
-- Package: `@fontsource-variable/inter` 5.3.0 (file `files/inter-latin-wght-normal.woff2`, latin subset, variable weight 100–900)
-- Upstream: https://github.com/rsms/inter
-- Copyright 2016 The Inter Project Authors
-- License: SIL Open Font License, Version 1.1 (OFL-1.1), reproduced below
+- Package: `@fontsource/atkinson-hyperlegible` 5.3.0 (pinned; files `files/atkinson-hyperlegible-latin-400-normal.woff2` and `files/atkinson-hyperlegible-latin-700-normal.woff2`, latin subset)
+- Upstream: Braille Institute of America (via Google Fonts, https://github.com/google/fonts)
+- Copyright 2020 Braille Institute of America, Inc.
+- License: SIL Open Font License, Version 1.1 (OFL-1.1, as declared in the installed package's `package.json` and `LICENSE`), reproduced below
 - Use: subset by Fontsource; served as distributed, self-hosted from our own origin by `next/font/local` in `src/app/layout.tsx`.
 
 ```
-Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter) Inter-Italic[opsz,wght].ttf: Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
+Copyright 2020 Braille Institute of America, Inc. AtkinsonHyperlegible-Italic.ttf: Copyright 2020 Braille Institute of America, Inc. AtkinsonHyperlegible-Bold.ttf: Copyright 2020 Braille Institute of America, Inc. AtkinsonHyperlegible-BoldItalic.ttf: Copyright 2020 Braille Institute of America, Inc.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

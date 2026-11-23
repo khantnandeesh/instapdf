@@ -108,9 +108,10 @@ export function Dialog({
       aria-describedby={description ? descId : undefined}
       className={cx(
         variant === "fullscreen"
-          ? "ip-rise-in m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto overscroll-contain border-0 bg-bg p-0 text-fg backdrop:bg-transparent"
+          ? "mp-modal-in m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto overscroll-contain border-0 bg-surface-raised p-0 text-ink backdrop:bg-transparent"
           : cx(
-              "m-auto max-h-[calc(100dvh-32px)] rounded-xl bg-surface-overlay p-0 text-fg shadow-hero backdrop:bg-scrim",
+              // Mint Paper Modal: white, radius-md, 24px padding, scales in from 0.96 over 0.3s.
+              "mp-modal-in m-auto max-h-[calc(100dvh-32px)] rounded-md bg-surface-raised p-0 text-ink shadow-menu backdrop:bg-scrim",
               wide ? "w-[min(880px,calc(100vw-32px))]" : "w-[min(440px,calc(100vw-32px))]",
             ),
         className,
@@ -125,22 +126,23 @@ export function Dialog({
         </>
       )}
       {open && variant === "default" && (
-        <div className="flex flex-col gap-4 p-6 max-sm:p-5">
+        <div className="flex flex-col gap-5 p-6">
           <div className="flex min-w-0 items-start gap-3">
-            {icon && <span className="shrink-0 text-fg-muted">{icon}</span>}
+            {icon && <span className="mt-0.5 shrink-0 text-muted">{icon}</span>}
             <div className="min-w-0 flex-1">
-              <h2 id={titleId} className="text-base leading-snug font-semibold break-words">
+              <h2 id={titleId} className="text-card-heading break-words">
                 {title}
               </h2>
               {description && (
-                <div id={descId} className="mt-1 text-sm text-fg-muted">
+                <div id={descId} className="mt-2 text-muted">
                   {description}
                 </div>
               )}
             </div>
           </div>
           {children}
-          {footer && <div className="flex flex-col-reverse gap-2 min-[400px]:flex-row min-[400px]:justify-end">{footer}</div>}
+          {/* Mint Paper: primary + ghost, left-aligned (primary first; DOM order, and so Tab order, unchanged). */}
+          {footer && <div className="flex flex-col-reverse gap-2.5 min-[400px]:flex-row-reverse min-[400px]:justify-end">{footer}</div>}
         </div>
       )}
     </dialog>

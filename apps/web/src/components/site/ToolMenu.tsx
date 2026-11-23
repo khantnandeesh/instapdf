@@ -14,7 +14,7 @@ import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { cx } from "../ui/cx";
 import { Dialog } from "../ui/Dialog";
-import { ChevronDownIcon, CloseIcon, GridIcon } from "../ui/icons";
+import { ChevronDownIcon, CloseIcon } from "../ui/icons";
 import { IconButton } from "../ui/IconButton";
 import { LiveRegion } from "../ui/LiveRegion";
 import { RuntimeMarker } from "../ui/RuntimeMarker";
@@ -26,6 +26,17 @@ const MENU_ID = "tool-menu";
 const RESULTS_ID = "tool-menu-results";
 
 type Mode = "panel" | "dialog";
+type Anchor = { top: number; left: number; width: number };
+
+/** Mint Paper Menu: opens directly under its trigger, left-aligned, kept inside the viewport. */
+function anchorFor(trigger: HTMLElement | null): Anchor {
+  const vw = document.documentElement.clientWidth;
+  const width = Math.min(1140, vw - 30);
+  const r = trigger?.getBoundingClientRect();
+  const top = Math.max(8, (r?.bottom ?? 0) + 4);
+  const left = Math.max(15, Math.min(r?.left ?? 15, vw - width - 15));
+  return { top, left, width };
+}
 
 const isTyping = (t: EventTarget | null) =>
   t instanceof Element && (!!t.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']") || (t as HTMLElement).isContentEditable);
@@ -42,6 +53,7 @@ export function ToolMenu() {
   const [desktop, setDesktop] = useState<boolean | null>(null);
   const [focusSearch, setFocusSearch] = useState(true);
   const [query, setQuery] = useState("");
+  const [anchor, setAnchor] = useState<Anchor>({ top: 60, left: 15, width: 1140 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -57,6 +69,7 @@ export function ToolMenu() {
 
   const openMenu = useCallback((focus: "search" | "title") => {
     setMode(window.matchMedia(DESKTOP).matches ? "panel" : "dialog");
+    setAnchor(anchorFor(triggerRef.current));
     setFocusSearch(focus === "search");
     setQuery("");
     setOpen(true);
@@ -82,6 +95,18 @@ export function ToolMenu() {
     if (!header) return;
     if (open && mode === "panel") header.setAttribute("data-menu-open", "");
     else header.removeAttribute("data-menu-open");
+  }, [open, mode]);
+
+  // Keep the panel under its trigger while the page scrolls or resizes.
+  useEffect(() => {
+    if (!open || mode !== "panel") return;
+    const update = () => setAnchor(anchorFor(triggerRef.current));
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
   }, [open, mode]);
 
   // Panel: focus the search on open (AC-28); Escape closes and returns focus (AC-26).
@@ -159,31 +184,29 @@ export function ToolMenu() {
         aria-haspopup={desktop === false ? "dialog" : undefined}
         onClick={toggle}
         data-testid="all-tools-button"
-        className={cx(
-          "ip-js-only inline-flex h-11 items-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors duration-(--ip-duration-fast) md:h-9",
-          "relative before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-['']",
-          open ? "bg-primary-soft text-primary-ink" : "text-fg hover:bg-hover",
-        )}
+        // Mint Paper Header: the "All" chip (surface-soft, 1px border, radius-md).
+        className="ip-js-only mp-navlink mp-navlink--chip relative cursor-pointer before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-['']"
       >
-        <GridIcon size={16} />
         {siteCopy.menuButton}
-        <ChevronDownIcon size={16} className={cx("transition-transform duration-(--ip-duration-fast)", open && "rotate-180")} />
+        <ChevronDownIcon size={16} className={cx("transition-transform duration-(--dur-base)", open && "rotate-180")} />
       </button>
       <noscript>
-        <Link href="/#tools" prefetch={false} className="inline-flex h-11 items-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap md:h-9">
+        <Link href="/#tools" prefetch={false} className="mp-navlink mp-navlink--chip">
           {siteCopy.menuButton}
         </Link>
       </noscript>
 
       {open && mode === "panel" && (
         <>
-          <div aria-hidden="true" className="ip-fade-in fixed inset-x-0 top-(--ip-header-h) bottom-0 bg-scrim" onClick={() => close(true)} data-testid="tool-menu-scrim" />
+          {/* Mint Paper Menu has no dimming: an invisible layer below the header catches the outside click. */}
+          <div aria-hidden="true" className="fixed inset-x-0 bottom-0" style={{ top: Math.max(0, anchor.top - 4) }} onClick={() => close(true)} data-testid="tool-menu-scrim" />
           <div
             id={MENU_ID}
-            className="ip-drop-in fixed inset-x-0 top-(--ip-header-h) max-h-(--ip-menu-max-h) overflow-y-auto overscroll-contain border-b border-border bg-surface-overlay shadow-lg"
+            className="mp-menu fixed overflow-y-auto overscroll-contain"
+            style={{ top: anchor.top, left: anchor.left, width: anchor.width, maxHeight: `calc(100dvh - ${anchor.top}px - 24px)` }}
             data-testid="tool-menu"
           >
-            <div className="relative mx-auto max-w-[1280px] px-6 pt-6 pb-8 lg:px-8">{content}</div>
+            <div className="relative px-5 pt-5 pb-4">{content}</div>
           </div>
         </>
       )}
@@ -254,7 +277,7 @@ function MenuContent({
       className="min-w-0 flex-1 md:max-w-[420px]"
     />
   );
-  const count = <span className="min-w-[9ch] text-sm text-fg-muted tabular-nums">{copy.ofTotal(matches.length, items.length)}</span>;
+  const count = <span className="min-w-[9ch] text-sm text-muted tabular-nums">{copy.ofTotal(matches.length, items.length)}</span>;
 
   return (
     <div
@@ -269,7 +292,7 @@ function MenuContent({
           {count}
         </div>
       ) : (
-        <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-chrome px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-2">
+        <div className="sticky top-0 z-10 -mx-4 bg-surface-raised px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-2 shadow-[0_1px_0_var(--border)]">
           <div className="flex items-center gap-2">
             {search}
             {closeButton}
@@ -279,7 +302,7 @@ function MenuContent({
       )}
 
       {!searching && recent.length > 0 && (
-        <div className="mt-4 border-b border-border pb-4">
+        <div className="mt-4 pb-2">
           <RecentStrip
             items={recent}
             idPrefix="menu"
@@ -296,7 +319,7 @@ function MenuContent({
       <div ref={resultsRef} id={RESULTS_ID}>
         {groups.length === 0 ? (
           <div className="mt-6 flex flex-wrap items-center gap-3" data-testid="tool-menu-no-results">
-            <p className="text-sm font-semibold [overflow-wrap:anywhere]">{copy.none(query.trim())}</p>
+            <p className="font-bold [overflow-wrap:anywhere]">{copy.none(query.trim())}</p>
             <Button
               variant="ghost"
               size="sm"
@@ -309,12 +332,13 @@ function MenuContent({
             </Button>
           </div>
         ) : (
-          <nav aria-label={copy.title} className="mt-6 gap-8 md:columns-3 xl:columns-4">
+          <nav aria-label={copy.title} className={cx("mt-4 gap-2 md:columns-3 xl:columns-4", mode === "panel" ? "-mx-5" : "-mx-4")}>
             {groups.map((g) => (
-              <section key={g.id} aria-labelledby={`menu-cat-${g.id}`} className="mb-6 break-inside-avoid" data-testid="tool-menu-group">
-                <h2 id={`menu-cat-${g.id}`} className="mb-1 flex items-baseline gap-2 px-2 text-sm font-semibold text-fg-muted">
+              <section key={g.id} aria-labelledby={`menu-cat-${g.id}`} className={cx("mb-4 break-inside-avoid", `ip-cat-${g.id}`)} data-testid="tool-menu-group">
+                {/* Category eyebrow: UPPERCASE in the category's text shade. */}
+                <h2 id={`menu-cat-${g.id}`} className="mp-eyebrow flex items-baseline gap-2 px-[15px] pt-1.5 pb-1">
                   {g.label}
-                  <span className="text-xs font-normal tabular-nums">{g.items.length}</span>
+                  <span className="text-sm text-muted normal-case tabular-nums">{g.items.length}</span>
                 </h2>
                 <ul>
                   {g.items.map((item) => (
@@ -328,7 +352,7 @@ function MenuContent({
           </nav>
         )}
       </div>
-      {mode === "panel" && <div className="absolute top-6 end-6 lg:end-8">{closeButton}</div>}
+      {mode === "panel" && <div className="absolute top-4 end-4">{closeButton}</div>}
     </div>
   );
 }
@@ -337,10 +361,11 @@ function MenuEntry({ item }: { item: ToolIndexItem }) {
   const badge = badgeText(item);
   // Name from content, in visual order: name, badge, runtime marker (AC-56, AC-59).
   return (
-    <Link href={`/${item.slug}`} prefetch={false} className="flex min-h-11 flex-col justify-center gap-0.5 rounded-sm px-2 py-1.5 transition-colors duration-(--ip-duration-fast) hover:bg-hover">
+    // Mint Paper Menu row: 3x15 padding, 16px leading icon (category hue), #f5f5f5 on hover.
+    <Link href={`/${item.slug}`} prefetch={false} className="mp-menu-row gap-0.5 max-md:min-h-11">
       <span className="flex items-center gap-2">
-        <span className={cx("shrink-0", usable(item) ? "text-primary-ink" : "text-fg-muted")}>{item.icon}</span>
-        <span className="min-w-0 flex-1 text-sm font-medium [overflow-wrap:anywhere] text-fg">{item.name}</span>
+        <span className={cx("shrink-0 [&_svg]:size-4", usable(item) ? "text-(--c)" : "text-muted")}>{item.icon}</span>
+        <span className="min-w-0 flex-1 [overflow-wrap:anywhere] text-ink">{item.name}</span>
         {badge && (
           <>
             <NameSep />
@@ -351,7 +376,7 @@ function MenuEntry({ item }: { item: ToolIndexItem }) {
       {item.runtime === "client" && (
         <>
           <NameSep />
-          <RuntimeMarker className="ps-7" />
+          <RuntimeMarker className="ps-6" />
         </>
       )}
     </Link>

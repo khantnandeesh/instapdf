@@ -113,8 +113,10 @@ test.describe("AC-49 at 375 px", () => {
   });
 });
 
+// Light only until Mint Paper defines a dark mode: "dark" runs with the OS in dark mode, which must
+// keep the light palette and stay clean.
 for (const scheme of ["light", "dark"] as const) {
-  test.describe(`${scheme} theme`, () => {
+  test.describe(`${scheme === "light" ? "light" : "OS dark preference (light palette)"}`, () => {
     test.use({ colorScheme: scheme });
 
     test(`AC-50: axe finds no critical or serious violations in empty, password, ready and result states (${scheme})`, async ({ page }) => {

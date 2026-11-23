@@ -75,7 +75,7 @@ export function OwnerPasswordDialog({
           onSubmit(value);
         }}
       >
-        <label htmlFor={inputId} className="text-sm font-medium">
+        <label htmlFor={inputId} className="sr-only">
           Owner password
         </label>
         <div className="relative">
@@ -85,18 +85,19 @@ export function OwnerPasswordDialog({
             type={visible ? "text" : "password"}
             value={value}
             onChange={(e) => setValue(e.target.value)}
+            placeholder="Owner password"
             autoComplete="off"
             spellCheck={false}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? errorId : undefined}
-            className="ip-field h-11 w-full rounded-md ps-3 pe-12 text-[16px] sm:text-base"
+            className="ip-field h-10 w-full rounded-lg ps-[13px] pe-12"
           />
-          <IconButton label="Show password" pressed={visible} size="sm" tooltip={false} className="absolute top-1.5 right-1.5" icon={<EyeIcon size={18} />} onClick={() => setVisible((v) => !v)} />
+          <IconButton label="Show password" pressed={visible} size="sm" tooltip={false} className="absolute top-[5px] right-[5px]" icon={<EyeIcon size={18} />} onClick={() => setVisible((v) => !v)} />
         </div>
         <p id={errorId} role="alert" className="flex h-5 items-center gap-1.5 text-sm">
           {error && (
             <>
-              <AlertIcon size={16} className="text-danger" />
+              <AlertIcon size={16} className="text-danger-strong" />
               {error}
             </>
           )}

@@ -1,10 +1,14 @@
 "use client";
-import { useRef, type KeyboardEvent } from "react";
+import { useRef, type KeyboardEvent, type ReactNode } from "react";
 import { cx } from "./cx";
 
-export type SegmentOption<T extends string> = { value: T; label: string; shortLabel?: string };
+export type SegmentOption<T extends string> = { value: T; label: string; shortLabel?: string; icon?: ReactNode };
 
-/** Radio group with roving tabindex; arrow keys move and select. */
+/**
+ * Radio group with roving tabindex; arrow keys move and select. Two Mint Paper looks:
+ * - "toolbar": joined editing-tool buttons in the soft blue glow (EditorToolbar); selected = active.
+ * - "tiles": ChoiceTiles (line icon over a 15px label); selected = mint edge on choice-bg.
+ */
 export function SegmentedControl<T extends string>({
   label,
   value,
@@ -13,6 +17,7 @@ export function SegmentedControl<T extends string>({
   disabled,
   className,
   fullWidth,
+  look = "toolbar",
 }: {
   label: string;
   value: T;
@@ -21,6 +26,7 @@ export function SegmentedControl<T extends string>({
   disabled?: boolean;
   className?: string;
   fullWidth?: boolean;
+  look?: "toolbar" | "tiles";
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const current = Math.max(0, options.findIndex((o) => o.value === value));
@@ -37,13 +43,14 @@ export function SegmentedControl<T extends string>({
     refs.current[next]?.focus();
   }
 
+  const tiles = look === "tiles";
   return (
     <div
       role="radiogroup"
       aria-label={label}
       aria-disabled={disabled || undefined}
       onKeyDown={onKeyDown}
-      className={cx("inline-flex h-11 rounded-md bg-surface-sunken p-0.5 lg:h-10", fullWidth && "flex w-full", className)}
+      className={cx(tiles ? "grid grid-flow-col auto-cols-fr gap-2.5" : "mp-toolbar", fullWidth && (tiles ? "w-full" : "flex w-full"), className)}
     >
       {options.map((o, i) => {
         const checked = i === current;
@@ -60,13 +67,13 @@ export function SegmentedControl<T extends string>({
             disabled={disabled}
             onClick={() => onChange(o.value)}
             className={cx(
-              "min-w-11 flex-1 rounded-sm px-3 text-sm whitespace-nowrap transition-[background-color,color,box-shadow] duration-(--ip-duration-fast)",
-              checked ? "ip-seg-checked bg-surface-overlay font-semibold text-fg shadow-control" : // text-strong: `text` on the ink-2 track would dip under 4.5:1.
-                "font-medium text-fg hover:bg-hover",
-              "disabled:text-fg-disabled",
-              checked && "disabled:bg-surface-raised disabled:shadow-none",
+              tiles ? "mp-choice min-w-0 px-2 py-4 max-lg:flex-row max-lg:gap-1.5 max-lg:py-2" : "mp-btn mp-btn--tool flex-1",
+              checked && "ip-seg-checked",
             )}
+            // The toolbar look shows the pressed state through aria-checked styling below.
+            data-active={!tiles && checked ? "" : undefined}
           >
+            {tiles && o.icon}
             {o.shortLabel ? (
               <>
                 <span className="lg:hidden">{o.shortLabel}</span>

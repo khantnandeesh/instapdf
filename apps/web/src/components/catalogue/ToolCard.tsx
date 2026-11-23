@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { splitAt, type Range } from "@/lib/catalogue/search";
 import { Badge } from "../ui/Badge";
 import { cx } from "../ui/cx";
-import { ArrowRightIcon } from "../ui/icons";
 import { RuntimeMarker } from "../ui/RuntimeMarker";
 import { catalogueCopy as copy } from "./copy";
 import { usable, type ToolIndexItem } from "./types";
@@ -42,6 +41,7 @@ export function NameSep() {
 /** Badge and runtime marker, each preceded by a NameSep. */
 function Meta({ item, className }: { item: ToolIndexItem; className?: string }) {
   const badge = badgeText(item);
+  if (!badge && item.runtime !== "client") return null;
   return (
     <span className={cx("flex min-h-5 flex-wrap items-center gap-x-2 gap-y-1", className)}>
       {badge && (
@@ -60,80 +60,61 @@ function Meta({ item, className }: { item: ToolIndexItem; className?: string }) 
   );
 }
 
-function IconTile({ item, size = 40 }: { item: ToolIndexItem; size?: number }) {
-  return (
-    <span
-      className={cx("grid shrink-0 place-items-center rounded-md", usable(item) ? "bg-primary-soft text-primary-ink" : "bg-surface-sunken text-fg-muted")}
-      style={{ width: size, height: size }}
-    >
-      {item.icon}
-    </span>
-  );
+/** The 32px icon halo: the category hue at 20% behind a thin icon in the full hue (Mint Paper ToolCard). */
+function Halo({ item }: { item: ToolIndexItem }) {
+  return <span className="mp-halo">{item.icon}</span>;
 }
 
-const cardBase = (item: ToolIndexItem) =>
-  cx(
-    "ip-edge group relative flex h-full rounded-xl transition-[transform,box-shadow,background-color] duration-(--ip-duration-fast) ease-out active:scale-[0.99]",
-    // Ready: a surface card on canvas. Planned: the same hairline ring with no fill, so it reads quieter.
-    usable(item)
-      ? "bg-surface-raised shadow-sm [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-md"
-      : "bg-transparent shadow-sm hover:bg-hover",
-  );
+/** Leaf-cornered Mint Paper tool card. Colour means category: `ip-cat-*` sets the hue. */
+const cardClass = (item: ToolIndexItem, extra?: string) => cx("mp-card", `ip-cat-${item.category}`, extra);
 
 /** Full catalogue card: the whole card is one link (AC-7). */
 export function ToolCard({ item, idPrefix = "cat", nameRange, summaryRange }: { item: ToolIndexItem; idPrefix?: string; nameRange?: Range; summaryRange?: Range }) {
   const base = `${idPrefix}-${item.slug}`;
   // The name comes from the content, in visual order: name, summary, badge, marker (AC-56).
   return (
-    <Link href={`/${item.slug}`} prefetch={false} className={cx(cardBase(item), "gap-3 p-4")}>
-      <IconTile item={item} />
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span id={`${base}-name`} className="pe-5 font-semibold [overflow-wrap:anywhere] text-fg">
+    <Link href={`/${item.slug}`} prefetch={false} className={cardClass(item)} data-planned={usable(item) ? undefined : ""}>
+      <span className="mp-card__top">
+        <Halo item={item} />
+        <span id={`${base}-name`} className="min-w-0 [overflow-wrap:anywhere]">
           <Highlighted text={item.name} range={nameRange} />
         </span>
-        <NameSep />
-        <span id={`${base}-summary`} className="text-sm text-fg-muted">
-          <Highlighted text={item.summary} range={summaryRange} />
-        </span>
-        <Meta item={item} />
       </span>
-      {usable(item) && (
-        <ArrowRightIcon
-          size={16}
-          className="absolute top-4 end-4 text-primary-ink opacity-0 transition-[opacity,transform] duration-(--ip-duration-fast) group-hover:translate-x-1 group-hover:opacity-100"
-        />
-      )}
+      <NameSep />
+      <span id={`${base}-summary`} className="mp-card__desc">
+        <Highlighted text={item.summary} range={summaryRange} />
+      </span>
+      <Meta item={item} className="mb-1 ms-1.5" />
     </Link>
   );
 }
 
-/** Compact Popular-row tile. The summary shows at >= 1024 px and is always part of the link's name. */
+/** Popular-row card. The summary shows at >= 1024 px and is always part of the link's name. */
 export function ToolTile({ item, idPrefix = "pop" }: { item: ToolIndexItem; idPrefix?: string }) {
   const base = `${idPrefix}-${item.slug}`;
   // Name from content, in visual order: name, summary (visible at >= 1024 px), badge, marker (AC-56).
   return (
-    <Link href={`/${item.slug}`} prefetch={false} className={cx(cardBase(item), "min-h-24 flex-col gap-2 p-4")}>
-      <IconTile item={item} />
-      <span id={`${base}-name`} className="font-semibold [overflow-wrap:anywhere] text-fg">
-        {item.name}
+    <Link href={`/${item.slug}`} prefetch={false} className={cardClass(item)} data-planned={usable(item) ? undefined : ""}>
+      <span className="mp-card__top">
+        <Halo item={item} />
+        <span id={`${base}-name`} className="min-w-0 [overflow-wrap:anywhere]">
+          {item.name}
+        </span>
       </span>
       <NameSep />
-      <span id={`${base}-summary`} className="sr-only text-sm text-fg-muted lg:not-sr-only lg:line-clamp-2">
+      <span id={`${base}-summary`} className="sr-only lg:not-sr-only lg:mt-1.5 lg:mb-2 lg:ms-1.5 lg:block lg:text-sm lg:leading-4 lg:text-muted">
         {item.summary}
       </span>
-      <Meta item={item} className="mt-auto" />
+      <Meta item={item} className="mt-1 mb-1 ms-1.5" />
     </Link>
   );
 }
 
-/** Recent-tools chip (usable tools only, so no badges). */
+/** Recent-tools chip (usable tools only, so no badges): the Mint Paper nav chip, icon in its category hue. */
 export function ToolChip({ item, children }: { item: ToolIndexItem; children?: ReactNode }) {
   return (
-    <Link
-      href={`/${item.slug}`}
-      className="ip-tint ip-edge inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-surface-raised ps-3 pe-4 text-sm font-medium whitespace-nowrap text-fg shadow-control hover:shadow-control-hover"
-    >
-      <span className="text-primary-ink">{item.icon}</span>
+    <Link href={`/${item.slug}`} className={cx("mp-navlink mp-navlink--chip gap-2", `ip-cat-${item.category}`)}>
+      <span className="text-(--c) [&_svg]:size-4">{item.icon}</span>
       {item.name}
       {children}
     </Link>

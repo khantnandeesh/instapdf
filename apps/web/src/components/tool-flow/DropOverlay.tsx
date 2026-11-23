@@ -8,13 +8,13 @@ export function DropOverlay({ active, mode }: { active: boolean; mode: "add" | "
       data-testid="drop-overlay"
       data-active={active || undefined}
       className={cx(
-        "pointer-events-none fixed inset-0 z-40 bg-drop-overlay transition-opacity duration-(--ip-duration-fast)",
+        "pointer-events-none fixed inset-0 z-40 bg-drop-overlay transition-opacity duration-(--dur-base)",
         active ? "visible opacity-100" : "invisible opacity-0",
       )}
     >
-      <div className="absolute inset-3 grid place-items-center rounded-xl border-2 border-dashed border-accent">
-        <div className={cx("flex flex-col items-center gap-3 text-lg font-medium text-fg transition-transform duration-(--ip-duration-base) ease-out", active ? "-translate-y-1" : "")}>
-          <FilesIcon size={40} className="text-primary-ink" />
+      <div className="absolute inset-3 grid place-items-center rounded-tray border-2 border-dashed border-brand">
+        <div className="flex flex-col items-center gap-3 text-card-heading text-ink">
+          <FilesIcon size={40} className="text-brand-strong" />
           {mode === "add" ? "Drop to add files" : "Drop to replace the file"}
         </div>
       </div>

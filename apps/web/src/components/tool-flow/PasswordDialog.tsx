@@ -94,7 +94,8 @@ export function PasswordDialog({
           if (!busy) onSubmit(value, showApplyToAll && applyAll);
         }}
       >
-        <label htmlFor={inputId} className="text-sm font-medium">
+        {/* Mint Paper AuthForm field: placeholder in view, the label visually hidden (still the accessible name). */}
+        <label htmlFor={inputId} className="sr-only">
           Password
         </label>
         <div key={attempt} className={error && attempt > 0 ? "ip-shake relative" : "relative"}>
@@ -105,19 +106,20 @@ export function PasswordDialog({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             readOnly={busy}
+            placeholder="Password"
             autoComplete="off"
             autoCapitalize="off"
             spellCheck={false}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? errorId : undefined}
-            className="ip-field h-11 w-full rounded-md ps-3 pe-12 text-[16px] text-fg sm:text-base"
+            className="ip-field h-10 w-full rounded-lg ps-[13px] pe-12"
           />
           <IconButton
             label="Show password"
             pressed={visible}
             size="sm"
             tooltip={false}
-            className="absolute top-1.5 right-1.5"
+            className="absolute top-[5px] right-[5px]"
             icon={<EyeIcon size={18} />}
             onClick={() => {
               const el = input.current;
@@ -129,17 +131,17 @@ export function PasswordDialog({
             }}
           />
         </div>
-        <p id={errorId} role="alert" className="flex min-h-5 items-start gap-1.5 text-sm text-danger" data-testid="password-error">
+        <p id={errorId} role="alert" className="flex min-h-5 items-start gap-1.5 text-sm text-danger-strong" data-testid="password-error">
           {error && (
             <>
               <AlertIcon size={16} className="mt-0.5 shrink-0" />
-              <span className="text-fg">{error}</span>
+              <span className="text-ink">{error}</span>
             </>
           )}
         </p>
         {showApplyToAll && (
           <label className="mt-1 flex min-h-11 cursor-pointer items-start gap-2 text-sm">
-            <input type="checkbox" checked={applyAll} onChange={(e) => setApplyAll(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-(--ip-primary)" />
+            <input type="checkbox" checked={applyAll} onChange={(e) => setApplyAll(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-(--brand-strong)" />
             {copy.pwApplyAll}
           </label>
         )}

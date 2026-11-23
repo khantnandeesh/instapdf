@@ -10,19 +10,21 @@ import { SkipLink } from "@/components/site/SkipLink";
 import "./globals.css";
 
 /**
- * Inter (variable, latin subset), self-hosted from @fontsource-variable/inter (SIL OFL 1.1, see
- * THIRD-PARTY-NOTICES.md). One file covers every weight, so only it is preloaded; no runtime
- * request leaves our origin. Falls back to the system stack, metric-adjusted so the swap does not shift.
+ * Atkinson Hyperlegible (Mint Paper's one family), latin subset, weights 400 and 700, self-hosted
+ * from @fontsource/atkinson-hyperlegible (SIL OFL 1.1, see THIRD-PARTY-NOTICES.md). No request
+ * leaves our origin. Falls back to the system stack, metric-adjusted so the swap does not shift.
+ * The package has no 500; Mint Paper's 500 subtitle renders at 400.
  */
-const inter = localFont({
-  src: "../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2",
-  variable: "--font-inter",
-  weight: "100 900",
-  style: "normal",
+const atkinson = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "../../node_modules/@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-700-normal.woff2", weight: "700", style: "normal" },
+  ],
+  variable: "--font-atkinson",
   display: "swap",
   preload: true,
   adjustFontFallback: "Arial",
-  fallback: ["system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+  fallback: ["system-ui", "sans-serif"],
 });
 
 export const metadata: Metadata = {
@@ -37,7 +39,7 @@ export default function RootLayout({
 }>) {
   return (
     // The pre-paint script may add data-recent to <html> before hydration.
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang="en" className={atkinson.variable} suppressHydrationWarning>
       <head>
         <RecentPrepaintScript />
       </head>

@@ -12,10 +12,21 @@ import { flowTool } from "@/tools/registry";
 
 const tool = flowTool("rotate-pdf");
 
-const scopes: { value: RotateScope; label: string; shortLabel: string }[] = [
-  { value: "all", label: "All pages", shortLabel: "All" },
-  { value: "odd", label: "Odd pages", shortLabel: "Odd" },
-  { value: "even", label: "Even pages", shortLabel: "Even" },
+/** ChoiceTile line icon: three small pages, the ones in scope filled. */
+function ScopeIcon({ filled }: { filled: [boolean, boolean, boolean] }) {
+  return (
+    <svg width="27" height="27" viewBox="0 0 27 27" aria-hidden="true" className="max-lg:hidden" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+      {[2, 10, 18].map((x, i) => (
+        <rect key={x} x={x + 0.75} y="6.75" width="6.5" height="13.5" rx="1" fill={filled[i] ? "currentColor" : "none"} fillOpacity={filled[i] ? 0.35 : 0} />
+      ))}
+    </svg>
+  );
+}
+
+const scopes: { value: RotateScope; label: string; shortLabel: string; icon: React.ReactNode }[] = [
+  { value: "all", label: "All pages", shortLabel: "All", icon: <ScopeIcon filled={[true, true, true]} /> },
+  { value: "odd", label: "Odd pages", shortLabel: "Odd", icon: <ScopeIcon filled={[true, false, true]} /> },
+  { value: "even", label: "Even pages", shortLabel: "Even", icon: <ScopeIcon filled={[false, true, false]} /> },
 ];
 
 /** Pending rotation per file id: unbounded display degrees per page. */
@@ -90,8 +101,8 @@ export function RotateTool() {
       decoratePage={(file, index) => ({ pendingDelta: deltas[file.id]?.[index] ?? 0, inScope: isInScope(scope, index) })}
       renderPageActions={(file, index, tabIndex) => (
         <>
-          <IconButton label={`Rotate page ${index + 1} left`} size="sm" tabIndex={tabIndex} icon={<RotateLeftIcon size={18} />} onClick={() => rotateOne(file, index, -90)} />
-          <IconButton label={`Rotate page ${index + 1} right`} size="sm" tabIndex={tabIndex} icon={<RotateRightIcon size={18} />} onClick={() => rotateOne(file, index, 90)} />
+          <IconButton label={`Rotate page ${index + 1} left`} variant="soft" tabIndex={tabIndex} icon={<RotateLeftIcon size={16} />} onClick={() => rotateOne(file, index, -90)} />
+          <IconButton label={`Rotate page ${index + 1} right`} variant="soft" tabIndex={tabIndex} icon={<RotateRightIcon size={16} />} onClick={() => rotateOne(file, index, 90)} />
         </>
       )}
       onPageKey={(file, index, key) => {
@@ -102,38 +113,46 @@ export function RotateTool() {
         return false;
       }}
       renderOptions={(ctx) => (
-        <div className="flex items-center gap-2 lg:flex-col lg:items-stretch lg:gap-4">
-          <div className="flex flex-col gap-1.5">
-            <span className="hidden text-sm font-medium lg:block" aria-hidden="true">
-              Apply to
+        // Mint Paper working mode: numbered steps, ChoiceTiles for the scope, the rotate actions as
+        // editing tools (blue), Reset as a soft button; the mint primary sits below in the dock.
+        <div className="flex items-center gap-3 lg:flex-col lg:items-stretch lg:gap-6">
+          <div className="flex min-w-0 flex-col gap-2.5 max-lg:flex-1">
+            <span className="mp-step hidden lg:block" aria-hidden="true">
+              1. Apply to
             </span>
-            <SegmentedControl label="Apply to" value={scope} options={scopes} onChange={setScope} fullWidth />
+            <SegmentedControl look="tiles" label="Apply to" value={scope} options={scopes} onChange={setScope} fullWidth />
           </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" className="max-lg:w-11 max-lg:px-0 lg:flex-1" iconStart={<RotateLeftIcon />} aria-label="Rotate left" title="Rotate left" onClick={() => rotateAll(ctx, -90)}>
-              <span className="hidden lg:inline">Rotate left</span>
-            </Button>
-            <Button variant="secondary" className="max-lg:w-11 max-lg:px-0 lg:flex-1" iconStart={<RotateRightIcon />} aria-label="Rotate right" title="Rotate right" onClick={() => rotateAll(ctx, 90)}>
-              <span className="hidden lg:inline">Rotate right</span>
-            </Button>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="max-sm:h-11 max-sm:w-11 max-sm:px-0 lg:self-start"
-            iconStart={<ResetIcon size={18} />}
-            aria-label="Reset rotation"
-            title="Reset rotation"
-            disabled={!pending}
-            onClick={() => {
-              setDeltas({});
-              ctx.announce("Rotation reset");
-            }}
-          >
-            <span className="max-sm:hidden" aria-hidden="true">
-              Reset
+          <div className="flex flex-col gap-2.5">
+            <span className="mp-step hidden lg:block" aria-hidden="true">
+              2. Rotate
             </span>
-          </Button>
+            <div className="flex items-center gap-3 lg:flex-col lg:items-start">
+              <div className="mp-toolbar lg:flex lg:w-full">
+                <Button variant="tool" className="max-lg:size-11 max-lg:px-0 lg:flex-1" iconStart={<RotateLeftIcon size={18} />} aria-label="Rotate left" title="Rotate left" onClick={() => rotateAll(ctx, -90)}>
+                  <span className="hidden lg:inline">Rotate left</span>
+                </Button>
+                <Button variant="tool" className="max-lg:size-11 max-lg:px-0 lg:flex-1" iconStart={<RotateRightIcon size={18} />} aria-label="Rotate right" title="Rotate right" onClick={() => rotateAll(ctx, 90)}>
+                  <span className="hidden lg:inline">Rotate right</span>
+                </Button>
+              </div>
+              <Button
+                variant="soft"
+                className="max-sm:size-11 max-sm:px-0"
+                iconStart={<ResetIcon size={16} />}
+                aria-label="Reset rotation"
+                title="Reset rotation"
+                disabled={!pending}
+                onClick={() => {
+                  setDeltas({});
+                  ctx.announce("Rotation reset");
+                }}
+              >
+                <span className="max-sm:hidden" aria-hidden="true">
+                  Reset
+                </span>
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     />

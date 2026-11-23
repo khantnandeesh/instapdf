@@ -82,15 +82,15 @@ export function PageGrid({
         Use arrow keys to move between pages.{onPageKey ? " Press [ or ] to rotate the page." : ""}
       </span>
       {files.map((file) => (
-        <section key={file.id} aria-label={showHeaders ? file.name : undefined} className="ip-settle">
+        <section key={file.id} aria-label={showHeaders ? file.name : undefined}>
           {(showHeaders || file.status !== "ready") && (
             <div className="mb-2 flex h-10 items-center gap-2">
-              {file.status === "loading" && <Spinner size={16} label={`Reading ${file.name}`} />}
-              {file.status === "locked" && <LockIcon size={16} className="text-fg-muted" />}
-              <span className="min-w-0 truncate text-sm font-medium" title={file.name}>
+              {file.status === "loading" && <Spinner size={16} label={`Reading ${file.name}`} className="text-brand-strong" />}
+              {file.status === "locked" && <LockIcon size={16} className="text-muted" />}
+              <span className="min-w-0 truncate font-bold text-ink" title={file.name}>
                 {file.status === "loading" ? copy.reading(file.name) : file.name}
               </span>
-              <span className="shrink-0 text-sm text-fg-muted tabular-nums">
+              <span className="shrink-0 text-sm text-muted tabular-nums">
                 {file.status === "ready" ? `· ${copy.pages(file.pageCount)}` : file.status === "locked" ? "· Password needed" : ""}
               </span>
               {showHeaders && (
@@ -109,8 +109,8 @@ export function PageGrid({
               role="list"
               aria-label={showHeaders ? `Pages of ${file.name}` : "Pages"}
               className={cx(
-                "grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,var(--ip-thumb-size))] sm:gap-4",
-                dimmed && "opacity-60 transition-opacity duration-(--ip-duration-base)",
+                "grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,calc(var(--ip-thumb-size)+40px))] sm:gap-5",
+                dimmed && "opacity-60 transition-opacity duration-(--dur-base)",
               )}
             >
               {file.pages.map((size, i) => {
@@ -132,9 +132,9 @@ export function PageGrid({
                         {renderActions?.(file, i, isActive ? 0 : -1)}
                         <IconButton
                           label={`Enlarge page ${i + 1}`}
-                          size="sm"
+                          variant="soft"
                           tabIndex={isActive ? 0 : -1}
-                          icon={<EnlargeIcon size={18} />}
+                          icon={<EnlargeIcon size={16} />}
                           onClick={() => onOpen(file, i)}
                         />
                       </>

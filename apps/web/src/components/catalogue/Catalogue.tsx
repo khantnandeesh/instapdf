@@ -114,99 +114,102 @@ export function Catalogue() {
   }, [updateQuery]);
 
   return (
-    <section aria-labelledby="tools-heading" className="mt-12 sm:mt-16" data-testid="catalogue">
-      <div id="tools" ref={headingRef} className="flex scroll-mt-[calc(var(--ip-header-h)+16px)] flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 id="tools-heading" className="text-2xl font-semibold sm:text-3xl">
-          {copy.title}
-        </h2>
-        <p className="text-sm text-fg-muted tabular-nums">{copy.summary(items.length, readyCount)}</p>
-      </div>
+    // Mint Paper Home: the sand wash holds the whole catalogue, grouped under coloured eyebrows.
+    <section aria-labelledby="tools-heading" className="mp-sand pt-(--space-8) pb-(--space-8)" data-testid="catalogue">
+      <div className="mx-auto max-w-[1170px] px-[15px]">
+        <div id="tools" ref={headingRef} className="scroll-mt-[calc(var(--ip-header-h)+16px)] text-center">
+          <h2 id="tools-heading" className="text-section-title text-ink">
+            {copy.title}
+          </h2>
+          <p className="mt-2.5 text-subtitle text-muted tabular-nums">{copy.summary(items.length, readyCount)}</p>
+        </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <SearchField
-          ref={searchRef}
-          id={CATALOGUE_SEARCH_ID}
-          label={copy.searchLabel}
-          hideLabel
-          size="lg"
-          value={query}
-          onChange={updateQuery}
-          onEscape={() => updateQuery("")}
-          placeholder={copy.searchPlaceholder}
-          shortcutHint
-          className="w-full md:max-w-[480px] md:flex-1"
-        />
-        <div className="flex flex-1 flex-wrap items-center justify-between gap-x-4 md:flex-none md:contents">
-          <Switch id="ready-only" label={copy.readyOnly} checked={readyOnly} onChange={(v) => {
-            userChanged.current = true;
-            setReadyOnly(v);
-          }} />
-          <span className="min-w-[8ch] text-end text-sm text-fg-muted tabular-nums md:ms-auto" data-testid="catalogue-count">
-            {copy.shown(matches.length)}
-          </span>
+        <div className="mx-auto mt-6 flex max-w-[957px] flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          <SearchField
+            ref={searchRef}
+            id={CATALOGUE_SEARCH_ID}
+            label={copy.searchLabel}
+            hideLabel
+            size="lg"
+            value={query}
+            onChange={updateQuery}
+            onEscape={() => updateQuery("")}
+            placeholder={copy.searchPlaceholder}
+            shortcutHint
+            className="w-full md:max-w-[480px] md:flex-1"
+          />
+          <div className="flex flex-1 flex-wrap items-center justify-between gap-x-5 md:flex-none md:contents">
+            <Switch id="ready-only" label={copy.readyOnly} checked={readyOnly} onChange={(v) => {
+              userChanged.current = true;
+              setReadyOnly(v);
+            }} />
+            <span className="min-w-[8ch] text-end text-sm text-muted tabular-nums" data-testid="catalogue-count">
+              {copy.shown(matches.length)}
+            </span>
+          </div>
+        </div>
+        <LiveRegion message={live} />
+
+        {!searching && (
+          // Inline padding offset by negative margins keeps edge chips' focus outlines inside the scroller.
+          <nav aria-label={copy.jumpLabel} className="ip-scroll-x -mx-1.5 mt-4 px-1.5">
+            <ul className="flex gap-2 py-1.5 max-lg:flex-nowrap lg:flex-wrap lg:justify-center">
+              {groups.map((g) => (
+                <li key={g.id} className="shrink-0">
+                  <a href={`#cat-${g.id}`} className="mp-navlink mp-navlink--chip">
+                    {g.label}
+                    <span className="ms-1 text-muted tabular-nums">{g.matches.length}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
+
+        <div className="mx-auto lg:w-[957px]">
+          {!searching && (
+            <div className="ip-recent-slot mt-8">
+              <RecentStrip items={readyOnly ? recent.filter(usable) : recent} onClear={onClearRecent} idPrefix="home" />
+            </div>
+          )}
+
+          {!searching && popular.length > 0 && (
+            <section aria-labelledby="popular-heading" className="ip-cat-popular mt-8" data-testid="popular">
+              <h3 id="popular-heading" className="mp-eyebrow">
+                {copy.popularTitle}
+              </h3>
+              <ul className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-[repeat(3,300px)] lg:gap-x-[28.5px]">
+                {popular.map((item) => (
+                  <li key={item.slug} className={`ip-cat-${item.category}`}>
+                    <ToolTile item={item} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {groups.length === 0 ? (
+            <NoResults query={query.trim()} onClear={clearSearch} />
+          ) : (
+            groups.map((g) => <CategorySection key={g.id} id={g.id} label={g.label} matches={g.matches} searching={searching} />)
+          )}
         </div>
       </div>
-      <LiveRegion message={live} />
-
-      {!searching && (
-        // Inline padding offset by negative margins keeps edge chips' focus outlines inside the scroller.
-        <nav aria-label={copy.jumpLabel} className="ip-scroll-x -mx-1.5 mt-3 px-1.5">
-          <ul className="flex gap-2 py-1 max-lg:flex-nowrap lg:flex-wrap">
-            {groups.map((g) => (
-              <li key={g.id} className="shrink-0">
-                <a
-                  href={`#cat-${g.id}`}
-                  className="ip-tint ip-edge inline-flex h-9 items-center gap-1.5 rounded-full bg-surface-raised px-3.5 text-sm font-medium whitespace-nowrap shadow-control hover:shadow-control-hover"
-                >
-                  {g.label}
-                  <span className="text-fg-muted tabular-nums">{g.matches.length}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      )}
-
-      {!searching && (
-        <div className="ip-recent-slot mt-8">
-          <RecentStrip items={readyOnly ? recent.filter(usable) : recent} onClear={onClearRecent} idPrefix="home" />
-        </div>
-      )}
-
-      {!searching && popular.length > 0 && (
-        <section aria-labelledby="popular-heading" className="mt-8" data-testid="popular">
-          <h3 id="popular-heading" className="text-lg font-semibold">
-            {copy.popularTitle}
-          </h3>
-          <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5 lg:gap-4">
-            {popular.map((item) => (
-              <li key={item.slug}>
-                <ToolTile item={item} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {groups.length === 0 ? (
-        <NoResults query={query.trim()} onClear={clearSearch} />
-      ) : (
-        groups.map((g) => <CategorySection key={g.id} id={g.id} label={g.label} matches={g.matches} searching={searching} />)
-      )}
     </section>
   );
 }
 
 function CategorySection({ id, label, matches, searching }: { id: string; label: string; matches: ToolMatch<ToolIndexItem>[]; searching: boolean }) {
   return (
-    <section id={`cat-${id}`} aria-labelledby={`cat-${id}-heading`} className="mt-8 scroll-mt-[calc(var(--ip-header-h)+16px)] sm:mt-10" data-testid="category">
+    <section id={`cat-${id}`} aria-labelledby={`cat-${id}-heading`} className={`ip-cat-${id} mt-8 scroll-mt-[calc(var(--ip-header-h)+16px)]`} data-testid="category">
+      {/* Mint Paper eyebrow: UPPERCASE in the category's colour (text shade, see tokens.css). */}
       <div className="flex items-baseline gap-3">
-        <h3 id={`cat-${id}-heading`} className="text-lg font-semibold sm:text-xl">
+        <h3 id={`cat-${id}-heading`} className="mp-eyebrow">
           {label}
         </h3>
-        <span className="text-sm text-fg-muted tabular-nums">{copy.groupCount(matches.length)}</span>
+        <span className="text-sm text-muted tabular-nums">{copy.groupCount(matches.length)}</span>
       </div>
-      <ul role="list" className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+      <ul role="list" className="grid grid-cols-1 gap-y-5 sm:grid-cols-2 sm:gap-x-5 lg:grid-cols-[repeat(3,300px)] lg:gap-x-[28.5px]">
         {matches.map((m) => (
           <li key={m.item.slug}>
             <ToolCard item={m.item} nameRange={searching ? m.name : undefined} summaryRange={searching ? m.summary : undefined} />
@@ -220,13 +223,13 @@ function CategorySection({ id, label, matches, searching }: { id: string; label:
 function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
   return (
     <div className="mt-10 flex flex-col items-center gap-2 py-8 text-center" data-testid="no-results">
-      <span className="grid size-16 place-items-center rounded-full bg-surface-sunken text-fg-muted">
-        <SearchIcon size={32} />
+      <span className="grid size-16 place-items-center rounded-full bg-surface-raised text-muted shadow-card">
+        <SearchIcon size={28} />
       </span>
-      <p className="mt-2 font-semibold [overflow-wrap:anywhere]">{copy.none(query)}</p>
+      <p className="mt-2 font-bold [overflow-wrap:anywhere]">{copy.none(query)}</p>
       {/* Same size as the line above: a bold line over a smaller one reads as a heading to axe (p-as-heading). */}
-      <p className="text-fg-muted">{copy.tip}</p>
-      <Button variant="secondary" className="mt-2" onClick={onClear}>
+      <p className="text-muted">{copy.tip}</p>
+      <Button variant="outline" className="mt-2" onClick={onClear}>
         {copy.clear}
       </Button>
     </div>
