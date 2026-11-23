@@ -1,0 +1,31 @@
+{
+ "id": "sejda-t1",
+ "fixture": "pre-rotated.pdf",
+ "password": "-",
+ "actions": [
+  "r"
+ ],
+ "start": "2026-11-23T15:28:09.476Z",
+ "events": [
+  "r"
+ ],
+ "readyText": " Sejda All Tools Compress Edit Fill & Sign Merge Delete Pages Crop\nPricing Desktop Log in \nRotate PDF\nRotate and save PDF pages permanently\n  \nAll pages\nOnly odd\nOnly even\n \n \n Reset\n1\n2\n3\nApply changes",
+ "runAt": "2026-11-23T15:28:21.590Z",
+ "net": [
+  "GET https://www.sejda.com/rotate-pdf-pages 0",
+  "POST https://www.sejda.com/api/files/upload-check 19",
+  "POST https://www.sejda.com/api/files/upload 0",
+  "POST https://www.sejda.com/api/tasks 483",
+  "GET https://www.sejda.com/result 0",
+  "GET https://www.sejda.com/api/tasks/PL2O3QML-202611231628/change 0",
+  "GET https://www.sejda.com/api/tasks/PL2O3QML-202611231628/download/pre-rotated.pdf 0",
+  "GET chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html 0",
+  "GET https://www.sejda.com/api/tasks/PL2O3QML-202611231628/download/pre-rotated.pdf 0",
+  "GET chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/cb026027-2acc-4b39-8bab-50eb98b56730 0"
+ ],
+ "end": "2026-11-23T15:29:51.668Z",
+ "capturedName": "pre-rotated.pdf",
+ "contentDisposition": null,
+ "fetchedLater": "2026-11-23T15:36:26.548Z",
+ "note": "Download captured afterwards with a same-origin fetch of the task output (no extra task). Query strings/tokens stripped."
+}

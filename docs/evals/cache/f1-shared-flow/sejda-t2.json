@@ -1,0 +1,34 @@
+{
+ "id": "sejda-t2",
+ "fixture": "user-pw.pdf",
+ "password": "test",
+ "actions": [
+  "r"
+ ],
+ "start": "2026-11-23T15:31:29.569Z",
+ "events": [
+  "r"
+ ],
+ "pwModal": null,
+ "pwInputType": "text",
+ "readyText": " Sejda All Tools Compress Edit Fill & Sign Merge Delete Pages Crop\nPricing Desktop Log in \nRotate PDF\nRotate and save PDF pages permanently\n  \nAll pages\nOnly odd\nOnly even\n \n \n Reset\n1\n2\n3\nApply changes",
+ "runAt": "2026-11-23T15:31:47.830Z",
+ "net": [
+  "GET https://www.sejda.com/rotate-pdf-pages 0",
+  "POST https://www.sejda.com/api/files/upload-check 19",
+  "POST https://www.sejda.com/api/files/upload 0",
+  "POST https://www.sejda.com/api/files/9fddefbc-b846-4155-b3ca-40ef041bef89-4D1N52UIHA0B1M01_2/password 19",
+  "POST https://www.sejda.com/api/tasks 504",
+  "GET https://www.sejda.com/result 0",
+  "GET https://www.sejda.com/api/tasks/R3JS5DYB-202611231631/change 0",
+  "GET https://www.sejda.com/api/tasks/R3JS5DYB-202611231631/download/user-pw.pdf 0",
+  "GET chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html 0",
+  "GET https://www.sejda.com/api/tasks/R3JS5DYB-202611231631/download/user-pw.pdf 0",
+  "GET chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/7bfc70c2-db3b-46d5-a150-527261b19aa8 0"
+ ],
+ "end": "2026-11-23T15:33:17.906Z",
+ "capturedName": "user-pw.pdf",
+ "contentDisposition": null,
+ "fetchedLater": "2026-11-23T15:36:24.883Z",
+ "note": "Download captured afterwards with a same-origin fetch of the task output (no extra task). Query strings/tokens stripped."
+}
