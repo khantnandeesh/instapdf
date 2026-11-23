@@ -73,7 +73,7 @@ function IconTile({ item, size = 40 }: { item: ToolIndexItem; size?: number }) {
 
 const cardBase = (item: ToolIndexItem) =>
   cx(
-    "group relative flex h-full rounded-xl transition-[transform,box-shadow,background-color] duration-(--ip-duration-fast) ease-out active:scale-[0.99]",
+    "ip-edge group relative flex h-full rounded-xl transition-[transform,box-shadow,background-color] duration-(--ip-duration-fast) ease-out active:scale-[0.99]",
     // Ready: a surface card on canvas. Planned: the same hairline ring with no fill, so it reads quieter.
     usable(item)
       ? "bg-surface-raised shadow-sm [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-md"
@@ -131,7 +131,7 @@ export function ToolChip({ item, children }: { item: ToolIndexItem; children?: R
   return (
     <Link
       href={`/${item.slug}`}
-      className="ip-tint inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-surface-raised ps-3 pe-4 text-sm font-medium whitespace-nowrap text-fg shadow-control"
+      className="ip-tint ip-edge inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-surface-raised ps-3 pe-4 text-sm font-medium whitespace-nowrap text-fg shadow-control hover:shadow-control-hover"
     >
       <span className="text-primary-ink">{item.icon}</span>
       {item.name}

@@ -32,7 +32,7 @@ export function Notice({
   return (
     <div
       role={tone === "danger" || tone === "warning" ? "alert" : "status"}
-      className={cx("flex items-start gap-3 rounded-lg p-3 text-sm text-fg", tones[tone].box, className)}
+      className={cx("ip-edge flex items-start gap-3 rounded-lg p-3 text-sm text-fg", tones[tone].box, className)}
     >
       <Icon size={20} className={cx("mt-px shrink-0", tones[tone].icon)} />
       <div className="min-w-0 flex-1 break-words">

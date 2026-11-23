@@ -39,20 +39,19 @@
 
   /* Accent family: Lagoon teal (change these together) */
   --ip-accent: #0d9488; /* marks, progress, focus: 3.7:1 on surface, 3.4:1 on canvas */
-  --ip-primary: #0c8378; /* accent-strong: fills with white text, 4.6:1 */
-  --ip-primary-hover: #0b736a; /* 5.7:1 */
-  --ip-primary-active: #0a655d;
+  --ip-primary: #0a746b; /* fills with on-primary (5.6:1) and safe as text: 5.6:1 on surface, 5.2:1 on canvas */
+  --ip-primary-hover: #09665e; /* 6.8:1 */
+  --ip-primary-active: #085a53;
   --ip-on-primary: #ffffff;
   --ip-primary-ink: #0a746b; /* accent as text: 5.6:1 on surface, 5.2:1 on canvas, 4.5:1 on soft */
-  --ip-primary-soft: rgb(13 148 136 / 0.12);
+  --ip-primary-soft: #e2f2f1; /* opaque: accent 12% on white; on-primary-soft 4.9:1 */
   --ip-on-primary-soft: #0a746b;
-  --ip-primary-faint: rgb(13 148 136 / 0.06);
+  --ip-primary-faint: rgb(13 148 136 / 0.06); /* translucent tint (drop hover) */
   --ip-primary-ring: rgb(13 148 136 / 0.3);
   --ip-focus-ring: #0d9488;
 
   /* Status: -text tones carry words, -soft tones are fills */
-  --ip-danger: #b91c1c;
-  --ip-danger-strong: #b91c1c;
+  --ip-danger: #b91c1c; /* words, edges, and fills with on-danger (6.5:1) */
   --ip-danger-hover: #a31919;
   --ip-danger-soft: rgb(239 68 68 / 0.1);
   --ip-on-danger: #ffffff;
@@ -68,6 +67,8 @@
   /* Elevation (Universal UI shadow roles) */
   --ip-shadow-sm: 0 0 0 1px rgb(0 0 0 / 0.06); /* card */
   --ip-shadow-control: inset 0 0 0 1px var(--ip-field-line), 0 1px 2px rgb(0 0 0 / 0.04);
+  --ip-shadow-control-hover: inset 0 0 0 1px var(--ip-field-line-hover), 0 1px 2px rgb(0 0 0 / 0.06);
+  --ip-shadow-primary: 0 1px 2px rgb(0 0 0 / 0.12);
   --ip-shadow-md: 0 0 0 1px rgb(0 0 0 / 0.06), 0 4px 16px rgb(0 0 0 / 0.08); /* window */
   --ip-shadow-lg: 0 0 0 1px rgb(0 0 0 / 0.08), 0 4px 16px rgb(0 0 0 / 0.12), 0 12px 32px rgb(0 0 0 / 0.08); /* float */
   --ip-shadow-hero: 0 0 0 1px rgb(0 0 0 / 0.06), 0 30px 60px -12px rgb(50 50 93 / 0.25), 0 18px 36px -18px rgb(0 0 0 / 0.3);
@@ -119,21 +120,20 @@
   --ip-inverse: #ececee;
   --ip-on-inverse: #111113;
   --ip-accent: #0d9488; /* 5.0:1 on canvas, 4.6:1 on surface, 4.0:1 on raised */
-  --ip-primary: #0c8378;
-  --ip-primary-hover: #0b736a;
-  --ip-primary-active: #0a655d;
-  --ip-on-primary: #ffffff;
+  --ip-primary: #34a89c; /* light fill with dark on-primary (6.5:1); as text 5.2:1+ on every dark ground */
+  --ip-primary-hover: #4cb0a7;
+  --ip-primary-active: #5fbab2;
+  --ip-on-primary: #111113;
   --ip-primary-ink: #4cb0a7; /* 6.7:1 on surface, 5.8:1 on raised, 4.5:1 on soft */
-  --ip-primary-soft: rgb(13 148 136 / 0.2);
+  --ip-primary-soft: #173232; /* opaque; on-primary-soft 5.2:1, primary 4.7:1 */
   --ip-on-primary-soft: #4cb0a7;
   --ip-primary-faint: rgb(13 148 136 / 0.1);
   --ip-primary-ring: rgb(13 148 136 / 0.35);
   --ip-focus-ring: #0d9488;
   --ip-danger: #f87171;
-  --ip-danger-strong: #b91c1c;
-  --ip-danger-hover: #a31919;
+  --ip-danger-hover: #fca5a5;
   --ip-danger-soft: rgb(239 68 68 / 0.16);
-  --ip-on-danger: #ffffff;
+  --ip-on-danger: #111113; /* 6.8:1 on danger */
   --ip-success: #4ade80;
   --ip-success-soft: rgb(34 197 94 / 0.16);
   --ip-warning: #fbbf24;
@@ -142,6 +142,8 @@
   --ip-drop-overlay: rgb(17 33 33 / 0.94); /* canvas tinted 12% with the accent */
   --ip-shadow-sm: 0 0 0 1px rgb(255 255 255 / 0.06);
   --ip-shadow-control: inset 0 0 0 1px var(--ip-field-line);
+  --ip-shadow-control-hover: inset 0 0 0 1px var(--ip-field-line-hover);
+  --ip-shadow-primary: 0 1px 2px rgb(0 0 0 / 0.4);
   --ip-shadow-md: 0 0 0 1px rgb(255 255 255 / 0.08), 0 4px 16px rgb(0 0 0 / 0.4);
   --ip-shadow-lg: 0 0 0 1px rgb(255 255 255 / 0.1), 0 4px 16px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.3);
   --ip-shadow-hero: 0 0 0 1px rgb(255 255 255 / 0.08), 0 30px 60px -12px rgb(0 0 0 / 0.6);
@@ -174,21 +176,20 @@
     --ip-inverse: #ececee;
     --ip-on-inverse: #111113;
     --ip-accent: #0d9488; /* 5.0:1 on canvas, 4.6:1 on surface, 4.0:1 on raised */
-    --ip-primary: #0c8378;
-    --ip-primary-hover: #0b736a;
-    --ip-primary-active: #0a655d;
-    --ip-on-primary: #ffffff;
+    --ip-primary: #34a89c; /* light fill with dark on-primary (6.5:1); as text 5.2:1+ on every dark ground */
+    --ip-primary-hover: #4cb0a7;
+    --ip-primary-active: #5fbab2;
+    --ip-on-primary: #111113;
     --ip-primary-ink: #4cb0a7; /* 6.7:1 on surface, 5.8:1 on raised, 4.5:1 on soft */
-    --ip-primary-soft: rgb(13 148 136 / 0.2);
+    --ip-primary-soft: #173232; /* opaque; on-primary-soft 5.2:1, primary 4.7:1 */
     --ip-on-primary-soft: #4cb0a7;
     --ip-primary-faint: rgb(13 148 136 / 0.1);
     --ip-primary-ring: rgb(13 148 136 / 0.35);
     --ip-focus-ring: #0d9488;
     --ip-danger: #f87171;
-    --ip-danger-strong: #b91c1c;
-    --ip-danger-hover: #a31919;
+    --ip-danger-hover: #fca5a5;
     --ip-danger-soft: rgb(239 68 68 / 0.16);
-    --ip-on-danger: #ffffff;
+    --ip-on-danger: #111113; /* 6.8:1 on danger */
     --ip-success: #4ade80;
     --ip-success-soft: rgb(34 197 94 / 0.16);
     --ip-warning: #fbbf24;
@@ -197,6 +198,8 @@
     --ip-drop-overlay: rgb(17 33 33 / 0.94); /* canvas tinted 12% with the accent */
     --ip-shadow-sm: 0 0 0 1px rgb(255 255 255 / 0.06);
     --ip-shadow-control: inset 0 0 0 1px var(--ip-field-line);
+    --ip-shadow-control-hover: inset 0 0 0 1px var(--ip-field-line-hover);
+    --ip-shadow-primary: 0 1px 2px rgb(0 0 0 / 0.4);
     --ip-shadow-md: 0 0 0 1px rgb(255 255 255 / 0.08), 0 4px 16px rgb(0 0 0 / 0.4);
     --ip-shadow-lg: 0 0 0 1px rgb(255 255 255 / 0.1), 0 4px 16px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.3);
     --ip-shadow-hero: 0 0 0 1px rgb(255 255 255 / 0.08), 0 30px 60px -12px rgb(0 0 0 / 0.6);
@@ -243,7 +246,6 @@
   --color-primary-ink: var(--ip-primary-ink);
   --color-primary-faint: var(--ip-primary-faint);
   --color-primary-ring: var(--ip-primary-ring);
-  --color-danger-strong: var(--ip-danger-strong);
   --color-danger-hover: var(--ip-danger-hover);
   --color-border: var(--ip-border);
   --color-border-strong: var(--ip-border-strong);
@@ -309,6 +311,8 @@
   --shadow-lg: var(--ip-shadow-lg);
   --shadow-paper: var(--ip-shadow-paper);
   --shadow-control: var(--ip-shadow-control);
+  --shadow-control-hover: var(--ip-shadow-control-hover);
+  --shadow-primary: var(--ip-shadow-primary);
   --shadow-hero: var(--ip-shadow-hero);
   --shadow-lift: var(--ip-shadow-lift);
 

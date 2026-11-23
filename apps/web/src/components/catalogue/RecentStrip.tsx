@@ -14,7 +14,8 @@ export function RecentStrip({ items, onClear, idPrefix, level = 3 }: { items: To
       <H id={headingId} className={level === 2 ? "text-sm font-semibold text-fg-muted" : "text-lg font-semibold"}>
         {copy.recentTitle}
       </H>
-      <ul className="col-span-2 row-start-2 -mx-1 flex gap-2 overflow-x-auto px-1 py-0.5 [scrollbar-width:thin]">
+      {/* 6px of padding (offset by negative margins, so nothing moves) keeps the 2+2px focus outline inside the scroller. */}
+      <ul className="col-span-2 row-start-2 -mx-1.5 -my-1 flex scroll-px-1.5 gap-2 overflow-x-auto px-1.5 py-1.5 [scrollbar-width:thin]">
         {items.map((item) => (
           <li key={item.slug}>
             <ToolChip item={item} />

@@ -155,7 +155,7 @@ export function Catalogue() {
               <li key={g.id} className="shrink-0">
                 <a
                   href={`#cat-${g.id}`}
-                  className="ip-tint inline-flex h-9 items-center gap-1.5 rounded-full bg-surface-raised px-3.5 text-sm font-medium whitespace-nowrap shadow-control"
+                  className="ip-tint ip-edge inline-flex h-9 items-center gap-1.5 rounded-full bg-surface-raised px-3.5 text-sm font-medium whitespace-nowrap shadow-control hover:shadow-control-hover"
                 >
                   {g.label}
                   <span className="text-fg-muted tabular-nums">{g.matches.length}</span>

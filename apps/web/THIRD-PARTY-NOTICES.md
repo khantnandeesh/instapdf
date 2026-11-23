@@ -9,7 +9,7 @@ Assets shipped to browsers by `apps/web` that carry their own license terms.
 - Upstream: https://github.com/rsms/inter
 - Copyright 2016 The Inter Project Authors
 - License: SIL Open Font License, Version 1.1 (OFL-1.1), reproduced below
-- Use: self-hosted by `next/font/local` in `src/app/layout.tsx`; served from our own origin, unmodified.
+- Use: subset by Fontsource; served as distributed, self-hosted from our own origin by `next/font/local` in `src/app/layout.tsx`.
 
 ```
 Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter) Inter-Italic[opsz,wght].ttf: Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)

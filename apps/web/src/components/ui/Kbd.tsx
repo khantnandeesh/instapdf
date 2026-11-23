@@ -5,7 +5,7 @@ export function Kbd({ children }: { children: ReactNode }) {
   return (
     <kbd
       aria-hidden="true"
-      className="inline-grid h-5 min-w-5 place-items-center rounded-sm border border-border bg-surface-sunken px-1 font-mono text-[11px] text-fg-muted"
+      className="inline-grid h-5 min-w-5 place-items-center rounded-sm border border-border bg-surface-sunken px-1 font-mono text-[11px] text-fg"
     >
       {children}
     </kbd>

@@ -6,6 +6,16 @@ The single source of truth for InstaPDF's visual design system: token values, th
 - Basis: the owner's Universal UI system (derived from the Stageshow look). We keep our `--ip-*` names and map them onto Universal UI roles; we do not import its React bundle.
 - Adopted 2026-11-23 (owner choice: teal "Lagoon" accent and this dark mode).
 
+## Token meaning (what changed against the pre-Universal tokens)
+
+Every pre-existing `--ip-*` name keeps its meaning; only values moved. In particular `primary` is still both a fill (with `on-primary`) and safe as text, `primary-soft` is still opaque, and `on-danger` still pairs with `danger`. Notes for branches written against the old tokens:
+
+- `bg` and `surface` are now the same warm canvas; cards are `surface-raised`.
+- `surface-sunken`, `border` and `border-strong` are now translucent inks (they adapt to whatever they sit on). `border-strong` is reserved for switch and slider tracks; text fields, secondary buttons and chips use the new `field-line` (also ≥ 3:1).
+- `shadow-sm` / `shadow-md` / `shadow-lg` now carry Universal UI roles: card ring, window, float.
+- New tokens only (no renames): `surface-overlay`, `chrome`, `well`, `hover`, `pressed`, `field-line` / `-hover`, `inverse` / `on-inverse`, `accent`, `primary-ink`, `primary-faint`, `primary-ring`, `danger-hover`, `paper-filter`, `shadow-control` / `-hover`, `shadow-primary`, `shadow-hero`, `shadow-lift`, `radius-2xl`.
+- `text-primary` remains valid. `text-primary-ink` is the preferred accent-text utility (identical in light, higher contrast in dark).
+
 ## Principles
 
 - **One accent, quiet grays.** Screens read as calm structure in canvas, surface and hairlines. The accent is spent on the thing being acted on: the primary button, the current page, the selected scope, progress, focus. Everything else stays gray.
@@ -37,7 +47,8 @@ Dark follows `prefers-color-scheme`; `data-theme="light"` or `"dark"` on `<html>
 | `fg-disabled` | text-faint | `#9A9A9D` | `#6C6C70` | placeholders and disabled words only (exempt) |
 | `paper` / `paper-filter` | – | `#FFFFFF` / `none` | `#FFFFFF` / `brightness(0.86)` | PDF pages |
 | `inverse` / `on-inverse` | inverse | `#262628` / `#FFFFFF` | `#ECECEE` / `#111113` | tooltips |
-| `danger` / `danger-strong` / `danger-soft` | danger-text / danger-strong / danger-soft | `#B91C1C` / `#B91C1C` / red `.10` | `#F87171` / `#B91C1C` / red `.16` | error words and edges / destructive fill / error notice |
+| `danger` / `danger-hover` / `on-danger` | danger-text (also the fill) | `#B91C1C` / `#A31919` / `#FFFFFF` | `#F87171` / `#FCA5A5` / `#111113` | error words and edges; destructive button fill with `on-danger` |
+| `danger-soft` | danger-soft | red `.10` | red `.16` | error notice fill |
 | `success` / `success-soft` | success-text / -soft | `#15803D` / green `.12` | `#4ADE80` / green `.16` | result check, privacy marks |
 | `warning` / `warning-soft` | warning-text / -soft | `#B45309` / amber `.14` | `#FBBF24` / amber `.18` | limit notices |
 | `scrim` | – | `rgb(17 17 19/.45)` | `rgb(0 0 0/.6)` | dialog and menu backdrop |
@@ -51,11 +62,12 @@ Change these together, never one alone, and keep the contrast targets in the tab
 | `--ip-*` token | Universal UI role | Light | Dark | Use |
 |---|---|---|---|---|
 | `accent` | accent | `#0D9488` | `#0D9488` | progress, scope outline, current-page bar, field focus edge, drop borders |
-| `primary` | accent-strong | `#0C8378` | `#0C8378` | fills with white text: primary button, switch on, scope check, brand mark |
-| `primary-hover` / `primary-active` | accent-hover | `#0B736A` / `#0A655D` | same | hover and pressed fills |
-| `on-primary` | on-accent | `#FFFFFF` | `#FFFFFF` | text and icons on fills |
-| `primary-ink` (= `on-primary-soft`) | accent-ink | `#0A746B` | `#4CB0A7` | links, accent icons, beta and rotation badges |
-| `primary-soft` / `-faint` / `-ring` | accent-soft / -faint / -ring | teal `.12` / `.06` / `.30` | teal `.20` / `.10` / `.35` | selected fills, drop hover, field focus halo |
+| `primary` | accent-strong, also safe as text | `#0A746B` | `#34A89C` | fills with `on-primary` (primary button, switch on, scope check, brand mark), and accent text |
+| `primary-hover` / `primary-active` | accent-hover | `#09665E` / `#085A53` | `#4CB0A7` / `#5FBAB2` | hover and pressed fills (dark lightens) |
+| `on-primary` | on-accent | `#FFFFFF` | `#111113` | text and icons on `primary` fills |
+| `primary-ink` (= `on-primary-soft`) | accent-ink | `#0A746B` | `#4CB0A7` | links, accent icons, beta and rotation badges (a higher-contrast alternative to `primary` as text in dark) |
+| `primary-soft` | accent-soft, composited | `#E2F2F1` (opaque) | `#173232` (opaque) | selected and pressed fills, accent badges and icon tiles |
+| `primary-faint` / `primary-ring` | accent-faint / accent-ring | teal `.06` / `.30` | teal `.10` / `.35` | translucent tints: drop hover, field focus halo, text selection |
 | `focus` | focus | `#0D9488` | `#0D9488` | 2 px solid outline, 2 px offset |
 | `drop-overlay` | – | `rgb(227 237 235/.94)` | `rgb(17 33 33/.94)` | drag-over overlay: canvas tinted with the accent (recompute when the accent changes) |
 
@@ -67,7 +79,7 @@ Why teal: it reads calm and private, which suits "fast, private PDF tools"; it s
 - Text is calm, not glaring: `fg` `#ECECEE` (12.8–16:1), `fg-muted` `#9D9DA1` (5.6–7.0:1).
 - White PDF pages would glare in a grid on near-black. Pages get a light hairline ring and `filter: brightness(0.86)` (white on surface drops from 17.4:1 to 12.5:1). Hovering or focusing a tile (`.ip-paper-lit`) restores full brightness, and the page preview dialog is never dimmed.
 - Soft tones are translucent, so anything that floats (notice stack, rotation badge) sits on an opaque `surface-overlay` first.
-- Accent fills keep the same value as light (`#0C8378`, white text 4.6:1); accent text lightens to `#4CB0A7`.
+- Accent fills lighten to `#34A89C` with near-black `on-primary` text (6.5:1), the same pattern as `danger` (`#F87171` with `#111113`, 6.8:1). That keeps every `primary` and `danger` pair valid both as a fill and as text.
 
 ## Type
 
@@ -81,8 +93,9 @@ Why teal: it reads calm and private, which suits "fast, private PDF tools"; it s
 
 - Spacing: 4 px base (4, 8, 12, 16, 20, 24, 32, 48, 64). Words keep a 12 px inset from the edge of a row, field or card.
 - Radius by role: `sm` 6 (menu rows, segment thumbs), `md` 8 (buttons, fields, segmented track), `lg` 10 (notices, tiles, wells), `xl` 12 (cards, workspace, dock, dialogs, result card), `2xl` 16 (marketing panels); pills for badges, chips, switches, progress.
-- Shadows, one per role: `shadow-sm` card ring (cards, workspace, dock); `shadow-control` (secondary buttons, chips: an inset `field-line` ring); `shadow-md` window (hovered cards, mobile dock, floating bars); `shadow-lg` float (menu panel, notices); `shadow-hero` (dialogs); `shadow-paper` (the page itself).
-- Focus: 2 px solid `focus` outline, 2 px offset, on every interactive element. Text fields instead turn their edge `accent` with a 3 px `primary-ring` halo.
+- Shadows, one per role: `shadow-sm` card ring (cards, workspace, dock); `shadow-control` / `shadow-control-hover` (secondary buttons, chips: an inset `field-line` ring, darker on hover); `shadow-primary` (primary buttons); `shadow-md` window (hovered cards, mobile dock, floating bars); `shadow-lg` float (menu panel, notices); `shadow-hero` (dialogs); `shadow-paper` (the page itself).
+- Focus: 2 px solid `focus` outline, 2 px offset, on every interactive element. Text fields instead turn their edge `accent` with a 3 px `primary-ring` halo and keep a transparent 2 px outline, which forced-colors mode paints.
+- Forced colors (Windows High Contrast): shadows and backgrounds are dropped, so every control or card whose edge is a shadow ring (`.ip-edge`) gets a 1 px `ButtonText` border, and the selected segment (`.ip-seg-checked`) a 2 px `Highlight` outline. Covered by `e2e/ui/forced-colors.spec.ts`.
 - Motion: 80 ms press, 120 ms hover and toggles, 150 ms rotation, crossfades and page dim, 240 ms result check. `cubic-bezier(.25,.8,.25,1)` for things that appear, `cubic-bezier(.45,0,.1,1)` for things that move. Reduced motion sets every duration to 0. Animate only opacity, transform and filter.
 
 ## Measured contrast (WCAG 2.1; alpha tokens composited on the ground named)
@@ -92,10 +105,11 @@ Why teal: it reads calm and private, which suits "fast, private PDF tools"; it s
 | `fg` on canvas / surface / raised / chrome | 13.9 / 15.1 / 15.1 / 15.1 | 16.0 / 14.7 / 12.8 / 14.3 |
 | `fg-muted` on canvas / surface / raised / chrome | 4.53 / 4.9 / 4.9 / 4.9 | 7.0 / 6.4 / 5.6 / 6.2 |
 | `fg` on `surface-sunken` over canvas (neutral badge, segment labels) | 12.2 | 13.5 |
-| `on-primary` on `primary` / `primary-hover` | 4.6 / 5.7 | 4.6 / 5.7 |
+| `on-primary` on `primary` / `primary-hover` | 5.6 / 6.8 | 6.5 / 7.3 |
+| `primary` as text on canvas / surface / raised | 5.2 / 5.6 / 5.6 | 6.5 / 6.0 / 5.2 |
 | `primary-ink` on canvas / surface / raised | 5.2 / 5.6 / 5.6 | 7.3 / 6.7 / 5.8 |
-| `primary-ink` on `primary-soft` over surface / raised | 4.9 / 4.9 | 5.2 / 4.5 |
-| `danger` on surface / `danger-soft`; white on `danger-strong` | 6.5 / 5.7; 6.5 | 6.3 / 5.3; 6.5 |
+| `primary-ink` (= `on-primary-soft`) on `primary-soft` | 4.9 | 5.2 |
+| `danger` on surface / `danger-soft`; `on-danger` on `danger` | 6.5 / 5.7; 6.5 | 6.3 / 5.3; 6.8 |
 | `success` on surface / `success-soft` | 5.0 / 4.5 | 10.0 / 7.6 |
 | `warning` on surface / `warning-soft` | 5.0 / 4.5 | 10.4 / 7.4 |
 | `field-line` edge (over the field fill) vs fill / canvas / raised (non-text, 3:1) | 3.4 / 3.1 / 3.4 | 3.6 / 3.9 / 3.1 |
