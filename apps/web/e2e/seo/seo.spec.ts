@@ -83,7 +83,7 @@ test.describe("indexable pages", () => {
       expect(JSON.stringify(ld)).not.toContain("aggregateRating");
 
       const content = seoContent[path.slice(1)];
-      const faq = ld.find((t) => t["@type"] === "FAQPage") as { mainEntity: { name: string; acceptedAnswer: { text: string } }[] };
+      const faq = ld.find((t) => t["@type"] === "FAQPage") as unknown as { mainEntity: { name: string; acceptedAnswer: { text: string } }[] };
       const guide = page.getByTestId("tool-guide");
       await expect(guide.locator("summary")).toHaveText(faq.mainEntity.map((q) => q.name));
       expect(faq.mainEntity.map((q) => q.acceptedAnswer.text)).toEqual(content.faq.map((f) => f.a));
