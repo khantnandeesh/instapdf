@@ -8,6 +8,8 @@
  * 1. Reads the production dependency tree with `pnpm list --prod --json --depth Infinity`
  *    (packages listed but not installed, e.g. other platforms' optional binaries, are skipped:
  *    they are never built into or shipped with the app).
+ *    Font-only packages (e.g. @fontsource/*, served by next/font/local) are entries of kind
+ *    "font", so OFL-1.1 is allowed for them and only them (license-policy.mjs FONT_PACKAGES).
  * 2. Adds the fonts and vendored assets that are not npm dependencies: the next/font Google
  *    fonts (OFL-1.1), any OFL fonts under public/fonts, and the Lucide/Feather icon paths.
  * 3. Fails (exit 1) if anything is outside the allow-list in scripts/license-policy.mjs.
@@ -21,7 +23,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { copyrightLines, EXCEPTIONS, findViolations, licenseExpression } from "./license-policy.mjs";
+import { copyrightLines, EXCEPTIONS, findViolations, isFontOnlyPackage, licenseExpression } from "./license-policy.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -90,7 +92,7 @@ function packageEntries() {
     const texts = filesIn(path).map((f) => ({ file: f, text: readFileSync(join(path, f), "utf8").trim() }));
     const copyright = texts.flatMap((t) => copyrightLines(t.text));
     entries.push({
-      kind: "package",
+      kind: isFontOnlyPackage(name, readdirSync(path)) ? "font" : "package",
       name,
       version,
       license: licenseExpression(pkg),

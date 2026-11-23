@@ -11,6 +11,18 @@ export const ALLOWED_CODE = new Set(["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3
 export const ALLOWED_FONT = new Set(["OFL-1.1"]);
 
 /**
+ * npm packages that ship only font files and their CSS (no program code), e.g. self-hosted
+ * Fontsource fonts loaded with next/font/local. They are judged as fonts (ALLOWED_FONT), and only
+ * if they really hold no JavaScript (see isFontOnlyPackage).
+ */
+export const FONT_PACKAGES = [/^@fontsource\/[a-z0-9-]+$/, /^@fontsource-variable\/[a-z0-9-]+$/];
+
+/** A listed font package whose top-level files include no JavaScript. */
+export function isFontOnlyPackage(name, files) {
+  return FONT_PACKAGES.some((re) => re.test(name)) && !files.some((f) => /\.(m?js|cjs)$/i.test(f));
+}
+
+/**
  * Named, reviewed exceptions: package name → the exact license expression accepted for it
  * and why. Anything else outside the allow-list fails the build.
  * @type {Record<string, { license: string; reason: string }>}
@@ -113,6 +125,8 @@ export function copyrightLines(text) {
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => /^(copyright\b|\(c\)|©)/i.test(l))
-    .filter((l) => !/\[yyyy\]|\{yyyy\}|<year>|copyright notice|copyright owner\]|copyright holders? (and|or)/i.test(l));
+    .filter((l) => !/\[yyyy\]|\{yyyy\}|<year>|copyright notice|copyright owner\]|copyright holders? (and|or)/i.test(l))
+    // SIL OFL 1.1 boilerplate ("Copyright Holder(s)", "copyright statement(s).", the warranty line).
+    .filter((l) => !/^copyright (holder|statement)|^copyright holder be liable/i.test(l));
   return [...new Set(lines)].slice(0, 6);
 }

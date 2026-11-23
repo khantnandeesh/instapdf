@@ -5,11 +5,43 @@ import {
   EXCEPTIONS,
   findViolations,
   isAllowedExpression,
+  isFontOnlyPackage,
   licenseExpression,
 } from "../../../scripts/license-policy.mjs";
 
 type Kind = "package" | "font" | "asset";
 const pkg = (name: string, license: string | null, kind: Kind = "package") => ({ name, version: "1.0.0", license, kind });
+
+describe("copyrightLines on the SIL OFL 1.1 text", () => {
+  it("keeps the real notice and drops the license's template lines", () => {
+    const ofl = [
+      "Copyright 2020 Braille Institute of America, Inc.",
+      "copyright statement(s).",
+      "Copyright Holder. This restriction only applies to the primary font name as",
+      "Copyright Holder(s) and the Author(s) or with their explicit written",
+      "COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,",
+    ].join("\n");
+    expect(copyrightLines(ofl)).toEqual(["Copyright 2020 Braille Institute of America, Inc."]);
+  });
+});
+
+describe("isFontOnlyPackage", () => {
+  it("treats a Fontsource package with only CSS and font files as a font", () => {
+    expect(isFontOnlyPackage("@fontsource/atkinson-hyperlegible", ["LICENSE", "index.css", "400.css", "files", "package.json"])).toBe(true);
+    expect(isFontOnlyPackage("@fontsource-variable/inter", ["LICENSE", "index.css"])).toBe(true);
+  });
+
+  it("refuses look-alike names and font packages that ship JavaScript", () => {
+    expect(isFontOnlyPackage("fontsource-helper", ["index.css"])).toBe(false);
+    expect(isFontOnlyPackage("@fontsourcex/foo", ["index.css"])).toBe(false);
+    expect(isFontOnlyPackage("@fontsource/foo", ["index.css", "index.js"])).toBe(false);
+  });
+
+  it("so OFL-1.1 passes for a font package but still fails for code", () => {
+    expect(findViolations([pkg("@fontsource/atkinson-hyperlegible", "OFL-1.1", "font")])).toHaveLength(0);
+    expect(findViolations([pkg("@fontsource/atkinson-hyperlegible", "OFL-1.1")])).toHaveLength(1);
+  });
+});
 
 describe("isAllowedExpression", () => {
   it.each(["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MPL-2.0", "0BSD", "Zlib"])("allows %s", (id) => {
