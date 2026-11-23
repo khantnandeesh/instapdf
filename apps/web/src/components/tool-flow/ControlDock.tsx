@@ -42,6 +42,7 @@ export function ControlDock({
   return (
     <aside
       ref={ref}
+      data-ip-dock=""
       role="region"
       aria-label={label}
       className={[

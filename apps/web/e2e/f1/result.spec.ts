@@ -246,6 +246,26 @@ test("AC-55: pasting a PDF loads it; pasting text does nothing; a paste into a t
   await expect(tiles(page)).toHaveCount(3); // only user-pw.pdf, not the pasted file
 });
 
+test("AC-55 / F1 eval G-1: a paste event dispatched on the document or the window loads the PDF", async ({ page }) => {
+  const b64 = (await readFile(fx("three-pages.pdf"))).toString("base64");
+  for (const target of ["document", "window"] as const) {
+    await page.evaluate(
+      ({ b64, target }) => {
+        const dt = new DataTransfer();
+        dt.items.add(new File([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], "three-pages.pdf", { type: "application/pdf" }));
+        const ev = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
+        if (target === "document") document.dispatchEvent(ev);
+        else window.dispatchEvent(ev);
+      },
+      { b64, target },
+    );
+    await expect(flow(page), target).toHaveAttribute("data-state", "ready");
+    await expect(tiles(page), target).toHaveCount(3);
+    await page.reload();
+    await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
+  }
+});
+
 test("AC-56: Share sends exactly the output File when supported", async ({ page }) => {
   await page.addInitScript(() => {
     const nav = navigator as Navigator & { __shared?: { name: string; type: string; size: number }[][] };

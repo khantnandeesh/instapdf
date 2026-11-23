@@ -57,6 +57,18 @@
   --ip-dock-h-md: 76px; /* fixed bottom dock 640-1023px (1 row) */
   --ip-thumb-size: 160px; /* default page-tile box; slider range 80-400 */
   --ip-tap-min: 44px; /* minimum touch target */
+
+  /* F2: site header, tool menu, home catalogue (docs/specs/f2-home.md, H-2) */
+  --ip-z-header: 20;
+  --ip-z-header-open: 50; /* above the F1 dock (20), notices (30) and drop overlay (40) */
+  --ip-menu-max-h: calc(100dvh - var(--ip-header-h) - 32px);
+  --ip-recent-h: 92px;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --ip-recent-h: 96px;
+  }
 }
 
 :root[data-theme="dark"] {
@@ -198,6 +210,8 @@
   --text-2xl--line-height: 2.25rem;
   --text-3xl: 2.25rem;
   --text-3xl--line-height: 2.75rem;
+  --text-4xl: 3rem;
+  --text-4xl--line-height: 3.5rem;
 
   /* Radius */
   --radius-sm: 6px;

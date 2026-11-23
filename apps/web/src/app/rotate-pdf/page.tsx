@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SiteHeader } from "@/components/tool-flow/SiteHeader";
+import { RecordVisit } from "@/components/catalogue/RecordVisit";
 import { RotateTool } from "@/tools/rotate/RotateTool";
 import { flowTool } from "@/tools/registry";
 
@@ -12,14 +12,9 @@ export const metadata: Metadata = {
 
 export default function RotatePdfPage() {
   return (
-    <>
-      <SiteHeader />
-      <main
-        id="main"
-        className="mx-auto w-full max-w-[1280px] px-4 pb-[calc(var(--ip-dock-actual,var(--ip-dock-h))+env(safe-area-inset-bottom)+16px)] sm:px-6 sm:pb-[calc(var(--ip-dock-actual,var(--ip-dock-h-md))+env(safe-area-inset-bottom)+16px)] lg:px-8 lg:pb-12"
-      >
-        <RotateTool />
-      </main>
-    </>
+    <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1280px] px-4 pb-12 outline-none sm:px-6 lg:px-8">
+      <RecordVisit slug={tool.slug} />
+      <RotateTool />
+    </main>
   );
 }

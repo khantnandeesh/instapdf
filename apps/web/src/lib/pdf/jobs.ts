@@ -49,15 +49,20 @@ async function runRotate(job: RotateJob, onProgress: ProgressFn): Promise<JobOut
   onProgress(0);
   let wasEncrypted = false;
 
-  const rotateOne = async (file: RotateJob["files"][number]) => {
-    const r = await rotatePdf({ bytes: new Uint8Array(await file.source.arrayBuffer()), deltas: file.deltas, password: file.password });
+  /** Reports progress inside file `i`, so the bar moves during long single-file runs (F1 eval G-2). */
+  const within = (i: number) => (fraction: number) => onProgress(Math.min(0.99, (done + weights[i] * fraction) / total));
+
+  const rotateOne = async (file: RotateJob["files"][number], i: number) => {
+    const bytes = new Uint8Array(await file.source.arrayBuffer());
+    within(i)(0.1);
+    const r = await rotatePdf({ bytes, deltas: file.deltas, password: file.password }, (f) => within(i)(0.1 + 0.9 * f));
     wasEncrypted ||= r.wasEncrypted;
     return r;
   };
 
   if (job.files.length === 1) {
     const [file] = job.files;
-    const r = await rotateOne(file);
+    const r = await rotateOne(file, 0);
     onProgress(1);
     return {
       name: pdfOutputName(file.name),
@@ -72,7 +77,7 @@ async function runRotate(job: RotateJob, onProgress: ProgressFn): Promise<JobOut
   const zip = createZipWriter();
   const entries: { name: string; pageCount: number }[] = [];
   for (let i = 0; i < job.files.length; i++) {
-    const r = await rotateOne(job.files[i]);
+    const r = await rotateOne(job.files[i], i);
     zip.add(names[i], r.bytes); // copied into the ZIP Blob; r.bytes can be collected now
     entries.push({ name: names[i], pageCount: r.pageCount });
     done += weights[i];

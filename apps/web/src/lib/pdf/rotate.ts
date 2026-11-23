@@ -9,6 +9,13 @@ export type RotateInput = {
   password?: string;
 };
 
+/** Fraction of one file's work done (0..1). Saving is the last stage and reports nothing itself. */
+export type StageProgress = (fraction: number) => void;
+
+/** Share of a file's work reached after loading it, and after setting every page's rotation. */
+export const STAGE_LOADED = 0.4;
+export const STAGE_PAGES = 0.6;
+
 export type RotateResult = { bytes: Uint8Array; pageCount: number; wasEncrypted: boolean };
 
 /** Loads a PDF, decrypting it when needed (the output is saved unencrypted). */
@@ -25,13 +32,14 @@ export async function loadForEdit(bytes: Uint8Array, password?: string) {
  * (existing rotation + delta) mod 360. Nothing is rasterized and page order,
  * content, boxes and metadata are left as they are.
  */
-export async function rotatePdf({ bytes, deltas, password }: RotateInput): Promise<RotateResult> {
+export async function rotatePdf({ bytes, deltas, password }: RotateInput, onProgress?: StageProgress): Promise<RotateResult> {
   const { doc, wasEncrypted } = await loadForEdit(bytes, password);
+  onProgress?.(STAGE_LOADED);
   const pages = doc.getPages();
   pages.forEach((page, i) => {
     const delta = normalizeRotation(deltas[i] ?? 0);
-    if (delta === 0) return;
-    page.setRotation(degrees(finalRotation(page.getRotation().angle, delta)));
+    if (delta !== 0) page.setRotation(degrees(finalRotation(page.getRotation().angle, delta)));
+    onProgress?.(STAGE_LOADED + ((STAGE_PAGES - STAGE_LOADED) * (i + 1)) / pages.length);
   });
   const out = await doc.save();
   return { bytes: out, pageCount: pages.length, wasEncrypted };
