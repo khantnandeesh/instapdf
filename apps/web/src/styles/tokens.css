@@ -1,0 +1,217 @@
+/*
+ * InstaPDF design tokens (light + dark).
+ * Source of truth: docs/specs/f1-shared-flow.md, "## UI" > "Design tokens".
+ * Raw values live in CSS custom properties; `@theme inline` exposes them as
+ * Tailwind v4 utilities (bg-surface, text-fg-muted, ring-focus, duration-base, ...).
+ * Contrast ratios for every text/background pair are listed in the spec.
+ * Dark mode follows the OS, and `data-theme="light|dark"` on <html> forces one.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Neutrals */
+  --ip-bg: #ffffff;
+  --ip-surface: #f5f6fa; /* app canvas behind the grid */
+  --ip-surface-raised: #ffffff; /* cards, dock, dialogs */
+  --ip-surface-sunken: #eceef4; /* placeholders, wells, segmented track */
+  --ip-border: #dfe2ea; /* decorative dividers only, never the only cue */
+  --ip-border-strong: #7c8296; /* input and control borders, >= 3:1 */
+  --ip-fg: #151823;
+  --ip-fg-muted: #535a6e;
+  --ip-fg-disabled: #8a90a3;
+  --ip-paper: #ffffff; /* PDF page thumbnails: always white, both themes */
+
+  /* Brand / primary (indigo-violet, our own) */
+  --ip-primary: #3d3bd4;
+  --ip-primary-hover: #312fb3;
+  --ip-primary-active: #28269a;
+  --ip-on-primary: #ffffff;
+  --ip-primary-soft: #ecedff;
+  --ip-on-primary-soft: #2f2da8;
+
+  /* Status */
+  --ip-danger: #b3261e;
+  --ip-danger-soft: #fdf1f0;
+  --ip-on-danger: #ffffff;
+  --ip-success: #0b7a47;
+  --ip-success-soft: #eaf7f0;
+  --ip-warning: #9a5200;
+  --ip-warning-soft: #fff6e6;
+
+  /* Focus, overlays */
+  --ip-focus-ring: #3d3bd4;
+  --ip-scrim: rgb(13 15 21 / 0.5);
+  --ip-drop-overlay: rgb(236 237 255 / 0.92);
+
+  /* Elevation */
+  --ip-shadow-sm: 0 1px 2px rgb(21 24 35 / 0.08);
+  --ip-shadow-md: 0 2px 8px rgb(21 24 35 / 0.1), 0 1px 2px rgb(21 24 35 / 0.06);
+  --ip-shadow-lg: 0 12px 32px rgb(21 24 35 / 0.18);
+  --ip-shadow-paper: 0 0 0 1px rgb(21 24 35 / 0.08), 0 1px 3px rgb(21 24 35 / 0.12);
+
+  /* Layout metrics (used by the shared tool flow) */
+  --ip-header-h: 56px;
+  --ip-dock-w: 320px; /* control dock column at >= 1024px */
+  --ip-dock-h: 128px; /* fixed bottom dock below 640px (2 rows) */
+  --ip-dock-h-md: 76px; /* fixed bottom dock 640-1023px (1 row) */
+  --ip-thumb-size: 160px; /* default page-tile box; slider range 80-400 */
+  --ip-tap-min: 44px; /* minimum touch target */
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ip-bg: #0d0f15;
+  --ip-surface: #141720;
+  --ip-surface-raised: #1b1f2a;
+  --ip-surface-sunken: #090b10;
+  --ip-border: #2a2f3d;
+  --ip-border-strong: #6e7488;
+  --ip-fg: #eceef4;
+  --ip-fg-muted: #a2a8ba;
+  --ip-fg-disabled: #5d6375;
+  --ip-paper: #ffffff;
+  --ip-primary: #8f93ff;
+  --ip-primary-hover: #a9acff;
+  --ip-primary-active: #c4c6ff;
+  --ip-on-primary: #0d0f15;
+  --ip-primary-soft: #23254a;
+  --ip-on-primary-soft: #c4c6ff;
+  --ip-danger: #ff8a80;
+  --ip-danger-soft: #3a1715;
+  --ip-on-danger: #0d0f15;
+  --ip-success: #4fd18b;
+  --ip-success-soft: #0f2e1f;
+  --ip-warning: #f5b451;
+  --ip-warning-soft: #33240b;
+  --ip-focus-ring: #a9acff;
+  --ip-scrim: rgb(0 0 0 / 0.6);
+  --ip-drop-overlay: rgb(35 37 74 / 0.92);
+  --ip-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --ip-shadow-md: 0 2px 8px rgb(0 0 0 / 0.45);
+  --ip-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
+  --ip-shadow-paper: 0 0 0 1px rgb(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ip-bg: #0d0f15;
+    --ip-surface: #141720;
+    --ip-surface-raised: #1b1f2a;
+    --ip-surface-sunken: #090b10;
+    --ip-border: #2a2f3d;
+    --ip-border-strong: #6e7488;
+    --ip-fg: #eceef4;
+    --ip-fg-muted: #a2a8ba;
+    --ip-fg-disabled: #5d6375;
+    --ip-paper: #ffffff;
+    --ip-primary: #8f93ff;
+    --ip-primary-hover: #a9acff;
+    --ip-primary-active: #c4c6ff;
+    --ip-on-primary: #0d0f15;
+    --ip-primary-soft: #23254a;
+    --ip-on-primary-soft: #c4c6ff;
+    --ip-danger: #ff8a80;
+    --ip-danger-soft: #3a1715;
+    --ip-on-danger: #0d0f15;
+    --ip-success: #4fd18b;
+    --ip-success-soft: #0f2e1f;
+    --ip-warning: #f5b451;
+    --ip-warning-soft: #33240b;
+    --ip-focus-ring: #a9acff;
+    --ip-scrim: rgb(0 0 0 / 0.6);
+    --ip-drop-overlay: rgb(35 37 74 / 0.92);
+    --ip-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --ip-shadow-md: 0 2px 8px rgb(0 0 0 / 0.45);
+    --ip-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
+    --ip-shadow-paper: 0 0 0 1px rgb(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5);
+  }
+}
+
+/* Motion. Reduced motion collapses every duration to 0 (opacity fades included). */
+:root {
+  --ip-duration-instant: 80ms;
+  --ip-duration-fast: 120ms;
+  --ip-duration-base: 180ms;
+  --ip-duration-slow: 280ms;
+  --ip-ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ip-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ip-duration-instant: 0ms;
+    --ip-duration-fast: 0ms;
+    --ip-duration-base: 0ms;
+    --ip-duration-slow: 0ms;
+  }
+}
+
+@theme inline {
+  /* Colors -> bg-*, text-*, border-*, ring-*, outline-* utilities */
+  --color-bg: var(--ip-bg);
+  --color-surface: var(--ip-surface);
+  --color-surface-raised: var(--ip-surface-raised);
+  --color-surface-sunken: var(--ip-surface-sunken);
+  --color-border: var(--ip-border);
+  --color-border-strong: var(--ip-border-strong);
+  --color-fg: var(--ip-fg);
+  --color-fg-muted: var(--ip-fg-muted);
+  --color-fg-disabled: var(--ip-fg-disabled);
+  --color-paper: var(--ip-paper);
+  --color-primary: var(--ip-primary);
+  --color-primary-hover: var(--ip-primary-hover);
+  --color-primary-active: var(--ip-primary-active);
+  --color-on-primary: var(--ip-on-primary);
+  --color-primary-soft: var(--ip-primary-soft);
+  --color-on-primary-soft: var(--ip-on-primary-soft);
+  --color-danger: var(--ip-danger);
+  --color-danger-soft: var(--ip-danger-soft);
+  --color-on-danger: var(--ip-on-danger);
+  --color-success: var(--ip-success);
+  --color-success-soft: var(--ip-success-soft);
+  --color-warning: var(--ip-warning);
+  --color-warning-soft: var(--ip-warning-soft);
+  --color-focus: var(--ip-focus-ring);
+  --color-scrim: var(--ip-scrim);
+  --color-drop-overlay: var(--ip-drop-overlay);
+
+  /* Kept for the existing placeholder home page */
+  --color-background: var(--ip-bg);
+  --color-foreground: var(--ip-fg);
+
+  /* Type */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.875rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.25rem;
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: 2.75rem;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* Elevation */
+  --shadow-sm: var(--ip-shadow-sm);
+  --shadow-md: var(--ip-shadow-md);
+  --shadow-lg: var(--ip-shadow-lg);
+  --shadow-paper: var(--ip-shadow-paper);
+
+  /* Motion -> duration-*, ease-* utilities */
+  --ease-out: var(--ip-ease-out);
+  --ease-in-out: var(--ip-ease-in-out);
+}
