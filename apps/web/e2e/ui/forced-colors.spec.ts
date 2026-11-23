@@ -1,4 +1,4 @@
-/** Forced colors (Windows High Contrast): focus and selection stay visible. Design system: docs/design/mint-paper.md */
+/** Forced colors (Windows High Contrast): focus and selection stay visible. Design system: docs/design/berrypdf.md */
 import { expect, test, type Locator } from "@playwright/test";
 import { catalogueSearch, openHydrated } from "../f2/support";
 import { dialog, openRotate, passwordField, pick, pickReady, scope, tabTo } from "../support/flow";
@@ -74,5 +74,6 @@ test("forced colors: Tab focus on the checked segment still shows the focus ring
   });
   expect(o.style).toBe("solid");
   expect(o.width).toBeGreaterThanOrEqual(2);
-  expect(o.offset).toBe(2);
+  // BerryPDF: buttons and choice tiles show the 3px blueberry ring 3px away.
+  expect(o.offset).toBe(3);
 });

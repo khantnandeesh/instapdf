@@ -53,7 +53,7 @@ test.describe("AC-56 at 375x812", () => {
   });
 });
 
-test.describe("AC-56 with the OS in dark mode at 1366x900 (light only until Mint Paper defines dark)", () => {
+test.describe("AC-56 with the OS in dark mode at 1366x900 (light only until BerryPDF defines dark)", () => {
   test.use({ viewport: { width: 1366, height: 900 }, colorScheme: "dark" });
 
   test("AC-56: with the OS in dark mode the page stays on the light palette and axe finds no serious or critical violations on home, catalogue and menu no-results, desktop menu, coming-soon, 404 and /rotate-pdf", async ({ page }, info) => {
@@ -61,7 +61,8 @@ test.describe("AC-56 with the OS in dark mode at 1366x900 (light only until Mint
 
     await openHydrated(page);
     // Dark mode is pending the designer's definition: an OS dark preference keeps the light palette.
-    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(255, 255, 255)");
+    // BerryPDF grid paper: the light ground (#fffdfb) stays.
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(255, 253, 251)");
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("light");
     await expectNoSeriousAxeViolations(page, "dark, home, menu closed");
 
@@ -93,7 +94,7 @@ test.describe("AC-56 with the OS in dark mode at 1366x900 (light only until Mint
   });
 });
 
-test.describe("AC-56 with the OS in dark mode at 375x812 (light only until Mint Paper defines dark)", () => {
+test.describe("AC-56 with the OS in dark mode at 375x812 (light only until BerryPDF defines dark)", () => {
   test.use({ viewport: { width: 375, height: 812 }, colorScheme: "dark" });
 
   test("AC-56: with the OS in dark mode axe finds no serious or critical violations on home and with the mobile menu open at 375 px", async ({ page }) => {
