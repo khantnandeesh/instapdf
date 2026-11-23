@@ -49,6 +49,9 @@
   .ip-tooltip {
     animation: ip-fade-in var(--ip-duration-fast) var(--ip-ease-out) 300ms both;
   }
+  .ip-drop-in {
+    animation: ip-drop-in var(--ip-duration-base) var(--ip-ease-out) both;
+  }
   .ip-draw {
     stroke-dasharray: 24;
     animation: ip-draw var(--ip-duration-slow) var(--ip-ease-out) both;
@@ -104,6 +107,12 @@
     transform: translateY(6px);
   }
 }
+@keyframes ip-drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
 @keyframes ip-draw {
   from {
     stroke-dashoffset: 24;
@@ -156,4 +165,69 @@
   border-radius: 9999px;
   background: var(--ip-primary);
   border: 2px solid var(--ip-surface-raised);
+}
+
+/* ---- F2: site chrome and home catalogue (docs/specs/f2-home.md) ---------------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Search highlight: tinted, plus an underline so it does not rely on color; no width change. */
+.ip-mark {
+  background: var(--ip-primary-soft);
+  color: inherit;
+  border-radius: 3px;
+  padding-inline: 2px;
+  margin-inline: -2px;
+  box-shadow: inset 0 -2px 0 var(--ip-primary);
+}
+
+/* Our search fields draw their own clear button. */
+.ip-search::-webkit-search-cancel-button,
+.ip-search::-webkit-search-decoration {
+  appearance: none;
+}
+
+/* The home Recent row's box is reserved before paint when history exists (H-10). */
+.ip-recent-slot {
+  display: none;
+}
+:root[data-recent] .ip-recent-slot {
+  display: block;
+  min-height: var(--ip-recent-h);
+}
+
+/* Progressive enhancement: without scripts the All tools button gives way to a link. */
+@media (scripting: none) {
+  .ip-js-only {
+    display: none !important;
+  }
+}
+
+/* A row that scrolls sideways below 1024 px instead of widening the page. */
+.ip-scroll-x {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 24px;
+}
+@media (max-width: 1023px) {
+  .ip-scroll-x {
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
+}
+@media (min-width: 1024px) {
+  .ip-scroll-x {
+    overflow-x: visible;
+  }
+}
+
+/* Tool pages: below 1024 px the F1 dock is fixed at the bottom; keep the footer's end clear of it. */
+@media (max-width: 1023px) {
+  body:has([data-ip-dock]) .ip-site-footer {
+    padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);
+  }
 }
