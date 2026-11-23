@@ -9,10 +9,16 @@ variable "region" {
   default     = "us-central1"
 }
 
-variable "github_repo" {
-  description = "owner/name of the only GitHub repository allowed to deploy via WIF."
+variable "github_repository_id" {
+  description = "Numeric id of the GitHub repo allowed to deploy via WIF (khantnandeesh/instapdf). Ids survive renames."
   type        = string
-  default     = "khantnandeesh/instapdf"
+  default     = "1468806745"
+}
+
+variable "github_owner_id" {
+  description = "Numeric id of the GitHub repo owner."
+  type        = string
+  default     = "148197396"
 }
 
 variable "billing_account_id" {
@@ -37,7 +43,10 @@ variable "web_max_instances" {
 }
 
 variable "extra_cors_origins" {
-  description = "Origins allowed to PUT/GET on the jobs bucket besides the Cloud Run URLs (local dev, custom domain)."
-  type        = list(string)
-  default     = ["http://localhost:3000"]
+  description = "Per-env origins allowed on that env's jobs bucket besides its Cloud Run URL (local dev, custom domain)."
+  type        = map(list(string))
+  default = {
+    staging = ["http://localhost:3000"]
+    prod    = []
+  }
 }

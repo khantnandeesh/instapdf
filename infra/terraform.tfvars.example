@@ -1,4 +1,5 @@
 project_id = "gen-lang-client-0724979937"
 # region           = "us-central1"
-# github_repo      = "khantnandeesh/instapdf"
+# github_repository_id = "1468806745"
+# github_owner_id      = "148197396"
 # billing_account_id = "XXXXXX-XXXXXX-XXXXXX" # leave unset to skip the budget

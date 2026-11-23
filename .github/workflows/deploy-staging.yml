@@ -1,7 +1,10 @@
 name: Deploy staging
 
 on:
-  push:
+  # Deploy only commits on main that passed CI.
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -16,22 +19,35 @@ concurrency:
 env:
   REGION: us-central1
   SERVICE: web-staging
-  IMAGE: us-central1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/instapdf/web:${{ github.sha }}
+  # workflow_run: the commit CI tested; workflow_dispatch: the dispatched commit.
+  SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
 jobs:
   deploy:
     # Skip until the GCP bootstrap is done and the repo variables exist (infra/README.md).
-    if: ${{ vars.GCP_WIF_PROVIDER != '' }}
+    # workflow_run: only a successful CI run for a push to main in this repo
+    # (not a PR whose head branch happens to be called main).
+    # workflow_dispatch: only from main (WIF also rejects other refs).
+    if: >-
+      ${{ vars.GCP_WIF_PROVIDER != '' && vars.GCP_DEPLOYER_SA_STAGING != '' && (
+        (github.event_name == 'workflow_run'
+          && github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'push'
+          && github.event.workflow_run.head_repository.full_name == github.repository)
+        || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      ) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
 
       - uses: google-github-actions/auth@v2
         with:
           project_id: ${{ vars.GCP_PROJECT_ID }}
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA_STAGING }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
@@ -39,18 +55,23 @@ jobs:
         run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
       - name: Build and push image
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
         run: |
-          docker build -f apps/web/Dockerfile -t "$IMAGE" .
-          docker push "$IMAGE"
+          image="${REGION}-docker.pkg.dev/${PROJECT_ID}/instapdf/web:${SHA}"
+          echo "IMAGE=${image}" >> "$GITHUB_ENV"
+          docker build -f apps/web/Dockerfile -t "$image" .
+          docker push "$image"
 
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy "$SERVICE" \
             --image "$IMAGE" \
             --region "$REGION" \
+            --update-env-vars "APP_VERSION=${SHA}" \
             --quiet
 
       - name: Smoke test
         run: |
           url="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
-          .github/scripts/smoke-test.sh "$url"
+          .github/scripts/smoke-test.sh "$url" "$SHA"
