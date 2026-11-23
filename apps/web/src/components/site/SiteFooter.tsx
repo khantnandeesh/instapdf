@@ -4,12 +4,12 @@ import { infoPages, siteCopy } from "./copy";
 
 const linkClass = "inline-flex min-h-11 items-center text-sm text-fg-muted hover:text-fg hover:underline lg:min-h-8";
 
-/** Footer on every page (spec F2 §3g): A–Z tools, company and legal placeholders, copyright. */
+/** Footer on every page (spec F2 §3g): A–Z tools, company and legal pages, copyright. */
 export function SiteFooter() {
   const az = [...tools].sort((a, b) => a.name.localeCompare(b.name, "en"));
   const year = new Date().getFullYear();
   const company = (["about", "help"] as const).map((s) => ({ href: `/${s}`, label: infoPages[s] }));
-  const legal = (["privacy", "terms", "cookies", "security"] as const).map((s) => ({ href: `/${s}`, label: infoPages[s] }));
+  const legal = (["privacy", "terms", "cookies", "licenses", "security"] as const).map((s) => ({ href: `/${s}`, label: infoPages[s] }));
   return (
     <footer className="ip-site-footer mt-16 border-t border-border bg-surface pt-12 pb-8 sm:mt-24">
       <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
