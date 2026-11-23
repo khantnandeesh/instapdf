@@ -21,12 +21,12 @@ export function BrandMark({ size = 30, className }: { size?: number; className?:
   );
 }
 
-/** Mark + "InstaPDF" in mint (brand-strong, 4.95:1); the name fades to brand on hover over 1s. */
+/** Mark + "BerryPDF" in mint (brand-strong, 4.95:1); the name fades to brand on hover over 1s. */
 export function Wordmark({ className }: { className?: string }) {
   return (
     <span className={cx("inline-flex items-center gap-2 text-nav text-brand-strong", className)}>
       <BrandMark />
-      <span className="transition-colors duration-(--dur-attention) ease-standard group-hover:text-brand">InstaPDF</span>
+      <span className="transition-colors duration-(--dur-attention) ease-standard group-hover:text-brand">BerryPDF</span>
     </span>
   );
 }

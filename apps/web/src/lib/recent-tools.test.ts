@@ -3,6 +3,7 @@ import {
   clearRecent,
   parseRecent,
   readRecent,
+  LEGACY_RECENT_KEY,
   RECENT_KEY,
   recentPrepaintScript,
   recordVisit,
@@ -82,6 +83,34 @@ describe("storage", () => {
     expect(JSON.parse(store.getItem(RECENT_KEY)!)).toEqual(["rotate-pdf"]);
   });
 
+  it("moves a list saved under the old product key to the new key, transparently", () => {
+    store.setItem(LEGACY_RECENT_KEY, '["crop-pdf","rotate-pdf"]');
+    expect(readRecent()).toEqual(["crop-pdf", "rotate-pdf"]);
+    expect(store.getItem(RECENT_KEY)).toBe('["crop-pdf","rotate-pdf"]');
+    expect(store.getItem(LEGACY_RECENT_KEY)).toBeNull();
+    recordVisit("merge-pdf");
+    expect(JSON.parse(store.getItem(RECENT_KEY)!)).toEqual(["merge-pdf", "crop-pdf", "rotate-pdf"]);
+    expect(store.getItem(LEGACY_RECENT_KEY)).toBeNull();
+  });
+
+  it("keeps the new key when both keys exist, and drops the old one", () => {
+    store.setItem(RECENT_KEY, '["rotate-pdf"]');
+    store.setItem(LEGACY_RECENT_KEY, '["crop-pdf"]');
+    expect(readRecent()).toEqual(["rotate-pdf"]);
+    expect(store.getItem(LEGACY_RECENT_KEY)).toBeNull();
+  });
+
+  it("still reads the old key when storage writes are blocked", () => {
+    store.setItem(LEGACY_RECENT_KEY, '["rotate-pdf"]');
+    store.setItem = () => {
+      throw new Error("QuotaExceededError");
+    };
+    store.removeItem = () => {
+      throw new Error("QuotaExceededError");
+    };
+    expect(readRecent()).toEqual(["rotate-pdf"]);
+  });
+
   it("clears the list (AC-47)", () => {
     recordVisit("rotate-pdf");
     clearRecent();
@@ -145,5 +174,13 @@ describe("pre-paint script (H-10)", () => {
       expect(visibleRecent(parseRecent(stored), (s) => s === "rotate-pdf").length > 0, String(stored)).toBe(expected);
     }
     expect(run(null, true)).toBe(false);
+  });
+
+  it("also reads a list still saved under the old product key", () => {
+    let marked = false;
+    const localStorage = { getItem: (k: string) => (k === LEGACY_RECENT_KEY ? '["rotate-pdf"]' : null) };
+    const document = { documentElement: { setAttribute: () => (marked = true) } };
+    new Function("localStorage", "document", recentPrepaintScript(["rotate-pdf"]))(localStorage, document);
+    expect(marked).toBe(true);
   });
 });

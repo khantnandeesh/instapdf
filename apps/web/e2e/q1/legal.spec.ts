@@ -32,7 +32,7 @@ test.describe("server HTML", () => {
     expect(html).toContain("connect-src &#x27;self&#x27;");
     expect(html).toContain("Network");
     expect(html).toContain("Content-Security-Policy");
-    expect(html).toContain("instapdf:recent-tools");
+    expect(html).toContain("berrypdf:recent-tools");
     expect(html).toContain("us-central1");
     expect(html).toMatch(/coming later/i);
   });

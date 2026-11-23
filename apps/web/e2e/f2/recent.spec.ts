@@ -28,7 +28,7 @@ test("AC-41: after opening /rotate-pdf, Rotate is first in Recent on the home pa
 
 test("AC-41: client-side navigation back to / shows the new entry at once", async ({ page }) => {
   await openHydrated(page, "/rotate-pdf");
-  await page.getByRole("link", { name: "InstaPDF home" }).click();
+  await page.getByRole("link", { name: "BerryPDF home" }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(homeRecent(page).getByRole("link").first()).toHaveAttribute("href", "/rotate-pdf");
 });

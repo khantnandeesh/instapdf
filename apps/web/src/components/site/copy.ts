@@ -1,8 +1,8 @@
 /** Site-wide strings (spec F2 H-8). Our own wording. */
 export const siteCopy = {
-  homeTitle: "InstaPDF · Fast, private PDF tools",
+  homeTitle: "BerryPDF · Fast, private PDF tools",
   homeDescription: "Free online PDF tools to organize, edit and convert PDFs. Most tools run in your browser, so your files stay on your device.",
-  logoLabel: "InstaPDF home",
+  logoLabel: "BerryPDF home",
   skip: "Skip to main content",
   menuButton: "All tools",
   menuClose: "Close all tools",

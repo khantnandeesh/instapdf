@@ -215,9 +215,9 @@ function noticesText(entries) {
   }
   const rule = "=".repeat(78);
   const parts = [
-    "InstaPDF: third-party notices",
+    "BerryPDF: third-party notices",
     "",
-    "InstaPDF includes or uses the open-source software, fonts and icons below.",
+    "BerryPDF includes or uses the open-source software, fonts and icons below.",
     "Each block lists the components it applies to, followed by the license or",
     "NOTICE text they ship with. A summary is at /licenses.",
     "",

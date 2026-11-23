@@ -1,5 +1,5 @@
 /**
- * Single source of truth for every InstaPDF tool.
+ * Single source of truth for every BerryPDF tool.
  * `ref` is the matching Sejda slug, used only by the parity evaluator.
  * `runtime`: "client" = processed in the browser, nothing uploaded; "server" = processing worker.
  */

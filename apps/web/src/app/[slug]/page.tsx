@@ -15,7 +15,7 @@ type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const tool = toolBySlug((await params).slug);
   return {
-    title: `${tool?.name ?? "Tool"} (coming soon) · InstaPDF`,
+    title: `${tool?.name ?? "Tool"} (coming soon) · BerryPDF`,
     description: tool?.summary,
     robots: { index: false },
   };

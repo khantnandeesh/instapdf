@@ -29,7 +29,7 @@ The page takes no files.
 |---|---|---|
 | Files, cloud, URL, encrypted files | None on the home page. The hero button goes to the editor tool page. | None. A drop-a-file-on-the-home-page shortcut is left to step 2 (Research) to propose; it is not in this spec. |
 | Search text | A search field exists in the menu markup but is hidden (`display:none`), so visitors cannot use it. Its hidden logic is a case-insensitive substring match on the tool name and description. | A visible search field on the home page and in the menu (see §3). |
-| Device history | `localStorage.prevUsedTools` (JSON array of slugs) plus `pinnedTools`. Both are written in the browser and never sent. | `localStorage["instapdf:recent-tools"]` holds a JSON array of tool slugs. It is never sent anywhere. Pinning is deferred (D-3). |
+| Device history | `localStorage.prevUsedTools` (JSON array of slugs) plus `pinnedTools`. Both are written in the browser and never sent. | `localStorage["berrypdf:recent-tools"]` holds a JSON array of tool slugs. It is never sent anywhere. Pinning is deferred (D-3). |
 | Data source | Static server-rendered HTML | The tool registry (`apps/web/src/tools/registry.ts`) is the only source. Names, summaries, categories, status and the tool count all come from it. Nothing is hard-coded on the page. |
 
 Registry additions this feature needs (builders decide the exact shape):
@@ -44,7 +44,7 @@ Registry additions this feature needs (builders decide the exact shape):
 
 | Control | Type | Default | Allowed values | Effect |
 |---|---|---|---|---|
-| Heading plus one-line pitch | text | – | our own copy | Says what InstaPDF is. Mentions that most tools run in the browser. |
+| Heading plus one-line pitch | text | – | our own copy | Says what BerryPDF is. Mentions that most tools run in the browser. |
 | Primary call to action | large button/link | – | – | Reference: goes to its flagship tool (the editor). **Ours:** goes to the `featured` tool once that tool is not `planned`. Until then (today the editor is planned) it is "browse tools": it scrolls the catalogue into view, sets the hash `#tools` and focuses the catalogue search field. |
 | Secondary "see all N tools" link | text link plus down chevron | – | – | Reference: scrolls down by a fixed 700 px. **Ours:** scrolls to the catalogue heading. N is the registry count (45 today), never hard-coded. |
 
@@ -69,7 +69,7 @@ Reference: logo; an "All Tools" button with a chevron; 6 shortcut links (Compres
 
 | Control | Type | Default | Allowed values | Effect |
 |---|---|---|---|---|
-| Logo | link | – | – | Goes to `/`. Accessible name "InstaPDF home". |
+| Logo | link | – | – | Goes to `/`. Accessible name "BerryPDF home". |
 | All tools | `<button aria-expanded aria-controls>` | collapsed | open / closed | Toggles the tool menu (3d / 3e). |
 | Shortcut links | text links | – | up to 5 usable tools (status not `planned`), in popular order and then registry order | Quick access. **Never point to a planned tool.** Today that means only Rotate. Hidden below 768 px. |
 | Right-hand area | – | – | – | Pricing, Log in and Account are **deferred to F19**. The language picker is **deferred to F22**. The desktop-app link is out of scope. F2 leaves this area empty (no dead buttons). |
@@ -103,7 +103,7 @@ Ours: a full-screen dialog (`role=dialog`, `aria-modal=true`) with a sticky top 
 
 | Rule | Value |
 |---|---|
-| Storage | `localStorage["instapdf:recent-tools"]`, a JSON array of slugs, newest first |
+| Storage | `localStorage["berrypdf:recent-tools"]`, a JSON array of slugs, newest first |
 | When recorded | When a **usable** tool page (`beta` / `live`) is opened. Coming-soon pages, the home page, 404 and footer pages are not recorded. |
 | Order | Move to front: revisiting a tool moves it to the front (the reference does not, which we treat as a bug) |
 | Cap | 12 stored, 6 shown |
@@ -121,7 +121,7 @@ Reference: three columns (resources/company; API; legal), an A–Z list of every
 | Tools | All tools (`/#tools`) plus an A–Z list of every tool (status badge on planned ones) | Tool pages or coming-soon pages |
 | Company | About, Help | Placeholder pages (F21 replaces them) |
 | Legal | Privacy, Terms, Cookies, Security | Placeholder pages (F21) |
-| Bottom line | `© <current year> InstaPDF` plus a one-line privacy note | – |
+| Bottom line | `© <current year> BerryPDF` plus a one-line privacy note | – |
 
 Placeholder page: HTTP 200, the shared header and footer, an `h1` with the page name, a short "being written" note, `noindex`. Language links, pricing, desktop and API links are deferred (F19, F21, F22).
 
@@ -175,7 +175,7 @@ All run against the staging site. "Usable" means registry status `beta` or `live
 
 ### Hero and page basics
 
-- **AC-1 (P0)** `GET /` returns 200. The page has exactly one `h1`, a `<title>` containing "InstaPDF" and a non-empty meta description.
+- **AC-1 (P0)** `GET /` returns 200. The page has exactly one `h1`, a `<title>` containing "BerryPDF" and a non-empty meta description.
 - **AC-2 (P0)** The hero's primary call to action is visible without scrolling at both 1366×900 and 375×812.
 - **AC-3 (P0)** Activating the primary call to action, while the `featured` tool is planned, brings the catalogue heading into the viewport, sets the URL hash to `#tools` and focuses the catalogue search field. If the featured tool is usable, it navigates to `/<featured slug>` instead.
 - **AC-4 (P1)** The hero's "see all tools" link shows the registry tool count [45] and scrolls the catalogue heading into view.
@@ -230,7 +230,7 @@ All run against the staging site. "Usable" means registry status `beta` or `live
 ### Recent tools
 
 - **AC-40 (P1)** In a fresh browser profile, neither the home page nor the menu shows a Recent group.
-- **AC-41 (P1)** After opening `/rotate-pdf` and coming back to `/`, the home page Recent row and the menu Recent group both show Rotate first. `localStorage["instapdf:recent-tools"]` starts with `"rotate-pdf"`.
+- **AC-41 (P1)** After opening `/rotate-pdf` and coming back to `/`, the home page Recent row and the menu Recent group both show Rotate first. `localStorage["berrypdf:recent-tools"]` starts with `"rotate-pdf"`.
 - **AC-42 (P1)** Opening a coming-soon page (`/merge-pdf`), a placeholder page or an unknown path does not change the stored recent list.
 - **AC-43 (P1)** Seeding the store with `["no-such-tool","merge-pdf","rotate-pdf"]` shows only Rotate in Recent (unknown and planned slugs are skipped).
 - **AC-44 (P1)** Seeding the store with the invalid value `{oops` gives a working home page with no Recent group and no uncaught error. Opening `/rotate-pdf` then rewrites the value to a valid JSON array starting with `"rotate-pdf"`.
@@ -392,7 +392,7 @@ Shared frame on every page (root layout): skip link → `SiteHeader` (56 px, sti
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ InstaPDF   [▦ All tools ▾]   Rotate                                          │ header 56
+│ BerryPDF   [▦ All tools ▾]   Rotate                                          │ header 56
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │ pt 48
 │ Fast, private PDF tools                                                      │ h1 4xl 600
@@ -440,7 +440,7 @@ Shared frame on every page (root layout): skip link → `SiteHeader` (56 px, sti
 
 ```
 ┌──────────────────────────────────────────┐
-│ InstaPDF  [▦ All tools ▾]  Rotate        │ header 56, ≤ 3 shortcuts
+│ BerryPDF  [▦ All tools ▾]  Rotate        │ header 56, ≤ 3 shortcuts
 ├──────────────────────────────────────────┤
 │ Fast, private PDF tools                  │ h1 3xl
 │ Organize, edit and convert PDFs …        │ lg
@@ -472,7 +472,7 @@ Shared frame on every page (root layout): skip link → `SiteHeader` (56 px, sti
 
 ```
 ┌───────────────────────────────┐
-│ InstaPDF       [▦ All tools]  │ header 56, no shortcuts
+│ BerryPDF       [▦ All tools]  │ header 56, no shortcuts
 ├───────────────────────────────┤
 │ Fast, private                 │ h1 2xl
 │ PDF tools                     │
@@ -512,7 +512,7 @@ Shared frame on every page (root layout): skip link → `SiteHeader` (56 px, sti
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ InstaPDF   [▦ All tools ▴]   Rotate                                          │ header (z 50 while open)
+│ BerryPDF   [▦ All tools ▴]   Rotate                                          │ header (z 50 while open)
 ├──────────────────────────────────────────────────────────────────────────────┤
 │ [🔍 Search tools                      ]  45 tools                        [×] │ panel top row 64
 │ Recently used  [⟳ Rotate] [..]                                    Clear      │ 52, only with history
@@ -571,13 +571,13 @@ Shared frame on every page (root layout): skip link → `SiteHeader` (56 px, sti
 
 ```
 1280:  ┌───────────────────────────────────────────────────────────────┐
-       │ InstaPDF                 Tools A–Z (4 CSS columns)   Company  Legal │
+       │ BerryPDF                 Tools A–Z (4 CSS columns)   Company  Legal │
        │ Fast, private PDF tools. Alternate & mix  Edit PDF …  About    Privacy│
        │ All tools →               …                           Help     Terms  │
        │                                                                Cookies│
        │                                                                Security│
        │ ───────────────────────────────────────────────────────────── │
-       │ © 2026 InstaPDF · Browser tools never upload your files.      │
+       │ © 2026 BerryPDF · Browser tools never upload your files.      │
        └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -585,7 +585,7 @@ Shared frame on every page (root layout): skip link → `SiteHeader` (56 px, sti
 - ≥ 1024: grid `[brand 240px] [tools 1fr] [company 140px] [legal 140px]`; the A–Z list uses `columns: 4` (3 at 1024–1279). 640–1023: brand row on top, then tools (`columns: 3`), then company and legal side by side. < 640: brand, tools (`columns: 2`), company and legal side by side.
 - Each group is a `nav` with an `h2` (`sm` 600 `fg`), links `sm` `fg-muted` hover `fg` underline. Link rows are 32 px at ≥ 1024 and 44 px below 1024 (touch).
 - A–Z tool links show a trailing "Soon" text in `xs fg-muted` for planned tools, with the full "Coming soon" in the accessible name (`<span aria-hidden>Soon</span><span class="sr-only">, coming soon</span>`). Footer entries carry no runtime marker (AC-59 covers cards and menu entries only).
-- Bottom line: `© {current year} InstaPDF` and "Browser tools never upload your files." (`xs fg-muted`). The year is computed at render; the page is static, so the build year shows until the next deploy, which happens far more often than yearly. A unit test pins "current year at build".
+- Bottom line: `© {current year} BerryPDF` and "Browser tools never upload your files." (`xs fg-muted`). The year is computed at render; the page is static, so the build year shows until the next deploy, which happens far more often than yearly. A unit test pins "current year at build".
 - **Tool routes with the F1 dock:** below 1024 the dock is `position: fixed` at the bottom, so it would cover the end of the footer. Move the dock clearance from `main` to the footer: add `data-ip-dock` to `ControlDock`'s root and in `globals.css`:
   `@media (max-width: 1023px) { body:has([data-ip-dock]) .ip-site-footer { padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px); } }`
   Then the rotate page's `main` bottom padding becomes a normal `pb-12` at every width (the footer now follows `main`, so the last tile row scrolls clear of the dock anyway). F1 AC-49 (primary visible without scrolling, `scrollY` 0) is unaffected because the dock and header are unchanged.
@@ -616,7 +616,7 @@ Shared frame on every page (root layout): skip link → `SiteHeader` (56 px, sti
 - Status panel: `surface` background, 2 px dashed `border` (decorative), `rounded-xl`, padding 32 (24 below 640), content start-aligned at ≥ 640 and centered below. Clock icon 40 in a `surface-sunken` circle, `h2` "Coming soon" (`lg` 600), body `base fg-muted`. The runtime line appears only for `runtime: "client"` tools; server tools get "When it's ready, files you add will be processed on our servers and deleted within 2 hours." **No file input of any kind** (AC-48).
 - Primary: `Button primary md` link "Browse all tools" → `/#tools`. The "← All tools" link above the `h1` also goes to `/#tools`.
 - "Ready to use now": `ToolCard` grid of usable tools (registry order). If none were usable the section would be omitted.
-- `<title>` "Merge (coming soon) · InstaPDF", `robots: noindex`.
+- `<title>` "Merge (coming soon) · BerryPDF", `robots: noindex`.
 
 #### Placeholder pages (About, Help, Privacy, Terms, Cookies, Security)
 
@@ -684,7 +684,7 @@ Why the catalogue is one client island and not server cards with a filter script
 |---|---|---|---|
 | `SkipLink` | server | – | Current F1 skip link, moved here. First focusable element on every page. Target `main#main` with `tabIndex={-1}` so focus really moves (AC-58). |
 | `SiteHeader` | server | `currentSlug?` (from the page; header shortcuts use it for `aria-current`) | H-4 header. Replaces `components/tool-flow/SiteHeader.tsx` (delete it and its import in the rotate page). Rendered once in `app/layout.tsx`. `<header>` landmark. `z-index: var(--ip-z-header)`; while the menu is open, `ToolMenu` sets `data-menu-open` on the header and CSS raises it to `--ip-z-header-open`. |
-| `Logo` | server | – | Link to `/`, wordmark "Insta" `fg` + "PDF" `primary`, `lg` 600, accessible name "InstaPDF home" (`aria-label`). |
+| `Logo` | server | – | Link to `/`, wordmark "BerryPDF" beside the berry mark, `lg` 600, accessible name "BerryPDF home" (`aria-label`). |
 | `HeaderShortcuts` | server | `currentSlug?` | `<ul>` of up to 5 links to usable tools (popular order, then registry order). Items 4–5 get `hidden lg:block`; the whole list `hidden md:flex`. |
 | `ToolMenu` | client | – (reads `ToolIndexProvider`, recent store) | Owns `open`, `mode`, `query`. Renders the trigger and, while open, `ToolMenuSurface`. Registers the `/` shortcut (H-7). Closes on route change (`usePathname` change), on choosing an entry (click handler on the surface for any `a[href]`), on Escape, on scrim click, on the close button, and (panel mode) when focus leaves both the trigger and the panel (`focusout` with `relatedTarget` outside). Panel content is mounted only while open (keeps the initial DOM small). |
 | `ToolMenuTrigger` | client | `open`, `onToggle` | `<button type="button" aria-expanded aria-controls="tool-menu" aria-haspopup="dialog" only in mobile mode>`. Label "All tools" (constant; state is in `aria-expanded`). **No-JS fallback:** the button carries class `ip-js-only` and a sibling `<noscript><a href="/#tools">All tools</a></noscript>` uses the same classes; `@media (scripting: none) { .ip-js-only { display: none } }`. Same box size, no shift. |
@@ -715,7 +715,7 @@ Why the catalogue is one client island and not server cards with a filter script
 | `NoResults` | client | `query`, `onClear` | In place of the groups: 40 px search icon in a `surface-sunken` circle, `base` 600 "No tools match “zzqx”", `sm fg-muted` "Try a shorter word, like “split” or “word”.", `Button secondary md` "Clear search". `role="status"` is **not** set here (the live region announces "No tools found"); this avoids a double announcement. |
 | `RecordVisit` | client (renders `null`) | `slug` | On mount: `recordVisit(slug)` (move to front, dedupe, cap 12, overwrite corrupt values, swallow storage errors). Placed only on usable tool pages. |
 
-`lib/recent-tools.ts`: `KEY = "instapdf:recent-tools"`, `read(): string[]` (try/catch, must be an array of strings, else `[]`), `visible(index)` (skip unknown and planned, first 6), `record(slug)`, `clear()`, `subscribe(cb)`. All storage access is wrapped so a throwing `localStorage` getter (AC-45) is handled.
+`lib/recent-tools.ts`: `KEY = "berrypdf:recent-tools"` (a list under the pre-rename key `instapdf:recent-tools` is moved to it on first read), `read(): string[]` (try/catch, must be an array of strings, else `[]`), `visible(index)` (skip unknown and planned, first 6), `record(slug)`, `clear()`, `subscribe(cb)`. All storage access is wrapped so a throwing `localStorage` getter (AC-45) is handled.
 
 ### H-6. States
 
@@ -776,7 +776,7 @@ Why the catalogue is one client island and not server cards with a filter script
 
 | Key | Text |
 |---|---|
-| meta.home.title / description | "InstaPDF · Fast, private PDF tools" / "Free online PDF tools to organize, edit and convert PDFs. Most tools run in your browser, so your files stay on your device." (tune the last clause per F21; keep it true: most tools are client) |
+| meta.home.title / description | "BerryPDF · Fast, private PDF tools" / "Free online PDF tools to organize, edit and convert PDFs. Most tools run in your browser, so your files stay on your device." (tune the last clause per F21; keep it true: most tools are client) |
 | hero.title | "Fast, private PDF tools" |
 | hero.pitch | "Organize, edit and convert PDFs without installing anything. Most tools run right in your browser, so your files stay on your device." |
 | hero.cta (featured planned) / (featured usable) | "Find a tool" / registry `actionLabel` of the featured tool, e.g. "Edit a PDF" |
@@ -828,7 +828,7 @@ Transitions only on `opacity` and `transform` (plus `background-color` / `border
 - **Static route.** `/` renders at build (no `searchParams`, no cookies, no headers reads). `/[slug]` coming-soon pages are `generateStaticParams` for planned slugs. Placeholders and 404 are static.
 - **First-load JS budget (< 150 KB gzip for `/`).** Framework baseline (React, Next runtime) is about 100–105 KB. Islands: `ToolIndexProvider` + `ToolMenu` (with `SearchField`, `Badge`, `RuntimeMarker`, `Dialog`, `matchTools`) about 6–8 KB; `Catalogue` (+ cards, recent store) about 5–7 KB. Expected total about 115–120 KB. Tool icons are not JS (H-3). No new runtime dependency. Check with `next build` output; if the home route goes above 135 KB, lazy-load `ToolMenuSurface` with `next/dynamic` on first pointer-enter/focus of the trigger.
 - **Payload.** The tool index (45 items with pre-rendered SVGs) is serialized once in the layout RSC payload, about 20 KB raw / 5 KB gzip. Keep `keywords` short.
-- **Pre-paint Recent reservation (no CLS for returning users).** `RecentPrepaintScript` is a tiny inline script in `<head>` generated at build with the list of usable slugs: it reads `localStorage["instapdf:recent-tools"]` in a try/catch, counts entries that are usable slugs, and if ≥ 1 sets `data-recent` on `<html>`. CSS: `.ip-recent-slot { display: none } :root[data-recent] .ip-recent-slot { display: block; min-height: var(--ip-recent-h) }`. After hydration `RecentRow` renders into that slot; the box size does not change. The same validity rules live in `lib/recent-tools.ts`; a unit test runs both on the AC-43/44 fixtures. `<html suppressHydrationWarning>` covers the added attribute. If a CSP is added later, the script needs a hash or nonce.
+- **Pre-paint Recent reservation (no CLS for returning users).** `RecentPrepaintScript` is a tiny inline script in `<head>` generated at build with the list of usable slugs: it reads `localStorage["berrypdf:recent-tools"]` in a try/catch, counts entries that are usable slugs, and if ≥ 1 sets `data-recent` on `<html>`. CSS: `.ip-recent-slot { display: none } :root[data-recent] .ip-recent-slot { display: block; min-height: var(--ip-recent-h) }`. After hydration `RecentRow` renders into that slot; the box size does not change. The same validity rules live in `lib/recent-tools.ts`; a unit test runs both on the AC-43/44 fixtures. `<html suppressHydrationWarning>` covers the added attribute. If a CSP is added later, the script needs a hash or nonce.
 - **Fixed boxes.** Header 56 at every width; trigger and noscript fallback same size; search end slot 44×44; result count `min-w`; card meta line min 20; icons with explicit `width`/`height`; Recent slot reserved; menu content is fixed-position (never in flow).
 - **Accepted shift.** `/?q=…` deep links apply the filter after hydration, which removes cards below the toolbar once. That is a shared-link case, not the Lighthouse target; documented here so QA does not chase it.
 - **Fonts.** Atkinson Hyperlegible 400/700, self-hosted via `next/font/local` (see `docs/design/mint-paper.md`): two preloaded latin woff2 files from our origin, metric-adjusted fallback, so no third-party requests (AC-54) and no swap shift.

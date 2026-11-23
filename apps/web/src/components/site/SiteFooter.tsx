@@ -25,7 +25,7 @@ export function SiteFooter() {
           <Wordmark />
           <small className="mt-2 block text-sm leading-6 text-muted">
             {siteCopy.footerTagline}
-            <br />© {year} InstaPDF · {siteCopy.footerPrivacy}
+            <br />© {year} BerryPDF · {siteCopy.footerPrivacy}
           </small>
           <Link href="/#tools" prefetch={false} className={`${linkClass} mt-2`}>
             {siteCopy.footerAllTools} →

@@ -105,7 +105,7 @@ Copy the behavior only, never the wording.
 ## 6. Output (Rotate)
 
 - **One input file:** a single PDF that **keeps the original file name** (`<basename>.pdf`), downloaded directly. *Assumption:* the reference result was not seen because no task was run. The evaluator should confirm the reference's name on its first real Rotate task, and we follow it if it differs.
-- **Two or more input files:** one rotated PDF per input, packed in a ZIP named `instapdf-rotate.zip`. The entries keep the original file names. Duplicate names get ` (2)`, ` (3)` and so on.
+- **Two or more input files:** one rotated PDF per input, packed in a ZIP named `berrypdf-rotate.zip`. The entries keep the original file names. Duplicate names get ` (2)`, ` (3)` and so on.
 - **What changes in the PDF:** only the `/Rotate` entry of each affected page, set to `(original + delta) mod 360`. Page count, page order, content streams, extractable text, page boxes, document metadata and bookmarks are unchanged. Pages are not rasterized.
 - **Encrypted inputs:** the output is saved **without encryption** (it opens without a password). The result screen says so and offers "Protect" in the continue-in-another-tool list once F11 exists. *Assumption, to be confirmed against the reference by the evaluator.*
 - Output size stays within the input size plus 10% (no re-encoding bloat).
@@ -171,7 +171,7 @@ All ACs run on `/rotate-pdf`.
 ### Result screen
 
 - **AC-41 (P0)** After processing, a result screen appears with a Download control. Clicking it downloads a file named `three-pages.pdf` that is a valid PDF.
-- **AC-42 (P1)** With two inputs (`three-pages.pdf`, `sixty-pages.pdf`) the download is `instapdf-rotate.zip`. It contains exactly two PDFs with the original names and 3 and 60 pages, each rotated as chosen.
+- **AC-42 (P1)** With two inputs (`three-pages.pdf`, `sixty-pages.pdf`) the download is `berrypdf-rotate.zip`. It contains exactly two PDFs with the original names and 3 and 60 pages, each rotated as chosen.
 - **AC-43 (P1)** The result screen offers "continue in another tool". Choosing Rotate there opens the tool already in the ready state with the previous output loaded (3 thumbnails already shown rotated, no file picker step). Rotating right again and running gives `/Rotate 180` on every page.
 - **AC-44 (P0)** Start over returns to the empty state. No thumbnails remain, and picking a new file works normally.
 - **AC-45 (P2)** "Back to options" returns to the ready state with the same file and pending rotations.
@@ -273,7 +273,7 @@ The tool route renders `SiteHeader` (56 px: wordmark linking to `/`, "All tools"
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ InstaPDF                                                     All tools   │ header 56
+│ BerryPDF                                                     All tools   │ header 56
 ├──────────────────────────────────────────────────────────────────────────┤
 │  Rotate PDF                                                              │ h1 2xl
 │  Turn pages and save the rotation                                        │ fg-muted
@@ -301,7 +301,7 @@ The tool route renders `SiteHeader` (56 px: wordmark linking to `/`, "All tools"
 
 ```
 ┌────────────────────────────────────────────┐
-│ InstaPDF                        All tools  │
+│ BerryPDF                        All tools  │
 ├────────────────────────────────────────────┤
 │ Rotate PDF                                 │
 │ Turn pages and save the rotation           │
@@ -323,7 +323,7 @@ The tool route renders `SiteHeader` (56 px: wordmark linking to `/`, "All tools"
 
 ```
 ┌───────────────────────────────┐
-│ InstaPDF            All tools │
+│ BerryPDF            All tools │
 ├───────────────────────────────┤
 │ Rotate PDF                    │ h1 xl
 │ Turn pages and save the rot…  │

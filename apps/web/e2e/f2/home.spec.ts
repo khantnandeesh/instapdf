@@ -17,11 +17,11 @@ import {
 } from "./support";
 
 test.describe("hero and page basics", () => {
-  test("AC-1: / returns 200 with one h1, a title with InstaPDF and a meta description", async ({ page }) => {
+  test("AC-1: / returns 200 with one h1, a title with BerryPDF and a meta description", async ({ page }) => {
     const res = await page.goto("/");
     expect(res?.status()).toBe(200);
     await expect(page.locator("h1")).toHaveCount(1);
-    await expect(page).toHaveTitle(/InstaPDF/);
+    await expect(page).toHaveTitle(/BerryPDF/);
     expect((await page.locator('meta[name="description"]').getAttribute("content"))?.trim()).toBeTruthy();
   });
 
