@@ -1,5 +1,6 @@
 # Build context: repository root.  docker build -f apps/web/Dockerfile .
-FROM node:22-alpine AS build
+# Base image from Google's Docker Hub mirror: same official image, avoids anonymous pull rate limits (429).
+FROM mirror.gcr.io/library/node:22-alpine AS build
 WORKDIR /repo
 RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -8,7 +9,7 @@ RUN pnpm install --frozen-lockfile --filter web...
 COPY apps/web apps/web
 RUN pnpm --filter web build
 
-FROM node:22-alpine AS run
+FROM mirror.gcr.io/library/node:22-alpine AS run
 WORKDIR /app
 ENV NODE_ENV=production PORT=8080 HOSTNAME=0.0.0.0
 COPY --from=build /repo/apps/web/.next/standalone ./
