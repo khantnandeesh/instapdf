@@ -3,6 +3,8 @@
  * `ref` is the matching Sejda slug, used only by the parity evaluator.
  * `runtime`: "client" = processed in the browser, nothing uploaded; "server" = processing worker.
  */
+import { pdfOutputName, zipName } from "../lib/pdf/naming";
+
 export type ToolCategory =
   | "organize"
   | "edit"
@@ -13,6 +15,32 @@ export type ToolCategory =
   | "scans"
   | "automate";
 
+/** PDF permissions a tool may need (an owner-restricted file can deny them). */
+export type Permission = "print" | "modify" | "copy" | "annotate" | "fillForms" | "assemble";
+
+/**
+ * What the shared flow (pick files -> options -> run -> result) reads for a
+ * tool. See docs/specs/f1-shared-flow.md, "U-9".
+ */
+export type ToolFlowConfig = {
+  /** Accepted file types: MIME types and lower-case extensions with the dot. */
+  accept: { mime: string[]; extensions: string[] };
+  multiFile: boolean;
+  maxFiles: number;
+  maxFileBytes: number;
+  /** Total pages across every file in one task. */
+  maxTotalPages: number;
+  defaultView: "pages" | "files";
+  requiredPermissions: Permission[];
+  /** Primary button label, e.g. "Rotate PDF". */
+  actionLabel: string;
+  /** Progress label, e.g. "Rotating" (shown as "Rotating… 42%"). */
+  progressLabel: string;
+  optionsDensity: "compact" | "full";
+  /** Output file name for these input names (one PDF, or a ZIP for several). */
+  outputName: (inputs: string[]) => string;
+};
+
 export type Tool = {
   slug: string;
   name: string;
@@ -21,6 +49,38 @@ export type Tool = {
   runtime: "client" | "server";
   ref: string;
   status: "planned" | "beta" | "live";
+  /** Present once the tool runs on the shared flow. */
+  flow?: ToolFlowConfig;
+};
+
+const MB = 1024 * 1024;
+const PDF_ONLY = { mime: ["application/pdf"], extensions: [".pdf"] };
+
+/** Browser-tool defaults from the F1 spec (no free-tier gate for browser tools). */
+const clientPdfFlow = (
+  slug: string,
+  labels: Pick<ToolFlowConfig, "actionLabel" | "progressLabel">,
+  overrides: Partial<ToolFlowConfig> = {},
+): ToolFlowConfig => ({
+  accept: PDF_ONLY,
+  multiFile: true,
+  maxFiles: 20,
+  maxFileBytes: 100 * MB,
+  maxTotalPages: 1000,
+  defaultView: "pages",
+  requiredPermissions: [],
+  optionsDensity: "compact",
+  outputName: (inputs) => (inputs.length === 1 ? pdfOutputName(inputs[0]) : zipName(slug)),
+  ...labels,
+  ...overrides,
+});
+
+/** Tools that run on the shared flow, by slug. */
+const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = {
+  "rotate-pdf": {
+    status: "beta",
+    flow: clientPdfFlow("rotate-pdf", { actionLabel: "Rotate PDF", progressLabel: "Rotating" }),
+  },
 };
 
 const t = (
@@ -30,7 +90,7 @@ const t = (
   category: ToolCategory,
   runtime: Tool["runtime"],
   ref = slug,
-): Tool => ({ slug, name, summary, category, runtime, ref, status: "planned" });
+): Tool => ({ slug, name, summary, category, runtime, ref, status: "planned", ...flows[slug] });
 
 export const tools: Tool[] = [
   t("merge-pdf", "Merge", "Join PDFs and images into a single document", "organize", "client"),
@@ -81,3 +141,22 @@ export const tools: Tool[] = [
 ];
 
 export const toolBySlug = (slug: string) => tools.find((x) => x.slug === slug);
+
+/** A tool that is known to run on the shared flow. */
+export type FlowTool = Tool & { flow: ToolFlowConfig };
+
+export function flowTool(slug: string): FlowTool {
+  const tool = toolBySlug(slug);
+  if (!tool?.flow) throw new Error(`Tool ${slug} does not run on the shared flow`);
+  return tool as FlowTool;
+}
+
+/**
+ * Tools that can continue from an output of this MIME type: browser tools that
+ * are not planned and accept it (spec U-9).
+ */
+export function continueTargets(outputType: string): FlowTool[] {
+  return tools.filter(
+    (t): t is FlowTool => t.runtime === "client" && t.status !== "planned" && !!t.flow && t.flow.accept.mime.includes(outputType),
+  );
+}
