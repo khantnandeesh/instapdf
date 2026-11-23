@@ -1299,6 +1299,89 @@
   }
 }
 
+/* ---- Motion pass (owner 2026-11-23): quiet entrances, at most 400ms, CSS only -------------- */
+@layer components {
+  /* Tool tiles rise in, staggered per grid (the first dozen 30ms apart, the rest together). */
+  .mp-rise > li {
+    animation: mp-rise-in 360ms var(--ease-enter) both;
+  }
+  .mp-rise > li:nth-child(2) { animation-delay: 30ms; }
+  .mp-rise > li:nth-child(3) { animation-delay: 60ms; }
+  .mp-rise > li:nth-child(4) { animation-delay: 90ms; }
+  .mp-rise > li:nth-child(5) { animation-delay: 120ms; }
+  .mp-rise > li:nth-child(6) { animation-delay: 150ms; }
+  .mp-rise > li:nth-child(7) { animation-delay: 180ms; }
+  .mp-rise > li:nth-child(8) { animation-delay: 210ms; }
+  .mp-rise > li:nth-child(9) { animation-delay: 240ms; }
+  .mp-rise > li:nth-child(10) { animation-delay: 270ms; }
+  .mp-rise > li:nth-child(n + 11) { animation-delay: 300ms; }
+  /* Hero: title, line, button and note fade up one after another. */
+  .mp-hero > h1,
+  .mp-hero > p,
+  .mp-hero > div {
+    animation: mp-fade-up 400ms var(--ease-enter) both;
+  }
+  .mp-hero > p:first-of-type { animation-delay: 70ms; }
+  .mp-hero > div { animation-delay: 140ms; }
+  .mp-hero > p.mp-hero__note { animation-delay: 210ms; }
+  .mp-intro > h1,
+  .mp-enter {
+    animation: mp-fade-up 360ms var(--ease-enter) both;
+  }
+  /* Panels (drop card, result) pop in with the bundle's small overshoot. */
+  .mp-pop-in {
+    animation: mp-pop-in 380ms var(--ease-pop) both;
+  }
+  .mp-tick-in {
+    animation: mp-pop-in 400ms var(--ease-pop) 160ms both;
+  }
+  /* The empty-state card's outline breathes in pale berry, inviting a drop. */
+  .mp-dropcard {
+    animation:
+      mp-pop-in 380ms var(--ease-pop) both,
+      mp-breathe 3.2s ease-in-out 400ms infinite;
+  }
+  /* Rendered page thumbnails ease in (fade + settle from 98%). */
+  .mp-thumb-in {
+    animation: mp-thumb-in 300ms var(--ease-enter) both;
+  }
+}
+@keyframes mp-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+@keyframes mp-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes mp-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+}
+@keyframes mp-thumb-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@keyframes mp-breathe {
+  0%,
+  100% {
+    border-color: var(--sand);
+    box-shadow: var(--shadow-card), 0 0 0 0 rgba(217, 43, 75, 0);
+  }
+  50% {
+    border-color: var(--mp-card-hover-border);
+    box-shadow: var(--shadow-card), 0 0 0 8px rgba(217, 43, 75, 0.07);
+  }
+}
+
 /* BerryPDF (motion.md): under reduced motion, drop every animation and transition; the berry loader
    stands still as a whole berry (below). The one exception is the small busy indicator (F1 U-4: it
    carries state), which pulses instead of freezing. */

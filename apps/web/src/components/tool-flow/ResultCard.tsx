@@ -74,9 +74,9 @@ export function ResultCard({
   return (
     // BerryPDF Panel: one centred white panel (20px radius, sand outline, soft pink shadow);
     // Download is the single berry action. A leaf-green tick says "done" (success, not category).
-    <section aria-labelledby={titleId} className="mp-panel mx-auto w-full max-w-[760px] p-5 sm:p-10" data-testid="result">
+    <section aria-labelledby={titleId} className="mp-panel mp-pop-in mx-auto w-full max-w-[760px] p-5 sm:p-10" data-testid="result">
       <h2 id={titleId} className="flex items-center gap-3 font-display text-[22px] leading-[1.2] font-semibold text-ink-black">
-        <span className="grid size-10 place-items-center rounded-full bg-[var(--mp-alert-ok-bg)] text-leaf">
+        <span className="mp-tick-in grid size-10 place-items-center rounded-full bg-[var(--mp-alert-ok-bg)] text-leaf">
           <CheckIcon size={24} />
         </span>
         {copy.resultTitle(isZip)}
