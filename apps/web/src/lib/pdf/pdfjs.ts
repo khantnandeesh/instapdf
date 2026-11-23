@@ -89,8 +89,12 @@ export async function readPageSizes(doc: PDFDocumentProxy, signal?: AbortSignal)
     await Promise.all(
       Array.from({ length: end - start }, async (_, k) => {
         const page = await doc.getPage(start + k + 1);
-        const vp = page.getViewport({ scale: 1 });
-        sizes[start + k] = { width: vp.width, height: vp.height };
+        try {
+          const vp = page.getViewport({ scale: 1 });
+          sizes[start + k] = { width: vp.width, height: vp.height };
+        } finally {
+          page.cleanup();
+        }
       }),
     );
   }

@@ -31,9 +31,25 @@ export function ResultCard({
 }) {
   const download = useRef<HTMLAnchorElement>(null);
   const isZip = output.type === "application/zip";
-  const url = useMemo(() => URL.createObjectURL(output.blob), [output.blob]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
-  useEffect(() => download.current?.focus(), []);
+  // Created in an effect and revoked in its cleanup, so StrictMode's double
+  // mount never leaves the link pointing at a revoked URL.
+  const [url, setUrl] = useState<string | undefined>();
+  useEffect(() => {
+    const u = URL.createObjectURL(output.blob);
+    setUrl(u);
+    return () => {
+      URL.revokeObjectURL(u);
+      setUrl(undefined);
+    };
+  }, [output.blob]);
+  // Focus lands on Download once it is a real link (it needs its href to be focusable).
+  const focused = useRef(false);
+  useEffect(() => {
+    if (url && !focused.current) {
+      focused.current = true;
+      download.current?.focus();
+    }
+  }, [url]);
   const [downloaded, setDownloaded] = useState(false);
   useEffect(() => {
     if (!downloaded) return;
@@ -168,6 +184,10 @@ function ResultPreview({ output }: { output: ToolOutput }) {
       const bytes = new Uint8Array(await output.blob.arrayBuffer());
       const r = await openPdf(bytes);
       if (!r.ok) return;
+      if (!alive) {
+        void r.pdf.task.destroy(); // unmounted while opening: nothing will clean up later
+        return;
+      }
       destroy = () => void r.pdf.task.destroy();
       const box = host.current?.parentElement?.clientWidth || 240;
       const canvas = await renderPage(r.pdf.doc, 0, box);
