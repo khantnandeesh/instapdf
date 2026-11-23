@@ -6,7 +6,7 @@ The build-time scan, `scripts/licenses.mjs`, also lists them on `/licenses` and 
 
 ## Fredoka (font)
 
-- Package: `@fontsource/fredoka` 5.3.0 (pinned; files `files/fredoka-latin-400-normal.woff2`, `-500-`, `-600-` and `-700-normal.woff2`, latin subset)
+- Package: `@fontsource-variable/fredoka` 5.3.0 (pinned; file `files/fredoka-latin-wght-normal.woff2`, the variable weight axis 300–700, latin subset)
 - Upstream: The Fredoka Project Authors (https://github.com/hafontia/Fredoka-One, via Google Fonts)
 - Copyright 2016 The Fredoka Project Authors
 - License: SIL Open Font License, Version 1.1 (OFL-1.1, as declared in the installed package's `package.json` and `LICENSE`), reproduced below

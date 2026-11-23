@@ -78,13 +78,25 @@ function readRaw(): string | null {
 }
 
 function write(list: string[] | null) {
-  try {
-    const s = storage();
-    if (!s) return;
-    if (list === null) s.removeItem(RECENT_KEY);
-    else s.setItem(RECENT_KEY, JSON.stringify(list));
-  } catch {
-    // Storage full or blocked: recent tools are a convenience, so stay silent.
+  const s = storage();
+  if (s) {
+    if (list === null) {
+      // Clear removes both keys, each on its own: when the migration could not run (storage
+      // full), the old key is still there and must not bring the list back after Clear.
+      for (const key of [RECENT_KEY, LEGACY_RECENT_KEY]) {
+        try {
+          s.removeItem(key);
+        } catch {
+          // Blocked: nothing more we can do.
+        }
+      }
+    } else {
+      try {
+        s.setItem(RECENT_KEY, JSON.stringify(list));
+      } catch {
+        // Storage full or blocked: recent tools are a convenience, so stay silent.
+      }
+    }
   }
   emit();
 }

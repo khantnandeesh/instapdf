@@ -457,6 +457,24 @@ test.describe("privacy, accessibility, layout", () => {
     expect(scripts.filter((s) => /pdf\.worker|pdfjs/i.test(s.url)).map((s) => s.url)).toEqual([]);
   });
 
+  test("fonts: one self-hosted variable Fredoka file is preloaded (not four static weights), and the page loads no other font", async ({ page, request }) => {
+    await page.goto("/", { waitUntil: "networkidle" });
+    const preloads = await page.locator('link[rel="preload"][as="font"]').evaluateAll((ls) => ls.map((l) => (l as HTMLLinkElement).href));
+    expect(preloads).toHaveLength(1);
+    const origin = new URL(page.url()).origin;
+    expect(new URL(preloads[0]).origin).toBe(origin);
+    const bytes = (await (await request.get(preloads[0])).body()).length;
+    expect(bytes, "variable latin file, about 30 KB").toBeLessThanOrEqual(36 * 1024);
+    const fonts = await page.evaluate(() => performance.getEntriesByType("resource").filter((e) => /\.woff2?($|\?)/.test(e.name)).map((e) => e.name));
+    expect(new Set(fonts).size).toBe(1);
+    // Every weight we use comes from that one face.
+    const weights = await page.evaluate(async () => {
+      await document.fonts.ready;
+      return [...document.fonts].filter((f) => f.status === "loaded" && !/fallback/i.test(f.family)).map((f) => f.weight);
+    });
+    expect(weights).toEqual(["300 700"]);
+  });
+
   test("AC-57: no horizontal scroll at 320, 375, 768, 1024 and 1440 px", async ({ page }) => {
     for (const width of [320, 375, 768, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 });

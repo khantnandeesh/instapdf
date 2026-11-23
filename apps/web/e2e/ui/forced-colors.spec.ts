@@ -77,3 +77,18 @@ test("forced colors: Tab focus on the checked segment still shows the focus ring
   // BerryPDF: buttons and choice tiles show the 3px blueberry ring 3px away.
   expect(o.offset).toBe(3);
 });
+
+test("forced colors: the password dialog's apply-to-all checkbox shows its checked state", async ({ page }) => {
+  await openRotate(page);
+  await pick(page, "user-pw.pdf", "user-pw-2.pdf");
+  await expect(dialog(page)).toBeVisible();
+  const box = dialog(page).getByRole("checkbox");
+  await expect(box).not.toBeChecked();
+  // The system checkbox (not our drawn one) is used, so the system draws the tick.
+  expect(await box.evaluate((e) => getComputedStyle(e).appearance)).toBe("auto");
+  const before = await box.screenshot({ animations: "disabled" });
+  await box.check();
+  await expect(box).toBeChecked();
+  const after = await box.screenshot({ animations: "disabled" });
+  expect(after.equals(before), "checked and unchecked must look different").toBe(false);
+});

@@ -118,6 +118,22 @@ describe("storage", () => {
     expect(readRecent()).toEqual([]);
   });
 
+  it("clears both keys when a full storage stopped the migration (old key never comes back)", () => {
+    store.setItem(LEGACY_RECENT_KEY, '["rotate-pdf"]');
+    const realSet = store.setItem.bind(store);
+    store.setItem = () => {
+      throw new Error("QuotaExceededError");
+    };
+    expect(readRecent()).toEqual(["rotate-pdf"]); // migration failed, old key still read
+    expect(store.getItem(LEGACY_RECENT_KEY)).toBe('["rotate-pdf"]');
+    clearRecent();
+    expect(store.getItem(RECENT_KEY)).toBeNull();
+    expect(store.getItem(LEGACY_RECENT_KEY)).toBeNull();
+    expect(readRecent()).toEqual([]);
+    store.setItem = realSet;
+    expect(readRecent()).toEqual([]);
+  });
+
   it("survives writes that throw, e.g. quota exceeded (AC-45)", () => {
     store.setItem(RECENT_KEY, '["rotate-pdf"]');
     store.setItem = () => {

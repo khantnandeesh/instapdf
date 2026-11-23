@@ -11,17 +11,13 @@ import { SkipLink } from "@/components/site/SkipLink";
 import "./globals.css";
 
 /**
- * Fredoka (BerryPDF's one family), latin subset, weights 400, 500, 600 and 700, self-hosted from
- * @fontsource/fredoka (SIL OFL 1.1, see THIRD-PARTY-NOTICES.md). No request leaves our origin.
- * Falls back to the system stack, metric-adjusted so the swap does not shift.
+ * Fredoka (BerryPDF's one family), latin subset, as one variable-weight file (300-700) self-hosted
+ * from @fontsource-variable/fredoka (SIL OFL 1.1, see THIRD-PARTY-NOTICES.md): a single ~30 KB
+ * preload covers the 400, 500, 600 and 700 we use, instead of four static files (~64 KB).
+ * No request leaves our origin. Falls back to the system stack, metric-adjusted so the swap does not shift.
  */
 const fredoka = localFont({
-  src: [
-    { path: "../../node_modules/@fontsource/fredoka/files/fredoka-latin-400-normal.woff2", weight: "400", style: "normal" },
-    { path: "../../node_modules/@fontsource/fredoka/files/fredoka-latin-500-normal.woff2", weight: "500", style: "normal" },
-    { path: "../../node_modules/@fontsource/fredoka/files/fredoka-latin-600-normal.woff2", weight: "600", style: "normal" },
-    { path: "../../node_modules/@fontsource/fredoka/files/fredoka-latin-700-normal.woff2", weight: "700", style: "normal" },
-  ],
+  src: [{ path: "../../node_modules/@fontsource-variable/fredoka/files/fredoka-latin-wght-normal.woff2", weight: "300 700", style: "normal" }],
   variable: "--font-fredoka",
   display: "swap",
   preload: true,

@@ -141,8 +141,9 @@ export function Dialog({
             )}
           </div>
           {children}
-          {/* BerryPDF: equal-width buttons, the quiet one on the left and the filled one on the right (DOM order = Tab order). */}
-          {footer && <div className="grid auto-cols-fr grid-flow-col gap-3 [&>*]:px-2.5">{footer}</div>}
+          {/* BerryPDF: equal-width buttons, the quiet one on the left and the filled one on the right (DOM order = Tab order).
+              Below 640px they stack full width (filled one last), so three buttons never overflow a phone. */}
+          {footer && <div className="grid grid-cols-1 gap-3 sm:auto-cols-fr sm:grid-flow-col sm:grid-cols-none [&>*]:px-2.5" data-testid="dialog-footer">{footer}</div>}
         </div>
       )}
     </dialog>
