@@ -178,15 +178,15 @@ All run against the staging site. "Usable" means registry status `beta` or `live
 - **AC-1 (P0)** `GET /` returns 200. The page has exactly one `h1`, a `<title>` containing "BerryPDF" and a non-empty meta description.
 - **AC-2 (P0)** The hero's primary call to action is visible without scrolling at both 1366×900 and 375×812.
 - **AC-3 (P0)** Activating the primary call to action, while the `featured` tool is planned, brings the catalogue heading into the viewport, sets the URL hash to `#tools` and focuses the catalogue search field. If the featured tool is usable, it navigates to `/<featured slug>` instead.
-- **AC-4 (P1)** The hero's "see all tools" link shows the registry tool count [45] and scrolls the catalogue heading into view.
+- **AC-4 (P1)** ~~The hero's "see all tools" link shows the registry tool count [45] and scrolls the catalogue heading into view.~~ Changed 2026-11-23 per owner: minimal text. The hero is the title, one short line, the main action (which already scrolls to the catalogue, AC-3) and one short privacy note; there is no separate see-all link.
 
 ### Catalogue
 
 - **AC-5 (P0)** The category sections of the catalogue (not counting Popular or Recent) contain exactly one link per registry tool [45]. The set of hrefs equals `/<slug>` for every registry slug, with no duplicates.
 - **AC-6 (P0)** The category headings appear in this order: Organize pages, Edit & sign, Optimize, Security, Convert from PDF, Convert to PDF, Scans, Automate (our labels may differ in wording but not in order or grouping). Each tool sits under its registry category.
-- **AC-7 (P0)** Each card shows the tool's registry name and summary, and the whole card is a single link.
+- **AC-7 (P0)** Each card shows the tool's registry name, and the whole card is a single link. The summary is part of the link's accessible name (visually hidden) and its `title` tooltip. (Changed 2026-11-23 per owner: minimal text; the summary line is no longer drawn.)
 - **AC-8 (P0)** The Rotate card links to `/rotate-pdf`, has no coming-soon badge, and clicking it opens the Rotate tool in its empty state (a file input that accepts `.pdf` is present).
-- **AC-9 (P0)** Every planned tool card [44] shows a visible "Coming soon" badge, and its link's accessible name includes it. No usable tool card shows it.
+- **AC-9 (P0)** Every planned tool card [44] shows a visible status mark ("Soon"), and its link's accessible name includes "Coming soon". No usable tool card shows it. (Changed 2026-11-23 per owner: minimal text; the visible mark is the short "Soon".)
 - **AC-10 (P0)** A crawl of every internal `href` on `/` (header, menu, catalogue, footer) finds no response with status ≥ 400.
 - **AC-11 (P1)** A Popular row appears above the category sections, whatever the number of usable tools in it. It holds the registry's popular tools, usable ones first and then planned ones, each part in the fixed popular order [today: Rotate, then Edit PDF, Compress, Delete pages, Merge, Split, Crop, Fill & sign, PDF to Word, Extract pages], with the same badges as the catalogue.
 - **AC-12 (P1)** With JavaScript disabled, `/` still contains every catalogue link [45] (server-rendered).
@@ -248,7 +248,7 @@ All run against the staging site. "Usable" means registry status `beta` or `live
 ### Footer
 
 - **AC-52 (P0)** Every page from AC-23 has a footer with links to All tools, About, Help, Privacy, Terms, Cookies and Security, and a copyright line with the current year. Each of those links returns 200.
-- **AC-53 (P2)** The footer has an A–Z list of every registry tool [45 links], each going to `/<slug>`.
+- **AC-53 (P2)** The footer has an A–Z list of every registry tool [45 links], each going to `/<slug>`. (Changed 2026-11-23 per owner: compact footer; the list is folded under a "Tools A–Z" toggle and planned entries carry no visible "Soon", only ", coming soon" for screen readers.)
 
 ### Privacy, performance, accessibility
 
@@ -304,7 +304,7 @@ Quick read of the field: all six show a grid of tool cards with an icon each, gr
 
 The evaluator does not hold the reference to these, but they must work on staging.
 
-- **AC-59 (P1) (improvement)** Every catalogue card and menu entry of a tool with registry `runtime: "client"` shows a visible "Runs in your browser" marker (an icon with text, or text alone). The marker text is part of the link's accessible name. Tools with `runtime: "server"` do not show it. This also applies to planned tools, because it describes how the tool will work.
+- **AC-59 (P1) (improvement)** Every catalogue card and menu entry of a tool with registry `runtime: "client"` shows a visible "Runs in your browser" marker (an icon with text, or text alone). The marker text is part of the link's accessible name. Tools with `runtime: "server"` do not show it. This also applies to planned tools, because it describes how the tool will work. (Changed 2026-11-23 per owner: minimal text; the marker is no longer drawn, it stays in the accessible name, visually hidden.)
 - **AC-60 (P2) (improvement)** Every catalogue card and menu entry shows an icon. Icons are inline SVG with `aria-hidden="true"` (the name stays the accessible label), loading `/` makes no extra network request for icons, and the icon package's license is MIT, ISC, Apache-2.0 or BSD.
 - **AC-61 (P2) (improvement)** Pressing `/` while focus is not in a text input, textarea or contenteditable element focuses the catalogue search field on `/`, and opens the tool menu with its search field focused on any other page. The `/` character is not typed into the field. Pressing `/` inside a text field types it normally.
 - **AC-62 (P2) (improvement)** Typing in the catalogue search updates the URL to `/?q=<query>` with `replaceState` (no new history entries per keystroke). An empty query removes `q`. Loading `/?q=split` shows the same filtered result as typing `split` (AC-15) with the query in the field. The server HTML for `/?q=…` still contains all catalogue links (AC-12).
@@ -584,7 +584,7 @@ Shared frame on every page (root layout): skip link → `SiteHeader` (56 px, sti
 - `surface` background, top `border`, padding 48 top / 32 bottom, `mt-24` (64 below 640) after `main`.
 - ≥ 1024: grid `[brand 240px] [tools 1fr] [company 140px] [legal 140px]`; the A–Z list uses `columns: 4` (3 at 1024–1279). 640–1023: brand row on top, then tools (`columns: 3`), then company and legal side by side. < 640: brand, tools (`columns: 2`), company and legal side by side.
 - Each group is a `nav` with an `h2` (`sm` 600 `fg`), links `sm` `fg-muted` hover `fg` underline. Link rows are 32 px at ≥ 1024 and 44 px below 1024 (touch).
-- A–Z tool links show a trailing "Soon" text in `xs fg-muted` for planned tools, with the full "Coming soon" in the accessible name (`<span aria-hidden>Soon</span><span class="sr-only">, coming soon</span>`). Footer entries carry no runtime marker (AC-59 covers cards and menu entries only).
+- *(Changed 2026-11-23 per owner: minimal text: no visible "Soon" in the footer, only the sr-only ", coming soon"; the list is folded under a "Tools A–Z" toggle.)* A–Z tool links show a trailing "Soon" text in `xs fg-muted` for planned tools, with the full "Coming soon" in the accessible name (`<span aria-hidden>Soon</span><span class="sr-only">, coming soon</span>`). Footer entries carry no runtime marker (AC-59 covers cards and menu entries only).
 - Bottom line: `© {current year} BerryPDF` and "Browser tools never upload your files." (`xs fg-muted`). The year is computed at render; the page is static, so the build year shows until the next deploy, which happens far more often than yearly. A unit test pins "current year at build".
 - **Tool routes with the F1 dock:** below 1024 the dock is `position: fixed` at the bottom, so it would cover the end of the footer. Move the dock clearance from `main` to the footer: add `data-ip-dock` to `ControlDock`'s root and in `globals.css`:
   `@media (max-width: 1023px) { body:has([data-ip-dock]) .ip-site-footer { padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px); } }`
@@ -613,7 +613,7 @@ Shared frame on every page (root layout): skip link → `SiteHeader` (56 px, sti
 ```
 
 - Same container and gutters as the F1 tool page, so the `h1` sits in the same place before and after the tool ships.
-- Status panel: `surface` background, 2 px dashed `border` (decorative), `rounded-xl`, padding 32 (24 below 640), content start-aligned at ≥ 640 and centered below. Clock icon 40 in a `surface-sunken` circle, `h2` "Coming soon" (`lg` 600), body `base fg-muted`. The runtime line appears only for `runtime: "client"` tools; server tools get "When it's ready, files you add will be processed on our servers and deleted within 2 hours." **No file input of any kind** (AC-48).
+- *(Changed 2026-11-23 per owner: minimal text: the page is now the `h1`, the "Coming soon" tag, one "Browse all tools" button and "Ready now"; the summary, body and runtime lines are gone.)* Status panel: `surface` background, 2 px dashed `border` (decorative), `rounded-xl`, padding 32 (24 below 640), content start-aligned at ≥ 640 and centered below. Clock icon 40 in a `surface-sunken` circle, `h2` "Coming soon" (`lg` 600), body `base fg-muted`. The runtime line appears only for `runtime: "client"` tools; server tools get "When it's ready, files you add will be processed on our servers and deleted within 2 hours." **No file input of any kind** (AC-48).
 - Primary: `Button primary md` link "Browse all tools" → `/#tools`. The "← All tools" link above the `h1` also goes to `/#tools`.
 - "Ready to use now": `ToolCard` grid of usable tools (registry order). If none were usable the section would be omitted.
 - `<title>` "Merge (coming soon) · BerryPDF", `robots: noindex`.

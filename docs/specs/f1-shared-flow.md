@@ -367,7 +367,7 @@ Location: primitives in `apps/web/src/components/ui/` (design-system, owned by u
 
 ```
 <ToolFlow tool={toolConfig} options={<RotateOptions/>} pageActions={RotatePageActions} process={rotate}>
-├─ <ToolIntro/>                         h1 + summary
+├─ <ToolIntro/>                         h1
 ├─ <DropOverlay/>                        fixed, shown while dragging over the page
 ├─ <NoticeStack/>                        floating intake and limit notices
 ├─ <LiveRegion/>
@@ -395,10 +395,10 @@ Location: primitives in `apps/web/src/components/ui/` (design-system, owned by u
 | Component | Props / slots | Behavior and look |
 |---|---|---|
 | `ToolFlow` | `tool: ToolFlowConfig` (see U-9), `options: ReactNode`, `pageActions?: ComponentType<PageActionProps>`, `pageTransform?: (pageRef) => {rotate: number}` (what the tile should display), `canRun?: () => true \| string` (string = reason shown in `DockStatus`), `process: (files, signal, onProgress) => Promise<ToolOutput>`, `initialFiles?: File[] \| ToolOutput` (continue-in-another-tool) | Owns the state machine, intake, password queue, notices, leave guard and paste listener. Renders the layout grid. `data-state` attribute on its root (`empty`, `loading`, `password`, `ready`, `processing`, `done`, `error`) for tests and CSS. Root is a drop target. |
-| `ToolIntro` | `title`, `summary` | `h1` (`2xl`, `xl` below 640) and one `fg-muted` line. Same in every state, so the page never jumps. |
+| `ToolIntro` | `title` | `h1` (`2xl`, `xl` below 640); the `fg-muted` summary line is gone *(changed 2026-11-23 per owner: minimal text)*. Same in every state, so the page never jumps. |
 | `DropCard` | children | `surface-raised` card, 2 px dashed `border-strong`, `rounded-xl`. Center stack: file icon (48, `primary`), primary `Button lg` "Choose PDF files", hint line "or drop them here · paste with Ctrl+V" (`⌘V` on macOS; only for `pointer: fine`), then `LimitsNote` and `PrivacyNote`. Hover on the card: border turns `primary`. The whole card is not a button (avoids a giant ambiguous target); the button is the control. |
 | `FilePicker` | `accept: string`, `multiple: boolean`, `onFiles(files: File[])`, `label`, `variant`, `sources?: ReactNode` (dropdown slot, AC-11) | Visible `Button` that clicks a visually hidden `<input type="file">` (keep the input in the DOM, `class="sr-only"`, `tabindex=-1`, so `setInputFiles` works). Resets `input.value` after each pick so the same file can be picked twice. `sources` slot: in F1 render nothing (AC-11 "no entries"); later a caret `IconButton` "More ways to add files" opening a menu. Prefetch: on `pointerenter`/`focus` of the button, start `import()` of the pdf.js loader so parsing starts warm. |
-| `LimitsNote` | `tool` | `sm fg-muted`: "PDF only · up to 20 files, 100 MB each, 500 MB and 1,000 pages in total". Built from registry caps. |
+| `LimitsNote` | `tool` | `sm fg-muted`: "Up to 20 files, 100 MB each"; the full "PDF only · up to 20 files, 100 MB each, 500 MB and 1,000 pages in total" is its tooltip and screen-reader text *(changed 2026-11-23 per owner: minimal text)*. Built from registry caps. |
 | `PrivacyNote` | `runtime: "client" \| "server"`, `context: "intro" \| "result"` | Lock icon (`success`) + `sm` text. Client/intro: "Your files stay on this device. Nothing is uploaded." Client/result: "Done on this device. Your file was never uploaded." (AC-57). Server: different copy owned by F6; result variant not rendered for server (AC-57). |
 | `DropOverlay` | `active: boolean`, `mode: "add" \| "replace"` | `position: fixed; inset: 0`, `drop-overlay` background, inner `inset: 12px` 2 px dashed `primary` border `rounded-xl`, centered icon and `lg` text "Drop to add files" / "Drop to replace the file". `aria-hidden`, `pointer-events: none`. Driven by a drag counter (`dragenter` ++ / `dragleave` --) so nested elements don't flicker; reset on `drop` and on `dragend`/window `blur`. Only reacts when `dataTransfer.types` includes `Files`. |
 | `NoticeStack` | `notices: {id, tone, title, body, fileName?}[]`, `onDismiss(id)` | Fixed, anchored above the dock: bottom `calc(dock height + 12px)` below 1024; at ≥ 1024 bottom-left of the workspace column (`bottom: 24px`, inset to the workspace). Width `min(480px, 100vw - 32px)`. Newest on top, max 3 visible plus "+N more" button that expands. **Errors never auto-dismiss.** Info notices (e.g. "Loaded 20 of 21 files") also stay until dismissed or the next intake. Because it floats, adding or removing a notice never moves content. |
@@ -442,11 +442,11 @@ Location: primitives in `apps/web/src/components/ui/` (design-system, owned by u
 
 | Key | Text |
 |---|---|
-| intro.rotate.title / summary | "Rotate PDF" / "Turn pages and save the rotation" (from the registry) |
+| intro.rotate.title | "Rotate PDF" (the summary line is no longer shown on the page; it stays the meta description) *(changed 2026-11-23 per owner: minimal text)* |
 | picker.button | "Choose PDF files" ("Choose PDF file" for single-file tools) |
-| picker.hint | "or drop them here · paste with Ctrl+V" |
-| privacy.intro | "Your files stay on this device. Nothing is uploaded." |
-| privacy.result | "Done on this device. Your file was never uploaded." |
+| picker.hint | "or drop them here" (paste still works, AC-55; it is just not advertised) *(changed 2026-11-23 per owner: minimal text)* |
+| privacy.intro | "Your files stay on this device." *(changed 2026-11-23 per owner: minimal text)* |
+| privacy.result | "Done on this device. Never uploaded." *(changed 2026-11-23 per owner: minimal text)* |
 | status.empty / loading / password / ready | "Add a PDF to start" / "Reading files…" / "Waiting for a password" / "{pages} pages · {files} file(s)" |
 | action.rotate | "Rotate PDF" (registry `actionLabel`) |
 | progress.rotate | "Rotating… {n}%" |
