@@ -60,12 +60,10 @@ function Meta({ item, className }: { item: ToolIndexItem; className?: string }) 
   );
 }
 
-function IconTile({ item, size = 40 }: { item: ToolIndexItem; size?: number }) {
+/** 40px square. A class, not a style attribute: the CSP has no style-src 'unsafe-inline'. */
+function IconTile({ item }: { item: ToolIndexItem }) {
   return (
-    <span
-      className={cx("grid shrink-0 place-items-center rounded-md", usable(item) ? "bg-primary-soft text-primary" : "bg-surface-sunken text-fg-muted")}
-      style={{ width: size, height: size }}
-    >
+    <span className={cx("grid size-10 shrink-0 place-items-center rounded-md", usable(item) ? "bg-primary-soft text-primary" : "bg-surface-sunken text-fg-muted")}>
       {item.icon}
     </span>
   );
