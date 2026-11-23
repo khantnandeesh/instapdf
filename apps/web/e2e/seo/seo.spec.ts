@@ -1,7 +1,7 @@
 /**
  * SEO checklist, automated (docs/process/workflow.md "SEO checklist", docs/seo/strategy.md).
- * Runs against the production server (`pnpm build && pnpm start`): metadata, robots and the
- * sitemap are only final in a production build. Every indexable page is checked, so a new tool
+ * Runs against the production server (`pnpm build && SITE_INDEXABLE=1 pnpm start`, which the
+ * Playwright config does): metadata, robots and the sitemap are only final in a production build. Every indexable page is checked, so a new tool
  * page is covered as soon as it is usable.
  */
 import { expect, test, type Page } from "@playwright/test";
@@ -150,7 +150,7 @@ test.describe("crawl controls", () => {
   });
 
   test("staging and other hosts are never indexed", async ({ request }) => {
-    const headers = { "x-forwarded-host": STAGING_HOST };
+    const headers = { host: STAGING_HOST };
     const txt = await (await request.get("/robots.txt", { headers })).text();
     expect(txt).toMatch(/Disallow: \/\s*$/m);
     expect(txt).not.toContain("Sitemap:");
@@ -158,6 +158,20 @@ test.describe("crawl controls", () => {
       const res = await request.get(path, { headers });
       expect(res.headers()["x-robots-tag"]).toBe("noindex, nofollow");
     }
+  });
+
+  test("a client-set X-Forwarded-Host cannot change indexing", async ({ request }) => {
+    const res = await request.get("/rotate-pdf", { headers: { "x-forwarded-host": STAGING_HOST } });
+    expect(res.headers()["x-robots-tag"]).toBeUndefined();
+  });
+
+  test("the Organization logo in structured data exists", async ({ page, request }) => {
+    await page.goto("/");
+    const raw = await page.locator('script[type="application/ld+json"]').first().textContent();
+    const org = (JSON.parse(raw!)["@graph"] as { "@type": string; logo?: string }[]).find((t) => t["@type"] === "Organization");
+    const res = await request.get(org!.logo!.replace(SITE_ORIGIN, ""));
+    expect(res.status()).toBe(200);
+    expect(res.headers()["content-type"]).toBe("image/png");
   });
 
   test("coming-soon tools are noindex and stay out of the sitemap", async ({ page }) => {

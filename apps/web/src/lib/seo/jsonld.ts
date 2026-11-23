@@ -27,7 +27,7 @@ export function organizationLd(): Thing {
     "@id": ORG_ID,
     name: SITE_NAME,
     url: absoluteUrl("/"),
-    logo: absoluteUrl("/icon.png"),
+    logo: absoluteUrl("/logo.png"),
   };
 }
 

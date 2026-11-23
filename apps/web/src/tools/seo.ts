@@ -329,7 +329,7 @@ export const seoContent: Record<string, ToolSeoContent> = {
       },
       {
         q: "Are my files uploaded?",
-        a: "No. Rotation runs in your browser and the page is not allowed to send your files anywhere, so they stay on your device.",
+        a: "No. Rotation runs in your browser, so your files stay on your device.",
       },
       {
         q: "Can I rotate a password-protected PDF?",

@@ -5,5 +5,5 @@ export const size = ogSize;
 export const contentType = ogContentType;
 
 export default function Image() {
-  return ogImage({ title: "Free PDF tools", line: "Fast and private. Most tools never upload your files." });
+  return ogImage({ title: "Free PDF tools", line: "Fast and private, right in your browser." });
 }

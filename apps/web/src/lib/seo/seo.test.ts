@@ -3,15 +3,18 @@ import { languageAlternates } from "./i18n";
 import { jsonLdString } from "./jsonld";
 import { pageMetadata } from "./metadata";
 import { indexableRoutes } from "./routes";
-import { absoluteUrl, isIndexableHost, SITE_HOST } from "./site";
+import { absoluteUrl, isIndexable, SITE_HOST } from "./site";
 
 describe("seo foundations", () => {
-  it("indexes only the canonical host (and localhost for checks)", () => {
-    expect(isIndexableHost(SITE_HOST)).toBe(true);
-    expect(isIndexableHost("web-staging-qzq5fa2g7q-uc.a.run.app")).toBe(false);
-    expect(isIndexableHost("web-prod-abc-uc.a.run.app")).toBe(false);
-    expect(isIndexableHost(null)).toBe(false);
-    expect(isIndexableHost("localhost:3000")).toBe(true);
+  it("indexes only prod (SITE_INDEXABLE=1) on the canonical host", () => {
+    const prod = { SITE_INDEXABLE: "1" };
+    expect(isIndexable(SITE_HOST, prod)).toBe(true);
+    expect(isIndexable("localhost:3000", prod)).toBe(true);
+    expect(isIndexable(SITE_HOST, {})).toBe(false);
+    expect(isIndexable("web-staging-qzq5fa2g7q-uc.a.run.app", prod)).toBe(false);
+    expect(isIndexable("127.0.0.1.evil.example", prod)).toBe(false);
+    expect(isIndexable(`${SITE_HOST}, evil.example`, prod)).toBe(false);
+    expect(isIndexable(null, prod)).toBe(false);
   });
   it("builds absolute URLs", () => {
     expect(absoluteUrl("/rotate-pdf")).toMatch(/^https:\/\/[^/]+\/rotate-pdf$/);

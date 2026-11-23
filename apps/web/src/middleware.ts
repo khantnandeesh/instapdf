@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
 import { contentSecurityPolicy, hashesFor, type CspManifest } from "@/lib/security/csp";
-import { isIndexableHost } from "@/lib/seo/site";
+import { isIndexable } from "@/lib/seo/site";
 
 export const config = {
   runtime: "nodejs",
@@ -39,8 +39,8 @@ export function middleware(request: NextRequest) {
   const policy = dev ? contentSecurityPolicy({ dev }) : contentSecurityPolicy({ scriptHashes: hashesFor(loadManifest(), request.nextUrl.pathname) });
   const response = NextResponse.next();
   response.headers.set("Content-Security-Policy", policy);
-  // Only the canonical host may be indexed (src/lib/seo/site.ts): staging and raw Cloud Run URLs never are.
-  if (!isIndexableHost(request.headers.get("x-forwarded-host") ?? request.headers.get("host"))) {
+  // Only prod on the canonical host may be indexed (src/lib/seo/site.ts): staging and raw Cloud Run URLs never are.
+  if (!isIndexable(request.headers.get("host"))) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
   return response;
