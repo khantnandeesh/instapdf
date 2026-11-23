@@ -22,6 +22,7 @@ describe("flow config", () => {
     expect(rotate.flow.maxTotalPages).toBe(1000);
     expect(rotate.flow.requiredPermissions).toEqual([]);
     expect(rotate.flow.actionLabel).toBe("Rotate PDF");
+    expect(rotate.flow.title).toBe("Rotate PDF");
     expect(rotate.flow.outputName(["three-pages.pdf"])).toBe("three-pages.pdf");
     expect(rotate.flow.outputName(["a.pdf", "b.pdf"])).toBe("instapdf-rotate.zip");
   });

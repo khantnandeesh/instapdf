@@ -23,6 +23,8 @@ export type Permission = "print" | "modify" | "copy" | "annotate" | "fillForms" 
  * tool. See docs/specs/f1-shared-flow.md, "U-9".
  */
 export type ToolFlowConfig = {
+  /** Page heading, e.g. "Rotate PDF". */
+  title: string;
   /** Accepted file types: MIME types and lower-case extensions with the dot. */
   accept: { mime: string[]; extensions: string[] };
   multiFile: boolean;
@@ -59,7 +61,7 @@ const PDF_ONLY = { mime: ["application/pdf"], extensions: [".pdf"] };
 /** Browser-tool defaults from the F1 spec (no free-tier gate for browser tools). */
 const clientPdfFlow = (
   slug: string,
-  labels: Pick<ToolFlowConfig, "actionLabel" | "progressLabel">,
+  labels: Pick<ToolFlowConfig, "title" | "actionLabel" | "progressLabel">,
   overrides: Partial<ToolFlowConfig> = {},
 ): ToolFlowConfig => ({
   accept: PDF_ONLY,
@@ -79,7 +81,7 @@ const clientPdfFlow = (
 const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = {
   "rotate-pdf": {
     status: "beta",
-    flow: clientPdfFlow("rotate-pdf", { actionLabel: "Rotate PDF", progressLabel: "Rotating" }),
+    flow: clientPdfFlow("rotate-pdf", { title: "Rotate PDF", actionLabel: "Rotate PDF", progressLabel: "Rotating" }),
   },
 };
 
@@ -90,7 +92,7 @@ const t = (
   category: ToolCategory,
   runtime: Tool["runtime"],
   ref = slug,
-): Tool => ({ slug, name, summary, category, runtime, ref, status: "planned", ...flows[slug] });
+): Tool => ({ slug, name, summary, category, runtime, ref, ...(flows[slug] ?? { status: "planned" }) });
 
 export const tools: Tool[] = [
   t("merge-pdf", "Merge", "Join PDFs and images into a single document", "organize", "client"),
