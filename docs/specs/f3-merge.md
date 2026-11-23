@@ -1,6 +1,6 @@
 # F3: Merge (files view + pages view, reorder, options)
 
-Status: step 1 (Analyze) done. Next: Research.
+Status: step 1 (Analyze) done; §8 decisions resolved by the orchestrator; step 2 (Research) done (§ Improvements). Next: UX design.
 Reference observed: `merge-pdf` on the live reference site, 2026-11-23, desktop 1280×900 and mobile 375 px. We uploaded synthetic fixtures only (two small PDFs, one PNG, and one more PDF through the page picker) and did **not** run a merge, so the result screen and the contents of the merged file are not observed. Anything about the output that we could not see is marked *unverified* and is our decision; the evaluator should confirm it on its first real Merge task.
 Internal screenshots: `docs/specs/assets/f3-merge/` (reference only, never ship). Index in §9.
 
@@ -244,14 +244,14 @@ All ACs run on `/merge-pdf` on staging. "Output" means the downloaded PDF, check
 
 ### Intake and files view
 
-- **AC-1 (P0) (ref)** `/merge-pdf` shows the tool (not a coming-soon page). Its file input allows multiple files and accepts `.pdf`, `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.webp`, `.tif` and `.tiff`.
+- **AC-1 (P0) (ref)** `/merge-pdf` shows the tool (not a coming-soon page). Its file input allows multiple files and accepts `.pdf`, `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.webp`, `.tif` and `.tiff`. (`.tif` and `.tiff` only if §8a decision 9 is met.)
 - **AC-2 (P0) (ref)** Picking `alpha.pdf` and `bravo.pdf` reaches the ready state in the **files view** with 2 cards in that order. Each card shows the file name and the page count (3 and 2) and the letter badges A and B.
 - **AC-3 (P1) (ref)** Picking `File10.pdf`, `file2.pdf`, `bravo.pdf`, `alpha.pdf` in one batch (in that order) shows the cards as alpha, bravo, file2, File10 (natural, case-insensitive).
 - **AC-4 (P1) (ref)** With `bravo.pdf` and `echo.pdf` loaded, adding `alpha.pdf` through Add files appends it: the order is bravo, echo, alpha.
 - **AC-5 (P0) (ref)** Picking `charlie.png` with `alpha.pdf` shows a `charlie.png` card with 1 page and a rendered thumbnail. Running gives a 4-page PDF.
 - **AC-6 (P1) (ours)** Picking `broken.png` with `alpha.pdf` shows an error naming `broken.png`, and `alpha.pdf` stays loaded.
 - **AC-7 (P2) (ours)** Picking `huge.png` shows an error naming it and giving the 50-megapixel cap, within 3 s; the tab stays responsive.
-- **AC-8 (P2) (ref)** Picking `fox.tiff` gives a card with 2 pages; running gives 2 pages, each with one image.
+- **AC-8 (P2) (ref)** *(conditional on §8a decision 9: deferred if no permissive TIFF decoder)* Picking `fox.tiff` gives a card with 2 pages; running gives 2 pages, each with one image.
 - **AC-9 (P0) (ref)** In the files view, dragging the `bravo.pdf` card in front of `alpha.pdf` (pointer drag) changes the card order to bravo, alpha. Running gives 5 pages with text in order Bravo 1, Bravo 2, Alpha 1, Alpha 2, Alpha 3.
 - **AC-10 (P0) (ours)** Keyboard only: focusing the `alpha.pdf` card and pressing Alt+ArrowRight moves it after `bravo.pdf`. Focus stays on the `alpha.pdf` card, and a polite live region announces its new position. Running gives Bravo pages first.
 - **AC-11 (P1) (ours)** Each card has Move earlier / Move later buttons; the first card's Move earlier and the last card's Move later are disabled. Activating Move later on the first of two cards swaps them.
@@ -367,6 +367,46 @@ All ACs run on `/merge-pdf` on staging. "Output" means the downloaded PDF, check
 9. **TIFF** needs a new decoder dependency (UTIF.js, MIT, to be verified), or TIFF is dropped from `accept` until a later feature.
 10. **Bookmark titles** for per-file entries drop the extension; TOC and footer use the full file name.
 
+### 8a. Orchestrator resolution (2026-11-23)
+
+- **Decisions 1–7 and 10:** accepted as written.
+- **Decision 8 (Unicode font):** accepted. A font under SIL OFL 1.1 (for example a Noto Sans subset) may be used for footer and contents (TOC) text, consistent with Geist in F1. It must be **lazy-loaded**: fetched only when the footer or contents option is used and a run starts (or when the text needs glyphs outside the standard font, if the engineer keeps the standard font for Latin-1 text). It must never be part of the initial page load of `/merge-pdf`. Its license file goes into the third-party notices.
+- **Decision 9 (TIFF), conditional:** TIFF is accepted **only if** the decoder's license is verified as permissive (MIT, BSD, Apache-2.0, ISC or MPL) when it is added at build time. If the check fails, or no such decoder is found, then:
+  - `.tif` and `.tiff` are dropped from the accepted types (AC-1's accept list loses them, and the empty-state copy does not mention TIFF);
+  - AC-8 and the TIFF parts of §2, §5 and §6 become **deferred** (not tested), and the engineer records the deferral in the PR and in `docs/process/backlog.md`;
+  - a `.tiff` file is then rejected as an unsupported type, like any other wrong type (F1 behavior).
+
 ## 9. Screenshot index (internal)
 
 01 empty · 02 files view after picking alpha, bravo, charlie (sorted by name; PNG on a portrait page) · 03 file card hover actions · 04 sort menu · 05 after Z–A (files view) · 06 pages view still in the old order · 07 page hover actions · 08 one page selected · 09 remove-with-others-selected prompt · 10 after removing one page · 11 duplicate and per-page rotate · 12 move-to-position dialog · 13 invalid position · 14 insert-point menu · 15 insert-point "add pages" submenu with blank page · 16 blank page inserted · 17 files view ignores page edits · 18 options panel · 19 page picker · 20 picker with Shift / Ctrl selection · 21 after adding picked pages (switched to pages view) · 22 pages view sorted A–Z · 23 dragging a file card · 24 files view showing picked pages as extra whole-file cards · 25 options changed (remembered in local storage) · 26 pages view hides the options · 27, 28 mobile pages and files views.
+
+## Improvements
+
+Research, 2026-11-23. iLovePDF, Smallpdf and PDF24 were blocked by this session's network proxy, so we could not inspect them live. Claims marked † come from the competitors' own help or blog pages found through web search. Claims marked ‡ come from the researcher's prior knowledge and were **not** re-checked live (*unverified*). Nothing was run on any competitor, and no competitor text, assets or code is reused (Stirling-PDF has mixed licensing, so we take ideas only).
+
+Quick read of the field: everyone does drag-to-reorder of file cards. iLovePDF sorts by name and offers a separate page-organize step with "+" insert points for blank pages † and a "mix" mode that interleaves pages from several files †. PDF24 has a file mode and a separate page mode †. Smallpdf and Adobe Acrobat online have a file list plus a page-level view and undo while organizing ‡. Stirling-PDF sorts by file name (natural sort) and by date †, and has a "remove digital signature" toggle on merge ‡. PDFgear's online merge runs in the browser ‡. Our spec already covers most of this (two views, sort, insert points, picker, TOC, footer), so the list below keeps to a few cheap extras; the spec already has 77 ACs.
+
+| # | Idea | Seen at | User benefit | Cost | Adopt/skip | Reason |
+|---|---|---|---|---|---|---|
+| I-1 | **Reverse order** entry in the Sort menu (reverses the current segment order in one step) | Stirling-PDF ‡, smaller merge tools † | Files that arrive newest-first (scans, mail exports) are fixed with one click instead of many drags | S | **Adopt** → AC-78 | Pure list operation on the existing page model; no new UI beyond a menu item. |
+| I-2 | **Undo after remove**: removing a card or page(s) shows a short notice with an Undo button that puts them back exactly where they were | Adobe Acrobat online ‡, Smallpdf ‡ (undo while organizing) | Recovers from a mis-tap, which is common on phones where remove sits next to rotate | S | **Adopt** → AC-79 | With one page list (§3e) this is a snapshot restore of the list before the remove; single level only, no full undo/redo stack. |
+| I-3 | **Duplicate-file notice**: when a file with the same name, size and last-modified date as one already loaded is added, say so (it is still added) | Not seen at the six ‡; common upload pattern | Catches the common "picked the same file twice" mistake before the merge is run | S | **Adopt** → AC-80 | A comparison at intake plus an F1 info notice. It does not block, because a repeated file can be intentional. |
+| I-4 | Interleave ("mix") pages of several files, e.g. fronts + backs of a duplex scan | iLovePDF † | Rebuilds double-sided scans | M | Skip | This is the reference's separate Alternate & mix tool, planned in F5. |
+| I-5 | Per-file page range typed on the card ("1-3, 5") | PDF24 page mode †, smaller tools † | Take part of a file without opening the page view | M | Skip | The pages view and the picker (§3c, §3d) already do this; a second way adds UI and tests to an already large spec. Revisit with Split/Extract. |
+| I-6 | Full undo/redo stack (Ctrl+Z / Ctrl+Shift+Z) for every edit | Adobe Acrobat online ‡, Stirling-PDF ‡ | Undo any step, not just removals | M | Skip | I-2 covers the risky case. A full history belongs with Organize (F5), which shares this page model. |
+| I-7 | Remove digital signatures on merge | Stirling-PDF ‡ | Avoids broken-signature warnings in the output | S | Skip | pdf-lib copying already leaves the signature invalid; a dedicated option adds little. Revisit with the signature tools. |
+| I-8 | Merge on the server for very large jobs | iLovePDF, Smallpdf, PDF24, Adobe (all upload) ‡ | Works on weak devices | L | Skip | Goes against browser-first (rule 4) and costs money (rule 5). Our caps fit in the browser. |
+| I-9 | Add a whole folder (directory picker / folder drop) | PDF24 desktop ‡ | Merge a folder of scans in one go | M | Skip | Patchy browser support for directory pick on mobile; drag of many files already works. Revisit later. |
+| I-10 | "Continue with Compress" right after the merge | iLovePDF, Smallpdf ‡ | Merged files are often too big to email | S | Skip (for now) | Compress is a server tool that is not built yet; F1's Continue-with list picks it up automatically once it exists. |
+
+### Improvement acceptance criteria
+
+The evaluator does not compare these with the reference, but they must work.
+
+- **AC-78 (P2) (ours) (improvement)** With cards in the order alpha, bravo, echo, Sort → Reverse order gives echo, bravo, alpha; choosing it again restores alpha, bravo, echo. In the Pages view after AC-19 (A1, B1, A2, A3, B2), Reverse order reverses the segments, not the pages inside them: the tile order becomes B2, A2, A3, B1, A1. Running gives that order.
+- **AC-79 (P1) (ours) (improvement)** Removing the `bravo.pdf` card (of alpha, bravo, echo) shows a polite notice with an Undo button for at least 8 s; activating Undo restores the card in position 2 with the same rotation, and running gives 6 pages in the order Alpha 1–3, Bravo 1–2, Echo 1. The same works in the Pages view after "All selected" removes A1 and B1 (both come back in their old positions). Undo is reachable by keyboard and focus returns to the restored item. A later edit replaces the notice (single level of undo).
+- **AC-80 (P2) (ours) (improvement)** With `alpha.pdf` loaded, adding the same `alpha.pdf` again (same name, size and last-modified time) adds a second card and shows a dismissible info notice naming `alpha.pdf` and saying it was added twice. Adding `bravo.pdf` shows no such notice.
+
+**Totals with improvements: 80 ACs: 32 P0, 38 P1, 10 P2.** Plus the inherited F1 ACs listed in §0a.
+
+Sources (web search, 2026-11-23): [iLovePDF: organize PDF pages](https://www.ilovepdf.com/blog/organize-pdf-pages) · [iLovePDF: organizing, splitting and merging guide](https://ilovepdf.com/blog/organize-split-merge-pdf-files-ultimate-guide) · [PDF24 help: merge PDF files](https://help.pdf24.org/en/how-to-merge-pdf-files-with-pdf24/) · [Stirling-PDF merge sort-by-date fix (#4461)](https://git.laurivan.com/Mirrors/Stirling-PDF/src/commit/fd95876d8fc3f3951525cbf7c836a2736dd60eb2) · [Stirling-PDF repository](https://github.com/Stirling-Tools/Stirling-PDF) · [IONOS: merging PDFs](https://www.ionos.com/digitalguide/online-marketing/online-sales/merging-pdfs/)
