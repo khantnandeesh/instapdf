@@ -113,19 +113,27 @@ test.describe("AC-49 at 375 px", () => {
   });
 });
 
-test("AC-50: axe finds no critical or serious violations in empty, password, ready and result states", async ({ page }) => {
-  const check = (state: string) => expectNoSeriousAxeViolations(page, state);
-  await check("empty");
-  await pick(page, "user-pw.pdf");
-  await expect(dialog(page)).toBeVisible();
-  await check("password");
-  await passwordField(page).fill("test");
-  await page.keyboard.press("Enter");
-  await expect(flow(page)).toHaveAttribute("data-state", "ready");
-  await check("ready");
-  await run(page);
-  await check("result");
-});
+// Light only until Mint Paper defines a dark mode: "dark" runs with the OS in dark mode, which must
+// keep the light palette and stay clean.
+for (const scheme of ["light", "dark"] as const) {
+  test.describe(`${scheme === "light" ? "light" : "OS dark preference (light palette)"}`, () => {
+    test.use({ colorScheme: scheme });
+
+    test(`AC-50: axe finds no critical or serious violations in empty, password, ready and result states (${scheme})`, async ({ page }) => {
+      const check = (state: string) => expectNoSeriousAxeViolations(page, `${scheme}, ${state}`);
+      await check("empty");
+      await pick(page, "user-pw.pdf");
+      await expect(dialog(page)).toBeVisible();
+      await check("password");
+      await passwordField(page).fill("test");
+      await page.keyboard.press("Enter");
+      await expect(flow(page)).toHaveAttribute("data-state", "ready");
+      await check("ready");
+      await run(page);
+      await check("result");
+    });
+  });
+}
 
 test("AC-51: with files loaded, leaving the page asks for confirmation (and not when empty)", async ({ page }) => {
   // Empty: no prompt.

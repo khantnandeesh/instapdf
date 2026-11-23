@@ -8,7 +8,6 @@ import { disposeWorker } from "@/lib/pdf/worker-client";
 import { acceptAttribute, fitsPageBudget, screenFiles } from "@/lib/pdf/validation";
 import { continueTargets, type FlowTool } from "@/tools/registry";
 import { Button } from "../ui/Button";
-import { cx } from "../ui/cx";
 import { PlusIcon } from "../ui/icons";
 import { LiveRegion } from "../ui/LiveRegion";
 import { SegmentedControl } from "../ui/SegmentedControl";
@@ -545,8 +544,8 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
           announce={announce}
         />
       ) : (
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-6">
-          <section aria-label="Your files" className={cx("min-w-0", state !== "empty" && "rounded-xl bg-surface")}>
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]">
+          <section aria-label="Your files" className="min-w-0">
             {state === "empty" ? (
               <DropCard>
                 <FilePicker
@@ -557,13 +556,14 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
                   onFiles={(f, t) => void intake(f, t)}
                   inputTestId="file-input"
                 />
-                <p className="hidden text-sm text-fg-muted [@media(pointer:fine)]:block">{copy.pickerHint(isMac)}</p>
+                <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copy.pickerHint(isMac)}</p>
                 <LimitsNote text={copy.limits(flow)} />
                 <PrivacyNote runtime={tool.runtime} context="intro" />
               </DropCard>
             ) : (
               <>
-                <div className="sticky top-(--ip-header-h) z-10 flex h-[52px] items-center gap-3 rounded-t-xl border-b border-border bg-surface px-3 sm:px-6">
+                {/* Working mode: a sticky row of editing tools (EditorToolbar look). */}
+                <div className="sticky top-(--ip-header-h) z-10 flex h-[60px] items-center gap-4 bg-surface-raised">
                   {files.length > 1 && (
                     <SegmentedControl
                       label="View"
@@ -593,16 +593,17 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
                       accept={accept}
                       multiple={flow.multiFile}
                       label={flow.multiFile ? "Add files" : "Replace file"}
-                      variant="secondary"
+                      variant="tool"
                       size="sm"
-                      icon={<PlusIcon size={18} />}
+                      className="shadow-glow"
+                      icon={<PlusIcon size={16} />}
                       disabled={state === "processing"}
                       onFiles={(f, t) => void intake(f, t, { replace: !flow.multiFile })}
                       inputTestId="file-input"
                     />
                   </span>
                 </div>
-                <div className="flex flex-col gap-4 p-3 sm:p-6" style={{ minHeight: "calc(var(--ip-thumb-size) + 36px)" }} inert={state === "processing" ? true : undefined}>
+                <div className="flex flex-col gap-4 pt-3 pb-6" style={{ minHeight: "calc(var(--ip-thumb-size) + 76px)" }} inert={state === "processing" ? true : undefined}>
                   {ownerBlocked.map((f) => (
                     <OwnerPermissionNotice
                       key={f.id}

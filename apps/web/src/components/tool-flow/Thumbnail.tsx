@@ -105,7 +105,7 @@ export function PageThumb({ fileId, index, className }: { fileId: string; index:
     <span
       ref={host}
       data-rendered={rendered || undefined}
-      className={cx("block h-full w-full", rendered ? "bg-paper" : "ip-pulse bg-surface-sunken", className)}
+      className={cx("block h-full w-full", rendered ? "bg-paper" : "ip-pulse bg-paper", className)}
     />
   );
 }

@@ -11,6 +11,35 @@ export const ALLOWED_CODE = new Set(["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3
 export const ALLOWED_FONT = new Set(["OFL-1.1"]);
 
 /**
+ * npm packages that ship only font files and their CSS (no program code), e.g. self-hosted
+ * Fontsource fonts loaded with next/font/local. They are judged as fonts (ALLOWED_FONT), and only
+ * if every file in them is a font, stylesheet or metadata file (see isFontOnlyPackage).
+ */
+export const FONT_PACKAGES = [/^@fontsource\/[a-z0-9-]+$/, /^@fontsource-variable\/[a-z0-9-]+$/];
+
+/** File types a font-only package may contain (allow-list; anything else, e.g. JS or WASM, disqualifies it). */
+export const FONT_PACKAGE_FILES = [
+  /\.(css|scss|woff2?|ttf|otf|json|md)$/i,
+  /\.d\.[a-z0-9]+\.ts$/i, // type stubs for CSS imports, e.g. index.d.css.ts
+  /^(licen[cs]e|readme|changelog)(\.(md|txt))?$/i,
+];
+
+/**
+ * A listed font package that is really only fonts: `files` is every file in the package,
+ * walked recursively (paths relative to its root, "/" separators), and its package.json
+ * declares no `scripts` and no `bin` (nothing that could run at install or as a command).
+ */
+export function isFontOnlyPackage(name, files, pkg = {}) {
+  if (!FONT_PACKAGES.some((re) => re.test(name))) return false;
+  const has = (v) => v != null && (typeof v === "string" ? v.trim() !== "" : Object.keys(v).length > 0);
+  if (has(pkg.scripts) || has(pkg.bin)) return false;
+  return files.length > 0 && files.every((f) => {
+    const base = f.split("/").pop() ?? f;
+    return FONT_PACKAGE_FILES.some((re) => re.test(base));
+  });
+}
+
+/**
  * Named, reviewed exceptions: package name → the exact license expression accepted for it
  * and why. Anything else outside the allow-list fails the build.
  * @type {Record<string, { license: string; reason: string }>}
@@ -113,6 +142,8 @@ export function copyrightLines(text) {
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => /^(copyright\b|\(c\)|©)/i.test(l))
-    .filter((l) => !/\[yyyy\]|\{yyyy\}|<year>|copyright notice|copyright owner\]|copyright holders? (and|or)/i.test(l));
+    .filter((l) => !/\[yyyy\]|\{yyyy\}|<year>|copyright notice|copyright owner\]|copyright holders? (and|or)/i.test(l))
+    // SIL OFL 1.1 boilerplate ("Copyright Holder(s)", "copyright statement(s).", the warranty line).
+    .filter((l) => !/^copyright (holder|statement)|^copyright holder be liable/i.test(l));
   return [...new Set(lines)].slice(0, 6);
 }

@@ -72,23 +72,24 @@ export function ResultCard({
   const titleId = "ip-result-title";
 
   return (
-    <section aria-labelledby={titleId} className="ip-settle mx-auto w-full max-w-[760px] rounded-xl bg-surface-raised p-5 shadow-sm sm:p-8" data-testid="result">
-      <h2 id={titleId} className="flex items-center gap-3 text-xl font-semibold">
-        <span className="grid size-8 place-items-center rounded-full bg-success-soft text-success">
+    // Mint Paper Panel: one centered white panel; Download is the single mint action.
+    <section aria-labelledby={titleId} className="mp-panel mx-auto w-full max-w-[760px] p-5 sm:p-10" data-testid="result">
+      <h2 id={titleId} className="flex items-center gap-3 text-prose-h2 tracking-[-0.5px] text-ink">
+        <span className="grid size-8 place-items-center rounded-full bg-brand-soft text-brand-strong">
           <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-            <path className="ip-draw" d="m5 12.5 4.5 4.5L19 7.5" />
+            <path d="m5 12.5 4.5 4.5L19 7.5" />
           </svg>
         </span>
         {copy.resultTitle(isZip)}
       </h2>
-      <div className="mt-6 flex flex-col items-center gap-6 sm:flex-row sm:items-start">
+      <div className="mt-[30px] flex flex-col items-center gap-[30px] sm:flex-row sm:items-start">
         <ResultPreview output={output} />
         <div className="flex w-full min-w-0 flex-1 flex-col gap-4">
           <div>
-            <p className="text-lg font-semibold break-all" data-testid="result-name">
+            <p className="text-tile-title font-bold break-all text-ink-black" data-testid="result-name">
               {output.name}
             </p>
-            <p id="ip-result-summary" className="text-sm text-fg-muted tabular-nums">
+            <p id="ip-result-summary" className="text-sm text-muted tabular-nums">
               {summary}
             </p>
           </div>
@@ -112,10 +113,9 @@ export function ResultCard({
             </a>
             {canShare && (
               <Button
-                variant="secondary"
-                size="lg"
-                className="max-sm:w-full"
-                iconStart={<ShareIcon />}
+                variant="line"
+                className="self-center max-sm:w-full"
+                iconStart={<ShareIcon size={16} />}
                 onClick={() => {
                   navigator.share({ files: [file] }).catch(() => {});
                 }}
@@ -130,10 +130,10 @@ export function ResultCard({
           </div>
           {!isZip && continueTargets.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold">{copy.resultContinue}</h3>
+              <h3 className="text-sm font-bold text-ink">{copy.resultContinue}</h3>
               <div className="mt-2 flex flex-wrap gap-2">
                 {continueTargets.map((t) => (
-                  <Button key={t.slug} size="sm" variant="secondary" onClick={() => onContinue(t)}>
+                  <Button key={t.slug} variant="soft" onClick={() => onContinue(t)}>
                     {t.name}
                   </Button>
                 ))}
@@ -142,11 +142,11 @@ export function ResultCard({
           )}
         </div>
       </div>
-      <div className="mt-6 flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-[30px] flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
         <Button variant="ghost" onClick={onStartOver} className="max-sm:w-full">
           Start over
         </Button>
-        <button type="button" onClick={onBack} className="h-11 rounded-md px-2 text-sm font-medium text-primary underline-offset-4 hover:underline max-sm:w-full">
+        <button type="button" onClick={onBack} className="h-11 rounded-sm px-2 text-nav text-brand-strong underline-offset-4 hover:underline max-sm:w-full">
           Back to options
         </button>
       </div>
@@ -163,10 +163,10 @@ function EntryList({ entries }: { entries: { name: string; pageCount: number }[]
           <span className="min-w-0 truncate" title={e.name}>
             {e.name}
           </span>
-          <span className="shrink-0 text-fg-muted tabular-nums">{copy.pages(e.pageCount)}</span>
+          <span className="shrink-0 text-muted tabular-nums">{copy.pages(e.pageCount)}</span>
         </li>
       ))}
-      {entries.length > 6 && <li className="text-fg-muted">+{entries.length - 6} more</li>}
+      {entries.length > 6 && <li className="text-muted">+{entries.length - 6} more</li>}
     </ul>
   );
 }
@@ -206,8 +206,8 @@ function ResultPreview({ output }: { output: ToolOutput }) {
     };
   }, [output, isPdf]);
   return (
-    <div className={cx("grid size-[200px] shrink-0 place-items-center rounded-lg bg-surface-sunken p-3 sm:size-[240px]", !ready && isPdf && "ip-pulse")}>
-      {isPdf ? <span ref={host} className="grid h-full w-full place-items-center" /> : <FilesIcon size={64} className="text-fg-muted" />}
+    <div className={cx("mp-tray grid size-[200px] shrink-0 place-items-center sm:size-[240px]", !ready && isPdf && "ip-pulse")}>
+      {isPdf ? <span ref={host} className="grid h-full w-full place-items-center" /> : <FilesIcon size={64} className="text-muted" />}
     </div>
   );
 }

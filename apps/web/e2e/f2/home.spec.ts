@@ -66,7 +66,8 @@ test.describe("catalogue", () => {
     await page.goto("/");
     expect(categories.map((c) => c.id)).toEqual(["organize", "edit", "optimize", "security", "convert-from", "convert-to", "scans", "automate"]);
     // Category headings are h3 under the "All tools" h2 (design H-7); query by section.
-    const headings = await page.locator("[data-testid=category] h3").allInnerTexts();
+    // Text content, not innerText: Mint Paper draws the eyebrows in UPPERCASE with CSS only.
+    const headings = (await page.locator("[data-testid=category] h3").allTextContents()).map((t) => t.trim());
     expect(headings).toEqual(categories.map((c) => c.label));
     for (const c of categories) {
       const section = page.locator(`#cat-${c.id}`);

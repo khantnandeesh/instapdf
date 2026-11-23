@@ -28,7 +28,7 @@ export default function LicensesPage() {
         <p>
           InstaPDF is built on open-source software. We thank the people who make it. Below are the components we use, their licenses and copyright notices. The
           full license and notice texts are in{" "}
-          <a href="/third-party-notices.txt" className="font-medium text-primary underline underline-offset-2 hover:no-underline">
+          <a href="/third-party-notices.txt" className="text-brand-strong underline underline-offset-2 hover:no-underline">
             third-party-notices.txt
           </a>
           .
@@ -40,7 +40,7 @@ export default function LicensesPage() {
       </Section>
 
       <Section id="packages" title="Software packages">
-        <p className="text-fg-muted">
+        <p className="text-muted">
           This list is generated from the site&apos;s production dependencies each time it is built ({packages.length} packages). Some are used only to build the
           site or to run its server and are never sent to your browser. We only use software under permissive licenses (MIT, Apache 2.0, BSD, ISC, MPL 2.0 and
           similar); the build stops if anything else appears.
@@ -59,11 +59,11 @@ export default function LicensesPage() {
 
 function EntryList({ entries, testId }: { entries: NoticeEntry[]; testId: string }) {
   return (
-    <ul className="divide-y divide-border rounded-lg border border-border" data-testid={testId}>
+    <ul className="divide-y divide-border rounded-panel border border-panel-border bg-surface-raised" data-testid={testId}>
       {entries.map((e) => (
         <li key={`${e.name}@${e.version}`} className="space-y-1 px-4 py-3 text-sm" data-license={e.license ?? ""}>
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <span className="font-semibold break-all text-fg">
+            <span className="font-bold break-all text-ink">
               {e.homepage ? (
                 <a href={e.homepage} rel="noopener noreferrer" className="hover:underline">
                   {e.name}
@@ -71,21 +71,21 @@ function EntryList({ entries, testId }: { entries: NoticeEntry[]; testId: string
               ) : (
                 e.name
               )}{" "}
-              <span className="font-normal text-fg-muted">{e.version}</span>
+              <span className="font-normal text-muted">{e.version}</span>
             </span>
-            <span className="rounded-sm bg-surface-sunken px-1.5 py-0.5 font-mono text-xs text-fg">{e.license}</span>
+            <span className="rounded-[3px] bg-[var(--code-yellow)] px-1.5 py-0.5 font-mono text-code-chip text-ink">{e.license}</span>
           </div>
           {e.copyright.length > 0 ? (
             e.copyright.map((c) => (
-              <p key={c} className="break-words text-fg-muted">
+              <p key={c} className="break-words text-muted">
                 {c}
               </p>
             ))
           ) : e.author ? (
-            <p className="break-words text-fg-muted">Author: {e.author.replace(/\s*<[^>]*>/, "")}</p>
+            <p className="break-words text-muted">Author: {e.author.replace(/\s*<[^>]*>/, "")}</p>
           ) : null}
-          {e.hasNotice && <p className="text-fg-muted">Includes a NOTICE file, reproduced in the full notices.</p>}
-          {e.exception && <p className="text-fg-muted">Data, not program code: used under its attribution license.</p>}
+          {e.hasNotice && <p className="text-muted">Includes a NOTICE file, reproduced in the full notices.</p>}
+          {e.exception && <p className="text-muted">Data, not program code: used under its attribution license.</p>}
         </li>
       ))}
     </ul>

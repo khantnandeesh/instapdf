@@ -41,17 +41,17 @@ export default function CookiesPage() {
           <table className="w-full min-w-[520px] border-collapse text-sm">
             <caption className="sr-only">Browser storage used by InstaPDF</caption>
             <thead>
-              <tr className="text-fg">
-                <th scope="col" className={`${cell} font-semibold`}>
+              <tr className="text-ink">
+                <th scope="col" className={`${cell} font-bold`}>
                   Name
                 </th>
-                <th scope="col" className={`${cell} font-semibold`}>
+                <th scope="col" className={`${cell} font-bold`}>
                   Type
                 </th>
-                <th scope="col" className={`${cell} font-semibold`}>
+                <th scope="col" className={`${cell} font-bold`}>
                   What it holds and why
                 </th>
-                <th scope="col" className={`${cell} font-semibold`}>
+                <th scope="col" className={`${cell} font-bold`}>
                   How long
                 </th>
               </tr>
@@ -87,7 +87,7 @@ export default function CookiesPage() {
 
       <Section id="clear" title="How to clear it">
         <p>
-          To clear the list of recently used tools, use the <strong className="font-semibold text-fg">Clear</strong> button next to &quot;Recently used&quot; on
+          To clear the list of recently used tools, use the <strong className="font-bold text-ink">Clear</strong> button next to &quot;Recently used&quot; on
           the <TextLink href="/">home page</TextLink> or in the All tools menu. To remove everything, clear this site&apos;s data in your browser&apos;s settings
           (often under Privacy, then Cookies and site data). Private or incognito windows discard it when you close them.
         </p>

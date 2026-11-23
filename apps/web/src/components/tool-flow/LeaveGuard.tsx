@@ -62,10 +62,10 @@ export function LeaveGuard({ active }: { active: boolean }) {
       fallbackFocus={() => document.getElementById("main")}
       footer={
         <>
-          <Button ref={stay} onClick={() => setPending(null)}>
+          <Button ref={stay} variant="ghost" onClick={() => setPending(null)}>
             {siteCopy.leaveStay}
           </Button>
-          <Button variant="danger" onClick={leave}>
+          <Button variant="primary" onClick={leave}>
             {siteCopy.leaveGo}
           </Button>
         </>

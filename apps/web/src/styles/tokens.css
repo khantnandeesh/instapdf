@@ -1,67 +1,199 @@
 /*
- * InstaPDF design tokens (light + dark).
- * Source of truth: docs/specs/f1-shared-flow.md, "## UI" > "Design tokens".
- * Raw values live in CSS custom properties; `@theme inline` exposes them as
- * Tailwind v4 utilities (bg-surface, text-fg-muted, ring-focus, duration-base, ...).
- * Contrast ratios for every text/background pair are listed in the spec.
- * Dark mode follows the OS, and `data-theme="light|dark"` on <html> forces one.
+ * InstaPDF design tokens on the owner's Mint Paper design system (light only).
+ * Source of truth: docs/design/mint-paper.md (token mapping, category hues, measured contrast,
+ * and the list of deliberate deviations from Mint Paper).
+ *
+ * Three layers:
+ * 1. Mint Paper's own tokens, with Mint Paper's names and exact values (--brand, --sand,
+ *    --cat-*, --space-*, --dur-*, --z-*; radius, shadow, easing, families and type styles
+ *    live in `@theme static` below so Tailwind emits them under the same names).
+ * 2. Our --ip-* role tokens, mapped onto Mint Paper. Feature code keeps using these names.
+ * 3. `@theme inline`: Tailwind utilities (bg-surface, text-fg-muted, bg-brand, bg-sand, ...).
+ *
+ * Dark mode: Mint Paper does not define one yet ("not yet defined"), so we ship light only.
+ * `color-scheme: light` keeps native controls light when the OS is in dark mode.
  */
 
+/* ---- 1. Mint Paper colour, spacing, duration and z-index tokens (exact values) ------------ */
 :root {
   color-scheme: light;
 
-  /* Neutrals */
-  --ip-bg: #ffffff;
-  --ip-surface: #f5f6fa; /* app canvas behind the grid */
-  --ip-surface-raised: #ffffff; /* cards, dock, dialogs */
-  --ip-surface-sunken: #eceef4; /* placeholders, wells, segmented track */
-  --ip-border: #dfe2ea; /* decorative dividers only, never the only cue */
-  --ip-border-strong: #7c8296; /* input and control borders, >= 3:1 */
-  --ip-fg: #151823;
-  --ip-fg-muted: #535a6e;
-  --ip-fg-disabled: #8a90a3;
-  --ip-paper: #ffffff; /* PDF page thumbnails: always white, both themes */
+  --brand: #00bb88; /* primary fill only: main button, logo, default icon tint */
+  --brand-bright: #00cc99; /* large text and icons only (2.08:1 on surface); also the primary hover fill */
+  --brand-strong: #00805c; /* mint for body-size text and links (4.95:1 on surface) */
+  --brand-tint: rgba(0, 204, 153, 0.06); /* ghost button fill */
+  --brand-tint-border: rgba(0, 204, 153, 0.1); /* ghost button border */
+  --brand-deep: #00a37a; /* NEW pill fill in the token list; the bundle's pill uses #00805c (see Pill) */
+  --brand-soft: rgba(0, 187, 136, 0.07); /* soft button, icon button and step-number fill */
+  --ink: #333333; /* headings and body text */
+  --ink-black: #000000; /* card titles, nav links */
+  --muted: #666666; /* descriptions, secondary text (5.74:1 on surface, 4.65:1 on sand) */
+  --subtle: #9aa5aa; /* defined; not used for text here (2.52:1 fails even large text), see mint-paper.md */
+  --surface: #ffffff;
+  --surface-soft: #f8f8f8; /* nav chip, hover rows */
+  --surface-footer: #f8f9fa;
+  --band: #eeeeee; /* full-width grey band */
+  --sand: #f3e5d8; /* warm section wash (fades to surface) and tool-card border */
+  --border: #eeeeee; /* hairline on chips */
+  --border-card: #e9ecef;
+  --link: #0282e5; /* selected state, focus ring, editing-tool edges (3.94:1: not for small text) */
+  --danger: #ff3268; /* field error border and glow */
+  --cat-merge: #2dc36a;
+  --cat-split: #83b31f;
+  --cat-edit: #0282e5;
+  --cat-compress: #29aad2;
+  --cat-scans: #e6405c;
+  --cat-convert-from: #f9812e;
+  --cat-convert-to: #6b0bff;
+  --cat-other: #da00ac;
+  --choice-bg: #eaf2ef; /* selected choice tile */
+  --tool-active-bg: #d9f0fa; /* editor toolbar button, active */
+  --tool-active-ink: #01518d; /* editor toolbar button text, active or hover */
+  --tool-glow: #9ecaed; /* glow around floating editor toolbars */
+  --canvas: #e8e8e8; /* editor backdrop */
+  --panel-border: #dadce0;
+  --page-tray: #eeeeee; /* tray behind a page thumbnail */
+  --switch-off: #cccccc; /* defined; the off track uses --ip-field-line instead (1.61:1), see mint-paper.md */
+  --hint: #aaaaaa; /* defined; hint text uses the bundle's #767676 (4.54:1) instead */
+  --code-yellow: rgba(241, 196, 15, 0.1);
+  --code-blue: rgba(52, 152, 219, 0.1);
+  --code-orange: rgba(243, 156, 18, 0.1);
+  --syntax-keyword: #0077aa;
+  --syntax-string: #669900;
 
-  /* Brand / primary (indigo-violet, our own) */
-  --ip-primary: #3d3bd4;
-  --ip-primary-hover: #312fb3;
-  --ip-primary-active: #28269a;
-  --ip-on-primary: #ffffff;
-  --ip-primary-soft: #ecedff;
-  --ip-on-primary-soft: #2f2da8;
+  /* Values Mint Paper's component bundle uses that have no token of their own. */
+  --mp-hint-ink: #767676; /* .mp-hint, tray page numbers: 4.54:1 on surface */
+  --mp-row-hover: #f5f5f5; /* menu row hover */
+  --mp-menu-border: rgba(0, 0, 0, 0.15);
+  --mp-input-border: #cccccc; /* source input border (1.61:1); fields use --ip-field-line */
+  --mp-outline-border: #bbbbbb; /* outline button border */
+  --mp-alert-edge: #00523c; /* darker bottom edge of the mint alert */
+  --mp-alert-danger: #c4124a; /* destructive alert fill (white text 5.94:1) */
+  --mp-alert-danger-edge: #8a0c34;
+  --mp-prose: #555555; /* legal/help body (7.46:1) */
+  --mp-prose-h2: #444444;
+  --mp-footer-link: #222222;
+  --mp-callout: rgba(0, 128, 92, 0.06);
+  --mp-focus-glow: rgba(2, 130, 229, 0.5); /* input focus glow */
+  --mp-input-inset: inset 0 1px 1px rgba(0, 0, 0, 0.075);
 
-  /* Status */
-  --ip-danger: #b3261e;
-  --ip-danger-soft: #fdf1f0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 30px;
+  --space-7: 40px;
+  --space-8: 60px;
+  --space-9: 120px;
+
+  --dur-fast: 0.15s; /* focus: border-color, box-shadow */
+  --dur-base: 0.2s; /* hover: background, halo opacity */
+  --dur-move: 0.3s; /* transforms: logo spin, modal in */
+  --dur-slow: 0.5s; /* button enter, card nudge, width changes */
+  --dur-attention: 1s; /* alert slide-down, brand-name colour fade */
+  --dur-tool: 0.4s; /* editor toolbar colour changes, switch */
+
+  --z-header: 899;
+  --z-header-link: 900;
+  --z-progress: 1000;
+}
+
+/* ---- 2. InstaPDF role tokens (names kept; values from Mint Paper) --------------------------- */
+:root {
+  /* Grounds */
+  --ip-bg: var(--surface);
+  --ip-surface: var(--surface-footer); /* secondary ground: footer */
+  --ip-surface-raised: var(--surface); /* cards, panels, fields */
+  --ip-surface-overlay: var(--surface); /* menus, dialogs, floating bars */
+  --ip-chrome: var(--surface); /* sticky bars: header, tool toolbar */
+  --ip-well: var(--page-tray); /* tray behind a framed page */
+  --ip-surface-sunken: var(--band); /* tags, tracks, placeholders */
+  --ip-hover: var(--mp-row-hover); /* hover rows */
+  --ip-pressed: var(--band);
+
+  /* Edges */
+  --ip-border: var(--border); /* hairlines */
+  /* Deviation (WCAG 1.4.11): Mint Paper's #ccc field border is 1.61:1. Text-field and switch-track
+     edges use the bundle's own #767676 instead (4.54:1 on surface, 3.68:1 on sand). */
+  --ip-field-line: var(--mp-hint-ink);
+  --ip-field-line-hover: var(--muted);
+  --ip-border-strong: var(--mp-hint-ink);
+
+  /* Text */
+  --ip-fg: var(--ink);
+  --ip-fg-muted: var(--muted);
+  --ip-fg-disabled: var(--hint);
+  --ip-paper: #ffffff;
+  --ip-inverse: var(--ink);
+  --ip-on-inverse: #ffffff;
+
+  /* Mint */
+  --ip-accent: var(--brand); /* marks, progress */
+  --ip-primary: var(--brand); /* the one filled action */
+  --ip-primary-hover: var(--brand-bright);
+  --ip-primary-active: var(--brand);
+  /* The primary button's label colour, in one place. Mint Paper pairs #00bb88 with white
+     (2.48:1, fails WCAG AA at every size). Until the owner decides we use the system's own
+     ink-black: 8.46:1 on brand, 10.10:1 on brand-bright (hover). Strict Mint Paper: #ffffff. */
+  --ip-on-primary: var(--ink-black);
+  --ip-primary-ink: var(--brand-strong); /* mint as text */
+  --ip-primary-soft: var(--brand-soft);
+  --ip-on-primary-soft: var(--brand-strong);
+  --ip-primary-faint: var(--brand-tint);
+  --ip-primary-ring: var(--mp-focus-glow);
+  --ip-focus-ring: var(--link);
+
+  /* Status. Mint Paper has a mint alert and a danger alert; it defines no success/warning hues. */
+  --ip-danger: var(--danger); /* error borders and glows */
+  --ip-danger-hover: var(--mp-alert-danger-edge);
+  --ip-danger-soft: rgba(255, 50, 104, 0.08);
+  --ip-danger-strong: var(--mp-alert-danger); /* alert fill, danger icons */
   --ip-on-danger: #ffffff;
-  --ip-success: #0b7a47;
-  --ip-success-soft: #eaf7f0;
-  --ip-warning: #9a5200;
-  --ip-warning-soft: #fff6e6;
+  --ip-success: var(--brand-strong);
+  --ip-success-soft: var(--brand-soft);
+  --ip-warning: var(--brand-strong);
+  --ip-warning-soft: var(--mp-callout);
 
-  /* Focus, overlays */
-  --ip-focus-ring: #3d3bd4;
-  --ip-scrim: rgb(13 15 21 / 0.5);
-  --ip-drop-overlay: rgb(236 237 255 / 0.92);
+  /* Overlays */
+  --ip-scrim: rgb(0 0 0 / 0.45);
+  --ip-drop-overlay: rgb(234 242 239 / 0.94); /* choice-bg, nearly opaque */
 
   /* Elevation */
-  --ip-shadow-sm: 0 1px 2px rgb(21 24 35 / 0.08);
-  --ip-shadow-md: 0 2px 8px rgb(21 24 35 / 0.1), 0 1px 2px rgb(21 24 35 / 0.06);
-  --ip-shadow-lg: 0 12px 32px rgb(21 24 35 / 0.18);
-  --ip-shadow-paper: 0 0 0 1px rgb(21 24 35 / 0.08), 0 1px 3px rgb(21 24 35 / 0.12);
+  --ip-shadow-sm: var(--shadow-card);
+  --ip-shadow-md: var(--shadow-panel);
+  --ip-shadow-lg: var(--shadow-menu);
+  --ip-shadow-paper: 0 0 0 1px rgb(0 0 0 / 0.08), 0 1px 3px rgb(0 0 0 / 0.08); /* a PDF page on its tray */
 
-  /* Layout metrics (used by the shared tool flow) */
-  --ip-header-h: 56px;
-  --ip-dock-w: 320px; /* control dock column at >= 1024px */
-  --ip-dock-h: 128px; /* fixed bottom dock below 640px (2 rows) */
-  --ip-dock-h-md: 76px; /* fixed bottom dock 640-1023px (1 row) */
-  --ip-thumb-size: 160px; /* default page-tile box; slider range 80-400 */
-  --ip-tap-min: 44px; /* minimum touch target */
+  /* Catalogue categories -> Mint Paper cat-* hues (icon disc and icon), plus a text shade for the
+     UPPERCASE eyebrow. Deviation: the cat-* hues are 1.86-3.72:1 on sand, so eyebrow words use the
+     same hue darkened until it reaches 4.5:1 on sand (see mint-paper.md). */
+  --ip-cat-organize: var(--cat-merge);
+  --ip-cat-organize-text: #1b7640;
+  --ip-cat-edit: var(--cat-edit);
+  --ip-cat-edit-text: #026aba;
+  --ip-cat-optimize: var(--cat-compress);
+  --ip-cat-optimize-text: #1b6f89;
+  --ip-cat-security: var(--cat-split);
+  --ip-cat-security-text: #527013;
+  --ip-cat-convert-from: var(--cat-convert-from);
+  --ip-cat-convert-from-text: #ad4a05;
+  --ip-cat-convert-to: var(--cat-convert-to);
+  --ip-cat-convert-to-text: var(--cat-convert-to); /* already 5.46:1 on sand */
+  --ip-cat-scans: var(--cat-scans);
+  --ip-cat-scans-text: #c91a38;
+  --ip-cat-automate: var(--cat-other);
+  --ip-cat-automate-text: #c00098;
 
-  /* F2: site header, tool menu, home catalogue (docs/specs/f2-home.md, H-2) */
+  /* Layout metrics (shared tool flow, header, menu) */
+  --ip-header-h: 57px; /* sticky header height: 15px top padding + 41px row + 1px */
+  --ip-dock-w: 360px; /* options panel column at >= 1024px */
+  --ip-dock-h: 176px; /* fixed bottom dock below 640px */
+  --ip-dock-h-md: 104px; /* fixed bottom dock 640-1023px */
+  --ip-thumb-size: 160px; /* default page box inside its tray; slider range 80-400 */
+  --ip-tap-min: 44px;
   --ip-z-header: 20;
-  --ip-z-header-open: 50; /* above the F1 dock (20), notices (30) and drop overlay (40) */
-  --ip-menu-max-h: calc(100dvh - var(--ip-header-h) - 32px);
+  --ip-z-header-open: 50;
   --ip-recent-h: 92px;
 }
 
@@ -71,115 +203,149 @@
   }
 }
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --ip-bg: #0d0f15;
-  --ip-surface: #141720;
-  --ip-surface-raised: #1b1f2a;
-  --ip-surface-sunken: #090b10;
-  --ip-border: #2a2f3d;
-  --ip-border-strong: #6e7488;
-  --ip-fg: #eceef4;
-  --ip-fg-muted: #a2a8ba;
-  --ip-fg-disabled: #5d6375;
-  --ip-paper: #ffffff;
-  --ip-primary: #8f93ff;
-  --ip-primary-hover: #a9acff;
-  --ip-primary-active: #c4c6ff;
-  --ip-on-primary: #0d0f15;
-  --ip-primary-soft: #23254a;
-  --ip-on-primary-soft: #c4c6ff;
-  --ip-danger: #ff8a80;
-  --ip-danger-soft: #3a1715;
-  --ip-on-danger: #0d0f15;
-  --ip-success: #4fd18b;
-  --ip-success-soft: #0f2e1f;
-  --ip-warning: #f5b451;
-  --ip-warning-soft: #33240b;
-  --ip-focus-ring: #a9acff;
-  --ip-scrim: rgb(0 0 0 / 0.6);
-  --ip-drop-overlay: rgb(35 37 74 / 0.92);
-  --ip-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --ip-shadow-md: 0 2px 8px rgb(0 0 0 / 0.45);
-  --ip-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
-  --ip-shadow-paper: 0 0 0 1px rgb(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5);
+/* ---- Tailwind: Mint Paper radius, shadow, easing, families and type styles ------------------ */
+@theme static {
+  --radius-sm: 4px; /* medium buttons, menus, tabs, fields */
+  --radius-md: 5px; /* nav chip, alerts, modal */
+  --radius-lg: 6px; /* large buttons */
+  --radius-card: 10px; /* tool card: three corners */
+  --radius-leaf: 25px; /* tool card bottom-right only */
+  --radius-pill: 20px; /* hover halo on icon-only buttons */
+  --radius-panel: 8px; /* app panels */
+  --radius-tray: 10px; /* page tray, promo pill */
+  --radius-round: 26px; /* switch track, round icon buttons */
+
+  --shadow-card: rgba(243, 229, 216, 0.5) 0px 2px 3px 0px, rgba(0, 0, 0, 0.08) 0px 1px 3px 0px;
+  --shadow-button: rgba(50, 50, 93, 0.11) 0px 4px 6px 0px, rgba(0, 0, 0, 0.08) 0px 1px 3px 0px;
+  --shadow-menu: rgba(0, 0, 0, 0.176) 0px 6px 12px 0px;
+  --shadow-plan: rgba(0, 0, 0, 0.06) 0px 10px 22px 0px;
+  --shadow-pressed: rgba(0, 0, 0, 0.125) 0px 3px 5px 0px inset;
+  --shadow-panel: rgba(50, 50, 93, 0.06) 0px 4px 7px 0px, rgba(0, 0, 0, 0.04) 0px 1px 4px 0px;
+  --shadow-glow: #9ecaed 0px 0px 10px 0px;
+  --shadow-window: #acacac 0px 0px 20px 0px;
+
+  --ease-standard: ease-in-out;
+  --ease-enter: ease-out;
+  --ease-progress-a: cubic-bezier(0.65, 0.815, 0.735, 0.395);
+  --ease-progress-b: cubic-bezier(0.165, 0.84, 0.44, 1);
+
+  /* Mint Paper's family stacks. Atkinson Hyperlegible is self-hosted with next/font
+     (layout.tsx defines --font-atkinson); the named family follows as in Mint Paper. */
+  --font-sans: var(--font-atkinson), "Atkinson Hyperlegible", Atkinson, system-ui, sans-serif;
+  --font-mono: Menlo, Monaco, Consolas, "Courier New", monospace;
+  --font-ui: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+
+  /* Mint Paper type styles -> text-<style> utilities (size, line height, tracking, weight). */
+  --text-hero: 39px;
+  --text-hero--line-height: 42.9px;
+  --text-hero--letter-spacing: -1px;
+  --text-hero--font-weight: 700;
+  --text-page-title: 36px;
+  --text-page-title--line-height: 39.6px;
+  --text-page-title--letter-spacing: -1px;
+  --text-page-title--font-weight: 700;
+  --text-section-title: 30px;
+  --text-section-title--line-height: 33px;
+  --text-section-title--letter-spacing: -0.5px;
+  --text-section-title--font-weight: 700;
+  --text-card-heading: 26px;
+  --text-card-heading--line-height: 28.6px;
+  --text-card-heading--letter-spacing: -0.5px;
+  --text-card-heading--font-weight: 700;
+  --text-subtitle: 26px;
+  --text-subtitle--line-height: 28.6px;
+  --text-subtitle--font-weight: 500; /* Atkinson Hyperlegible ships 400/700 only: renders at 400 */
+  --text-body: 17px;
+  --text-body--line-height: 25.5px;
+  --text-tile-title: 18px;
+  --text-tile-title--line-height: 28px;
+  --text-tile-desc: 14px;
+  --text-tile-desc--line-height: 16px;
+  --text-eyebrow: 18px;
+  --text-eyebrow--line-height: 24px;
+  --text-button: 18px;
+  --text-button--line-height: 25.7px;
+  --text-button--font-weight: 700;
+  --text-button-lg: 22px;
+  --text-button-lg--line-height: 29px;
+  --text-button-lg--font-weight: 700;
+  --text-nav: 17px;
+  --text-nav--line-height: 24.3px;
+  --text-tool-button: 14px; /* with font-ui */
+  --text-tool-button--line-height: 20px;
+  --text-choice-label: 15px; /* with font-ui */
+  --text-choice-label--line-height: 20px;
+  --text-pill: 10px; /* with font-ui */
+  --text-pill--line-height: 12px;
+  --text-help: 12px; /* with font-ui */
+  --text-help--line-height: 17px;
+  --text-prose-h2: 22px;
+  --text-prose-h2--line-height: 26px;
+  --text-prose-h2--font-weight: 700;
+  --text-prose-body: 16px;
+  --text-prose-body--line-height: 28px;
+  --text-step-title: 20px;
+  --text-step-title--line-height: 28px;
+  --text-code: 13px;
+  --text-code--line-height: 19px;
+  --text-code-chip: 12px;
+  --text-code-chip--line-height: 16px;
+
+  /* Generic sizes re-pointed at the Mint Paper scale, so no off-scale size can slip in. */
+  --text-xs: 12px; /* help */
+  --text-xs--line-height: 17px;
+  --text-sm: 14px; /* tile-desc / tool-button size */
+  --text-sm--line-height: 20px;
+  --text-base: 17px; /* body */
+  --text-base--line-height: 25.5px;
+  --text-lg: 18px; /* tile-title, eyebrow, button */
+  --text-lg--line-height: 28px;
+  --text-xl: 20px; /* step-title */
+  --text-xl--line-height: 28px;
+  --text-2xl: 22px; /* prose-h2, button-lg */
+  --text-2xl--line-height: 26px;
+  --text-3xl: 26px; /* card-heading, subtitle */
+  --text-3xl--line-height: 28.6px;
+  --text-4xl: 30px; /* section-title */
+  --text-4xl--line-height: 33px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --ip-bg: #0d0f15;
-    --ip-surface: #141720;
-    --ip-surface-raised: #1b1f2a;
-    --ip-surface-sunken: #090b10;
-    --ip-border: #2a2f3d;
-    --ip-border-strong: #6e7488;
-    --ip-fg: #eceef4;
-    --ip-fg-muted: #a2a8ba;
-    --ip-fg-disabled: #5d6375;
-    --ip-paper: #ffffff;
-    --ip-primary: #8f93ff;
-    --ip-primary-hover: #a9acff;
-    --ip-primary-active: #c4c6ff;
-    --ip-on-primary: #0d0f15;
-    --ip-primary-soft: #23254a;
-    --ip-on-primary-soft: #c4c6ff;
-    --ip-danger: #ff8a80;
-    --ip-danger-soft: #3a1715;
-    --ip-on-danger: #0d0f15;
-    --ip-success: #4fd18b;
-    --ip-success-soft: #0f2e1f;
-    --ip-warning: #f5b451;
-    --ip-warning-soft: #33240b;
-    --ip-focus-ring: #a9acff;
-    --ip-scrim: rgb(0 0 0 / 0.6);
-    --ip-drop-overlay: rgb(35 37 74 / 0.92);
-    --ip-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-    --ip-shadow-md: 0 2px 8px rgb(0 0 0 / 0.45);
-    --ip-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
-    --ip-shadow-paper: 0 0 0 1px rgb(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5);
-  }
-}
-
-/* Motion. Reduced motion collapses every duration to 0 (opacity fades included). */
-:root {
-  --ip-duration-instant: 80ms;
-  --ip-duration-fast: 120ms;
-  --ip-duration-base: 180ms;
-  --ip-duration-slow: 280ms;
-  --ip-ease-out: cubic-bezier(0.2, 0, 0, 1);
-  --ip-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --ip-duration-instant: 0ms;
-    --ip-duration-fast: 0ms;
-    --ip-duration-base: 0ms;
-    --ip-duration-slow: 0ms;
-  }
-}
-
+/* ---- 3. Colour utilities ---------------------------------------------------------------------- */
 @theme inline {
-  /* Colors -> bg-*, text-*, border-*, ring-*, outline-* utilities */
+  /* Role names (feature code) */
   --color-bg: var(--ip-bg);
   --color-surface: var(--ip-surface);
   --color-surface-raised: var(--ip-surface-raised);
   --color-surface-sunken: var(--ip-surface-sunken);
+  --color-surface-overlay: var(--ip-surface-overlay);
+  --color-chrome: var(--ip-chrome);
+  --color-well: var(--ip-well);
+  --color-hover: var(--ip-hover);
+  --color-pressed: var(--ip-pressed);
+  --color-field-line: var(--ip-field-line);
+  --color-field-line-hover: var(--ip-field-line-hover);
+  --color-inverse: var(--ip-inverse);
+  --color-on-inverse: var(--ip-on-inverse);
+  --color-accent: var(--ip-accent);
+  --color-primary: var(--ip-primary);
+  --color-primary-hover: var(--ip-primary-hover);
+  --color-primary-active: var(--ip-primary-active);
+  --color-on-primary: var(--ip-on-primary);
+  --color-primary-ink: var(--ip-primary-ink);
+  --color-primary-soft: var(--ip-primary-soft);
+  --color-on-primary-soft: var(--ip-on-primary-soft);
+  --color-primary-faint: var(--ip-primary-faint);
+  --color-primary-ring: var(--ip-primary-ring);
   --color-border: var(--ip-border);
   --color-border-strong: var(--ip-border-strong);
   --color-fg: var(--ip-fg);
   --color-fg-muted: var(--ip-fg-muted);
   --color-fg-disabled: var(--ip-fg-disabled);
   --color-paper: var(--ip-paper);
-  --color-primary: var(--ip-primary);
-  --color-primary-hover: var(--ip-primary-hover);
-  --color-primary-active: var(--ip-primary-active);
-  --color-on-primary: var(--ip-on-primary);
-  --color-primary-soft: var(--ip-primary-soft);
-  --color-on-primary-soft: var(--ip-on-primary-soft);
   --color-danger: var(--ip-danger);
+  --color-danger-hover: var(--ip-danger-hover);
   --color-danger-soft: var(--ip-danger-soft);
+  --color-danger-strong: var(--ip-danger-strong);
   --color-on-danger: var(--ip-on-danger);
   --color-success: var(--ip-success);
   --color-success-soft: var(--ip-success-soft);
@@ -189,43 +355,26 @@
   --color-scrim: var(--ip-scrim);
   --color-drop-overlay: var(--ip-drop-overlay);
 
-  /* Kept for the existing placeholder home page */
-  --color-background: var(--ip-bg);
-  --color-foreground: var(--ip-fg);
-
-  /* Type */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --text-xs: 0.75rem;
-  --text-xs--line-height: 1rem;
-  --text-sm: 0.875rem;
-  --text-sm--line-height: 1.25rem;
-  --text-base: 1rem;
-  --text-base--line-height: 1.5rem;
-  --text-lg: 1.125rem;
-  --text-lg--line-height: 1.625rem;
-  --text-xl: 1.375rem;
-  --text-xl--line-height: 1.875rem;
-  --text-2xl: 1.75rem;
-  --text-2xl--line-height: 2.25rem;
-  --text-3xl: 2.25rem;
-  --text-3xl--line-height: 2.75rem;
-  --text-4xl: 3rem;
-  --text-4xl--line-height: 3.5rem;
-
-  /* Radius */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-
-  /* Elevation */
-  --shadow-sm: var(--ip-shadow-sm);
-  --shadow-md: var(--ip-shadow-md);
-  --shadow-lg: var(--ip-shadow-lg);
-  --shadow-paper: var(--ip-shadow-paper);
-
-  /* Motion -> duration-*, ease-* utilities */
-  --ease-out: var(--ip-ease-out);
-  --ease-in-out: var(--ip-ease-in-out);
+  /* Mint Paper names */
+  --color-brand: var(--brand);
+  --color-brand-bright: var(--brand-bright);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-tint: var(--brand-tint);
+  --color-brand-soft: var(--brand-soft);
+  --color-ink: var(--ink);
+  --color-ink-black: var(--ink-black);
+  --color-muted: var(--muted);
+  --color-hint-ink: var(--mp-hint-ink);
+  --color-sand: var(--sand);
+  --color-band: var(--band);
+  --color-surface-soft: var(--surface-soft);
+  --color-surface-footer: var(--surface-footer);
+  --color-link: var(--link);
+  --color-choice-bg: var(--choice-bg);
+  --color-tool-active-bg: var(--tool-active-bg);
+  --color-tool-active-ink: var(--tool-active-ink);
+  --color-canvas: var(--canvas);
+  --color-panel-border: var(--panel-border);
+  --color-page-tray: var(--page-tray);
+  --color-prose: var(--mp-prose);
 }
