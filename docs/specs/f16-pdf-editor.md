@@ -1,6 +1,6 @@
 # F16: PDF editor (beat the reference editor)
 
-Status: steps 1 (Analyze) and 2 (Research) done; step 3 (Design) outline included, to be detailed by `ux-designer` before Build. **Scope approved by the owner on 2026-11-23:** F16 includes existing-text editing (phases E2/E3), and is the top-priority feature. **Revised 2026-11-23 after deeper research (§3):** the edit engine is a Rust core (WASM in the browser, same code native on the server as a consented fallback), not PDFium. This needs the owner's OK.
+Status: steps 1 (Analyze) and 2 (Research) done; step 3 (Design) outline included, to be detailed by `ux-designer` before Build. **Scope approved by the owner on 2026-11-23:** F16 includes existing-text editing (phases E2/E3), and is the top-priority feature. **Revised 2026-11-23 after deeper research (§3):** the edit engine is a Rust core (WASM in the browser, same code native on the server as a consented fallback), not PDFium. Approved by the owner on 2026-11-23.
 
 Reference observed: `pdf-editor` on the live reference site, 2026-11-23, with synthetic fixtures only (Playwright, network recorded). Two "Apply changes" tasks were run (within the 3/hour rule in CLAUDE.md).
 Companion research (competitors, libraries, licences): `docs/specs/f16-pdf-editor-research.md`.
