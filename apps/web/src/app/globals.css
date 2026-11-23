@@ -8,6 +8,8 @@
   }
 
   body {
+    /* Safety net: nothing should widen the page (clip keeps sticky working). */
+    overflow-x: clip;
     background: var(--ip-bg);
     color: var(--ip-fg);
     font-family: var(--font-sans);
@@ -18,4 +20,140 @@
     outline: 2px solid var(--ip-focus-ring);
     outline-offset: 2px;
   }
+}
+
+/* Shared tool flow: small keyframe utilities (transform/opacity only). */
+@layer utilities {
+  .ip-spin {
+    animation: ip-spin 800ms linear infinite;
+  }
+  .ip-indeterminate {
+    animation: ip-slide 1.2s var(--ip-ease-in-out) infinite;
+  }
+  .ip-pulse {
+    animation: ip-pulse 1.4s var(--ip-ease-in-out) infinite;
+  }
+  .ip-shake {
+    animation: ip-shake 240ms linear;
+  }
+  .ip-fade-in {
+    animation: ip-fade-in var(--ip-duration-base) var(--ip-ease-out) both;
+  }
+  .ip-rise-in {
+    animation: ip-rise-in var(--ip-duration-base) var(--ip-ease-out) both;
+  }
+  /* Transform-only entry for text (opacity fades would fail contrast checks mid-animation). */
+  .ip-settle {
+    animation: ip-settle var(--ip-duration-base) var(--ip-ease-out) both;
+  }
+  .ip-tooltip {
+    animation: ip-fade-in var(--ip-duration-fast) var(--ip-ease-out) 300ms both;
+  }
+  .ip-draw {
+    stroke-dasharray: 24;
+    animation: ip-draw var(--ip-duration-slow) var(--ip-ease-out) both;
+  }
+}
+
+@keyframes ip-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ip-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+@keyframes ip-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+@keyframes ip-shake {
+  0%,
+  50%,
+  100% {
+    transform: translateX(0);
+  }
+  12.5%,
+  62.5% {
+    transform: translateX(-4px);
+  }
+  37.5%,
+  87.5% {
+    transform: translateX(4px);
+  }
+}
+@keyframes ip-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ip-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes ip-settle {
+  from {
+    transform: translateY(6px);
+  }
+}
+@keyframes ip-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ip-spin {
+    /* Carries state, so it pulses instead of freezing (spec U-4 Spinner). */
+    animation: ip-pulse 1.2s linear infinite;
+  }
+  .ip-indeterminate,
+  .ip-shake,
+  .ip-pulse {
+    animation: none;
+  }
+}
+
+/* Range input: border-strong track (>= 3:1), primary thumb. */
+.ip-range {
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.ip-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--ip-border-strong);
+}
+.ip-range::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--ip-border-strong);
+}
+.ip-range::-webkit-slider-thumb {
+  appearance: none;
+  margin-top: -7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: var(--ip-primary);
+  border: 2px solid var(--ip-surface-raised);
+}
+.ip-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: var(--ip-primary);
+  border: 2px solid var(--ip-surface-raised);
 }
