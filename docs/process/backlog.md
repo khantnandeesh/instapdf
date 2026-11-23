@@ -8,7 +8,7 @@ Status values: `todo` · `in-progress (step n)` · `done` · `deferred`. The orc
 | F1 | Shared upload → options → process → result flow (incl. encrypted-PDF password prompts) | shared-chrome | done — evaluator PASS (docs/evals/f1-shared-flow.md); prod release waits on owner GitHub settings. Follow-ups: G-1 paste listener on `document`, G-2 per-page progress, vehicle tool: Rotate |
 | F2 | Home page + tool catalogue + header menu | home | done — evaluator PASS (docs/evals/f2-home.md); re-evaluated PASS 62/62 after #5. Follow-ups: Back/Forward leave guard, footer year at runtime, third-party notices page (F21), aria-controls on closed menu, separator spacing in tool link names |
 | F3 | Merge (files + pages view, reorder, options) | merge-pdf | in-progress (step 6: review fixes, PR #7) |
-| Q1 | Legal pages (privacy, terms, cookies, third-party notices) + strict CSP that blocks uploads on browser tools | privacy, terms, cookies | todo — **before the first prod release** |
+| Q1 | Legal pages (privacy, terms, cookies, third-party notices) + strict CSP that blocks uploads on browser tools | privacy, terms, cookies | done (#9) — owner must fill legal placeholders before the first prod release; caniuse-lite exception approved |
 | F4 | Split by pages / Extract / Delete / Rotate | split-pdf, extract-pdf-pages, delete-pdf-pages, rotate-pdf-pages | todo — next after Merge, built together with F5 on the shared page-list model (Rotate ships in F1) |
 | F5 | Organize / Visual combine / Alternate & mix | organize-pdf, visually-combine-reorder-pdf, alternate-mix-pdf | todo — together with F4 |
 | F12 | JPG↔PDF, extract images, PDF to text | jpg-to-pdf, pdf-to-jpg, extract-images-from-pdf, extract-text-from-pdf | todo |

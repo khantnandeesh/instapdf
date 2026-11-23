@@ -17,7 +17,7 @@ export function SiteFooter() {
   const az = [...tools].sort((a, b) => a.name.localeCompare(b.name, "en"));
   const year = new Date().getFullYear();
   const company = (["about", "help"] as const).map((s) => ({ href: `/${s}`, label: infoPages[s] }));
-  const legal = (["privacy", "terms", "cookies", "security"] as const).map((s) => ({ href: `/${s}`, label: infoPages[s] }));
+  const legal = (["privacy", "terms", "cookies", "licenses", "security"] as const).map((s) => ({ href: `/${s}`, label: infoPages[s] }));
   return (
     <footer className="ip-site-footer bg-surface-footer">
       <div className="mx-auto grid max-w-[1170px] grid-cols-2 gap-[30px] px-[30px] pt-(--space-7) pb-(--space-7) text-sm lg:grid-cols-[1.4fr_3fr_1fr_1fr]">

@@ -33,7 +33,7 @@ export const siteCopy = {
   leaveGo: "Leave",
 };
 
-/** Footer placeholder pages (F21 replaces them). */
+/** Footer info pages. About, Help and Security are still placeholders (F21); the legal ones are real (Q1). */
 export const infoPages = {
   about: "About",
   help: "Help",
@@ -41,6 +41,7 @@ export const infoPages = {
   terms: "Terms",
   cookies: "Cookies",
   security: "Security",
+  licenses: "Licenses",
 } as const;
 
 export type InfoSlug = keyof typeof infoPages;
