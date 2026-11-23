@@ -124,6 +124,70 @@ test.describe("desktop menu (1366x900)", () => {
     expect(await page.evaluate(() => window.scrollY)).toBe(before);
   });
 
+  test("AC-30: keyboard only: open, search, arrow into results, Tab out closes, Escape returns focus", async ({ page }) => {
+    // Reach the trigger with Tab alone, from the top of a freshly loaded page.
+    for (let i = 0; i < 10 && !(await menuButton(page).evaluate((b) => b === document.activeElement)); i++) await page.keyboard.press("Tab");
+    await expect(menuButton(page)).toBeFocused();
+
+    // Enter opens with the search focused; typing filters.
+    await page.keyboard.press("Enter");
+    await expect(menuButton(page)).toHaveAttribute("aria-expanded", "true");
+    await expect(menuSearch(page)).toBeFocused();
+    await page.keyboard.type("split");
+    await expect(menuLinks(page)).toHaveCount(5);
+
+    // ArrowDown moves to the first visible entry; Shift+Tab from the search goes back to the trigger, panel stays open.
+    await page.keyboard.press("ArrowDown");
+    await expect(menuLinks(page).first()).toBeFocused();
+    await menuSearch(page).focus();
+    await page.keyboard.press("Shift+Tab");
+    await expect(menuButton(page)).toBeFocused();
+    await expect(menuButton(page)).toHaveAttribute("aria-expanded", "true");
+
+    // Tab through every control in the panel; one more Tab leaves it and closes it.
+    await menuSearch(page).focus();
+    let left = false;
+    for (let i = 0; i < 20; i++) {
+      await page.keyboard.press("Tab");
+      if (!(await page.evaluate(() => !!document.activeElement?.closest("#tool-menu")))) {
+        left = true;
+        break;
+      }
+    }
+    expect(left).toBe(true);
+    await expect(menuButton(page)).toHaveAttribute("aria-expanded", "false");
+    await expect(menu(page)).toHaveCount(0);
+
+    // Space reopens; Escape (even with text in the search) closes in one press and focus returns to the trigger.
+    await menuButton(page).focus();
+    await page.keyboard.press("Space");
+    await expect(menuSearch(page)).toBeFocused();
+    await expect(menuSearch(page)).toHaveValue(""); // the query does not survive a close
+    await page.keyboard.type("rot");
+    await page.keyboard.press("Escape");
+    await expect(menu(page)).toHaveCount(0);
+    await expect(menuButton(page)).toBeFocused();
+  });
+
+  test("AC-28: special characters in the menu search are literal and never break it", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await openMenu(page);
+    await menuSearch(page).fill("&");
+    const hrefs = await menuLinks(page).evaluateAll((as) => as.map((a) => a.getAttribute("href")));
+    expect(hrefs).toEqual(expect.arrayContaining(["/fill-sign", "/combine-reorder"]));
+    for (const q of [".*", "(", "[", "\\", "<img src=x onerror=alert(1)>"]) {
+      await menuSearch(page).fill(q);
+      await expect(page.getByTestId("tool-menu-no-results"), q).toContainText(q);
+      await expect(menu(page).locator("img")).toHaveCount(0);
+    }
+    await page.getByTestId("tool-menu-no-results").getByRole("button", { name: "Clear search" }).click();
+    await expect(menuSearch(page)).toHaveValue("");
+    await expect(menuSearch(page)).toBeFocused();
+    await expect(menuLinks(page)).toHaveCount(tools.length);
+    expect(errors).toEqual([]);
+  });
+
   test("AC-35: Enter in the menu search opens the first match", async ({ page }) => {
     await openMenu(page);
     await page.keyboard.type("rota");
@@ -197,6 +261,46 @@ test.describe("mobile (375x812)", () => {
     await page.mouse.move(180, 500);
     await page.mouse.wheel(0, 800);
     await page.waitForTimeout(300);
+    expect(await page.evaluate(() => window.scrollY)).toBe(before);
+  });
+
+  test("AC-38: Tab and Shift+Tab wrap inside the dialog; touch scroll and close leave the page where it was", async ({ page }) => {
+    await openHydrated(page);
+    await page.evaluate(() => window.scrollTo(0, 400));
+    const before = await page.evaluate(() => window.scrollY);
+    expect(before).toBeGreaterThan(0);
+    await menuButton(page).click();
+    const dialog = page.getByRole("dialog", { name: "All tools" });
+    await expect(dialog).toBeVisible();
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe("hidden");
+
+    const inDialog = () => page.evaluate(() => !!document.activeElement?.closest("dialog[open]"));
+    // Strict trap: more presses than there are controls, in both directions; focus never leaves.
+    for (let i = 0; i < tools.length + 10; i++) {
+      await page.keyboard.press("Tab");
+      expect(await inDialog(), `Tab #${i + 1}`).toBe(true);
+    }
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press("Shift+Tab");
+      expect(await inDialog(), `Shift+Tab #${i + 1}`).toBe(true);
+    }
+    // From the search field (first control), Shift+Tab wraps to the last control, still inside.
+    await menuSearch(page).focus();
+    await page.keyboard.press("Shift+Tab");
+    expect(await inDialog()).toBe(true);
+    await expect(menuSearch(page)).not.toBeFocused();
+
+    // A touch swipe over the dialog scrolls the dialog, not the page behind it.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Input.synthesizeScrollGesture", { x: 180, y: 600, yDistance: -500, gestureSourceType: "touch", speed: 2000 });
+    await page.waitForTimeout(200);
+    expect(await page.evaluate(() => window.scrollY)).toBe(before);
+
+    // Closing restores page scrolling and the position.
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(menuButton(page)).toBeFocused();
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).not.toBe("hidden");
     expect(await page.evaluate(() => window.scrollY)).toBe(before);
   });
 

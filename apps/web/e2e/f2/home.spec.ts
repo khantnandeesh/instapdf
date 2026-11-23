@@ -1,4 +1,5 @@
 /** F2 home page and catalogue: AC-1 to AC-22, AC-54 to AC-63. Spec: docs/specs/f2-home.md */
+import { gzipSync } from "node:zlib";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import {
@@ -54,11 +55,17 @@ test.describe("hero and page basics", () => {
 });
 
 test.describe("catalogue", () => {
-  test("AC-5 / AC-6: one link per registry tool under its category, categories in order", async ({ page }) => {
+  test("AC-5: the category sections hold exactly one link per registry tool, no duplicates", async ({ page }) => {
     await page.goto("/");
     const hrefs = await categoryLinks(page).evaluateAll((as) => as.map((a) => a.getAttribute("href")));
     expect(hrefs).toHaveLength(tools.length);
+    expect(new Set(hrefs).size).toBe(hrefs.length);
     expect(new Set(hrefs)).toEqual(new Set(tools.map((t) => `/${t.slug}`)));
+  });
+
+  test("AC-6: category headings are in the fixed order and each tool sits under its registry category", async ({ page }) => {
+    await page.goto("/");
+    expect(categories.map((c) => c.id)).toEqual(["organize", "edit", "optimize", "security", "convert-from", "convert-to", "scans", "automate"]);
     // Category headings are h3 under the "All tools" h2 (design H-7); query by section.
     const headings = await page.locator("[data-testid=category] h3").allInnerTexts();
     expect(headings).toEqual(categories.map((c) => c.label));
@@ -80,12 +87,33 @@ test.describe("catalogue", () => {
     }
   });
 
-  test("AC-8 / AC-13: Rotate links to /rotate-pdf with a Beta badge, no coming-soon, and opens the tool", async ({ page }) => {
+  test("AC-13: a beta tool shows a Beta badge on its card and its menu entry", async ({ page }) => {
+    await openHydrated(page);
+    const beta = tools.filter((t) => t.status === "beta");
+    expect(beta.map((t) => t.slug)).toContain("rotate-pdf");
+    for (const t of beta) {
+      const card = page.locator(`[data-testid=category] a[href="/${t.slug}"]`);
+      await expect(card.getByText("Beta", { exact: true }), t.slug).toBeVisible();
+      await expect(card, t.slug).toHaveAccessibleName(/Beta/);
+    }
+    for (const t of tools.filter((x) => x.status !== "beta"))
+      await expect(page.locator(`[data-testid=category] a[href="/${t.slug}"]`), t.slug).not.toHaveAccessibleName(/Beta/);
+    await openMenu(page);
+    for (const t of beta) {
+      const entry = menuLinks(page).and(page.locator(`[href="/${t.slug}"]`));
+      await expect(entry.getByText("Beta", { exact: true }), t.slug).toBeVisible();
+      await expect(entry, t.slug).toHaveAccessibleName(/Beta/);
+    }
+    // No other tool carries it.
+    for (const t of tools.filter((x) => x.status !== "beta"))
+      await expect(menuLinks(page).and(page.locator(`[href="/${t.slug}"]`)), t.slug).not.toHaveAccessibleName(/Beta/);
+  });
+
+  test("AC-8: Rotate links to /rotate-pdf, has no coming-soon badge, and opens the tool's empty state", async ({ page }) => {
     await page.goto("/");
     const card = page.locator('[data-testid=category] a[href="/rotate-pdf"]');
     await expect(card).not.toContainText("Coming soon");
-    await expect(card).toContainText("Beta");
-    await expect(card).toHaveAccessibleName(/Beta/);
+    await expect(card).not.toHaveAccessibleName(/Coming soon/);
     await card.click();
     await expect(page).toHaveURL(/\/rotate-pdf$/);
     await expect(page.locator('input[type=file][accept*=".pdf"]')).toBeAttached();
@@ -161,6 +189,14 @@ test.describe("search", () => {
 
   const visibleNames = (page: import("@playwright/test").Page) =>
     page.locator("[data-testid=category] a[href]").evaluateAll((as) => as.map((a) => a.getAttribute("href")));
+
+  /** Independent oracle for the spec's rule: trimmed, case-insensitive substring of name, summary or a keyword. */
+  const expectedHrefs = (query: string) => {
+    const q = query.trim().toLowerCase();
+    const hits = tools.filter((t) => [t.name, t.summary, ...t.keywords].some((s) => s.toLowerCase().includes(q)));
+    // Category sections list tools in category order, registry order within each.
+    return categories.flatMap((c) => hits.filter((t) => t.category === c.id)).map((t) => `/${t.slug}`);
+  };
 
   test("AC-15: typing split shows the split tools and hides Merge, Rotate and Compress, live", async ({ page }) => {
     await expect(catalogueSearch(page)).toHaveAttribute("type", "search");
@@ -247,6 +283,58 @@ test.describe("search", () => {
     for (const t of tools) expect(html, t.slug).toContain(`href="/${t.slug}"`);
   });
 
+  test("AC-15: special characters are matched literally (no regex, no HTML) and never break the page", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("dialog", (d) => {
+      errors.push(`dialog: ${d.message()}`);
+      void d.dismiss();
+    });
+    for (const q of ["&", ".", ".*", "(", "[", "\\", "+?", "^$", "%", "'\"", "<b>x</b>", "<img src=x onerror=alert(1)>", "日本語", "ü"]) {
+      await catalogueSearch(page).fill(q);
+      const expected = expectedHrefs(q);
+      if (expected.length === 0) {
+        await expect(page.getByTestId("no-results"), q).toBeVisible();
+        // The query is shown as text, never parsed as markup.
+        await expect(page.getByTestId("no-results"), q).toContainText(q.trim());
+        await expect(page.locator("[data-testid=catalogue] b, [data-testid=catalogue] img")).toHaveCount(0);
+      } else {
+        await expect(page.getByTestId("no-results"), q).toHaveCount(0);
+        expect(await visibleNames(page), q).toEqual(expected);
+      }
+    }
+    // `&` is a real hit: the "X & Y" tools.
+    expect(expectedHrefs("&")).toEqual(expect.arrayContaining(["/fill-sign", "/combine-reorder"]));
+    expect(errors).toEqual([]);
+  });
+
+  test("AC-62: special characters round-trip through ?q and deep links", async ({ page }) => {
+    await catalogueSearch(page).fill("fill & sign");
+    await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe("fill & sign");
+    await page.reload();
+    await expect(catalogueSearch(page)).toHaveValue("fill & sign");
+    expect(await visibleNames(page)).toEqual(["/fill-sign"]);
+
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await openHydrated(page, `/?q=${encodeURIComponent("<img src=x onerror=alert(1)>")}`);
+    await expect(page.getByTestId("no-results")).toContainText("<img src=x onerror=alert(1)>");
+    await expect(page.locator("[data-testid=catalogue] img")).toHaveCount(0);
+
+    // A blank or whitespace-only q shows everything and is dropped from the URL.
+    await openHydrated(page, "/?q=%20%20");
+    await expect(categoryLinks(page)).toHaveCount(tools.length);
+    await expect(page.getByTestId("popular")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test("AC-62: a deep link /?q=split#tools keeps the hash and the filter", async ({ page }) => {
+    await openHydrated(page, "/?q=split#tools");
+    await expect(catalogueSearch(page)).toHaveValue("split");
+    expect(await visibleNames(page)).toEqual(expectedHrefs("split"));
+    expect(new URL(page.url()).hash).toBe("#tools");
+  });
+
   test("AC-63: matches are wrapped in <mark>; keyword-only hits are not; clearing removes them", async ({ page }) => {
     await catalogueSearch(page).fill("rot");
     const rotate = page.locator('[data-testid=category] a[href="/rotate-pdf"]');
@@ -313,6 +401,41 @@ test.describe("privacy, accessibility, layout", () => {
     await page.waitForLoadState("networkidle");
     expect([...origins].filter((o) => o !== new URL(page.url()).origin && !o.startsWith("data:"))).toEqual([]);
     expect(await context.cookies()).toEqual([]);
+  });
+
+  /*
+   * AC-55 is a Lighthouse (mobile) score measured by the evaluator on staging. This is a
+   * cheap local proxy that catches the usual regressions: a heavy chunk (pdf-lib / pdf.js)
+   * leaking onto the home page, or the page weight growing well past today's baseline
+   * (2026-11-23: ~121 KB gzip JS, ~23 KB gzip HTML, ~10 KB gzip CSS).
+   */
+  test("AC-55 (proxy): / stays inside a page-weight budget and loads no PDF-engine code", async ({ page }, info) => {
+    test.skip(isDesktop(info.project.name), "Lighthouse's mobile preset; measured once on mobile");
+    const gz: Record<string, number> = {};
+    const scripts: { url: string; raw: number }[] = [];
+    const pending: Promise<void>[] = [];
+    page.on("response", (r) => {
+      pending.push(
+        r
+          .body()
+          .then((body) => {
+            const type = r.request().resourceType();
+            gz[type] = (gz[type] ?? 0) + gzipSync(body).length;
+            if (type === "script") scripts.push({ url: r.url(), raw: body.length });
+          })
+          .catch(() => {}),
+      );
+    });
+    await page.goto("/", { waitUntil: "networkidle" });
+    await Promise.all(pending);
+    const kb = (n = 0) => Math.round(n / 1024);
+    const summary = Object.fromEntries(Object.entries(gz).map(([k, v]) => [k, `${kb(v)} KB`]));
+    expect(kb(gz.script), JSON.stringify(summary)).toBeLessThanOrEqual(140);
+    expect(kb(gz.document), JSON.stringify(summary)).toBeLessThanOrEqual(40);
+    expect(kb(gz.stylesheet), JSON.stringify(summary)).toBeLessThanOrEqual(20);
+    // pdf-lib and pdf.js belong to tool pages only; any single chunk this big means one leaked in.
+    expect(scripts.filter((s) => s.raw > 250 * 1024).map((s) => s.url)).toEqual([]);
+    expect(scripts.filter((s) => /pdf\.worker|pdfjs/i.test(s.url)).map((s) => s.url)).toEqual([]);
   });
 
   test("AC-56: axe finds no critical or serious violations (closed, menu open, no results)", async ({ page }) => {

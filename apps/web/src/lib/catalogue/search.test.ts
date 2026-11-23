@@ -50,4 +50,30 @@ describe("matchTools", () => {
     const order = tools.map((t) => t.slug).filter((s) => hits.includes(s));
     expect(hits).toEqual(order);
   });
+
+  it("AC-15: treats regex and markup characters literally and never throws", () => {
+    const oracle = (q: string) =>
+      tools.filter((t) => [t.name, t.summary, ...t.keywords].some((x) => x.toLowerCase().includes(q.trim().toLowerCase()))).map((t) => t.name);
+    for (const q of [".*", "(", ")", "[", "]", "\\", "+", "?", "^", "$", "|", "{2}", "%", "<b>", "&amp;", "'", '"']) {
+      expect(() => matchTools(tools, q), q).not.toThrow();
+      expect(names(q), q).toEqual(oracle(q));
+    }
+    expect(names(".*")).toEqual([]);
+    expect(names("&")).toEqual(expect.arrayContaining(["Fill & sign", "Combine & reorder", "Header & footer", "Alternate & mix"]));
+  });
+
+  it("handles non-Latin, accented and very long queries", () => {
+    expect(names("日本語")).toEqual([]);
+    expect(names("ü")).toEqual([]);
+    expect(names("x".repeat(10_000))).toEqual([]);
+    expect(names("\tsplit\n")).toEqual(expect.arrayContaining(["Split"]));
+  });
+
+  it("AC-63: match ranges index the original text (case kept) for name and summary", () => {
+    for (const m of matchTools(tools, "PDF")) {
+      if (m.name) expect(m.item.name.slice(...m.name).toLowerCase()).toBe("pdf");
+      if (m.summary) expect(m.item.summary.slice(...m.summary).toLowerCase()).toBe("pdf");
+    }
+    expect(splitAt("Rotate", undefined)).toBeNull();
+  });
 });

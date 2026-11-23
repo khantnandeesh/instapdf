@@ -8,14 +8,14 @@ import { menu, menuButton } from "./support";
 
 const leaveDialog = (page: import("@playwright/test").Page) => page.getByRole("dialog", { name: "Leave this tool?" });
 
-test("with no files, header links navigate straight away", async ({ page }) => {
+test("H-11: with no files, header links navigate straight away", async ({ page }) => {
   await openRotate(page);
   await page.getByRole("link", { name: "InstaPDF home" }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(leaveDialog(page)).toHaveCount(0);
 });
 
-test("with files loaded, the logo asks first; Stay keeps the files, Leave navigates", async ({ page }) => {
+test("H-11: with files loaded, the logo asks first; Stay keeps the files, Leave navigates", async ({ page }) => {
   await openRotate(page);
   await pickReady(page, "three-pages.pdf");
   await page.getByRole("link", { name: "InstaPDF home" }).click();
@@ -35,7 +35,7 @@ test("with files loaded, the logo asks first; Stay keeps the files, Leave naviga
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Fast, private PDF tools");
 });
 
-test("Escape on the dialog stays; a menu entry and a footer link are guarded too", async ({ page }) => {
+test("H-11: Escape on the dialog stays; a menu entry and a footer link are guarded too", async ({ page }) => {
   await openRotate(page);
   await pickReady(page, "three-pages.pdf");
 
@@ -53,7 +53,7 @@ test("Escape on the dialog stays; a menu entry and a footer link are guarded too
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Merge");
 });
 
-test("same-page links (skip link) are not guarded", async ({ page }) => {
+test("H-11: same-page links (skip link) are not guarded", async ({ page }) => {
   await openRotate(page);
   await pickReady(page, "three-pages.pdf");
   await page.getByRole("link", { name: "Skip to main content" }).focus();

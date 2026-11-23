@@ -78,8 +78,56 @@ test("AC-45: with localStorage throwing, the page, menu and search work and no R
   await page.locator("#catalogue-search").fill("");
   await openMenu(page);
   await expect(menuRecent(page)).toHaveCount(0);
+  await page.locator("#tool-menu-search").fill("split");
+  await expect(menu(page).locator('nav a[href="/merge-pdf"]')).toHaveCount(0);
+  await expect(menu(page).locator('nav a[href="/split-pdf"]')).toBeVisible();
   await openHydrated(page, "/rotate-pdf");
+  await expect(page.locator('input[type=file][accept*=".pdf"]')).toBeAttached();
   expect(errors).toEqual([]);
+});
+
+test("AC-45: with writes failing (quota exceeded), visiting a tool and clearing raise nothing", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.addInitScript(() => {
+    const fail = () => {
+      throw new DOMException("full", "QuotaExceededError");
+    };
+    Storage.prototype.setItem = fail;
+    Storage.prototype.removeItem = fail;
+  });
+  await openHydrated(page, "/rotate-pdf");
+  await expect(page.locator('input[type=file][accept*=".pdf"]')).toBeAttached();
+  await openHydrated(page, "/");
+  await expect(homeRecent(page)).toHaveCount(0);
+  await expect(page.locator("[data-testid=category]").first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("AC-44: well-formed JSON of the wrong shape is treated as empty and rewritten on the next visit", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  for (const bad of ['{"a":1}', '"rotate-pdf"', "null", "42", "[1,2]", '["rotate-pdf",null]', "[]", ""]) {
+    await seedRecent(page, bad);
+    await expect(page.locator("[data-testid=category]").first(), bad).toBeVisible();
+    await expect(homeRecent(page), bad).toHaveCount(0);
+    // The pre-paint script agrees: no space is reserved.
+    expect(await page.evaluate(() => document.documentElement.hasAttribute("data-recent")), bad).toBe(false);
+  }
+  await seedRecent(page, '{"a":1}');
+  await openHydrated(page, "/rotate-pdf");
+  await expect.poll(() => storedRecent(page)).toBe('["rotate-pdf"]');
+  expect(errors).toEqual([]);
+});
+
+test("AC-41: a visit recorded in another tab shows up here without a reload", async ({ page, context }) => {
+  await openHydrated(page);
+  await expect(homeRecent(page)).toHaveCount(0);
+  const other = await context.newPage();
+  await other.goto("/rotate-pdf");
+  await expect.poll(() => storedRecent(other)).toBe('["rotate-pdf"]');
+  await expect(homeRecent(page).getByRole("link").first()).toHaveAttribute("href", "/rotate-pdf");
 });
 
 test("AC-46: at most 12 stored, and a revisited tool moves to the front", async ({ page }) => {
@@ -89,6 +137,14 @@ test("AC-46: at most 12 stored, and a revisited tool moves to the front", async 
   await openHydrated(page, "/rotate-pdf");
   await expect.poll(async () => JSON.parse((await storedRecent(page))!)[0]).toBe("rotate-pdf");
   expect(JSON.parse((await storedRecent(page))!)).toHaveLength(12);
+});
+
+test("AC-46: a new visit to a full list drops the oldest entry", async ({ page }) => {
+  await page.goto("/");
+  const full = Array.from({ length: 12 }, (_, i) => `old-${i}`);
+  await page.evaluate(([k, v]) => localStorage.setItem(k, v), [RECENT_KEY, JSON.stringify(full)]);
+  await openHydrated(page, "/rotate-pdf");
+  await expect.poll(async () => JSON.parse((await storedRecent(page))!)).toEqual(["rotate-pdf", ...full.slice(0, 11)]);
 });
 
 test("AC-47: Clear empties the list and hides Recent on the home page and in the menu", async ({ page }) => {

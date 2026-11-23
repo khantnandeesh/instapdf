@@ -35,6 +35,26 @@ test("AC-49: coming-soon and placeholder pages are noindex; home and usable tool
   }
 });
 
+test("AC-49: every planned tool's coming-soon page carries noindex in the server HTML; / and usable tools do not", async ({ request }) => {
+  const robotsMeta = (html: string) => html.match(/<meta[^>]*name="robots"[^>]*>/)?.[0] ?? null;
+  for (const t of tools.filter((x) => x.status === "planned")) {
+    expect(robotsMeta(await (await request.get(`/${t.slug}`)).text()), t.slug).toMatch(/content="[^"]*noindex/);
+  }
+  for (const path of ["/", ...usableTools.map((t) => `/${t.slug}`)]) {
+    expect(robotsMeta(await (await request.get(path)).text()), path).toBeNull();
+  }
+});
+
+test("AC-50: unknown slugs, near-miss tool slugs and nested paths are all 404 with the catalogue link", async ({ request }) => {
+  for (const path of ["/no-such-tool", "/rotate-pdf-pages", "/merge-pdf/extra", "/rotate-pdf/x", "/%E6%97%A5%E6%9C%AC", "/tools"]) {
+    const res = await request.get(path);
+    expect(res.status(), path).toBe(404);
+    const html = await res.text();
+    expect(html, path).toContain('href="/#tools"');
+    expect(html, path).toContain("InstaPDF home");
+  }
+});
+
 test("AC-50: an unknown path is a 404 with header, footer, a message and a catalogue link", async ({ page }) => {
   const res = await page.goto("/does-not-exist");
   expect(res?.status()).toBe(404);

@@ -33,6 +33,9 @@ describe("pure rules", () => {
     expect(parseRecent('{"a":1}')).toEqual([]);
     expect(parseRecent('["a",1]')).toEqual([]);
     expect(parseRecent('["a","b"]')).toEqual(["a", "b"]);
+    // AC-44: well-formed JSON of the wrong shape, and empty values.
+    for (const bad of ["", "null", "42", "true", '"rotate-pdf"', '["rotate-pdf",null]', '[["rotate-pdf"]]', "[1,2]"]) expect(parseRecent(bad), bad).toEqual([]);
+    expect(parseRecent("[]")).toEqual([]);
   });
 
   it("moves a revisited tool to the front and keeps at most 12 (AC-46)", () => {
@@ -84,6 +87,19 @@ describe("storage", () => {
     clearRecent();
     expect(store.getItem(RECENT_KEY)).toBeNull();
     expect(readRecent()).toEqual([]);
+  });
+
+  it("survives writes that throw, e.g. quota exceeded (AC-45)", () => {
+    store.setItem(RECENT_KEY, '["rotate-pdf"]');
+    store.setItem = () => {
+      throw new Error("QuotaExceededError");
+    };
+    store.removeItem = () => {
+      throw new Error("QuotaExceededError");
+    };
+    expect(() => recordVisit("crop-pdf")).not.toThrow();
+    expect(() => clearRecent()).not.toThrow();
+    expect(readRecent()).toEqual(["rotate-pdf"]);
   });
 
   it("survives a throwing localStorage (AC-45)", () => {
