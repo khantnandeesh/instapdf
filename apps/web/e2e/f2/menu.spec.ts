@@ -1,9 +1,9 @@
 /** F2 header and tool menu: AC-23 to AC-39 (AC-34 dropped by design, H-11 item 2). Spec: docs/specs/f2-home.md */
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import {
   catalogueSearch,
   categories,
+  clickScrimOutsidePanel,
   categoryLinks,
   isDesktop,
   menu,
@@ -61,10 +61,19 @@ test.describe("desktop menu (1366x900)", () => {
 
   test("AC-27: the backdrop and the close button both close the menu", async ({ page }) => {
     await openMenu(page);
-    await page.mouse.click(683, 880); // the scrim below the panel
+    await clickScrimOutsidePanel(page);
     await expect(menuButton(page)).toHaveAttribute("aria-expanded", "false");
+    await expect(menu(page)).toHaveCount(0);
     await openMenu(page);
     await page.getByRole("button", { name: "Close all tools" }).click();
+    await expect(menuButton(page)).toHaveAttribute("aria-expanded", "false");
+    await expect(menuButton(page)).toBeFocused();
+  });
+
+  test("G-2: closing the panel by clicking the backdrop returns focus to the All tools button", async ({ page }) => {
+    await openMenu(page);
+    await expect(menuSearch(page)).toBeFocused();
+    await clickScrimOutsidePanel(page);
     await expect(menuButton(page)).toHaveAttribute("aria-expanded", "false");
     await expect(menuButton(page)).toBeFocused();
   });
@@ -315,15 +324,5 @@ test.describe("mobile (375x812)", () => {
     await catalogueSearch(page).fill("split");
     await expect(page.locator('[data-testid=category] a[href="/merge-pdf"]')).toHaveCount(0);
     await expect(page.locator('[data-testid=category] a[href="/split-pdf"]')).toBeVisible();
-  });
-
-  test("AC-56: axe finds no critical or serious violations with the mobile menu open", async ({ page }) => {
-    await openHydrated(page);
-    await menuButton(page).click();
-    await expect(page.getByRole("dialog", { name: "All tools" })).toBeVisible();
-    await page.waitForTimeout(300);
-    const r = await new AxeBuilder({ page }).analyze();
-    const bad = r.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
-    expect(bad.map((v) => v.id)).toEqual([]);
   });
 });

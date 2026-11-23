@@ -6,6 +6,7 @@ import { clearRecent } from "@/lib/recent-tools";
 import { matchTools } from "@/lib/catalogue/search";
 import { catalogueCopy as copy } from "../catalogue/copy";
 import { RecentStrip } from "../catalogue/RecentStrip";
+import { badgeText, NameSep } from "../catalogue/ToolCard";
 import { useToolIndex } from "../catalogue/ToolIndexProvider";
 import { CATALOGUE_SEARCH_ID, usable, type ToolIndexItem } from "../catalogue/types";
 import { useRecentTools } from "../catalogue/useRecentTools";
@@ -176,7 +177,7 @@ export function ToolMenu() {
 
       {open && mode === "panel" && (
         <>
-          <div aria-hidden="true" className="ip-fade-in fixed inset-x-0 top-(--ip-header-h) bottom-0 bg-scrim" onClick={() => close(false)} data-testid="tool-menu-scrim" />
+          <div aria-hidden="true" className="ip-fade-in fixed inset-x-0 top-(--ip-header-h) bottom-0 bg-scrim" onClick={() => close(true)} data-testid="tool-menu-scrim" />
           <div
             id={MENU_ID}
             className="ip-drop-in fixed inset-x-0 top-(--ip-header-h) max-h-(--ip-menu-max-h) overflow-y-auto overscroll-contain border-b border-border bg-surface-raised shadow-lg"
@@ -333,28 +334,26 @@ function MenuContent({
 }
 
 function MenuEntry({ item }: { item: ToolIndexItem }) {
-  const base = `menu-${item.slug}`;
-  const badge = item.status === "beta" ? copy.beta : item.status === "planned" ? copy.soon : null;
-  const ids = [`${base}-name`, badge && `${base}-badge`, item.runtime === "client" && `${base}-rt`].filter(Boolean).join(" ");
+  const badge = badgeText(item);
+  // Name from content, in visual order: name, badge, runtime marker (AC-56, AC-59).
   return (
-    <Link
-      href={`/${item.slug}`}
-      prefetch={false}
-      aria-labelledby={ids}
-      className="flex min-h-11 flex-col justify-center gap-0.5 rounded-md px-2 py-1.5 hover:bg-surface-sunken"
-    >
+    <Link href={`/${item.slug}`} prefetch={false} className="flex min-h-11 flex-col justify-center gap-0.5 rounded-md px-2 py-1.5 hover:bg-surface-sunken">
       <span className="flex items-center gap-2">
         <span className={cx("shrink-0", usable(item) ? "text-primary" : "text-fg-muted")}>{item.icon}</span>
-        <span id={`${base}-name`} className="min-w-0 flex-1 text-sm font-medium [overflow-wrap:anywhere] text-fg">
-          {item.name}
-        </span>
+        <span className="min-w-0 flex-1 text-sm font-medium [overflow-wrap:anywhere] text-fg">{item.name}</span>
         {badge && (
-          <Badge id={`${base}-badge`} tone={item.status === "planned" ? "soon" : "beta"}>
-            {badge}
-          </Badge>
+          <>
+            <NameSep />
+            <Badge tone={item.status === "planned" ? "soon" : "beta"}>{badge}</Badge>
+          </>
         )}
       </span>
-      {item.runtime === "client" && <RuntimeMarker id={`${base}-rt`} className="ps-7" />}
+      {item.runtime === "client" && (
+        <>
+          <NameSep />
+          <RuntimeMarker className="ps-7" />
+        </>
+      )}
     </Link>
   );
 }

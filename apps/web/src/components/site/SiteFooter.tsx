@@ -15,9 +15,10 @@ export function SiteFooter() {
       <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-[240px_1fr_140px_140px]">
           <div className="col-span-2 lg:col-span-1">
-            <p className="text-lg font-semibold tracking-tight">
+            {/* A wordmark, not a paragraph or a heading (axe p-as-heading). */}
+            <div className="text-lg font-semibold tracking-tight">
               Insta<span className="text-primary">PDF</span>
-            </p>
+            </div>
             <p className="mt-1 text-sm text-fg-muted">{siteCopy.footerTagline}</p>
             <Link href="/#tools" prefetch={false} className={linkClass}>
               {siteCopy.footerAllTools} →
