@@ -147,7 +147,7 @@ Lessons:
   5. **Shape:** HarfRust for Devanagari and Arabic, with ToUnicode so copy and search still work.
   6. **Verify every save:** run a render diff of untouched regions (they must be pixel-identical) and confirm the extracted text equals the expected text. If a check fails, roll back that edit and tell the user. That is our "never silently corrupt" guarantee.
 - **Effort:** about 3–5 agent-weeks to reach reference parity on existing-text editing, and 4–6 more to beat it (paragraph reflow, same-family re-subsetting, shaping). The JS-only tools (add text, sign, annotate…) are not blocked by the engine.
-- **What changes from the earlier decision:** PDFium is **no longer the edit engine**. It becomes a CI oracle (render diff, text extraction) and an optional renderer. The owner approved PDFium earlier; this revision replaces that approval and needs the owner's OK.
+- **What changes from the earlier decision:** PDFium is **no longer the edit engine**. It becomes a CI oracle (render diff, text extraction) and an optional renderer. The owner approved this revision on 2026-11-23, replacing the earlier PDFium approval.
 
 Other layers are unchanged: a DOM/SVG overlay, an operation log in IndexedDB (undo/redo, recovery), `@cantoo/pdf-lib` for forms, links, attachments and page operations until the engine covers them, a qpdf-WASM final pass, tesseract.js for small OCR jobs, and self-hosted OFL fonts. CSP stays `connect-src 'self'`; the server fallback is a separate, consented flow on a separate route.
 
@@ -326,6 +326,6 @@ Prerequisites: Q2 real-world corpus should include the editor fixtures above plu
 ## 13. Owner decisions (2026-11-23)
 
 1. **Approved:** existing-text editing is in F16 (E2/E3).
-2. **Revised, needs OK:** the edit engine is a Rust core (`berry-engine`) that runs as WASM in the browser and natively on the server as a consented fallback. PDFium is no longer the engine; it becomes a test oracle. Reason: our prototype showed PDFium's whole-page regeneration drops Type 3 text and its glyph check is unreliable for subset fonts (§3b).
+2. **Approved (revised, owner OK 2026-11-23):** the edit engine is a Rust core (`berry-engine`) that runs as WASM in the browser and natively on the server as a consented fallback. PDFium is no longer the engine; it becomes a test oracle. Reason: our prototype showed PDFium's whole-page regeneration drops Type 3 text and its glyph check is unreliable for subset fonts (§3b).
 3. **Approved:** the editor is top priority. E0 (engine spike) and E1 (editor core) start first, in parallel.
 4. **Approved direction:** every premium editor feature of the reference is free here, and server processing is allowed when it gives a better result, always with consent.
