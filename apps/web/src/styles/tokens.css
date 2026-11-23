@@ -1,5 +1,6 @@
 /*
- * InstaPDF design tokens (light + dark).
+ * InstaPDF design tokens (light + dark), on the Universal UI system:
+ * neutral canvas/surface/raised grounds, hairlines, one accent family.
  * Source of truth: docs/specs/f1-shared-flow.md, "## UI" > "Design tokens".
  * Raw values live in CSS custom properties; `@theme inline` exposes them as
  * Tailwind v4 utilities (bg-surface, text-fg-muted, ring-focus, duration-base, ...).
@@ -10,45 +11,67 @@
 :root {
   color-scheme: light;
 
-  /* Neutrals */
-  --ip-bg: #ffffff;
-  --ip-surface: #f5f6fa; /* app canvas behind the grid */
-  --ip-surface-raised: #ffffff; /* cards, dock, dialogs */
-  --ip-surface-sunken: #eceef4; /* placeholders, wells, segmented track */
-  --ip-border: #dfe2ea; /* decorative dividers only, never the only cue */
-  --ip-border-strong: #7c8296; /* input and control borders, >= 3:1 */
-  --ip-fg: #151823;
-  --ip-fg-muted: #535a6e;
-  --ip-fg-disabled: #8a90a3;
-  --ip-paper: #ffffff; /* PDF page thumbnails: always white, both themes */
+  /* Grounds (Universal UI: canvas, surface, raised, chrome, well) */
+  --ip-bg: #f6f5f4; /* canvas: the page ground */
+  --ip-surface: #f6f5f4; /* secondary ground (footer, coming-soon panels): canvas */
+  --ip-surface-raised: #ffffff; /* surface: cards, dock, workspace, fields */
+  --ip-surface-overlay: #ffffff; /* raised: menus, dialogs, toasts, floating bars */
+  --ip-chrome: #ffffff; /* top bar */
+  --ip-well: #efeeec; /* sunken backdrops behind a framed page */
+  --ip-surface-sunken: rgb(0 0 0 / 0.06); /* ink-2: tracks, neutral badges, placeholders, disabled fills */
+  --ip-hover: rgb(0 0 0 / 0.04); /* ink-1: hover on rows and ghost controls */
+  --ip-pressed: rgb(0 0 0 / 0.1); /* ink-4 */
 
-  /* Brand / primary (indigo-violet, our own) */
-  --ip-primary: #3d3bd4;
-  --ip-primary-hover: #312fb3;
-  --ip-primary-active: #28269a;
+  /* Hairlines and edges */
+  --ip-border: rgb(0 0 0 / 0.06); /* line: card rings, dividers */
+  --ip-field-line: rgb(0 0 0 / 0.15); /* edges of fields, chips and secondary buttons */
+  --ip-border-strong: rgb(0 0 0 / 0.42); /* control-line: switch and slider tracks, >= 3:1 on surface */
+
+  /* Text */
+  --ip-fg: #262628; /* text-strong, >= 13:1 */
+  --ip-fg-muted: #707074; /* text: 4.9:1 on surface, 4.5:1 on canvas */
+  --ip-fg-disabled: #9a9a9d; /* text-faint: placeholders/disabled only */
+  --ip-paper: #ffffff; /* PDF page thumbnails */
+  --ip-paper-filter: none;
+  --ip-inverse: #262628;
+  --ip-on-inverse: #ffffff;
+
+  /* Accent family: Lagoon teal (change these together) */
+  --ip-accent: #0d9488; /* marks, progress, focus: 3.7:1 on surface, 3.4:1 on canvas */
+  --ip-primary: #0c8378; /* accent-strong: fills with white text, 4.6:1 */
+  --ip-primary-hover: #0b736a; /* 5.7:1 */
+  --ip-primary-active: #0a655d;
   --ip-on-primary: #ffffff;
-  --ip-primary-soft: #ecedff;
-  --ip-on-primary-soft: #2f2da8;
+  --ip-primary-ink: #0a746b; /* accent as text: 5.6:1 on surface, 5.2:1 on canvas, 4.5:1 on soft */
+  --ip-primary-soft: rgb(13 148 136 / 0.12);
+  --ip-on-primary-soft: #0a746b;
+  --ip-primary-faint: rgb(13 148 136 / 0.06);
+  --ip-primary-ring: rgb(13 148 136 / 0.3);
+  --ip-focus-ring: #0d9488;
 
-  /* Status */
-  --ip-danger: #b3261e;
-  --ip-danger-soft: #fdf1f0;
+  /* Status: -text tones carry words, -soft tones are fills */
+  --ip-danger: #b91c1c;
+  --ip-danger-strong: #b91c1c;
+  --ip-danger-hover: #a31919;
+  --ip-danger-soft: rgb(239 68 68 / 0.1);
   --ip-on-danger: #ffffff;
-  --ip-success: #0b7a47;
-  --ip-success-soft: #eaf7f0;
-  --ip-warning: #9a5200;
-  --ip-warning-soft: #fff6e6;
+  --ip-success: #15803d;
+  --ip-success-soft: rgb(34 197 94 / 0.12);
+  --ip-warning: #b45309;
+  --ip-warning-soft: rgb(245 158 11 / 0.14);
 
-  /* Focus, overlays */
-  --ip-focus-ring: #3d3bd4;
-  --ip-scrim: rgb(13 15 21 / 0.5);
-  --ip-drop-overlay: rgb(236 237 255 / 0.92);
+  /* Overlays */
+  --ip-scrim: rgb(17 17 19 / 0.45);
+  --ip-drop-overlay: rgb(227 237 235 / 0.94); /* canvas tinted 8% with the accent */
 
-  /* Elevation */
-  --ip-shadow-sm: 0 1px 2px rgb(21 24 35 / 0.08);
-  --ip-shadow-md: 0 2px 8px rgb(21 24 35 / 0.1), 0 1px 2px rgb(21 24 35 / 0.06);
-  --ip-shadow-lg: 0 12px 32px rgb(21 24 35 / 0.18);
-  --ip-shadow-paper: 0 0 0 1px rgb(21 24 35 / 0.08), 0 1px 3px rgb(21 24 35 / 0.12);
+  /* Elevation (Universal UI shadow roles) */
+  --ip-shadow-sm: 0 0 0 1px rgb(0 0 0 / 0.06); /* card */
+  --ip-shadow-control: inset 0 0 0 1px rgb(0 0 0 / 0.15), 0 1px 2px rgb(0 0 0 / 0.04);
+  --ip-shadow-md: 0 0 0 1px rgb(0 0 0 / 0.06), 0 4px 16px rgb(0 0 0 / 0.08); /* window */
+  --ip-shadow-lg: 0 0 0 1px rgb(0 0 0 / 0.08), 0 4px 16px rgb(0 0 0 / 0.12), 0 12px 32px rgb(0 0 0 / 0.08); /* float */
+  --ip-shadow-hero: 0 0 0 1px rgb(0 0 0 / 0.06), 0 30px 60px -12px rgb(50 50 93 / 0.25), 0 18px 36px -18px rgb(0 0 0 / 0.3);
+  --ip-shadow-lift: 0 0 0 1px rgb(0 0 0 / 0.04), 0 12px 28px -6px rgb(50 50 93 / 0.28), 0 6px 12px -6px rgb(0 0 0 / 0.16);
+  --ip-shadow-paper: 0 0 0 1px rgb(0 0 0 / 0.08), 0 1px 3px rgb(0 0 0 / 0.08);
 
   /* Layout metrics (used by the shared tool flow) */
   --ip-header-h: 56px;
@@ -73,71 +96,109 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --ip-bg: #0d0f15;
-  --ip-surface: #141720;
-  --ip-surface-raised: #1b1f2a;
-  --ip-surface-sunken: #090b10;
-  --ip-border: #2a2f3d;
-  --ip-border-strong: #6e7488;
-  --ip-fg: #eceef4;
-  --ip-fg-muted: #a2a8ba;
-  --ip-fg-disabled: #5d6375;
+  --ip-bg: #111113;
+  --ip-surface: #111113;
+  --ip-surface-raised: #1a1a1d;
+  --ip-surface-overlay: #26262a; /* depth on dark comes from this lighter step, not shadow */
+  --ip-chrome: #1d1d20;
+  --ip-well: #0a0a0b;
+  --ip-surface-sunken: rgb(255 255 255 / 0.07);
+  --ip-hover: rgb(255 255 255 / 0.05);
+  --ip-pressed: rgb(255 255 255 / 0.13);
+  --ip-border: rgb(255 255 255 / 0.08);
+  --ip-field-line: rgb(255 255 255 / 0.16);
+  --ip-border-strong: rgb(255 255 255 / 0.4);
+  --ip-fg: #ececee;
+  --ip-fg-muted: #9d9da1; /* 5.6:1 or more on every dark ground */
+  --ip-fg-disabled: #6c6c70;
   --ip-paper: #ffffff;
-  --ip-primary: #8f93ff;
-  --ip-primary-hover: #a9acff;
-  --ip-primary-active: #c4c6ff;
-  --ip-on-primary: #0d0f15;
-  --ip-primary-soft: #23254a;
-  --ip-on-primary-soft: #c4c6ff;
-  --ip-danger: #ff8a80;
-  --ip-danger-soft: #3a1715;
-  --ip-on-danger: #0d0f15;
-  --ip-success: #4fd18b;
-  --ip-success-soft: #0f2e1f;
-  --ip-warning: #f5b451;
-  --ip-warning-soft: #33240b;
-  --ip-focus-ring: #a9acff;
+  /* White pages on near-black glare: dim them a step; hover, focus and preview restore full brightness. */
+  --ip-paper-filter: brightness(0.86);
+  --ip-inverse: #ececee;
+  --ip-on-inverse: #111113;
+  --ip-accent: #0d9488; /* 5.0:1 on canvas, 4.6:1 on surface, 4.0:1 on raised */
+  --ip-primary: #0c8378;
+  --ip-primary-hover: #0b736a;
+  --ip-primary-active: #0a655d;
+  --ip-on-primary: #ffffff;
+  --ip-primary-ink: #4cb0a7; /* 6.7:1 on surface, 5.8:1 on raised, 4.5:1 on soft */
+  --ip-primary-soft: rgb(13 148 136 / 0.2);
+  --ip-on-primary-soft: #4cb0a7;
+  --ip-primary-faint: rgb(13 148 136 / 0.1);
+  --ip-primary-ring: rgb(13 148 136 / 0.35);
+  --ip-focus-ring: #0d9488;
+  --ip-danger: #f87171;
+  --ip-danger-strong: #b91c1c;
+  --ip-danger-hover: #a31919;
+  --ip-danger-soft: rgb(239 68 68 / 0.16);
+  --ip-on-danger: #ffffff;
+  --ip-success: #4ade80;
+  --ip-success-soft: rgb(34 197 94 / 0.16);
+  --ip-warning: #fbbf24;
+  --ip-warning-soft: rgb(245 158 11 / 0.18);
   --ip-scrim: rgb(0 0 0 / 0.6);
-  --ip-drop-overlay: rgb(35 37 74 / 0.92);
-  --ip-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --ip-shadow-md: 0 2px 8px rgb(0 0 0 / 0.45);
-  --ip-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
-  --ip-shadow-paper: 0 0 0 1px rgb(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5);
+  --ip-drop-overlay: rgb(17 33 33 / 0.94); /* canvas tinted 12% with the accent */
+  --ip-shadow-sm: 0 0 0 1px rgb(255 255 255 / 0.06);
+  --ip-shadow-control: inset 0 0 0 1px rgb(255 255 255 / 0.16);
+  --ip-shadow-md: 0 0 0 1px rgb(255 255 255 / 0.08), 0 4px 16px rgb(0 0 0 / 0.4);
+  --ip-shadow-lg: 0 0 0 1px rgb(255 255 255 / 0.1), 0 4px 16px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.3);
+  --ip-shadow-hero: 0 0 0 1px rgb(255 255 255 / 0.08), 0 30px 60px -12px rgb(0 0 0 / 0.6);
+  --ip-shadow-lift: 0 0 0 1px rgb(255 255 255 / 0.1), 0 12px 28px -6px rgb(0 0 0 / 0.6);
+  --ip-shadow-paper: 0 0 0 1px rgb(255 255 255 / 0.14), 0 1px 3px rgb(0 0 0 / 0.5);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --ip-bg: #0d0f15;
-    --ip-surface: #141720;
-    --ip-surface-raised: #1b1f2a;
-    --ip-surface-sunken: #090b10;
-    --ip-border: #2a2f3d;
-    --ip-border-strong: #6e7488;
-    --ip-fg: #eceef4;
-    --ip-fg-muted: #a2a8ba;
-    --ip-fg-disabled: #5d6375;
+    --ip-bg: #111113;
+    --ip-surface: #111113;
+    --ip-surface-raised: #1a1a1d;
+    --ip-surface-overlay: #26262a; /* depth on dark comes from this lighter step, not shadow */
+    --ip-chrome: #1d1d20;
+    --ip-well: #0a0a0b;
+    --ip-surface-sunken: rgb(255 255 255 / 0.07);
+    --ip-hover: rgb(255 255 255 / 0.05);
+    --ip-pressed: rgb(255 255 255 / 0.13);
+    --ip-border: rgb(255 255 255 / 0.08);
+    --ip-field-line: rgb(255 255 255 / 0.16);
+    --ip-border-strong: rgb(255 255 255 / 0.4);
+    --ip-fg: #ececee;
+    --ip-fg-muted: #9d9da1; /* 5.6:1 or more on every dark ground */
+    --ip-fg-disabled: #6c6c70;
     --ip-paper: #ffffff;
-    --ip-primary: #8f93ff;
-    --ip-primary-hover: #a9acff;
-    --ip-primary-active: #c4c6ff;
-    --ip-on-primary: #0d0f15;
-    --ip-primary-soft: #23254a;
-    --ip-on-primary-soft: #c4c6ff;
-    --ip-danger: #ff8a80;
-    --ip-danger-soft: #3a1715;
-    --ip-on-danger: #0d0f15;
-    --ip-success: #4fd18b;
-    --ip-success-soft: #0f2e1f;
-    --ip-warning: #f5b451;
-    --ip-warning-soft: #33240b;
-    --ip-focus-ring: #a9acff;
+    /* White pages on near-black glare: dim them a step; hover, focus and preview restore full brightness. */
+    --ip-paper-filter: brightness(0.86);
+    --ip-inverse: #ececee;
+    --ip-on-inverse: #111113;
+    --ip-accent: #0d9488; /* 5.0:1 on canvas, 4.6:1 on surface, 4.0:1 on raised */
+    --ip-primary: #0c8378;
+    --ip-primary-hover: #0b736a;
+    --ip-primary-active: #0a655d;
+    --ip-on-primary: #ffffff;
+    --ip-primary-ink: #4cb0a7; /* 6.7:1 on surface, 5.8:1 on raised, 4.5:1 on soft */
+    --ip-primary-soft: rgb(13 148 136 / 0.2);
+    --ip-on-primary-soft: #4cb0a7;
+    --ip-primary-faint: rgb(13 148 136 / 0.1);
+    --ip-primary-ring: rgb(13 148 136 / 0.35);
+    --ip-focus-ring: #0d9488;
+    --ip-danger: #f87171;
+    --ip-danger-strong: #b91c1c;
+    --ip-danger-hover: #a31919;
+    --ip-danger-soft: rgb(239 68 68 / 0.16);
+    --ip-on-danger: #ffffff;
+    --ip-success: #4ade80;
+    --ip-success-soft: rgb(34 197 94 / 0.16);
+    --ip-warning: #fbbf24;
+    --ip-warning-soft: rgb(245 158 11 / 0.18);
     --ip-scrim: rgb(0 0 0 / 0.6);
-    --ip-drop-overlay: rgb(35 37 74 / 0.92);
-    --ip-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-    --ip-shadow-md: 0 2px 8px rgb(0 0 0 / 0.45);
-    --ip-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
-    --ip-shadow-paper: 0 0 0 1px rgb(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5);
+    --ip-drop-overlay: rgb(17 33 33 / 0.94); /* canvas tinted 12% with the accent */
+    --ip-shadow-sm: 0 0 0 1px rgb(255 255 255 / 0.06);
+    --ip-shadow-control: inset 0 0 0 1px rgb(255 255 255 / 0.16);
+    --ip-shadow-md: 0 0 0 1px rgb(255 255 255 / 0.08), 0 4px 16px rgb(0 0 0 / 0.4);
+    --ip-shadow-lg: 0 0 0 1px rgb(255 255 255 / 0.1), 0 4px 16px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.3);
+    --ip-shadow-hero: 0 0 0 1px rgb(255 255 255 / 0.08), 0 30px 60px -12px rgb(0 0 0 / 0.6);
+    --ip-shadow-lift: 0 0 0 1px rgb(255 255 255 / 0.1), 0 12px 28px -6px rgb(0 0 0 / 0.6);
+    --ip-shadow-paper: 0 0 0 1px rgb(255 255 255 / 0.14), 0 1px 3px rgb(0 0 0 / 0.5);
   }
 }
 
@@ -145,10 +206,10 @@
 :root {
   --ip-duration-instant: 80ms;
   --ip-duration-fast: 120ms;
-  --ip-duration-base: 180ms;
-  --ip-duration-slow: 280ms;
-  --ip-ease-out: cubic-bezier(0.2, 0, 0, 1);
-  --ip-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ip-duration-base: 150ms;
+  --ip-duration-slow: 240ms;
+  --ip-ease-out: cubic-bezier(0.25, 0.8, 0.25, 1); /* things that appear */
+  --ip-ease-in-out: cubic-bezier(0.45, 0, 0.1, 1); /* things that move */
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -166,6 +227,20 @@
   --color-surface: var(--ip-surface);
   --color-surface-raised: var(--ip-surface-raised);
   --color-surface-sunken: var(--ip-surface-sunken);
+  --color-surface-overlay: var(--ip-surface-overlay);
+  --color-chrome: var(--ip-chrome);
+  --color-well: var(--ip-well);
+  --color-hover: var(--ip-hover);
+  --color-pressed: var(--ip-pressed);
+  --color-field-line: var(--ip-field-line);
+  --color-inverse: var(--ip-inverse);
+  --color-on-inverse: var(--ip-on-inverse);
+  --color-accent: var(--ip-accent);
+  --color-primary-ink: var(--ip-primary-ink);
+  --color-primary-faint: var(--ip-primary-faint);
+  --color-primary-ring: var(--ip-primary-ring);
+  --color-danger-strong: var(--ip-danger-strong);
+  --color-danger-hover: var(--ip-danger-hover);
   --color-border: var(--ip-border);
   --color-border-strong: var(--ip-border-strong);
   --color-fg: var(--ip-fg);
@@ -193,37 +268,45 @@
   --color-background: var(--ip-bg);
   --color-foreground: var(--ip-fg);
 
-  /* Type */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  /* Type: one system family (Universal UI). Sizes: xs ui-12, sm ui-13, base body 15,
+     lg lead 17, xl heading 20, 2xl page-title 24, 3xl title 28, 4xl display 40. */
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", "SFMono-Regular", ui-monospace, Consolas, monospace;
   --text-xs: 0.75rem;
   --text-xs--line-height: 1rem;
-  --text-sm: 0.875rem;
+  --text-sm: 0.8125rem;
   --text-sm--line-height: 1.25rem;
-  --text-base: 1rem;
-  --text-base--line-height: 1.5rem;
-  --text-lg: 1.125rem;
-  --text-lg--line-height: 1.625rem;
-  --text-xl: 1.375rem;
-  --text-xl--line-height: 1.875rem;
-  --text-2xl: 1.75rem;
-  --text-2xl--line-height: 2.25rem;
-  --text-3xl: 2.25rem;
-  --text-3xl--line-height: 2.75rem;
-  --text-4xl: 3rem;
-  --text-4xl--line-height: 3.5rem;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.55;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.5;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.3;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 1.25;
+  --text-2xl--letter-spacing: -0.01em;
+  --text-3xl: 1.75rem;
+  --text-3xl--line-height: 1.2;
+  --text-3xl--letter-spacing: -0.01em;
+  --text-4xl: 2.5rem;
+  --text-4xl--line-height: 1.15;
+  --text-4xl--letter-spacing: -0.02em;
 
-  /* Radius */
+  /* Radius by role: sm menu rows/nav, md buttons/fields, lg popovers/alerts, xl cards/dialogs, 2xl panels */
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
 
   /* Elevation */
   --shadow-sm: var(--ip-shadow-sm);
   --shadow-md: var(--ip-shadow-md);
   --shadow-lg: var(--ip-shadow-lg);
   --shadow-paper: var(--ip-shadow-paper);
+  --shadow-control: var(--ip-shadow-control);
+  --shadow-hero: var(--ip-shadow-hero);
+  --shadow-lift: var(--ip-shadow-lift);
 
   /* Motion -> duration-*, ease-* utilities */
   --ease-out: var(--ip-ease-out);

@@ -316,6 +316,15 @@ The evaluator does not hold the reference to these, but they must work on stagin
 
 Designed 2026-11-23 by ux-designer. This is the build contract for the home page, the site header and tool menu, the footer, and the coming-soon, placeholder and 404 pages. It extends the F1 design system (`docs/specs/f1-shared-flow.md`, `## UI`): same tokens, primitives, focus style, motion rules and breakpoints. Where this section says "F1 U-x" it means that section of the F1 spec. The look is InstaPDF's own. The reference screenshots are for behavior only and are never a visual guide.
 
+> **Universal UI re-theme (2026-11-23, alternative branch `chore/universal-ui-alt`).** Token values, type, radius, shadows and motion now follow F1 U-2. Behavior, structure, ARIA and copy are unchanged. Where a component row below names an older visual, the re-theme wins:
+> - Cards (tool cards, workspace, dock, result, coming-soon panel) are `surface-raised` with the hairline `shadow-sm` ring, `rounded-xl`, no borders. Planned tool cards are a transparent ring on the canvas (no dashes) with a grey icon tile and a neutral "Coming soon" badge in `fg`; usable cards are filled, lift on hover and show the arrow in `primary-ink`.
+> - Accent text and icons use `primary-ink`; fills with white text use `primary`; marks (scope outline, current-page bar, progress, drop borders, field focus edge) use `accent`.
+> - Secondary buttons and chips: `surface-raised` + `shadow-control`, hover tint `hover`. Category and recent chips are pills. Fields: `field-line` edge, on focus an `accent` edge with a 3 px `primary-ring` halo.
+> - Notices: soft fill, `rounded-lg`, no coloured start border. Floating notices sit on `surface-overlay`. Menus and dialogs use `surface-overlay` (lighter than cards in dark); header and mobile dock use `chrome`.
+> - "Runs in your browser" icons are grey (`fg-muted`); green is kept for status (result check, privacy marks).
+> - Drop card: `surface-raised`, 2 px dashed `field-line`, a 64 px `primary-soft` circle with the file icon; hover turns the border `accent` with a `primary-faint` fill.
+> - Brand: a 22 px `primary` rounded square with a page glyph before the "InstaPDF" wordmark (`base` 600).
+
 ### H-1. Design principles for the home page
 
 1. **One step to the tool.** A visitor who knows what they want types two letters (search is on the page and in the header menu, and `/` focuses it) or clicks a card. No intermediate pages, no hover-only paths.
@@ -829,7 +838,7 @@ Transitions only on `opacity` and `transform` (plus `background-color` / `border
 - **Pre-paint Recent reservation (no CLS for returning users).** `RecentPrepaintScript` is a tiny inline script in `<head>` generated at build with the list of usable slugs: it reads `localStorage["instapdf:recent-tools"]` in a try/catch, counts entries that are usable slugs, and if ≥ 1 sets `data-recent` on `<html>`. CSS: `.ip-recent-slot { display: none } :root[data-recent] .ip-recent-slot { display: block; min-height: var(--ip-recent-h) }`. After hydration `RecentRow` renders into that slot; the box size does not change. The same validity rules live in `lib/recent-tools.ts`; a unit test runs both on the AC-43/44 fixtures. `<html suppressHydrationWarning>` covers the added attribute. If a CSP is added later, the script needs a hash or nonce.
 - **Fixed boxes.** Header 56 at every width; trigger and noscript fallback same size; search end slot 44×44; result count `min-w`; card meta line min 20; icons with explicit `width`/`height`; Recent slot reserved; menu content is fixed-position (never in flow).
 - **Accepted shift.** `/?q=…` deep links apply the filter after hydration, which removes cards below the toolbar once. That is a shared-link case, not the Lighthouse target; documented here so QA does not chase it.
-- **Fonts.** Geist via `next/font` (self-hosted, size-adjusted fallback, already in the layout). No third-party requests (AC-54).
+- **Fonts.** The system stack (Universal UI re-theme, 2026-11-23): no web font at all, so no font request, no swap shift and no third-party requests (AC-54).
 - **Prefetch.** `next/link` prefetches visible links in production. With 45+ card links that is many prefetches on a slow phone. Set `prefetch={false}` on catalogue cards, tiles, footer links and planned-tool links; keep default prefetch only for usable tools in the header shortcuts and Recent chips. Coming-soon pages are tiny static HTML, so no prefetch is needed.
 
 ### H-11. Decisions for the engineer

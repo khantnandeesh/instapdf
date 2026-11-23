@@ -544,7 +544,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
         />
       ) : (
         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-6">
-          <section aria-label="Your files" className={cx("min-w-0", state !== "empty" && "rounded-xl bg-surface")}>
+          <section aria-label="Your files" className={cx("min-w-0", state !== "empty" && "rounded-xl bg-surface-raised shadow-sm")}>
             {state === "empty" ? (
               <DropCard>
                 <FilePicker
@@ -561,7 +561,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
               </DropCard>
             ) : (
               <>
-                <div className="sticky top-(--ip-header-h) z-10 flex h-[52px] items-center gap-3 rounded-t-xl border-b border-border bg-surface px-3 sm:px-6">
+                <div className="sticky top-(--ip-header-h) z-10 flex h-[52px] items-center gap-3 rounded-t-xl border-b border-border bg-surface-raised px-3 sm:px-6">
                   {files.length > 1 && (
                     <SegmentedControl
                       label="View"

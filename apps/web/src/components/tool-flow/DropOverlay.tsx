@@ -12,9 +12,9 @@ export function DropOverlay({ active, mode }: { active: boolean; mode: "add" | "
         active ? "visible opacity-100" : "invisible opacity-0",
       )}
     >
-      <div className="absolute inset-3 grid place-items-center rounded-xl border-2 border-dashed border-primary">
+      <div className="absolute inset-3 grid place-items-center rounded-xl border-2 border-dashed border-accent">
         <div className={cx("flex flex-col items-center gap-3 text-lg font-medium text-fg transition-transform duration-(--ip-duration-base) ease-out", active ? "-translate-y-1" : "")}>
-          <FilesIcon size={40} className="text-primary" />
+          <FilesIcon size={40} className="text-primary-ink" />
           {mode === "add" ? "Drop to add files" : "Drop to replace the file"}
         </div>
       </div>

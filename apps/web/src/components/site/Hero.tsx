@@ -13,10 +13,10 @@ export function Hero() {
   const feature = toolBySlug(featured);
   const live = feature && isUsable(feature) ? feature : null;
   return (
-    <div className="pt-8 sm:pt-10 lg:pt-12">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl">{siteCopy.heroTitle}</h1>
-      <p className="mt-3 max-w-[640px] text-base text-fg-muted sm:text-lg">{siteCopy.heroPitch}</p>
-      <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+    <div className="pt-10 sm:pt-14 lg:pt-16">
+      <h1 className="text-3xl font-semibold text-balance sm:text-4xl lg:text-[3.25rem] lg:leading-[1.08] lg:tracking-[-0.025em]">{siteCopy.heroTitle}</h1>
+      <p className="mt-4 max-w-[600px] text-base text-fg-muted sm:text-lg">{siteCopy.heroPitch}</p>
+      <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         {live ? (
           <Link href={`/${live.slug}`} className={buttonClasses("primary", "lg", "max-sm:w-full")} data-testid="hero-cta">
             {live.flow?.actionLabel ?? live.name}
@@ -27,9 +27,9 @@ export function Hero() {
             {siteCopy.heroCta}
           </a>
         )}
-        <a href="#tools" className="inline-flex h-11 items-center justify-center gap-1 rounded-md px-2 font-medium text-primary hover:underline" data-testid="hero-see-all">
+        <a href="#tools" className={buttonClasses("secondary", "lg", "max-sm:w-full")} data-testid="hero-see-all">
           {siteCopy.heroSeeAll(tools.length)}
-          <ChevronDownIcon size={18} />
+          <ChevronDownIcon size={18} className="text-fg-muted" />
         </a>
       </div>
       <ul className="mt-6 flex flex-col gap-2 text-sm text-fg-muted sm:flex-row sm:gap-6">

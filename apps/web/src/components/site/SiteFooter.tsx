@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { tools } from "@/tools/registry";
+import { BrandMark } from "./BrandMark";
 import { infoPages, siteCopy } from "./copy";
 
-const linkClass = "inline-flex min-h-11 items-center text-sm text-fg-muted hover:text-fg hover:underline lg:min-h-8";
+const linkClass = "inline-flex min-h-11 items-center text-sm text-fg-muted transition-colors duration-(--ip-duration-fast) hover:text-fg lg:min-h-8";
 
 /** Footer on every page (spec F2 §3g): A–Z tools, company and legal placeholders, copyright. */
 export function SiteFooter() {
@@ -11,13 +12,16 @@ export function SiteFooter() {
   const company = (["about", "help"] as const).map((s) => ({ href: `/${s}`, label: infoPages[s] }));
   const legal = (["privacy", "terms", "cookies", "security"] as const).map((s) => ({ href: `/${s}`, label: infoPages[s] }));
   return (
-    <footer className="ip-site-footer mt-16 border-t border-border bg-surface pt-12 pb-8 sm:mt-24">
+    <footer className="ip-site-footer mt-16 border-t border-border bg-bg pt-12 pb-8 sm:mt-24">
       <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-[240px_1fr_140px_140px]">
           <div className="col-span-2 lg:col-span-1">
             {/* A wordmark, not a paragraph or a heading (axe p-as-heading). */}
-            <div className="text-lg font-semibold tracking-tight">
-              Insta<span className="text-primary">PDF</span>
+            <div className="inline-flex items-center gap-2 text-base font-semibold">
+              <BrandMark />
+              <span>
+                Insta<span className="text-primary-ink">PDF</span>
+              </span>
             </div>
             <p className="mt-1 text-sm text-fg-muted">{siteCopy.footerTagline}</p>
             <Link href="/#tools" prefetch={false} className={linkClass}>

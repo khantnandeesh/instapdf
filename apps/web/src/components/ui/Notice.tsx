@@ -7,10 +7,10 @@ import { AlertIcon, CheckIcon, CloseIcon, InfoIcon } from "./icons";
 export type NoticeTone = "info" | "success" | "warning" | "danger";
 
 const tones: Record<NoticeTone, { box: string; icon: string }> = {
-  info: { box: "bg-primary-soft border-primary", icon: "text-primary" },
-  success: { box: "bg-success-soft border-success", icon: "text-success" },
-  warning: { box: "bg-warning-soft border-warning", icon: "text-warning" },
-  danger: { box: "bg-danger-soft border-danger", icon: "text-danger" },
+  info: { box: "bg-primary-soft", icon: "text-primary-ink" },
+  success: { box: "bg-success-soft", icon: "text-success" },
+  warning: { box: "bg-warning-soft", icon: "text-warning" },
+  danger: { box: "bg-danger-soft", icon: "text-danger" },
 };
 
 export function Notice({
@@ -32,7 +32,7 @@ export function Notice({
   return (
     <div
       role={tone === "danger" || tone === "warning" ? "alert" : "status"}
-      className={cx("flex items-start gap-3 rounded-lg border-s-4 p-3 text-sm text-fg", tones[tone].box, className)}
+      className={cx("flex items-start gap-3 rounded-lg p-3 text-sm text-fg", tones[tone].box, className)}
     >
       <Icon size={20} className={cx("mt-px shrink-0", tones[tone].icon)} />
       <div className="min-w-0 flex-1 break-words">

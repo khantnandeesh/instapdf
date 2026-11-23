@@ -110,7 +110,7 @@ export function Dialog({
         variant === "fullscreen"
           ? "ip-rise-in m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto overscroll-contain border-0 bg-bg p-0 text-fg backdrop:bg-transparent"
           : cx(
-              "m-auto max-h-[calc(100dvh-32px)] rounded-xl bg-surface-raised p-0 text-fg shadow-lg backdrop:bg-scrim",
+              "m-auto max-h-[calc(100dvh-32px)] rounded-xl bg-surface-overlay p-0 text-fg shadow-hero backdrop:bg-scrim",
               wide ? "w-[min(880px,calc(100vw-32px))]" : "w-[min(440px,calc(100vw-32px))]",
             ),
         className,
@@ -127,9 +127,9 @@ export function Dialog({
       {open && variant === "default" && (
         <div className="flex flex-col gap-4 p-6 max-sm:p-5">
           <div className="flex min-w-0 items-start gap-3">
-            {icon && <span className="mt-0.5 shrink-0 text-fg-muted">{icon}</span>}
+            {icon && <span className="shrink-0 text-fg-muted">{icon}</span>}
             <div className="min-w-0 flex-1">
-              <h2 id={titleId} className="text-lg font-semibold break-words">
+              <h2 id={titleId} className="text-base leading-snug font-semibold break-words">
                 {title}
               </h2>
               {description && (

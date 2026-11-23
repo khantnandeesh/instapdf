@@ -20,6 +20,55 @@
     outline: 2px solid var(--ip-focus-ring);
     outline-offset: 2px;
   }
+
+  ::selection {
+    background: var(--ip-primary-ring);
+  }
+}
+
+/* Universal UI components: fields, tints, paper. */
+@layer components {
+  /* Text fields: hairline edge; on focus the edge turns accent (>= 3:1) with a 3px accent-ring halo. */
+  .ip-field {
+    border: 1px solid var(--ip-field-line);
+    background: var(--ip-surface-raised);
+    transition:
+      border-color var(--ip-duration-fast) ease-out,
+      box-shadow var(--ip-duration-fast) ease-out;
+  }
+  .ip-field:hover {
+    border-color: var(--ip-border-strong);
+  }
+  .ip-field:focus-visible {
+    outline: none;
+    border-color: var(--ip-accent);
+    box-shadow: 0 0 0 3px var(--ip-primary-ring);
+  }
+  .ip-field[aria-invalid="true"] {
+    border-color: var(--ip-danger);
+  }
+  .ip-field::placeholder {
+    color: var(--ip-fg-muted);
+  }
+
+  /* Hover tint for opaque controls (secondary buttons, chips): ink-1 laid over the fill. */
+  .ip-tint:hover {
+    background-image: linear-gradient(var(--ip-hover), var(--ip-hover));
+  }
+  .ip-tint:active {
+    background-image: linear-gradient(var(--ip-pressed), var(--ip-pressed));
+  }
+
+  /* PDF pages: dimmed a step in dark so white paper does not glare; full brightness while
+     the person is looking at one (hover or focus inside an .ip-paper-lit ancestor). */
+  .ip-paper {
+    filter: var(--ip-paper-filter);
+    transition: filter var(--ip-duration-base) var(--ip-ease-out);
+  }
+  .ip-paper-lit:hover .ip-paper,
+  .ip-paper-lit:focus-within .ip-paper {
+    filter: none;
+  }
 }
 
 /* Shared tool flow: small keyframe utilities (transform/opacity only). */
@@ -134,7 +183,7 @@
   }
 }
 
-/* Range input: border-strong track (>= 3:1), primary thumb. */
+/* Range input: control-line track (>= 3:1), accent-strong thumb. */
 .ip-range {
   appearance: none;
   background: transparent;
@@ -158,6 +207,7 @@
   border-radius: 9999px;
   background: var(--ip-primary);
   border: 2px solid var(--ip-surface-raised);
+  box-shadow: 0 0 0 1px var(--ip-border);
 }
 .ip-range::-moz-range-thumb {
   width: 18px;
@@ -182,7 +232,7 @@
   border-radius: 3px;
   padding-inline: 2px;
   margin-inline: -2px;
-  box-shadow: inset 0 -2px 0 var(--ip-primary);
+  box-shadow: inset 0 -2px 0 var(--ip-accent);
 }
 
 /* Our search fields draw their own clear button. */

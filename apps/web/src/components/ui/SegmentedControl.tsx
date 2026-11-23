@@ -43,7 +43,7 @@ export function SegmentedControl<T extends string>({
       aria-label={label}
       aria-disabled={disabled || undefined}
       onKeyDown={onKeyDown}
-      className={cx("inline-flex h-11 rounded-md bg-surface-sunken p-1 lg:h-10", fullWidth && "flex w-full", className)}
+      className={cx("inline-flex h-11 rounded-md bg-surface-sunken p-0.5 lg:h-10", fullWidth && "flex w-full", className)}
     >
       {options.map((o, i) => {
         const checked = i === current;
@@ -60,10 +60,11 @@ export function SegmentedControl<T extends string>({
             disabled={disabled}
             onClick={() => onChange(o.value)}
             className={cx(
-              "min-w-11 flex-1 rounded-[7px] px-3 text-sm whitespace-nowrap transition-colors duration-(--ip-duration-fast)",
-              checked ? "bg-primary-soft font-semibold text-on-primary-soft shadow-sm" : "font-medium text-fg-muted hover:text-fg",
+              "min-w-11 flex-1 rounded-sm px-3 text-sm whitespace-nowrap transition-[background-color,color,box-shadow] duration-(--ip-duration-fast)",
+              checked ? "bg-surface-overlay font-semibold text-fg shadow-control" : // text-strong: `text` on the ink-2 track would dip under 4.5:1.
+                "font-medium text-fg hover:bg-hover",
               "disabled:text-fg-disabled",
-              checked && "disabled:bg-surface-raised",
+              checked && "disabled:bg-surface-raised disabled:shadow-none",
             )}
           >
             {o.shortLabel ? (

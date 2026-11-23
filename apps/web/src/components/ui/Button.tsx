@@ -6,10 +6,10 @@ export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-active",
-  secondary: "bg-surface-raised text-fg border border-border-strong hover:bg-surface-sunken",
-  ghost: "bg-transparent text-fg hover:bg-surface-sunken",
-  danger: "bg-danger text-on-danger hover:opacity-90",
+  primary: "bg-primary text-on-primary shadow-[0_1px_2px_rgb(0_0_0/0.12)] hover:bg-primary-hover active:bg-primary-active",
+  secondary: "ip-tint bg-surface-raised text-fg shadow-control",
+  ghost: "bg-transparent text-fg hover:bg-hover active:bg-pressed",
+  danger: "bg-danger-strong text-on-danger hover:bg-danger-hover",
 };
 
 const sizes: Record<ButtonSize, string> = {
@@ -23,7 +23,7 @@ export function buttonClasses(variant: ButtonVariant = "secondary", size: Button
   return cx(
     "relative inline-flex select-none items-center justify-center rounded-md font-medium whitespace-nowrap",
     "transition-[background-color,color,transform] duration-(--ip-duration-fast) ease-out active:scale-[0.98]",
-    "disabled:pointer-events-none disabled:border-transparent disabled:bg-surface-sunken disabled:text-fg-disabled",
+    "disabled:pointer-events-none disabled:bg-surface-sunken disabled:bg-none disabled:text-fg-disabled disabled:shadow-none",
     variants[variant],
     sizes[size],
     extra,

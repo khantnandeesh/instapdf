@@ -41,18 +41,18 @@ export function ComingSoonPage({ tool }: { tool: Tool }) {
       <ToolIntro title={tool.name} summary={tool.summary} />
       <section
         aria-labelledby="soon-heading"
-        className="flex min-h-[280px] max-w-[760px] flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border bg-surface p-6 text-center sm:min-h-[420px] sm:items-start sm:justify-center sm:p-8 sm:text-start"
+        className="flex min-h-[280px] max-w-[760px] flex-col items-center gap-3 rounded-xl bg-surface-raised p-6 text-center shadow-sm sm:min-h-[420px] sm:items-start sm:justify-center sm:p-8 sm:text-start"
         data-testid="coming-soon"
       >
-        <span className="grid size-16 place-items-center rounded-full bg-surface-sunken text-fg-muted">
-          <ClockIcon size={40} />
+        <span className="grid size-14 place-items-center rounded-full bg-surface-sunken text-fg-muted">
+          <ClockIcon size={28} />
         </span>
-        <h2 id="soon-heading" className="text-lg font-semibold">
+        <h2 id="soon-heading" className="text-xl font-semibold">
           {siteCopy.soonHeading}
         </h2>
         <p className="text-fg-muted">{siteCopy.soonBody(tool.name)}</p>
         <p className="flex items-start gap-2 text-sm text-fg-muted">
-          {tool.runtime === "client" ? <DeviceIcon size={18} className="mt-px shrink-0 text-success" /> : <InfoIcon size={18} className="mt-px shrink-0" />}
+          {tool.runtime === "client" ? <DeviceIcon size={18} className="mt-px shrink-0" /> : <InfoIcon size={18} className="mt-px shrink-0" />}
           {tool.runtime === "client" ? siteCopy.soonClient : siteCopy.soonServer}
         </p>
         <Link href="/#tools" className={buttonClasses("primary", "md", "mt-2")}>
@@ -68,9 +68,9 @@ export function ComingSoonPage({ tool }: { tool: Tool }) {
 export function PlaceholderPage({ title }: { title: string }) {
   return (
     <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[720px] px-4 pt-12 pb-12 outline-none sm:px-6">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+      <h1 className="text-2xl font-semibold">{title}</h1>
       <p className="mt-3 text-fg-muted">{siteCopy.placeholderBody}</p>
-      <Link href="/#tools" className="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline">
+      <Link href="/#tools" className="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-primary-ink underline-offset-4 hover:underline">
         {siteCopy.placeholderBack}
       </Link>
     </main>
@@ -81,7 +81,7 @@ export function NotFoundPage() {
   return (
     <main id="main" tabIndex={-1} className={`${container} pt-12 pb-12 outline-none`}>
       <div className="max-w-[720px]">
-        <h1 className="text-2xl font-semibold tracking-tight">{siteCopy.notFoundTitle}</h1>
+        <h1 className="text-2xl font-semibold">{siteCopy.notFoundTitle}</h1>
         <p className="mt-3 text-fg-muted">{siteCopy.notFoundBody}</p>
         <Link href="/#tools" className={buttonClasses("primary", "md", "mt-6")}>
           {siteCopy.soonCta}

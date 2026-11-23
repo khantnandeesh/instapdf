@@ -46,15 +46,15 @@ export function PageTile({
     <div role="listitem" className="group/tile flex min-w-0 flex-col items-center gap-1" data-page-index={index} data-file-id={fileId}>
       <div
         className={cx(
-          "relative grid aspect-square w-(--ip-thumb-size) place-items-center rounded-lg max-sm:w-full",
+          "ip-paper-lit relative grid aspect-square w-(--ip-thumb-size) place-items-center rounded-lg max-sm:w-full",
           "transition-shadow duration-(--ip-duration-fast) group-hover/tile:shadow-md group-focus-within/tile:shadow-md",
-          inScope && "outline-2 -outline-offset-2 outline-primary",
+          inScope && "outline-2 -outline-offset-2 outline-accent",
         )}
         data-testid="page-tile"
         data-rotation={pendingDelta}
       >
         <span
-          className="relative block overflow-hidden shadow-paper transition-transform duration-(--ip-duration-base) ease-out"
+          className="ip-paper relative block overflow-hidden shadow-paper transition-[transform,filter] duration-(--ip-duration-base) ease-out"
           style={{ ...pageBoxStyle(size), transform: `rotate(${pendingDelta}deg)` }}
           data-testid="page-visual"
         >
@@ -72,19 +72,19 @@ export function PageTile({
           className="absolute inset-0 rounded-lg focus-visible:outline-focus"
         />
         {badge && (
-          <span className="pointer-events-none absolute top-1.5 left-1.5 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-on-primary-soft tabular-nums">
+          <span className="pointer-events-none absolute top-1.5 left-1.5 z-[1] rounded-full bg-surface-overlay px-2 py-0.5 text-xs font-semibold text-primary-ink tabular-nums shadow-md">
             {badge}
           </span>
         )}
         {inScope && (
-          <span className="pointer-events-none absolute top-1.5 right-1.5 grid size-5 place-items-center rounded-full bg-primary text-on-primary">
+          <span className="pointer-events-none absolute top-1.5 right-1.5 grid size-5 place-items-center z-[1] rounded-full bg-primary text-on-primary shadow-md">
             <CheckIcon size={14} strokeWidth={2.5} />
           </span>
         )}
         {actions && !dimmed && (
           <div
             className={cx(
-              "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1 rounded-md bg-surface-raised/90 p-1 shadow-md",
+              "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1 rounded-md bg-surface-overlay p-1 shadow-lg",
               "opacity-0 transition-opacity duration-(--ip-duration-fast) group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100",
             )}
           >

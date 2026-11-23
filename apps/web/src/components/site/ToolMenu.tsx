@@ -162,7 +162,7 @@ export function ToolMenu() {
         className={cx(
           "ip-js-only inline-flex h-11 items-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors duration-(--ip-duration-fast) md:h-9",
           "relative before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-['']",
-          open ? "bg-primary-soft text-on-primary-soft" : "text-fg hover:bg-surface-sunken",
+          open ? "bg-primary-soft text-primary-ink" : "text-fg hover:bg-hover",
         )}
       >
         <GridIcon size={16} />
@@ -180,7 +180,7 @@ export function ToolMenu() {
           <div aria-hidden="true" className="ip-fade-in fixed inset-x-0 top-(--ip-header-h) bottom-0 bg-scrim" onClick={() => close(true)} data-testid="tool-menu-scrim" />
           <div
             id={MENU_ID}
-            className="ip-drop-in fixed inset-x-0 top-(--ip-header-h) max-h-(--ip-menu-max-h) overflow-y-auto overscroll-contain border-b border-border bg-surface-raised shadow-lg"
+            className="ip-drop-in fixed inset-x-0 top-(--ip-header-h) max-h-(--ip-menu-max-h) overflow-y-auto overscroll-contain border-b border-border bg-surface-overlay shadow-lg"
             data-testid="tool-menu"
           >
             <div className="relative mx-auto max-w-[1280px] px-6 pt-6 pb-8 lg:px-8">{content}</div>
@@ -269,7 +269,7 @@ function MenuContent({
           {count}
         </div>
       ) : (
-        <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-surface-raised px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-2">
+        <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-chrome px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-2">
           <div className="flex items-center gap-2">
             {search}
             {closeButton}
@@ -337,9 +337,9 @@ function MenuEntry({ item }: { item: ToolIndexItem }) {
   const badge = badgeText(item);
   // Name from content, in visual order: name, badge, runtime marker (AC-56, AC-59).
   return (
-    <Link href={`/${item.slug}`} prefetch={false} className="flex min-h-11 flex-col justify-center gap-0.5 rounded-md px-2 py-1.5 hover:bg-surface-sunken">
+    <Link href={`/${item.slug}`} prefetch={false} className="flex min-h-11 flex-col justify-center gap-0.5 rounded-sm px-2 py-1.5 transition-colors duration-(--ip-duration-fast) hover:bg-hover">
       <span className="flex items-center gap-2">
-        <span className={cx("shrink-0", usable(item) ? "text-primary" : "text-fg-muted")}>{item.icon}</span>
+        <span className={cx("shrink-0", usable(item) ? "text-primary-ink" : "text-fg-muted")}>{item.icon}</span>
         <span className="min-w-0 flex-1 text-sm font-medium [overflow-wrap:anywhere] text-fg">{item.name}</span>
         {badge && (
           <>

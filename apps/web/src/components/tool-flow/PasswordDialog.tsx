@@ -110,7 +110,7 @@ export function PasswordDialog({
             spellCheck={false}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? errorId : undefined}
-            className="h-11 w-full rounded-md border border-border-strong bg-surface-raised ps-3 pe-12 text-base text-fg aria-invalid:border-danger"
+            className="ip-field h-11 w-full rounded-md ps-3 pe-12 text-[16px] text-fg sm:text-base"
           />
           <IconButton
             label="Show password"

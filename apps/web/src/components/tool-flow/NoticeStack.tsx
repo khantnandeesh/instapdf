@@ -23,7 +23,8 @@ export function NoticeStack({ notices, onDismiss }: { notices: FlowNotice[]; onD
     >
       <div className="pointer-events-auto flex max-h-[60dvh] w-[min(480px,calc(100vw-32px))] flex-col gap-2 overflow-y-auto">
         {visible.map((n) => (
-          <div key={n.id} className="ip-settle shadow-lg">
+          // Soft tones are translucent: float them on an opaque raised ground.
+          <div key={n.id} className="ip-settle rounded-lg bg-surface-overlay shadow-lg">
             <Notice tone={n.tone} title={n.title} onDismiss={() => onDismiss(n.id)}>
               {n.items && n.items.length > 0 && <NoticeItems items={n.items} />}
             </Notice>
@@ -33,7 +34,7 @@ export function NoticeStack({ notices, onDismiss }: { notices: FlowNotice[]; onD
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="self-start rounded-md bg-surface-raised px-3 py-2 text-sm font-medium text-primary shadow-md"
+            className="self-start rounded-md bg-surface-overlay px-3 py-2 text-sm font-medium text-primary-ink shadow-lg"
           >
             +{hidden} more
           </button>
@@ -54,7 +55,7 @@ function NoticeItems({ items }: { items: string[] }) {
         ))}
       </ul>
       {items.length > 3 && !open && (
-        <button type="button" className="mt-1 font-medium text-primary underline" onClick={() => setOpen(true)}>
+        <button type="button" className="mt-1 font-medium text-primary-ink underline" onClick={() => setOpen(true)}>
           Show {items.length - 3} more
         </button>
       )}

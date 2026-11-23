@@ -89,7 +89,7 @@ export function OwnerPasswordDialog({
             spellCheck={false}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? errorId : undefined}
-            className="h-11 w-full rounded-md border border-border-strong bg-surface-raised ps-3 pe-12 text-base"
+            className="ip-field h-11 w-full rounded-md ps-3 pe-12 text-[16px] sm:text-base"
           />
           <IconButton label="Show password" pressed={visible} size="sm" tooltip={false} className="absolute top-1.5 right-1.5" icon={<EyeIcon size={18} />} onClick={() => setVisible((v) => !v)} />
         </div>

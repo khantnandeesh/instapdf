@@ -11,13 +11,13 @@ export function Switch({ id, label, checked, onChange, className }: { id: string
         className={cx(
           "relative h-5 w-9 shrink-0 rounded-full border transition-colors duration-(--ip-duration-fast)",
           "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus",
-          checked ? "border-primary bg-primary" : "border-border-strong bg-surface-raised",
+          checked ? "border-primary bg-primary" : "border-border-strong bg-transparent",
         )}
       >
         <span
           className={cx(
             "absolute top-px left-px grid size-4 place-items-center rounded-full transition-transform duration-(--ip-duration-fast)",
-            checked ? "translate-x-4 bg-on-primary text-primary" : "bg-border-strong",
+            checked ? "translate-x-4 bg-on-primary text-primary-ink" : "bg-border-strong",
           )}
         >
           {checked && <CheckIcon size={12} strokeWidth={3} />}

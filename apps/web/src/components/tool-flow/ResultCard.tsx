@@ -146,7 +146,7 @@ export function ResultCard({
         <Button variant="ghost" onClick={onStartOver} className="max-sm:w-full">
           Start over
         </Button>
-        <button type="button" onClick={onBack} className="h-11 rounded-md px-2 text-sm font-medium text-primary underline-offset-4 hover:underline max-sm:w-full">
+        <button type="button" onClick={onBack} className="h-11 rounded-md px-2 text-sm font-medium text-primary-ink underline-offset-4 hover:underline max-sm:w-full">
           Back to options
         </button>
       </div>
@@ -192,7 +192,7 @@ function ResultPreview({ output }: { output: ToolOutput }) {
       const box = host.current?.parentElement?.clientWidth || 240;
       const canvas = await renderPage(r.pdf.doc, 0, box);
       if (!alive) return;
-      canvas.className = "ip-fade-in block max-h-full max-w-full shadow-paper";
+      canvas.className = "ip-fade-in ip-paper block max-h-full max-w-full shadow-paper";
       canvas.style.width = `${canvas.width / Math.min(2, window.devicePixelRatio || 1)}px`;
       canvas.setAttribute("role", "img");
       canvas.setAttribute("aria-label", "Preview of page 1 of the result");
@@ -206,7 +206,7 @@ function ResultPreview({ output }: { output: ToolOutput }) {
     };
   }, [output, isPdf]);
   return (
-    <div className={cx("grid size-[200px] shrink-0 place-items-center rounded-lg bg-surface-sunken p-3 sm:size-[240px]", !ready && isPdf && "ip-pulse")}>
+    <div className={cx("ip-paper-lit grid size-[200px] shrink-0 place-items-center rounded-lg bg-well p-3 sm:size-[240px]", !ready && isPdf && "ip-pulse")}>
       {isPdf ? <span ref={host} className="grid h-full w-full place-items-center" /> : <FilesIcon size={64} className="text-fg-muted" />}
     </div>
   );

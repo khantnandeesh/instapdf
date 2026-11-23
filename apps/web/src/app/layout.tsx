@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { ToolIndexProvider } from "@/components/catalogue/ToolIndexProvider";
 import { buildToolIndex } from "@/components/catalogue/toolIndex";
 import { siteCopy } from "@/components/site/copy";
@@ -8,16 +7,6 @@ import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SkipLink } from "@/components/site/SkipLink";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: siteCopy.homeTitle,
@@ -35,7 +24,7 @@ export default function RootLayout({
       <head>
         <RecentPrepaintScript />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} flex min-h-dvh flex-col antialiased`}>
+      <body className="flex min-h-dvh flex-col antialiased">
         <SkipLink />
         <ToolIndexProvider index={buildToolIndex()}>
           <SiteHeader />

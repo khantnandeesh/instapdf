@@ -19,8 +19,8 @@ export function HeaderShortcuts({ links }: { links: { slug: string; name: string
                 href={`/${l.slug}`}
                 aria-current={current ? "page" : undefined}
                 className={cx(
-                  "relative inline-flex h-11 items-center px-3 text-sm font-medium whitespace-nowrap hover:text-fg",
-                  current ? "text-fg after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-primary" : "text-fg-muted",
+                  "relative inline-flex h-11 items-center px-3 text-sm font-medium whitespace-nowrap transition-colors duration-(--ip-duration-fast) hover:text-fg",
+                  current ? "text-fg after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-accent" : "text-fg-muted",
                 )}
               >
                 {l.name}

@@ -63,7 +63,7 @@ function Meta({ item, className }: { item: ToolIndexItem; className?: string }) 
 function IconTile({ item, size = 40 }: { item: ToolIndexItem; size?: number }) {
   return (
     <span
-      className={cx("grid shrink-0 place-items-center rounded-md", usable(item) ? "bg-primary-soft text-primary" : "bg-surface-sunken text-fg-muted")}
+      className={cx("grid shrink-0 place-items-center rounded-md", usable(item) ? "bg-primary-soft text-primary-ink" : "bg-surface-sunken text-fg-muted")}
       style={{ width: size, height: size }}
     >
       {item.icon}
@@ -73,10 +73,11 @@ function IconTile({ item, size = 40 }: { item: ToolIndexItem; size?: number }) {
 
 const cardBase = (item: ToolIndexItem) =>
   cx(
-    "group relative flex h-full rounded-lg border transition-[transform,box-shadow,border-color] duration-(--ip-duration-fast) ease-out active:scale-[0.99]",
+    "group relative flex h-full rounded-xl transition-[transform,box-shadow,background-color] duration-(--ip-duration-fast) ease-out active:scale-[0.99]",
+    // Ready: a surface card on canvas. Planned: the same hairline ring with no fill, so it reads quieter.
     usable(item)
-      ? "border-border bg-surface-raised shadow-sm hover:border-border-strong [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-md"
-      : "border-dashed border-border bg-surface hover:border-border-strong",
+      ? "bg-surface-raised shadow-sm [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-md"
+      : "bg-transparent shadow-sm hover:bg-hover",
   );
 
 /** Full catalogue card: the whole card is one link (AC-7). */
@@ -99,7 +100,7 @@ export function ToolCard({ item, idPrefix = "cat", nameRange, summaryRange }: { 
       {usable(item) && (
         <ArrowRightIcon
           size={16}
-          className="absolute top-4 end-4 text-fg-muted opacity-0 transition-[opacity,transform] duration-(--ip-duration-fast) group-hover:translate-x-1 group-hover:opacity-100"
+          className="absolute top-4 end-4 text-primary-ink opacity-0 transition-[opacity,transform] duration-(--ip-duration-fast) group-hover:translate-x-1 group-hover:opacity-100"
         />
       )}
     </Link>
@@ -130,9 +131,9 @@ export function ToolChip({ item, children }: { item: ToolIndexItem; children?: R
   return (
     <Link
       href={`/${item.slug}`}
-      className="inline-flex h-11 shrink-0 items-center gap-2 rounded-md border border-border bg-surface-raised ps-2 pe-3 text-sm font-medium whitespace-nowrap text-fg hover:border-border-strong"
+      className="ip-tint inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-surface-raised ps-3 pe-4 text-sm font-medium whitespace-nowrap text-fg shadow-control"
     >
-      <span className="text-primary">{item.icon}</span>
+      <span className="text-primary-ink">{item.icon}</span>
       {item.name}
       {children}
     </Link>

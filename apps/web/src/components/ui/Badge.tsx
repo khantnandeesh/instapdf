@@ -8,8 +8,9 @@ export function Badge({ tone, children, id, className }: { tone: "beta" | "soon"
     <span
       id={id}
       className={cx(
-        "inline-flex h-5 shrink-0 items-center gap-1 rounded-sm px-1.5 text-xs font-medium whitespace-nowrap",
-        tone === "beta" ? "bg-primary-soft text-on-primary-soft" : "bg-surface-sunken text-fg-muted",
+        "inline-flex h-5 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-medium whitespace-nowrap",
+        // Neutral badge words are text-strong: `text` on an ink-2 fill would dip under 4.5:1.
+        tone === "beta" ? "bg-primary-soft text-primary-ink" : "bg-surface-sunken text-fg",
         className,
       )}
     >

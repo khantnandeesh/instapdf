@@ -114,9 +114,9 @@ export function Catalogue() {
   }, [updateQuery]);
 
   return (
-    <section aria-labelledby="tools-heading" className="mt-8 sm:mt-12" data-testid="catalogue">
+    <section aria-labelledby="tools-heading" className="mt-12 sm:mt-16" data-testid="catalogue">
       <div id="tools" ref={headingRef} className="flex scroll-mt-[calc(var(--ip-header-h)+16px)] flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 id="tools-heading" className="text-xl font-semibold tracking-tight sm:text-2xl">
+        <h2 id="tools-heading" className="text-2xl font-semibold sm:text-3xl">
           {copy.title}
         </h2>
         <p className="text-sm text-fg-muted">{copy.summary(items.length, readyCount)}</p>
@@ -155,7 +155,7 @@ export function Catalogue() {
               <li key={g.id} className="shrink-0">
                 <a
                   href={`#cat-${g.id}`}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border-strong bg-surface-raised px-3 text-sm font-medium whitespace-nowrap hover:bg-surface-sunken"
+                  className="ip-tint inline-flex h-9 items-center gap-1.5 rounded-full bg-surface-raised px-3.5 text-sm font-medium whitespace-nowrap shadow-control"
                 >
                   {g.label}
                   <span className="text-fg-muted tabular-nums">{g.matches.length}</span>
@@ -223,7 +223,8 @@ function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
         <SearchIcon size={32} />
       </span>
       <p className="mt-2 font-semibold [overflow-wrap:anywhere]">{copy.none(query)}</p>
-      <p className="text-sm text-fg-muted">{copy.tip}</p>
+      {/* Same size as the line above: a bold line over a smaller one reads as a heading to axe (p-as-heading). */}
+      <p className="text-fg-muted">{copy.tip}</p>
       <Button variant="secondary" className="mt-2" onClick={onClear}>
         {copy.clear}
       </Button>

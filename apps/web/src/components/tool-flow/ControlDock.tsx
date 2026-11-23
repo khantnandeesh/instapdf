@@ -46,15 +46,15 @@ export function ControlDock({
       role="region"
       aria-label={label}
       className={[
-        "fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface-raised shadow-md",
+        "fixed inset-x-0 bottom-0 z-20 border-t border-border bg-chrome shadow-md",
         "px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] sm:px-6",
-        "lg:sticky lg:top-[calc(var(--ip-header-h)+24px)] lg:z-auto lg:flex lg:h-[calc(100dvh-var(--ip-header-h)-48px)] lg:max-h-[640px] lg:flex-col lg:rounded-xl lg:border lg:p-5 lg:shadow-sm",
+        "lg:sticky lg:top-[calc(var(--ip-header-h)+24px)] lg:z-auto lg:flex lg:h-[calc(100dvh-var(--ip-header-h)-48px)] lg:max-h-[640px] lg:flex-col lg:rounded-xl lg:border-0 lg:bg-surface-raised lg:p-5 lg:shadow-sm",
       ].join(" ")}
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 lg:h-full lg:flex-col lg:items-stretch">
         <fieldset disabled={optionsDisabled} className="min-w-0 sm:flex-1 lg:flex-1 lg:overflow-y-auto">
           <legend className="sr-only">{label}</legend>
-          <h2 className="mb-3 hidden text-sm font-semibold text-fg-muted lg:block">Options</h2>
+          <h2 className="mb-4 hidden text-base font-semibold lg:block">Options</h2>
           {options}
         </fieldset>
         <div className="flex flex-col gap-2 sm:min-w-[200px] lg:min-w-0">

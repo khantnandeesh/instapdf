@@ -31,10 +31,10 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         "disabled:pointer-events-none disabled:text-fg-disabled",
         "before:absolute before:top-1/2 before:left-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']",
         size === "sm" ? "size-8" : "size-11",
-        variant === "ghost" && "hover:bg-surface-sunken",
-        variant === "secondary" && "border border-border-strong bg-surface-raised hover:bg-surface-sunken",
-        variant === "raised" && "bg-surface-raised hover:bg-surface-sunken",
-        pressed && "bg-primary-soft text-on-primary-soft",
+        variant === "ghost" && "hover:bg-hover active:bg-pressed",
+        variant === "secondary" && "ip-tint bg-surface-raised shadow-control",
+        variant === "raised" && "ip-tint bg-surface-overlay",
+        pressed && "bg-primary-soft text-primary-ink",
         /\babsolute\b/.test(className ?? "") ? className : cx("relative", className),
       )}
       {...rest}
@@ -45,7 +45,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
           aria-hidden="true"
           className={cx(
             // Not rendered until hover/focus, so an off-screen tooltip never widens the page.
-            "pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden -translate-x-1/2 rounded-sm bg-fg px-2 py-1 text-xs font-medium whitespace-nowrap text-bg",
+            "pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden -translate-x-1/2 rounded-sm bg-inverse px-2 py-1 text-xs font-medium whitespace-nowrap text-on-inverse",
             "ip-tooltip group-hover/ib:block group-focus-visible/ib:block [@media(hover:none)]:!hidden",
           )}
         >

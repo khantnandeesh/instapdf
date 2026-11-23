@@ -60,7 +60,7 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
           aria-describedby={cx(shortcutHint && hintId, describedBy) || undefined}
           aria-controls={controls}
           className={cx(
-            "ip-search w-full rounded-md border border-border-strong bg-surface-raised ps-10 pe-12 text-base text-fg placeholder:text-fg-muted",
+            "ip-search ip-field w-full rounded-md ps-10 pe-12 text-[16px] text-fg sm:text-base",
             size === "lg" ? "h-12" : "h-11",
           )}
         />
@@ -79,7 +79,7 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
                 (e.currentTarget.closest("div")?.querySelector("input") as HTMLInputElement | null)?.focus();
                 onClear?.();
               }}
-              className="ip-fade-in grid size-11 place-items-center rounded-md text-fg-muted hover:bg-surface-sunken hover:text-fg"
+              className="ip-fade-in grid size-11 place-items-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"
             >
               <CloseIcon size={18} />
             </button>

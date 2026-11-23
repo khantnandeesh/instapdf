@@ -52,3 +52,41 @@ test.describe("AC-56 at 375x812", () => {
     await expectNoSeriousAxeViolations(page, "375 px menu open");
   });
 });
+
+test.describe("AC-56 in the dark theme at 1366x900", () => {
+  test.use({ viewport: { width: 1366, height: 900 }, colorScheme: "dark" });
+
+  test("AC-56: axe finds no serious or critical violations in the dark theme on home, desktop menu, coming-soon, 404 and /rotate-pdf", async ({ page }, info) => {
+    test.skip(!isDesktop(info.project.name), "desktop states");
+
+    await openHydrated(page);
+    await expectNoSeriousAxeViolations(page, "dark, home");
+
+    await openMenu(page);
+    await expect(menuLinks(page)).toHaveCount(tools.length);
+    await expectNoSeriousAxeViolations(page, "dark, desktop menu open");
+    await page.keyboard.press("Escape");
+
+    await openHydrated(page, "/merge-pdf");
+    await expectNoSeriousAxeViolations(page, "dark, coming-soon page /merge-pdf");
+
+    await page.goto("/does-not-exist");
+    await expectNoSeriousAxeViolations(page, "dark, 404 page");
+
+    await openHydrated(page, "/rotate-pdf");
+    await expectNoSeriousAxeViolations(page, "dark, /rotate-pdf, empty");
+  });
+});
+
+test.describe("AC-56 in the dark theme at 375x812", () => {
+  test.use({ viewport: { width: 375, height: 812 }, colorScheme: "dark" });
+
+  test("AC-56: axe finds no serious or critical violations in the dark theme on home and with the mobile menu open at 375 px", async ({ page }) => {
+    await openHydrated(page);
+    await expectNoSeriousAxeViolations(page, "dark, 375 px home");
+
+    await menuButton(page).click();
+    await expect(page.getByRole("dialog", { name: "All tools" })).toBeVisible();
+    await expectNoSeriousAxeViolations(page, "dark, 375 px menu open");
+  });
+});
