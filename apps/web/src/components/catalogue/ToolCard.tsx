@@ -21,22 +21,41 @@ export function Highlighted({ text, range }: { text: string; range?: Range }) {
   );
 }
 
-/** Ids for the parts that make up a link's accessible name: name, badge, runtime marker. */
-function nameParts(item: ToolIndexItem, base: string) {
-  const badge = item.status === "beta" ? copy.beta : item.status === "planned" ? copy.soon : null;
-  const ids = [`${base}-name`, badge && `${base}-badge`, item.runtime === "client" && `${base}-rt`].filter(Boolean).join(" ");
-  return { badge, ids };
+export function badgeText(item: ToolIndexItem): string | null {
+  return item.status === "beta" ? copy.beta : item.status === "planned" ? copy.soon : null;
 }
 
-function Meta({ item, base, badge }: { item: ToolIndexItem; base: string; badge: string | null }) {
+/**
+ * Goes between the visible pieces of a tool link. Tool links take their accessible name from
+ * their content (WCAG 2.5.3, AC-56), so each piece needs real whitespace after it (or the
+ * text runs together, "MergeComing soon") plus a comma for screen readers to pause on.
+ * Whitespace-only text is not rendered in flex layouts, so it changes nothing visually.
+ */
+export function NameSep() {
   return (
-    <span className="flex min-h-5 flex-wrap items-center gap-x-2 gap-y-1">
+    <>
+      <span className="sr-only">,</span>{" "}
+    </>
+  );
+}
+
+/** Badge and runtime marker, each preceded by a NameSep. */
+function Meta({ item, className }: { item: ToolIndexItem; className?: string }) {
+  const badge = badgeText(item);
+  return (
+    <span className={cx("flex min-h-5 flex-wrap items-center gap-x-2 gap-y-1", className)}>
       {badge && (
-        <Badge id={`${base}-badge`} tone={item.status === "planned" ? "soon" : "beta"}>
-          {badge}
-        </Badge>
+        <>
+          <NameSep />
+          <Badge tone={item.status === "planned" ? "soon" : "beta"}>{badge}</Badge>
+        </>
       )}
-      {item.runtime === "client" && <RuntimeMarker id={`${base}-rt`} />}
+      {item.runtime === "client" && (
+        <>
+          <NameSep />
+          <RuntimeMarker />
+        </>
+      )}
     </span>
   );
 }
@@ -63,18 +82,19 @@ const cardBase = (item: ToolIndexItem) =>
 /** Full catalogue card: the whole card is one link (AC-7). */
 export function ToolCard({ item, idPrefix = "cat", nameRange, summaryRange }: { item: ToolIndexItem; idPrefix?: string; nameRange?: Range; summaryRange?: Range }) {
   const base = `${idPrefix}-${item.slug}`;
-  const { badge, ids } = nameParts(item, base);
+  // The name comes from the content, in visual order: name, summary, badge, marker (AC-56).
   return (
-    <Link href={`/${item.slug}`} prefetch={false} aria-labelledby={ids} aria-describedby={`${base}-summary`} className={cx(cardBase(item), "gap-3 p-4")}>
+    <Link href={`/${item.slug}`} prefetch={false} className={cx(cardBase(item), "gap-3 p-4")}>
       <IconTile item={item} />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span id={`${base}-name`} className="pe-5 font-semibold [overflow-wrap:anywhere] text-fg">
           <Highlighted text={item.name} range={nameRange} />
         </span>
+        <NameSep />
         <span id={`${base}-summary`} className="text-sm text-fg-muted">
           <Highlighted text={item.summary} range={summaryRange} />
         </span>
-        <Meta item={item} base={base} badge={badge} />
+        <Meta item={item} />
       </span>
       {usable(item) && (
         <ArrowRightIcon
@@ -86,22 +106,21 @@ export function ToolCard({ item, idPrefix = "cat", nameRange, summaryRange }: { 
   );
 }
 
-/** Compact Popular-row tile. The summary shows at >= 1024 px and is always the link's description. */
+/** Compact Popular-row tile. The summary shows at >= 1024 px and is always part of the link's name. */
 export function ToolTile({ item, idPrefix = "pop" }: { item: ToolIndexItem; idPrefix?: string }) {
   const base = `${idPrefix}-${item.slug}`;
-  const { badge, ids } = nameParts(item, base);
+  // Name from content, in visual order: name, summary (visible at >= 1024 px), badge, marker (AC-56).
   return (
-    <Link href={`/${item.slug}`} prefetch={false} aria-labelledby={ids} aria-describedby={`${base}-summary`} className={cx(cardBase(item), "min-h-24 flex-col gap-2 p-4")}>
+    <Link href={`/${item.slug}`} prefetch={false} className={cx(cardBase(item), "min-h-24 flex-col gap-2 p-4")}>
       <IconTile item={item} />
       <span id={`${base}-name`} className="font-semibold [overflow-wrap:anywhere] text-fg">
         {item.name}
       </span>
+      <NameSep />
       <span id={`${base}-summary`} className="sr-only text-sm text-fg-muted lg:not-sr-only lg:line-clamp-2">
         {item.summary}
       </span>
-      <span className="mt-auto">
-        <Meta item={item} base={base} badge={badge} />
-      </span>
+      <Meta item={item} className="mt-auto" />
     </Link>
   );
 }
