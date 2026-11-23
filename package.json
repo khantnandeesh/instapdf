@@ -10,5 +10,9 @@
     "typecheck": "pnpm --filter web typecheck",
     "test": "pnpm --filter web test",
     "e2e": "pnpm --filter web e2e"
+  },
+  "pnpm": {
+    "//": "sharp is an optional Next.js dependency for next/image only (unused); its libvips binaries are LGPL-3.0, outside our license allow-list.",
+    "ignoredOptionalDependencies": ["sharp"]
   }
 }
