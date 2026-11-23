@@ -1,0 +1,120 @@
+/**
+ * Recently used tools, kept on this device only (spec F2 §3f).
+ * localStorage["instapdf:recent-tools"] = JSON array of slugs, newest first.
+ * Every storage access is wrapped: a corrupt value or a blocked/throwing
+ * localStorage reads as an empty list and never raises.
+ */
+
+export const RECENT_KEY = "instapdf:recent-tools";
+export const RECENT_STORED_MAX = 12;
+export const RECENT_SHOWN_MAX = 6;
+
+/** Parses a stored value. Anything but an array of strings is treated as empty. */
+export function parseRecent(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!Array.isArray(value) || !value.every((s) => typeof s === "string")) return [];
+    return value as string[];
+  } catch {
+    return [];
+  }
+}
+
+/** The list after a visit: the slug moves to the front, duplicates go, at most 12 are kept. */
+export function withVisit(list: readonly string[], slug: string): string[] {
+  return [slug, ...list.filter((s) => s !== slug)].slice(0, RECENT_STORED_MAX);
+}
+
+/** What the UI shows: known usable slugs only (unknown and planned are skipped), first 6. */
+export function visibleRecent(list: readonly string[], isUsable: (slug: string) => boolean): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of list) {
+    if (seen.has(s) || !isUsable(s)) continue;
+    seen.add(s);
+    out.push(s);
+    if (out.length === RECENT_SHOWN_MAX) break;
+  }
+  return out;
+}
+
+// ---- storage -----------------------------------------------------------------
+
+function storage(): Storage | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function readRaw(): string | null {
+  try {
+    return storage()?.getItem(RECENT_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function write(list: string[] | null) {
+  try {
+    const s = storage();
+    if (!s) return;
+    if (list === null) s.removeItem(RECENT_KEY);
+    else s.setItem(RECENT_KEY, JSON.stringify(list));
+  } catch {
+    // Storage full or blocked: recent tools are a convenience, so stay silent.
+  }
+  emit();
+}
+
+const listeners = new Set<() => void>();
+function emit() {
+  for (const l of listeners) l();
+}
+
+/** Subscribes to changes from this tab and (through the `storage` event) other tabs. */
+export function subscribeRecent(cb: () => void): () => void {
+  listeners.add(cb);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === RECENT_KEY || e.key === null) cb();
+  };
+  if (typeof window !== "undefined") window.addEventListener("storage", onStorage);
+  return () => {
+    listeners.delete(cb);
+    if (typeof window !== "undefined") window.removeEventListener("storage", onStorage);
+  };
+}
+
+let cache: { raw: string | null; list: string[] } = { raw: null, list: [] };
+
+/** The stored list. Returns the same array while the stored value is unchanged (useSyncExternalStore). */
+export function readRecent(): string[] {
+  const raw = readRaw();
+  if (raw !== cache.raw) cache = { raw, list: parseRecent(raw) };
+  return cache.list;
+}
+
+const EMPTY: string[] = [];
+export const serverRecent = () => EMPTY;
+
+/** Records a visit to a usable tool page. Rewrites a corrupt stored value. */
+export function recordVisit(slug: string) {
+  write(withVisit(readRecent(), slug));
+}
+
+export function clearRecent() {
+  write(null);
+}
+
+/**
+ * Inline script for <head> (spec H-10): before first paint, marks <html data-recent>
+ * when the store holds at least one usable slug, so the home page reserves the
+ * Recent row's space and nothing shifts after hydration. Same rules as above.
+ */
+export function recentPrepaintScript(usableSlugs: readonly string[]): string {
+  return `(function(){try{var u=${JSON.stringify(usableSlugs)};var v=JSON.parse(localStorage.getItem(${JSON.stringify(
+    RECENT_KEY,
+  )})||"[]");if(Array.isArray(v)&&v.some(function(s){return typeof s==="string"&&u.indexOf(s)>=0})&&v.every(function(s){return typeof s==="string"}))document.documentElement.setAttribute("data-recent","")}catch(e){}})();`;
+}
