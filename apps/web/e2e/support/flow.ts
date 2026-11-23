@@ -63,6 +63,8 @@ export async function bytesOf(download: Download) {
 
 /** Clicks Download on the result screen and returns the file name and bytes. */
 export async function downloadResult(page: Page) {
+  // The link gets its blob href in an effect after the result renders; a click before that goes nowhere.
+  await expect(downloadLink(page)).toHaveAttribute("href", /^blob:/);
   const [download] = await Promise.all([page.waitForEvent("download"), downloadLink(page).click()]);
   return { name: download.suggestedFilename(), bytes: await bytesOf(download) };
 }

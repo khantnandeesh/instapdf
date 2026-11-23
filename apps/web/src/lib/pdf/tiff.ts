@@ -31,8 +31,20 @@ const MAX_VALUES_PER_TAG = 4_000_000;
  */
 const MAX_TOTAL_VALUES = 8_000_000;
 const budgetBytes = (len: number) => 2 * len + 64 * 1024;
-/** Tags UTIF.decodeImage reads; everything else is skipped (and costs nothing). */
-const KEEP_TAGS = new Set([254, 256, 257, 258, 259, 262, 266, 273, 277, 278, 279, 284, 317, 320, 322, 323, 324, 325, 338, 339, 347, 513, 514, 529, 530, 531, 532]);
+/**
+ * Tags UTIF.decodeImage and UTIF.toRGBA8 read (and the reduced-image flag);
+ * everything else is skipped and costs nothing. A canary test checks this
+ * against UTIF's source, so an upgrade that reads a new tag fails the tests.
+ */
+export const TIFF_DECODER_TAGS: ReadonlySet<number> = new Set([
+  254, 256, 257, 258, 259, 262, 266, 273, 277, 278, 279, 284, 317, 320, 322, 323, 324, 325, 338, 339, 347, 513, 514, 515, 519, 520, 521, 529, 530, 531, 532, 33422,
+]);
+/**
+ * IFD entries looked at across the file: entries of honest IFDs never overlap,
+ * so a file has at most len / 12 of them; IFDs laid over each other (each
+ * claiming up to 65,535 entries) are refused instead of walked again and again.
+ */
+const budgetEntries = (len: number) => Math.ceil(len / 12) + 4096;
 
 const TYPE_SIZE: Record<number, number> = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8 };
 
@@ -66,6 +78,7 @@ function walk(b: Uint8Array): TiffFile {
   let ifdCount = 0;
   let spentBytes = 0;
   let spentValues = 0;
+  let spentEntries = 0;
   while (offset !== 0) {
     if (visited.has(offset) || offset < 8 || offset + 2 > len) throw new Bad("unreadable");
     visited.add(offset);
@@ -73,6 +86,8 @@ function walk(b: Uint8Array): TiffFile {
     const count = u16(offset);
     const end = offset + 2 + count * 12;
     if (end + 4 > len) throw new Bad("unreadable");
+    spentEntries += count;
+    if (spentEntries > budgetEntries(len)) throw new Bad("unreadable");
     const ifd: TiffIfd = {};
     for (let i = 0; i < count; i++) {
       const e = offset + 2 + i * 12;
@@ -80,7 +95,7 @@ function walk(b: Uint8Array): TiffFile {
       const type = u16(e + 2);
       const num = u32(e + 4);
       const size = TYPE_SIZE[type];
-      if (!size || num === 0 || !KEEP_TAGS.has(tag)) continue; // unknown types and tags UTIF does not read are skipped
+      if (!size || num === 0 || !TIFF_DECODER_TAGS.has(tag)) continue; // unknown types and tags UTIF does not read are skipped
       if (num > MAX_VALUES_PER_TAG) throw new Bad("unreadable");
       const bytes = size * num;
       spentBytes += bytes;

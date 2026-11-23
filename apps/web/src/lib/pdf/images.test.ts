@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { exceedsPixelCap, imageFormatOfName, imagePageSize, imagePlacement, probeImage, sniffFormat } from "./images";
-import { decodeTiffFrame, readTiff, tiffFrameSizes, type TiffFile } from "./tiff";
+import { decodeTiffFrame, readTiff, TIFF_DECODER_TAGS, tiffFrameSizes, type TiffFile } from "./tiff";
 
 const fx = async (name: string) => new Uint8Array(await readFile(new URL(`../../../tests/fixtures/${name}`, import.meta.url)));
 
@@ -123,6 +123,39 @@ describe("TIFF structure walker (review fix)", () => {
     expect(readTiff(b)).toEqual({ problem: "unreadable" });
     expect(Date.now() - t).toBeLessThan(5000); // before the budget: about 8 s and 3 GB
     expect(process.memoryUsage().heapUsed - before).toBeLessThan(400 * 1024 * 1024);
+  });
+  it("refuses IFDs laid over each other (per-file entry budget), fast", () => {
+    // 1,000 IFDs four bytes apart, each claiming 60,000 entries over the same bytes.
+    const N = 1000;
+    const C = 60_000;
+    const b = new Uint8Array(8 + 4 * N + 12 * C + 4 * N + 16);
+    const v = new DataView(b.buffer);
+    b.set([0x49, 0x49, 42, 0]);
+    v.setUint32(4, 8, true);
+    for (let i = 0; i < N; i++) {
+      const at = 8 + 4 * i;
+      v.setUint16(at, C, true);
+      v.setUint32(at + 2 + 12 * C, i < N - 1 ? at + 4 : 0, true);
+    }
+    const t = performance.now();
+    expect(readTiff(b)).toEqual({ problem: "unreadable" });
+    expect(performance.now() - t).toBeLessThan(150); // without the budget: 60M entries walked (about 0.5 s)
+  });
+  it("canary: every tag UTIF's decoder reads is kept by the walker", async () => {
+    const { createRequire } = await import("node:module");
+    const src = await readFile(createRequire(import.meta.url).resolve("utif"), "utf8");
+    // The functions decodeTiffFrame reaches (Nikon/makerNote decoding needs sub-IFDs the walker never reads).
+    const reached = ["decodeImage", "decode._decompress", "decode._decodeARW", "decode._decodeNewJPEG", "decode._decodeOldJPEGInit", "decode._decodeOldJPEG", "toRGBA8"];
+    const read = new Set<number>();
+    for (const fn of reached) {
+      const start = src.indexOf(`UTIF.${fn} = function`);
+      expect(start, `UTIF.${fn} not found`).toBeGreaterThan(-1);
+      const end = src.indexOf("\nUTIF.", start + 1);
+      const body = src.slice(start, end === -1 ? undefined : end).replace(/\/\/.*$/gm, "");
+      for (const m of body.matchAll(/\["t(\d+)"\]/g)) read.add(Number(m[1]));
+    }
+    expect(read.size).toBeGreaterThan(10);
+    expect([...read].filter((t) => !TIFF_DECODER_TAGS.has(t))).toEqual([]);
   });
   it("accepts a plain frame", () => {
     expect(tiffFrameSizes(ifdTiff(image(2, 2), 0, 16))).toEqual([{ width: 2, height: 2 }]);

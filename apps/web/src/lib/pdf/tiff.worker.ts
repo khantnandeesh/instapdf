@@ -4,6 +4,7 @@
  * ImageBitmaps for thumbnails, off the main thread. Each file is walked once
  * and kept while its thumbnails are being drawn (a few files at most).
  */
+import { createSizedCache } from "./sized-cache";
 import { decodeTiffFrame, readTiff, type TiffFile } from "./tiff";
 
 export type TiffRequest =
@@ -15,33 +16,24 @@ export type TiffResponse =
   | { id: number; ok: false; problem: "unreadable" | "tooLarge" };
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
-/** Parsed files kept for their thumbnails, bounded by their size in bytes (oldest dropped first). */
+/** Parsed files kept for their thumbnails, bounded by their size in bytes (least recently used dropped first). */
 const CACHE_BYTES = 96 * 1024 * 1024;
 type Parsed = { bytes: Uint8Array; file: TiffFile };
-const files = new Map<string, { size: number; parsed: Promise<Parsed> }>();
-
-function cachedBytes() {
-  let n = 0;
-  for (const f of files.values()) n += f.size;
-  return n;
-}
+const files = createSizedCache<Promise<Parsed>>(CACHE_BYTES);
 
 function parsed(key: string, blob: Blob): Promise<Parsed> {
   const hit = files.get(key);
-  if (hit) {
-    files.delete(key); // most recently used goes last
-    files.set(key, hit);
-    return hit.parsed;
-  }
+  if (hit) return hit;
   const p = blob.arrayBuffer().then((buf) => {
     const bytes = new Uint8Array(buf);
     const r = readTiff(bytes);
     if (!("frames" in r)) throw new Error(r.problem);
     return { bytes, file: r };
   });
-  files.set(key, { size: blob.size, parsed: p });
-  p.catch(() => files.delete(key));
-  while (files.size > 1 && cachedBytes() > CACHE_BYTES) files.delete(files.keys().next().value!);
+  files.set(key, blob.size, p);
+  p.catch(() => {
+    if (files.get(key) === p) files.delete(key);
+  });
   return p;
 }
 

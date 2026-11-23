@@ -54,6 +54,8 @@ const isRtl = (cp: number) => (cp >= 0x0590 && cp <= 0x05ff) || (cp >= 0xfb1d &&
 const isDigit = (cp: number) => cp >= 0x30 && cp <= 0x39;
 /** Neutral characters that join a right-to-left run when they sit inside it (spaces and common name punctuation). */
 const isNeutral = (cp: number) => cp === 0x20 || cp === 0x2d || cp === 0x5f || cp === 0x2e || cp === 0x2c || cp === 0x28 || cp === 0x29 || cp === 0x5b || cp === 0x5d;
+/** A separator that joins two digit groups into one number (Unicode bidi W4: "12-3", "1,000", "2024-01-05"). */
+const isNumberSeparator = (cp: number) => cp === 0x2d || cp === 0x2e || cp === 0x2c;
 const MIRROR: Record<string, string> = { "(": ")", ")": "(", "[": "]", "]": "[" };
 
 /**
@@ -62,7 +64,9 @@ const MIRROR: Record<string, string> = { "(": ")", ")": "(", "[": "]", "]": "[" 
  *   "-", "_", ".", ",", brackets and digits that follow, as long as another
  *   Hebrew letter or a number comes after them (neutrals at the end of the
  *   run, before Latin text or the end, stay left to right: ".pdf");
- * - the run is reversed, but each group of digits keeps its own order;
+ * - the run is reversed, but each number keeps its own order: digits, and a
+ *   single "-", "." or "," between two digits ("12-3", "2024-01-05", "1,000"),
+ *   as Unicode bidi rule W4 does;
  * - brackets inside the run are mirrored.
  * Mixed nesting and Arabic-style shaping are not supported (spec F3 §5).
  */
@@ -82,12 +86,12 @@ export function visualOrder(text: string): string {
       if (isRtl(cps[j]) || isDigit(cps[j])) last = j;
       j++;
     }
-    // Tokens: digit groups stay whole; everything else is one character.
+    // Tokens: numbers stay whole; everything else is one character.
     const tokens: string[] = [];
     for (let k = i; k <= last; ) {
       if (isDigit(cps[k])) {
         let e = k;
-        while (e <= last && isDigit(cps[e])) e++;
+        while (e <= last && (isDigit(cps[e]) || (isNumberSeparator(cps[e]) && e + 1 <= last && isDigit(cps[e + 1]) && isDigit(cps[e - 1])))) e++;
         tokens.push(chars.slice(k, e).join(""));
         k = e;
       } else {

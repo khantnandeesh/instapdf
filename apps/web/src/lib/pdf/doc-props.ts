@@ -11,9 +11,9 @@ const textOf = (o: PDFObject | undefined) => (o instanceof PDFString || o instan
 /** BCP 47-shaped language tags only ("de", "de-DE", "zh-Hant-TW"); anything else is ignored. */
 const LANG_TAG = /^[A-Za-z]{1,8}(-[A-Za-z0-9]{1,8})*$/;
 
-/** The document's /Lang, if it is a well-formed language tag. */
+/** The document's /Lang, if it is a well-formed language tag ("en_US" is read as "en-US"). */
 export function readLang(doc: PDFDocument): string | undefined {
-  const lang = textOf(doc.catalog.lookup(PDFName.of("Lang")))?.trim();
+  const lang = textOf(doc.catalog.lookup(PDFName.of("Lang")))?.trim().replace(/_/g, "-");
   return lang && LANG_TAG.test(lang) ? lang : undefined;
 }
 
@@ -21,6 +21,10 @@ export function readLang(doc: PDFDocument): string | undefined {
 export function writeLang(out: PDFDocument, lang: string): void {
   if (LANG_TAG.test(lang)) out.catalog.set(PDFName.of("Lang"), PDFHexString.fromText(lang));
 }
+
+/** The numbering styles the PDF spec defines (decimal, Roman, letters); any other /S means "prefix only". */
+const LABEL_STYLES = new Set(["D", "R", "r", "A", "a"]);
+const MAX_LABEL_START = 1_000_000_000;
 
 /** Each page's label in the source (null where no range covers it), or null when the file has no labels. */
 export function readPageLabels(doc: PDFDocument): (PageLabel | null)[] | null {
@@ -38,8 +42,9 @@ export function readPageLabels(doc: PDFDocument): (PageLabel | null)[] | null {
       for (let i = 0; i + 1 < nums.size() && ranges.length < maxRanges; i += 2) {
         const k = nums.lookup(i);
         const v = nums.lookup(i + 1);
-        // Ranges that start past the last page cannot apply: skipped without being kept.
-        if (k instanceof PDFNumber && v instanceof PDFDict && k.asNumber() >= 0 && k.asNumber() < pageCount) ranges.push({ start: k.asNumber(), dict: v });
+        // Only whole page indexes in the file count: ranges past the last page cannot apply and are not kept.
+        const start = k instanceof PDFNumber ? k.asNumber() : NaN;
+        if (v instanceof PDFDict && Number.isInteger(start) && start >= 0 && start < pageCount) ranges.push({ start, dict: v });
       }
     }
     const kids = node.lookup(PDFName.of("Kids"));
@@ -49,8 +54,8 @@ export function readPageLabels(doc: PDFDocument): (PageLabel | null)[] | null {
     }
   };
   walk(root, 0);
-  // Ranges starting past the last page cannot apply; a hostile tree cannot make this pages x ranges.
-  const usable = ranges.filter((r) => r.start >= 0 && r.start < pageCount).sort((a, b) => a.start - b.start);
+  // Sorted once, then one moving pointer: a hostile tree cannot make this pages x ranges.
+  const usable = ranges.sort((a, b) => a.start - b.start);
   if (!usable.length) return null;
   let at = -1; // index of the range covering the current page (moving pointer)
   return Array.from({ length: pageCount }, (_, i) => {
@@ -59,7 +64,10 @@ export function readPageLabels(doc: PDFDocument): (PageLabel | null)[] | null {
     if (!r) return null;
     const s = r.dict.lookup(PDFName.of("S"));
     const st = r.dict.lookup(PDFName.of("St"));
-    return { S: s instanceof PDFName ? s.decodeText() : undefined, P: textOf(r.dict.lookup(PDFName.of("P"))), St: (st instanceof PDFNumber ? st.asNumber() : 1) + i - r.start };
+    const style = s instanceof PDFName ? s.decodeText() : undefined;
+    // /St must be a whole number >= 1; anything else (or too large to number pages) starts at 1.
+    const first = st instanceof PDFNumber && Number.isInteger(st.asNumber()) && st.asNumber() >= 1 && st.asNumber() <= MAX_LABEL_START ? st.asNumber() : 1;
+    return { S: style && LABEL_STYLES.has(style) ? style : undefined, P: textOf(r.dict.lookup(PDFName.of("P"))), St: first + i - r.start };
   });
 }
 

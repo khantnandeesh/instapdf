@@ -22,7 +22,8 @@ export function scanInWorker(blob: Blob): Promise<PdfMarkers> {
       pending.get(e.data.id)?.(e.data.markers);
       pending.delete(e.data.id);
     };
-    worker.onerror = () => {
+    // A crashed worker or an unreadable reply settles every waiting scan with no markers.
+    worker.onerror = worker.onmessageerror = () => {
       for (const done of pending.values()) done(NONE);
       pending.clear();
       worker?.terminate();
@@ -30,9 +31,15 @@ export function scanInWorker(blob: Blob): Promise<PdfMarkers> {
     };
   }
   const id = nextId++;
+  const w = worker;
   return new Promise((resolve) => {
     pending.set(id, resolve);
-    worker!.postMessage({ id, blob });
+    try {
+      w.postMessage({ id, blob });
+    } catch {
+      pending.delete(id);
+      resolve(NONE);
+    }
   });
 }
 

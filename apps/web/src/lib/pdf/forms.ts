@@ -340,31 +340,50 @@ type FormInternals = {
  */
 export function flattenFields(doc: PDFDocument): string[] {
   const form = doc.getForm();
-  try {
-    form.updateFieldAppearances();
-  } catch {
-    // Fields without a usable appearance are caught one by one below.
-  }
   const internals = form as unknown as FormInternals;
   const kept: string[] = [];
+  // Appearances are brought up to date field by field (form.updateFieldAppearances
+  // stops at the first field that fails, leaving every later field stale).
+  let font: ReturnType<typeof form.getDefaultFont> | undefined;
   for (const field of form.getFields()) {
-    // Check every widget before drawing any, so a field is never half drawn and still fillable.
+    try {
+      if (field.needsAppearancesUpdate()) field.defaultUpdateAppearances((font ??= form.getDefaultFont()));
+    } catch {
+      // Its appearance may not show its value: it stays a fillable field.
+      kept.push(field.getName());
+      continue;
+    }
+    // Check everything flattenWidgetOntoPage needs for every widget before drawing any,
+    // so a field is never half drawn and still fillable.
     let plan: { w: unknown; page: PDFPage; ref: PDFRef }[];
     try {
-      plan = field.acroField.getWidgets().map((w) => {
+      const widgets = field.acroField.getWidgets();
+      if (!widgets.length) throw new Error("No widgets");
+      plan = widgets.map((w) => {
         const page = internals.findWidgetPage(w);
         const ref = internals.findWidgetAppearanceRef(field, w);
         if (!page || !(ref instanceof PDFRef) || !(doc.context.lookup(ref) instanceof PDFStream)) throw new Error("No appearance");
+        const r = w.getRectangle(); // throws on a malformed /Rect
+        if (![r.x, r.y, r.width, r.height].every(Number.isFinite)) throw new Error("Bad rectangle");
         return { w, page, ref };
       });
     } catch {
       kept.push(field.getName());
       continue;
     }
+    let drawn = 0;
     try {
-      for (const { w, page, ref } of plan) internals.flattenWidgetOntoPage(page, w, ref);
+      for (const { w, page, ref } of plan) {
+        internals.flattenWidgetOntoPage(page, w, ref);
+        drawn++;
+      }
     } catch {
-      // Something was drawn already: the drawn appearance wins, the field goes.
+      // Not expected after the checks above. Nothing drawn: the field stays fillable.
+      // Something drawn: the drawn appearance wins and the field goes (never both).
+      if (drawn === 0) {
+        kept.push(field.getName());
+        continue;
+      }
     }
     form.removeField(field);
   }
