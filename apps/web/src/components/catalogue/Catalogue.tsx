@@ -119,7 +119,7 @@ export function Catalogue() {
         <h2 id="tools-heading" className="text-2xl font-semibold sm:text-3xl">
           {copy.title}
         </h2>
-        <p className="text-sm text-fg-muted">{copy.summary(items.length, readyCount)}</p>
+        <p className="text-sm text-fg-muted tabular-nums">{copy.summary(items.length, readyCount)}</p>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -203,7 +203,7 @@ function CategorySection({ id, label, matches, searching }: { id: string; label:
         <h3 id={`cat-${id}-heading`} className="text-lg font-semibold sm:text-xl">
           {label}
         </h3>
-        <span className="text-sm text-fg-muted">{copy.groupCount(matches.length)}</span>
+        <span className="text-sm text-fg-muted tabular-nums">{copy.groupCount(matches.length)}</span>
       </div>
       <ul role="list" className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
         {matches.map((m) => (

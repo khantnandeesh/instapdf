@@ -1,10 +1,10 @@
 /*
  * InstaPDF design tokens (light + dark), on the Universal UI system:
  * neutral canvas/surface/raised grounds, hairlines, one accent family.
- * Source of truth: docs/specs/f1-shared-flow.md, "## UI" > "Design tokens".
+ * Source of truth: docs/design/universal-ui.md (token mapping, accent family, dark mode, contrast).
  * Raw values live in CSS custom properties; `@theme inline` exposes them as
  * Tailwind v4 utilities (bg-surface, text-fg-muted, ring-focus, duration-base, ...).
- * Contrast ratios for every text/background pair are listed in the spec.
+ * Contrast ratios for every text/background pair are listed in that document.
  * Dark mode follows the OS, and `data-theme="light|dark"` on <html> forces one.
  */
 
@@ -24,8 +24,9 @@
 
   /* Hairlines and edges */
   --ip-border: rgb(0 0 0 / 0.06); /* line: card rings, dividers */
-  --ip-field-line: rgb(0 0 0 / 0.15); /* edges of fields, chips and secondary buttons */
-  --ip-border-strong: rgb(0 0 0 / 0.42); /* control-line: switch and slider tracks, >= 3:1 on surface */
+  --ip-field-line: rgb(0 0 0 / 0.45); /* edges of fields, chips, secondary buttons: 3.3:1 on surface, 3.1:1 on canvas (WCAG 1.4.11) */
+  --ip-field-line-hover: rgb(0 0 0 / 0.58);
+  --ip-border-strong: rgb(0 0 0 / 0.48); /* control-line: switch and slider tracks, 3.7:1 on surface and canvas */
 
   /* Text */
   --ip-fg: #262628; /* text-strong, >= 13:1 */
@@ -66,7 +67,7 @@
 
   /* Elevation (Universal UI shadow roles) */
   --ip-shadow-sm: 0 0 0 1px rgb(0 0 0 / 0.06); /* card */
-  --ip-shadow-control: inset 0 0 0 1px rgb(0 0 0 / 0.15), 0 1px 2px rgb(0 0 0 / 0.04);
+  --ip-shadow-control: inset 0 0 0 1px var(--ip-field-line), 0 1px 2px rgb(0 0 0 / 0.04);
   --ip-shadow-md: 0 0 0 1px rgb(0 0 0 / 0.06), 0 4px 16px rgb(0 0 0 / 0.08); /* window */
   --ip-shadow-lg: 0 0 0 1px rgb(0 0 0 / 0.08), 0 4px 16px rgb(0 0 0 / 0.12), 0 12px 32px rgb(0 0 0 / 0.08); /* float */
   --ip-shadow-hero: 0 0 0 1px rgb(0 0 0 / 0.06), 0 30px 60px -12px rgb(50 50 93 / 0.25), 0 18px 36px -18px rgb(0 0 0 / 0.3);
@@ -106,8 +107,9 @@
   --ip-hover: rgb(255 255 255 / 0.05);
   --ip-pressed: rgb(255 255 255 / 0.13);
   --ip-border: rgb(255 255 255 / 0.08);
-  --ip-field-line: rgb(255 255 255 / 0.16);
-  --ip-border-strong: rgb(255 255 255 / 0.4);
+  --ip-field-line: rgb(255 255 255 / 0.38); /* 3.4:1 or more on every dark ground */
+  --ip-field-line-hover: rgb(255 255 255 / 0.52);
+  --ip-border-strong: rgb(255 255 255 / 0.42);
   --ip-fg: #ececee;
   --ip-fg-muted: #9d9da1; /* 5.6:1 or more on every dark ground */
   --ip-fg-disabled: #6c6c70;
@@ -139,7 +141,7 @@
   --ip-scrim: rgb(0 0 0 / 0.6);
   --ip-drop-overlay: rgb(17 33 33 / 0.94); /* canvas tinted 12% with the accent */
   --ip-shadow-sm: 0 0 0 1px rgb(255 255 255 / 0.06);
-  --ip-shadow-control: inset 0 0 0 1px rgb(255 255 255 / 0.16);
+  --ip-shadow-control: inset 0 0 0 1px var(--ip-field-line);
   --ip-shadow-md: 0 0 0 1px rgb(255 255 255 / 0.08), 0 4px 16px rgb(0 0 0 / 0.4);
   --ip-shadow-lg: 0 0 0 1px rgb(255 255 255 / 0.1), 0 4px 16px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.3);
   --ip-shadow-hero: 0 0 0 1px rgb(255 255 255 / 0.08), 0 30px 60px -12px rgb(0 0 0 / 0.6);
@@ -160,8 +162,9 @@
     --ip-hover: rgb(255 255 255 / 0.05);
     --ip-pressed: rgb(255 255 255 / 0.13);
     --ip-border: rgb(255 255 255 / 0.08);
-    --ip-field-line: rgb(255 255 255 / 0.16);
-    --ip-border-strong: rgb(255 255 255 / 0.4);
+    --ip-field-line: rgb(255 255 255 / 0.38); /* 3.4:1 or more on every dark ground */
+    --ip-field-line-hover: rgb(255 255 255 / 0.52);
+    --ip-border-strong: rgb(255 255 255 / 0.42);
     --ip-fg: #ececee;
     --ip-fg-muted: #9d9da1; /* 5.6:1 or more on every dark ground */
     --ip-fg-disabled: #6c6c70;
@@ -193,7 +196,7 @@
     --ip-scrim: rgb(0 0 0 / 0.6);
     --ip-drop-overlay: rgb(17 33 33 / 0.94); /* canvas tinted 12% with the accent */
     --ip-shadow-sm: 0 0 0 1px rgb(255 255 255 / 0.06);
-    --ip-shadow-control: inset 0 0 0 1px rgb(255 255 255 / 0.16);
+    --ip-shadow-control: inset 0 0 0 1px var(--ip-field-line);
     --ip-shadow-md: 0 0 0 1px rgb(255 255 255 / 0.08), 0 4px 16px rgb(0 0 0 / 0.4);
     --ip-shadow-lg: 0 0 0 1px rgb(255 255 255 / 0.1), 0 4px 16px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.3);
     --ip-shadow-hero: 0 0 0 1px rgb(255 255 255 / 0.08), 0 30px 60px -12px rgb(0 0 0 / 0.6);
@@ -233,6 +236,7 @@
   --color-hover: var(--ip-hover);
   --color-pressed: var(--ip-pressed);
   --color-field-line: var(--ip-field-line);
+  --color-field-line-hover: var(--ip-field-line-hover);
   --color-inverse: var(--ip-inverse);
   --color-on-inverse: var(--ip-on-inverse);
   --color-accent: var(--ip-accent);
@@ -268,9 +272,9 @@
   --color-background: var(--ip-bg);
   --color-foreground: var(--ip-fg);
 
-  /* Type: one system family (Universal UI). Sizes: xs ui-12, sm ui-13, base body 15,
+  /* Type: one family, Inter (self-hosted, next/font/local), on the system stack (Universal UI). Sizes: xs ui-12, sm ui-13, base body 15,
      lg lead 17, xl heading 20, 2xl page-title 24, 3xl title 28, 4xl display 40. */
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "SF Mono", "SFMono-Regular", ui-monospace, Consolas, monospace;
   --text-xs: 0.75rem;
   --text-xs--line-height: 1rem;

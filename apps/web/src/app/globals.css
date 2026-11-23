@@ -37,7 +37,7 @@
       box-shadow var(--ip-duration-fast) ease-out;
   }
   .ip-field:hover {
-    border-color: var(--ip-border-strong);
+    border-color: var(--ip-field-line-hover);
   }
   .ip-field:focus-visible {
     outline: none;
@@ -54,6 +54,7 @@
   /* Hover tint for opaque controls (secondary buttons, chips): ink-1 laid over the fill. */
   .ip-tint:hover {
     background-image: linear-gradient(var(--ip-hover), var(--ip-hover));
+    box-shadow: inset 0 0 0 1px var(--ip-field-line-hover);
   }
   .ip-tint:active {
     background-image: linear-gradient(var(--ip-pressed), var(--ip-pressed));

@@ -238,16 +238,9 @@ These run on `/rotate-pdf` like the others. The evaluator does not compare them 
 
 ## UI
 
-Designed 2026-11-23 by ux-designer. This section is the build contract for the shared flow. Every later tool reuses these components and only adds its own options panel, per-page actions and `process()`. The look is InstaPDF's own, built on the owner's Universal UI system (Lagoon teal accent on quiet warm-neutral grounds, system type, square page tiles, one control dock; re-themed 2026-11-23, see U-2). Do not use the reference screenshots as a visual guide; they are for behavior only.
+Designed 2026-11-23 by ux-designer. This section is the build contract for the shared flow. Every later tool reuses these components and only adds its own options panel, per-page actions and `process()`. The look is InstaPDF's own, built on the owner's Universal UI system (Lagoon teal accent on quiet warm-neutral grounds, system type, square page tiles, one control dock; re-themed 2026-11-23, see `docs/design/universal-ui.md`). Do not use the reference screenshots as a visual guide; they are for behavior only.
 
-> **Universal UI re-theme (2026-11-23, alternative branch `chore/universal-ui-alt`).** Token values, type, radius, shadows and motion now follow F1 U-2. Behavior, structure, ARIA and copy are unchanged. Where a component row below names an older visual, the re-theme wins:
-> - Cards (tool cards, workspace, dock, result, coming-soon panel) are `surface-raised` with the hairline `shadow-sm` ring, `rounded-xl`, no borders. Planned tool cards are a transparent ring on the canvas (no dashes) with a grey icon tile and a neutral "Coming soon" badge in `fg`; usable cards are filled, lift on hover and show the arrow in `primary-ink`.
-> - Accent text and icons use `primary-ink`; fills with white text use `primary`; marks (scope outline, current-page bar, progress, drop borders, field focus edge) use `accent`.
-> - Secondary buttons and chips: `surface-raised` + `shadow-control`, hover tint `hover`. Category and recent chips are pills. Fields: `field-line` edge, on focus an `accent` edge with a 3 px `primary-ring` halo.
-> - Notices: soft fill, `rounded-lg`, no coloured start border. Floating notices sit on `surface-overlay`. Menus and dialogs use `surface-overlay` (lighter than cards in dark); header and mobile dock use `chrome`.
-> - "Runs in your browser" icons are grey (`fg-muted`); green is kept for status (result check, privacy marks).
-> - Drop card: `surface-raised`, 2 px dashed `field-line`, a 64 px `primary-soft` circle with the file icon; hover turns the border `accent` with a `primary-faint` fill.
-> - Brand: a 22 px `primary` rounded square with a page glyph before the "InstaPDF" wordmark (`base` 600).
+> **Design system:** all visual values (tokens, accent family, dark mode, Inter type, shape, motion, contrast) live in [`docs/design/universal-ui.md`](../design/universal-ui.md); where this section names an older visual, that document wins.
 
 ### U-1. Design principles for this flow
 
@@ -260,69 +253,11 @@ Designed 2026-11-23 by ux-designer. This section is the build contract for the s
 
 The tokens existed only as two colors, so this feature defines the full set. Implemented in `apps/web/src/styles/tokens.css` (imported by `apps/web/src/app/globals.css`) as `--ip-*` CSS custom properties and exposed to Tailwind v4 through `@theme inline`. Use the Tailwind utilities (`bg-surface-raised`, `text-fg-muted`, `bg-primary text-on-primary`, `outline-focus`, `shadow-paper`, `rounded-lg` ...) and never raw hex values in components.
 
-**Theme switching.** Dark follows `prefers-color-scheme`. `data-theme="light"` or `"dark"` on `<html>` forces one (no toggle UI in F1). PDF pages stay white (`--ip-paper`) in both themes; in dark they get a light hairline ring and `--ip-paper-filter: brightness(0.86)` so a grid of white pages does not glare (white on `surface` drops from 17.4:1 to 12.5:1). Hovering or focusing a tile, and the preview dialog, show the page at full brightness.
-
-**System.** Values follow the owner's Universal UI tokens. Grounds step by role: `canvas` (page) → `surface` (cards, dock, workspace, fields) → `raised` (menus, dialogs, floating notices). On dark, depth comes from those lighter steps and hairlines, not from bigger shadows. The accent is spent on the thing being acted on (primary button, current page, selected scope, progress, focus); everything else stays gray. To re-brand, change only the accent family together (`accent`, `primary`, `primary-hover`, `primary-active`, `primary-ink`, `primary-soft`, `primary-faint`, `primary-ring`, `focus`, and the tint in `drop-overlay`), keeping the contrast targets below.
-
-**Color (light / dark)**
-
-| Token (`--ip-*`) | Universal UI role | Light | Dark | Use |
-|---|---|---|---|---|
-| `bg` | canvas | `#F6F5F4` | `#111113` | page ground |
-| `surface` | canvas | `#F6F5F4` | `#111113` | secondary ground: footer, planned-tool cards |
-| `surface-raised` | surface | `#FFFFFF` | `#1A1A1D` | cards, workspace, dock, fields, secondary buttons |
-| `surface-overlay` | raised | `#FFFFFF` | `#26262A` | menus, dialogs, floating notices, tile action bar |
-| `chrome` | chrome | `#FFFFFF` | `#1D1D20` | header, mobile dock bar |
-| `well` | well | `#EFEEEC` | `#0A0A0B` | sunken backdrop behind a framed page (result preview, file cards) |
-| `surface-sunken` | ink-2 | `rgb(0 0 0/.06)` | `rgb(255 255 255/.07)` | tracks, neutral badge, placeholders, disabled fill |
-| `hover` / `pressed` | ink-1 / ink-4 | `.04` / `.10` black | `.05` / `.13` white | hover and pressed tints |
-| `border` | line | `rgb(0 0 0/.06)` | `rgb(255 255 255/.08)` | hairlines, card rings (decorative) |
-| `field-line` | field-line | `rgb(0 0 0/.15)` | `rgb(255 255 255/.16)` | edges of fields, chips, secondary buttons (decorative: label, icon and fill identify them) |
-| `border-strong` | control-line | `rgb(0 0 0/.42)` | `rgb(255 255 255/.40)` | switch and slider tracks (≥ 3:1) |
-| `fg` | text-strong | `#262628` | `#ECECEE` | body text, titles, neutral badge words |
-| `fg-muted` | text | `#707074` | `#9D9DA1` | labels, descriptions, meta, icons |
-| `fg-disabled` | text-faint | `#9A9A9D` | `#6C6C70` | placeholders/disabled only (exempt) |
-| `paper` / `paper-filter` | – | `#FFFFFF` / none | `#FFFFFF` / `brightness(.86)` | PDF pages |
-| `inverse` / `on-inverse` | inverse | `#262628` / `#FFFFFF` | `#ECECEE` / `#111113` | tooltips |
-| `accent` | accent | `#0D9488` | `#0D9488` | progress, scope outline, current-page bar, field focus edge |
-| `primary` / `-hover` / `-active` | accent-strong / accent-hover | `#0C8378` / `#0B736A` / `#0A655D` | same | fills with white text (primary button, switch on, scope check) |
-| `on-primary` | on-accent | `#FFFFFF` | `#FFFFFF` | text on primary |
-| `primary-ink` (= `on-primary-soft`) | accent-ink | `#0A746B` | `#4CB0A7` | links, accent icons, beta badge, rotation badge |
-| `primary-soft` / `-faint` / `-ring` | accent-soft / -faint / -ring | teal at .12 / .06 / .30 | teal at .20 / .10 / .35 | selected fills, drop hover, field focus halo |
-| `focus` | focus | `#0D9488` | `#0D9488` | 2 px focus outline, 2 px offset |
-| `danger` / `danger-strong` / `danger-soft` | danger-text / danger-strong / danger-soft | `#B91C1C` / `#B91C1C` / red .10 | `#F87171` / `#B91C1C` / red .16 | error words and edges / destructive fill / error notice |
-| `success` / `success-soft` | success-text / -soft | `#15803D` / green .12 | `#4ADE80` / green .16 | result check, privacy marks |
-| `warning` / `warning-soft` | warning-text / -soft | `#B45309` / amber .14 | `#FBBF24` / amber .18 | limit notices |
-| `scrim` | – | `rgb(17 17 19/.45)` | `rgb(0 0 0/.6)` | dialog and menu backdrop |
-| `drop-overlay` | – | `rgb(227 237 235/.94)` | `rgb(17 33 33/.94)` | drag-over overlay (canvas tinted with the accent) |
-
-**Measured contrast (WCAG 2.1; alpha tokens composited on the ground named)**
-
-| Pair | Light | Dark |
-|---|---|---|
-| `fg` on canvas / surface / raised / chrome | 13.9 / 15.1 / 15.1 / 15.1 | 16.0 / 14.7 / 12.8 / 14.3 |
-| `fg-muted` on canvas / surface / raised / chrome | 4.53 / 4.9 / 4.9 / 4.9 | 7.0 / 6.4 / 5.6 / 6.2 |
-| `fg` on `surface-sunken` (neutral badge) over canvas | 12.2 | 13.5 |
-| `on-primary` on `primary` / `primary-hover` | 4.6 / 5.7 | 4.6 / 5.7 |
-| `primary-ink` on canvas / surface / raised | 5.2 / 5.6 / 5.6 | 7.3 / 6.7 / 5.8 |
-| `primary-ink` on `primary-soft` over surface / raised | 4.9 / 4.9 | 5.2 / 4.5 |
-| `danger` on surface / `danger-soft`; white on `danger-strong` | 6.5 / 5.7; 6.5 | 6.3 / 5.3; 6.5 |
-| `success` on surface / `success-soft` | 5.0 / 4.5 | 10.0 / 7.6 |
-| `warning` on surface / `warning-soft` | 5.0 / 4.5 | 10.4 / 7.4 |
-| `border-strong` on surface (non-text, 3:1) | 3.0 | 3.8 |
-| `focus` on canvas / surface / raised / chrome (non-text, 3:1) | 3.4 / 3.7 / 3.7 / 3.7 | 5.0 / 4.6 / 4.0 / 4.5 |
-
-Rule: `fg-muted` never sits on `surface-sunken` or `well` (it would dip under 4.5:1); neutral badges use `fg`. Soft tones are translucent, so anything floating (notice stack, tile badges) sits on an opaque `surface-overlay` first. Selected and error states always add a non-color cue (icon, outline, text).
-
-**Type.** One system family, `system-ui, -apple-system, "Segoe UI", sans-serif` (no web font: zero font bytes, no swap shift); mono `"SF Mono", ui-monospace, Consolas, monospace` for code only. Scale (Universal UI): `xs` 12/16 (ui-12), `sm` 13/20 (ui-13: buttons, labels, captions), `base` 15/1.55 (body; card and dialog titles at 600), `lg` 17/1.5 (lead text, result filename), `xl` 20/1.3 (heading), `2xl` 24/1.25 −0.01em (page title), `3xl` 28/1.2 −0.01em (section title), `4xl` 40/1.15 −0.02em (display; the home hero grows to 52 px at ≥ 1024). Text fields use 16 px below 640 px so iOS does not zoom. Weights: 400 body, 500 labels and buttons, 600 titles. Changing numbers use `tabular-nums`.
+Values, the token mapping, dark mode, type and the measured contrast table: see [`docs/design/universal-ui.md`](../design/universal-ui.md) (single source of truth).
 
 **Spacing.** Tailwind's 4 px scale. Flow rhythm: 4 / 8 / 12 / 16 / 24 / 32 / 48. Page gutters: 16 (≤ 639), 24 (640–1023), 32 (≥ 1024). Grid gap 16 (12 below 640).
 
-**Radius.** By role: `sm` 6 (menu rows, segment thumbs, small chips), `md` 8 (buttons, fields, segmented track), `lg` 10 (notices, tiles, wells), `xl` 12 (cards, workspace, dock, dialogs, result card), `2xl` 16 (marketing panels). Pill (`rounded-full`) for badges, category chips, recent chips, switches and the progress track.
-
-**Elevation.** One shadow per role: `shadow-sm` = card (a 1 px hairline ring, no blur) for cards, workspace and dock; `shadow-control` for secondary buttons and chips; `shadow-md` = window for hovered cards, the mobile dock and floating bars; `shadow-lg` = float for the menu panel and notices; `shadow-hero` for dialogs; `shadow-paper` the page itself (hairline + 1 px blur; a lighter ring in dark).
-
-**Motion.** `--ip-duration-instant` 80 ms (press), `-fast` 120 ms (hover, toggles), `-base` 150 ms (rotation, crossfades, page dim), `-slow` 240 ms (result check mark). `--ease-out` `cubic-bezier(.25,.8,.25,1)` for things that appear, `--ease-in-out` `cubic-bezier(.45,0,.1,1)` for things that move. Under `prefers-reduced-motion: reduce` every duration is 0 ms. Animate only `opacity`, `transform` and `filter` (no layout work, no CLS).
+**Radius, elevation, motion.** See [`docs/design/universal-ui.md`](../design/universal-ui.md).
 
 **Layout metrics.** `--ip-header-h` 56 px, `--ip-dock-w` 320 px, `--ip-dock-h` 128 px (< 640), `--ip-dock-h-md` 76 px (640–1023), `--ip-thumb-size` 160 px default, `--ip-tap-min` 44 px (every touch target is at least 44×44 px, including icon buttons).
 
@@ -644,7 +579,7 @@ The UI needs these per tool (names are a proposal; the engineer owns the type): 
 ### U-10. Performance and no-shift checklist
 
 - Route JS: `ToolFlow`, primitives and Rotate options only. **pdf.js and pdf-lib are loaded with `import()`** on first intake (prefetched on hover/focus of the picker), and processing runs in a Web Worker. No UI libraries, no animation library, no icon package; icons are inline SVG.
-- Fonts: the system stack (no web font, so no font request and no font-swap shift).
+- Fonts: Inter, self-hosted via `next/font/local` (one preloaded latin woff2, `swap`, metric-adjusted fallback, so no third-party request and no swap shift).
 - Fixed boxes: tiles (square), placeholders (page aspect from viewport), file cards, preview box (240/200 square), dock (fixed or sticky with constant height per breakpoint), progress (same box as primary), password error line (reserved), toolbar (52 px constant even when the toggle is hidden).
 - Floating, never in-flow: notices, drop overlay, dialogs, tooltips, page action bar.
 - Thumbnail rendering: DPR-aware but capped at 2×; size = current `--ip-thumb-size`; re-render only after the slider stops (debounce 150 ms), with CSS scaling in between.
