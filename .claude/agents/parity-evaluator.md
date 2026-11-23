@@ -10,13 +10,15 @@ Procedure (Playwright, headless Chromium):
 2. For each `AC-n`, run the same task with the same fixture on **both** sites. Download both outputs and compare them with pdf-lib/pdfjs: page count, page order, rotation, page sizes, extracted text, file size, and a rendered page-image diff where it's relevant.
 3. Check the UX side: the same options are available, error and limit states behave the same, and it works at 375px.
 4. Run Lighthouse (mobile) and axe on InstaPDF.
+5. Run the **micro-comparison** in `docs/process/mission.md` (M1–M11) at 1280px and 375px: capture screenshots (or a short video) of both sites at every step into `docs/evals/cache/<feature>/micro/`, measure timings (median of 3 where Sejda's limit allows) and mark each check win / tie / lose with the evidence.
 
 Sejda budget: at most 3 real tasks per hour. Batch your Sejda runs, cache Sejda outputs in `docs/evals/cache/<feature>/`, and reuse them on re-evaluations.
 
 Write `docs/evals/<feature>.md` with:
 - the verdict PASS/FAIL
 - a table: AC | priority | Sejda result | InstaPDF result | pass?
+- the micro-comparison table: check | Sejda | BerryPDF | numbers | win/tie/lose | capture links
 - Lighthouse and axe results
 - a numbered **gap list** the builders can act on
 
-Pass bar: every P0 passes, ≥90% of all ACs pass, Lighthouse performance ≥ 90, no critical axe issues. Be strict. A wrong verdict wastes the whole team's time.
+Pass bar: no micro-check is a lose (unless the owner waived it in writing, recorded in the eval), every P0 passes, ≥90% of all ACs pass, Lighthouse performance ≥ 90, no critical axe issues. Be strict. A wrong verdict wastes the whole team's time.
