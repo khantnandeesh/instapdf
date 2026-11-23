@@ -1,0 +1,71 @@
+name: Deploy prod
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  REGION: us-central1
+  SERVICE: web-prod
+  IMAGE: us-central1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/instapdf/web:${{ github.sha }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      # Promote the exact image staging ran for this commit; build only if missing.
+      - name: Reuse staging image or build
+        run: |
+          if gcloud artifacts docker images describe "$IMAGE" >/dev/null 2>&1; then
+            echo "Reusing existing image $IMAGE"
+          else
+            echo "No image for ${GITHUB_SHA}; building"
+            docker build -f apps/web/Dockerfile -t "$IMAGE" .
+            docker push "$IMAGE"
+          fi
+
+      # New revision gets 0% traffic and a "candidate" URL until it passes.
+      - name: Deploy candidate revision (no traffic)
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --image "$IMAGE" \
+            --region "$REGION" \
+            --no-traffic \
+            --tag candidate \
+            --quiet
+
+      - name: Smoke test candidate
+        run: |
+          url="$(gcloud run services describe "$SERVICE" --region "$REGION" --format=json \
+            | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')"
+          .github/scripts/smoke-test.sh "$url"
+
+      - name: Shift 100% traffic to the new revision
+        run: gcloud run services update-traffic "$SERVICE" --region "$REGION" --to-latest --quiet
+
+      - name: Smoke test live URL
+        run: |
+          url="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
+          .github/scripts/smoke-test.sh "$url"
