@@ -45,10 +45,10 @@ export default function PrivacyPage() {
           and loading scripts, images or frames from elsewhere).
         </p>
         <Sub title="Check it yourself">
-          <ol className="list-decimal space-y-1.5 ps-6 marker:text-fg-muted">
+          <ol className="list-decimal space-y-1.5 ps-6 marker:text-muted">
             <li>
               Open your browser&apos;s developer tools (usually <kbd className="font-mono text-[0.9em]">F12</kbd>, or right-click and choose Inspect) and go to
-              the <strong className="font-semibold text-fg">Network</strong> tab.
+              the <strong className="font-bold text-ink">Network</strong> tab.
             </li>
             <li>
               Open a tool, for example <TextLink href="/rotate-pdf">Rotate</TextLink>, add a PDF, process it and download the result. You will see the page&apos;s own
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
         <p>
           To show the tools you used recently, your browser keeps a list of up to {f.recentMax} tool names in its local storage under the key{" "}
           <Code>{f.recentKey}</Code>. It holds only tool names, never file names or contents, and it never leaves your device. You can clear it with the{" "}
-          <strong className="font-semibold text-fg">Clear</strong> button next to &quot;Recently used&quot; on the home page or in the All tools menu, or by
+          <strong className="font-bold text-ink">Clear</strong> button next to &quot;Recently used&quot; on the home page or in the All tools menu, or by
           clearing this site&apos;s data in your browser settings. Details are in the <TextLink href="/cookies">cookie notice</TextLink>.
         </p>
       </Section>

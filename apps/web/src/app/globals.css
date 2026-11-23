@@ -598,6 +598,7 @@
   }
   .mp-callout a {
     color: var(--brand-strong);
+    text-decoration: underline;
   }
 
   /* ---- Progress (3px line fixed to the top of the viewport) --------------------------------- */
@@ -682,8 +683,19 @@
   .mp-prose p {
     margin: 0 0 24px;
   }
+  .mp-prose ul,
+  .mp-prose ol,
+  .mp-prose table {
+    margin: 0 0 24px;
+  }
+  /* Underlined: mint vs #555 body is only 1.51:1, so colour alone would not mark a link (WCAG 1.4.1). */
   .mp-prose a {
     color: var(--brand-strong);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .mp-prose a:hover {
+    text-decoration-thickness: 2px;
   }
   .mp-prose em {
     font-size: 14px;

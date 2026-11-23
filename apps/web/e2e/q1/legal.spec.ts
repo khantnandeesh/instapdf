@@ -47,7 +47,7 @@ test.describe("server HTML", () => {
 
   test("/licenses lists the real dependency tree, fonts and icons; full texts are served", async ({ request }) => {
     const html = await (await request.get("/licenses")).text();
-    for (const name of ["pdfjs-dist", "@cantoo/pdf-lib", "pdf-lib", "react", "next", "fflate", "Geist (font)", "Lucide icons"]) expect(html, name).toContain(name);
+    for (const name of ["pdfjs-dist", "@cantoo/pdf-lib", "pdf-lib", "react", "next", "fflate", "@fontsource/atkinson-hyperlegible", "Lucide icons"]) expect(html, name).toContain(name);
     expect(html).toContain("OFL-1.1");
     expect(html).toContain("Cole Bemis"); // Feather (MIT) copyright, carried with the Lucide icons
     expect(html).not.toMatch(/data-license="[^"]*GPL/);
