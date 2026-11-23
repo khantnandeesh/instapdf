@@ -10,8 +10,8 @@ import { Contact, Fill, LegalPage, List, Section, Summary, TextLink } from "@/co
 import { legalFacts as f } from "@/components/legal/facts";
 
 export const metadata: Metadata = {
-  title: "Terms of use · InstaPDF",
-  description: "The terms for using InstaPDF's free PDF tools, in plain language.",
+  title: "Terms of use · BerryPDF",
+  description: "The terms for using BerryPDF's free PDF tools, in plain language.",
 };
 
 export default function TermsPage() {
@@ -20,13 +20,13 @@ export default function TermsPage() {
       title="Terms of use"
       intro={
         <p>
-          These terms are the agreement between you and <Fill>Company name</Fill> (&quot;we&quot;) for using InstaPDF. By using the site you accept them. We have
+          These terms are the agreement between you and <Fill>Company name</Fill> (&quot;we&quot;) for using BerryPDF. By using the site you accept them. We have
           tried to keep them short and readable.
         </p>
       }
     >
       <Summary>
-        <li>InstaPDF is free to use and needs no account.</li>
+        <li>BerryPDF is free to use and needs no account.</li>
         <li>Your files stay yours. Browser tools never upload them.</li>
         <li>Only process files you have the right to use, and don&apos;t misuse the service.</li>
         <li>We work hard to get results right, but check important documents before you rely on them.</li>
@@ -34,7 +34,7 @@ export default function TermsPage() {
 
       <Section id="service" title="The service">
         <p>
-          InstaPDF is a set of online tools for working with PDF files. Most tools run entirely in your browser, as explained in our{" "}
+          BerryPDF is a set of online tools for working with PDF files. Most tools run entirely in your browser, as explained in our{" "}
           <TextLink href="/privacy">privacy policy</TextLink>. Some tools are marked &quot;coming soon&quot; and are not available yet. We may add, change or remove
           tools, and the service may sometimes be unavailable, for example during maintenance.
         </p>
@@ -51,7 +51,7 @@ export default function TermsPage() {
       <Section id="use" title="Acceptable use">
         <p>Please don&apos;t:</p>
         <List>
-          <li>use InstaPDF to break the law or to infringe anyone else&apos;s rights, including copyright and privacy;</li>
+          <li>use BerryPDF to break the law or to infringe anyone else&apos;s rights, including copyright and privacy;</li>
           <li>try to disrupt, overload or break the service, or get around its limits or security measures;</li>
           <li>use automated means to send large volumes of requests to the service;</li>
           <li>copy or resell the service itself, or pretend to be us.</li>
@@ -61,14 +61,14 @@ export default function TermsPage() {
 
       <Section id="ours" title="Our site and open-source software">
         <p>
-          The InstaPDF name, design and text belong to us. InstaPDF is built with open-source software, fonts and icons, each used under its own license. The{" "}
+          The BerryPDF name, design and text belong to us. BerryPDF is built with open-source software, fonts and icons, each used under its own license. The{" "}
           <TextLink href="/licenses">open-source licenses</TextLink> page lists them, and nothing in these terms limits your rights under those licenses.
         </p>
       </Section>
 
       <Section id="warranty" title="No guarantee">
         <p>
-          We provide InstaPDF free of charge and &quot;as is&quot;. PDF files vary a great deal, and although we test our tools carefully we can&apos;t promise that
+          We provide BerryPDF free of charge and &quot;as is&quot;. PDF files vary a great deal, and although we test our tools carefully we can&apos;t promise that
           every result will be perfect or that the service will always be available. Keep your original files, and check results before you rely on them,
           especially for legal, financial or other important documents.
         </p>
@@ -77,7 +77,7 @@ export default function TermsPage() {
       <Section id="liability" title="Limits on our liability">
         <p>
           To the extent the law allows, we are not liable for indirect or consequential losses, or for loss of data, profits or business, arising from your use of
-          InstaPDF. Nothing in these terms limits liability that cannot legally be limited, or takes away rights you have as a consumer under the law where you
+          BerryPDF. Nothing in these terms limits liability that cannot legally be limited, or takes away rights you have as a consumer under the law where you
           live.
         </p>
       </Section>
@@ -85,7 +85,7 @@ export default function TermsPage() {
       <Section id="changes" title="Changes to these terms">
         <p>
           We may update these terms, for example when new kinds of tools launch. We will post the new version here and change the date at the top. If you keep
-          using InstaPDF after that, the new terms apply.
+          using BerryPDF after that, the new terms apply.
         </p>
       </Section>
 

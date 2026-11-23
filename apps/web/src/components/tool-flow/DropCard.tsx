@@ -1,13 +1,23 @@
 import type { ReactNode } from "react";
+import { Floaties, Sticker } from "../berry/Berry";
 
 /**
- * Empty state, Mint Paper Tool page: a pale grey band holding only the large upload button and
- * a few lines of small muted reassurance (privacy, limits). The whole page is the drop target.
+ * Empty state, before any file: BerryPDF's floating-berry EmptyState on the grid paper (the only
+ * background). Small pale berries and blossoms float at different depths around a white
+ * leaf-cornered card (white surfaces stay solid, so the grid never runs behind the words) that
+ * holds only the large upload button and two or three short muted lines (drop hint, limits, privacy).
+ * The card pops in, then its outline breathes gently (mp-dropcard) to invite a drop.
+ * The whole page stays the drop target. The decoration is aria-hidden, ignores the pointer and
+ * never takes focus.
  */
 export function DropCard({ children }: { children: ReactNode }) {
   return (
-    <div className="grid min-h-[280px] place-items-center bg-band px-[15px] py-[50px] text-center lg:min-h-[420px]">
-      <div className="flex max-w-md flex-col items-center gap-3">{children}</div>
+    <div className="mp-empty grid min-h-[300px] place-items-center px-[15px] py-10 lg:min-h-[440px]" data-testid="drop-card">
+      <Floaties set="empty" />
+      <div className="mp-empty__in mp-dropcard relative w-full max-w-[440px] rounded-[16px_16px_28px_16px] border-[1.5px] border-sand bg-surface-raised px-6 pt-9 pb-8 shadow-card">
+        <Sticker kind="blossom" size={34} className="mp-sticker--tilt-r absolute -top-4 -right-3" />
+        <div className="flex flex-col items-center gap-3">{children}</div>
+      </div>
     </div>
   );
 }

@@ -110,9 +110,10 @@ export function Dialog({
         variant === "fullscreen"
           ? "mp-modal-in m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto overscroll-contain border-0 bg-surface-raised p-0 text-ink backdrop:bg-transparent"
           : cx(
-              // Mint Paper Modal: white, radius-md, 24px padding, scales in from 0.96 over 0.3s.
-              "mp-modal-in m-auto max-h-[calc(100dvh-32px)] rounded-md bg-surface-raised p-0 text-ink shadow-menu backdrop:bg-scrim",
-              wide ? "w-[min(880px,calc(100vw-32px))]" : "w-[min(440px,calc(100vw-32px))]",
+              // BerryPDF Modal: 380px, 24px corners with a 40px leaf corner, a pale-pink wave across the top,
+              // one deep soft shadow on a blurred berry-tinted backdrop; rises 14px and pops in (0.3s overshoot).
+              "mp-modal m-auto max-h-[calc(100dvh-32px)] p-0",
+              wide ? "w-[min(880px,calc(100vw-32px))]" : "w-[min(380px,calc(100vw-32px))]",
             ),
         className,
       )}
@@ -126,23 +127,23 @@ export function Dialog({
         </>
       )}
       {open && variant === "default" && (
-        <div className="flex flex-col gap-5 p-6">
-          <div className="flex min-w-0 items-start gap-3">
-            {icon && <span className="mt-0.5 shrink-0 text-muted">{icon}</span>}
-            <div className="min-w-0 flex-1">
-              <h2 id={titleId} className="text-card-heading break-words">
-                {title}
-              </h2>
-              {description && (
-                <div id={descId} className="mt-2 text-muted">
-                  {description}
-                </div>
-              )}
-            </div>
+        <div className="flex flex-col gap-5 px-7 pt-[34px] pb-[26px]">
+          <div className="min-w-0 text-center">
+            {/* One icon says what the dialog is about: berry duotone in a white circle with a pink ring, on the wave. */}
+            {icon && <span className="mp-modal__icon">{icon}</span>}
+            <h2 id={titleId} className="text-card-heading break-words text-ink-black">
+              {title}
+            </h2>
+            {description && (
+              <div id={descId} className="mt-2 leading-[1.45] text-muted">
+                {description}
+              </div>
+            )}
           </div>
           {children}
-          {/* Mint Paper: primary + ghost, left-aligned (primary first; DOM order, and so Tab order, unchanged). */}
-          {footer && <div className="flex flex-col-reverse gap-2.5 min-[400px]:flex-row-reverse min-[400px]:justify-end">{footer}</div>}
+          {/* BerryPDF: equal-width buttons, the quiet one on the left and the filled one on the right (DOM order = Tab order).
+              Below 640px they stack full width (filled one last), so three buttons never overflow a phone. */}
+          {footer && <div className="grid grid-cols-1 gap-3 sm:auto-cols-fr sm:grid-flow-col sm:grid-cols-none [&>*]:px-2.5" data-testid="dialog-footer">{footer}</div>}
         </div>
       )}
     </dialog>

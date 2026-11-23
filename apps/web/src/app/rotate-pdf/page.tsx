@@ -6,7 +6,7 @@ import { flowTool } from "@/tools/registry";
 const tool = flowTool("rotate-pdf");
 
 export const metadata: Metadata = {
-  title: `${tool.flow.title} · InstaPDF`,
+  title: `${tool.flow.title} · BerryPDF`,
   description: `${tool.summary}. Runs in your browser; your files are never uploaded.`,
 };
 

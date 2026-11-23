@@ -8,7 +8,7 @@ export type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "ari
   size?: "sm" | "md";
   pressed?: boolean;
   tooltip?: boolean;
-  /** "soft" (default for raised/secondary): Mint Paper's 30px round soft icon button. "ghost": no fill, round halo on hover. */
+  /** "soft" (default for raised/secondary): BerryPDF's 34px round pink icon button (shrinks to 0.92 when pressed). "ghost": no fill, a milk-pink round halo on hover. */
   variant?: "ghost" | "secondary" | "raised" | "soft";
 };
 
@@ -30,7 +30,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       className={cx(
         "group/ib mp-iconbtn",
         plain && "mp-iconbtn--plain",
-        plain && size === "sm" && "size-[30px]",
+        plain && size === "sm" && "size-[34px]",
         /\babsolute\b/.test(className ?? "") ? className : cx("relative", className),
       )}
       {...rest}

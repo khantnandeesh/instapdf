@@ -81,7 +81,7 @@ export function PageThumb({ fileId, index, className }: { fileId: string; index:
           cancel = null;
           have = true;
           canvas.dataset.size = String(renderSize);
-          canvas.className = "ip-fade-in block h-full w-full";
+          canvas.className = "mp-thumb-in block h-full w-full";
           el.replaceChildren(canvas);
           setRendered(true);
         });

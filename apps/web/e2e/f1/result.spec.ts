@@ -41,13 +41,13 @@ test("AC-41: the result screen's Download gives three-pages.pdf, a valid PDF", a
   expect(await pageCountOf(out.bytes)).toBe(3);
 });
 
-test("AC-42: two inputs give instapdf-rotate.zip with both PDFs, original names, 3 and 60 pages, rotated as chosen", async ({ page }) => {
+test("AC-42: two inputs give berrypdf-rotate.zip with both PDFs, original names, 3 and 60 pages, rotated as chosen", async ({ page }) => {
   await pickReady(page, "three-pages.pdf", "sixty-pages.pdf");
   await scope(page, "Odd").click();
   await rotateRight(page).click();
   await run(page);
   const out = await downloadResult(page);
-  expect(out.name).toBe("instapdf-rotate.zip");
+  expect(out.name).toBe("berrypdf-rotate.zip");
   const entries = unzip(out.bytes);
   expect(Object.keys(entries)).toEqual(["three-pages.pdf", "sixty-pages.pdf"]);
   expect(await pageCountOf(entries["three-pages.pdf"])).toBe(3);
@@ -290,7 +290,7 @@ test("AC-56: Share sends exactly the output File when supported", async ({ page 
   await run(page);
   await page.getByRole("button", { name: "Share" }).click();
   const zipShared = await page.evaluate(() => (navigator as Navigator & { __shared?: { name: string; type: string }[][] }).__shared!.at(-1));
-  expect(zipShared?.map((f) => [f.name, f.type])).toEqual([["instapdf-rotate.zip", "application/zip"]]);
+  expect(zipShared?.map((f) => [f.name, f.type])).toEqual([["berrypdf-rotate.zip", "application/zip"]]);
 });
 
 test("AC-56: no Share control when canShare returns false or the API is missing", async ({ page }) => {

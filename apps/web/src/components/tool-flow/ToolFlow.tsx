@@ -8,7 +8,8 @@ import { disposeWorker } from "@/lib/pdf/worker-client";
 import { acceptAttribute, fitsPageBudget, screenFiles } from "@/lib/pdf/validation";
 import { continueTargets, type FlowTool } from "@/tools/registry";
 import { Button } from "../ui/Button";
-import { PlusIcon } from "../ui/icons";
+import { BerryLoader } from "../berry/Berry";
+import { PlusIcon, UploadIcon } from "../ui/icons";
 import { LiveRegion } from "../ui/LiveRegion";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { Slider } from "../ui/Slider";
@@ -517,7 +518,6 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
   const ctx: FlowContext = { files, readyFiles, state, disabled: optionsDisabled, announce };
   const decorate = decoratePage ?? (() => ({ pendingDelta: 0, inScope: false }));
   const previewFile = preview ? readyFiles.find((f) => f.id === preview.fileId) : undefined;
-  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
   const accept = acceptAttribute(flow.accept);
   const ownerFile = ownerFor ? readyFiles.find((f) => f.id === ownerFor) : undefined;
 
@@ -531,7 +531,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
     <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" style={thumbSize === THUMB_DEFAULT ? undefined : { ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
       <DropOverlay active={dragging && acceptsDrop} mode={flow.multiFile || files.length === 0 ? "add" : "replace"} />
       <LiveRegion message={message} />
-      <ToolIntro ref={heading} title={flow.title} summary={tool.summary} />
+      <ToolIntro ref={heading} title={flow.title} />
 
       {state === "done" && output ? (
         <ResultCard
@@ -553,19 +553,22 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
                   accept={accept}
                   multiple={flow.multiFile}
                   label={copy.pickerButton(flow.multiFile)}
+                  icon={<UploadIcon size={24} />}
                   onFiles={(f, t) => void intake(f, t)}
                   inputTestId="file-input"
                 />
-                <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copy.pickerHint(isMac)}</p>
-                <LimitsNote text={copy.limits(flow)} />
+                <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copy.pickerHint}</p>
+                <LimitsNote text={copy.limits(flow)} full={copy.limitsFull(flow)} />
                 <PrivacyNote runtime={tool.runtime} context="intro" />
               </DropCard>
             ) : (
-              <>
-                {/* Working mode: a sticky row of editing tools (EditorToolbar look). */}
-                <div className="sticky top-(--ip-header-h) z-10 flex h-[60px] items-center gap-4 bg-surface-raised">
+              // BerryPDF working mode: plain seed-cream, no decoration. A sticky row of editing tools
+              // (blueberry EditorToolbar look, Tabs for the view) above the pink page trays.
+              <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 sm:px-5">
+                <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] items-center gap-4 rounded-t-panel bg-cream px-3 sm:-mx-5 sm:px-5">
                   {files.length > 1 && (
                     <SegmentedControl
+                      look="tabs"
                       label="View"
                       value={view}
                       onChange={setViewChoice}
@@ -636,7 +639,19 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
                     />
                   </ThumbContext.Provider>
                 </div>
-              </>
+                {state === "processing" && (
+                  // A full wait: the berry loader over the dimmed pages, kept in view while scrolling.
+                  // Decorative; the dock's progress bar and status carry the state for assistive tech.
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[11]" data-testid="processing-loader">
+                    <div className="sticky top-[calc(var(--ip-header-h)+120px)] flex justify-center pt-16">
+                      <div className="mp-loading rounded-panel border-[1.5px] border-sand bg-surface-raised px-8 pt-5 pb-4 shadow-card">
+                        <BerryLoader size="md" />
+                        <span className="tabular-nums">{copy.progress(flow.progressLabel, Math.round(progress * 100))}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </section>
 

@@ -9,8 +9,9 @@ export const metadata: Metadata = {
 };
 
 /**
- * Home: hero and the tool catalogue (spec docs/specs/f2-home.md), on Mint Paper's Home template:
- * white hero, then the sand wash holding the whole catalogue. Static.
+ * Home: hero and the tool catalogue (spec docs/specs/f2-home.md), on BerryPDF's Home template:
+ * everything on grid paper (the only background): the hero with floating berries, then (by spacing
+ * only) the catalogue grouped under coloured eyebrows. Static.
  */
 export default function Home() {
   return (

@@ -51,7 +51,7 @@ test("AC-50: unknown slugs, near-miss tool slugs and nested paths are all 404 wi
     expect(res.status(), path).toBe(404);
     const html = await res.text();
     expect(html, path).toContain('href="/#tools"');
-    expect(html, path).toContain("InstaPDF home");
+    expect(html, path).toContain("BerryPDF home");
   }
 });
 
@@ -81,7 +81,7 @@ test("AC-52: every page has the footer links and the current year; each link ret
       await expect(link, `${path} ${name}`).toBeVisible();
       if (path === "/") expect((await request.get((await link.getAttribute("href"))!)).status(), name).toBe(200);
     }
-    await expect(footer, path).toContainText(`© ${year} InstaPDF`);
+    await expect(footer, path).toContainText(`© ${year} BerryPDF`);
   }
 });
 

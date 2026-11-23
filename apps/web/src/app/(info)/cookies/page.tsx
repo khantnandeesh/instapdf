@@ -10,15 +10,15 @@ import { Code, Fill, LegalPage, Section, Summary, TextLink } from "@/components/
 import { legalFacts as f } from "@/components/legal/facts";
 
 export const metadata: Metadata = {
-  title: "Cookies · InstaPDF",
-  description: "InstaPDF sets no cookies. It keeps a short list of recently used tools in your browser, and you can clear it.",
+  title: "Cookies · BerryPDF",
+  description: "BerryPDF sets no cookies. It keeps a short list of recently used tools in your browser, and you can clear it.",
 };
 
 const cell = "border-b border-border px-3 py-2 align-top text-start";
 
 export default function CookiesPage() {
   return (
-    <LegalPage title="Cookies and browser storage" intro={<p>InstaPDF doesn&apos;t use cookies. Here is the little we do keep in your browser, and how to remove it.</p>}>
+    <LegalPage title="Cookies and browser storage" intro={<p>BerryPDF doesn&apos;t use cookies. Here is the little we do keep in your browser, and how to remove it.</p>}>
       <Summary>
         <li>No cookies: not ours, and not from advertisers or analytics services.</li>
         <li>Two small browser-storage entries that make the site easier to use. Neither leaves your device.</li>
@@ -39,7 +39,7 @@ export default function CookiesPage() {
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[520px] border-collapse text-sm">
-            <caption className="sr-only">Browser storage used by InstaPDF</caption>
+            <caption className="sr-only">Browser storage used by BerryPDF</caption>
             <thead>
               <tr className="text-ink">
                 <th scope="col" className={`${cell} font-bold`}>
