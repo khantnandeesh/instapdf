@@ -1,6 +1,6 @@
 # F2: Home page, tool catalogue and header menu
 
-Status: step 1 (Analyze) done. Next: Research.
+Status: step 2 (Research) done. Next: Design.
 Reference observed: the reference home page (`/`) on desktop (1366×900) and mobile (375×812), its "All tools" mega menu, and its recent-tools behavior, 2026-11-23. No processing task was run. One tool page (`flip-pdf`) was opened only to see how a visit is recorded in the recent list.
 Internal screenshots: `docs/specs/assets/f2-home/` (reference only, never ship).
 
@@ -58,7 +58,7 @@ Observed reference structure: a "Most popular" block of 9 cards, then 8 group bl
 | No-results message | inline message plus "Clear search" button | hidden | – | Shown when nothing matches. The button clears the query and focuses the field. |
 | Available-only toggle | switch or checkbox | off | on / off | On: hides `planned` tools. Today only Rotate remains. (P2; this helps while most tools are planned.) |
 | Category jump links | row of chips or links | – | the 8 categories | Scrolls to that group and sets the hash (e.g. `#cat-security`). (P2) |
-| Popular row | card grid | shown | registry `popular` tools in their fixed order | Shortcut to the most-used tools. Proposed set (mirrors the reference's popular block): Edit PDF, Compress, Delete pages, Merge, Split, Crop, Fill & sign, PDF to Word, Extract pages. Those tools still appear in their own category too. |
+| Popular row | card grid | shown | registry `popular` tools in their fixed order | Shortcut to the most-used tools. Set: the reference's popular block plus Rotate: Rotate, Edit PDF, Compress, Delete pages, Merge, Split, Crop, Fill & sign, PDF to Word, Extract pages. Usable tools (`beta` / `live`) come first, then planned ones; each part keeps the fixed registry order. Always shown (no minimum number of usable tools). Those tools still appear in their own category too. |
 | Category groups | `<section>` with an `h2` and a card grid | all shown | registry categories in this order: Organize pages, Edit & sign, Optimize, Security, Convert from PDF, Convert to PDF, Scans, Automate | Each of the 45 tools appears in exactly one group (no duplicates across groups, unlike the reference). Order within a group follows the registry. |
 | Tool card | a single link: name, summary, status badge | – | – | Usable tool (`beta` or `live`): links to `/<slug>`. `beta` shows a small "Beta" badge. `planned`: muted style, visible "Coming soon" badge, links to the coming-soon page `/<slug>` (§4). The badge text is part of the link's accessible name. |
 | Recent row (home) | card row above Popular | hidden when empty | up to 6 usable tools | Same data as the menu's Recent group (§3d). The reference only shows Recent in the menu, not on the home page. Ours shows it in both. |
@@ -188,7 +188,7 @@ All run against the staging site. "Usable" means registry status `beta` or `live
 - **AC-8 (P0)** The Rotate card links to `/rotate-pdf`, has no coming-soon badge, and clicking it opens the Rotate tool in its empty state (a file input that accepts `.pdf` is present).
 - **AC-9 (P0)** Every planned tool card [44] shows a visible "Coming soon" badge, and its link's accessible name includes it. No usable tool card shows it.
 - **AC-10 (P0)** A crawl of every internal `href` on `/` (header, menu, catalogue, footer) finds no response with status ≥ 400.
-- **AC-11 (P1)** A Popular row appears above the category sections with the registry's popular tools in their fixed order [Edit PDF, Compress, Delete pages, Merge, Split, Crop, Fill & sign, PDF to Word, Extract pages], using the same badges as the catalogue.
+- **AC-11 (P1)** A Popular row appears above the category sections, whatever the number of usable tools in it. It holds the registry's popular tools, usable ones first and then planned ones, each part in the fixed popular order [today: Rotate, then Edit PDF, Compress, Delete pages, Merge, Split, Crop, Fill & sign, PDF to Word, Extract pages], with the same badges as the catalogue.
 - **AC-12 (P1)** With JavaScript disabled, `/` still contains every catalogue link [45] (server-rendered).
 - **AC-13 (P1)** A usable tool in `beta` status [Rotate] shows a "Beta" badge on its card and menu entry.
 - **AC-14 (P2)** Category jump links scroll the matching section heading into view and update the URL hash.
@@ -271,8 +271,43 @@ All run against the staging site. "Usable" means registry status `beta` or `live
 
 1. **Planned tools link to a coming-soon page** (HTTP 200, `noindex`) instead of being unclickable. That keeps URLs stable for when each tool ships and makes the "no broken links" check simple. The alternative is non-link cards with `aria-disabled`.
 2. **Hero call to action** points to the catalogue until a `featured` tool (proposed: the editor, F16) is usable, so the hero never sends people to a placeholder. Another option is to feature Rotate now, but it is a weak headline tool.
-3. **Popular row mirrors the reference's popular set**, which today is all planned tools. One option is to also include Rotate; another is to hide Popular until at least 3 of its tools are usable.
+3. **Popular row = the reference's popular set plus Rotate.** Decided by the orchestrator (2026-11-23): Rotate is included, usable tools are ordered before coming-soon ones within the row, and the row is always visible (no hide-until-3-usable rule).
 4. **Header shortcuts show usable tools only** (today just Rotate). The reference shows 6 popular tools.
 5. **Recent:** no padding with defaults, revisits move a tool to the front, 6 shown, and it also appears on the home page. All four differ from the reference.
 6. **Search is visible** on the home page and in the menu (the reference's is hidden), and it includes registry `keywords`. That needs a new registry field.
 7. **No duplicate cards across categories** (the reference lists Crop, Compress, Delete pages and others twice). The Popular row is the only duplicate.
+
+## Improvements
+
+Research, 2026-11-23. iLovePDF, Smallpdf and PDF24 were blocked by this session's network proxy, so claims about them come from web search results and prior knowledge. Claims marked *(unverified)* were not checked on the live site this time. PDFgear, Adobe and Stirling-PDF claims come from search results (vendor pages, release notes) unless also marked.
+
+Quick read of the field: all six show a grid of tool cards with an icon each, grouped or filterable by category. iLovePDF and Adobe filter the grid with category chips *(unverified)*. Smallpdf's flow is "pick a tool, then drop the file" and it has a Tools menu plus a header search entry. PDFgear's selling point is that its online tools run locally in the browser. Stirling-PDF (v3) has a tool search, suggests tools based on past use and earlier versions let users star favourites *(favourites unverified)*. None of them shows a tool's processing location (browser or server) on the card itself.
+
+| Idea | Seen at | User benefit | Cost | Adopt/skip | Reason |
+|---|---|---|---|---|---|
+| "Runs in your browser" marker on cards and menu entries for `runtime: "client"` tools | PDFgear (promotes local processing site-wide, not per card); Stirling-PDF (self-hosted) | Visitors see before they start which tools never upload their file | S | **Adopt** → AC-59 | The registry already has `runtime`; this is our main privacy edge and costs only a badge. |
+| One icon per tool on cards and menu entries | All six (iLovePDF, Smallpdf, PDF24 *(unverified)*) | Faster scanning of a 45-tool grid, especially on mobile | M | **Adopt** → AC-60 | Use a permissive icon set (Lucide, ISC) as inline SVG, so there are no extra requests and no license issue. |
+| `/` keyboard shortcut focuses search (home) or opens the menu with search focused (other pages) | Not seen at the six; common web pattern (GitHub, MDN) | Keyboard users get to any tool in two keystrokes | S | **Adopt** → AC-61 | Tiny client-side handler that must not fire while typing in a field. |
+| Search query kept in the URL (`/?q=split`) | Not seen at the six *(unverified)* | Back button and reload keep the filter, and a filtered view can be shared | S | **Adopt** → AC-62 | Uses `history.replaceState`. It is read on the client only, so the server HTML stays complete (AC-12). |
+| Highlight the matched text in card names and summaries | Stirling-PDF tool search *(unverified)* | Shows why a card matched, which matters for keyword-only hits | S | **Adopt** → AC-63 | A `<mark>` around the substring using the shared match function. |
+| Category filter chips that hide the other groups | iLovePDF, Adobe *(unverified)* | Narrows the grid to one group | S | Skip | AC-14 jump links cover this without hiding tools. Adding filtering as well would duplicate the search UX. |
+| Drop a PDF anywhere on the home page, then pick a tool | Adobe Acrobat online, Smallpdf home toolbox *(unverified)* | Saves a step for people who start with a file | M | Skip | Today only Rotate is usable, and passing files to a tool needs an in-browser handoff that F1 does not have. Revisit once 5 or more tools are usable. |
+| Favourite/star tools | Stirling-PDF *(unverified)* | Personal shortlist | S | Skip | Already planned as pinning (D-3). |
+| Tool suggestions ranked by past use | Stirling-PDF v3 release notes | Most-used tools surface first | S | Skip | Recent tools (§3f) already cover this. Ranking would make the order unpredictable. |
+| Typo-tolerant (fuzzy) search | Not confirmed at the six | `comress` still finds Compress | S | Skip | Risks false hits (it would break AC-15's "split hides Merge"). Keywords cover the common synonyms. |
+| "Notify me when ready" on coming-soon pages | Common on product sites; not seen at the six | Visitors come back when the tool ships | M | Skip | Needs email storage and sending, so it is server-side, involves personal data and is not budget-neutral. Belongs with F19/F21. |
+| Dark mode | Stirling-PDF (Docker Hub listing) | Comfort | M | Skip | Site-wide design-system work, not specific to the home page. Better done once for all pages. |
+| Installable PWA / offline catalogue | PDF24 and PDFgear offer desktop apps instead *(unverified)* | Works offline | L | Skip | Too big for F2. Belongs with a later platform feature. |
+| Prefetch tool pages on hover | Common Next.js behavior | Faster tool opening | S | Skip | `next/link` already prefetches by default, so there is nothing extra to specify. |
+
+### Acceptance criteria (improvements)
+
+The evaluator does not hold the reference to these, but they must work on staging.
+
+- **AC-59 (P1) (improvement)** Every catalogue card and menu entry of a tool with registry `runtime: "client"` shows a visible "Runs in your browser" marker (an icon with text, or text alone). The marker text is part of the link's accessible name. Tools with `runtime: "server"` do not show it. This also applies to planned tools, because it describes how the tool will work.
+- **AC-60 (P2) (improvement)** Every catalogue card and menu entry shows an icon. Icons are inline SVG with `aria-hidden="true"` (the name stays the accessible label), loading `/` makes no extra network request for icons, and the icon package's license is MIT, ISC, Apache-2.0 or BSD.
+- **AC-61 (P2) (improvement)** Pressing `/` while focus is not in a text input, textarea or contenteditable element focuses the catalogue search field on `/`, and opens the tool menu with its search field focused on any other page. The `/` character is not typed into the field. Pressing `/` inside a text field types it normally.
+- **AC-62 (P2) (improvement)** Typing in the catalogue search updates the URL to `/?q=<query>` with `replaceState` (no new history entries per keystroke). An empty query removes `q`. Loading `/?q=split` shows the same filtered result as typing `split` (AC-15) with the query in the field. The server HTML for `/?q=…` still contains all catalogue links (AC-12).
+- **AC-63 (P2) (improvement)** While a query is active, the matched substring in each visible card's name or summary is wrapped in `<mark>` (case-insensitive, for example `rot` gives `<mark>Rot</mark>ate`). A card matched only by a keyword shows no highlight and is still shown. Clearing the query removes every `<mark>`.
+
+**Totals with improvements: 63 ACs: 19 P0, 29 P1, 15 P2 (5 improvements).**
