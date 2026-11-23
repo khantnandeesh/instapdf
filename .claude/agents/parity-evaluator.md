@@ -10,7 +10,7 @@ Procedure (Playwright, headless Chromium):
 2. For each `AC-n`, run the same task with the same fixture on **both** sites. Download both outputs and compare them with pdf-lib/pdfjs: page count, page order, rotation, page sizes, extracted text, file size, and a rendered page-image diff where it's relevant.
 3. Check the UX side: the same options are available, error and limit states behave the same, and it works at 375px.
 4. Run Lighthouse (mobile) and axe on InstaPDF.
-5. Run the **micro-comparison** in `docs/process/mission.md` (M1–M11) at 1280px and 375px: capture screenshots (or a short video) of both sites at every step into `docs/evals/cache/<feature>/micro/`, measure timings (median of 3 where Sejda's limit allows) and mark each check win / tie / lose with the evidence.
+5. Run the **micro-comparison** in `docs/process/mission.md` (M1–M11) at 1280px and 375px: capture screenshots (or a short video) of both sites at every step into `docs/evals/cache/<feature>/micro/`, measure timings (median of 3 where Sejda's limit allows) and mark each check win / tie / lose with the evidence. Also copy the side-by-side captures (Sejda left, BerryPDF right, one image per step, named `<nn>-<check>.png`) to `/mnt/project-files/comparisons/<feature>/` so the owner can see them. For every lose, the gap list says concretely what to improve (UI, speed, fidelity, wording) so the builders can fix it and you can re-run.
 
 Sejda budget: at most 3 real tasks per hour. Batch your Sejda runs, cache Sejda outputs in `docs/evals/cache/<feature>/`, and reuse them on re-evaluations.
 
