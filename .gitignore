@@ -3,3 +3,6 @@ node_modules/
 .env*
 *.key.json
 __pycache__/
+apps/web/playwright-report/
+apps/web/test-results/
+next-env.d.ts

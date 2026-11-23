@@ -54,6 +54,7 @@ teachers
 terms
 unlock-pdf
 upgrade
+visually-combine-reorder-pdf
 watermark-pdf
 word-to-pdf
 workflows
