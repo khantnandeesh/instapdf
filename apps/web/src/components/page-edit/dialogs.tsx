@@ -120,7 +120,7 @@ export function PagePickerDialog({
       fallbackFocus={fallbackFocus}
       footer={
         <>
-          <Button variant="secondary" onClick={onCancel}>
+          <Button variant="ghost" onClick={onCancel}>
             {labels.cancel}
           </Button>
           <Button variant="primary" disabled={count === 0} aria-describedby={count === 0 ? hintId : undefined} onClick={() => onConfirm([...selected].sort((a, b) => a - b))} data-testid="picker-confirm">
@@ -131,8 +131,7 @@ export function PagePickerDialog({
     >
       <div className="flex h-11 flex-wrap items-center gap-2">
         <Button
-          variant="ghost"
-          size="sm"
+          variant="soft"
           onClick={() => {
             setSelected(new Set(pages.map((_, k) => k)));
             announce(labels.ofSelected(pages.length, pages.length));
@@ -141,8 +140,7 @@ export function PagePickerDialog({
           {labels.selectAll}
         </Button>
         <Button
-          variant="ghost"
-          size="sm"
+          variant="plain"
           onClick={() => {
             setSelected(new Set());
             announce(labels.ofSelected(0, pages.length));
@@ -150,19 +148,19 @@ export function PagePickerDialog({
         >
           {labels.selectNone}
         </Button>
-        <span className="ms-auto text-sm text-fg-muted tabular-nums">{labels.ofSelected(count, pages.length)}</span>
+        <span className="ms-auto font-display text-[15px] font-semibold text-brand-strong tabular-nums">{labels.ofSelected(count, pages.length)}</span>
       </div>
-      <p id={hintId} className={cx("text-xs text-fg-muted", count > 0 && "invisible")}>
+      <p id={hintId} className={cx("text-help text-muted", count > 0 && "invisible")}>
         {labels.atLeastOne}
       </p>
-      <div className="max-h-[min(50dvh,480px)] overflow-y-auto rounded-lg bg-surface p-3">
-        <div ref={grid} role="list" className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,120px)]" data-testid="picker-grid">
+      <div className="max-h-[min(50dvh,480px)] overflow-y-auto rounded-tray border-[1.5px] border-sand bg-cream p-3">
+        <div ref={grid} role="list" className="mp-rise-tiles grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,144px)]" data-testid="picker-grid">
           {pages.map((size, i) => {
             const on = selected.has(i);
             const label = `${letter}${i + 1}`;
             return (
-              <div key={i} role="listitem" className="flex flex-col items-center gap-1">
-                <div className={cx("relative grid aspect-square w-full place-items-center rounded-lg sm:w-[120px]", on && "outline-2 -outline-offset-2 outline-primary")}>
+              <div key={i} role="listitem" className="mp-tray flex flex-col items-center gap-1.5 p-3" data-selected={on || undefined}>
+                <div className="relative grid aspect-square w-full place-items-center sm:w-[120px]">
                   <span className="relative block overflow-hidden bg-paper shadow-paper" style={pageBoxStyle(size)}>
                     <PageThumb fileId={fileId} index={i} />
                   </span>
@@ -179,24 +177,24 @@ export function PagePickerDialog({
                       select(i, { toggle: e.ctrlKey || e.metaKey, range: e.shiftKey });
                     }}
                     onKeyDown={(e) => onKey(e, i)}
-                    className="absolute inset-0 rounded-lg focus-visible:outline-focus"
+                    className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-3"
                     data-testid="picker-tile"
                   />
                   <span
                     aria-hidden="true"
                     onClick={() => select(i, { toggle: true, range: false })}
-                    className="absolute top-1 right-1 grid size-7 cursor-pointer place-items-center"
+                    className="absolute -top-1.5 -right-1.5 grid size-7 cursor-pointer place-items-center"
                   >
                     {on ? (
-                      <span className="grid size-5 place-items-center rounded-full bg-primary text-on-primary">
-                        <CheckIcon size={14} strokeWidth={2.5} />
+                      <span className="mp-tick-in grid size-[22px] place-items-center rounded-full bg-leaf text-white ring-2 ring-white">
+                        <CheckIcon size={14} />
                       </span>
                     ) : (
-                      <span className="size-5 rounded-full border-[1.5px] border-border-strong bg-surface-raised/90" />
+                      <span className="size-[22px] rounded-full border-[1.5px] border-field-line bg-surface-raised shadow-menu" />
                     )}
                   </span>
                 </div>
-                <span aria-hidden="true" className="text-xs font-medium tabular-nums">
+                <span aria-hidden="true" className="mp-tray__n tabular-nums">
                   {label}
                 </span>
               </div>
@@ -264,7 +262,7 @@ export function MoveToPositionDialog({
       fallbackFocus={fallbackFocus}
       footer={
         <>
-          <Button variant="secondary" onClick={onCancel}>
+          <Button variant="ghost" onClick={onCancel}>
             {labels.cancel}
           </Button>
           <Button variant="primary" onClick={submit} data-testid="move-confirm">
@@ -280,7 +278,7 @@ export function MoveToPositionDialog({
         }}
         className="flex flex-col gap-1.5"
       >
-        <label htmlFor={fieldId} className="text-sm font-medium">
+        <label htmlFor={fieldId} className="text-sm font-semibold text-ink">
           {labels.field}
         </label>
         <input
@@ -299,13 +297,12 @@ export function MoveToPositionDialog({
             setInvalid(false);
           }}
           className={cx(
-            "h-11 rounded-md border bg-surface-raised px-3 text-base text-fg tabular-nums",
-            invalid ? "border-danger outline-danger" : "border-border-strong",
+            "ip-field h-11 px-3.5 tabular-nums",
             invalid && shake > 0 && "ip-shake",
           )}
           data-testid="move-input"
         />
-        <p id={errorId} role={invalid ? "alert" : undefined} className={cx("flex min-h-5 items-center gap-1 text-sm text-danger", !invalid && "invisible")}>
+        <p id={errorId} role={invalid ? "alert" : undefined} className={cx("flex min-h-5 items-center gap-1 text-sm font-semibold text-danger", !invalid && "invisible")}>
           <AlertIcon size={16} />
           {labels.error}
         </p>

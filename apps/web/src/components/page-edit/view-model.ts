@@ -4,7 +4,6 @@
  */
 import type { LoadedFile } from "@/components/tool-flow/types";
 import { describeSourcePages, isBlank, pageLabel, segmentsOf, type PageRef, type SourceInfo } from "@/lib/page-list";
-import { formatBytes } from "@/lib/pdf/naming";
 import { normalizeRotation } from "@/lib/pdf/rotation";
 import { editCopy as c } from "@/tools/merge/copy-edit";
 import type { CardView } from "./SegmentGrid";
@@ -41,7 +40,7 @@ export function buildCards({ pages, sources, files }: ListModel): CardView[] {
         ? file?.status === "locked"
           ? "Password needed"
           : "Reading…"
-        : c.cardMeta({ image: src?.kind === "image", pages: seg.pages.length, blank, part, total: src?.pageCount ?? 0, size: formatBytes(src?.size ?? 0) }),
+        : c.cardMeta({ image: src?.kind === "image", pages: seg.pages.length, blank, part, total: src?.pageCount ?? 0 }),
     };
   });
 }

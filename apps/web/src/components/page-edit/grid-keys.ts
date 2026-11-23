@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 /** Roving-focus helpers shared by the Merge grids (F1 U-7 keys). */
 
 export function gridColumns(list: HTMLElement | null): number {
@@ -47,4 +48,14 @@ export function loadDrag() {
   dragModule ??= import("./drag");
   dragModule.catch(() => (dragModule = null));
   return dragModule;
+}
+
+/** False for the grid's first 700 ms (while its tiles rise in, staggered), then true. */
+export function useSettled(): boolean {
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(true), 700);
+    return () => clearTimeout(t);
+  }, []);
+  return settled;
 }

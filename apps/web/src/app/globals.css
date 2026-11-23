@@ -884,6 +884,19 @@
   .mp-modal-in {
     animation: mp-modal-in var(--dur-move) var(--ease-pop);
   }
+  /* Bottom sheet (Merge options below 1024px): white, 24px top corners, the modal's backdrop; rises from the bottom. */
+  .mp-sheet {
+    box-sizing: border-box;
+    border-radius: 24px 24px 0 0;
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 -12px 40px rgba(58, 20, 30, 0.18);
+    animation: mp-sheet-in var(--dur-move) var(--ease-pop);
+  }
+  .mp-sheet::backdrop {
+    background: var(--mp-backdrop);
+    backdrop-filter: blur(8px);
+  }
 
   /* ---- Panel and page tray (working mode) --------------------------------------------------- */
   .mp-panel {
@@ -1217,6 +1230,12 @@
     transform: translateY(0);
   }
 }
+@keyframes mp-sheet-in {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
 @keyframes mp-modal-in {
   0% {
     transform: translateY(14px) scale(0.94);
@@ -1360,6 +1379,29 @@
     animation:
       mp-pop-in 380ms var(--ease-pop) both,
       mp-breathe 3.2s ease-in-out 400ms 1; /* breathes once: no motion past 5s (WCAG 2.2.2) */
+  }
+  /* Merge: file cards and page trays rise in like tool tiles (30ms apart, capped at 300ms). Once the
+     grid has settled the delay drops, so a card or tile that moves (React re-inserts it) rises
+     straight into its new place: quiet feedback for a reorder. */
+  /* Fill "backwards" only: once done, no animation stays on the tile (a filling transform would make
+     each tile a stacking context, and the next tile would cover the insert point in the gap). */
+  .mp-rise-tiles > [role="listitem"] {
+    animation: mp-rise-in 360ms var(--ease-enter) backwards;
+  }
+  .mp-rise-tiles > [role="listitem"]:nth-child(2) { animation-delay: 30ms; }
+  .mp-rise-tiles > [role="listitem"]:nth-child(3) { animation-delay: 60ms; }
+  .mp-rise-tiles > [role="listitem"]:nth-child(4) { animation-delay: 90ms; }
+  .mp-rise-tiles > [role="listitem"]:nth-child(5) { animation-delay: 120ms; }
+  .mp-rise-tiles > [role="listitem"]:nth-child(6) { animation-delay: 150ms; }
+  .mp-rise-tiles > [role="listitem"]:nth-child(7) { animation-delay: 180ms; }
+  .mp-rise-tiles > [role="listitem"]:nth-child(8) { animation-delay: 210ms; }
+  .mp-rise-tiles > [role="listitem"]:nth-child(9) { animation-delay: 240ms; }
+  .mp-rise-tiles > [role="listitem"]:nth-child(10) { animation-delay: 270ms; }
+  .mp-rise-tiles > [role="listitem"]:nth-child(n + 11) { animation-delay: 300ms; }
+  .mp-rise-tiles[data-settled] > [role="listitem"] { animation-delay: 0ms; }
+  /* The floating selection bar and the options sheet rise in. */
+  .mp-rise-in {
+    animation: mp-pop-in 300ms var(--ease-pop) both;
   }
   /* Rendered page thumbnails ease in (fade + settle from 98%). */
   .mp-thumb-in {

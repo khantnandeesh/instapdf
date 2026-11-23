@@ -11,7 +11,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { formatDelta } from "@/lib/pdf/rotation";
 import type { MoveStep, PageSize } from "@/lib/page-list";
 import { editCopy as c } from "@/tools/merge/copy-edit";
-import { gridColumns, loadDrag, moveStepFor, navTarget } from "./grid-keys";
+import { gridColumns, loadDrag, moveStepFor, navTarget, useSettled } from "./grid-keys";
 import { buildTiles, type ListModel } from "./view-model";
 
 export type TileView = {
@@ -157,6 +157,7 @@ export default function EditablePageGrid({
   const list = useRef<HTMLDivElement>(null);
   const [activeUid, setActiveUid] = useState<string | null>(null);
   const [dragging, setDragging] = useState<Set<string>>(new Set());
+  const settled = useSettled();
   const menus = useRef(new Map<string, MenuButtonHandle | null>());
   const active = Math.max(0, tiles.findIndex((t) => t.uid === activeUid));
   const narrow = useNarrow();
@@ -275,11 +276,11 @@ export default function EditablePageGrid({
         <span
           aria-hidden="true"
           className={cx(
-            "grid size-(--ip-insert-size) place-items-center rounded-full border border-border-strong bg-surface-raised text-fg-muted shadow-sm",
-            "group-hover/ins:bg-primary-soft group-hover/ins:text-primary group-focus-visible/ins:bg-primary-soft group-focus-visible/ins:text-primary group-focus-visible/ins:outline-2 group-focus-visible/ins:outline-focus group-aria-expanded/ins:bg-primary-soft group-aria-expanded/ins:text-primary",
+            "grid size-(--ip-insert-size) place-items-center rounded-full border-[1.5px] border-brand-tint-border bg-surface-raised text-brand-strong shadow-menu transition-[background-color,transform] duration-(--dur-base)",
+            "group-hover/ins:scale-110 group-hover/ins:bg-brand-tint group-focus-visible/ins:bg-brand-tint group-focus-visible/ins:outline-3 group-focus-visible/ins:outline-offset-2 group-focus-visible/ins:outline-focus group-aria-expanded/ins:bg-brand-tint",
           )}
         >
-          <PlusIcon size={14} strokeWidth={2.25} />
+          <PlusIcon size={14} />
         </span>
       </MenuButton>
     </span>
@@ -295,7 +296,11 @@ export default function EditablePageGrid({
         role="list"
         aria-label={labels.list}
         aria-describedby="ip-pages-hint"
-        className={cx("grid grid-cols-2 gap-3 px-2 sm:grid-cols-[repeat(auto-fill,var(--ip-thumb-size))] sm:gap-4", dimmed && "opacity-60")}
+        data-settled={settled || undefined}
+        className={cx(
+          "mp-rise-tiles grid grid-cols-2 gap-3 px-2 sm:grid-cols-[repeat(auto-fill,calc(var(--ip-thumb-size)+32px))] sm:gap-5",
+          dimmed && "opacity-60 transition-opacity duration-(--dur-base)",
+        )}
         data-testid="page-grid"
       >
         {tiles.map((t, i) => {
@@ -317,39 +322,39 @@ export default function EditablePageGrid({
             { id: "enlarge", label: labels.enlarge, disabled: t.blank, onSelect: () => onAction(t.uid, "enlarge", null) },
           ];
           return (
-            <div key={t.uid} role="listitem" className="group/tile relative flex min-w-0 flex-col items-center gap-1" data-uid={t.uid}>
+            // BerryPDF PagePreview tray: the page on a pink tray, its label below in Fredoka; a selected page gets the berry ring and a leaf tick.
+            <div key={t.uid} role="listitem" className="group/tile mp-tray relative flex min-w-0 flex-col items-center gap-2 max-sm:p-2" data-selected={t.selected || undefined} data-uid={t.uid}>
+              {i === 0 && insertPoint(0, labels.insertStart, tab, "start")}
               <div
                 data-tile-box=""
                 onPointerDown={(e) => onPointerDown(e, t)}
                 className={cx(
-                  "ip-no-callout relative grid aspect-square w-(--ip-thumb-size) touch-pan-y place-items-center rounded-lg max-sm:w-full",
-                  "transition-[opacity,box-shadow] duration-(--dur-fast) group-hover/tile:shadow-md group-focus-within/tile:shadow-md",
-                  t.selected && "outline-2 -outline-offset-2 outline-primary",
-                  dragging.has(t.uid) && "opacity-40 outline-2 outline-border-strong outline-dashed",
+                  "ip-no-callout relative grid aspect-square w-(--ip-thumb-size) touch-pan-y place-items-center rounded-[10px] max-sm:w-full",
+                  "transition-opacity duration-(--dur-base)",
+                  dragging.has(t.uid) && "opacity-40 outline-2 outline-offset-2 outline-brand outline-dashed",
                 )}
                 data-testid="page-tile"
                 data-selected={t.selected || undefined}
                 data-rotation={t.rotation}
               >
                 <span
-                  className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-base) ease-out"
+                  className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
                   style={{ ...pageBoxStyle(t.size), transform: `rotate(${t.rotation}deg)` }}
                 >
                   {t.blank ? (
-                    <span className="absolute inset-2 flex flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-border-strong text-xs text-on-paper-muted">
+                    <span className="absolute inset-2 flex flex-col items-center justify-center gap-1 rounded-sm border-[1.5px] border-dashed border-brand-tint-border text-help text-on-paper-muted">
                       <FileIcon size={24} />
                       {labels.blankName}
                     </span>
                   ) : t.status === "ready" && t.fileId ? (
                     <PageThumb fileId={t.fileId} index={t.sourceIndex} />
                   ) : (
-                    <span className="grid h-full w-full place-items-center bg-surface-sunken">
-                      {t.status === "locked" ? <LockIcon size={24} className="text-fg-muted" /> : <Spinner size={20} label={t.accessibleName} className="text-primary" />}
+                    <span className="grid h-full w-full place-items-center bg-band">
+                      {t.status === "locked" ? <LockIcon size={24} className="text-muted" /> : <Spinner size={20} label={t.accessibleName} className="text-brand-strong" />}
                     </span>
                   )}
                 </span>
-                {i === 0 && insertPoint(0, labels.insertStart, tab, "start")}
-                {t.inserted && <span aria-hidden="true" className="ip-glow pointer-events-none absolute inset-0 rounded-lg bg-primary-soft" />}
+                {t.inserted && <span aria-hidden="true" className="ip-glow pointer-events-none absolute inset-0 rounded-[10px] bg-brand-tint" />}
                 <button
                   type="button"
                   data-main=""
@@ -364,36 +369,30 @@ export default function EditablePageGrid({
                     onSelect(t.uid, { toggle: e.ctrlKey || e.metaKey, range: e.shiftKey });
                   }}
                   onKeyDown={(e) => onKeyDown(e, i)}
-                  className="absolute inset-0 rounded-lg focus-visible:outline-focus"
+                  className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-3"
                   data-testid="tile-main"
                 />
-                <span aria-hidden="true" className="pointer-events-none absolute top-1.5 left-1.5 flex gap-1">
-                  <span
-                    className={cx(
-                      "grid h-5 min-w-5 place-items-center rounded-sm px-1 text-xs font-semibold shadow-sm",
-                      t.selected ? "bg-primary-soft text-on-primary-soft" : "bg-surface-raised/90 text-fg",
-                    )}
-                  >
-                    {t.label}
+                {badge && (
+                  <span aria-hidden="true" className="pointer-events-none absolute top-1.5 left-1.5 z-[1] rounded-pill bg-surface-raised px-2 py-0.5 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">
+                    {badge}
                   </span>
-                  {badge && <span className="rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-on-primary-soft tabular-nums">{badge}</span>}
-                </span>
+                )}
                 {t.status === "ready" && (
                   <span
                     aria-hidden="true"
                     data-no-drag=""
                     onClick={() => onSelect(t.uid, { toggle: true, range: false })}
                     className={cx(
-                      "absolute top-1 right-1 grid size-7 cursor-pointer place-items-center",
+                      "absolute -top-2 -right-2 z-[2] grid size-8 cursor-pointer place-items-center",
                       !t.selected && "opacity-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100",
                     )}
                   >
                     {t.selected ? (
-                      <span className="grid size-5 place-items-center rounded-full bg-primary text-on-primary">
-                        <CheckIcon size={14} strokeWidth={2.5} />
+                      <span className="mp-tick-in grid size-[22px] place-items-center rounded-full bg-leaf text-white ring-2 ring-white">
+                        <CheckIcon size={14} />
                       </span>
                     ) : (
-                      <span className="size-5 rounded-full border-[1.5px] border-border-strong bg-surface-raised/90" />
+                      <span className="size-[22px] rounded-full border-[1.5px] border-field-line bg-surface-raised shadow-menu" />
                     )}
                   </span>
                 )}
@@ -401,19 +400,19 @@ export default function EditablePageGrid({
                   <div
                     data-no-drag=""
                     className={cx(
-                      "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1 rounded-md bg-surface-raised/90 p-0.5 shadow-md",
-                      "opacity-0 transition-opacity duration-(--dur-fast) group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 has-[[aria-expanded=true]]:opacity-100 [@media(hover:none)]:opacity-100",
+                      "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1.5 rounded-lg border-[1.5px] border-sand bg-surface-raised p-1.5 shadow-menu max-sm:bottom-0 max-sm:gap-0 max-sm:border-0 max-sm:bg-surface-raised/90 max-sm:p-0",
+                      "opacity-0 transition-opacity duration-(--dur-base) group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 has-[[aria-expanded=true]]:opacity-100 [@media(hover:none)]:opacity-100",
                     )}
                   >
-                    {!narrow && <IconButton label={labels.rotateTileLeft(t.label)} size="sm" tabIndex={tab} className="max-lg:size-11" icon={<RotateLeftIcon size={18} />} onClick={(e) => onAction(t.uid, "rotate-left", e.currentTarget)} />}
-                    <IconButton label={labels.rotateTileRight(t.label)} size="sm" tabIndex={tab} className="max-lg:size-11" icon={<RotateRightIcon size={18} />} onClick={(e) => onAction(t.uid, "rotate-right", e.currentTarget)} />
+                    {!narrow && <IconButton label={labels.rotateTileLeft(t.label)} variant="soft" tabIndex={tab} className="max-lg:size-11" icon={<RotateLeftIcon size={16} />} onClick={(e) => onAction(t.uid, "rotate-left", e.currentTarget)} />}
+                    <IconButton label={labels.rotateTileRight(t.label)} variant="soft" tabIndex={tab} className="max-lg:size-11" icon={<RotateRightIcon size={16} />} onClick={(e) => onAction(t.uid, "rotate-right", e.currentTarget)} />
                     <IconButton
                       label={labels.removeTile(t.label)}
-                      size="sm"
+                      variant="soft"
                       tabIndex={tab}
                       className="max-lg:size-11"
                       icon={
-                        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                           <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
                         </svg>
                       }
@@ -427,7 +426,7 @@ export default function EditablePageGrid({
                       items={moreItems}
                       placement="bottom-end"
                       tabIndex={tab}
-                      className="relative grid size-8 place-items-center rounded-md text-fg before:absolute before:size-11 before:content-[''] hover:bg-surface-sunken max-lg:size-11"
+                      className="mp-iconbtn relative before:absolute before:size-11 before:content-[''] max-lg:size-11"
                       data-testid="tile-more"
                     >
                       <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
@@ -438,27 +437,29 @@ export default function EditablePageGrid({
                     </MenuButton>
                   </div>
                 )}
-                {insertPoint(i + 1, labels.insertAfter(t.label), tab, "end")}
               </div>
-              <span className="h-5 text-xs font-medium text-fg tabular-nums" aria-hidden="true" data-testid="tile-label">
+              <span className="mp-tray__n h-5 tabular-nums" aria-hidden="true" data-testid="tile-label">
                 {t.label}
               </span>
+              {insertPoint(i + 1, labels.insertAfter(t.label), tab, "end")}
             </div>
           );
         })}
-        <div role="listitem" className="flex min-w-0 flex-col items-center gap-1">
+        <div role="listitem" className="flex min-w-0 flex-col">
           <MenuButton
             label={labels.addAtEnd}
             items={insertItems(tiles.length)}
             disabled={dimmed}
             className={cx(
-              "grid aspect-square w-(--ip-thumb-size) place-items-center rounded-lg border-2 border-dashed border-border-strong bg-surface max-sm:w-full",
-              "transition-colors duration-(--dur-fast) hover:border-primary hover:bg-primary-soft",
+              "grid aspect-square w-full place-items-center rounded-tray border-2 border-dashed border-brand-tint-border bg-surface-raised/60 text-brand-strong",
+              "transition-[background-color,border-color,transform] duration-(--dur-base) hover:-translate-y-0.5 hover:border-brand hover:bg-brand-tint active:translate-y-0 disabled:opacity-50",
             )}
             data-testid="add-tile"
           >
-            <span className="flex flex-col items-center gap-1 text-sm font-medium">
-              <PlusIcon size={24} className="text-primary" />
+            <span className="flex flex-col items-center gap-1.5 font-display text-[15px] font-semibold">
+              <span className="grid size-11 place-items-center rounded-full bg-brand-tint">
+                <PlusIcon size={22} />
+              </span>
               {labels.addTile}
             </span>
           </MenuButton>
@@ -468,7 +469,7 @@ export default function EditablePageGrid({
         <div
           role="toolbar"
           aria-label={labels.selectionBar}
-          className="ip-rise-in fixed bottom-[calc(var(--ip-dock-actual,0px)+12px)] left-1/2 z-(--ip-z-selbar) flex h-(--ip-selbar-h) -translate-x-1/2 items-center gap-1 rounded-xl bg-surface-raised px-2 shadow-lg lg:bottom-6 lg:left-[calc(50%-var(--ip-dock-w)/2)]"
+          className="mp-rise-in fixed bottom-[calc(var(--ip-dock-actual,0px)+12px)] left-1/2 z-(--ip-z-selbar) flex h-(--ip-selbar-h) -translate-x-1/2 items-center gap-1.5 rounded-panel border-[1.5px] border-sand bg-surface-raised px-2.5 shadow-menu lg:bottom-6 lg:left-[calc(50%-var(--ip-dock-w)/2)]"
           data-testid="selection-bar"
           onKeyDown={(e) => {
             if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
@@ -478,18 +479,18 @@ export default function EditablePageGrid({
             e.preventDefault();
           }}
         >
-          <span className="min-w-[7.5rem] px-2 text-sm font-semibold tabular-nums" data-testid="selection-count">
+          <span className="min-w-[6.5rem] px-2 font-display text-[15px] font-semibold text-brand-strong tabular-nums" data-testid="selection-count">
             {labels.selected(selectionCount)}
           </span>
-          <IconButton label={labels.rotateSelLeft} icon={<RotateLeftIcon />} onClick={() => onRotateSelection(-90)} />
-          <IconButton label={labels.rotateSelRight} icon={<RotateRightIcon />} tabIndex={-1} onClick={() => onRotateSelection(90)} />
-          <Button variant="ghost" size="sm" aria-label={labels.removeSel} tabIndex={-1} className="max-sm:h-11" onClick={onRemoveSelection}>
+          <IconButton label={labels.rotateSelLeft} variant="soft" icon={<RotateLeftIcon size={18} />} onClick={() => onRotateSelection(-90)} />
+          <IconButton label={labels.rotateSelRight} variant="soft" icon={<RotateRightIcon size={18} />} tabIndex={-1} onClick={() => onRotateSelection(90)} />
+          <Button variant="soft" aria-label={labels.removeSel} tabIndex={-1} className="max-sm:h-11" onClick={onRemoveSelection}>
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
             </svg>
             <span className="max-sm:hidden">Remove</span>
           </Button>
-          <Button variant="ghost" size="sm" aria-label={labels.clearSel} tabIndex={-1} className="max-sm:h-11" onClick={onClearSelection}>
+          <Button variant="plain" aria-label={labels.clearSel} tabIndex={-1} className="max-sm:h-11" onClick={onClearSelection}>
             {labels.clear}
           </Button>
         </div>

@@ -10,7 +10,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { formatDelta } from "@/lib/pdf/rotation";
 import type { MoveStep, PageSize } from "@/lib/page-list";
 import { editCopy as c } from "@/tools/merge/copy-edit";
-import { gridColumns, loadDrag, moveStepFor, navTarget } from "./grid-keys";
+import { gridColumns, loadDrag, moveStepFor, navTarget, useSettled } from "./grid-keys";
 import { buildCards, type ListModel } from "./view-model";
 
 export type CardView = {
@@ -94,6 +94,7 @@ export function SegmentGrid({
   const list = useRef<HTMLDivElement>(null);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [dragKey, setDragKey] = useState<string | null>(null);
+  const settled = useSettled();
   const active = Math.max(0, cards.findIndex((c) => c.key === activeKey));
 
   const focusCard = (i: number) => {
@@ -186,35 +187,40 @@ export function SegmentGrid({
         role="list"
         aria-label={labels.list}
         aria-describedby="ip-files-hint"
-        className={cx("grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,var(--ip-thumb-size))] sm:gap-4", dimmed && "opacity-60")}
+        data-settled={settled || undefined}
+        className={cx(
+          "mp-rise-tiles grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,calc(var(--ip-thumb-size)+32px))] sm:gap-5",
+          dimmed && "opacity-60 transition-opacity duration-(--dur-base)",
+        )}
         data-testid="segment-grid"
       >
         {cards.map((card, i) => {
           const isActive = i === active;
           const tab = isActive ? 0 : -1;
           const badge = formatDelta(card.rotation);
+          // BerryPDF PagePreview tray: the file's first page on a pink tray, its name in Fredoka below.
           return (
-            <div key={card.key} role="listitem" className="group/card flex min-w-0 flex-col gap-1" data-card-key={card.key} data-testid="file-card">
+            <div key={card.key} role="listitem" className="group/card mp-tray flex min-w-0 flex-col gap-1 max-sm:p-2" data-card-key={card.key} data-testid="file-card">
               <div
                 data-card-box=""
                 onPointerDown={(e) => onPointerDown(e, card)}
                 className={cx(
-                  "ip-no-callout relative grid aspect-square w-(--ip-thumb-size) touch-pan-y place-items-center rounded-lg bg-surface-raised shadow-sm max-sm:w-full",
-                  "transition-[opacity,box-shadow] duration-(--dur-fast) group-hover/card:shadow-md group-focus-within/card:shadow-md",
-                  dragKey === card.key && "opacity-40 outline-2 outline-offset-[-2px] outline-border-strong outline-dashed",
+                  "ip-no-callout relative grid aspect-square w-(--ip-thumb-size) touch-pan-y place-items-center rounded-[10px] max-sm:w-full",
+                  "transition-opacity duration-(--dur-base)",
+                  dragKey === card.key && "opacity-40 outline-2 outline-offset-2 outline-brand outline-dashed",
                 )}
               >
                 {card.status === "ready" && card.fileId && card.thumbSize ? (
                   <span
-                    className="relative block overflow-hidden shadow-paper transition-transform duration-(--dur-base) ease-out"
+                    className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
                     style={{ ...pageBoxStyle(card.thumbSize), transform: `rotate(${card.rotation}deg)` }}
                   >
                     <PageThumb fileId={card.fileId} index={card.thumbIndex} />
                   </span>
                 ) : card.status === "loading" ? (
-                  <Spinner size={24} label={`Reading ${card.name}`} className="text-primary" />
+                  <Spinner size={24} label={`Reading ${card.name}`} className="text-brand-strong" />
                 ) : card.status === "locked" ? (
-                  <LockIcon size={28} className="text-fg-muted" />
+                  <LockIcon size={28} className="text-muted" />
                 ) : null}
                 <button
                   type="button"
@@ -226,84 +232,83 @@ export function SegmentGrid({
                   onFocus={() => setActiveKey(card.key)}
                   onClick={() => onPreview(card.key)}
                   onKeyDown={(e) => onKeyDown(e, i)}
-                  className="absolute inset-0 rounded-lg focus-visible:outline-focus"
+                  className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-3"
                   data-testid="card-main"
                 />
-                <span aria-hidden="true" className="pointer-events-none absolute top-1.5 left-1.5 flex gap-1">
-                  <span className="grid h-5 min-w-5 place-items-center rounded-sm bg-surface-raised/90 px-1 text-xs font-semibold text-fg shadow-sm" data-testid="source-badge">
+                <span aria-hidden="true" className="pointer-events-none absolute -top-1.5 -left-1.5 z-[1] flex gap-1">
+                  <span className="grid h-6 min-w-6 place-items-center rounded-pill bg-surface-raised px-1.5 font-display text-help font-semibold text-brand-strong shadow-menu" data-testid="source-badge">
                     {card.letter}
                   </span>
-                  {badge && <span className="rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-on-primary-soft tabular-nums">{badge}</span>}
+                  {badge && <span className="rounded-pill bg-surface-raised px-2 py-1 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">{badge}</span>}
                 </span>
                 <IconButton
                   label={labels.remove(card.name)}
-                  size="sm"
-                  variant="raised"
+                  variant="soft"
                   tabIndex={tab}
                   data-no-drag=""
-                  className="absolute top-1 right-1 shadow-sm max-lg:size-11"
-                  icon={<CloseIcon size={18} />}
+                  className="absolute -top-2 -right-2 z-[2] bg-surface-raised shadow-menu max-lg:size-11"
+                  icon={<CloseIcon size={16} />}
                   onClick={() => onRemove(card.key)}
                 />
                 {card.status === "ready" && !dimmed && (
                   <div
                     data-no-drag=""
                     className={cx(
-                      "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1 rounded-md bg-surface-raised/90 p-0.5 shadow-md",
-                      "opacity-0 transition-opacity duration-(--dur-fast) group-hover/card:opacity-100 group-focus-within/card:opacity-100 [@media(hover:none)]:opacity-100",
+                      "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1.5 rounded-lg border-[1.5px] border-sand bg-surface-raised p-1.5 shadow-menu max-sm:bottom-0 max-sm:gap-0 max-sm:border-0 max-sm:bg-surface-raised/90 max-sm:p-0",
+                      "opacity-0 transition-opacity duration-(--dur-base) group-hover/card:opacity-100 group-focus-within/card:opacity-100 [@media(hover:none)]:opacity-100",
                     )}
                   >
-                    <IconButton label={labels.rotateLeft(card.name)} size="sm" tabIndex={tab} className="max-lg:size-11" icon={<RotateLeftIcon size={18} />} onClick={() => onRotate(card.key, -90)} />
-                    <IconButton label={labels.rotateRight(card.name)} size="sm" tabIndex={tab} className="max-lg:size-11" icon={<RotateRightIcon size={18} />} onClick={() => onRotate(card.key, 90)} />
-                    <IconButton label={labels.enlarge(card.name)} size="sm" tabIndex={tab} className="max-lg:size-11" icon={<EnlargeIcon size={18} />} onClick={() => onPreview(card.key)} />
+                    <IconButton label={labels.rotateLeft(card.name)} variant="soft" tabIndex={tab} className="max-lg:size-11" icon={<RotateLeftIcon size={16} />} onClick={() => onRotate(card.key, -90)} />
+                    <IconButton label={labels.rotateRight(card.name)} variant="soft" tabIndex={tab} className="max-lg:size-11" icon={<RotateRightIcon size={16} />} onClick={() => onRotate(card.key, 90)} />
+                    <IconButton label={labels.enlarge(card.name)} variant="soft" tabIndex={tab} className="max-lg:size-11" icon={<EnlargeIcon size={16} />} onClick={() => onPreview(card.key)} />
                   </div>
                 )}
               </div>
-              <span className="truncate text-sm font-medium" title={card.name} data-testid="file-name">
+              <span className="mt-1 truncate font-display text-[15px] leading-5 font-semibold text-ink" title={card.name} data-testid="file-name">
                 {card.name}
               </span>
-              <span className="truncate text-xs text-fg-muted tabular-nums" data-testid="file-meta">
+              <span className="truncate text-help text-muted tabular-nums" data-testid="file-meta">
                 {card.meta}
               </span>
-              <div className="flex h-11 items-center justify-between">
+              <div className="-mx-1 flex h-11 items-center justify-between">
                 <IconButton
                   label={labels.moveEarlier(card.name)}
                   size="sm"
                   tabIndex={tab}
                   className="max-lg:size-11"
                   disabled={i === 0 || dimmed}
-                  icon={<ChevronLeftIcon size={18} />}
+                  icon={<ChevronLeftIcon size={16} />}
                   onClick={() => onMove(card.key, "earlier")}
                 />
-                <span aria-hidden="true" className="text-xs text-fg-muted tabular-nums max-[359px]:hidden">
-                  {labels.position(i + 1, cards.length)}
-                </span>
                 <IconButton
                   label={labels.moveLater(card.name)}
                   size="sm"
                   tabIndex={tab}
                   className="max-lg:size-11"
                   disabled={i === cards.length - 1 || dimmed}
-                  icon={<ChevronRightIcon size={18} />}
+                  icon={<ChevronRightIcon size={16} />}
                   onClick={() => onMove(card.key, "later")}
                 />
               </div>
             </div>
           );
         })}
-        <div role="listitem" className="flex min-w-0 flex-col gap-1">
+        <div role="listitem" className="flex min-w-0 flex-col">
           <button
             type="button"
             onClick={(e) => onAddFiles(e.currentTarget)}
             disabled={dimmed}
+            title={labels.addFiles}
             className={cx(
-              "grid aspect-square w-(--ip-thumb-size) place-items-center rounded-lg border-2 border-dashed border-border-strong bg-surface max-sm:w-full",
-              "transition-colors duration-(--dur-fast) hover:border-primary hover:bg-primary-soft",
+              "grid aspect-square w-full place-items-center rounded-tray border-2 border-dashed border-brand-tint-border bg-surface-raised/60 text-brand-strong",
+              "transition-[background-color,border-color,transform] duration-(--dur-base) hover:-translate-y-0.5 hover:border-brand hover:bg-brand-tint active:translate-y-0 disabled:opacity-50",
             )}
             data-testid="add-tile"
           >
-            <span className="flex flex-col items-center gap-1 text-sm font-medium">
-              <PlusIcon size={24} className="text-primary" />
+            <span className="flex flex-col items-center gap-1.5 font-display text-[15px] font-semibold">
+              <span className="grid size-11 place-items-center rounded-full bg-brand-tint">
+                <PlusIcon size={22} />
+              </span>
               {labels.addFiles}
             </span>
           </button>
@@ -317,8 +322,8 @@ export function SegmentGrid({
 export function ShortcutsHelp() {
   return (
     <details className="mt-4 text-sm">
-      <summary className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-md px-2 font-medium text-fg-muted hover:bg-surface-sunken">{c.shortcuts}</summary>
-      <ul className="mt-2 grid gap-1.5 text-fg-muted sm:grid-cols-2">
+      <summary className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-pill px-3 text-muted transition-colors duration-(--dur-base) hover:bg-band hover:text-brand-strong">{c.shortcuts}</summary>
+      <ul className="mt-2 grid gap-1.5 text-muted sm:grid-cols-2">
         <li>
           <Kbd>Alt</Kbd> + <Kbd>←</Kbd> <Kbd>→</Kbd> move the focused file or page
         </li>
@@ -341,3 +346,4 @@ export function ShortcutsHelp() {
     </details>
   );
 }
+

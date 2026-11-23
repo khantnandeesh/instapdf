@@ -187,7 +187,8 @@ export const MenuButton = forwardRef<
         role="menu"
         aria-label={label}
         onKeyDown={onMenuKey}
-        className="fixed m-0 max-w-[calc(100vw-32px)] min-w-[200px] rounded-lg border border-border bg-surface-raised p-1 text-fg shadow-lg"
+        // BerryPDF Menu: white, 1.5px sand, radius 14, shadow-menu, scales in (0.15s).
+        className="mp-menu fixed m-0 max-w-[calc(100vw-32px)] min-w-[220px] p-1.5 text-ink"
         style={{ inset: "auto" }}
       >
         {items.map((entry, i) =>
@@ -199,21 +200,21 @@ export const MenuButton = forwardRef<
               tabIndex={-1}
               disabled={entry.disabled}
               className={cx(
-                "flex h-11 w-full items-center gap-2 rounded-md px-3 text-start text-sm font-medium whitespace-nowrap outline-none [@media(pointer:fine)]:lg:h-9",
-                "hover:bg-surface-sunken focus-visible:bg-surface-sunken focus:bg-surface-sunken disabled:text-fg-disabled",
+                "flex h-11 w-full items-center gap-2 rounded-[9px] px-3 text-start text-[15px] whitespace-nowrap outline-none [@media(pointer:fine)]:lg:h-10",
+                "transition-colors duration-(--dur-base) hover:bg-band hover:text-brand-strong focus:bg-band focus:text-brand-strong disabled:text-muted disabled:opacity-60",
               )}
               onClick={() => {
                 hide(true);
                 entry.onSelect();
               }}
             >
-              {entry.icon && <span className="shrink-0 text-fg-muted">{entry.icon}</span>}
+              {entry.icon && <span className="shrink-0 text-muted">{entry.icon}</span>}
               {entry.label}
             </button>
           ) : "separator" in entry ? (
-            <div key={`s${i}`} role="separator" className="my-1 h-px bg-border" />
+            <div key={`s${i}`} role="separator" className="mx-2 my-1 h-[1.5px] bg-sand" />
           ) : (
-            <p key={`n${i}`} className="px-3 py-2 text-xs text-fg-muted">
+            <p key={`n${i}`} className="px-3 py-2 text-help text-muted">
               {entry.note}
             </p>
           ),

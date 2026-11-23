@@ -635,7 +635,8 @@ export function MergeTool() {
           { id: "reverse", label: c.sortItems.reverse, onSelect: () => sortBy("reverse") },
         ];
 
-  const toolbarButton = "inline-flex h-9 items-center gap-1.5 rounded-md border border-border-strong bg-surface-raised px-3 text-sm font-medium whitespace-nowrap hover:bg-surface-sunken disabled:text-fg-disabled max-sm:w-11 max-sm:justify-center max-sm:px-0";
+  // BerryPDF EditorToolbar: blueberry editing tools, like "Add files" beside them.
+  const toolbarButton = "mp-btn mp-btn--tool whitespace-nowrap max-sm:size-11 max-sm:px-0";
 
   const renderWorkspace = (w: WorkspaceContext) => (
     <>
@@ -740,13 +741,13 @@ export function MergeTool() {
         viewToggleFromOneFile
         compactAddFiles
         optionsBadge={changed ? c.changed(changed) : undefined}
-        copyOverrides={{ pickerButton: c.pickerButton, pickerHint: c.pickerHint, limits: c.limits, statusEmpty: c.statusEmpty, errorType: c.errorType }}
+        copyOverrides={{ pickerButton: c.pickerButton, pickerHint: c.pickerHint, limits: c.limits, limitsFull: c.limitsFull, statusEmpty: c.statusEmpty, errorType: c.errorType }}
         canRun={() => (pages.some((p) => p.pending) || picker ? c.statusPending : pages.length ? true : c.statusEmpty)}
         readyStatus={() => c.status(readyPages.length, sourceCount)}
         renderWorkspace={renderWorkspace}
         toolbarStart={(w) => (
           <MenuButton label={c.sort} items={sortItems} disabled={w.dimmed} className={toolbarButton} title={c.sort} data-testid="sort-menu">
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4" />
             </svg>
             <span className="max-md:sr-only">{c.sort}</span>
