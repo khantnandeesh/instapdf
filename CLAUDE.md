@@ -39,7 +39,8 @@ InstaPDF is a fast, private online PDF toolkit. Sejda (https://www.sejda.com) is
 - `docs/evals/<feature>.md`: evaluator verdicts.
 - `docs/process/workflow.md`: the pipeline, gates and conventions.
 - `docs/process/backlog.md`: ordered feature list and status.
+- `docs/seo/`: SEO strategy, competitor teardown and keyword plan.
 
 ## Definition of done (every feature)
 
-Spec merged → code + tests merged via PR with green CI → deployed to staging → evaluator verdict **PASS** recorded in `docs/evals/` → backlog updated.
+Spec merged → code + tests merged via PR with green CI (including the SEO checklist in `docs/process/workflow.md`) → deployed to staging → evaluator verdict **PASS** recorded in `docs/evals/` → backlog updated.

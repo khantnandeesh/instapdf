@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ComingSoonPage } from "@/components/site/pages";
+import { toolMetadata } from "@/lib/seo/metadata";
 import { toolBySlug, tools } from "@/tools/registry";
 
 /** Coming-soon pages for planned tools. Usable tools have their own route; anything else is a 404. */
@@ -14,11 +15,8 @@ type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const tool = toolBySlug((await params).slug);
-  return {
-    title: `${tool?.name ?? "Tool"} (coming soon) · BerryPDF`,
-    description: tool?.summary,
-    robots: { index: false },
-  };
+  if (!tool) return { robots: { index: false } };
+  return toolMetadata(tool);
 }
 
 export default async function PlannedToolPage({ params }: Props) {

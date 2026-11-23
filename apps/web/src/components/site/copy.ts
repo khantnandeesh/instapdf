@@ -1,7 +1,7 @@
 /** Site-wide strings (spec F2 H-8). Our own wording. */
 export const siteCopy = {
-  homeTitle: "BerryPDF · Fast, private PDF tools",
-  homeDescription: "Free online PDF tools to organize, edit and convert PDFs. Most tools run in your browser, so your files stay on your device.",
+  homeTitle: "Free PDF Tools Online: Edit, Merge, Convert | BerryPDF",
+  homeDescription: "Free online PDF tools to edit, merge, split, compress and convert PDFs. No sign-up, no watermark. Most tools run in your browser, so files stay on your device.",
   logoLabel: "BerryPDF home",
   skip: "Skip to main content",
   menuButton: "All tools",

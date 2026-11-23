@@ -6,15 +6,17 @@
  * .generated/licenses.json, read here, plus public/third-party-notices.txt (full texts).
  */
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/metadata";
 import { LegalPage, Section, TextLink } from "@/components/legal/Legal";
 import { readNotices, type NoticeEntry } from "@/lib/licenses/notices";
 
 export const dynamic = "force-static";
 
-export const metadata: Metadata = {
-  title: "Open-source licenses · BerryPDF",
+export const metadata: Metadata = pageMetadata({
+  path: "/licenses",
+  title: "Open-Source Licenses | BerryPDF",
   description: "The open-source software, fonts and icons BerryPDF uses, with their licenses and copyright notices.",
-};
+});
 
 export default function LicensesPage() {
   const entries = readNotices();

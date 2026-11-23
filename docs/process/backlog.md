@@ -27,6 +27,8 @@ Status values: `todo` · `in-progress (step n)` · `done` · `deferred`. The orc
 | F17 | Fill & sign | sign-pdf | todo |
 | F21 | Marketing + legal pages | desktop, developers, html-pdf-api, help, blog, press, security, sla, privacy, terms, cookies | todo — privacy, terms, cookies and third-party notices moved to Q1; rest later; desktop/API/teachers pages deferred |
 | F19 | Accounts, usage limits, pricing + checkout | login, account, upgrade, teachers | todo — only once server tools have real usage; server-minute pricing, India pricing (UPI), no ads |
-| F22 | i18n (30 locales) | – | todo — ~5 locales first (Hindi first) |
+| S1 | SEO foundations: keyword-first URLs, metadata system, sitemap/robots, structured data, hreflang scaffold, OG cards, perf budgets, per-tool SEO checklist (docs/seo/) | – | in review |
+| S2 | Launch SEO: domain + Search Console, comparison pages, guides, variant pages (docs/seo/keyword-plan.md) | – | todo — needs the owner's domain |
+| F22 | i18n (30 locales) | – | todo — ~5 locales first (Hindi first); order and rules in docs/seo/keyword-plan.md §3 |
 | F18 | Form creator | pdf-forms | deferred |
 | F20 | Workflows (tool chains) | workflows | deferred |
