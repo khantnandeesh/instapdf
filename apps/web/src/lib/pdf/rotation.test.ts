@@ -18,17 +18,17 @@ describe("isInScope", () => {
 });
 
 describe("rotateScope", () => {
-  it("rotates all pages right (AC-30)", () => {
+  it("AC-30: rotates all pages right", () => {
     expect(rotateScope([], 3, "all", 90)).toEqual([90, 90, 90]);
   });
-  it("rotates left to 270 after normalizing (AC-31)", () => {
+  it("AC-31: rotates left to 270 after normalizing", () => {
     expect(rotateScope([], 3, "all", -90).map(normalizeRotation)).toEqual([270, 270, 270]);
   });
-  it("respects odd and even scopes (AC-33)", () => {
+  it("AC-33: respects odd and even scopes", () => {
     expect(rotateScope([], 3, "odd", 90)).toEqual([90, 0, 90]);
     expect(rotateScope([], 3, "even", 90)).toEqual([0, 90, 0]);
   });
-  it("is cumulative and keeps unbounded display values (AC-34)", () => {
+  it("AC-34: is cumulative and keeps unbounded display values", () => {
     let d: number[] = [];
     d = rotateScope(d, 2, "all", 90);
     d = rotateScope(d, 2, "all", 90);
@@ -46,7 +46,7 @@ describe("rotateScope", () => {
 });
 
 describe("rotatePage", () => {
-  it("changes only that page (AC-32)", () => {
+  it("AC-32: changes only that page", () => {
     expect(rotatePage([], 3, 1, 90)).toEqual([0, 90, 0]);
   });
   it("ignores an out-of-range index", () => {
@@ -55,7 +55,7 @@ describe("rotatePage", () => {
 });
 
 describe("finalRotation", () => {
-  it("adds to the existing rotation (AC-36)", () => {
+  it("AC-36: adds to the existing rotation", () => {
     expect([0, 90, 0].map((orig) => finalRotation(orig, 90))).toEqual([90, 180, 90]);
     expect(finalRotation(270, 90)).toBe(0);
     expect(finalRotation(90, -90)).toBe(0);

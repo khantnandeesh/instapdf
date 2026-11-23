@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildZip } from "./zip";
 
 describe("buildZip", () => {
-  it("stores entries under unique names (AC-42)", () => {
+  it("AC-42: stores entries under unique names", () => {
     const a = new Uint8Array([1, 2, 3]);
     const b = new Uint8Array([4, 5]);
     const zip = buildZip([

@@ -1,0 +1,130 @@
+/**
+ * Shared helpers for the F1 shared-flow e2e suite (Rotate as the vehicle tool).
+ * Every assertion about output reads the downloaded file with libraries that
+ * are independent of the app: upstream pdf-lib (cannot decrypt, so loading
+ * proves "no password") and pdf.js (text).
+ */
+import { readFile } from "node:fs/promises";
+import { expect, type Download, type Locator, type Page } from "@playwright/test";
+import { unzipSync } from "fflate";
+import { PDFDocument } from "pdf-lib";
+
+export const fx = (name: string) => `tests/fixtures/${name}`;
+
+export const flow = (page: Page) => page.getByTestId("tool-flow");
+export const primary = (page: Page) => page.getByTestId("primary-action");
+export const tiles = (page: Page) => page.getByTestId("page-tile");
+export const fileInput = (page: Page) => page.getByTestId("file-input");
+export const dialog = (page: Page) => page.getByRole("dialog");
+export const passwordField = (page: Page) => dialog(page).getByLabel("Password", { exact: true });
+export const rotateRight = (page: Page) => page.getByRole("button", { name: "Rotate right", exact: true });
+export const rotateLeft = (page: Page) => page.getByRole("button", { name: "Rotate left", exact: true });
+export const scope = (page: Page, which: "All" | "Odd" | "Even") => page.getByRole("radio", { name: new RegExp(`^${which}( pages)?$`) });
+export const downloadLink = (page: Page) => page.getByRole("link", { name: "Download" });
+
+/** Opens /rotate-pdf and waits until drop/paste/hand-off listeners are live. */
+export async function openRotate(page: Page) {
+  await page.goto("/rotate-pdf");
+  await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
+}
+
+export async function pick(page: Page, ...names: string[]) {
+  await fileInput(page).setInputFiles(names.map((n) => (n.includes("/") ? n : fx(n))));
+}
+
+/** Picks files and waits for the ready state. */
+export async function pickReady(page: Page, ...names: string[]) {
+  await pick(page, ...names);
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+}
+
+/** Builds File objects in the page from fixture bytes and dispatches drag events with them. */
+export async function dropFixtures(page: Page, names: string[], events: ("dragenter" | "dragover" | "dragleave" | "drop")[] = ["dragenter", "dragover", "drop"]) {
+  const payload = await Promise.all(names.map(async (n) => ({ name: n, b64: (await readFile(fx(n))).toString("base64") })));
+  await page.evaluate(
+    ({ payload, events }) => {
+      const dt = new DataTransfer();
+      for (const f of payload) dt.items.add(new File([Uint8Array.from(atob(f.b64), (c) => c.charCodeAt(0))], f.name, { type: "application/pdf" }));
+      for (const type of events) document.body.dispatchEvent(new DragEvent(type, { dataTransfer: dt, bubbles: true, cancelable: true }));
+    },
+    { payload, events },
+  );
+}
+
+/** Runs the primary action and waits for the result screen. */
+export async function run(page: Page) {
+  await primary(page).click();
+  await expect(flow(page)).toHaveAttribute("data-state", "done", { timeout: 30_000 });
+}
+
+export async function bytesOf(download: Download) {
+  return new Uint8Array(await readFile((await download.path())!));
+}
+
+/** Clicks Download on the result screen and returns the file name and bytes. */
+export async function downloadResult(page: Page) {
+  const [download] = await Promise.all([page.waitForEvent("download"), downloadLink(page).click()]);
+  return { name: download.suggestedFilename(), bytes: await bytesOf(download) };
+}
+
+/** Throws if the PDF is encrypted (upstream pdf-lib refuses encrypted files). */
+export async function loadPlain(bytes: Uint8Array) {
+  const doc = await PDFDocument.load(bytes);
+  expect(doc.isEncrypted, "output must not be encrypted").toBe(false);
+  expect(doc.context.trailerInfo.Encrypt, "output trailer must have no /Encrypt").toBeUndefined();
+  return doc;
+}
+
+export async function rotationsOf(bytes: Uint8Array) {
+  const doc = await loadPlain(bytes);
+  return doc.getPages().map((p) => p.getRotation().angle);
+}
+
+export async function pageCountOf(bytes: Uint8Array) {
+  return (await loadPlain(bytes)).getPageCount();
+}
+
+/** Extracted text per page, with pdf.js (legacy build for Node). */
+export async function textsOf(bytes: Uint8Array): Promise<string[]> {
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const task = getDocument({ data: bytes.slice(), verbosity: 0 });
+  const doc = await task.promise;
+  const out: string[] = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const content = await (await doc.getPage(i)).getTextContent();
+    out.push(content.items.map((it) => ("str" in it ? it.str : "")).join(""));
+  }
+  await task.destroy();
+  return out;
+}
+
+export function unzip(bytes: Uint8Array) {
+  return unzipSync(bytes);
+}
+
+export async function fixtureBytes(name: string) {
+  return new Uint8Array(await readFile(fx(name)));
+}
+
+/** Presses Tab until `target` has focus (proves it is reachable by keyboard). */
+export async function tabTo(page: Page, target: Locator, max = 60) {
+  for (let i = 0; i < max; i++) {
+    if (await target.evaluate((el) => el === document.activeElement).catch(() => false)) return;
+    await page.keyboard.press("Tab");
+  }
+  await expect(target).toBeFocused();
+}
+
+export const isDesktop = (projectName: string) => projectName === "desktop";
+
+/** "Back to options" on the result screen, then waits for the ready state. */
+export async function backToOptions(page: Page) {
+  await page.getByRole("button", { name: "Back to options" }).click();
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+}
+
+/** "Start over" on the result screen, then waits for the empty state. */
+export async function startOver(page: Page) {
+  await page.getByRole("button", { name: "Start over" }).click();
+  await expect(flow(page)).toHaveAttribute("data-state", "empty");
+}

@@ -11,7 +11,7 @@ describe("hasAcceptedType", () => {
     expect(hasAcceptedType(f("A.PDF", 1, ""), accept)).toBe(true);
     expect(hasAcceptedType(f("a.pdf", 1, "application/octet-stream"), accept)).toBe(true);
   });
-  it("rejects other extensions (AC-12)", () => {
+  it("AC-12: rejects other extensions", () => {
     expect(hasAcceptedType(f("notes.txt", 1, "text/plain"), accept)).toBe(false);
     expect(hasAcceptedType(f("notes.txt", 1, "application/pdf"), accept)).toBe(false);
   });
@@ -25,17 +25,17 @@ describe("hasAcceptedType", () => {
 });
 
 describe("screenFiles", () => {
-  it("keeps valid files next to a wrong type (AC-15)", () => {
+  it("AC-15: keeps valid files next to a wrong type", () => {
     const r = screenFiles([f("notes.txt", 10, "text/plain"), f("three-pages.pdf")], limits, 0);
     expect(r.accepted.map((x) => x.name)).toEqual(["three-pages.pdf"]);
     expect(r.rejected).toEqual([{ name: "notes.txt", reason: "type" }]);
   });
-  it("rejects files over the size cap (AC-16)", () => {
+  it("AC-16: rejects files over the size cap", () => {
     const r = screenFiles([f("big.pdf", 100 * 1024 * 1024 + 1), f("ok.pdf", 100 * 1024 * 1024)], limits, 0);
     expect(r.rejected).toEqual([{ name: "big.pdf", reason: "size" }]);
     expect(r.accepted.map((x) => x.name)).toEqual(["ok.pdf"]);
   });
-  it("keeps the first 20 of 21 files (AC-18)", () => {
+  it("AC-18: keeps the first 20 of 21 files", () => {
     const files = Array.from({ length: 21 }, (_, i) => f(`f${i}.pdf`));
     const r = screenFiles(files, limits, 0);
     expect(r.accepted).toHaveLength(20);
@@ -54,7 +54,7 @@ describe("screenFiles", () => {
 });
 
 describe("fitsPageBudget", () => {
-  it("allows exactly the cap and rejects one more (AC-17)", () => {
+  it("AC-17: allows exactly the cap and rejects one more", () => {
     expect(fitsPageBudget(0, 1000, 1000)).toBe(true);
     expect(fitsPageBudget(0, 1001, 1000)).toBe(false);
     expect(fitsPageBudget(997, 3, 1000)).toBe(true);

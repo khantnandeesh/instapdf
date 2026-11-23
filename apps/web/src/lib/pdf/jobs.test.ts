@@ -11,7 +11,7 @@ const buf = async (name: string) => {
 const rotations = async (bytes: Uint8Array) => (await PDFDocument.load(bytes)).getPages().map((p) => p.getRotation().angle);
 
 describe("runJob rotate", () => {
-  it("returns one PDF that keeps the input name for one file (AC-41)", async () => {
+  it("AC-41: returns one PDF that keeps the input name for one file", async () => {
     const progress: number[] = [];
     const out = await runJob(
       { kind: "rotate", zipName: "instapdf-rotate.zip", files: [{ name: "three-pages.pdf", buffer: await buf("three-pages.pdf"), deltas: [90, 90, 90] }] },
@@ -25,7 +25,7 @@ describe("runJob rotate", () => {
     expect(progress.at(-1)).toBe(1);
   });
 
-  it("returns a ZIP with one PDF per input for two files (AC-42)", async () => {
+  it("AC-42: returns a ZIP with one PDF per input for two files", async () => {
     const out = await runJob(
       {
         kind: "rotate",

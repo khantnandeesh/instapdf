@@ -4,7 +4,18 @@
 import { writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PDFDocument, StandardFonts, degrees } from "@cantoo/pdf-lib";
+import { deflateSync } from "node:zlib";
+import {
+  PDFDocument,
+  PDFHexString,
+  PDFName,
+  PDFNumber,
+  PDFOperator,
+  PDFOperatorNames as Ops,
+  PDFString,
+  StandardFonts,
+  degrees,
+} from "@cantoo/pdf-lib";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXED_DATE = new Date("2026-01-01T00:00:00Z");
@@ -61,6 +72,158 @@ for (const name of ["user-pw.pdf", "user-pw-2.pdf"]) {
   });
   await save("owner-restricted.pdf", doc, { useObjectStreams: false });
 }
+
+// ---- corpus fixtures (QA): scanned image, form, bookmarks, mixed sizes, non-Latin text ----
+
+/** Minimal grayscale PNG encoder, so the "scan" needs no image dependency. */
+function grayPng(width, height, pixel) {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (buf) => {
+    let c = 0xffffffff;
+    for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const out = Buffer.alloc(12 + data.length);
+    out.writeUInt32BE(data.length, 0);
+    out.write(type, 4, "ascii");
+    data.copy(out, 8);
+    out.writeUInt32BE(crc(out.subarray(4, 8 + data.length)), 8 + data.length);
+    return out;
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 0; // grayscale
+  const raw = Buffer.alloc((width + 1) * height);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) raw[y * (width + 1) + 1 + x] = pixel(x, y);
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+}
+
+{
+  // Image-only pages, like a scanner makes: no text layer at all.
+  const doc = await PDFDocument.create({ updateMetadata: false });
+  doc.setCreationDate(FIXED_DATE);
+  doc.setModificationDate(FIXED_DATE);
+  for (let i = 1; i <= 2; i++) {
+    const png = grayPng(298, 421, (x, y) => (y > 30 && y < 50 && x > 30 && x < 30 + 60 * i ? 20 : 235 + ((x * 7 + y * 13 + i) % 17)));
+    const img = await doc.embedPng(png);
+    const page = doc.addPage([595, 842]);
+    page.drawImage(img, { x: 0, y: 0, width: 595, height: 842 });
+  }
+  await save("scanned.pdf", doc);
+}
+
+{
+  // AcroForm with a text field and a checkbox on page 1.
+  const doc = await makeDoc(2);
+  const form = doc.getForm();
+  const name = form.createTextField("full_name");
+  name.setText("Ada Lovelace");
+  name.addToPage(doc.getPage(0), { x: 72, y: 600, width: 300, height: 28 });
+  const agree = form.createCheckBox("agree");
+  agree.check();
+  agree.addToPage(doc.getPage(0), { x: 72, y: 550, width: 20, height: 20 });
+  await save("form.pdf", doc);
+}
+
+{
+  // Outline (bookmarks) with one entry per page.
+  const doc = await makeDoc(3);
+  const ctx = doc.context;
+  const outlinesRef = ctx.nextRef();
+  const itemRefs = doc.getPages().map(() => ctx.nextRef());
+  doc.getPages().forEach((page, i) => {
+    const item = ctx.obj({
+      Title: PDFString.of(`Chapter ${i + 1}`),
+      Parent: outlinesRef,
+      Dest: [page.ref, "Fit"],
+    });
+    if (i > 0) item.set(PDFName.of("Prev"), itemRefs[i - 1]);
+    if (i < itemRefs.length - 1) item.set(PDFName.of("Next"), itemRefs[i + 1]);
+    ctx.assign(itemRefs[i], item);
+  });
+  ctx.assign(outlinesRef, ctx.obj({ Type: "Outlines", First: itemRefs[0], Last: itemRefs.at(-1), Count: PDFNumber.of(itemRefs.length) }));
+  doc.catalog.set(PDFName.of("Outlines"), outlinesRef);
+  await save("bookmarks.pdf", doc);
+}
+
+{
+  // A4 portrait, US Letter landscape, A5 portrait.
+  const doc = await PDFDocument.create({ updateMetadata: false });
+  doc.setCreationDate(FIXED_DATE);
+  doc.setModificationDate(FIXED_DATE);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  [[595, 842], [792, 612], [420, 595]].forEach(([w, h], i) => {
+    const page = doc.addPage([w, h]);
+    page.drawText(`Page ${i + 1}`, { x: 40, y: h - 60, size: 24, font });
+  });
+  await save("mixed-sizes.pdf", doc);
+}
+
+{
+  // Non-Latin text (Cyrillic, Greek, CJK, Arabic) through a Type0 font with a
+  // ToUnicode map, so text extraction is exact. The font is not embedded (no
+  // font file or dependency needed); viewers substitute a font for display.
+  const text = "Привет мир · Γειά σου · 你好世界 · مرحبا";
+  const chars = Array.from(text);
+  const doc = await PDFDocument.create({ updateMetadata: false });
+  doc.setCreationDate(FIXED_DATE);
+  doc.setModificationDate(FIXED_DATE);
+  const ctx = doc.context;
+  const hex = (n, w = 4) => n.toString(16).toUpperCase().padStart(w, "0");
+  const utf16 = (ch) => Array.from(Buffer.from(ch, "utf16le").swap16()).map((b) => hex(b, 2)).join("");
+  const cmap = [
+    "/CIDInit /ProcSet findresource begin",
+    "12 dict begin",
+    "begincmap",
+    "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def",
+    "/CMapName /InstaPDF-Fixture-UCS def",
+    "/CMapType 2 def",
+    "1 begincodespacerange <0000> <FFFF> endcodespacerange",
+    `${chars.length} beginbfchar`,
+    ...chars.map((ch, i) => `<${hex(i + 1)}> <${utf16(ch)}>`),
+    "endbfchar",
+    "endcmap",
+    "CMapName currentdict /CMap defineresource pop",
+    "end",
+    "end",
+  ].join("\n");
+  const toUnicode = ctx.register(ctx.flateStream(cmap));
+  const descriptor = ctx.register(
+    ctx.obj({ Type: "FontDescriptor", FontName: "NotoSans", Flags: 4, FontBBox: [-500, -300, 1500, 1000], ItalicAngle: 0, Ascent: 1000, Descent: -300, CapHeight: 700, StemV: 80 }),
+  );
+  const cidFont = ctx.register(
+    ctx.obj({
+      Type: "Font",
+      Subtype: "CIDFontType2",
+      BaseFont: "NotoSans",
+      CIDSystemInfo: { Registry: PDFString.of("Adobe"), Ordering: PDFString.of("Identity"), Supplement: 0 },
+      FontDescriptor: descriptor,
+      DW: 1000,
+    }),
+  );
+  const font = ctx.register(ctx.obj({ Type: "Font", Subtype: "Type0", BaseFont: "NotoSans", Encoding: "Identity-H", DescendantFonts: [cidFont], ToUnicode: toUnicode }));
+  for (let p = 1; p <= 2; p++) {
+    const page = doc.addPage([595, 842]);
+    const key = page.node.newFontDictionary("F1", font);
+    page.pushOperators(
+      PDFOperator.of(Ops.BeginText),
+      PDFOperator.of(Ops.SetFontAndSize, [key, PDFNumber.of(12)]),
+      PDFOperator.of(Ops.MoveText, [PDFNumber.of(72), PDFNumber.of(760)]),
+      PDFOperator.of(Ops.ShowText, [PDFHexString.of(chars.map((_, i) => hex(i + 1)).join(""))]),
+      PDFOperator.of(Ops.EndText),
+    );
+  }
+  await save("non-latin.pdf", doc);
+}
+
+// The large fixture (>= 40 MB) is generated at test time by e2e/support/large-pdf.ts, never committed.
 
 await writeFile(join(here, "corrupt.pdf"), "This is not a PDF file, only plain text with a .pdf extension.\n");
 await writeFile(join(here, "empty.pdf"), new Uint8Array(0));

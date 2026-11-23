@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { baseName, fileNameOnly, formatBytes, pdfOutputName, uniqueNames, zipName } from "./naming";
 
 describe("pdfOutputName", () => {
-  it("keeps the original name (AC-41)", () => {
+  it("AC-41: keeps the original name", () => {
     expect(pdfOutputName("three-pages.pdf")).toBe("three-pages.pdf");
     expect(pdfOutputName("Report.PDF")).toBe("Report.PDF");
   });
@@ -18,7 +18,7 @@ describe("pdfOutputName", () => {
 });
 
 describe("zipName", () => {
-  it("names the ZIP after the tool (AC-42)", () => {
+  it("AC-42: names the ZIP after the tool", () => {
     expect(zipName("rotate-pdf")).toBe("instapdf-rotate.zip");
     expect(zipName("merge-pdf")).toBe("instapdf-merge.zip");
     expect(zipName("n-up")).toBe("instapdf-n-up.zip");
