@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { siteCopy } from "../site/copy";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
+import { AlertIcon } from "../ui/icons";
 import { useLeaveGuard } from "./useLeaveGuard";
 
 /**
@@ -57,6 +58,7 @@ export function LeaveGuard({ active }: { active: boolean }) {
       open={!!pending}
       onClose={() => setPending(null)}
       title={siteCopy.leaveTitle}
+      icon={<AlertIcon />}
       description={siteCopy.leaveBody}
       initialFocusRef={stay}
       fallbackFocus={() => document.getElementById("main")}

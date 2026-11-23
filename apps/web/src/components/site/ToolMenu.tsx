@@ -28,7 +28,7 @@ const RESULTS_ID = "tool-menu-results";
 type Mode = "panel" | "dialog";
 type Anchor = { top: number; left: number; width: number };
 
-/** Mint Paper Menu: opens directly under its trigger, left-aligned, kept inside the viewport. */
+/** BerryPDF Menu: opens directly under its trigger, left-aligned, kept inside the viewport. */
 function anchorFor(trigger: HTMLElement | null): Anchor {
   const vw = document.documentElement.clientWidth;
   const width = Math.min(1140, vw - 30);
@@ -184,7 +184,7 @@ export function ToolMenu() {
         aria-haspopup={desktop === false ? "dialog" : undefined}
         onClick={toggle}
         data-testid="all-tools-button"
-        // Mint Paper Header: the "All" chip (surface-soft, 1px border, radius-md).
+        // BerryPDF Header: the "All tools" pill chip (cream with a sand outline).
         className="ip-js-only mp-navlink mp-navlink--chip relative cursor-pointer before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-['']"
       >
         {siteCopy.menuButton}
@@ -198,7 +198,7 @@ export function ToolMenu() {
 
       {open && mode === "panel" && (
         <>
-          {/* Mint Paper Menu has no dimming: an invisible layer below the header catches the outside click. */}
+          {/* BerryPDF Menu has no dimming: an invisible layer below the header catches the outside click. */}
           <div aria-hidden="true" className="fixed inset-x-0 bottom-0" style={{ top: Math.max(0, anchor.top - 4) }} onClick={() => close(true)} data-testid="tool-menu-scrim" />
           <div
             id={MENU_ID}
@@ -292,7 +292,7 @@ function MenuContent({
           {count}
         </div>
       ) : (
-        <div className="sticky top-0 z-10 -mx-4 bg-surface-raised px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-2 shadow-[0_1px_0_var(--border)]">
+        <div className="sticky top-0 z-10 -mx-4 bg-surface-raised px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-2 shadow-[0_1.5px_0_var(--sand)]">
           <div className="flex items-center gap-2">
             {search}
             {closeButton}
@@ -361,11 +361,11 @@ function MenuEntry({ item }: { item: ToolIndexItem }) {
   const badge = badgeText(item);
   // Name from content, in visual order: name, badge, runtime marker (AC-56, AC-59).
   return (
-    // Mint Paper Menu row: 3x15 padding, 16px leading icon (category hue), #f5f5f5 on hover.
-    <Link href={`/${item.slug}`} prefetch={false} className="mp-menu-row gap-0.5 max-md:min-h-11">
+    // BerryPDF Menu row: icon + label, 8x12 padding, 9px radius; hover gives a pink band and berry text.
+    <Link href={`/${item.slug}`} prefetch={false} className="mp-menu-row mx-2 gap-0.5 max-md:min-h-11">
       <span className="flex items-center gap-2">
-        <span className={cx("shrink-0 [&_svg]:size-4", usable(item) ? "text-(--c)" : "text-muted")}>{item.icon}</span>
-        <span className="min-w-0 flex-1 [overflow-wrap:anywhere] text-ink">{item.name}</span>
+        <span className={cx("shrink-0 [&_svg]:size-5", usable(item) ? "text-(--c)" : "text-muted")}>{item.icon}</span>
+        <span className="ip-menu-name min-w-0 flex-1 [overflow-wrap:anywhere] text-ink">{item.name}</span>
         {badge && (
           <>
             <NameSep />
@@ -376,7 +376,7 @@ function MenuEntry({ item }: { item: ToolIndexItem }) {
       {item.runtime === "client" && (
         <>
           <NameSep />
-          <RuntimeMarker className="ps-6" />
+          <RuntimeMarker className="ps-7" />
         </>
       )}
     </Link>

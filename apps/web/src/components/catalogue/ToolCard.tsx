@@ -60,12 +60,12 @@ function Meta({ item, className }: { item: ToolIndexItem; className?: string }) 
   );
 }
 
-/** The 32px icon halo: the category hue at 20% behind a thin icon in the full hue (Mint Paper ToolCard). */
+/** The 40px icon disc: the category berry at 16% behind the duotone icon in the full colour (BerryPDF ToolCard). */
 function Halo({ item }: { item: ToolIndexItem }) {
   return <span className="mp-halo">{item.icon}</span>;
 }
 
-/** Leaf-cornered Mint Paper tool card. Colour means category: `ip-cat-*` sets the hue. */
+/** Leaf-cornered BerryPDF tool card. Colour means category: `ip-cat-*` sets the hue. */
 const cardClass = (item: ToolIndexItem, extra?: string) => cx("mp-card", `ip-cat-${item.category}`, extra);
 
 /** Full catalogue card: the whole card is one link (AC-7). */
@@ -84,7 +84,7 @@ export function ToolCard({ item, idPrefix = "cat", nameRange, summaryRange }: { 
       <span id={`${base}-summary`} className="mp-card__desc">
         <Highlighted text={item.summary} range={summaryRange} />
       </span>
-      <Meta item={item} className="mb-1 ms-1.5" />
+      <Meta item={item} className="mb-0.5 ms-0.5" />
     </Link>
   );
 }
@@ -102,19 +102,19 @@ export function ToolTile({ item, idPrefix = "pop" }: { item: ToolIndexItem; idPr
         </span>
       </span>
       <NameSep />
-      <span id={`${base}-summary`} className="sr-only lg:not-sr-only lg:mt-1.5 lg:mb-2 lg:ms-1.5 lg:block lg:text-sm lg:leading-4 lg:text-muted">
+      <span id={`${base}-summary`} className="sr-only lg:not-sr-only lg:mt-2 lg:mb-1.5 lg:ms-0.5 lg:block lg:text-sm lg:leading-[19px] lg:text-muted">
         {item.summary}
       </span>
-      <Meta item={item} className="mt-1 mb-1 ms-1.5" />
+      <Meta item={item} className="mt-1.5 mb-0.5 ms-0.5" />
     </Link>
   );
 }
 
-/** Recent-tools chip (usable tools only, so no badges): the Mint Paper nav chip, icon in its category hue. */
+/** Recent-tools chip (usable tools only, so no badges): the BerryPDF nav chip, icon in its category colour. */
 export function ToolChip({ item, children }: { item: ToolIndexItem; children?: ReactNode }) {
   return (
     <Link href={`/${item.slug}`} className={cx("mp-navlink mp-navlink--chip gap-2", `ip-cat-${item.category}`)}>
-      <span className="text-(--c) [&_svg]:size-4">{item.icon}</span>
+      <span className="text-(--c) [&_svg]:size-[18px]">{item.icon}</span>
       {item.name}
       {children}
     </Link>

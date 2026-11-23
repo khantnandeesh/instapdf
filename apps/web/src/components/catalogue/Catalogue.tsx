@@ -114,8 +114,9 @@ export function Catalogue() {
   }, [updateQuery]);
 
   return (
-    // Mint Paper Home: the sand wash holds the whole catalogue, grouped under coloured eyebrows.
-    <section aria-labelledby="tools-heading" className="mp-sand pt-(--space-8) pb-(--space-8)" data-testid="catalogue">
+    // BerryPDF Home: the catalogue, grouped under coloured eyebrows, right on the grid paper (the only
+    // background); the hero above is set off by spacing and one vine divider (page.tsx).
+    <section aria-labelledby="tools-heading" className="pt-(--space-7) pb-(--space-8)" data-testid="catalogue">
       <div className="mx-auto max-w-[1170px] px-[15px]">
         <div id="tools" ref={headingRef} className="scroll-mt-[calc(var(--ip-header-h)+16px)] text-center">
           <h2 id="tools-heading" className="text-section-title text-ink">
@@ -202,7 +203,7 @@ export function Catalogue() {
 function CategorySection({ id, label, matches, searching }: { id: string; label: string; matches: ToolMatch<ToolIndexItem>[]; searching: boolean }) {
   return (
     <section id={`cat-${id}`} aria-labelledby={`cat-${id}-heading`} className={`ip-cat-${id} mt-8 scroll-mt-[calc(var(--ip-header-h)+16px)]`} data-testid="category">
-      {/* Mint Paper eyebrow: UPPERCASE in the category's colour (text shade, see tokens.css). */}
+      {/* BerryPDF eyebrow: UPPERCASE Fredoka in the category's berry colour (text shade, see tokens.css). */}
       <div className="flex items-baseline gap-3">
         <h3 id={`cat-${id}-heading`} className="mp-eyebrow">
           {label}
@@ -223,8 +224,8 @@ function CategorySection({ id, label, matches, searching }: { id: string; label:
 function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
   return (
     <div className="mt-10 flex flex-col items-center gap-2 py-8 text-center" data-testid="no-results">
-      <span className="grid size-16 place-items-center rounded-full bg-surface-raised text-muted shadow-card">
-        <SearchIcon size={28} />
+      <span className="grid size-16 place-items-center rounded-full bg-surface-raised text-brand-strong shadow-card">
+        <SearchIcon size={30} />
       </span>
       <p className="mt-2 font-bold [overflow-wrap:anywhere]">{copy.none(query)}</p>
       {/* Same size as the line above: a bold line over a smaller one reads as a heading to axe (p-as-heading). */}

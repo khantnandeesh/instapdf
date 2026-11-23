@@ -4,18 +4,23 @@ import { buildToolIndex } from "../catalogue/toolIndex";
 import { usable } from "../catalogue/types";
 import { ToolIntro } from "../tool-flow/ToolIntro";
 import { buttonClasses } from "../ui/Button";
-import { ArrowLeftIcon, ClockIcon, DeviceIcon, InfoIcon } from "../ui/icons";
+import { Floaties, VineDivider } from "../berry/Berry";
+import { ArrowLeftIcon, DeviceIcon, InfoIcon } from "../ui/icons";
 import type { Tool } from "@/tools/registry";
 import { siteCopy } from "./copy";
 
 const container = "mx-auto w-full max-w-[1170px] px-[15px]";
 
-/** Usable tools as Mint Paper tool cards on the sand wash (coming-soon and 404 pages). Omitted when none are usable. */
+/**
+ * Usable tools as BerryPDF tool cards (coming-soon and 404 pages), on the grid paper, set off from
+ * the empty state above by the vine divider (the page's one divider style). Omitted when none are usable.
+ */
 export function AvailableNow({ idPrefix }: { idPrefix: string }) {
   const ready = buildToolIndex().items.filter(usable);
   if (!ready.length) return null;
   return (
-    <section aria-labelledby={`${idPrefix}-available`} className="mp-sand mt-(--space-8) pt-(--space-8) pb-(--space-8)" data-testid="available-now">
+    <section aria-labelledby={`${idPrefix}-available`} className="pt-(--space-7) pb-(--space-8)" data-testid="available-now">
+      <VineDivider className="mb-(--space-7)" />
       <div className={container}>
         <h2 id={`${idPrefix}-available`} className="text-center text-section-title text-ink">
           {siteCopy.available}
@@ -34,27 +39,27 @@ export function AvailableNow({ idPrefix }: { idPrefix: string }) {
 
 /**
  * `/<slug>` of a planned tool: a status page instead of a 404, never a file picker (AC-48).
- * Mint Paper Tool page: centered page-title + grey subtitle, then the full-width grey band.
+ * BerryPDF Tool page head (centred page title + muted subtitle), then the EmptyState: the words and
+ * the single berry button in the middle of the grid paper, small pale berries and blossoms
+ * floating around them, and a jam label naming the status.
  */
 export function ComingSoonPage({ tool }: { tool: Tool }) {
   return (
     <main id="main" tabIndex={-1} className="outline-none">
       <div className={container}>
-        <Link href="/#tools" className="mt-4 inline-flex min-h-6 items-center gap-1.5 text-sm text-muted hover:text-ink hover:underline">
+        <Link href="/#tools" className="mt-4 inline-flex min-h-6 items-center gap-1.5 text-sm text-muted hover:text-brand-strong hover:underline">
           <ArrowLeftIcon size={16} />
           {siteCopy.soonBack}
         </Link>
         <ToolIntro title={tool.name} summary={tool.summary} />
       </div>
-      <section aria-labelledby="soon-heading" className="bg-band py-[50px]" data-testid="coming-soon">
-        <div className={`${container} flex flex-col items-center gap-3 text-center`}>
-          <span className="grid size-14 place-items-center rounded-full bg-surface-raised text-muted">
-            <ClockIcon size={28} />
-          </span>
-          <h2 id="soon-heading" className="text-section-title text-ink">
-            {siteCopy.soonHeading}
+      <section aria-labelledby="soon-heading" className="mp-empty" data-testid="coming-soon">
+        <Floaties set="empty" />
+        <div className={`mp-empty__in ${container} flex flex-col items-center gap-3 text-center`}>
+          <h2 id="soon-heading">
+            <span className="mp-jamtag text-[15px]">{siteCopy.soonHeading}</span>
           </h2>
-          <p className="max-w-[640px] text-ink">{siteCopy.soonBody(tool.name)}</p>
+          <p className="max-w-[640px] text-[20px] leading-[1.4] text-ink-black">{siteCopy.soonBody(tool.name)}</p>
           <p className="flex max-w-[640px] items-start gap-2 text-sm text-muted">
             {tool.runtime === "client" ? <DeviceIcon size={18} className="mt-px shrink-0" /> : <InfoIcon size={18} className="mt-px shrink-0" />}
             {tool.runtime === "client" ? siteCopy.soonClient : siteCopy.soonServer}
@@ -69,7 +74,7 @@ export function ComingSoonPage({ tool }: { tool: Tool }) {
   );
 }
 
-/** Footer placeholder pages until F21 writes them: Mint Paper Prose column. */
+/** Footer placeholder pages until F21 writes them: BerryPDF Prose column (no decoration). */
 export function PlaceholderPage({ title }: { title: string }) {
   return (
     <main id="main" tabIndex={-1} className="px-[15px] pt-(--space-8) pb-(--space-8) outline-none">
@@ -88,13 +93,17 @@ export function PlaceholderPage({ title }: { title: string }) {
 
 export function NotFoundPage() {
   return (
-    <main id="main" tabIndex={-1} className="pt-(--space-8) outline-none">
-      <div className={`${container} text-center`}>
-        <h1 className="text-page-title text-ink">{siteCopy.notFoundTitle}</h1>
-        <p className="mt-2.5 text-subtitle text-muted">{siteCopy.notFoundBody}</p>
-        <Link href="/#tools" className={buttonClasses("primary", "md", "mt-6")}>
-          {siteCopy.soonCta}
-        </Link>
+    <main id="main" tabIndex={-1} className="outline-none">
+      {/* BerryPDF EmptyState: nothing to show here, so the words and one button float among berries. */}
+      <div className="mp-empty">
+        <Floaties set="empty" />
+        <div className={`mp-empty__in ${container} pt-(--space-8)`}>
+          <h1 className="text-page-title text-ink-black">{siteCopy.notFoundTitle}</h1>
+          <p className="mt-2.5 text-subtitle text-muted">{siteCopy.notFoundBody}</p>
+          <Link href="/#tools" className={buttonClasses("primary", "md", "mt-6")}>
+            {siteCopy.soonCta}
+          </Link>
+        </div>
       </div>
       <AvailableNow idPrefix="nf" />
     </main>

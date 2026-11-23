@@ -12,14 +12,24 @@ import { flowTool } from "@/tools/registry";
 
 const tool = flowTool("rotate-pdf");
 
-/** ChoiceTile line icon: three small pages, the ones in scope filled. */
+/** ChoiceTile icon (30px, duotone like Phosphor): three small pages, the ones in scope filled. */
 function ScopeIcon({ filled }: { filled: [boolean, boolean, boolean] }) {
   return (
-    <svg width="27" height="27" viewBox="0 0 27 27" aria-hidden="true" className="max-lg:hidden" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
-      {[2, 10, 18].map((x, i) => (
-        <rect key={x} x={x + 0.75} y="6.75" width="6.5" height="13.5" rx="1" fill={filled[i] ? "currentColor" : "none"} fillOpacity={filled[i] ? 0.35 : 0} />
+    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true" className="max-lg:hidden" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round">
+      {[2.5, 11.5, 20.5].map((x, i) => (
+        <rect key={x} x={x} y="7" width="7" height="16" rx="1.6" fill={filled[i] ? "currentColor" : "none"} fillOpacity={filled[i] ? 0.35 : 0} />
       ))}
     </svg>
+  );
+}
+
+/** A numbered option step: the number in a soft berry disc, then the Fredoka title (decorative; the group has its own label). */
+function Step({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <span className="mp-step hidden lg:flex" aria-hidden="true">
+      <span className="mp-step__n">{n}</span>
+      {children}
+    </span>
   );
 }
 
@@ -113,19 +123,15 @@ export function RotateTool() {
         return false;
       }}
       renderOptions={(ctx) => (
-        // Mint Paper working mode: numbered steps, ChoiceTiles for the scope, the rotate actions as
-        // editing tools (blue), Reset as a soft button; the mint primary sits below in the dock.
-        <div className="flex items-center gap-3 lg:flex-col lg:items-stretch lg:gap-6">
-          <div className="flex min-w-0 flex-col gap-2.5 max-lg:flex-1">
-            <span className="mp-step hidden lg:block" aria-hidden="true">
-              1. Apply to
-            </span>
+        // BerryPDF working mode: numbered steps, ChoiceTiles for the scope, the rotate actions as
+        // blueberry editing tools, Reset as a soft button; the berry primary sits below in the dock.
+        <div className="flex items-center gap-3 lg:flex-col lg:items-stretch lg:gap-7">
+          <div className="flex min-w-0 flex-col gap-3.5 max-lg:flex-1">
+            <Step n={1}>Apply to</Step>
             <SegmentedControl look="tiles" label="Apply to" value={scope} options={scopes} onChange={setScope} fullWidth />
           </div>
-          <div className="flex flex-col gap-2.5">
-            <span className="mp-step hidden lg:block" aria-hidden="true">
-              2. Rotate
-            </span>
+          <div className="flex flex-col gap-3.5">
+            <Step n={2}>Rotate</Step>
             <div className="flex items-center gap-3 lg:flex-col lg:items-start">
               <div className="mp-toolbar lg:flex lg:w-full">
                 <Button variant="tool" className="max-lg:size-11 max-lg:px-0 lg:flex-1" iconStart={<RotateLeftIcon size={18} />} aria-label="Rotate left" title="Rotate left" onClick={() => rotateAll(ctx, -90)}>

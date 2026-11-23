@@ -3,15 +3,13 @@ import { tools } from "@/tools/registry";
 import { Wordmark } from "./BrandMark";
 import { infoPages, siteCopy } from "./copy";
 
-/* Mint Paper Footer links: near-black, 14px, 24px rows (a 24px target, WCAG 2.5.8), underline on hover. */
-const linkClass = "block text-sm leading-6 text-[var(--mp-footer-link)] no-underline hover:underline";
-/* Small bold uppercase headings. */
-const headingClass = "mb-2.5 text-sm font-bold tracking-[0.5px] text-ink uppercase";
+/* BerryPDF Footer links: ink, 15px on 27px rows (also a 24px target, WCAG 2.5.8); berry and underlined on hover. */
+const linkClass = "mp-footer__link";
 
 /**
- * Footer on every page (spec F2 §3g), Mint Paper Footer: a tall, light sitemap on surface-footer
- * with 40px top padding; a small muted sign-off on the left, then plain link columns under small
- * bold uppercase headings. No icons, no social row, no dividers.
+ * Footer on every page (spec F2 §3g), BerryPDF Footer: a calm sitemap on cream, introduced by the
+ * vine divider (layout.tsx). Left: the berry mark, the name and a small muted sign-off; then plain
+ * link columns under small uppercase Fredoka headings in berry red. No social row, no boxes.
  */
 export function SiteFooter() {
   const az = [...tools].sort((a, b) => a.name.localeCompare(b.name, "en"));
@@ -19,11 +17,11 @@ export function SiteFooter() {
   const company = (["about", "help"] as const).map((s) => ({ href: `/${s}`, label: infoPages[s] }));
   const legal = (["privacy", "terms", "cookies", "licenses", "security"] as const).map((s) => ({ href: `/${s}`, label: infoPages[s] }));
   return (
-    <footer className="ip-site-footer bg-surface-footer">
-      <div className="mx-auto grid max-w-[1170px] grid-cols-2 gap-[30px] px-[30px] pt-(--space-7) pb-(--space-7) text-sm lg:grid-cols-[1.4fr_3fr_1fr_1fr]">
+    <footer className="ip-site-footer mp-footer">
+      <div className="mx-auto grid max-w-[1170px] grid-cols-2 gap-[30px] px-[30px] pt-[26px] pb-[34px] text-[15px] lg:grid-cols-[1.4fr_3fr_1fr_1fr]">
         <div className="col-span-2 lg:col-span-1">
           <Wordmark />
-          <small className="mt-2 block text-sm leading-6 text-muted">
+          <small className="mt-3 block text-sm leading-[1.7] text-muted">
             {siteCopy.footerTagline}
             <br />© {year} BerryPDF · {siteCopy.footerPrivacy}
           </small>
@@ -32,7 +30,7 @@ export function SiteFooter() {
           </Link>
         </div>
         <nav aria-labelledby="footer-tools" className="col-span-2 lg:col-span-1">
-          <h2 id="footer-tools" className={headingClass}>
+          <h2 id="footer-tools">
             Tools A–Z
           </h2>
           <ul className="columns-2 gap-6 sm:columns-3 xl:columns-4" data-testid="footer-az">
@@ -65,7 +63,7 @@ export function SiteFooter() {
 function FooterNav({ id, title, links }: { id: string; title: string; links: { href: string; label: string }[] }) {
   return (
     <nav aria-labelledby={id}>
-      <h2 id={id} className={headingClass}>
+      <h2 id={id}>
         {title}
       </h2>
       <ul>

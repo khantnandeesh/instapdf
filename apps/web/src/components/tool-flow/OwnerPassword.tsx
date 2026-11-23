@@ -61,8 +61,8 @@ export function OwnerPasswordDialog({
         </>
       }
     >
-      <IconButton label="Close" className="absolute top-2 right-2" tooltip={false} icon={<CloseIcon />} onClick={onClose} />
-      <ul className="list-disc ps-5 text-sm">
+      <IconButton label="Close" size="sm" className="absolute top-3 right-3" tooltip={false} icon={<CloseIcon size={18} />} onClick={onClose} />
+      <ul className="mp-seedlist mx-auto text-start text-[15px]">
         {denied.map((p) => (
           <li key={p}>{permissionLabels[p]}</li>
         ))}
@@ -90,14 +90,14 @@ export function OwnerPasswordDialog({
             spellCheck={false}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? errorId : undefined}
-            className="ip-field h-10 w-full rounded-lg ps-[13px] pe-12"
+            className="ip-field h-12 w-full ps-[14px] pe-12"
           />
-          <IconButton label="Show password" pressed={visible} size="sm" tooltip={false} className="absolute top-[5px] right-[5px]" icon={<EyeIcon size={18} />} onClick={() => setVisible((v) => !v)} />
+          <IconButton label="Show password" pressed={visible} size="sm" tooltip={false} className="absolute top-[7px] right-[7px]" icon={<EyeIcon size={18} />} onClick={() => setVisible((v) => !v)} />
         </div>
-        <p id={errorId} role="alert" className="flex h-5 items-center gap-1.5 text-sm">
+        <p id={errorId} role="alert" className="flex min-h-5 items-center gap-1.5 text-sm font-semibold text-danger">
           {error && (
             <>
-              <AlertIcon size={16} className="text-danger-strong" />
+              <AlertIcon size={16} />
               {error}
             </>
           )}
