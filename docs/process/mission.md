@@ -10,6 +10,16 @@ Owner's words (2026-11-23): "If anyone has to use a PDF, they use BerryPDF. That
 4. **The best result wins.** We pick the engine that produces the best output. Browser first, because it's faster, private and costs nothing. When a server engine gives a clearly better result, the spec proves it (side-by-side outputs) and it may run on the server, within the budget hard stop. That tool's privacy copy must then say honestly that files are uploaded and deleted.
 5. **Minimal, beautiful, alive UI.** Only the words a user needs, tasteful motion, and the BerryPDF look (`docs/design/berrypdf.md`).
 
+## Server tools: free forever, with a queue
+
+Owner's model (2026-11-23) for anything that runs on our servers:
+
+- **Free stays free, always.** No paywall on a server tool.
+- **A fixed, capped pool of workers** keeps us inside the ₹1000/month budget (Cloud Run max instances, per-IP and global daily limits, and the budget hard stop from rule 5).
+- **When the pool is busy, the user joins a queue** and sees their live position and an honest estimate (for example "You're #25 in line, about 2 minutes"). They can leave the tab open or cancel. Nobody gets a silent failure or a vague "server busy".
+- **Paid later, if ever:** a premium lane may get priority or dedicated workers. The free lane never gets worse because of it.
+- The queue lives in the design of the server worker and the hard stop (backlog Q3 and F6), and in any feature that uses the server (for example the editor, if a server engine wins on quality).
+
 ## How we work
 
 - **Research before building.** Every feature starts with the crawl of the reference page, a live run of the reference tool, and a competitor survey (Sejda, iLovePDF, Smallpdf, PDF24, Adobe, PDFgear, Stirling and others as relevant). A claim needs evidence: a screenshot, a network log, an output file or a link.
