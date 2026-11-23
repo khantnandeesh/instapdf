@@ -277,25 +277,33 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
   useEffect(() => {
     if (lockedFiles.length === 0 && pwDone !== 0) setPwDone(0);
   }, [lockedFiles.length, pwDone]);
+  // The file whose password is being checked. The dialog keeps showing it until
+  // the check (and any "use for the other files" pass) ends, so the next file's
+  // name never flashes up as a second prompt (AC-26).
+  const [pwSubmitting, setPwSubmitting] = useState<{ id: string; name: string } | null>(null);
   const submitPassword = useCallback(
     async (password: string, applyAll: boolean) => {
       const target = filesRef.current.find((f) => f.status === "locked");
       if (!target) return;
       setPw((p) => ({ ...p, busy: true }));
+      setPwSubmitting({ id: target.id, name: target.name });
       const problems: string[] = [];
       const r = await loadFile(target.id, password, problems);
       if (r === "wrong") {
         setPw((p) => ({ busy: false, error: copy.pwWrong, attempt: p.attempt + 1 }));
+        setPwSubmitting(null);
         return;
       }
       let resolved = 1;
       if (applyAll) {
         for (const other of filesRef.current.filter((f) => f.status === "locked")) {
-          if ((await loadFile(other.id, password, problems)) !== "locked") resolved++;
+          const r2 = await loadFile(other.id, password, problems);
+          if (r2 !== "locked" && r2 !== "wrong") resolved++; // a wrong password leaves it locked
         }
       }
       setPwDone((d) => d + resolved);
       setPw({ busy: false, attempt: 0 });
+      setPwSubmitting(null);
       flushProblems(problems);
     },
     [flushProblems, loadFile],
@@ -316,7 +324,6 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
     setProgress(0);
     setPhase("processing");
     announce(tool.flow.progressLabel);
-    requestAnimationFrame(() => progressBox.current?.focus());
     const started = performance.now();
     try {
       const out = await process(ready, controller.signal, (v) => setProgress(v));
@@ -331,9 +338,20 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
       if (controller.signal.aborted) return;
       console.error(`[${tool.slug}] processing failed:`, error instanceof Error ? error.message : "unknown error");
       setPhase("error");
-      requestAnimationFrame(() => retryButton.current?.focus());
     }
   }, [announce, process, tool.flow.progressLabel, tool.slug]);
+
+  // Move focus once the processing bar or the error panel has been committed
+  // (a requestAnimationFrame can run before React commits under load).
+  useEffect(() => {
+    if (phase === "processing") progressBox.current?.focus();
+    else if (phase === "error") retryButton.current?.focus();
+  }, [phase]);
+  // Start over focuses the (re-mounted) picker after the empty state is committed.
+  const [focusPickerTick, setFocusPickerTick] = useState(0);
+  useEffect(() => {
+    if (focusPickerTick) picker.current?.focus();
+  }, [focusPickerTick]);
 
   const startOver = useCallback(() => {
     abort.current?.abort();
@@ -345,9 +363,10 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
     setNotices([]);
     setViewChoice(null);
     setPw({ busy: false, attempt: 0 });
+    setPwSubmitting(null);
     onReset?.();
     announce("Cleared. Add a PDF to start.");
-    requestAnimationFrame(() => picker.current?.focus());
+    setFocusPickerTick((n) => n + 1);
   }, [announce, onReset, releaseDoc, updateFiles]);
 
   const backToOptions = useCallback(() => {
@@ -610,9 +629,9 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
       <NoticeStack notices={notices} onDismiss={dismissNotice} />
 
       <PasswordDialog
-        open={!!currentLocked && state !== "done"}
-        fileId={currentLocked?.id ?? ""}
-        fileName={currentLocked?.name ?? ""}
+        open={(!!currentLocked || !!pwSubmitting) && state !== "done"}
+        fileId={pwSubmitting?.id ?? currentLocked?.id ?? ""}
+        fileName={pwSubmitting?.name ?? currentLocked?.name ?? ""}
         queuePosition={pwDone + lockedFiles.length > 1 ? { index: pwDone + 1, total: pwDone + lockedFiles.length } : undefined}
         showApplyToAll={lockedFiles.length > 1 || files.some((f) => f.status === "loading")}
         error={pw.error}

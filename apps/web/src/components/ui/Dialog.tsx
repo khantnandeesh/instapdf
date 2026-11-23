@@ -55,7 +55,9 @@ export function Dialog({
     } else if (!open && dialog.open) {
       dialog.close();
       const back = returnFocusRef?.current ?? opener.current;
-      const el = back && back.isConnected && !back.closest("[inert]") ? back : fallbackFocus?.();
+      // <body> means nothing had focus when the dialog opened (e.g. the picker that started
+      // the intake had already unmounted), so use the fallback instead of dropping focus.
+      const el = back && back !== document.body && back.isConnected && !back.closest("[inert]") ? back : fallbackFocus?.();
       el?.focus();
     }
   }, [open, initialFocusRef, returnFocusRef, fallbackFocus]);
