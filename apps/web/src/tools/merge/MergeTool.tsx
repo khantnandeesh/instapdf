@@ -156,8 +156,13 @@ export function MergeTool() {
   };
 
   /** Applies an edit. Edits that offer undo replace the notice; any other edit ends undo. */
-  const commit = (next: PageRef[], o: { undo?: string } = {}) => {
+  const commit = (next: PageRef[], o: { undo?: string } = {}): boolean => {
     const prev = pagesRef.current;
+    // Edits that add pages (blank, duplicate) respect the same total-page cap as intake (spec §2, §5).
+    if (next.length > prev.length && next.length > tool.flow.maxTotalPages) {
+      api.current?.pushNotice({ tone: "warning", title: c.overPages(tool.flow.maxTotalPages) });
+      return false;
+    }
     if (o.undo) {
       const old = undoRef.current;
       if (old) api.current?.dismissNotice(old.noticeId);
@@ -176,6 +181,7 @@ export function MergeTool() {
     setPages(next);
     const alive = new Set(next.map((p) => p.uid));
     setSelection((s) => (Array.from(s).every((u) => alive.has(u)) ? s : new Set(Array.from(s).filter((u) => alive.has(u)))));
+    return true;
   };
 
   // Ctrl/Cmd+Z while the undo notice is shown.
@@ -451,7 +457,7 @@ export function MergeTool() {
   const insertBlank = (at: number) => {
     const list = pagesRef.current;
     const blank: PageRef = { uid: newUid(), sourceId: null, sourceIndex: -1, rotation: 0, size: blankSizeAt(list, at) };
-    commit(insertPages(list, at, [blank]));
+    if (!commit(insertPages(list, at, [blank]))) return;
     api.current?.setView("pages");
     setInserted(new Set([blank.uid]));
     announce(c.blankAdded(list[at - 1] ? c.after(labelOf(list[at - 1])) : at === 0 && list.length ? c.atStart : c.atEnd));
@@ -525,7 +531,7 @@ export function MergeTool() {
       }
       case "duplicate": {
         const { pages: next, added } = duplicatePages(list, new Set(scopeOf(uid)), newUid);
-        commit(next);
+        if (!commit(next)) return;
         setInserted(new Set(added));
         focusOn(added[0]);
         return;

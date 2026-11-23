@@ -45,4 +45,5 @@ export const mergeCopy = {
   changed: (count: number) => `${count} changed`,
   reset: "Reset options",
   resetDone: "Options reset",
+  overPages: (max: number) => `That would take this merge past ${n(max)} pages, so nothing was added.`,
 };
