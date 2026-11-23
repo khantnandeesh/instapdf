@@ -29,12 +29,28 @@ describe("flow config", () => {
     expect(rotate.flow.outputName(["three-pages.pdf"])).toBe("three-pages.pdf");
     expect(rotate.flow.outputName(["a.pdf", "b.pdf"])).toBe("instapdf-rotate.zip");
   });
-  it("keeps every other tool planned", () => {
-    expect(tools.filter((t) => t.status !== "planned").map((t) => t.slug)).toEqual(["rotate-pdf"]);
+  it("runs Merge on the shared flow with its overrides (F3 §0)", async () => {
+    const { flowTool } = await import("./registry");
+    const merge = flowTool("merge-pdf");
+    expect(merge.status).toBe("beta");
+    expect(merge.runtime).toBe("client");
+    expect(merge.flow.accept.extensions).toEqual([".pdf", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", ".tiff"]);
+    expect(merge.flow.maxFiles).toBe(50);
+    expect(merge.flow.maxFileBytes).toBe(100 * 1024 * 1024);
+    expect(merge.flow.maxTotalBytes).toBe(500 * 1024 * 1024);
+    expect(merge.flow.maxTotalPages).toBe(1000);
+    expect(merge.flow.defaultView).toBe("files");
+    expect(merge.flow.optionsDensity).toBe("full");
+    expect(merge.flow.requiredPermissions).toEqual([]);
+    expect(merge.flow.actionLabel).toBe("Merge PDFs");
+    expect(merge.flow.outputName(["alpha.pdf", "bravo.pdf"])).toBe("alpha-merged.pdf");
   });
-  it("offers Rotate to continue with a PDF output and nothing for a ZIP", async () => {
+  it("keeps every other tool planned", () => {
+    expect(tools.filter((t) => t.status !== "planned").map((t) => t.slug)).toEqual(["merge-pdf", "rotate-pdf"]);
+  });
+  it("offers Merge and Rotate to continue with a PDF output and nothing for a ZIP (F3 AC-43 adapted)", async () => {
     const { continueTargets } = await import("./registry");
-    expect(continueTargets("application/pdf").map((t) => t.slug)).toEqual(["rotate-pdf"]);
+    expect(continueTargets("application/pdf").map((t) => t.slug)).toEqual(["merge-pdf", "rotate-pdf"]);
     expect(continueTargets("application/zip")).toEqual([]);
   });
 });
@@ -82,10 +98,10 @@ describe("catalogue fields (F2)", () => {
   it("orders the Popular row usable first, then planned, in the fixed order (AC-11)", () => {
     expect(popularTools().map((t) => t.slug)).toEqual([
       "rotate-pdf",
+      "merge-pdf",
       "pdf-editor",
       "compress-pdf",
       "delete-pages",
-      "merge-pdf",
       "split-pdf",
       "crop-pdf",
       "fill-sign",
@@ -99,7 +115,7 @@ describe("catalogue fields (F2)", () => {
     const s = shortcutTools();
     expect(s.length).toBeLessThanOrEqual(5);
     for (const t of s) expect(isUsable(t)).toBe(true);
-    expect(s.map((t) => t.slug)).toEqual(["rotate-pdf"]);
+    expect(s.map((t) => t.slug)).toEqual(["rotate-pdf", "merge-pdf"]);
   });
   it("features the editor (H-11 item 7)", () => {
     expect(featured).toBe("pdf-editor");

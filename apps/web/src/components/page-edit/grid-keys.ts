@@ -1,0 +1,50 @@
+/** Roving-focus helpers shared by the Merge grids (F1 U-7 keys). */
+
+export function gridColumns(list: HTMLElement | null): number {
+  if (!list) return 1;
+  return Math.max(1, getComputedStyle(list).gridTemplateColumns.split(" ").filter(Boolean).length);
+}
+
+/** Focus target for an arrow / Home / End / Page key, or null when the key is not a navigation key. */
+export function navTarget(key: string, cur: number, count: number, cols: number): number | null {
+  let next: number;
+  switch (key) {
+    case "ArrowRight": next = cur + 1; break;
+    case "ArrowLeft": next = cur - 1; break;
+    case "ArrowDown": next = cur + cols; break;
+    case "ArrowUp": next = cur - cols; break;
+    case "Home": next = 0; break;
+    case "End": next = count - 1; break;
+    case "PageDown": next = cur + cols * 3; break;
+    case "PageUp": next = cur - cols * 3; break;
+    default: return null;
+  }
+  return Math.max(0, Math.min(count - 1, next));
+}
+
+/** Alt+Arrow / Alt+Home / Alt+End move steps (spec F3 M-8): by list position, not by row. */
+export function moveStepFor(e: { key: string; altKey: boolean; ctrlKey: boolean; metaKey: boolean }): "earlier" | "later" | "first" | "last" | null {
+  if (!e.altKey || e.ctrlKey || e.metaKey) return null;
+  switch (e.key) {
+    case "ArrowLeft":
+    case "ArrowUp":
+      return "earlier";
+    case "ArrowRight":
+    case "ArrowDown":
+      return "later";
+    case "Home":
+      return "first";
+    case "End":
+      return "last";
+    default:
+      return null;
+  }
+}
+
+/** Starts loading the drag module (idle after the first ready state, or on the first pointerdown). */
+let dragModule: Promise<typeof import("./drag")> | null = null;
+export function loadDrag() {
+  dragModule ??= import("./drag");
+  dragModule.catch(() => (dragModule = null));
+  return dragModule;
+}
