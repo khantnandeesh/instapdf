@@ -38,6 +38,8 @@ type Phase = "idle" | "processing" | "done" | "error";
 const MIN_PROCESSING_MS = 300;
 const THUMB_MIN = 80;
 const THUMB_MAX = 400;
+/** Same as --ip-thumb-size in tokens.css, so the server HTML needs no style attribute (strict CSP style-src). */
+const THUMB_DEFAULT = 160;
 
 let fileSeq = 0;
 
@@ -85,7 +87,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
   const [message, setMessage] = useState("");
   const announce = useCallback((m: string) => setMessage((prev) => (prev === m ? `${m} ` : m)), []);
   const [viewChoice, setViewChoice] = useState<"pages" | "files" | null>(null);
-  const [thumbSize, setThumbSize] = useState(160);
+  const [thumbSize, setThumbSize] = useState(THUMB_DEFAULT);
   const [renderSize, setRenderSize] = useState(160);
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<{ fileId: string; index: number } | null>(null);
@@ -527,7 +529,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
   );
 
   return (
-    <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" style={{ ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
+    <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" style={thumbSize === THUMB_DEFAULT ? undefined : { ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
       <DropOverlay active={dragging && acceptsDrop} mode={flow.multiFile || files.length === 0 ? "add" : "replace"} />
       <LiveRegion message={message} />
       <ToolIntro ref={heading} title={flow.title} summary={tool.summary} />
