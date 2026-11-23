@@ -79,8 +79,7 @@ export function DockStatus({ id, text, extra }: { id: string; text: string; extr
 
 /**
  * Same box as the primary button, so swapping them moves nothing: the "Rotating… 42%" line over
- * BerryPDF's JamProgress (the progressbar). While it runs, the vine strip also grows across the top
- * of the working area (ToolFlow; decorative, this bar carries the state).
+ * BerryPDF's JamProgress (the progressbar).
  */
 export const ProcessingBar = forwardRef<HTMLDivElement, { label: string; value: number }>(function ProcessingBar({ label, value }, ref) {
   const pct = Math.round(value * 100);

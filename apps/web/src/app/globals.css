@@ -1190,7 +1190,8 @@
     /* Our drawn checkbox paints its tick as a white image on a berry fill, and forced colors
        repaints the fill, so the tick vanishes. Hand the box back to the system checkbox, which
        draws its checked state in system colours. */
-    .mp-checkbox {
+    .mp-checkbox,
+    .mp-checkbox:checked {
       appearance: auto;
       background: none;
       border: 0;
@@ -1316,7 +1317,7 @@
   .mp-rise > li:nth-child(10) { animation-delay: 270ms; }
   .mp-rise > li:nth-child(n + 11) { animation-delay: 300ms; }
   /* Hero: title, line, button and note fade up one after another. */
-  .mp-hero > h1,
+  /* The h1 is the largest paint, so it shows at once (AC-55). */
   .mp-hero > p,
   .mp-hero > div {
     animation: mp-fade-up 400ms var(--ease-enter) both;
@@ -1339,7 +1340,7 @@
   .mp-dropcard {
     animation:
       mp-pop-in 380ms var(--ease-pop) both,
-      mp-breathe 3.2s ease-in-out 400ms infinite;
+      mp-breathe 3.2s ease-in-out 400ms 1; /* breathes once: no motion past 5s (WCAG 2.2.2) */
   }
   /* Rendered page thumbnails ease in (fade + settle from 98%). */
   .mp-thumb-in {
