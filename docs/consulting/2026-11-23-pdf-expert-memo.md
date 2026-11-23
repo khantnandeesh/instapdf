@@ -60,4 +60,4 @@ Monetization: browser tools free and unlimited; charge for server minutes (OCR p
 | Recommendation | Status |
 |---|---|
 | Merge: flatten failure, `scalePage` indirect boxes, Lang/PageLabels carry-over, warnings for tagged/PDF/A/layers/attachments/signatures, private-API canary, `pdf-lib` to devDependencies, conditional NeedAppearances | In the F3 fix round (PR #7) |
-| Charter rule 4 change, roadmap reorder, budget hard stop, legal pages before prod, corpus gate | Awaiting owner decision |
+| Charter rule 4 change, roadmap reorder, budget hard stop, legal pages before prod, corpus gate | Approved by owner 2026-11-23: CLAUDE.md, workflow.md and backlog.md updated (Q1–Q3 added) |
