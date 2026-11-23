@@ -6,7 +6,7 @@ Status values: `todo` · `in-progress (step n)` · `done`. The orchestrator keep
 |---|---|---|---|
 | F0 | Foundation: monorepo, CI, design tokens, app shell, tool registry, GCP infra + deploy pipelines | – | done (staging: https://web-staging-qzq5fa2g7q-uc.a.run.app; owner to set GitHub repo vars + production env/tag ruleset) |
 | F1 | Shared upload → options → process → result flow (incl. encrypted-PDF password prompts) | shared-chrome | done — evaluator PASS (docs/evals/f1-shared-flow.md); prod release waits on owner GitHub settings. Follow-ups: G-1 paste listener on `document`, G-2 per-page progress, vehicle tool: Rotate |
-| F2 | Home page + tool catalogue + header menu | home | in-progress (step 1) |
+| F2 | Home page + tool catalogue + header menu | home | done — evaluator PASS (docs/evals/f2-home.md); fix in progress for G-1 (AC-56 accessible names, P1). Follow-ups: Back/Forward leave guard, footer year at runtime, third-party notices page (F21) |
 | F3 | Merge (files + pages view, reorder, options) | merge-pdf | todo |
 | F4 | Split by pages / Extract / Delete / Rotate | split-pdf, extract-pdf-pages, delete-pdf-pages, rotate-pdf-pages | todo (Rotate ships in F1; F4 reuses it) |
 | F5 | Organize / Visual combine / Alternate & mix | organize-pdf, visually-combine-reorder-pdf, alternate-mix-pdf | todo |
