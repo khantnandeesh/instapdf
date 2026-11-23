@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { setHandoff, takeHandoff } from "@/lib/pdf/handoff";
 import { openPdf, readPageSizes, type OpenedPdf } from "@/lib/pdf/pdfjs";
 import { ThumbnailRenderer } from "@/lib/pdf/thumbnails";
+import { USER_ERROR } from "@/lib/pdf/user-error";
 import { disposeWorker } from "@/lib/pdf/worker-client";
 import { acceptAttribute, fitsPageBudget, screenFiles } from "@/lib/pdf/validation";
 import { exceedsPixelCap, imageFormatOfName, imagePageSize, probeImage, sniffFormat } from "@/lib/pdf/images";
@@ -106,6 +107,13 @@ export type ToolFlowProps = {
   apiRef?: { current: FlowApi | null };
   /** Called after every change to the file list (status, pages, removal). */
   onFilesChange?: (files: LoadedFile[]) => void;
+  /**
+   * Loads an inspector for each PDF (lazily, so it is not in the first load):
+   * `scan` reads the raw bytes before pdf.js takes them, `notice` looks at the
+   * opened document; a returned sentence is shown as a non-blocking notice
+   * (Merge: properties the output will not keep).
+   */
+  inspectPdf?: () => Promise<PdfInspector>;
 };
 
 export function ToolFlow({
@@ -132,6 +140,7 @@ export function ToolFlow({
   optionsBadge,
   apiRef,
   onFilesChange,
+  inspectPdf,
 }: ToolFlowProps) {
   const flow = tool.flow;
   const router = useRouter();
@@ -152,6 +161,8 @@ export function ToolFlow({
   const [output, setOutput] = useState<ToolOutput | null>(null);
   const [progress, setProgress] = useState(0);
   const [progressPhase, setProgressPhase] = useState<"fonts" | "pages" | undefined>();
+  /** A processing error meant for the user (the job said what to do), shown instead of the generic one. */
+  const [processMessage, setProcessMessage] = useState<string | null>(null);
   const [notices, setNotices] = useState<FlowNotice[]>([]);
   const [message, setMessage] = useState("");
   const announce = useCallback((m: string) => setMessage((prev) => (prev === m ? `${m} ` : m)), []);
@@ -273,8 +284,13 @@ export function ToolFlow({
         // Pictures (Merge): sizes from the header, no decode; each image (or TIFF frame) is one A4 page.
         const format = sniffFormat(bytes);
         let frames: { width: number; height: number }[] | null = null;
-        if (format === "tiff") frames = await (await import("@/lib/pdf/tiff")).tiffFrameSizes(bytes);
-        else if (format) {
+        let tooLarge = false;
+        if (format === "tiff") {
+          // Walked in the TIFF worker with a time limit: a hostile file can never hang this tab.
+          const r = await (await import("@/lib/pdf/tiff-client")).probeTiff(entry.source);
+          if ("frames" in r) frames = r.frames;
+          else tooLarge = r.problem === "tooLarge";
+        } else if (format) {
           const probe = probeImage(bytes);
           frames = probe ? [probe] : null;
         }
@@ -284,6 +300,7 @@ export function ToolFlow({
           removeFile(id);
           return "rejected" as const;
         };
+        if (tooLarge) return reject(copy.errorPixels(entry.name));
         if (!format || !frames?.length) return reject(copy.errorImage(entry.name));
         if (frames.some((f) => exceedsPixelCap(f.width, f.height))) return reject(copy.errorPixels(entry.name));
         const otherPages = filesRef.current.filter((f) => f.id !== id).reduce((sum, f) => sum + f.pageCount, 0);
@@ -293,6 +310,8 @@ export function ToolFlow({
         announce(copy.fileReady(entry.name, frames.length));
         return "ok";
       }
+      const inspector = inspectPdf ? await inspectPdf().catch(() => null) : null;
+      const scanned = inspector?.scan(bytes); // before pdf.js takes the buffer
       const result = await openPdf(bytes, password);
       if (!filesRef.current.some((f) => f.id === id)) {
         if (result.ok) void result.pdf.task.destroy();
@@ -335,9 +354,14 @@ export function ToolFlow({
       renderer?.register(id, pdf.doc);
       patchFile(id, { status: "ready", pages });
       announce(copy.fileReady(entry.name, pdf.pageCount));
+      if (inspector)
+        void inspector
+          .notice(entry.name, pdf.doc, scanned)
+          .then((note) => note && filesRef.current.some((f) => f.id === id) && pushNotice({ tone: "warning", title: note, sticky: true }))
+          .catch(() => {});
       return "ok";
     },
-    [announce, flow.maxTotalPages, patchFile, removeFile, renderer],
+    [announce, flow.maxTotalPages, inspectPdf, patchFile, pushNotice, removeFile, renderer],
   );
 
   const flushProblems = useCallback(
@@ -376,7 +400,7 @@ export function ToolFlow({
       intakeTrigger.current = trigger;
       if (phaseRef.current === "error") setPhase("idle");
       // Info notices last until the next intake; errors stay until dismissed.
-      setNotices((prev) => prev.filter((n) => n.tone === "danger"));
+      setNotices((prev) => prev.filter((n) => n.tone === "danger" || n.sticky));
 
       const screened = screenFiles(
         incoming,
@@ -483,14 +507,17 @@ export function ToolFlow({
       if (controller.signal.aborted) return;
       setProgress(1);
       setOutput(out);
+      for (const w of out.warnings ?? []) pushNotice({ tone: "warning", title: w });
       setPhase("done");
       announce(copy.resultTitle(out.type === "application/zip"));
     } catch (error) {
       if (controller.signal.aborted) return;
-      console.error(`[${tool.slug}] processing failed:`, error instanceof Error ? error.message : "unknown error");
+      const message = error instanceof Error ? error.message : "unknown error";
+      console.error(`[${tool.slug}] processing failed:`, message.startsWith(USER_ERROR) ? "user-facing error" : message);
+      setProcessMessage(message.startsWith(USER_ERROR) ? message.slice(USER_ERROR.length) : null);
       setPhase("error");
     }
-  }, [announce, process, tool.flow.progressLabel, tool.slug]);
+  }, [announce, process, pushNotice, tool.flow.progressLabel, tool.slug]);
 
   // Move focus once the processing bar or the error panel has been committed
   // (a requestAnimationFrame can run before React commits under load).
@@ -838,7 +865,7 @@ export function ToolFlow({
               state === "processing" ? (
                 <ProcessingBar ref={progressBox} label={flow.progressLabel} value={progress} phaseLabel={progressPhase === "fonts" ? copy.preparingFonts : undefined} />
               ) : state === "error" ? (
-                <ProcessError ref={retryButton} message={copy.errorProcess(flow.progressLabel)} onRetry={run} onStartOver={startOver} />
+                <ProcessError ref={retryButton} message={processMessage ?? copy.errorProcess(flow.progressLabel)} onRetry={run} onStartOver={startOver} />
               ) : (
                 primary
               )
@@ -888,6 +915,9 @@ export function ToolFlow({
     </div>
   );
 }
+
+/** See `inspectPdf`. `scan` returns whatever `notice` needs from the raw bytes. */
+export type PdfInspector = { scan: (bytes: Uint8Array) => unknown; notice: (name: string, doc: OpenedPdf["doc"], scanned: unknown) => Promise<string | null> };
 
 /** Re-render thumbnails only in steps, scaling with CSS in between. */
 function renderBucket(size: number): number {

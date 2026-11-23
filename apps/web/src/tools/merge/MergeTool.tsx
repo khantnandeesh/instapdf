@@ -56,6 +56,9 @@ const PagePickerDialog = dynamic(() => loadDialogs().then((m) => m.PagePickerDia
 const MoveToPositionDialog = dynamic(() => loadDialogs().then((m) => m.MoveToPositionDialog), { ssr: false });
 const RemoveSelectedDialog = dynamic(() => loadDialogs().then((m) => m.RemoveSelectedDialog), { ssr: false });
 
+/** Lazily loaded: says which document properties a merge will not keep (non-blocking notice). */
+const inspectPdf = () => import("@/lib/pdf/inspect").then((m) => m.inspector);
+
 type IntakeTag = { at?: number; picker?: boolean };
 type Undo = { snapshot: PageRef[]; noticeId: string };
 type Picker = { fileId: string; at: number | null; letter: string; afterLabel: string | null };
@@ -599,7 +602,7 @@ export function MergeTool() {
       },
       { signal, onProgress },
     );
-    return { name: out.name, type: out.type, blob: out.blob, size: out.blob.size, pageCount: out.pageCount, wasEncrypted: out.wasEncrypted };
+    return { name: out.name, type: out.type, blob: out.blob, size: out.blob.size, pageCount: out.pageCount, wasEncrypted: out.wasEncrypted, warnings: out.warnings };
   };
 
   // Prefetch the workspace chunks once the page is idle, so the first pick never waits for them.
@@ -767,6 +770,7 @@ export function MergeTool() {
             <ChevronDownIcon size={16} className="max-sm:hidden" />
           </MenuButton>
         )}
+        inspectPdf={inspectPdf}
         renderOptions={(ctx) => <MergeOptions value={options} onChange={changeOptions} announce={ctx.announce} />}
       />
       {dialogsUsed.picker && (

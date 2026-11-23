@@ -34,6 +34,8 @@ export type ToolOutput = {
   pageCount?: number;
   entries?: { name: string; pageCount: number }[];
   wasEncrypted: boolean;
+  /** Non-blocking notes about the result, shown as warning notices. */
+  warnings?: string[];
 };
 
 export type FlowState = "empty" | "loading" | "password" | "ready" | "processing" | "done" | "error";
@@ -84,6 +86,8 @@ export type FlowNoticeInput = {
   body?: string;
   items?: string[];
   action?: { label: string; onClick: () => void };
+  /** Kept when new files are added (other info and warning notices are cleared then). */
+  sticky?: boolean;
   /** Auto-dismiss after this long (paused while hovered or focused). */
   timeoutMs?: number;
   onExpire?: () => void;
