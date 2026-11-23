@@ -23,7 +23,7 @@ Status values: `todo` · `in-progress (step n)` · `done` · `deferred`. The orc
 | F13 | Grayscale / Repair | grayscale-pdf, repair-pdf | todo — repair client-side via qpdf-WASM |
 | F15 | OCR / Deskew | ocr-pdf, deskew-pdf | todo — OCR in the browser (tesseract.js) for small jobs; server (OCRmyPDF without Ghostscript) for large |
 | F14 | Office + HTML conversions | word-to-pdf, pdf-to-word, pdf-to-excel, pdf-to-ppt, html-to-pdf | todo — Word/HTML→PDF only (LibreOffice / Chromium, SSRF-hardened, no URL input at first); PDF→Word/Excel/PPT deferred (no good permissive engine) |
-| F16 | PDF editor | pdf-editor | todo — scope: add text, images, whiteout, annotate (no editing of existing text) |
+| F16 | PDF editor | pdf-editor | todo — spec drafted (`docs/specs/f16-pdf-editor.md`): browser-only, 4 phases E1 core → E2 existing-text line edit → E3 paragraphs, links, forms → E4 redaction, Indic/Arabic, OCR. Proposed scope change (adds existing-text editing) awaits owner approval |
 | F17 | Fill & sign | sign-pdf | todo |
 | F21 | Marketing + legal pages | desktop, developers, html-pdf-api, help, blog, press, security, sla, privacy, terms, cookies | todo — privacy, terms, cookies and third-party notices moved to Q1; rest later; desktop/API/teachers pages deferred |
 | F19 | Accounts, usage limits, pricing + checkout | login, account, upgrade, teachers | todo — only once server tools have real usage; server-minute pricing, India pricing (UPI), no ads |
