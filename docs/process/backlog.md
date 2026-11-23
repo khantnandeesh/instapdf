@@ -14,7 +14,7 @@ Status values: `todo` · `in-progress (step n)` · `done` · `deferred`. The orc
 | F12 | JPG↔PDF, extract images, PDF to text | jpg-to-pdf, pdf-to-jpg, extract-images-from-pdf, extract-text-from-pdf | todo |
 | F11 | Protect / Unlock | encrypt-pdf, unlock-pdf | todo — client-side (qpdf-WASM / @cantoo/pdf-lib); tell users when encryption is removed |
 | Q2 | Real-world PDF corpus (qpdf/PDFBox/PDFium/pdf.js suites, veraPDF/Isartor, encryption matrix; fetched by hash nightly) + oracles; CI: WebKit project, bundle-size check, lockfile license scan | – | todo |
-| Q3 | Budget hard stop (budget Pub/Sub → server tools max instances 0) + per-IP/global daily job limits; static assets behind a CDN | – | todo — before F6 |
+| Q3 | Budget hard stop (budget Pub/Sub → server tools max instances 0) + per-IP/global daily job limits + **free job queue** (fixed worker pool, live "You're #n in line" position and ETA, cancel; see docs/process/mission.md) ; static assets behind a CDN | – | todo — before F6 |
 | F6 | Compress (server worker + infra) | compress-pdf | todo — client-first compress (image downsampling in a worker) with server fallback; needs Q3 hard stop and the ≤2h cleaner (Cloud Task per job **and** 15-min sweep) before any upload code |
 | F7 | Split by outline / size / text / in half | split-pdf-by-* , split-pdf-down-the-middle | todo |
 | F8 | Crop / Resize / Flip / N-up | crop-pdf, resize-pdf, flip-pdf, n-up-pdf | todo |
