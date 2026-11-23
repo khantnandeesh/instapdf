@@ -774,7 +774,7 @@ Why the catalogue is one client island and not server cards with a filter script
 
 | Key | Text |
 |---|---|
-| meta.home.title / description | "InstaPDF · Fast, private PDF tools" / "Free online PDF tools that run in your browser. Organize, edit and convert PDFs without uploading them." (tune the last clause per F21; keep it true: most tools are client) |
+| meta.home.title / description | "InstaPDF · Fast, private PDF tools" / "Free online PDF tools to organize, edit and convert PDFs. Most tools run in your browser, so your files stay on your device." (tune the last clause per F21; keep it true: most tools are client) |
 | hero.title | "Fast, private PDF tools" |
 | hero.pitch | "Organize, edit and convert PDFs without installing anything. Most tools run right in your browser, so your files stay on your device." |
 | hero.cta (featured planned) / (featured usable) | "Find a tool" / registry `actionLabel` of the featured tool, e.g. "Edit a PDF" |
