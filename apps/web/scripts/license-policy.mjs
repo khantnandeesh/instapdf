@@ -13,13 +13,30 @@ export const ALLOWED_FONT = new Set(["OFL-1.1"]);
 /**
  * npm packages that ship only font files and their CSS (no program code), e.g. self-hosted
  * Fontsource fonts loaded with next/font/local. They are judged as fonts (ALLOWED_FONT), and only
- * if they really hold no JavaScript (see isFontOnlyPackage).
+ * if every file in them is a font, stylesheet or metadata file (see isFontOnlyPackage).
  */
 export const FONT_PACKAGES = [/^@fontsource\/[a-z0-9-]+$/, /^@fontsource-variable\/[a-z0-9-]+$/];
 
-/** A listed font package whose top-level files include no JavaScript. */
-export function isFontOnlyPackage(name, files) {
-  return FONT_PACKAGES.some((re) => re.test(name)) && !files.some((f) => /\.(m?js|cjs)$/i.test(f));
+/** File types a font-only package may contain (allow-list; anything else, e.g. JS or WASM, disqualifies it). */
+export const FONT_PACKAGE_FILES = [
+  /\.(css|scss|woff2?|ttf|otf|json|md)$/i,
+  /\.d\.[a-z0-9]+\.ts$/i, // type stubs for CSS imports, e.g. index.d.css.ts
+  /^(licen[cs]e|readme|changelog)(\.(md|txt))?$/i,
+];
+
+/**
+ * A listed font package that is really only fonts: `files` is every file in the package,
+ * walked recursively (paths relative to its root, "/" separators), and its package.json
+ * declares no `scripts` and no `bin` (nothing that could run at install or as a command).
+ */
+export function isFontOnlyPackage(name, files, pkg = {}) {
+  if (!FONT_PACKAGES.some((re) => re.test(name))) return false;
+  const has = (v) => v != null && (typeof v === "string" ? v.trim() !== "" : Object.keys(v).length > 0);
+  if (has(pkg.scripts) || has(pkg.bin)) return false;
+  return files.length > 0 && files.every((f) => {
+    const base = f.split("/").pop() ?? f;
+    return FONT_PACKAGE_FILES.some((re) => re.test(base));
+  });
 }
 
 /**

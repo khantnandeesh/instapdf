@@ -54,6 +54,13 @@ function prodTree() {
   return [...seen.values()];
 }
 
+/** Every file under `dir`, recursively, as "/"-separated paths relative to it (symlinks are listed, not followed). */
+function filesDeep(dir, prefix = "") {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? filesDeep(join(dir, e.name), `${prefix}${e.name}/`) : [`${prefix}${e.name}`],
+  );
+}
+
 const LICENSE_FILE = /^(licen[cs]e|copying|notice)([.-].*)?$/i;
 
 function filesIn(dir) {
@@ -92,7 +99,7 @@ function packageEntries() {
     const texts = filesIn(path).map((f) => ({ file: f, text: readFileSync(join(path, f), "utf8").trim() }));
     const copyright = texts.flatMap((t) => copyrightLines(t.text));
     entries.push({
-      kind: isFontOnlyPackage(name, readdirSync(path)) ? "font" : "package",
+      kind: isFontOnlyPackage(name, filesDeep(path), pkg) ? "font" : "package",
       name,
       version,
       license: licenseExpression(pkg),
