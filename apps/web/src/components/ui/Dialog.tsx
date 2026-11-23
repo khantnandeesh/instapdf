@@ -73,9 +73,28 @@ export function Dialog({
     return () => dialog.removeEventListener("cancel", onCancel);
   }, []);
 
+  /** Wrap guard (spec U-7): Tab from the last control goes to the first, Shift+Tab the reverse, instead of leaving for the browser UI. */
+  function wrapTab(e: React.KeyboardEvent<HTMLDialogElement>) {
+    if (e.key !== "Tab" || !ref.current) return;
+    const items = Array.from(
+      ref.current.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),
+    ).filter((el) => !(el as HTMLButtonElement).disabled && el.tabIndex >= 0 && el.getClientRects().length > 0);
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    } else if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    }
+  }
+
   return (
     <dialog
       ref={ref}
+      onKeyDown={wrapTab}
       aria-labelledby={titleId}
       aria-describedby={description ? descId : undefined}
       className={cx(

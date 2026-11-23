@@ -229,6 +229,20 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
     [pushNotice],
   );
 
+  // After a pick from the empty state, its picker unmounts. Once the workspace is
+  // committed, move focus to the toolbar's picker (the same control), but only
+  // if focus fell to <body>: newly loaded files never steal focus.
+  const [focusToolbarTick, setFocusToolbarTick] = useState(0);
+  useEffect(() => {
+    if (!focusToolbarTick) return;
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected) return;
+    const el = picker.current?.element;
+    if (!el) return;
+    intakeTrigger.current = el;
+    el.focus();
+  }, [focusToolbarTick]);
+
   const intake = useCallback(
     async (incoming: File[], trigger: HTMLElement | null, opts: { replace?: boolean } = {}) => {
       if (phaseRef.current === "processing" || phaseRef.current === "done") return;
@@ -263,6 +277,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
         return;
       }
       updateFiles((prev) => [...prev, ...entries]);
+      if (trigger) setFocusToolbarTick((n) => n + 1);
       announce(copy.readingCount(entries.length));
       for (const e of entries) await loadFile(e.id, undefined, problems);
       flushProblems(problems);
