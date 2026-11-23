@@ -111,7 +111,7 @@ export default function PrivacyPage() {
       <Section id="providers" title="Service providers">
         <p>
           The site is hosted on {f.hosting} (Google LLC) in {f.region}. Google handles the request logs described above on our behalf. If you are outside the
-          United States, this means that information is processed in the United States.
+          United States, this means that information may be processed outside your country, including in the United States.
         </p>
       </Section>
 

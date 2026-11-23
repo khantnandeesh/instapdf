@@ -11,7 +11,7 @@ import { downloadResult, fx, openRotate, pickReady, rotateRight, run, tiles } fr
 import { isDesktop, menuSearch, openHydrated, openMenu, plannedTools, RECENT_KEY, usableTools } from "../f2/support";
 
 const PAGES = ["/", ...usableTools.map((t) => `/${t.slug}`), ...plannedTools.map((t) => `/${t.slug}`), "/privacy", "/terms", "/cookies", "/licenses", "/about", "/help", "/security"];
-const NOT_FOUND = ["/does-not-exist", "/rotate-pdf/x", "/merge-pdf/extra"];
+const NOT_FOUND = ["/does-not-exist", "/rotate-pdf/x", "/merge-pdf/extra", "/_next/image?url=%2Ffile.svg&w=64&q=75", "/_next/static-x"];
 
 const directives = (policy: string) => new Map(policy.split(/;\s*/).map((d) => [d.split(" ")[0], d.split(" ").slice(1)] as const));
 

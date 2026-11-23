@@ -14,7 +14,7 @@ import { contentSecurityPolicy, hashesFor, type CspManifest } from "@/lib/securi
 
 export const config = {
   runtime: "nodejs",
-  matcher: ["/((?!_next/static|_next/image).*)"],
+  matcher: ["/((?!_next/static/).*)"],
 };
 
 const dev = process.env.NODE_ENV === "development";
