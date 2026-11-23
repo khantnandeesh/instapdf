@@ -1,6 +1,6 @@
 # F2: Home page, tool catalogue and header menu
 
-Status: step 2 (Research) done. Next: Design.
+Status: step 3 (Design) done. Next: Build.
 Reference observed: the reference home page (`/`) on desktop (1366×900) and mobile (375×812), its "All tools" mega menu, and its recent-tools behavior, 2026-11-23. No processing task was run. One tool page (`flip-pdf`) was opened only to see how a visit is recorded in the recent list.
 Internal screenshots: `docs/specs/assets/f2-home/` (reference only, never ship).
 
@@ -539,7 +539,7 @@ Shared frame on every page (root layout): skip link → `SiteHeader` (56 px, sti
 ├───────────────────────────────┤
 │ Recently used          Clear  │
 │ [⟳ Rotate] [..]  →            │
-│ Organize pages · 12           │ h2 sm 600 fg-muted, sticky under the bar? no
+│ Organize pages · 12           │ h2 sm 600 fg-muted (scrolls with the list)
 │ ⇉ Merge          Coming soon  │ entry 52, full width
 │   ▭ Runs in your browser      │
 │ ⇆ Split          Coming soon  │
