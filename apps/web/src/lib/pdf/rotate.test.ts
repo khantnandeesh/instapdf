@@ -85,4 +85,19 @@ describe("rotatePdf", () => {
     await expect(rotatePdf({ bytes: await fixture("corrupt.pdf"), deltas: [] })).rejects.toThrow();
     await expect(rotatePdf({ bytes: await fixture("empty.pdf"), deltas: [] })).rejects.toThrow();
   });
+
+  // Made by qpdf (via pikepdf), not by @cantoo/pdf-lib: tests/fixtures/gen-legacy-encryption.py
+  it.each([
+    ["rc4-128.pdf", "RC4 128-bit (V2/R3)"],
+    ["aes-128.pdf", "AES 128-bit (V4/R4)"],
+  ])("decrypts %s (%s) with the user password and saves it unencrypted", async (name) => {
+    const out = await rotatePdf({ bytes: await fixture(name), deltas: [90, 90, 90], password: "test" });
+    expect(out.wasEncrypted).toBe(true);
+    expect(await rotations(out.bytes)).toEqual([90, 90, 90]);
+    expect(await pageTexts(out.bytes)).toEqual(["Page 1", "Page 2", "Page 3"]);
+  });
+
+  it.each(["rc4-128.pdf", "aes-128.pdf"])("rejects a wrong password for %s", async (name) => {
+    await expect(rotatePdf({ bytes: await fixture(name), deltas: [90], password: "nope" })).rejects.toThrow();
+  });
 });
