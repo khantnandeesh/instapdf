@@ -138,7 +138,7 @@ Lessons:
 ### 3d. Recommendation: "Berry engine", one Rust core, browser first with a server fallback
 
 - **One codebase, two targets.** A Rust crate `berry-engine` compiled to WASM runs in a Web Worker (default, private, free to run) and natively in the worker service on Cloud Run (fallback). Both produce byte-identical results because they are the same code.
-- **When the server is used:** only if the browser can't (out of memory on a phone, a file over about 150 MB, or the user explicitly asks), always with consent ("Process on our server? Deleted within 2 hours"). The default stays 100% on device, and that is our headline.
+- **When the server is used:** only if the browser can't (out of memory on a phone, a file over about 150 MB, or the user explicitly asks), always with consent ("Process on our server? Deleted within 2 hours"). It uses the free, capped, queued worker pool from `docs/process/mission.md` (live queue position, no paywall), and its privacy copy says plainly that the file is uploaded and deleted. The default stays 100% on device, and that is our headline.
 - **Pipeline per edit:**
   1. **Recognise:** parse the content stream with a text-state interpreter, giving glyphs with position, font, size, colour and render mode. Group them into runs, lines and paragraphs. pdf.js stays the on-screen renderer for instant first paint; the engine's own parse is the truth for edits, so display and output never disagree.
   2. **Coverage:** parse the embedded font program (ttf-parser / CFF), map Unicode to the glyph through ToUnicode or the encoding plus cmap, and check the outline is non-empty.
