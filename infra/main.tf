@@ -12,10 +12,13 @@ locals {
   pool_path = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}"
 
   # Who may impersonate each deployer: staging = pushes to main,
-  # prod = release tags v* (see attribute.is_release mapping below).
+  # prod = jobs in the GitHub "production" environment. The provider
+  # condition only lets that environment through on v* tag refs, and the
+  # environment's deployment rule (GitHub settings, see README) only admits
+  # v* tags, so a workflow file edited on another ref can't reach prod.
   deployer_principal = {
     staging = "${local.pool_path}/attribute.ref/refs/heads/main"
-    prod    = "${local.pool_path}/attribute.is_release/true"
+    prod    = "${local.pool_path}/attribute.environment/production"
   }
 }
 
@@ -246,16 +249,21 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "attribute.repository_id"       = "assertion.repository_id"
     "attribute.repository_owner_id" = "assertion.repository_owner_id"
     "attribute.ref"                 = "assertion.ref"
-    # principalSet can't match a prefix, so derive a boolean for release tags.
-    "attribute.is_release" = "assertion.ref.startsWith(\"refs/tags/v\") ? \"true\" : \"false\""
+    # The claim only exists for jobs that declare an environment.
+    "attribute.environment" = "has(assertion.environment) ? assertion.environment : \"\""
   }
 
   # Numeric ids survive repo renames/transfers and can't be squatted.
-  # Only main and release tags can get a token at all.
+  # Only main (never as "production") and v* tags in the "production"
+  # environment can get a token at all.
   attribute_condition = join(" && ", [
     "assertion.repository_id == \"${var.github_repository_id}\"",
     "assertion.repository_owner_id == \"${var.github_owner_id}\"",
-    "(assertion.ref == \"refs/heads/main\" || assertion.ref.startsWith(\"refs/tags/v\"))",
+    # Parenthesised so the || can't escape the id checks above.
+    "(${join(" || ", [
+      "(assertion.ref == \"refs/heads/main\" && (!has(assertion.environment) || assertion.environment != \"production\"))",
+      "(assertion.ref.startsWith(\"refs/tags/v\") && has(assertion.environment) && assertion.environment == \"production\")",
+    ])})",
   ])
 
   oidc {

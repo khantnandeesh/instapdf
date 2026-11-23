@@ -54,14 +54,36 @@ If an org policy (`iam.allowedPolicyMemberDomains`) blocks `allUsers`, the
 
 | Identity | Can do | How it is scoped |
 |---|---|---|
-| WIF provider `github-oidc` | issue tokens at all | `repository_id == 1468806745`, `repository_owner_id == 148197396`, ref is `refs/heads/main` or `refs/tags/v*` |
+| WIF provider `github-oidc` | issue tokens at all | `repository_id == 1468806745`, `repository_owner_id == 148197396`, and either ref `refs/heads/main` (not in environment `production`) or ref `refs/tags/v*` in environment `production` |
 | `gh-deploy-staging` | deploy + shift traffic on `web-staging`, push images | impersonable only by `attribute.ref = refs/heads/main` |
-| `gh-deploy-prod` | deploy + shift traffic on `web-prod`, tag images | impersonable only by `attribute.is_release = true` (ref starts with `refs/tags/v`) |
+| `gh-deploy-prod` | deploy + shift traffic on `web-prod`, tag images | impersonable only by `attribute.environment = production` (which the condition allows only on `v*` tags) |
 | `web-runtime-<env>` | objectAdmin on `<project>-jobs-<env>`, sign URLs as itself | nothing project-wide |
 
 Both deployers have `run.developer` on their own service only, `run.viewer` on the
 project (read-only, for gcloud polling), `artifactregistry.writer` on the `instapdf`
 repo only, and `iam.serviceAccountUser` on their env's runtime SA only.
+
+### One-time GitHub settings (repo owner)
+
+Prod gating must not rely on the workflow file in the tagged commit, so GitHub
+itself has to enforce it:
+
+1. **Environment `production`** (Settings > Environments > New environment):
+   Deployment branches and tags > "Selected branches and tags" > add tag rule `v*`.
+   Optionally add yourself as a required reviewer.
+2. **Tag ruleset** (Settings > Rules > Rulesets > New tag ruleset): target `v*`,
+   enable "Restrict creations", "Restrict updates" and "Restrict deletions",
+   bypass list = the repo owner only.
+
+Without (1), the prod deploy job fails (its token cannot impersonate
+`gh-deploy-prod`); without (2), anyone with write access could cut a release tag.
+
+### Before F6 adds sensitive config
+
+Both deployers hold project-level `run.viewer`, which can read every Cloud Run
+service's configuration, including plain env vars. Before the worker adds any
+sensitive setting, either pass it as a Secret Manager reference (never a plain
+env var), or replace `run.viewer` with a minimal custom role.
 
 ## Job files and the 2-hour rule
 

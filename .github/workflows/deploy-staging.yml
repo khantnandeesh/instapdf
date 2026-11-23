@@ -42,19 +42,36 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.SHA }}
+          fetch-depth: 0
+
+      # CI runs can finish out of order; never deploy a commit older than main's tip.
+      - name: Skip if not the tip of main
+        id: fresh
+        run: |
+          git fetch --no-tags origin main
+          if git merge-base --is-ancestor origin/main "$SHA"; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::${SHA} is behind origin/main; a newer commit will deploy. Skipping."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: google-github-actions/auth@v2
+        if: steps.fresh.outputs.deploy == 'true'
         with:
           project_id: ${{ vars.GCP_PROJECT_ID }}
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
           service_account: ${{ vars.GCP_DEPLOYER_SA_STAGING }}
 
       - uses: google-github-actions/setup-gcloud@v2
+        if: steps.fresh.outputs.deploy == 'true'
 
       - name: Configure Docker for Artifact Registry
+        if: steps.fresh.outputs.deploy == 'true'
         run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
       - name: Build and push image
+        if: steps.fresh.outputs.deploy == 'true'
         env:
           PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
         run: |
@@ -64,6 +81,7 @@ jobs:
           docker push "$image"
 
       - name: Deploy to Cloud Run
+        if: steps.fresh.outputs.deploy == 'true'
         run: |
           gcloud run deploy "$SERVICE" \
             --image "$IMAGE" \
@@ -72,6 +90,7 @@ jobs:
             --quiet
 
       - name: Smoke test
+        if: steps.fresh.outputs.deploy == 'true'
         run: |
           url="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
           .github/scripts/smoke-test.sh "$url" "$SHA"

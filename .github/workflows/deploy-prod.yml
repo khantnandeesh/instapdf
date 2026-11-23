@@ -21,6 +21,9 @@ jobs:
   deploy:
     # Skip until the GCP bootstrap is done and the repo variables exist (infra/README.md).
     if: ${{ vars.GCP_WIF_PROVIDER != '' && vars.GCP_DEPLOYER_SA_PROD != '' }}
+    # Gate enforced by GitHub (deployment rule: tags v*) and by WIF, which only
+    # lets the prod deployer be impersonated from this environment.
+    environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -59,6 +62,9 @@ jobs:
           prev="$(gcloud run services describe "$SERVICE" --region "$REGION" --format=json \
             | jq -r '[.status.traffic[] | select(.percent == 100) | .revisionName][0] // empty')"
           echo "Current 100% revision: ${prev:-<none>}"
+          if [ -z "$prev" ]; then
+            echo "::warning::No single revision serves 100% of ${SERVICE} traffic; automatic rollback is disabled for this run."
+          fi
           echo "revision=${prev}" >> "$GITHUB_OUTPUT"
 
       # New revision gets 0% traffic and a "candidate" URL until it passes.
