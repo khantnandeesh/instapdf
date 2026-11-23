@@ -2,10 +2,14 @@
  * Processing jobs that run inside the processing Web Worker
  * (`processing.worker.ts`). Kept free of worker globals so they are unit tested.
  *
- * Memory: inputs arrive as Blobs (no copy on the main thread) and are read one
- * at a time; each output is handed off (single PDF) or streamed into the ZIP
- * before the next input is read, so at most one input and one output are held.
+ * Memory: inputs arrive as Blobs (no copy on the main thread). Rotate reads
+ * them one at a time and hands each output off (single PDF) or streams it into
+ * the ZIP before reading the next, so one input and one output are held. Merge
+ * builds one output: each source is parsed at its first use and released after
+ * its last page is copied (see merge.ts), so only the sources still to come
+ * stay parsed next to the growing output.
  */
+export { USER_ERROR } from "./user-error";
 import { mergePdf, type MergeEnv, type MergeInput } from "./merge";
 import { pdfOutputName, uniqueNames } from "./naming";
 import { rotatePdf } from "./rotate";
@@ -34,6 +38,8 @@ export type JobOutput = {
   entries?: { name: string; pageCount: number }[];
   /** True when any input was encrypted (the output never is). */
   wasEncrypted: boolean;
+  /** Non-blocking notes for the user about the result. */
+  warnings?: string[];
 };
 
 /** `phase` "fonts" = a font download (indeterminate); "pages" = back to the fraction. */
@@ -61,6 +67,7 @@ async function runMerge(job: MergeJob, onProgress: ProgressFn, env: JobEnv): Pro
     blob: new Blob([r.bytes as Uint8Array<ArrayBuffer>], { type: "application/pdf" }),
     pageCount: r.pageCount,
     wasEncrypted: r.wasEncrypted,
+    warnings: r.warnings,
   };
 }
 

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { PDFDocument, PDFName, PDFRawStream } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFName, PDFRawStream } from "pdf-lib";
 import { beforeAll, describe, expect, it } from "vitest";
 import { defaultMergeOptions, type MergeOptions } from "./merge-options";
 import { mergePdf, type MergeInput, type MergePageInput, type MergeSourceInput } from "./merge";
@@ -10,7 +10,7 @@ import type { FontManifest, FontSource } from "./text";
 const fixtures = new URL("../../../tests/fixtures/", import.meta.url);
 const blob = async (name: string) => new Blob([new Uint8Array(await readFile(new URL(name, fixtures)))]);
 
-const PAGES: Record<string, number> = { "alpha.pdf": 3, "bravo.pdf": 2, "echo.pdf": 1, "three-pages.pdf": 3, "form-a.pdf": 1, "form-b.pdf": 1, "pre-rotated.pdf": 3, "résumé-日本.pdf": 1, "sixty-pages.pdf": 60, "user-pw.pdf": 3, "charlie.png": 1, "delta.jpg": 1, "fox.tiff": 2 };
+const PAGES: Record<string, number> = { "alpha.pdf": 3, "bravo.pdf": 2, "echo.pdf": 1, "three-pages.pdf": 3, "form-a.pdf": 1, "form-b.pdf": 1, "pre-rotated.pdf": 3, "résumé-日本.pdf": 1, "sixty-pages.pdf": 60, "user-pw.pdf": 3, "charlie.png": 1, "delta.jpg": 1, "fox.tiff": 2, "sig-no-ap.pdf": 1, "indirect-box.pdf": 1, "lang-labels.pdf": 3, "tagged-features.pdf": 1 };
 
 async function source(name: string, id = name, password?: string): Promise<MergeSourceInput> {
   return { id, name, kind: /\.(png|jpe?g|tiff?)$/.test(name) ? "image" : "pdf", source: await blob(name), password };
@@ -115,6 +115,41 @@ describe("page order and edits", () => {
     const doc = await plain(r.bytes); // upstream pdf-lib cannot open encrypted files
     expect(doc.getPageCount()).toBe(6);
     expect((await texts(r.bytes)).map(first)).toEqual(["Page 1", "Page 2", "Page 3", "Alpha 1", "Alpha 2", "Alpha 3"]);
+  });
+});
+
+describe("duplicated pages (review fix)", () => {
+  async function items(bytes: Uint8Array) {
+    const doc = await pdfjs(bytes);
+    const out: { str: string; scale: number }[][] = [];
+    for (let i = 1; i <= doc.numPages; i++) {
+      const c = await (await doc.getPage(i)).getTextContent();
+      out.push(c.items.flatMap((it) => ("str" in it && it.str.trim() ? [{ str: it.str, scale: Math.abs(it.transform[0]) }] : [])));
+    }
+    await doc.loadingTask.destroy();
+    return out;
+  }
+  it("a duplicated page carries the footer once, like the original", async () => {
+    const r = await merge(["alpha.pdf"], { footer: true }, [p("alpha.pdf", 0), p("alpha.pdf", 0)]);
+    for (const page of await items(r.bytes)) {
+      expect(page.filter((i) => i.str.includes("alpha.pdf"))).toHaveLength(1);
+      expect(page.some((i) => i.str === "Alpha 1")).toBe(true);
+    }
+  });
+  it("a duplicated page is scaled once with same width (text present, right scale)", async () => {
+    const r = await merge(["bravo.pdf", "alpha.pdf"], { sameWidth: true }, [p("bravo.pdf", 0), p("alpha.pdf", 0), p("alpha.pdf", 0)]);
+    const s = await sizes(r.bytes);
+    for (const [w] of s) expect(Math.abs(w - 792)).toBeLessThanOrEqual(0.5);
+    const pages = await items(r.bytes);
+    const alpha = pages.slice(1).map((pg) => pg.find((i) => i.str === "Alpha 1"));
+    expect(alpha.every(Boolean)).toBe(true);
+    // 36 pt text scaled by 792/595 on both copies.
+    for (const a of alpha) expect(a!.scale).toBeCloseTo(36 * (792 / 595), 0);
+  });
+  it("duplicating a page that is also rotated keeps each copy's own rotation", async () => {
+    const r = await merge(["alpha.pdf"], { footer: true, sameWidth: true }, [p("alpha.pdf", 0, 90), p("alpha.pdf", 0)]);
+    expect(await rotations(r.bytes)).toEqual([90, 0]);
+    for (const page of await items(r.bytes)) expect(page.filter((i) => i.str.includes("alpha.pdf"))).toHaveLength(1);
   });
 });
 
@@ -253,7 +288,21 @@ describe("footer", () => {
     expect((await texts(r.bytes))[0]).toContain("résumé-日本.pdf");
     expect(phases).toEqual(["fonts", "pages"]);
   });
-  it("fetches no font for names Helvetica can show", async () => {
+  it("draws Korean, Chinese, Hebrew and Thai names; Arabic is a known limitation (shown as ?)", async () => {
+    const names = ["보고서.pdf", "报告书.pdf", "דוח שנתי.pdf", "รายงาน.pdf", "تقرير.pdf"];
+    const echo = await blob("echo.pdf");
+    const sources = names.map((n) => ({ id: n, name: n, kind: "pdf" as const, source: echo }));
+    const r = await mergePdf({ sources, pages: names.map((n) => p(n, 0)), options: { ...defaultMergeOptions, footer: true } }, { fonts }, () => {});
+    const t = await texts(r.bytes);
+    expect(t[0]).toContain("보고서.pdf");
+    expect(t[1]).toContain("报告书.pdf");
+    // Drawn right to left: pdf.js reports glyphs in visual order, the reverse of "דוח שנתי".
+    expect(t[2]).toContain("יתנש חוד.pdf");
+    expect(t[3]).toContain(".pdf");
+    expect(t[3]).not.toContain("?");
+    expect(t[4]).toContain("?????.pdf");
+  });
+    it("fetches no font for names Helvetica can show", async () => {
     let loads = 0;
     const counting: FontSource = { manifest: fonts.manifest, load: async (f) => (loads++, fonts.load(f)) };
     const sources = [await source("alpha.pdf")];
@@ -347,6 +396,102 @@ describe("form fields", () => {
   });
 });
 
+describe("form fields: types, nesting and pruning (review fix)", () => {
+  async function formPdf(build: (doc: import("@cantoo/pdf-lib").PDFDocument) => void, pages = 1) {
+    const { PDFDocument: Doc } = await import("@cantoo/pdf-lib");
+    const doc = await Doc.create();
+    for (let i = 0; i < pages; i++) doc.addPage([595, 842]);
+    build(doc);
+    return new Blob([(await doc.save()) as Uint8Array<ArrayBuffer>]);
+  }
+  const run = async (blobs: Blob[], pages: MergePageInput[], forms: MergeOptions["forms"]) =>
+    mergePdf({ sources: blobs.map((b, i) => ({ id: `s${i}`, name: `s${i}.pdf`, kind: "pdf" as const, source: b })), pages, options: { ...defaultMergeOptions, forms } }, {}, () => {});
+  const fieldNames = async (bytes: Uint8Array) => (await plain(bytes)).getForm().getFields().map((f) => f.getName()).sort();
+
+  it("merge joins same-named fields only when their types match; otherwise the later one is renamed", async () => {
+    const a = await formPdf((d) => d.getForm().createTextField("x").addToPage(d.getPage(0), { x: 50, y: 50 }));
+    const b = await formPdf((d) => d.getForm().createCheckBox("x").addToPage(d.getPage(0), { x: 50, y: 50 }));
+    const r = await run([a, b], [p("s0", 0), p("s1", 0)], "merge");
+    expect(await fieldNames(r.bytes)).toEqual(["x", "x_2"]);
+  });
+  it("merge joins child fields by partial name, recursively", async () => {
+    const a = await formPdf((d) => d.getForm().createTextField("person.name").addToPage(d.getPage(0), { x: 50, y: 50 }));
+    const b = await formPdf((d) => {
+      const f = d.getForm();
+      f.createTextField("person.name").addToPage(d.getPage(0), { x: 50, y: 50 });
+      f.createTextField("person.age").addToPage(d.getPage(0), { x: 50, y: 120 });
+    });
+    const r = await run([a, b], [p("s0", 0), p("s1", 0)], "merge");
+    const form = (await plain(r.bytes)).getForm();
+    expect(form.getFields().map((f) => f.getName()).sort()).toEqual(["person.age", "person.name"]);
+    expect(form.getTextField("person.name").acroField.getWidgets()).toHaveLength(2);
+  });
+  it("drops widgets of pages that are not in the output", async () => {
+    const a = await formPdf((d) => {
+      const field = d.getForm().createTextField("multi");
+      field.addToPage(d.getPage(0), { x: 50, y: 50 });
+      field.addToPage(d.getPage(1), { x: 50, y: 50 });
+    }, 2);
+    for (const mode of ["rename", "merge"] as const) {
+      const r = await run([a], [p("s0", 0)], mode);
+      const form = (await plain(r.bytes)).getForm();
+      expect(form.getTextField("multi").acroField.getWidgets(), mode).toHaveLength(1);
+    }
+  });
+});
+
+describe("expert review (PR #7 addendum)", () => {
+  it("A: a field that cannot be flattened stays fillable, with a warning naming the file; the rest is flattened", async () => {
+    const r = await merge(["sig-no-ap.pdf"], { forms: "flatten" });
+    const form = (await plain(r.bytes)).getForm();
+    expect(form.getFields().map((f) => f.getName())).toEqual(["approval"]);
+    expect((await texts(r.bytes))[0]).toContain("Ann"); // the text field was flattened
+    expect(r.warnings).toHaveLength(1);
+    expect(r.warnings[0]).toMatch(/sig-no-ap\.pdf.*approval/);
+    const clean = await merge(["form-a.pdf"], { forms: "flatten" });
+    expect(clean.warnings).toEqual([]);
+  });
+  it("B: same width resolves an indirect MediaBox instead of collapsing it", async () => {
+    const r = await merge(["alpha.pdf", "indirect-box.pdf"], { sameWidth: true }, [p("alpha.pdf", 0), p("indirect-box.pdf", 0)]);
+    const s = await sizes(r.bytes);
+    expect(s[1][0]).toBeCloseTo(595, 0);
+    expect(s[1][1]).toBeCloseTo(612 * (595 / 792), 0);
+    expect((await texts(r.bytes))[1]).toContain("Indirect 1");
+  });
+  it("C: carries /Lang and /PageLabels; drops dangling /StructParents", async () => {
+    const r = await merge(["alpha.pdf", "lang-labels.pdf", "tagged-features.pdf"]);
+    const doc = await plain(r.bytes);
+    expect(String(doc.catalog.lookup(PDFName.of("Lang")))).toBe("(de-DE)");
+    for (const page of doc.getPages()) expect(page.node.get(PDFName.of("StructParents"))).toBeUndefined();
+    expect(doc.catalog.get(PDFName.of("StructTreeRoot"))).toBeUndefined();
+    const pdf = await pdfjs(r.bytes);
+    // alpha 1-3, then lang-labels i, ii, A-1, then the tagged file's page 7.
+    expect(await pdf.getPageLabels()).toEqual(["1", "2", "3", "i", "ii", "A-1", "7"]);
+    await pdf.loadingTask.destroy();
+    const plainMerge = await plain((await merge(["alpha.pdf", "bravo.pdf"])).bytes);
+    expect(plainMerge.catalog.get(PDFName.of("PageLabels"))).toBeUndefined();
+    expect(plainMerge.catalog.get(PDFName.of("Lang"))).toBeUndefined();
+  });
+  it("D: canary - pdf-lib's object copier still exposes traversedObjects and honours seeded refs", async () => {
+    const { PDFDocument: Doc, PDFObjectCopier, PDFNull: Null } = await import("@cantoo/pdf-lib");
+    const src = await Doc.create();
+    const dst = await Doc.create();
+    const page = src.addPage();
+    const copier = PDFObjectCopier.for(src.context, dst.context);
+    const traversed = (copier as unknown as { traversedObjects?: unknown }).traversedObjects;
+    expect(traversed, "PDFObjectCopier.traversedObjects is gone: merge.ts reserves page refs through it").toBeInstanceOf(Map);
+    (traversed as Map<unknown, unknown>).set(page.ref, Null);
+    const copied = copier.copy(src.context.obj([page.ref])) as unknown as { get: (i: number) => unknown };
+    expect(copied.get(0), "a seeded ref must be used as is (links to dropped pages)").toBe(Null);
+  });
+  it("F: NeedAppearances only when a widget has no appearance", async () => {
+    const renamed = await plain((await merge(["form-a.pdf", "form-b.pdf"])).bytes);
+    expect(renamed.catalog.lookup(PDFName.of("AcroForm"), PDFDict).get(PDFName.of("NeedAppearances"))).toBeUndefined();
+    const merged = await plain((await merge(["form-a.pdf", "form-b.pdf"], { forms: "merge" })).bytes);
+    expect(String(merged.catalog.lookup(PDFName.of("AcroForm"), PDFDict).get(PDFName.of("NeedAppearances")))).toBe("true");
+  });
+});
+
 describe("image pages", () => {
   it("AC-5, AC-67: PNG on landscape A4, JPEG on portrait A4, centered, JPEG kept as DCT", async () => {
     const r = await merge(["alpha.pdf", "charlie.png", "delta.jpg"]);
@@ -391,10 +536,23 @@ describe("image pages", () => {
     expect(await rotations(r.bytes)).toEqual([0, 90]);
     expect(r.bytes.length).toBeLessThan(2934 * 1.5 + 4000);
   });
-  it("uses the injected decoder for GIF, BMP and WebP", async () => {
+  it("embeds decoded GIF/BMP/WebP pixels directly, with a soft mask only when needed", async () => {
     const tiny = await source("tiny.gif");
-    const png = new Uint8Array(await readFile(new URL("charlie.png", fixtures)));
-    const r = await mergePdf({ sources: [{ ...tiny, kind: "image" }], pages: [p("tiny.gif", 0)], options: defaultMergeOptions }, { decodeImage: async () => png }, () => {});
-    expect(r.pageCount).toBe(1);
+    const rgba = new Uint8Array(4 * 3 * 4).fill(200);
+    for (let i = 3; i < rgba.length; i += 4) rgba[i] = 255;
+    const opaque = await mergePdf({ sources: [{ ...tiny, kind: "image" }], pages: [p("tiny.gif", 0)], options: defaultMergeOptions }, { decodeImage: async () => ({ rgba, width: 4, height: 3 }) }, () => {});
+    const xobj = async (bytes: Uint8Array) => {
+      const doc = await plain(bytes);
+      const x = doc.getPage(0).node.Resources()!.lookup(PDFName.of("XObject")) as unknown as { entries: () => [unknown, unknown][]; lookup: (k: unknown) => PDFRawStream };
+      return x.lookup(x.entries()[0][0]).dict;
+    };
+    let d = await xobj(opaque.bytes);
+    expect(String(d.get(PDFName.of("ColorSpace")))).toBe("/DeviceRGB");
+    expect(String(d.get(PDFName.of("Filter")))).toBe("/FlateDecode");
+    expect(d.get(PDFName.of("SMask"))).toBeUndefined();
+    rgba[3] = 0;
+    const masked = await mergePdf({ sources: [{ ...tiny, kind: "image" }], pages: [p("tiny.gif", 0)], options: defaultMergeOptions }, { decodeImage: async () => ({ rgba, width: 4, height: 3 }) }, () => {});
+    d = await xobj(masked.bytes);
+    expect(d.get(PDFName.of("SMask"))).toBeDefined();
   });
 });

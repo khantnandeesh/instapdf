@@ -116,76 +116,190 @@ function rootFields(ctx: PDFContext, pages: PDFPage[]): Root[] {
   return roots;
 }
 
-/** Splits a merged field/widget dictionary into a parent field with the widget as its only kid. */
-function splitField(ctx: PDFContext, root: Root): Root {
-  if (!isWidget(root.dict)) return root;
+/** Kid entries of a field, split into child fields (have /T) and widgets. */
+function kidsOf(d: PDFDict): { fields: Root[]; widgets: Root[] } {
+  const out = { fields: [] as Root[], widgets: [] as Root[] };
+  const kids = d.lookup(N("Kids"));
+  if (!(kids instanceof PDFArray)) return out;
+  for (let i = 0; i < kids.size(); i++) {
+    const r = kids.get(i);
+    const k = kids.lookup(i);
+    if (!(r instanceof PDFRef) || !(k instanceof PDFDict)) continue;
+    (k.get(N("T")) ? out.fields : out.widgets).push({ ref: r, dict: k });
+  }
+  return out;
+}
+
+/** A field that holds a value (no child fields): a merged field/widget, or a field whose kids are widgets. */
+const isTerminal = (d: PDFDict) => isWidget(d) || kidsOf(d).fields.length === 0;
+
+/** /FT of a field, inherited from its ancestors when not set on it. */
+function fieldType(d: PDFDict): string | undefined {
+  let node: PDFDict | undefined = d;
+  for (let hop = 0; node && hop < 32; hop++) {
+    const ft = node.lookup(N("FT"));
+    if (ft instanceof PDFName) return ft.decodeText();
+    const parent: PDFObject | undefined = node.lookup(N("Parent"));
+    node = parent instanceof PDFDict ? parent : undefined;
+  }
+  return undefined;
+}
+
+/** Where a field is listed: the AcroForm's field list, or a parent field's /Kids. */
+type Container = { names: () => Set<string>; replace: (old: PDFRef, now: PDFRef) => void; add: (f: Root) => void; parent: PDFRef | null };
+
+function listContainer(list: Root[]): Container {
+  return {
+    names: () => new Set(list.map((f) => textOf(f.dict.lookup(N("T"))) ?? "")),
+    replace: (old, now) => {
+      const i = list.findIndex((f) => f.ref === old);
+      if (i >= 0) list[i] = { ref: now, dict: list[i].dict.context.lookup(now) as PDFDict };
+    },
+    add: (f) => {
+      f.dict.delete(N("Parent"));
+      list.push(f);
+    },
+    parent: null,
+  };
+}
+
+function kidsContainer(ctx: PDFContext, parent: Root): Container {
+  const kids = () => {
+    let k = parent.dict.lookup(N("Kids"));
+    if (!(k instanceof PDFArray)) {
+      k = ctx.obj([]) as PDFArray;
+      parent.dict.set(N("Kids"), k);
+    }
+    return k as PDFArray;
+  };
+  return {
+    names: () => new Set(kidsOf(parent.dict).fields.map((f) => textOf(f.dict.lookup(N("T"))) ?? "")),
+    replace: (old, now) => {
+      const k = kids();
+      for (let i = 0; i < k.size(); i++) if (k.get(i) === old) k.set(i, now);
+    },
+    add: (f) => {
+      f.dict.set(N("Parent"), parent.ref);
+      kids().push(f.ref);
+    },
+    parent: parent.ref,
+  };
+}
+
+/** Splits a merged field/widget dictionary into a field with the widget as its only kid. */
+function splitField(ctx: PDFContext, f: Root, where: Container): Root {
+  if (!isWidget(f.dict)) return f;
   const field = ctx.obj({}) as PDFDict;
   for (const key of FIELD_KEYS) {
-    const v = root.dict.get(N(key));
+    const v = f.dict.get(N(key));
     if (v) {
       field.set(N(key), v);
-      root.dict.delete(N(key));
+      f.dict.delete(N(key));
     }
   }
+  if (where.parent) field.set(N("Parent"), where.parent);
   const ref = ctx.register(field);
-  field.set(N("Kids"), ctx.obj([root.ref]));
-  root.dict.set(N("Parent"), ref);
+  field.set(N("Kids"), ctx.obj([f.ref]));
+  f.dict.set(N("Parent"), ref);
+  where.replace(f.ref, ref);
   return { ref, dict: field };
 }
 
+/** Gives `f` a partial name not used in `where` (name_2, name_3…) and lists it there. */
+function addRenamed(f: Root, where: Container) {
+  const name = textOf(f.dict.lookup(N("T")));
+  if (name !== undefined) {
+    const used = where.names();
+    let final = name;
+    for (let n = 2; used.has(final); n++) final = `${name}_${n}`;
+    if (final !== name) f.dict.set(N("T"), PDFHexString.fromText(final));
+  }
+  where.add(f);
+}
+
 /**
- * Builds the output AcroForm for "merge" (same full name = one field, the
- * first file's value) or "rename" (a later duplicate becomes name_2, name_3…).
- * `sourceForms` are the sources' AcroForm dictionaries already copied into
- * the output (for /DR and /DA).
+ * Merge mode: joins `dup` into `target` (same partial name). Terminal fields
+ * join only when their type matches (one value, several widgets); child
+ * fields of non-terminal fields join by partial name, recursively. Anything
+ * else is kept as its own field under a new name.
+ */
+function joinField(ctx: PDFContext, target: Root, dup: Root, where: Container) {
+  const tTerm = isTerminal(target.dict);
+  const dTerm = isTerminal(dup.dict);
+  if (tTerm && dTerm) {
+    if (fieldType(target.dict) !== fieldType(dup.dict)) return addRenamed(dup, where);
+    const into = splitField(ctx, target, where);
+    const kids = into.dict.lookup(N("Kids"), PDFArray);
+    const moved = isWidget(dup.dict) ? [dup] : kidsOf(dup.dict).widgets;
+    const ft = fieldType(into.dict);
+    const value = into.dict.lookup(N("V"));
+    for (const w of moved) {
+      if (w === dup) for (const key of FIELD_KEYS) w.dict.delete(N(key));
+      w.dict.set(N("Parent"), into.ref);
+      // The widget now shows the shared (first file's) value: a text or choice widget drops its
+      // stale appearance so viewers draw it again; a button shows the shared on/off state.
+      if (ft === "Tx" || ft === "Ch") w.dict.delete(N("AP"));
+      else if (ft === "Btn") w.dict.set(N("AS"), value instanceof PDFName ? value : N("Off"));
+      kids.push(w.ref);
+    }
+    return;
+  }
+  if (!tTerm && !dTerm) {
+    const inner = kidsContainer(ctx, target);
+    for (const child of kidsOf(dup.dict).fields) {
+      const name = textOf(child.dict.lookup(N("T")));
+      const match = kidsOf(target.dict).fields.find((f) => textOf(f.dict.lookup(N("T"))) === name);
+      if (match) joinField(ctx, match, child, inner);
+      else inner.add(child);
+    }
+    return;
+  }
+  addRenamed(dup, where);
+}
+
+/**
+ * Drops widgets (and then empty fields) that are not on an output page, so
+ * a field copied with its parent does not list widgets of removed pages.
+ * Returns false when nothing of the field is left.
+ */
+function prune(ctx: PDFContext, f: PDFDict, onPage: Set<PDFDict>, depth = 0): boolean {
+  if (isWidget(f)) return onPage.has(f);
+  const kids = f.lookup(N("Kids"));
+  if (!(kids instanceof PDFArray) || depth > 32) return false;
+  const keep = [];
+  for (let i = 0; i < kids.size(); i++) {
+    const k = kids.lookup(i);
+    if (!(k instanceof PDFDict)) continue;
+    const ok = k.get(N("T")) ? prune(ctx, k, onPage, depth + 1) : onPage.has(k);
+    if (ok) keep.push(kids.get(i));
+  }
+  f.set(N("Kids"), ctx.obj(keep));
+  return keep.length > 0;
+}
+
+/**
+ * Builds the output AcroForm for "merge" (same full name and type = one
+ * field, the first file's value) or "rename" (a later duplicate becomes
+ * name_2, name_3…). `sourceForms` hold each source's /DR and /DA, already
+ * copied into the output.
  */
 export function buildAcroForm(doc: PDFDocument, pages: PDFPage[], mode: "merge" | "rename", sourceForms: PDFDict[]): void {
   const ctx = doc.context;
-  const roots = rootFields(ctx, pages);
+  const onPage = new Set<PDFDict>();
+  for (const page of pages) for (const e of annotEntries(page)?.items ?? []) if (isWidget(e.dict)) onPage.add(e.dict);
+  const roots = rootFields(ctx, pages).filter((r) => prune(ctx, r.dict, onPage));
   if (!roots.length) return;
   const fields: Root[] = [];
-  if (mode === "rename") {
-    const used = new Set<string>();
-    for (const root of roots) {
-      const name = textOf(root.dict.lookup(N("T")));
-      if (name !== undefined) {
-        let final = name;
-        for (let n = 2; used.has(final); n++) final = `${name}_${n}`;
-        if (final !== name) root.dict.set(N("T"), PDFHexString.fromText(final));
-        used.add(final);
-      }
+  const top = listContainer(fields);
+  for (const root of roots) {
+    const name = textOf(root.dict.lookup(N("T")));
+    const match = name === undefined ? undefined : fields.find((f) => textOf(f.dict.lookup(N("T"))) === name);
+    if (!match) {
       fields.push(root);
+      continue;
     }
-  } else {
-    const byName = new Map<string, number>();
-    for (const root of roots) {
-      const name = textOf(root.dict.lookup(N("T")));
-      const at = name === undefined ? undefined : byName.get(name);
-      if (at === undefined) {
-        if (name !== undefined) byName.set(name, fields.length);
-        fields.push(root);
-        continue;
-      }
-      const target = splitField(ctx, fields[at]);
-      fields[at] = target;
-      const kids = target.dict.lookup(N("Kids"), PDFArray);
-      const moved: Root[] = isWidget(root.dict) ? [root] : [];
-      if (!moved.length) {
-        const ownKids = root.dict.lookup(N("Kids"));
-        if (ownKids instanceof PDFArray) {
-          for (let i = 0; i < ownKids.size(); i++) {
-            const r = ownKids.get(i);
-            const d = ownKids.lookup(i);
-            if (r instanceof PDFRef && d instanceof PDFDict) moved.push({ ref: r, dict: d });
-          }
-        }
-      }
-      for (const kid of moved) {
-        if (kid === root) for (const key of FIELD_KEYS) kid.dict.delete(N(key));
-        kid.dict.set(N("Parent"), target.ref);
-        kids.push(kid.ref);
-      }
-    }
+    if (mode === "rename") addRenamed(root, top);
+    else joinField(ctx, match, root, top);
   }
   const form = ctx.obj({}) as PDFDict;
   form.set(N("Fields"), ctx.obj(fields.map((f) => f.ref)));
@@ -205,7 +319,45 @@ export function buildAcroForm(doc: PDFDocument, pages: PDFPage[], mode: "merge" 
   if (dr.entries().length) form.set(N("DR"), dr);
   const da = sourceForms.map((f) => f.get(N("DA"))).find(Boolean);
   if (da) form.set(N("DA"), da);
-  // Merged fields share one value but keep each widget's old appearance; ask viewers to redraw.
-  if (mode === "merge") form.set(N("NeedAppearances"), PDFBool.True);
+  // Ask viewers to draw appearances only when some widget has none (e.g. joined text fields).
+  if ([...onPage].some((w) => !(w.lookup(N("AP")) instanceof PDFDict))) form.set(N("NeedAppearances"), PDFBool.True);
   doc.catalog.set(N("AcroForm"), ctx.register(form));
+}
+
+type FormInternals = {
+  findWidgetPage: (w: unknown) => PDFPage | undefined;
+  findWidgetAppearanceRef: (field: unknown, w: unknown) => PDFRef;
+  flattenWidgetOntoPage: (page: PDFPage, w: unknown, ref: PDFRef) => void;
+};
+
+/**
+ * Flattens each field whose every widget can be flattened, and keeps the
+ * rest as fillable fields. pdf-lib's own flatten() logs a widget it cannot
+ * flatten and then removes the field anyway, which loses typed values.
+ * Returns the names of the fields that were kept.
+ */
+export function flattenFields(doc: PDFDocument): string[] {
+  const form = doc.getForm();
+  try {
+    form.updateFieldAppearances();
+  } catch {
+    // Fields without a usable appearance are caught one by one below.
+  }
+  const internals = form as unknown as FormInternals;
+  const kept: string[] = [];
+  for (const field of form.getFields()) {
+    try {
+      const plan = field.acroField.getWidgets().map((w) => {
+        const page = internals.findWidgetPage(w);
+        const ref = internals.findWidgetAppearanceRef(field, w);
+        if (!page || !ref) throw new Error("No appearance");
+        return { w, page, ref };
+      });
+      for (const { w, page, ref } of plan) internals.flattenWidgetOntoPage(page, w, ref);
+      form.removeField(field);
+    } catch {
+      kept.push(field.getName());
+    }
+  }
+  return kept;
 }

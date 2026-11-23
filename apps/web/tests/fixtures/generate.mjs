@@ -297,6 +297,70 @@ async function textDoc(size, lines, title) {
     await save(file, doc);
   }
 }
+// ---- PR #7 expert-review fixtures ----
+{
+  // MediaBox as an indirect array of indirect numbers (US Letter landscape).
+  const doc = await textDoc([792, 612], ["Indirect 1"], null);
+  const ctx = doc.context;
+  const w = ctx.register(PDFNumber.of(792));
+  const h = ctx.register(PDFNumber.of(612));
+  doc.getPage(0).node.set(PDFName.of("MediaBox"), ctx.register(ctx.obj([0, 0, w, h])));
+  await save("indirect-box.pdf", doc);
+}
+{
+  // Document language and page labels: i, ii, then 1.
+  const doc = await textDoc([595, 842], ["Label 1", "Label 2", "Label 3"], null);
+  const ctx = doc.context;
+  doc.catalog.set(PDFName.of("Lang"), PDFString.of("de-DE"));
+  doc.catalog.set(PDFName.of("PageLabels"), ctx.obj({ Nums: [0, { S: "r" }, 2, { S: "D", P: PDFString.of("A-"), St: 1 }] }));
+  await save("lang-labels.pdf", doc);
+}
+{
+  // Properties a merge cannot keep: tags, PDF/A, layers, an attachment and a signature.
+  const doc = await textDoc([595, 842], ["Features 1"], null);
+  const ctx = doc.context;
+  doc.catalog.set(PDFName.of("MarkInfo"), ctx.obj({ Marked: true }));
+  doc.catalog.set(PDFName.of("StructTreeRoot"), ctx.register(ctx.obj({ Type: "StructTreeRoot" })));
+  doc.getPage(0).node.set(PDFName.of("StructParents"), PDFNumber.of(0));
+  const xmp = '<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/"><pdfaid:part>2</pdfaid:part><pdfaid:conformance>B</pdfaid:conformance></rdf:Description></rdf:RDF></x:xmpmeta><?xpacket end="w"?>';
+  doc.catalog.set(PDFName.of("Metadata"), ctx.register(ctx.stream(xmp, { Type: "Metadata", Subtype: "XML" })));
+  const ocg = ctx.register(ctx.obj({ Type: "OCG", Name: PDFString.of("Layer 1") }));
+  doc.catalog.set(PDFName.of("OCProperties"), ctx.obj({ OCGs: [ocg], D: { ON: [ocg] } }));
+  await doc.attach(new TextEncoder().encode("attached"), "note.txt", { mimeType: "text/plain" });
+  const sig = ctx.register(ctx.obj({ Type: "Sig", Filter: "Adobe.PPKLite", ByteRange: [0, 0, 0, 0], Contents: PDFHexString.of("00") }));
+  const widget = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Widget", FT: "Sig", T: PDFString.of("Signature1"), V: sig, Rect: [0, 0, 0, 0], P: doc.getPage(0).ref }));
+  doc.getPage(0).node.addAnnot(widget);
+  doc.catalog.set(PDFName.of("AcroForm"), ctx.obj({ Fields: [widget], SigFlags: 3 }));
+  await save("tagged-features.pdf", doc, { useObjectStreams: false });
+}
+{
+  // A text field (flattens) and a signature field without an appearance stream (cannot be flattened).
+  const doc = await textDoc([595, 842], ["Sig form"], null);
+  const form = doc.getForm();
+  const name = form.createTextField("name");
+  name.setText("Ann");
+  name.addToPage(doc.getPage(0), { x: 72, y: 600, width: 300, height: 28 });
+  const ctx = doc.context;
+  const widget = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Widget", FT: "Sig", T: PDFString.of("approval"), Rect: [72, 500, 272, 540], P: doc.getPage(0).ref }));
+  doc.getPage(0).node.addAnnot(widget);
+  form.acroForm.addField(widget);
+  await save("sig-no-ap.pdf", doc);
+}
+
+// A 26-byte TIFF whose only IFD points back at itself (review fix: must be refused, never loop).
+{
+  const b = Buffer.alloc(26);
+  b.write("II", 0, "ascii");
+  b.writeUInt16LE(42, 2);
+  b.writeUInt32LE(8, 4); // first IFD at 8
+  b.writeUInt16LE(1, 8); // one entry
+  b.writeUInt16LE(256, 10); // ImageWidth
+  b.writeUInt16LE(3, 12); // SHORT
+  b.writeUInt32LE(1, 14);
+  b.writeUInt16LE(10, 18);
+  b.writeUInt32LE(8, 22); // next IFD = itself
+  await writeFile(join(here, "cyclic-ifd.tiff"), b);
+}
 await writeFile(join(here, "broken.png"), "These are text bytes with a .png name, not an image.\n");
 // Raster fixtures (charlie.png, delta.jpg, fox.tiff ...) come from gen-images.py.
 
