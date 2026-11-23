@@ -59,7 +59,7 @@ Merge turns several documents into one. The visitor adds PDFs and pictures, puts
 
 ## 2. Inputs
 
-| Aspect | Reference behavior (observed) | InstaPDF F3 decision |
+| Aspect | Reference behavior (observed) | BerryPDF F3 decision |
 |---|---|---|
 | Local picker | Primary button, `multiple`, `accept` = PDF + PNG, GIF, JPG/JPEG, TIF/TIFF, BMP, WebP. Each file is uploaded right away. | Same accepted set, `multiple`. Nothing is uploaded. |
 | Drag and drop | Whole page is a drop target. | F1 behavior (AC-3). Dropping onto the grid while it is in the ready state appends to the end, unless the drop lands on an insert point (§3c), then the files go there. |
@@ -135,7 +135,7 @@ Ours, same behavior:
 
 Observed on the reference: the files view and the pages view keep **separate** lists, the task runs from whichever view is active, and the options panel ("More options") is **hidden in the pages view** (screenshot 26; the page script hides it on switch). Page edits are invisible in the files view (screenshot 17), and pages added through the picker show up there as extra whole-file cards (screenshot 24). After sorting files Z–A, the pages view still showed the old file order (screenshots 05, 06).
 
-InstaPDF keeps **one ordered page list**. Both views render it:
+BerryPDF keeps **one ordered page list**. Both views render it:
 
 - The pages view shows it page by page.
 - The files view groups it into **segments**: maximal runs of consecutive pages from the same source. A blank page the user inserted belongs to the segment in front of it (or the one after it at the very start).
@@ -205,7 +205,7 @@ All F1 states apply (U-6). Merge-specific additions:
 
 Copy the behavior, not the wording.
 
-| Case | Reference | InstaPDF |
+| Case | Reference | BerryPDF |
 |---|---|---|
 | Wrong type, corrupt, 0 bytes, too large, too many pages, too many files | F1 table | F1 behavior with Merge caps (50 files). |
 | Image that cannot be decoded (bad bytes with `.png`, or a TIFF the decoder rejects) | Not tested | Treated like a corrupt file: error naming it; other files stay. |
@@ -414,7 +414,7 @@ Sources (web search, 2026-11-23): [iLovePDF: organize PDF pages](https://www.ilo
 
 ## UI
 
-Designed 2026-11-23 by ux-designer. This is the build contract for `/merge-pdf`. It extends the F1 design system (`docs/specs/f1-shared-flow.md`, `## UI`, "U-x") and F2 (`docs/specs/f2-home.md`, `## UI`, "H-x"): same tokens, primitives, focus ring, motion rules, breakpoints and control dock. Only what Merge adds or changes is written here. The look is InstaPDF's own; the reference screenshots in §9 are for behavior only and are never a visual guide.
+Designed 2026-11-23 by ux-designer. This is the build contract for `/merge-pdf`. It extends the F1 design system (`docs/specs/f1-shared-flow.md`, `## UI`, "U-x") and F2 (`docs/specs/f2-home.md`, `## UI`, "H-x"): same tokens, primitives, focus ring, motion rules, breakpoints and control dock. Only what Merge adds or changes is written here. The look is BerryPDF's own; the reference screenshots in §9 are for behavior only and are never a visual guide.
 
 ### M-1. Design principles for Merge
 
@@ -462,7 +462,7 @@ The shared skeleton is F1 U-3: `ToolIntro`, the workspace (`section aria-label="
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
-│ InstaPDF  [▦ All tools ▾]  Merge  Rotate                                       │ header 56
+│ BerryPDF  [▦ All tools ▾]  Merge  Rotate                                       │ header 56
 ├────────────────────────────────────────────────────────────────────────────────┤
 │ Merge PDF                                                                      │ h1 2xl
 │ Join PDFs and images into a single document                                    │ fg-muted
@@ -491,7 +491,7 @@ The shared skeleton is F1 U-3: `ToolIntro`, the workspace (`section aria-label="
 
 - Two columns as F1 (workspace `minmax(0,1fr)`, dock 320, gap 24). Grid columns `repeat(auto-fill, var(--ip-thumb-size))`, gap 16: 5 cards per row at 160 px.
 - **Toolbar** (left to right): `ViewToggle` (Files · Pages, shown from **one** file, §3a) → `SortMenu` (icon + "Sort" + chevron) → spacer → `Add files` (secondary sm, + icon; a plain button, since cloud sources are hidden, F1 D-5) → `Add pages` (secondary sm menu button: "From a file…", "Blank page"). The thumbnail size slider is shown in the pages view only (F1), between Sort and the spacer.
-- **File card** (`SegmentCard`, M-4): box, name line, meta line, then a 44 px **position row**: `[← Move earlier]  "1 of 3"  [Move later →]`. Every card has the same height (box + 20 + 16 + 44 + gaps), so cards never jump. Top-start of the box: source letter badge; top-end: Remove (F1). Bottom of the box: floating action bar (Rotate left, Rotate right, Enlarge), shown on hover, focus-within and always on touch.
+- **File card** (`SegmentCard`, M-4): box, name line, meta line, then a 44 px **position row**: `[← Move earlier]  [Move later →]` (the "1 of 3" text is gone *(changed 2026-11-23 per owner: minimal text)*). Every card has the same height (box + 20 + 16 + 44 + gaps), so cards never jump. Top-start of the box: source letter badge; top-end: Remove (F1). Bottom of the box: floating action bar (Rotate left, Rotate right, Enlarge), shown on hover, focus-within and always on touch.
 - **End tile**: the last grid cell is a dashed "Add files" tile the same size as a card box. It opens the file picker directly (one click). Its position is always last, so adding files moves it once (user-initiated).
 - Options column scrolls inside the dock when taller than the dock (at 900 px viewport height it fits without scrolling).
 
@@ -523,7 +523,7 @@ The shared skeleton is F1 U-3: `ToolIntro`, the workspace (`section aria-label="
 
 ```
 ┌──────────────────────────────────────────────┐
-│ InstaPDF  [▦ All tools ▾]  Merge Rotate      │
+│ BerryPDF  [▦ All tools ▾]  Merge Rotate      │
 ├──────────────────────────────────────────────┤
 │ Merge PDF                                    │
 │ Join PDFs and images into a single document  │
@@ -551,7 +551,7 @@ The shared skeleton is F1 U-3: `ToolIntro`, the workspace (`section aria-label="
 
 ```
 ┌───────────────────────────────┐
-│ InstaPDF          [▦ Tools ▾] │
+│ BerryPDF          [▦ Tools ▾] │
 ├───────────────────────────────┤
 │ Merge PDF                     │ h1 xl
 │ Join PDFs and images into a…  │
@@ -673,7 +673,7 @@ app/merge-pdf/page.tsx (server)  → <RecordVisit slug="merge-pdf"/> + <MergeToo
 |---|---|---|
 | `Menu` / `MenuButton` / `MenuItem` / `MenuSeparator` | `MenuButton`: `label`, `icon?`, `iconOnly?`, `variant` (Button variants), `size`; `Menu`: `items: {id, label, icon?, disabled?, onSelect}[] \| "separator"`, `placement: "bottom-start" \| "bottom-end"` | WAI-ARIA menu button pattern: trigger `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`; popup `role="menu"` with `role="menuitem"` buttons. Enter/Space/ArrowDown opens on the first item, ArrowUp on the last; arrows move, Home/End, type-ahead on the first letter, Escape closes and returns focus to the trigger, Tab closes and moves on. Rendered with the native `popover="auto"` attribute (top layer, light dismiss, no z-index fights) and positioned by a few lines of JS from the trigger's rect: below, flipped above when there is not enough room (it opens upward from the end "Add" tile near the dock). `surface-raised`, `rounded-lg`, `shadow-lg`, 4 px padding, items 44 px high (36 at ≥ 1024 with a fine pointer), `sm` 500, 20 px icon, hover/focus `surface-sunken`, separator 1 px `border`. Min width 200, max `calc(100vw - 32px)`. Opening and closing: opacity + 4 px translate (`fast`). No library. |
 | `Select` | `label`, `value`, `options: {value, label}[]`, `description?`, `onChange`, `id` | Native `<select>` (best on mobile, free accessibility), 44 px, `rounded-md`, 1 px `border-strong`, `surface-raised`, custom chevron (`appearance: none` + `ChevronDownIcon`), focus ring F1. Visible `<label>` above (`sm` 500); `description` below (`xs fg-muted`, `aria-describedby`), its height reserved for two lines so changing the choice moves nothing. |
-| `Switch` | F2 H-5, unchanged | Used for the four on/off options; each gets a description line (`xs fg-muted`, `aria-describedby`). Tooltips are not used for option help (they don't work on touch). |
+| `Switch` | F2 H-5, unchanged | Used for the four on/off options; each gets a description (`aria-describedby`), now screen-reader text plus a `title` tooltip instead of a visible line *(changed 2026-11-23 per owner: minimal text)*. |
 | `Dialog` | add `variant: "sheet"` | Below 1024: anchored to the bottom, full width, `rounded-t-xl`, max height `--ip-sheet-max-h`, slide-up (`base`, transform) and fade. A 4 px × 36 px grabber is drawn for affordance only (no swipe-to-dismiss in F3; Escape, the close button and "Done" close it). Body scrolls; header and footer stay. |
 
 #### Shared editing components (`components/page-edit/`, reused by Organize in F5)
@@ -682,7 +682,7 @@ app/merge-pdf/page.tsx (server)  → <RecordVisit slug="merge-pdf"/> + <MergeToo
 |---|---|---|
 | `PageListModel` (not a component; `lib/page-list.ts`) | ordered `PageRef[]` (`{uid, sourceId, sourceIndex \| "blank", rotation, size}`), sources map (`letter`, `name`, `lastModified`, `size`) | Pure functions with unit tests: `segments()`, `move(uids, toIndex)`, `remove`, `duplicate`, `insert`, `sortBy(name \| date, dir)`, `reverseSegments()`, `snapshot()` / `restore()` (for undo). Both views render from it. Source letters: A–Z, then AA, AB… (50 files + picker files can exceed 26). |
 | `SegmentGrid` | `segments`, `onMove`, `onRemove`, `onRotate`, `onPreview` | Replaces F1 `FileGrid` for Merge (F1 `FileGrid` stays for Rotate). `role="list"`, `aria-label="Files in merge order"`, `aria-describedby` the hint "Use arrow keys to move between files. Alt with an arrow key moves the file." Same column rules as F1. Roving tabindex across the card buttons (F1 U-7 keys). Hosts pointer drag (M-7). |
-| `SegmentCard` | `segment` (`source`, `pageRange`, `pageCount`, `blankCount`, `rotation`, `status`), `position`, `total` | Extends F1 `FileCard` visuals. `role="listitem"`. Box: first page thumbnail (with the segment's rotation applied via transform, F1 rule: rotating never changes the box). **Main control** is a full-box button (like F1 `PageTile`), accessible name "alpha.pdf, 3 pages" (+ ", pages 2–3" for partial segments, + ", rotated 90°" when rotated); click / Enter opens `PagePreviewDialog` on the segment's pages. Top-start: `SourceBadge`. Top-end: Remove `IconButton` "Remove alpha.pdf" (F1). Floating action bar (bottom of the box, F1 `PageActionBar` style): Rotate left, Rotate right, Enlarge ("Rotate alpha.pdf left", …). Below the box: name (`sm` 500, ellipsis, `title`), meta (`xs fg-muted`, `tabular-nums`): "3 pages · 1.2 MB", "pages 2–3 of 3", "Image · 1 page", "3 pages (1 blank)". Position row (44 px): `IconButton` "Move alpha.pdf earlier" (chevron-left) · `xs fg-muted` "1 of 3" (`aria-hidden`; the list conveys position) · `IconButton` "Move alpha.pdf later"; disabled at the ends (AC-11). Rotation badge (F1 "+90°" pill) sits next to the letter badge. Loading and locked: F1 `FileCard` states, in the file's sorted position (§4). |
+| `SegmentCard` | `segment` (`source`, `pageRange`, `pageCount`, `blankCount`, `rotation`, `status`), `position`, `total` | Extends F1 `FileCard` visuals. `role="listitem"`. Box: first page thumbnail (with the segment's rotation applied via transform, F1 rule: rotating never changes the box). **Main control** is a full-box button (like F1 `PageTile`), accessible name "alpha.pdf, 3 pages" (+ ", pages 2–3" for partial segments, + ", rotated 90°" when rotated); click / Enter opens `PagePreviewDialog` on the segment's pages. Top-start: `SourceBadge`. Top-end: Remove `IconButton` "Remove alpha.pdf" (F1). Floating action bar (bottom of the box, F1 `PageActionBar` style): Rotate left, Rotate right, Enlarge ("Rotate alpha.pdf left", …). Below the box: name (`sm` 500, ellipsis, `title`), meta (`xs fg-muted`, `tabular-nums`): "3 pages" (size dropped *(changed 2026-11-23 per owner: minimal text)*), "pages 2–3 of 3", "Image · 1 page", "3 pages (1 blank)". Position row (44 px): `IconButton` "Move alpha.pdf earlier" (chevron-left) · `xs fg-muted` "1 of 3" (`aria-hidden`; the list conveys position) · `IconButton` "Move alpha.pdf later"; disabled at the ends (AC-11). Rotation badge (F1 "+90°" pill) sits next to the letter badge. Loading and locked: F1 `FileCard` states, in the file's sorted position (§4). |
 | `SourceBadge` | `letter`, `selected?` | `xs` 600, `h-5 min-w-5 px-1`, `rounded-sm`, `surface-raised` 90% with `shadow-sm`, `fg` text (17.7:1); on a selected tile `primary-soft` / `on-primary-soft`. `aria-hidden` (the letter is in the accessible name). |
 | `EditablePageGrid` | `pages`, `selection`, `onSelectionChange`, `onMove`, `onAction`, `onInsert` | Replaces F1 `PageGrid` for Merge: **one** flat list in output order (no file sections). `role="list"`, `aria-label="Pages in merge order"`, `aria-describedby` hint "Arrow keys move between pages. Space selects. Alt with an arrow key moves the page. Shift+F10 opens page actions." Keeps F1 lazy thumbnails (one `IntersectionObserver`, ≤ 1 row overscan, AC-52 of F1) and roving tabindex. Hosts pointer drag and rubber-band-free selection (no lasso in F3). |
 | `EditablePageTile` | `page`, `label` ("A1" / "Blank"), `selected`, `active`, `rotation`, `inserted?` (highlight) | Extends F1 `PageTile` (same square box, page drawn contained, rotation by transform, placeholder pulse). Main control: full-box `button` with **`aria-pressed`** = selected (M-8 explains why not `aria-selected`), accessible name "A1, page 1 of alpha.pdf" / "Blank page", + ", rotated 90°" when rotated. Selected look: 2 px `primary` outline inset 2 px + check badge top-end (`primary` circle, `on-primary` check) + letter badge in `primary-soft`: three cues, one not color. Unselected on touch (`hover: none`) and on hover/focus: an empty 20 px ring at top-end (`border-strong` 1.5 px on `surface-raised` 90%) so multi-select is discoverable. Clicking the ring toggles (additive, like Ctrl+click); it is `aria-hidden` and not focusable because Space on the tile does the same. Rotation badge "+90°" top-start (F1). Action bar (bottom, floating): ≥ 640: Rotate left, Rotate right, Remove, More (⋯); < 640: Rotate right, Remove, More (rotate left moves into More). When the box is narrower than 136 px (slider at 80–128) the bar shows only More (container query). Blank page: white `paper` box at the neighbour's size with a 1 px dashed `border-strong` inset 8 px, a 24 px blank-page icon and "Blank page" in `on-paper-muted` `xs`. `inserted`: a `primary-soft` glow overlay fades out over 1.2 s (opacity only). |
@@ -732,7 +732,7 @@ All F1 U-6 states apply. Additions and changes:
 
 | State | Workspace | Dock | Focus / announcement |
 |---|---|---|---|
-| **Empty** | F1 drop card. Button "Choose files"; hint "PDFs and images · or drop them here · paste with Ctrl+V"; limits "PDF, JPG, PNG, GIF, BMP, WebP, TIFF · up to 50 files, 100 MB each, 500 MB and 1,000 pages in total" (TIFF only if §8a decision 9 is met). | Options button / panel disabled; status "Add files to start"; primary disabled. | F1. |
+| **Empty** | F1 drop card. Button "Choose files"; hint "or drop them here"; limits "PDFs and images, up to 50 files", with the full limits as tooltip and screen-reader text (M-12) *(changed 2026-11-23 per owner: minimal text)*. | Options button / panel disabled; status "Add files to start"; primary disabled. | F1. |
 | **Loading** | Files view (default). Cards appear immediately in **sorted** position for the first batch (natural name order, §2), each in F1 loading state (spinner, "Reading…"), so the order the user will get is visible from the first frame and nothing re-sorts when files finish. Images show "Reading…" then their decoded thumbnail. | Primary disabled, status "Reading files…". | "Reading 3 files". |
 | **Password** | Locked card in its sorted position, F1 locked look. F1 `PasswordDialog`. | F1. | F1. |
 | **Ready, one file** | One card, toolbar with view toggle (AC-18), end tile "Add files" reads "Add more files" at this count. | Primary enabled; status "3 pages · 1 file · add more to merge". | "alpha.pdf ready, 3 pages". |
@@ -876,19 +876,33 @@ No-shift checklist additions: card height fixed (position row reserved); insert 
 | Key | Text |
 |---|---|
 | intro.title / summary | "Merge PDF" / "Join PDFs and images into a single document" (registry) |
-| picker.button / hint | "Choose files" / "PDFs and images · or drop them here · paste with Ctrl+V" |
+| picker.button / hint / limits | "Choose files" / "or drop them here" / "PDFs and images, up to 50 files"; the full limits ("PDF, JPG, PNG, GIF, BMP, WebP or TIFF · up to 50 files, 100 MB each, 500 MB and 1,000 pages in total · you can also paste them with Ctrl+V") are the tooltip and screen-reader text *(changed 2026-11-23 per owner: minimal text)* |
 | action / progress | "Merge PDFs" / "Merging… {n}%"; font phase "Preparing fonts…" |
 | status | "Add files to start" · "Reading files…" · "{p} pages · {f} files" · "{p} pages · 1 file · add more to merge" |
 | toolbar | "Files" · "Pages" · "Sort" · "Add files" · "Add pages" · "Add" |
 | sort items | "Name A to Z" · "Name Z to A" · "Oldest first" · "Newest first" · "Reverse order" · "Add more files to sort" |
 | add items | "Files…" · "Pages from a file…" · "Blank page" (insert-point: "Files here…" · "Pages from a file here…" · "Blank page here") |
-| card | "Move {name} earlier" · "Move {name} later" · "{i} of {n}" · "pages {a}–{b} of {n}" · "Image · 1 page" · "{n} pages ({b} blank)" |
+| card | "Move {name} earlier" · "Move {name} later" · ~~"{i} of {n}"~~ (removed *(changed 2026-11-23 per owner: minimal text)*) · "pages {a}–{b} of {n}" · "Image · 1 page" · "{n} pages ({b} blank)" |
 | tile | "Blank page" · More menu: "Duplicate" · "Move to position…" · "Move earlier" · "Move later" · "Blank page after" · "Pages from a file after…" · "Files after…" · "Enlarge" |
 | selection | "{n} selected" · "Remove" · "Clear" |
-| picker dialog | "Add pages from {name}" · "Pick the pages to add. They go after {A3}." / "…They go at the end." · "Select all" · "Select none" · "{n} of {t} selected" · "Add {n} pages" / "Add 1 page" / "Add pages" · "Select at least one page." |
+| picker dialog | "Add pages from {name}" · "They go after {A3}." / "They go at the end." *(changed 2026-11-23 per owner: minimal text)* · "Select all" · "Select none" · "{n} of {t} selected" · "Add {n} pages" / "Add 1 page" / "Add pages" · "Select at least one page." |
 | move dialog | "Move {A3}" / "Move {n} pages" · "Now at position {i} of {t}." · "New position (1–{t})" · "Enter a whole number from 1 to {t}." · "Move" |
 | confirm | "Remove pages?" · "{A3} is one of {n} selected pages." · "Only this page" · "Remove all {n} selected" |
 | undo | "Removed {name}." / "Removed {n} pages." · "Undo" |
 | duplicate | "{name} was added twice" · "If that was a mistake, remove the copy." · "Remove the copy" |
 | options | M-5 labels and descriptions · "Options" · "{n} changed" · "Merge options" · "Reset options" · "Done" |
 | errors | "{name} couldn't be read as an image." · "{name} is larger than 50 megapixels, the limit for images." · "This tool takes up to 50 files at a time. We loaded the first 50." · "Couldn't load the font for file names. Check your connection and try again." |
+
+### M-13. BerryPDF re-theme (2026-11-23)
+
+After the BerryPDF design system landed on `main` (`docs/design/berrypdf.md`), Merge follows it exactly as Rotate does; where this section and M-1…M-12 disagree on a visual value, this section and the design doc win. Behaviour, ARIA and every AC are unchanged.
+
+- **Files view cards and pages view tiles** are BerryPDF page trays (`mp-tray`, pink, 14 px radius, page number / label below in Fredoka `mp-tray__n`). The letter badge and the "+90°" badge are white pills with berry text; Remove is a soft round icon button at the tray's top corner; the floating action bar is the Rotate tool's white pill (sand outline, soft icon buttons). A selected tile gets the tray's 2.5 px berry ring and a leaf-green tick (BerryPDF in-scope look) instead of the outline + primary check; the letter badge on the tile is dropped because the label under the tray already says it (*changed 2026-11-23 per owner: minimal text*). The add tile is a dashed pale-berry tray with a round tinted plus.
+- **Toolbar**: Sort and Add pages are blueberry editing tools (`mp-btn--tool`), like Add files.
+- **Menus**: `mp-menu` (white, 1.5 px sand, radius 14, scale-in 0.15 s), rows radius 9 with band hover and berry text.
+- **Options panel**: each group heading is a numbered step (`mp-step`); Contents page is three ChoiceTiles with small page icons; the selects take the BerryPDF Input look with the visible label hidden where the step heading already names it (Bookmarks, Form fields); descriptions become screen-reader text + tooltip (*changed 2026-11-23 per owner: minimal text*). Reset options is a soft button.
+- **Bottom sheet** (< 1024 px): white, 24 px top corners, the modal's blurred berry backdrop, rises in (0.3 s overshoot), sand hairlines between header, body and footer.
+- **Dialogs** (page picker, move to position, remove selected): BerryPDF Modal; quiet action on the left, the one berry fill on the right. The remove-selected confirm is Cancel (ghost) · Only this page (outline) · Remove all {n} selected (berry), with focus on "Only this page" as before. Picker tiles are small trays in a cream well.
+- **Notices**: BerryPDF Alerts, top centre, dropping in (shared flow); Undo and duplicate notices keep their timer and action.
+- **Motion** (CSS only, all off under reduced motion): cards and tiles rise in staggered (360 ms, 30 ms apart, capped at 300 ms); once the grid settles (700 ms) a card or tile that moves rises straight into its new place, which is the reorder feedback beside the existing drag FLIP; thumbnails ease in (shared `mp-thumb-in`); inserted tiles keep their one-off glow; the selection bar and sheet pop in; nothing loops.
+- **Names**: the output fallback name is `berrypdf-merged.pdf`, the Producer is "BerryPDF", options are stored under `berrypdf:merge-options` (Merge has not shipped, so nothing to migrate).

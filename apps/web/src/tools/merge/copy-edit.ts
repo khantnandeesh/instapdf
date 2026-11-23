@@ -18,8 +18,8 @@ export const editCopy = {
   moveLater: (name: string) => `Move ${name} later`,
   position: (i: number, total: number) => `${i} of ${total}`,
   cardName: (name: string, pages: number, part: string, rotation: string) => [`${name}, ${plural(pages, "page")}`, part, rotation].filter(Boolean).join(", "),
-  cardMeta: (o: { image: boolean; pages: number; blank: number; part: string; total: number; size: string }) =>
-    o.part ? `${o.part} of ${o.total}` : o.image ? `Image · ${plural(o.pages, "page")}` : o.blank ? `${plural(o.pages, "page")} (${o.blank} blank)` : `${plural(o.pages, "page")} · ${o.size}`,
+  cardMeta: (o: { image: boolean; pages: number; blank: number; part: string; total: number }) =>
+    o.part ? `${o.part} of ${o.total}` : o.image ? `Image · ${plural(o.pages, "page")}` : o.blank ? `${plural(o.pages, "page")} (${o.blank} blank)` : plural(o.pages, "page"),
   rotateLeft: (name: string) => `Rotate ${name} left`,
   rotateRight: (name: string) => `Rotate ${name} right`,
   enlarge: (name: string) => `Enlarge ${name}`,
@@ -48,7 +48,7 @@ export const editCopy = {
   filesLabel: "Files in merge order",
   pagesLabel: "Pages in merge order",
   pickerTitle: (name: string) => `Add pages from ${name}`,
-  pickerHelp: (where: string) => `Pick the pages to add. They go ${where}.`,
+  pickerHelp: (where: string) => `They go ${where}.`,
   selectAll: "Select all",
   selectNone: "Select none",
   ofSelected: (count: number, total: number) => `${n(count)} of ${n(total)} selected`,
