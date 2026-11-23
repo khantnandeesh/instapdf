@@ -4,8 +4,8 @@ Status values: `todo` · `in-progress (step n)` · `done`. The orchestrator keep
 
 | # | Feature | Sejda slugs | Status |
 |---|---|---|---|
-| F0 | Foundation: monorepo, CI, design tokens, app shell, tool registry, GCP infra + deploy pipelines | – | in-progress (infra PR #1 in review; GCP blocked on owner enabling Service Usage / Resource Manager / Billing APIs) |
-| F1 | Shared upload → options → process → result flow (incl. encrypted-PDF password prompts) | shared-chrome | in-progress (step 2) — spec on `feat/f1-shared-flow`, vehicle tool: Rotate |
+| F0 | Foundation: monorepo, CI, design tokens, app shell, tool registry, GCP infra + deploy pipelines | – | done (staging: https://web-staging-qzq5fa2g7q-uc.a.run.app; owner to set GitHub repo vars + production env/tag ruleset) |
+| F1 | Shared upload → options → process → result flow (incl. encrypted-PDF password prompts) | shared-chrome | in-progress (step 4: build) — spec + UI on `feat/f1-shared-flow`, vehicle tool: Rotate |
 | F2 | Home page + tool catalogue + header menu | home | todo |
 | F3 | Merge (files + pages view, reorder, options) | merge-pdf | todo |
 | F4 | Split by pages / Extract / Delete / Rotate | split-pdf, extract-pdf-pages, delete-pdf-pages, rotate-pdf-pages | todo (Rotate ships in F1; F4 reuses it) |
