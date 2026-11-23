@@ -3,7 +3,8 @@
  * Processing Web Worker: runs browser tools off the main thread.
  * Files arrive as Blobs (passed by reference) and never leave the device.
  */
-import { encodePng, type ImageFormat } from "./images";
+import type { ImageFormat } from "./images";
+import { encodePng } from "./png";
 import { runJob, type Job, type JobEnv, type JobOutput } from "./jobs";
 import type { FontManifest } from "./text";
 

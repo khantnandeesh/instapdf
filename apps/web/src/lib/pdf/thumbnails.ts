@@ -6,10 +6,16 @@
  * worker (OffscreenCanvas) when available, otherwise on the main thread.
  */
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
+import { imagePlacement, type ImageFormat } from "./images";
+
+/** A picture input: rendered without pdf.js, on the A4 page it becomes (spec F3 M-11 #6). */
+type ImageEntry = { kind: "image"; blob: Blob; format: ImageFormat; frames: { width: number; height: number }[] };
+type Entry = PDFDocumentProxy | ImageEntry;
+const isImage = (e: Entry): e is ImageEntry => (e as ImageEntry).kind === "image";
 
 type Request = {
   key: string;
-  doc: PDFDocumentProxy;
+  doc: Entry;
   index: number;
   cssSize: number;
   priority: number;
@@ -24,7 +30,7 @@ const MAX_DPR = 2;
 const CONCURRENCY = 3;
 
 export class ThumbnailRenderer {
-  private docs = new Map<string, PDFDocumentProxy>();
+  private docs = new Map<string, Entry>();
   private queue: Request[] = [];
   private running = 0;
   private active = new Set<Request>();
@@ -33,8 +39,13 @@ export class ThumbnailRenderer {
     this.docs.set(fileId, doc);
   }
 
+  registerImage(fileId: string, blob: Blob, format: ImageFormat, frames: { width: number; height: number }[]): void {
+    this.docs.set(fileId, { kind: "image", blob, format, frames });
+  }
+
   unregister(fileId: string): void {
     this.docs.delete(fileId);
+    dropBitmaps(fileId);
     for (const r of [...this.queue, ...this.active]) {
       if (!r.key.startsWith(`${fileId}:`)) continue;
       r.cancelled = true;
@@ -81,7 +92,8 @@ export class ThumbnailRenderer {
       const next = this.queue.shift()!;
       if (next.cancelled) continue;
       this.running++;
-      next.handle = startRender(next.doc, next.index, next.cssSize);
+      const doc = next.doc;
+      next.handle = isImage(doc) ? startImageRender(next.key.slice(0, next.key.lastIndexOf(":")), doc, next.index, next.cssSize) : startRender(doc, next.index, next.cssSize);
       this.active.add(next);
       next.handle.promise
         .then(next.resolve, next.reject)
@@ -135,4 +147,83 @@ export function startRender(doc: PDFDocumentProxy, index: number, cssSize: numbe
 
 export function renderPage(doc: PDFDocumentProxy, index: number, cssSize: number): Promise<HTMLCanvasElement> {
   return startRender(doc, index, cssSize).promise;
+}
+
+/** Decoded bitmaps per image frame (longest side <= 800 px), a few kept for re-renders. */
+const BITMAP_MAX = 800;
+const BITMAP_CACHE = 12;
+const bitmaps = new Map<string, Promise<ImageBitmap>>();
+
+function dropBitmaps(fileId: string) {
+  for (const [key, bmp] of bitmaps) {
+    if (!key.startsWith(`${fileId}:`)) continue;
+    bitmaps.delete(key);
+    void bmp.then((b) => b.close()).catch(() => {});
+  }
+}
+
+async function decodeFrame(entry: ImageEntry, index: number): Promise<ImageBitmap> {
+  const frame = entry.frames[index] ?? entry.frames[0];
+  const scale = Math.min(1, BITMAP_MAX / Math.max(frame.width, frame.height));
+  const size = { resizeWidth: Math.max(1, Math.round(frame.width * scale)), resizeHeight: Math.max(1, Math.round(frame.height * scale)), resizeQuality: "medium" as const };
+  let source: Blob | ImageData = entry.blob;
+  if (entry.format === "tiff") {
+    const { decodeTiffFrame } = await import("./tiff");
+    const f = await decodeTiffFrame(new Uint8Array(await entry.blob.arrayBuffer()), index);
+    source = new ImageData(new Uint8ClampedArray(f.rgba.buffer as ArrayBuffer, f.rgba.byteOffset, f.rgba.length), f.width, f.height);
+  }
+  try {
+    return await createImageBitmap(source, size);
+  } catch {
+    return createImageBitmap(source); // engines without resize options
+  }
+}
+
+function bitmapFor(fileId: string, entry: ImageEntry, index: number): Promise<ImageBitmap> {
+  const key = `${fileId}:${index}`;
+  let p = bitmaps.get(key);
+  if (!p) {
+    p = decodeFrame(entry, index);
+    p.catch(() => bitmaps.delete(key));
+    bitmaps.set(key, p);
+    if (bitmaps.size > BITMAP_CACHE) {
+      const [oldest] = bitmaps.keys();
+      const old = bitmaps.get(oldest);
+      bitmaps.delete(oldest);
+      void old?.then((b) => b.close()).catch(() => {});
+    }
+  } else {
+    bitmaps.delete(key); // refresh its LRU position
+    bitmaps.set(key, p);
+  }
+  return p;
+}
+
+/** Draws image frame `index` on its white A4 page, longest side `cssSize` CSS pixels. */
+export function startImageRender(fileId: string, entry: ImageEntry, index: number, cssSize: number): RenderHandle {
+  let cancelled = false;
+  const promise = (async () => {
+    const frame = entry.frames[index] ?? entry.frames[0];
+    const place = imagePlacement(frame.width, frame.height);
+    const bitmap = await bitmapFor(fileId, entry, index);
+    if (cancelled) throw new DOMException("Render cancelled", "AbortError");
+    const dpr = Math.min(MAX_DPR, typeof window === "undefined" ? 1 : window.devicePixelRatio || 1);
+    const k = (cssSize * dpr) / Math.max(place.page.width, place.page.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.floor(place.page.width * k));
+    canvas.height = Math.max(1, Math.floor(place.page.height * k));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("No 2D context");
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--ip-paper").trim() || "white"; // the paper token
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // PDF y grows upwards; the canvas y grows downwards.
+    ctx.drawImage(bitmap, place.x * k, (place.page.height - place.y - place.height) * k, place.width * k, place.height * k);
+    return canvas;
+  })();
+  return {
+    promise,
+    cancel() {
+      cancelled = true;
+    },
+  };
 }

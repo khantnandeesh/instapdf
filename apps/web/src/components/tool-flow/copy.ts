@@ -38,6 +38,9 @@ export const copy = {
   readingCount: (n: number) => `Reading ${plural(n, "file")}`,
   fileReady: (name: string, pages: number) => `${name} ready, ${plural(pages, "page")}`,
   pages: (n: number) => plural(n, "page"),
+  errorImage: (name: string) => `${name} couldn't be read as an image.`,
+  errorPixels: (name: string) => `${name} is larger than 50 megapixels, the limit for images.`,
+  preparingFonts: "Preparing fonts…",
 };
 
 export const permissionLabels: Record<Permission, string> = {

@@ -168,7 +168,7 @@ async function embedImageFrame(out: PDFDocument, src: ImageSource, frame: number
   if (src.format === "jpeg") image = await out.embedJpg(src.bytes);
   else if (src.format === "png") image = await out.embedPng(src.bytes);
   else if (src.format === "tiff") {
-    const [{ decodeTiffFrame }, { encodePng }] = await Promise.all([import("./tiff"), import("./images")]);
+    const [{ decodeTiffFrame }, { encodePng }] = await Promise.all([import("./tiff"), import("./png")]);
     const f = await decodeTiffFrame(src.bytes, frame);
     image = await out.embedPng(encodePng(f.rgba, f.width, f.height));
   } else {

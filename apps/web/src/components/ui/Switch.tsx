@@ -2,10 +2,10 @@ import { cx } from "./cx";
 import { CheckIcon } from "./icons";
 
 /** On/off switch: a native checkbox with role="switch" over a drawn track. The whole row is the hit area. */
-export function Switch({ id, label, checked, onChange, className }: { id: string; label: string; checked: boolean; onChange: (checked: boolean) => void; className?: string }) {
+export function Switch({ id, label, checked, onChange, className, describedBy }: { id: string; label: string; checked: boolean; onChange: (checked: boolean) => void; className?: string; describedBy?: string }) {
   return (
     <label htmlFor={id} className={cx("relative inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium select-none", className)}>
-      <input id={id} type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer absolute inset-0 z-10 m-0 size-full cursor-pointer appearance-none opacity-0" />
+      <input id={id} type="checkbox" role="switch" aria-describedby={describedBy} checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer absolute inset-0 z-10 m-0 size-full cursor-pointer appearance-none opacity-0" />
       <span
         aria-hidden="true"
         className={cx(

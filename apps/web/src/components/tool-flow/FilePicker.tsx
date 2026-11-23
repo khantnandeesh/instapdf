@@ -24,8 +24,10 @@ export const FilePicker = forwardRef<
     disabled?: boolean;
     className?: string;
     inputTestId?: string;
+    /** Below 640 px show only the icon (the label stays the accessible name). */
+    compact?: boolean;
   }
->(function FilePicker({ accept, multiple, onFiles, label, variant = "primary", size = "lg", icon, sources, disabled, className, inputTestId }, ref) {
+>(function FilePicker({ accept, multiple, onFiles, label, variant = "primary", size = "lg", icon, sources, disabled, className, inputTestId, compact }, ref) {
   const input = useRef<HTMLInputElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   useImperativeHandle(ref, () => ({
@@ -43,12 +45,12 @@ export const FilePicker = forwardRef<
         size={size}
         iconStart={icon}
         disabled={disabled}
-        className={className}
+        className={compact ? `max-sm:w-11 max-sm:px-0 ${className ?? ""}` : className}
         onPointerEnter={prefetchPdfjs}
         onFocus={prefetchPdfjs}
         onClick={() => input.current?.click()}
       >
-        {label}
+        {compact ? <span className="max-sm:sr-only">{label}</span> : label}
       </Button>
       {sources}
       <input

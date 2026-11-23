@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { encodePng, exceedsPixelCap, imageFormatOfName, imagePageSize, imagePlacement, probeImage, sniffFormat } from "./images";
+import { exceedsPixelCap, imageFormatOfName, imagePageSize, imagePlacement, probeImage, sniffFormat } from "./images";
+import { encodePng } from "./png";
 import { decodeTiffFrame, tiffFrameSizes } from "./tiff";
 
 const fx = async (name: string) => new Uint8Array(await readFile(new URL(`../../../tests/fixtures/${name}`, import.meta.url)));

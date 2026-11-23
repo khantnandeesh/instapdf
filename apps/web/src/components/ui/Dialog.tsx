@@ -23,6 +23,7 @@ export function Dialog({
   className,
   wide,
   variant = "default",
+  onCloseButton,
 }: {
   open: boolean;
   onClose: (reason: DialogCloseReason) => void;
@@ -42,7 +43,10 @@ export function Dialog({
    * under a visually hidden title, and focuses that title unless
    * `initialFocusRef` is set (no on-screen keyboard popping up on open).
    */
-  variant?: "default" | "fullscreen";
+  /** "sheet" (spec F3 M-4): anchored to the bottom, full width, max height --ip-sheet-max-h; body scrolls, header and footer stay. */
+  variant?: "default" | "fullscreen" | "sheet";
+  /** Sheet only: a close button in the header. */
+  onCloseButton?: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -109,7 +113,9 @@ export function Dialog({
       className={cx(
         variant === "fullscreen"
           ? "ip-rise-in m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto overscroll-contain border-0 bg-bg p-0 text-fg backdrop:bg-transparent"
-          : cx(
+          : variant === "sheet"
+            ? "ip-rise-in mx-0 mt-auto mb-0 max-h-(--ip-sheet-max-h) w-screen max-w-none rounded-t-xl border-0 bg-surface-raised p-0 text-fg shadow-lg backdrop:bg-scrim"
+            : cx(
               "m-auto max-h-[calc(100dvh-32px)] rounded-xl bg-surface-raised p-0 text-fg shadow-lg backdrop:bg-scrim",
               wide ? "w-[min(880px,calc(100vw-32px))]" : "w-[min(440px,calc(100vw-32px))]",
             ),
@@ -123,6 +129,32 @@ export function Dialog({
           </h2>
           {children}
         </>
+      )}
+      {open && variant === "sheet" && (
+        <div className="flex max-h-(--ip-sheet-max-h) flex-col">
+          <div className="flex shrink-0 flex-col items-stretch border-b border-border px-4 pt-2 pb-2">
+            <span aria-hidden="true" className="mx-auto mb-2 h-1 w-9 rounded-full bg-border-strong" />
+            <div className="flex items-center justify-between gap-3">
+              <h2 id={titleId} className="text-lg font-semibold">
+                {title}
+              </h2>
+              {onCloseButton && (
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={onCloseButton}
+                  className="relative grid size-11 place-items-center rounded-md text-fg hover:bg-surface-sunken"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round">
+                    <path d="M6 6l12 12M18 6 6 18" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">{children}</div>
+          {footer && <div className="flex shrink-0 flex-wrap gap-2 border-t border-border px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">{footer}</div>}
+        </div>
       )}
       {open && variant === "default" && (
         <div className="flex flex-col gap-4 p-6 max-sm:p-5">

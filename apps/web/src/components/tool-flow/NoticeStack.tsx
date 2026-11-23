@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
-import { Notice, type NoticeTone } from "../ui/Notice";
+import { useEffect, useRef, useState } from "react";
+import { Notice } from "../ui/Notice";
+import type { FlowNoticeInput } from "./types";
 
-export type FlowNotice = { id: string; tone: NoticeTone; title: string; items?: string[] };
+export type FlowNotice = FlowNoticeInput;
 
 /**
  * Floating notices above the dock (never in the document flow, so they never
@@ -23,11 +24,7 @@ export function NoticeStack({ notices, onDismiss }: { notices: FlowNotice[]; onD
     >
       <div className="pointer-events-auto flex max-h-[60dvh] w-[min(480px,calc(100vw-32px))] flex-col gap-2 overflow-y-auto">
         {visible.map((n) => (
-          <div key={n.id} className="ip-settle shadow-lg">
-            <Notice tone={n.tone} title={n.title} onDismiss={() => onDismiss(n.id)}>
-              {n.items && n.items.length > 0 && <NoticeItems items={n.items} />}
-            </Notice>
-          </div>
+          <TimedNotice key={n.id} notice={n} onDismiss={() => onDismiss(n.id)} />
         ))}
         {hidden > 0 && (
           <button
@@ -59,5 +56,47 @@ function NoticeItems({ items }: { items: string[] }) {
         </button>
       )}
     </>
+  );
+}
+
+/**
+ * One notice. With `timeoutMs` it dismisses itself, but the timer pauses
+ * while the pointer is over it or focus is inside it (WCAG 2.2.1).
+ */
+function TimedNotice({ notice: n, onDismiss }: { notice: FlowNotice; onDismiss: () => void }) {
+  const [paused, setPaused] = useState(false);
+  const left = useRef(n.timeoutMs ?? 0);
+  const expire = useRef(n.onExpire);
+  expire.current = n.onExpire;
+  const dismiss = useRef(onDismiss);
+  dismiss.current = onDismiss;
+  useEffect(() => {
+    if (!n.timeoutMs || paused) return;
+    const started = Date.now();
+    const t = setTimeout(() => {
+      expire.current?.();
+      dismiss.current();
+    }, left.current);
+    return () => {
+      clearTimeout(t);
+      left.current -= Date.now() - started;
+    };
+  }, [n.timeoutMs, paused]);
+  return (
+    <div
+      className="ip-settle shadow-lg"
+      data-testid="notice"
+      onPointerEnter={() => setPaused(true)}
+      onPointerLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPaused(false);
+      }}
+    >
+      <Notice tone={n.tone} title={n.title} onDismiss={onDismiss} action={n.action}>
+        {n.body && <p>{n.body}</p>}
+        {n.items && n.items.length > 0 && <NoticeItems items={n.items} />}
+      </Notice>
+    </div>
   );
 }

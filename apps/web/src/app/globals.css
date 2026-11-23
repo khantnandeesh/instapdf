@@ -58,6 +58,25 @@
   }
 }
 
+/* F3 Merge: iOS long-press callout and text selection off on draggable cards and tiles (M-11 #5). */
+.ip-no-callout {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* F3 Merge: glow on newly inserted tiles, fades out (opacity only). */
+.ip-glow {
+  animation: ip-glow 1.2s var(--ip-ease-out) both;
+}
+@keyframes ip-glow {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes ip-spin {
   to {
     transform: rotate(360deg);
@@ -126,6 +145,9 @@
   .ip-spin {
     /* Carries state, so it pulses instead of freezing (spec U-4 Spinner). */
     animation: ip-pulse 1.2s linear infinite;
+  }
+  .ip-glow {
+    display: none;
   }
   .ip-indeterminate,
   .ip-shake,
