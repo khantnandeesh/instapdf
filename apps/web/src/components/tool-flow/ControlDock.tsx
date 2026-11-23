@@ -81,13 +81,23 @@ export function ControlDock({
       ].join(" ")}
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 lg:h-full lg:flex-col lg:items-stretch">
-        {(!full || desktop !== false) && (
-          <fieldset disabled={optionsDisabled} className={full ? "min-w-0 max-lg:hidden lg:flex-1 lg:overflow-y-auto" : "min-w-0 sm:flex-1 lg:flex-1 lg:overflow-y-auto"}>
-            <legend className="sr-only">{label}</legend>
-            <h2 className="mb-3 hidden text-sm font-semibold text-fg-muted lg:block">Options</h2>
-            {options}
-          </fieldset>
-        )}
+        {(!full || desktop !== false) &&
+          (full ? (
+            // The scrolling panel stays keyboard-reachable while every control in it is disabled (axe scrollable-region-focusable).
+            <div tabIndex={optionsDisabled ? 0 : undefined} className="min-w-0 rounded-md focus-visible:outline-focus max-lg:hidden lg:flex-1 lg:overflow-y-auto">
+              <fieldset disabled={optionsDisabled} className="min-w-0">
+                <legend className="sr-only">{label}</legend>
+                <h2 className="mb-3 hidden text-sm font-semibold text-fg-muted lg:block">Options</h2>
+                {options}
+              </fieldset>
+            </div>
+          ) : (
+            <fieldset disabled={optionsDisabled} className="min-w-0 sm:flex-1 lg:flex-1 lg:overflow-y-auto">
+              <legend className="sr-only">{label}</legend>
+              <h2 className="mb-3 hidden text-sm font-semibold text-fg-muted lg:block">Options</h2>
+              {options}
+            </fieldset>
+          ))}
         {full && desktop !== true && (
           <Button
             ref={optionsButton}

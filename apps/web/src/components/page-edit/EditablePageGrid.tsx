@@ -139,7 +139,7 @@ export default function EditablePageGrid({
   selection: ReadonlySet<string>;
   inserted: ReadonlySet<string>;
   labels?: PageGridLabels;
-  focusUid: { uid: string; tick: number } | null;
+  focusUid: { uid: string; tick: number; onMount: boolean } | null;
   dimmed: boolean;
   selectionCount: number;
   onSelect: (uid: string, how: { toggle: boolean; range: boolean }) => void;
@@ -170,8 +170,12 @@ export default function EditablePageGrid({
     el?.scrollIntoView({ block: "nearest" });
   };
 
+  // At mount, only a request made for this grid (an insert that switched views) moves focus;
+  // an older one belonged to the other view and must not steal focus from the view toggle.
+  const handled = useRef(focusUid && !focusUid.onMount ? focusUid.tick : -1);
   useEffect(() => {
-    if (!focusUid) return;
+    if (!focusUid || focusUid.tick === handled.current) return;
+    handled.current = focusUid.tick;
     const i = tiles.findIndex((t) => t.uid === focusUid.uid);
     if (i >= 0) focusTile(i);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -442,7 +446,7 @@ export default function EditablePageGrid({
             </div>
           );
         })}
-        <div className="flex min-w-0 flex-col items-center gap-1">
+        <div role="listitem" className="flex min-w-0 flex-col items-center gap-1">
           <MenuButton
             label={labels.addAtEnd}
             items={insertItems(tiles.length)}

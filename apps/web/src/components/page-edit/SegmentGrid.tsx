@@ -79,7 +79,7 @@ export function SegmentGrid({
   labels?: SegmentGridLabels;
   sourceCount?: number;
   /** Focus the card holding this page uid after the next render. */
-  focusUid: { uid: string; tick: number } | null;
+  focusUid: { uid: string; tick: number; onMount: boolean } | null;
   dimmed: boolean;
   onMove: (key: string, step: MoveStep) => void;
   onDragTo: (key: string, gap: number) => void;
@@ -105,8 +105,12 @@ export function SegmentGrid({
     el?.scrollIntoView({ block: "nearest" });
   };
 
+  // At mount, only a request made for this grid (an insert that switched views) moves focus;
+  // an older one belonged to the other view and must not steal focus from the view toggle.
+  const handled = useRef(focusUid && !focusUid.onMount ? focusUid.tick : -1);
   useEffect(() => {
-    if (!focusUid) return;
+    if (!focusUid || focusUid.tick === handled.current) return;
+    handled.current = focusUid.tick;
     const i = cards.findIndex((c) => c.uids.includes(focusUid.uid));
     if (i >= 0) focusCard(i);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -237,7 +241,7 @@ export function SegmentGrid({
                   variant="raised"
                   tabIndex={tab}
                   data-no-drag=""
-                  className="absolute top-1 right-1 shadow-sm"
+                  className="absolute top-1 right-1 shadow-sm max-lg:size-11"
                   icon={<CloseIcon size={18} />}
                   onClick={() => onRemove(card.key)}
                 />
@@ -287,7 +291,7 @@ export function SegmentGrid({
             </div>
           );
         })}
-        <div className="flex min-w-0 flex-col gap-1">
+        <div role="listitem" className="flex min-w-0 flex-col gap-1">
           <button
             type="button"
             onClick={(e) => onAddFiles(e.currentTarget)}

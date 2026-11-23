@@ -69,8 +69,13 @@ export const MenuButton = forwardRef<
       } catch {
         return;
       }
+      // The toggle event is async: position and move focus now, so a fast next key reaches the menu.
+      setOpen(true);
+      position();
+      const list = itemEls();
+      (where === "last" ? list[list.length - 1] : list[0])?.focus();
     },
-    [disabled],
+    [disabled, position],
   );
   const hide = useCallback((returnFocus: boolean) => {
     try {
@@ -94,11 +99,7 @@ export const MenuButton = forwardRef<
       const isOpen = (e as ToggleEvent).newState === "open";
       setOpen(isOpen);
       onOpenChange?.(isOpen);
-      if (isOpen) {
-        position();
-        const list = itemEls();
-        (focusFirst.current === "last" ? list[list.length - 1] : list[0])?.focus();
-      }
+      if (isOpen) position();
     };
     p.addEventListener("toggle", onToggle);
     const reposition = () => {

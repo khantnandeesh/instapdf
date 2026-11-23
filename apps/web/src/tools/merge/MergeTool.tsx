@@ -103,8 +103,9 @@ export function MergeTool() {
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [dialogsUsed, setDialogsUsed] = useState({ picker: false, move: false, confirm: false });
   const [inserted, setInserted] = useState<Set<string>>(new Set());
-  const [focus, setFocus] = useState<{ uid: string; tick: number } | null>(null);
-  const focusOn = (uid: string | undefined) => uid && setFocus((f) => ({ uid, tick: (f?.tick ?? 0) + 1 }));
+  const [focus, setFocus] = useState<{ uid: string; tick: number; onMount: boolean } | null>(null);
+  /** `switchesView`: the action also opens the pages view, so the grid that mounts takes the request. */
+  const focusOn = (uid: string | undefined, switchesView = false) => uid && setFocus((f) => ({ uid, tick: (f?.tick ?? 0) + 1, onMount: switchesView }));
   const [options, setOptions] = useState<Options>(defaultMergeOptions);
 
   const filesHereInput = useRef<HTMLInputElement>(null);
@@ -454,7 +455,7 @@ export function MergeTool() {
     api.current?.setView("pages");
     setInserted(new Set([blank.uid]));
     announce(c.blankAdded(list[at - 1] ? c.after(labelOf(list[at - 1])) : at === 0 && list.length ? c.atStart : c.atEnd));
-    focusOn(blank.uid);
+    focusOn(blank.uid, true);
   };
   const openFilesHere = (at: number) => {
     pendingAt.current = at;
@@ -483,7 +484,7 @@ export function MergeTool() {
     api.current?.setView("pages");
     setInserted(new Set(added.map((p) => p.uid)));
     announce(c.pagesAdded(added.length, before ? c.after(labelOf(before)) : c.atEnd));
-    focusOn(added[0]?.uid);
+    focusOn(added[0]?.uid, true);
   };
   const cancelPicker = () => {
     const pk = pickerRef.current;
