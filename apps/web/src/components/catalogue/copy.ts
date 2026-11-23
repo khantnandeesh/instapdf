@@ -1,14 +1,11 @@
 /** Catalogue strings (spec F2 H-8). Our own wording. */
 export const catalogueCopy = {
   title: "All tools",
-  summary: (n: number, k: number) => `${n} tools · ${k} ready now`,
   searchLabel: "Search tools",
-  searchPlaceholder: "Search tools, e.g. “merge” or “jpg”",
-  shown: (n: number) => `${n} shown`,
+  searchPlaceholder: "Search tools",
   ofTotal: (n: number, total: number) => (n === total ? `${total} tools` : `${n} of ${total}`),
   live: (n: number) => (n === 0 ? "No tools found" : n === 1 ? "1 tool" : `${n} tools`),
   none: (q: string) => `No tools match “${q}”`,
-  tip: "Try a shorter word, like “split” or “word”.",
   clear: "Clear search",
   readyOnly: "Only ready tools",
   jumpLabel: "Jump to a category",
@@ -19,5 +16,5 @@ export const catalogueCopy = {
   popularTitle: "Popular",
   beta: "Beta",
   soon: "Coming soon",
-  groupCount: (n: number) => (n === 1 ? "1 tool" : `${n} tools`),
+  soonShort: "Soon",
 };

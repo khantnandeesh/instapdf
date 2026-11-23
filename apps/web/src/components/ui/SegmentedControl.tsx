@@ -5,9 +5,11 @@ import { cx } from "./cx";
 export type SegmentOption<T extends string> = { value: T; label: string; shortLabel?: string; icon?: ReactNode };
 
 /**
- * Radio group with roving tabindex; arrow keys move and select. Two Mint Paper looks:
- * - "toolbar": joined editing-tool buttons in the soft blue glow (EditorToolbar); selected = active.
- * - "tiles": ChoiceTiles (line icon over a 15px label); selected = mint edge on choice-bg.
+ * Radio group with roving tabindex; arrow keys move and select. Three BerryPDF looks:
+ * - "toolbar": joined blueberry editing tools in their halo (EditorToolbar); selected = active.
+ * - "tiles": ChoiceTiles (icon over a Fredoka label, on a pale lip); selected = berry edge and text
+ *   on the pink tint with a leaf-green tick badge.
+ * - "tabs": the soft segmented pill (Tabs) for 2-4 modes; selected = white pill with berry text.
  */
 export function SegmentedControl<T extends string>({
   label,
@@ -26,7 +28,7 @@ export function SegmentedControl<T extends string>({
   disabled?: boolean;
   className?: string;
   fullWidth?: boolean;
-  look?: "toolbar" | "tiles";
+  look?: "toolbar" | "tiles" | "tabs";
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const current = Math.max(0, options.findIndex((o) => o.value === value));
@@ -44,13 +46,14 @@ export function SegmentedControl<T extends string>({
   }
 
   const tiles = look === "tiles";
+  const tabs = look === "tabs";
   return (
     <div
       role="radiogroup"
       aria-label={label}
       aria-disabled={disabled || undefined}
       onKeyDown={onKeyDown}
-      className={cx(tiles ? "grid grid-flow-col auto-cols-fr gap-2.5" : "mp-toolbar", fullWidth && (tiles ? "w-full" : "flex w-full"), className)}
+      className={cx(tiles ? "grid grid-flow-col auto-cols-fr gap-3" : tabs ? "mp-tabs" : "mp-toolbar", fullWidth && (tiles ? "w-full" : "flex w-full"), className)}
     >
       {options.map((o, i) => {
         const checked = i === current;
@@ -67,11 +70,11 @@ export function SegmentedControl<T extends string>({
             disabled={disabled}
             onClick={() => onChange(o.value)}
             className={cx(
-              tiles ? "mp-choice min-w-0 px-2 py-4 max-lg:flex-row max-lg:gap-1.5 max-lg:py-2" : "mp-btn mp-btn--tool flex-1",
+              tiles ? "mp-choice min-w-0 px-2 py-4 max-lg:flex-row max-lg:gap-1.5 max-lg:py-2.5" : tabs ? "mp-tab" : "mp-btn mp-btn--tool flex-1",
               checked && "ip-seg-checked",
             )}
             // The toolbar look shows the pressed state through aria-checked styling below.
-            data-active={!tiles && checked ? "" : undefined}
+            data-active={!tiles && !tabs && checked ? "" : undefined}
           >
             {tiles && o.icon}
             {o.shortLabel ? (

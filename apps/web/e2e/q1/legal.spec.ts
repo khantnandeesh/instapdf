@@ -32,7 +32,7 @@ test.describe("server HTML", () => {
     expect(html).toContain("connect-src &#x27;self&#x27;");
     expect(html).toContain("Network");
     expect(html).toContain("Content-Security-Policy");
-    expect(html).toContain("instapdf:recent-tools");
+    expect(html).toContain("berrypdf:recent-tools");
     expect(html).toContain("us-central1");
     expect(html).toMatch(/coming later/i);
   });
@@ -47,9 +47,9 @@ test.describe("server HTML", () => {
 
   test("/licenses lists the real dependency tree, fonts and icons; full texts are served", async ({ request }) => {
     const html = await (await request.get("/licenses")).text();
-    for (const name of ["pdfjs-dist", "@cantoo/pdf-lib", "pdf-lib", "react", "next", "fflate", "@fontsource/atkinson-hyperlegible", "Lucide icons"]) expect(html, name).toContain(name);
+    for (const name of ["pdfjs-dist", "@cantoo/pdf-lib", "pdf-lib", "react", "next", "fflate", "@fontsource-variable/fredoka", "Phosphor icons"]) expect(html, name).toContain(name);
     expect(html).toContain("OFL-1.1");
-    expect(html).toContain("Cole Bemis"); // Feather (MIT) copyright, carried with the Lucide icons
+    expect(html).toContain("Phosphor Icons"); // MIT copyright, carried with the vendored Phosphor icon paths
     expect(html).not.toMatch(/data-license="[^"]*GPL/);
 
     const txt = await request.get("/third-party-notices.txt");

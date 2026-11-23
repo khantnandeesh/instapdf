@@ -11,7 +11,8 @@
  *    Font-only packages (e.g. @fontsource/*, served by next/font/local) are entries of kind
  *    "font", so OFL-1.1 is allowed for them and only them (license-policy.mjs FONT_PACKAGES).
  * 2. Adds the fonts and vendored assets that are not npm dependencies: the next/font Google
- *    fonts (OFL-1.1), any OFL fonts under public/fonts, and the Lucide/Feather icon paths.
+ *    fonts (OFL-1.1), any OFL fonts under public/fonts, and the Phosphor icon paths
+ *    (vendored into src at build time by scripts/gen-tool-icons.mjs).
  * 3. Fails (exit 1) if anything is outside the allow-list in scripts/license-policy.mjs.
  * 4. Writes .generated/licenses.json (read by the /licenses page at build time) and
  *    public/third-party-notices.txt (full license and NOTICE texts). Both are gitignored.
@@ -177,22 +178,22 @@ function fontEntries() {
 }
 
 function assetEntries() {
-  const dir = join(root, "node_modules", "lucide-static");
+  const dir = join(root, "node_modules", "@phosphor-icons", "core");
   if (!existsSync(join(dir, "LICENSE"))) {
-    console.error("licenses: lucide-static is not installed; its notice is needed for the vendored icons (run pnpm install).");
+    console.error("licenses: @phosphor-icons/core is not installed; its notice is needed for the vendored icons (run pnpm install).");
     process.exit(1);
   }
-  const version = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")).version;
+  const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
   const text = readFileSync(join(dir, "LICENSE"), "utf8").trim();
   return [
     {
       kind: "asset",
-      name: "Lucide icons (icon paths, some derived from Feather)",
-      version,
-      license: "ISC AND MIT",
+      name: "Phosphor icons (Duotone icon paths)",
+      version: pkg.version,
+      license: pkg.license,
       copyright: copyrightLines(text),
       author: null,
-      homepage: "https://lucide.dev",
+      homepage: "https://phosphoricons.com",
       texts: [{ file: "LICENSE", text }],
     },
   ];
@@ -215,9 +216,9 @@ function noticesText(entries) {
   }
   const rule = "=".repeat(78);
   const parts = [
-    "InstaPDF: third-party notices",
+    "BerryPDF: third-party notices",
     "",
-    "InstaPDF includes or uses the open-source software, fonts and icons below.",
+    "BerryPDF includes or uses the open-source software, fonts and icons below.",
     "Each block lists the components it applies to, followed by the license or",
     "NOTICE text they ship with. A summary is at /licenses.",
     "",

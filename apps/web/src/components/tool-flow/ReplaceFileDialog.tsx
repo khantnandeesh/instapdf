@@ -1,6 +1,7 @@
 "use client";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
+import { FilesIcon } from "../ui/icons";
 
 /** Single-file tools only: confirm before a new file replaces the loaded one. */
 export function ReplaceFileDialog({ open, fileName, onConfirm, onCancel }: { open: boolean; fileName: string; onConfirm: () => void; onCancel: () => void }) {
@@ -9,6 +10,7 @@ export function ReplaceFileDialog({ open, fileName, onConfirm, onCancel }: { ope
       open={open}
       onClose={onCancel}
       title={`Replace ${fileName}?`}
+      icon={<FilesIcon />}
       description="This tool works on one file at a time. The new file takes its place."
       footer={
         <>

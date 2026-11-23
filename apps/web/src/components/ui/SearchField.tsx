@@ -45,7 +45,7 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
         {label}
       </label>
       <div className="relative">
-        <SearchIcon size={18} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
+        <SearchIcon size={20} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-brand-strong" />
         <input
           ref={ref}
           id={id}
@@ -60,9 +60,9 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
           aria-describedby={cx(shortcutHint && hintId, describedBy) || undefined}
           aria-controls={controls}
           className={cx(
-            // Mint Paper Input: 1px edge, radius-sm, 17px text, faint inset shadow; link-blue focus glow.
+            // BerryPDF Input: 1.5px edge, 12px radius, 16px text; focus turns the edge berry with a 4px pink ring.
             "ip-search ip-field w-full ps-10 pe-11",
-            size === "lg" ? "h-11" : "h-10",
+            size === "lg" ? "h-12" : "h-11",
           )}
         />
         {shortcutHint && (
@@ -80,7 +80,7 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
                 (e.currentTarget.closest("div")?.querySelector("input") as HTMLInputElement | null)?.focus();
                 onClear?.();
               }}
-              className="ip-fade-in grid size-9 place-items-center rounded-pill text-muted transition-colors duration-(--dur-base) hover:bg-surface-soft hover:text-ink-black"
+              className="ip-fade-in grid size-9 place-items-center rounded-pill text-muted transition-colors duration-(--dur-base) hover:bg-milk hover:text-brand-strong"
             >
               <CloseIcon size={18} />
             </button>

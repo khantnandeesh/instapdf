@@ -12,8 +12,8 @@ import { readNotices, type NoticeEntry } from "@/lib/licenses/notices";
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
-  title: "Open-source licenses · InstaPDF",
-  description: "The open-source software, fonts and icons InstaPDF uses, with their licenses and copyright notices.",
+  title: "Open-source licenses · BerryPDF",
+  description: "The open-source software, fonts and icons BerryPDF uses, with their licenses and copyright notices.",
 };
 
 export default function LicensesPage() {
@@ -26,7 +26,7 @@ export default function LicensesPage() {
       updated={false}
       intro={
         <p>
-          InstaPDF is built on open-source software. We thank the people who make it. Below are the components we use, their licenses and copyright notices. The
+          BerryPDF is built on open-source software. We thank the people who make it. Below are the components we use, their licenses and copyright notices. The
           full license and notice texts are in{" "}
           <a href="/third-party-notices.txt" className="text-brand-strong underline underline-offset-2 hover:no-underline">
             third-party-notices.txt

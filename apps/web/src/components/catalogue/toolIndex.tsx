@@ -13,7 +13,7 @@ export function buildToolIndex(): ToolIndex {
     runtime: t.runtime,
     keywords: t.keywords,
     ...(t.popularRank !== undefined ? { popularRank: t.popularRank } : {}),
-    icon: <ToolIcon name={t.icon} size={20} />,
+    icon: <ToolIcon name={t.icon} size={22} />,
   }));
   return { items, categories };
 }

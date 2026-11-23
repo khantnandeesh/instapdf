@@ -19,9 +19,9 @@ describe("pdfOutputName", () => {
 
 describe("zipName", () => {
   it("AC-42: names the ZIP after the tool", () => {
-    expect(zipName("rotate-pdf")).toBe("instapdf-rotate.zip");
-    expect(zipName("merge-pdf")).toBe("instapdf-merge.zip");
-    expect(zipName("n-up")).toBe("instapdf-n-up.zip");
+    expect(zipName("rotate-pdf")).toBe("berrypdf-rotate.zip");
+    expect(zipName("merge-pdf")).toBe("berrypdf-merge.zip");
+    expect(zipName("n-up")).toBe("berrypdf-n-up.zip");
   });
 });
 

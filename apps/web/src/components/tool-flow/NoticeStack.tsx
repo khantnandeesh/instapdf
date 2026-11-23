@@ -5,7 +5,7 @@ import { Notice, type NoticeTone } from "../ui/Notice";
 export type FlowNotice = { id: string; tone: NoticeTone; title: string; items?: string[] };
 
 /**
- * Floating notices (never in the document flow, so they never move content), as Mint Paper
+ * Floating notices (never in the document flow, so they never move content), as BerryPDF
  * Alerts: top center, dropping in from above. Newest first, three visible, the rest behind
  * "+N more". Errors never auto-dismiss.
  */

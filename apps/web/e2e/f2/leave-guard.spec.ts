@@ -10,7 +10,7 @@ const leaveDialog = (page: import("@playwright/test").Page) => page.getByRole("d
 
 test("H-11: with no files, header links navigate straight away", async ({ page }) => {
   await openRotate(page);
-  await page.getByRole("link", { name: "InstaPDF home" }).click();
+  await page.getByRole("link", { name: "BerryPDF home" }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(leaveDialog(page)).toHaveCount(0);
 });
@@ -18,7 +18,7 @@ test("H-11: with no files, header links navigate straight away", async ({ page }
 test("H-11: with files loaded, the logo asks first; Stay keeps the files, Leave navigates", async ({ page }) => {
   await openRotate(page);
   await pickReady(page, "three-pages.pdf");
-  await page.getByRole("link", { name: "InstaPDF home" }).click();
+  await page.getByRole("link", { name: "BerryPDF home" }).click();
   await expect(leaveDialog(page)).toBeVisible();
   await expect(leaveDialog(page)).toContainText("Your files and changes here will be lost.");
   await expect(leaveDialog(page).getByRole("button", { name: "Stay" })).toBeFocused();
@@ -29,7 +29,7 @@ test("H-11: with files loaded, the logo asks first; Stay keeps the files, Leave 
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
   await expect(tiles(page)).toHaveCount(3);
 
-  await page.getByRole("link", { name: "InstaPDF home" }).click();
+  await page.getByRole("link", { name: "BerryPDF home" }).click();
   await leaveDialog(page).getByRole("button", { name: "Leave" }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Fast, private PDF tools");
