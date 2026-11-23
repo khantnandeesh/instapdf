@@ -78,7 +78,7 @@ Why teal: it reads calm and private, which suits "fast, private PDF tools"; it s
 - Grounds: page `#111113` → cards, dock and workspace `#1A1A1D` → header `#1D1D20` → menus, dialogs and floating notices `#26262A`. Hairlines are white at 6–10 %. Shadows are kept only as a backup.
 - Text is calm, not glaring: `fg` `#ECECEE` (12.8–16:1), `fg-muted` `#9D9DA1` (5.6–7.0:1).
 - White PDF pages would glare in a grid on near-black. Pages get a light hairline ring and `filter: brightness(0.86)` (white on surface drops from 17.4:1 to 12.5:1). Hovering or focusing a tile (`.ip-paper-lit`) restores full brightness, and the page preview dialog is never dimmed.
-- Soft tones are translucent, so anything that floats (notice stack, rotation badge) sits on an opaque `surface-overlay` first.
+- `primary-soft` is opaque, but the status soft fills (`success-soft`, `warning-soft`, `danger-soft`) and `primary-faint` are translucent, so anything that floats (notice stack, rotation badge) sits on an opaque `surface-overlay` first.
 - Accent fills lighten to `#34A89C` with near-black `on-primary` text (6.5:1), the same pattern as `danger` (`#F87171` with `#111113`, 6.8:1). That keeps every `primary` and `danger` pair valid both as a fill and as text.
 
 ## Type
@@ -95,7 +95,7 @@ Why teal: it reads calm and private, which suits "fast, private PDF tools"; it s
 - Radius by role: `sm` 6 (menu rows, segment thumbs), `md` 8 (buttons, fields, segmented track), `lg` 10 (notices, tiles, wells), `xl` 12 (cards, workspace, dock, dialogs, result card), `2xl` 16 (marketing panels); pills for badges, chips, switches, progress.
 - Shadows, one per role: `shadow-sm` card ring (cards, workspace, dock); `shadow-control` / `shadow-control-hover` (secondary buttons, chips: an inset `field-line` ring, darker on hover); `shadow-primary` (primary buttons); `shadow-md` window (hovered cards, mobile dock, floating bars); `shadow-lg` float (menu panel, notices); `shadow-hero` (dialogs); `shadow-paper` (the page itself).
 - Focus: 2 px solid `focus` outline, 2 px offset, on every interactive element. Text fields instead turn their edge `accent` with a 3 px `primary-ring` halo and keep a transparent 2 px outline, which forced-colors mode paints.
-- Forced colors (Windows High Contrast): shadows and backgrounds are dropped, so every control or card whose edge is a shadow ring (`.ip-edge`) gets a 1 px `ButtonText` border, and the selected segment (`.ip-seg-checked`) a 2 px `Highlight` outline. Covered by `e2e/ui/forced-colors.spec.ts`.
+- Forced colors (Windows High Contrast): shadows and backgrounds are dropped, so every control or card whose edge is a shadow ring (`.ip-edge`) gets a 1 px `ButtonText` border, and the selected segment (`.ip-seg-checked`) a 2 px `Highlight` border (a border, so its focus outline stays visible). Covered by `e2e/ui/forced-colors.spec.ts`.
 - Motion: 80 ms press, 120 ms hover and toggles, 150 ms rotation, crossfades and page dim, 240 ms result check. `cubic-bezier(.25,.8,.25,1)` for things that appear, `cubic-bezier(.45,0,.1,1)` for things that move. Reduced motion sets every duration to 0. Animate only opacity, transform and filter.
 
 ## Measured contrast (WCAG 2.1; alpha tokens composited on the ground named)

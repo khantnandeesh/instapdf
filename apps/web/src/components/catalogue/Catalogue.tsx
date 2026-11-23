@@ -149,7 +149,8 @@ export function Catalogue() {
       <LiveRegion message={live} />
 
       {!searching && (
-        <nav aria-label={copy.jumpLabel} className="ip-scroll-x mt-3">
+        // Inline padding offset by negative margins keeps edge chips' focus outlines inside the scroller.
+        <nav aria-label={copy.jumpLabel} className="ip-scroll-x -mx-1.5 mt-3 px-1.5">
           <ul className="flex gap-2 py-1 max-lg:flex-nowrap lg:flex-wrap">
             {groups.map((g) => (
               <li key={g.id} className="shrink-0">

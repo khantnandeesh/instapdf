@@ -67,9 +67,10 @@
     .ip-edge {
       border: 1px solid ButtonText;
     }
+    /* A border, not an outline: the checked segment is the one that takes focus, and its
+       focus outline must stay free to show. */
     .ip-seg-checked {
-      outline: 2px solid Highlight;
-      outline-offset: -2px;
+      border: 2px solid Highlight;
     }
   }
 

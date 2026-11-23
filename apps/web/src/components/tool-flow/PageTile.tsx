@@ -77,7 +77,7 @@ export function PageTile({
           </span>
         )}
         {inScope && (
-          <span className="pointer-events-none absolute top-1.5 right-1.5 grid size-5 place-items-center z-[1] rounded-full bg-primary text-on-primary shadow-md">
+          <span className="pointer-events-none absolute top-1.5 right-1.5 grid size-5 place-items-center z-[1] rounded-full bg-primary text-on-primary shadow-md ring-1 ring-surface-overlay">
             <CheckIcon size={14} strokeWidth={2.5} />
           </span>
         )}
