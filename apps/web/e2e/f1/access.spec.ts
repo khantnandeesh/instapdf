@@ -1,7 +1,7 @@
 /** F1 shared flow, sections "Accessibility and mobile" (AC-48 to AC-51) and improvements AC-52, AC-53. Spec: docs/specs/f1-shared-flow.md */
 import { readFile } from "node:fs/promises";
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { expectNoSeriousAxeViolations } from "../support/axe";
 import {
   dialog,
   downloadLink,
@@ -114,11 +114,7 @@ test.describe("AC-49 at 375 px", () => {
 });
 
 test("AC-50: axe finds no critical or serious violations in empty, password, ready and result states", async ({ page }) => {
-  const check = async (state: string) => {
-    const r = await new AxeBuilder({ page }).analyze();
-    const bad = r.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
-    expect(bad.map((v) => `${state}: ${v.id} ${v.nodes.map((n) => n.target).join(" | ")}`)).toEqual([]);
-  };
+  const check = (state: string) => expectNoSeriousAxeViolations(page, state);
   await check("empty");
   await pick(page, "user-pw.pdf");
   await expect(dialog(page)).toBeVisible();

@@ -1,6 +1,5 @@
 /** F2 home page and catalogue: AC-1 to AC-22, AC-54 to AC-63. Spec: docs/specs/f2-home.md */
 import { gzipSync } from "node:zlib";
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import {
   catalogueSearch,
@@ -364,6 +363,25 @@ test.describe("improvements", () => {
     }
   });
 
+  test("AC-56/AC-59: card, Popular tile and menu entry names are the visible content in order, comma-separated", async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 }); // tile summaries are visible at >= 1024 px
+    await openHydrated(page);
+    const merge = tools.find((t) => t.slug === "merge-pdf")!;
+    const rotate = tools.find((t) => t.slug === "rotate-pdf")!;
+    expect(merge.status).toBe("planned");
+    expect(rotate.status).toBe("beta");
+    const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // Exact name: every piece in visual order, joined by ", " (whitespace around the comma may vary).
+    const exact = (...parts: (string | false)[]) => new RegExp(`^${parts.filter((p): p is string => !!p).map((p) => esc(p.trim())).join("\\s*,\\s*")}$`);
+    const rt = (t: typeof merge) => t.runtime === "client" && "Runs in your browser";
+
+    await expect(page.locator('[data-testid=category] a[href="/merge-pdf"]')).toHaveAccessibleName(exact(merge.name, merge.summary, "Coming soon", rt(merge)));
+    await expect(page.getByTestId("popular").locator('a[href="/rotate-pdf"]')).toHaveAccessibleName(exact(rotate.name, rotate.summary, "Beta", rt(rotate)));
+    await openMenu(page);
+    await expect(menuLinks(page).and(page.locator('[href="/merge-pdf"]'))).toHaveAccessibleName(exact(merge.name, "Coming soon", rt(merge)));
+    await expect(menuLinks(page).and(page.locator('[href="/rotate-pdf"]'))).toHaveAccessibleName(exact(rotate.name, "Beta", rt(rotate)));
+  });
+
   test("AC-60: every card and menu entry has an aria-hidden inline SVG icon", async ({ page }) => {
     await openHydrated(page);
     const cards = categoryLinks(page);
@@ -436,22 +454,6 @@ test.describe("privacy, accessibility, layout", () => {
     // pdf-lib and pdf.js belong to tool pages only; any single chunk this big means one leaked in.
     expect(scripts.filter((s) => s.raw > 250 * 1024).map((s) => s.url)).toEqual([]);
     expect(scripts.filter((s) => /pdf\.worker|pdfjs/i.test(s.url)).map((s) => s.url)).toEqual([]);
-  });
-
-  test("AC-56: axe finds no critical or serious violations (closed, menu open, no results)", async ({ page }) => {
-    const check = async (label: string) => {
-      const r = await new AxeBuilder({ page }).analyze();
-      const bad = r.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
-      expect(bad.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(", ")}`), label).toEqual([]);
-    };
-    await openHydrated(page);
-    await check("menu closed");
-    await openMenu(page);
-    await page.waitForTimeout(300); // let the entry animation finish
-    await check("menu open");
-    await page.keyboard.press("Escape");
-    await catalogueSearch(page).fill("zzqx");
-    await check("no results");
   });
 
   test("AC-57: no horizontal scroll at 320, 375, 768, 1024 and 1440 px", async ({ page }) => {

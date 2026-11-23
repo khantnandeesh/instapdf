@@ -41,3 +41,19 @@ export async function seedRecent(page: Page, value: string) {
   await page.evaluate(([k, v]) => localStorage.setItem(k, v), [RECENT_KEY, value]);
   await page.reload();
 }
+
+/**
+ * Clicks the desktop menu's backdrop at a point that is not covered by the panel: the middle of
+ * the strip between the panel's bottom edge and the scrim's bottom edge. The scrim's centre is
+ * under the panel, so a plain `scrim.click()` never passes Playwright's hit-target check (G-3).
+ */
+export async function clickScrimOutsidePanel(page: Page) {
+  const scrim = page.getByTestId("tool-menu-scrim");
+  const s = await scrim.boundingBox();
+  const p = await menu(page).boundingBox();
+  if (!s || !p) throw new Error("menu panel or scrim is not rendered");
+  const strip = s.y + s.height - (p.y + p.height);
+  expect(strip, "visible backdrop strip below the panel").toBeGreaterThan(4);
+  // The position is relative to the scrim; Playwright still checks the scrim is the hit target there.
+  await scrim.click({ position: { x: s.width / 2, y: p.y + p.height - s.y + strip / 2 } });
+}
