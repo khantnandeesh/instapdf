@@ -14,7 +14,7 @@ export type MergeOptions = {
   forms: FormMode;
 };
 
-export const MERGE_OPTIONS_KEY = "instapdf:merge-options";
+export const MERGE_OPTIONS_KEY = "berrypdf:merge-options";
 
 export const defaultMergeOptions: MergeOptions = {
   toc: "none",

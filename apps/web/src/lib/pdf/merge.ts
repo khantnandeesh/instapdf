@@ -327,7 +327,7 @@ export async function mergePdf(input: MergeInput, env: MergeEnv, onProgress: (fr
   const { options } = input;
   onProgress(0);
   const out = await PDFDocument.create({ updateMetadata: false });
-  out.setProducer("InstaPDF");
+  out.setProducer("BerryPDF");
   const pagesIn = input.pages.filter((p) => p.sourceId === null || input.sources.some((s) => s.id === p.sourceId));
   if (!pagesIn.length) throw new Error("Nothing to merge");
   const sourceById = new Map(input.sources.map((s) => [s.id, s]));

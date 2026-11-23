@@ -19,9 +19,9 @@ describe("pdfOutputName", () => {
 
 describe("zipName", () => {
   it("AC-42: names the ZIP after the tool", () => {
-    expect(zipName("rotate-pdf")).toBe("instapdf-rotate.zip");
-    expect(zipName("merge-pdf")).toBe("instapdf-merge.zip");
-    expect(zipName("n-up")).toBe("instapdf-n-up.zip");
+    expect(zipName("rotate-pdf")).toBe("berrypdf-rotate.zip");
+    expect(zipName("merge-pdf")).toBe("berrypdf-merge.zip");
+    expect(zipName("n-up")).toBe("berrypdf-n-up.zip");
   });
 });
 
@@ -58,7 +58,7 @@ describe("mergedName (F3 §6, AC-66)", () => {
   it("replaces characters file systems do not allow", () => {
     expect(mergedName('a:b*c?"d<e>f|g.pdf')).toBe("a-b-c--d-e-f-g-merged.pdf");
     expect(mergedName("folder/x.pdf")).toBe("x-merged.pdf");
-    expect(mergedName(undefined)).toBe("instapdf-merged.pdf");
-    expect(mergedName("....pdf")).toBe("instapdf-merged.pdf");
+    expect(mergedName(undefined)).toBe("berrypdf-merged.pdf");
+    expect(mergedName("....pdf")).toBe("berrypdf-merged.pdf");
   });
 });

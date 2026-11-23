@@ -147,7 +147,7 @@ When nothing has been edited at page level, segments are exactly the files and t
 
 ### 3f. Merge options (options panel)
 
-All options are remembered on this device (`localStorage["instapdf:merge-options"]`) and restored on the next visit. The reference does the same per option (`settings.merge-pdf.*` keys observed). Labels below are our own.
+All options are remembered on this device (`localStorage["berrypdf:merge-options"]`) and restored on the next visit. The reference does the same per option (`settings.merge-pdf.*` keys observed). Labels below are our own.
 
 | Control | Type | Default | Allowed values | What it does to the output | Reference |
 |---|---|---|---|---|---|
@@ -225,7 +225,7 @@ Copy the behavior, not the wording.
 - **Pages from PDFs** are copied, not re-rendered: content streams, text, annotations (except form widgets in Remove / Flatten modes) and page boxes are kept. `/Rotate` = original + the user's rotation, mod 360.
 - **Pages from images:** one page per image (per frame for TIFF). Page size A4, **portrait for portrait or square images and landscape for landscape images** (our choice; the reference showed a landscape PNG on a portrait page, screenshot 02). The image is centered, scaled to fit inside a 36 pt margin with its aspect ratio kept, and never scaled above its size at 72 dpi. JPEGs are embedded without re-encoding.
 - **Options** change the output as described in §3f.
-- **Document info:** Producer "InstaPDF"; Title, Author and other Info fields are not copied from the sources. No encryption, even when inputs were encrypted (F1 AC-29 note applies).
+- **Document info:** Producer "BerryPDF"; Title, Author and other Info fields are not copied from the sources. No encryption, even when inputs were encrypted (F1 AC-29 note applies).
 - **Size:** for PDF-only inputs with no TOC, footer or same-width option, the output is at most the sum of the input sizes × 1.1 + 50 KB. Resources shared by several pages of one source are written once.
 
 ## 7. Acceptance criteria
@@ -699,7 +699,7 @@ app/merge-pdf/page.tsx (server)  → <RecordVisit slug="merge-pdf"/> + <MergeToo
 
 | Component | Content |
 |---|---|
-| `MergeTool` | Owns the page list, selection, undo snapshot, options state (`localStorage["instapdf:merge-options"]`), and passes `renderWorkspace` / toolbar items to `ToolFlow`. |
+| `MergeTool` | Owns the page list, selection, undo snapshot, options state (`localStorage["berrypdf:merge-options"]`), and passes `renderWorkspace` / toolbar items to `ToolFlow`. |
 | `SortMenu` | `MenuButton` (icon `sort`, label "Sort", icon-only < 768) with items: "Name A to Z", "Name Z to A", "Oldest first", "Newest first", separator, "Reverse order". These are actions, not a persistent state, so they are `menuitem`s (no checkmarks). After choosing: the list animates to its new order (FLIP, `base`), focus returns to the Sort button, polite announcement "Sorted by name, A to Z" / "Order reversed". With one segment the menu still opens, but the items are disabled with the menu's first line "Add more files to sort" (`xs fg-muted`, not focusable). |
 | `AddPagesMenu` (≥ 640) / `AddMenu` (< 640) | See M-3. "From a file…" opens a single-file picker (`multiple` off, same `accept`); "Blank page" follows §3c (after the last selected page, else at the end) and switches to the pages view if needed, then focuses the new blank tile. |
 | `MergeOptions` | The options panel (M-5). Same component inside the dock column and inside the sheet. |

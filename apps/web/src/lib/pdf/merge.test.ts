@@ -80,7 +80,7 @@ describe("page order and edits", () => {
     expect(r.progress[0]).toBe(0);
     expect(r.progress.at(-1)).toBe(1);
     const doc = await plain(r.bytes);
-    expect(doc.getProducer()).toBe("InstaPDF");
+    expect(doc.getProducer()).toBe("BerryPDF");
     expect(doc.getTitle()).toBeUndefined();
   });
 
