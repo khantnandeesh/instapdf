@@ -27,9 +27,9 @@ test.describe("AC-56 at 1366x900", () => {
     await page.keyboard.press("Escape");
     await expect(menu(page)).toHaveCount(0);
 
-    await openHydrated(page, "/merge-pdf");
+    await openHydrated(page, "/split-pdf");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expectNoSeriousAxeViolations(page, "coming-soon page /merge-pdf");
+    await expectNoSeriousAxeViolations(page, "coming-soon page /split-pdf");
 
     const notFound = await page.goto("/does-not-exist");
     expect(notFound?.status()).toBe(404);
