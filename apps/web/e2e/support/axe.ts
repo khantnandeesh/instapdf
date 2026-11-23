@@ -15,8 +15,14 @@ export const AXE_WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag2
  *    (WCAG 2.5.3) was experimental in axe-core 4.11, which is why our old default-only check
  *    missed it while the evaluator's 4.14 run flagged it.
  * `withTags()` on its own would be narrower than (1): it runs only the tagged rules.
+ * Note: bumping axe-core can surface new (experimental-rule) violations; fix them, don't filter them out.
  */
+/** Waits until entry animations (menu drop-in, scrim fade, dialogs) finish, so contrast is measured on final colors. */
+export const settled = (page: Page) =>
+  page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || (a.effect?.getComputedTiming().iterations ?? 1) === Infinity));
+
 export async function expectNoSeriousAxeViolations(page: Page, state: string) {
+  await settled(page);
   const defaults = await new AxeBuilder({ page }).analyze();
   // Tags are OR-ed; "experimental" lifts axe's default exclusion. Keep only WCAG-tagged rules
   // from this pass so experimental best-practice rules do not sneak in.

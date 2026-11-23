@@ -1,11 +1,7 @@
 /** F2 AC-56 (and gap G-1): axe across the home page, the header menu and the shared pages. Spec: docs/specs/f2-home.md */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { expectNoSeriousAxeViolations } from "../support/axe";
 import { catalogueSearch, isDesktop, menu, menuButton, menuLinks, menuSearch, openHydrated, openMenu, tools } from "./support";
-
-/** Waits until entry animations (menu drop-in, scrim fade) are done, so contrast is measured on final colors. */
-const settled = (page: Page) =>
-  page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || (a.effect?.getComputedTiming().iterations ?? 1) === Infinity));
 
 test.describe("AC-56 at 1366x900", () => {
   test.use({ viewport: { width: 1366, height: 900 } });
@@ -23,7 +19,6 @@ test.describe("AC-56 at 1366x900", () => {
 
     await openMenu(page);
     await expect(menuLinks(page)).toHaveCount(tools.length);
-    await settled(page);
     await expectNoSeriousAxeViolations(page, "desktop menu open");
 
     await menuSearch(page).fill("zzqx");
@@ -54,7 +49,6 @@ test.describe("AC-56 at 375x812", () => {
 
     await menuButton(page).click();
     await expect(page.getByRole("dialog", { name: "All tools" })).toBeVisible();
-    await settled(page);
     await expectNoSeriousAxeViolations(page, "375 px menu open");
   });
 });

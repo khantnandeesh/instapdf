@@ -363,6 +363,25 @@ test.describe("improvements", () => {
     }
   });
 
+  test("AC-56/AC-59: card, Popular tile and menu entry names are the visible content in order, comma-separated", async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 }); // tile summaries are visible at >= 1024 px
+    await openHydrated(page);
+    const merge = tools.find((t) => t.slug === "merge-pdf")!;
+    const rotate = tools.find((t) => t.slug === "rotate-pdf")!;
+    expect(merge.status).toBe("planned");
+    expect(rotate.status).toBe("beta");
+    const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // Exact name: every piece in visual order, joined by ", " (whitespace around the comma may vary).
+    const exact = (...parts: (string | false)[]) => new RegExp(`^${parts.filter((p): p is string => !!p).map((p) => esc(p.trim())).join("\\s*,\\s*")}$`);
+    const rt = (t: typeof merge) => t.runtime === "client" && "Runs in your browser";
+
+    await expect(page.locator('[data-testid=category] a[href="/merge-pdf"]')).toHaveAccessibleName(exact(merge.name, merge.summary, "Coming soon", rt(merge)));
+    await expect(page.getByTestId("popular").locator('a[href="/rotate-pdf"]')).toHaveAccessibleName(exact(rotate.name, rotate.summary, "Beta", rt(rotate)));
+    await openMenu(page);
+    await expect(menuLinks(page).and(page.locator('[href="/merge-pdf"]'))).toHaveAccessibleName(exact(merge.name, "Coming soon", rt(merge)));
+    await expect(menuLinks(page).and(page.locator('[href="/rotate-pdf"]'))).toHaveAccessibleName(exact(rotate.name, "Beta", rt(rotate)));
+  });
+
   test("AC-60: every card and menu entry has an aria-hidden inline SVG icon", async ({ page }) => {
     await openHydrated(page);
     const cards = categoryLinks(page);
