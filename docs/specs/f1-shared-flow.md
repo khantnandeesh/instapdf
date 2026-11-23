@@ -238,9 +238,9 @@ These run on `/rotate-pdf` like the others. The evaluator does not compare them 
 
 ## UI
 
-Designed 2026-11-23 by ux-designer. This section is the build contract for the shared flow. Every later tool reuses these components and only adds its own options panel, per-page actions and `process()`. The look is InstaPDF's own, built on the owner's Mint Paper system (white page, sand wash, one mint action, grey page trays, one control dock; re-themed 2026-11-23, see `docs/design/mint-paper.md`). Do not use the reference screenshots as a visual guide; they are for behavior only.
+Designed 2026-11-23 by ux-designer. This section is the build contract for the shared flow. Every later tool reuses these components and only adds its own options panel, per-page actions and `process()`. The look is InstaPDF's own, built on the owner's BerryPDF system (grid-paper page, one berry action, pink page trays, blueberry editing tools, one control dock; re-themed 2026-11-23, see `docs/design/berrypdf.md`). Do not use the reference screenshots as a visual guide; they are for behavior only.
 
-> **Design system:** all visual values (tokens, category hues, Atkinson Hyperlegible type, shape, motion, measured contrast and the deviations list) live in [`docs/design/mint-paper.md`](../design/mint-paper.md) (the owner's Mint Paper system, light only; dark mode is pending the designer's definition); where this section names an older visual, that document wins.
+> **Design system:** all visual values (tokens, category hues, Fredoka type, Phosphor Duotone icons, motifs, shape, motion, measured contrast and the deviations list) live in [`docs/design/berrypdf.md`](../design/berrypdf.md) (the owner's BerryPDF system, light only; dark mode is pending the designer's definition); where this section names an older visual, that document wins.
 
 ### U-1. Design principles for this flow
 
@@ -253,11 +253,11 @@ Designed 2026-11-23 by ux-designer. This section is the build contract for the s
 
 The tokens existed only as two colors, so this feature defines the full set. Implemented in `apps/web/src/styles/tokens.css` (imported by `apps/web/src/app/globals.css`) as `--ip-*` CSS custom properties and exposed to Tailwind v4 through `@theme inline`. Use the Tailwind utilities (`bg-surface-raised`, `text-fg-muted`, `bg-primary text-on-primary`, `outline-focus`, `shadow-paper`, `rounded-lg` ...) and never raw hex values in components.
 
-Values, the token mapping, type, the measured contrast table and the deviations: see [`docs/design/mint-paper.md`](../design/mint-paper.md) (single source of truth).
+Values, the token mapping, type, the measured contrast table and the deviations: see [`docs/design/berrypdf.md`](../design/berrypdf.md) (single source of truth).
 
 **Spacing.** Tailwind's 4 px scale. Flow rhythm: 4 / 8 / 12 / 16 / 24 / 32 / 48. Page gutters: 16 (≤ 639), 24 (640–1023), 32 (≥ 1024). Grid gap 16 (12 below 640).
 
-**Radius, elevation, motion.** See [`docs/design/mint-paper.md`](../design/mint-paper.md).
+**Radius, elevation, motion.** See [`docs/design/berrypdf.md`](../design/berrypdf.md).
 
 **Layout metrics.** `--ip-header-h` 57 px, `--ip-dock-w` 360 px, `--ip-dock-h` 176 px (< 640), `--ip-dock-h-md` 104 px (640–1023), `--ip-thumb-size` 160 px default, `--ip-tap-min` 44 px (every touch target is at least 44×44 px, including icon buttons).
 
@@ -548,7 +548,7 @@ Every state keeps the same skeleton (header, `ToolIntro`, workspace, dock), so s
 | State changes | one polite `LiveRegion`: "Reading 2 files", "three-pages.pdf ready, 3 pages", "Rotating", "Your PDF is ready", "All pages will rotate 90° clockwise" (after toolbar rotate), "Rotation reset" |
 | Result preview | `img` (or canvas with `role="img"`) `aria-label="Preview of page 1 of the result"` |
 
-**Contrast and visibility checks.** All text pairs are in U-2. Disabled controls use `fg-disabled` (exempt). Focus outline 3 px `focus` (Mint Paper `link` #0282e5) with 2 px offset: 3.94:1 on surface, 3.40:1 on band and page trays, 3.19:1 on sand (non-text, ≥ 3:1). The scope outline is the same link blue, 2 px, around the page's grey tray (3.40:1 against the tray). The page image sits on its tray with `shadow-paper` (a hairline ring and soft shadow). There is no dark mode until Mint Paper defines one. Measured values and deviations: [`docs/design/mint-paper.md`](../design/mint-paper.md). Target sizes: every interactive element ≥ 44×44 px at < 1024 and ≥ 32×32 visual with 44×44 hit area at ≥ 1024. Zoom to 200% and 400% (320 CSS px reflow) works: at 320 px the dock's options row wraps to two rows (dock grows; `main` padding uses the measured dock height via a `ResizeObserver` writing `--ip-dock-actual`).
+**Contrast and visibility checks.** All text pairs are in U-2. Disabled controls use `fg-disabled` (exempt). Focus outline 3 px `focus` (BerryPDF `link`, blueberry #4a63d9) with 2 px offset (3 px on buttons, icon buttons, tabs and choice tiles): 5.15:1 on surface, 4.58:1 on the pink trays, 4.24:1 on sand (non-text, ≥ 3:1). Pages in the chosen scope get BerryPDF's 2.5 px berry ring around their pink tray (4.25:1 against the tray) plus a leaf tick. The page image sits on its tray with `shadow-paper` (a hairline ring and soft shadow). There is no dark mode until BerryPDF defines one. Measured values and deviations: [`docs/design/berrypdf.md`](../design/berrypdf.md). Target sizes: every interactive element ≥ 44×44 px at < 1024 and ≥ 32×32 visual with 44×44 hit area at ≥ 1024. Zoom to 200% and 400% (320 CSS px reflow) works: at 320 px the dock's options row wraps to two rows (dock grows; `main` padding uses the measured dock height via a `ResizeObserver` writing `--ip-dock-actual`).
 
 ### U-8. Micro-interactions
 
@@ -590,5 +590,5 @@ The UI needs these per tool (names are a proposal; the engineer owns the type): 
 2. **Thumbnail renderer location:** pdf.js render in a worker with `OffscreenCanvas` where supported, falling back to main-thread canvas. Either is fine for the design as long as AC-52 holds.
 3. **Hand-off store for Continue-with:** in-memory (module-level or `sessionStorage` key holding a `Blob` URL) is the engineer's call; the design only requires that the target tool opens directly in the ready state with no picker step (AC-43).
 4. **`sessionStorage` for the slider value** is optional polish; drop it if it complicates SSR.
-5. **Dark mode** is not shipped: Mint Paper does not define one yet, so the tokens are light only (no `data-theme` switch). It is pending the designer's definition; see [`docs/design/mint-paper.md`](../design/mint-paper.md).
+5. **Dark mode** is not shipped: BerryPDF does not define one yet, so the tokens are light only (no `data-theme` switch). It is pending the designer's definition; see [`docs/design/berrypdf.md`](../design/berrypdf.md).
 6. **The 768 px `DockStatus`** is visually hidden; if testing shows users miss the disabled reason, show it as a one-line caption above the dock (fixed position, no shift).
