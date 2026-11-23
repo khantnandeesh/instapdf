@@ -1,6 +1,6 @@
 # F2: Home page, tool catalogue and header menu
 
-Status: step 3 (Design) done. Next: Build.
+Status: step 4 (Build) in progress on `feat/f2-home`.
 Reference observed: the reference home page (`/`) on desktop (1366×900) and mobile (375×812), its "All tools" mega menu, and its recent-tools behavior, 2026-11-23. No processing task was run. One tool page (`flip-pdf`) was opened only to see how a visit is recorded in the recent list.
 Internal screenshots: `docs/specs/assets/f2-home/` (reference only, never ship).
 
@@ -217,7 +217,7 @@ All run against the staging site. "Usable" means registry status `beta` or `live
 - **AC-31 (P1)** At ≥ 768 px the header shows at most 5 tool shortcut links, and none of them goes to a planned tool [today: exactly one, Rotate].
 - **AC-32 (P1)** Opening the menu does not change the page's scroll position. Checked by scrolling 600 px down and then opening the menu.
 - **AC-33 (P2)** At 1280×720, every menu entry [45] can be reached by scrolling inside the panel or the page.
-- **AC-34 (P2)** Hovering the All tools button for at least 300 ms with a mouse opens the menu. Moving the pointer away does not close it.
+- **AC-34 (P2) — dropped (design H-11 item 2)** ~~Hovering the All tools button for at least 300 ms with a mouse opens the menu. Moving the pointer away does not close it.~~ Dropped by design as §3d allowed (orchestrator decision 2026-11-23): click or `/` opens the menu. The evaluator records it as "dropped by design (ux)".
 - **AC-35 (P2)** In the menu search, pressing Enter opens the first visible match (`rota` then Enter goes to `/rotate-pdf`).
 
 ### Mobile (375×812)
