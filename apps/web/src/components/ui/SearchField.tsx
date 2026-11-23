@@ -79,7 +79,7 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
                 (e.currentTarget.closest("div")?.querySelector("input") as HTMLInputElement | null)?.focus();
                 onClear?.();
               }}
-              className="ip-fade-in grid size-8 place-items-center rounded-md text-fg-muted hover:bg-surface-sunken hover:text-fg"
+              className="ip-fade-in grid size-11 place-items-center rounded-md text-fg-muted hover:bg-surface-sunken hover:text-fg"
             >
               <CloseIcon size={18} />
             </button>
