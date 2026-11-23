@@ -48,4 +48,6 @@ The parity evaluator runs the same tasks with the same fixtures on Sejda and on 
 
 **Pass rule:** a tool can't PASS while any micro-check is a **lose**, unless the owner waives that check in writing (recorded in `docs/evals/<feature>.md`). Ties are allowed. Where Sejda paywalls something we offer free, that check counts as a win.
 
+Feature annexes add tool-specific fixtures and measurements to these checks: the editor's is `docs/process/editor-micro-checks.md`.
+
 Sejda politeness still applies: at most 3 real tasks per hour, with outputs and captures cached in `docs/evals/cache/<feature>/` and reused.
