@@ -4,6 +4,7 @@
  * `runtime`: "client" = processed in the browser, nothing uploaded; "server" = processing worker.
  */
 import { pdfOutputName, zipName } from "../lib/pdf/naming";
+import type { ToolIconName } from "./tool-icon-names";
 
 export type ToolCategory =
   | "organize"
@@ -53,8 +54,90 @@ export type Tool = {
   runtime: "client" | "server";
   ref: string;
   status: "planned" | "beta" | "live";
+  /** Lucide icon name (see scripts/gen-tool-icons.mjs). */
+  icon: ToolIconName;
+  /** Extra search words that are not in the name or summary. */
+  keywords: string[];
+  /** Position in the home page's Popular row (1 = first); absent = not popular. */
+  popularRank?: number;
   /** Present once the tool runs on the shared flow. */
   flow?: ToolFlowConfig;
+};
+
+/** Catalogue groups, in display order. */
+export const categories: { id: ToolCategory; label: string }[] = [
+  { id: "organize", label: "Organize pages" },
+  { id: "edit", label: "Edit & sign" },
+  { id: "optimize", label: "Optimize" },
+  { id: "security", label: "Security" },
+  { id: "convert-from", label: "Convert from PDF" },
+  { id: "convert-to", label: "Convert to PDF" },
+  { id: "scans", label: "Scans" },
+  { id: "automate", label: "Automate" },
+];
+
+/** The hero's call to action goes here once this tool is usable (spec F2 §3a). */
+export const featured = "pdf-editor";
+
+/** Popular row, in its fixed order (spec F2 §3b). */
+const popular = [
+  "rotate-pdf",
+  "pdf-editor",
+  "compress-pdf",
+  "delete-pages",
+  "merge-pdf",
+  "split-pdf",
+  "crop-pdf",
+  "fill-sign",
+  "pdf-to-word",
+  "extract-pages",
+];
+
+/** Search aliases: words people type that are not in the name or summary. */
+const keywordsBySlug: Record<string, string[]> = {
+  "merge-pdf": ["combine", "join", "append"],
+  "extract-pages": ["select", "pick pages"],
+  "delete-pages": ["remove pages"],
+  "rotate-pdf": ["turn", "orientation", "landscape"],
+  "organize-pdf": ["reorder", "sort", "arrange"],
+  "combine-reorder": ["merge"],
+  "alternate-mix": ["interleave", "collate"],
+  "split-by-bookmarks": ["outline", "chapters"],
+  "split-by-size": ["file size", "email"],
+  "split-in-half": ["booklet", "two up"],
+  "crop-pdf": ["margins", "trim"],
+  "resize-pdf": ["page size", "a4", "letter", "scale"],
+  "flip-pdf": ["mirror"],
+  "n-up": ["pages per sheet", "imposition"],
+  "pdf-editor": ["text", "annotate", "whiteout", "edit"],
+  "fill-sign": ["sign", "signature", "form", "esign"],
+  "create-forms": ["fillable", "form fields"],
+  "watermark-pdf": ["stamp", "logo", "confidential"],
+  "page-numbers": ["paginate", "numbering"],
+  "header-footer": ["label"],
+  "bates-numbering": ["legal", "stamp"],
+  "edit-metadata": ["properties", "title", "author"],
+  "bookmarks": ["outline", "toc", "table of contents"],
+  "rename-pdf": ["file name"],
+  "remove-annotations": ["comments", "highlights"],
+  "flatten-pdf": ["form fields"],
+  "compress-pdf": ["shrink", "reduce", "smaller", "optimize"],
+  "grayscale-pdf": ["black and white", "greyscale", "monochrome"],
+  "repair-pdf": ["fix", "broken", "corrupt"],
+  "protect-pdf": ["encrypt", "password", "lock"],
+  "unlock-pdf": ["decrypt", "remove password"],
+  "pdf-to-word": ["docx", "doc"],
+  "pdf-to-excel": ["xlsx", "spreadsheet", "table"],
+  "pdf-to-ppt": ["ppt", "pptx", "slides"],
+  "pdf-to-image": ["png", "jpeg", "tiff", "picture"],
+  "pdf-to-text": ["txt", "extract text"],
+  "extract-images": ["pictures", "photos"],
+  "image-to-pdf": ["jpeg", "png", "photo", "picture"],
+  "word-to-pdf": ["docx", "doc"],
+  "html-to-pdf": ["html", "url", "website"],
+  "ocr-pdf": ["recognize text", "searchable"],
+  "deskew-pdf": ["straighten", "tilted"],
+  "workflows": ["batch", "automate", "chain"],
 };
 
 const MB = 1024 * 1024;
@@ -94,58 +177,89 @@ const t = (
   summary: string,
   category: ToolCategory,
   runtime: Tool["runtime"],
+  icon: ToolIconName,
   ref = slug,
-): Tool => ({ slug, name, summary, category, runtime, ref, ...(flows[slug] ?? { status: "planned" }) });
+): Tool => {
+  const rank = popular.indexOf(slug);
+  return {
+    slug,
+    name,
+    summary,
+    category,
+    runtime,
+    ref,
+    icon,
+    keywords: keywordsBySlug[slug] ?? [],
+    ...(rank >= 0 ? { popularRank: rank + 1 } : {}),
+    ...(flows[slug] ?? { status: "planned" }),
+  };
+};
 
 export const tools: Tool[] = [
-  t("merge-pdf", "Merge", "Join PDFs and images into a single document", "organize", "client"),
-  t("split-pdf", "Split", "Break a PDF into parts by page ranges", "organize", "client"),
-  t("extract-pages", "Extract pages", "Keep only the pages you pick", "organize", "client", "extract-pdf-pages"),
-  t("delete-pages", "Delete pages", "Remove unwanted pages", "organize", "client", "delete-pdf-pages"),
-  t("rotate-pdf", "Rotate", "Turn pages and save the rotation", "organize", "client", "rotate-pdf-pages"),
-  t("organize-pdf", "Organize", "Reorder, duplicate and remove pages visually", "organize", "client"),
-  t("combine-reorder", "Combine & reorder", "Mix pages from several files in any order", "organize", "client", "visually-combine-reorder-pdf"),
-  t("alternate-mix", "Alternate & mix", "Interleave pages from two or more files", "organize", "client", "alternate-mix-pdf"),
-  t("split-by-bookmarks", "Split by bookmarks", "One file per chapter, using the outline", "organize", "client", "split-pdf-by-outline"),
-  t("split-by-size", "Split by size", "Parts no bigger than a target size", "organize", "client", "split-pdf-by-size"),
-  t("split-by-text", "Split by text", "Start a new file when page text changes", "organize", "client", "split-pdf-by-text"),
-  t("split-in-half", "Split in half", "Cut two-page scans into single pages", "organize", "client", "split-pdf-down-the-middle"),
-  t("crop-pdf", "Crop", "Trim margins or set a new page box", "edit", "client"),
-  t("resize-pdf", "Resize", "Change page size or add margins", "edit", "client"),
-  t("flip-pdf", "Flip", "Mirror pages horizontally or vertically", "edit", "client"),
-  t("n-up", "N-up", "Print several pages per sheet", "edit", "client", "n-up-pdf"),
-  t("pdf-editor", "Edit PDF", "Add and change text, images, shapes and links", "edit", "client"),
-  t("fill-sign", "Fill & sign", "Fill in forms and add your signature", "edit", "client", "sign-pdf"),
-  t("create-forms", "Create forms", "Make any PDF fillable", "edit", "client", "pdf-forms"),
-  t("watermark-pdf", "Watermark", "Stamp text or an image on pages", "edit", "client"),
-  t("page-numbers", "Page numbers", "Number your pages", "edit", "client", "page-numbers-pdf"),
-  t("header-footer", "Header & footer", "Add labels to the top or bottom of pages", "edit", "client", "header-footer-pdf"),
-  t("bates-numbering", "Bates numbering", "Stamp legal Bates numbers across many files", "edit", "client", "bates-numbering-pdf"),
-  t("edit-metadata", "Edit metadata", "Change title, author, keywords and more", "edit", "client", "edit-pdf-metadata"),
-  t("bookmarks", "Bookmarks", "Create or edit the document outline", "edit", "client", "pdf-bookmarks"),
-  t("rename-pdf", "Rename by content", "Name files using text found inside them", "edit", "client"),
-  t("remove-annotations", "Remove annotations", "Strip highlights, comments and markup", "edit", "client", "delete-pdf-annotations"),
-  t("flatten-pdf", "Flatten", "Lock form fields and annotations into the page", "edit", "client"),
-  t("compress-pdf", "Compress", "Make your PDF smaller", "optimize", "server"),
-  t("grayscale-pdf", "Grayscale", "Convert colors to shades of gray", "optimize", "server"),
-  t("repair-pdf", "Repair", "Recover content from a damaged file", "optimize", "server"),
-  t("protect-pdf", "Protect", "Add a password and permissions", "security", "server", "encrypt-pdf"),
-  t("unlock-pdf", "Unlock", "Remove passwords and restrictions", "security", "server"),
-  t("pdf-to-word", "PDF to Word", "Editable .docx from your PDF", "convert-from", "server"),
-  t("pdf-to-excel", "PDF to Excel", "Pull tables into .xlsx or CSV", "convert-from", "server"),
-  t("pdf-to-ppt", "PDF to PowerPoint", "Slides from your PDF pages", "convert-from", "server"),
-  t("pdf-to-image", "PDF to image", "Pages as JPG, PNG or TIFF", "convert-from", "client", "pdf-to-jpg"),
-  t("pdf-to-text", "PDF to text", "Copy out all the text", "convert-from", "client", "extract-text-from-pdf"),
-  t("extract-images", "Extract images", "Save every embedded image", "convert-from", "client", "extract-images-from-pdf"),
-  t("image-to-pdf", "Image to PDF", "Turn JPG, PNG and other images into a PDF", "convert-to", "client", "jpg-to-pdf"),
-  t("word-to-pdf", "Word to PDF", "Convert .docx documents", "convert-to", "server"),
-  t("html-to-pdf", "Web page to PDF", "Capture URLs or HTML as PDF", "convert-to", "server"),
-  t("ocr-pdf", "OCR", "Make scanned PDFs searchable", "scans", "server"),
-  t("deskew-pdf", "Deskew", "Straighten tilted scans", "scans", "server"),
-  t("workflows", "Workflows", "Chain tools and run them in one go", "automate", "client"),
+  t("merge-pdf", "Merge", "Join PDFs and images into a single document", "organize", "client", "merge"),
+  t("split-pdf", "Split", "Break a PDF into parts by page ranges", "organize", "client", "split"),
+  t("extract-pages", "Extract pages", "Keep only the pages you pick", "organize", "client", "file-output", "extract-pdf-pages"),
+  t("delete-pages", "Delete pages", "Remove unwanted pages", "organize", "client", "file-minus", "delete-pdf-pages"),
+  t("rotate-pdf", "Rotate", "Turn pages and save the rotation", "organize", "client", "rotate-cw", "rotate-pdf-pages"),
+  t("organize-pdf", "Organize", "Reorder, duplicate and remove pages visually", "organize", "client", "layout-grid"),
+  t("combine-reorder", "Combine & reorder", "Mix pages from several files in any order", "organize", "client", "combine", "visually-combine-reorder-pdf"),
+  t("alternate-mix", "Alternate & mix", "Interleave pages from two or more files", "organize", "client", "shuffle", "alternate-mix-pdf"),
+  t("split-by-bookmarks", "Split by bookmarks", "One file per chapter, using the outline", "organize", "client", "bookmark", "split-pdf-by-outline"),
+  t("split-by-size", "Split by size", "Parts no bigger than a target size", "organize", "client", "ruler", "split-pdf-by-size"),
+  t("split-by-text", "Split by text", "Start a new file when page text changes", "organize", "client", "text-search", "split-pdf-by-text"),
+  t("split-in-half", "Split in half", "Cut two-page scans into single pages", "organize", "client", "columns-2", "split-pdf-down-the-middle"),
+  t("crop-pdf", "Crop", "Trim margins or set a new page box", "edit", "client", "crop"),
+  t("resize-pdf", "Resize", "Change page size or add margins", "edit", "client", "scaling"),
+  t("flip-pdf", "Flip", "Mirror pages horizontally or vertically", "edit", "client", "flip-horizontal-2"),
+  t("n-up", "N-up", "Print several pages per sheet", "edit", "client", "grid-2x2", "n-up-pdf"),
+  t("pdf-editor", "Edit PDF", "Add and change text, images, shapes and links", "edit", "client", "square-pen"),
+  t("fill-sign", "Fill & sign", "Fill in forms and add your signature", "edit", "client", "signature", "sign-pdf"),
+  t("create-forms", "Create forms", "Make any PDF fillable", "edit", "client", "text-cursor-input", "pdf-forms"),
+  t("watermark-pdf", "Watermark", "Stamp text or an image on pages", "edit", "client", "stamp"),
+  t("page-numbers", "Page numbers", "Number your pages", "edit", "client", "list-ordered", "page-numbers-pdf"),
+  t("header-footer", "Header & footer", "Add labels to the top or bottom of pages", "edit", "client", "panel-top", "header-footer-pdf"),
+  t("bates-numbering", "Bates numbering", "Stamp legal Bates numbers across many files", "edit", "client", "hash", "bates-numbering-pdf"),
+  t("edit-metadata", "Edit metadata", "Change title, author, keywords and more", "edit", "client", "tags", "edit-pdf-metadata"),
+  t("bookmarks", "Bookmarks", "Create or edit the document outline", "edit", "client", "book-marked", "pdf-bookmarks"),
+  t("rename-pdf", "Rename by content", "Name files using text found inside them", "edit", "client", "file-pen"),
+  t("remove-annotations", "Remove annotations", "Strip highlights, comments and markup", "edit", "client", "eraser", "delete-pdf-annotations"),
+  t("flatten-pdf", "Flatten", "Lock form fields and annotations into the page", "edit", "client", "layers"),
+  t("compress-pdf", "Compress", "Make your PDF smaller", "optimize", "server", "shrink"),
+  t("grayscale-pdf", "Grayscale", "Convert colors to shades of gray", "optimize", "server", "contrast"),
+  t("repair-pdf", "Repair", "Recover content from a damaged file", "optimize", "server", "wrench"),
+  t("protect-pdf", "Protect", "Add a password and permissions", "security", "server", "lock-keyhole", "encrypt-pdf"),
+  t("unlock-pdf", "Unlock", "Remove passwords and restrictions", "security", "server", "lock-keyhole-open"),
+  t("pdf-to-word", "PDF to Word", "Editable .docx from your PDF", "convert-from", "server", "file-text"),
+  t("pdf-to-excel", "PDF to Excel", "Pull tables into .xlsx or CSV", "convert-from", "server", "sheet"),
+  t("pdf-to-ppt", "PDF to PowerPoint", "Slides from your PDF pages", "convert-from", "server", "presentation"),
+  t("pdf-to-image", "PDF to image", "Pages as JPG, PNG or TIFF", "convert-from", "client", "image", "pdf-to-jpg"),
+  t("pdf-to-text", "PDF to text", "Copy out all the text", "convert-from", "client", "align-left", "extract-text-from-pdf"),
+  t("extract-images", "Extract images", "Save every embedded image", "convert-from", "client", "images", "extract-images-from-pdf"),
+  t("image-to-pdf", "Image to PDF", "Turn JPG, PNG and other images into a PDF", "convert-to", "client", "file-image", "jpg-to-pdf"),
+  t("word-to-pdf", "Word to PDF", "Convert .docx documents", "convert-to", "server", "file-type"),
+  t("html-to-pdf", "Web page to PDF", "Capture URLs or HTML as PDF", "convert-to", "server", "globe"),
+  t("ocr-pdf", "OCR", "Make scanned PDFs searchable", "scans", "server", "scan-text"),
+  t("deskew-pdf", "Deskew", "Straighten tilted scans", "scans", "server", "scan"),
+  t("workflows", "Workflows", "Chain tools and run them in one go", "automate", "client", "workflow"),
 ];
 
 export const toolBySlug = (slug: string) => tools.find((x) => x.slug === slug);
+
+/** "Usable" = the tool page works (status beta or live). */
+export const isUsable = (tool: Pick<Tool, "status">) => tool.status !== "planned";
+
+/** Popular tools: usable first, then planned, each part in the fixed popular order. */
+export function popularTools(list: readonly Tool[] = tools): Tool[] {
+  const ranked = list.filter((x) => x.popularRank !== undefined).sort((a, b) => a.popularRank! - b.popularRank!);
+  return [...ranked.filter(isUsable), ...ranked.filter((x) => !isUsable(x))];
+}
+
+/** Header shortcuts: up to `max` usable tools, popular order first, then registry order. */
+export function shortcutTools(max = 5, list: readonly Tool[] = tools): Tool[] {
+  const usable = list.filter(isUsable);
+  const ranked = usable.filter((x) => x.popularRank !== undefined).sort((a, b) => a.popularRank! - b.popularRank!);
+  return [...ranked, ...usable.filter((x) => x.popularRank === undefined)].slice(0, max);
+}
 
 /** A tool that is known to run on the shared flow. */
 export type FlowTool = Tool & { flow: ToolFlowConfig };
