@@ -548,7 +548,7 @@ Every state keeps the same skeleton (header, `ToolIntro`, workspace, dock), so s
 | State changes | one polite `LiveRegion`: "Reading 2 files", "three-pages.pdf ready, 3 pages", "Rotating", "Your PDF is ready", "All pages will rotate 90° clockwise" (after toolbar rotate), "Rotation reset" |
 | Result preview | `img` (or canvas with `role="img"`) `aria-label="Preview of page 1 of the result"` |
 
-**Contrast and visibility checks.** All text pairs are in U-2. Disabled controls use `fg-disabled` (exempt). Focus outline 2 px `focus` with 2 px offset reaches ≥ 7:1 against every surface. The scope outline (`primary`, 2 px) is ≥ 6:1 against `surface`. The page image on `paper` inside dark mode gets `shadow-paper` with a 1 px light ring so its edge is visible (decorative). Target sizes: every interactive element ≥ 44×44 px at < 1024 and ≥ 32×32 visual with 44×44 hit area at ≥ 1024. Zoom to 200% and 400% (320 CSS px reflow) works: at 320 px the dock's options row wraps to two rows (dock grows; `main` padding uses the measured dock height via a `ResizeObserver` writing `--ip-dock-actual`).
+**Contrast and visibility checks.** All text pairs are in U-2. Disabled controls use `fg-disabled` (exempt). Focus outline 3 px `focus` (Mint Paper `link` #0282e5) with 2 px offset: 3.94:1 on surface, 3.40:1 on band and page trays, 3.19:1 on sand (non-text, ≥ 3:1). The scope outline is the same link blue, 2 px, around the page's grey tray (3.40:1 against the tray). The page image sits on its tray with `shadow-paper` (a hairline ring and soft shadow). There is no dark mode until Mint Paper defines one. Measured values and deviations: [`docs/design/mint-paper.md`](../design/mint-paper.md). Target sizes: every interactive element ≥ 44×44 px at < 1024 and ≥ 32×32 visual with 44×44 hit area at ≥ 1024. Zoom to 200% and 400% (320 CSS px reflow) works: at 320 px the dock's options row wraps to two rows (dock grows; `main` padding uses the measured dock height via a `ResizeObserver` writing `--ip-dock-actual`).
 
 ### U-8. Micro-interactions
 
@@ -590,5 +590,5 @@ The UI needs these per tool (names are a proposal; the engineer owns the type): 
 2. **Thumbnail renderer location:** pdf.js render in a worker with `OffscreenCanvas` where supported, falling back to main-thread canvas. Either is fine for the design as long as AC-52 holds.
 3. **Hand-off store for Continue-with:** in-memory (module-level or `sessionStorage` key holding a `Blob` URL) is the engineer's call; the design only requires that the target tool opens directly in the ready state with no picker step (AC-43).
 4. **`sessionStorage` for the slider value** is optional polish; drop it if it complicates SSR.
-5. **Dark-mode toggle UI** is not in F1; tokens already support `data-theme`.
+5. **Dark mode** is not shipped: Mint Paper does not define one yet, so the tokens are light only (no `data-theme` switch). It is pending the designer's definition; see [`docs/design/mint-paper.md`](../design/mint-paper.md).
 6. **The 768 px `DockStatus`** is visually hidden; if testing shows users miss the disabled reason, show it as a one-line caption above the dock (fixed position, no shift).

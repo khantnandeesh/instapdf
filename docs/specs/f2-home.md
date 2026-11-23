@@ -770,7 +770,7 @@ Why the catalogue is one client island and not server cards with a filter script
 | Coming-soon | `h1` tool name; status panel `h2` "Coming soon"; the badge in the `h1` row is plain text. |
 | Current page | Header shortcut `aria-current="page"`. |
 
-**Contrast and targets.** All text pairs are in F1 U-2 or H-2. Focus ring: the global 2 px `focus` outline, offset 2 (≥ 7:1 on every surface, F1 U-7); on cards the outline follows `rounded-lg`. Every interactive element is ≥ 44×44 below 1024 (cards, tiles, chips, entries, footer links, switch row, header button) and ≥ 32 visual / 44 hit at ≥ 1024. Zoom: at 400% (320 CSS px) the header still fits (logo + 44 px button), the hero stacks, toolbars wrap, and no horizontal scroll appears (AC-57).
+**Contrast and targets.** All text pairs are in F1 U-2 or H-2. Focus ring: the global 3 px `focus` outline (Mint Paper `link`), offset 2: 3.94:1 on surface, 3.19:1 on the sand wash (F1 U-7, [`docs/design/mint-paper.md`](../design/mint-paper.md)); on cards the outline follows the leaf corner. Every interactive element is ≥ 44×44 below 1024 (cards, tiles, entries, switch row) and ≥ 32 visual / 44 hit at ≥ 1024, except Mint Paper's chips and header links (about 38 px) and footer links (24 px rows), which meet the WCAG 2.5.8 24 px minimum. Zoom: at 400% (320 CSS px) the header still fits (logo + 44 px button), the hero stacks, toolbars wrap, and no horizontal scroll appears (AC-57).
 
 ### H-8. Copy (our own wording; keep strings in `components/catalogue/copy.ts` and `components/site/copy.ts`)
 
