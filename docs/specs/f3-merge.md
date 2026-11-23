@@ -1,6 +1,6 @@
 # F3: Merge (files view + pages view, reorder, options)
 
-Status: step 1 (Analyze) done; §8 decisions resolved by the orchestrator; step 2 (Research) done (§ Improvements). Next: UX design.
+Status: step 1 (Analyze) done; §8 decisions resolved by the orchestrator; step 2 (Research) done (§ Improvements); step 3 (UX) done (§ UI). Next: build.
 Reference observed: `merge-pdf` on the live reference site, 2026-11-23, desktop 1280×900 and mobile 375 px. We uploaded synthetic fixtures only (two small PDFs, one PNG, and one more PDF through the page picker) and did **not** run a merge, so the result screen and the contents of the merged file are not observed. Anything about the output that we could not see is marked *unverified* and is our decision; the evaluator should confirm it on its first real Merge task.
 Internal screenshots: `docs/specs/assets/f3-merge/` (reference only, never ship). Index in §9.
 
@@ -80,10 +80,10 @@ Merge turns several documents into one. The visitor adds PDFs and pictures, puts
 | View toggle | 2-way segmented control | **Files** | Files · Pages | Switches the workspace between file cards and page tiles. On Merge it is shown as soon as **one** file is loaded (F1 hides it for one file), because the pages view is where blank pages and extra pages are added. |
 | Add files | split button with menu | – | Local files (cloud entries hidden, F1 D-5) | Appends whole files (all pages). |
 | Add pages | split button with menu | – | From a file (opens the picker, one file at a time) · Blank page | "From a file" opens the page picker (§3d). "Blank page" inserts one blank page (§3c). |
-| Sort | menu button | – | Name A–Z · Name Z–A · Last modified, oldest first · Last modified, newest first | Files view: reorders file cards. Pages view: stable-sorts pages by their source file's name or date, keeping page order inside each file. Name sort is natural and case-insensitive (reference uses natural sort on the lower-cased name). Date sort uses the `File.lastModified` of each source. Blank pages the user inserted travel with the page in front of them. |
+| Sort | menu button | – | Name A–Z · Name Z–A · Last modified, oldest first · Last modified, newest first · **Reverse order** (AC-78, improvement I-1) | Files view: reorders file cards. Pages view: stable-sorts pages by their source file's name or date, keeping page order inside each file. Name sort is natural and case-insensitive (reference uses natural sort on the lower-cased name). Date sort uses the `File.lastModified` of each source. Blank pages the user inserted travel with the page in front of them. **Reverse order** reverses the order of the segments (§3e) in both views and keeps the page order inside each segment; choosing it twice restores the previous order. |
 | Thumbnail size | slider | F1 default | F1 range | F1 AC-10. |
 
-Reference note: the reference's sort lives in a "Reorder" menu with exactly these four entries, and it works in both views (in the pages view it sorts pages by file name).
+Reference note: the reference's sort lives in a "Reorder" menu with exactly the four sort entries (Reverse order is ours), and it works in both views (in the pages view it sorts pages by file name).
 
 ### 3b. Files view
 
@@ -410,3 +410,484 @@ The evaluator does not compare these with the reference, but they must work.
 **Totals with improvements: 80 ACs: 32 P0, 38 P1, 10 P2.** Plus the inherited F1 ACs listed in §0a.
 
 Sources (web search, 2026-11-23): [iLovePDF: organize PDF pages](https://www.ilovepdf.com/blog/organize-pdf-pages) · [iLovePDF: organizing, splitting and merging guide](https://ilovepdf.com/blog/organize-split-merge-pdf-files-ultimate-guide) · [PDF24 help: merge PDF files](https://help.pdf24.org/en/how-to-merge-pdf-files-with-pdf24/) · [Stirling-PDF merge sort-by-date fix (#4461)](https://git.laurivan.com/Mirrors/Stirling-PDF/src/commit/fd95876d8fc3f3951525cbf7c836a2736dd60eb2) · [Stirling-PDF repository](https://github.com/Stirling-Tools/Stirling-PDF) · [IONOS: merging PDFs](https://www.ionos.com/digitalguide/online-marketing/online-sales/merging-pdfs/)
+
+## UI
+
+Designed 2026-11-23 by ux-designer. This is the build contract for `/merge-pdf`. It extends the F1 design system (`docs/specs/f1-shared-flow.md`, `## UI`, "U-x") and F2 (`docs/specs/f2-home.md`, `## UI`, "H-x"): same tokens, primitives, focus ring, motion rules, breakpoints and control dock. Only what Merge adds or changes is written here. The look is InstaPDF's own; the reference screenshots in §9 are for behavior only and are never a visual guide.
+
+### M-1. Design principles for Merge
+
+1. **Two actions to the result, still.** Choose files → "Merge PDFs". The first batch arrives already sorted by name (§2), the options have safe defaults, and the primary is enabled from one file on. Everything else (reorder, page edits, options) is optional and never stands between the user and the button.
+2. **One list, two lenses.** The files view and the pages view are two renderings of the same ordered page list (§3e). Switching views keeps scroll position on the focused item, never changes order and never resets selection.
+3. **Every pointer gesture has a button and a key.** Drag works with mouse and touch, but each drag has a visible button alternative (Move earlier / Move later, Move to position) and a keyboard shortcut (Alt+arrows), and each move is announced.
+4. **No layout shift from editing chrome.** Insert points, the selection bar, drag ghosts, menus, notices and the undo notice float or sit in reserved space. The only reflow is the one the user asked for (an item moved, added or removed), and that reflow is animated with transforms (FLIP), not by animating size or position properties.
+5. **Undo instead of "are you sure".** Removing is one click and can be undone (AC-79). The single confirm dialog left is the one the spec requires (remove one page while others are selected, AC-26), and its safer choice has focus.
+
+### M-2. Tokens: additions to F1 U-2 and F2 H-2
+
+Add to `apps/web/src/styles/tokens.css` (same file, same `--ip-*` naming, exposed through `@theme inline` where a utility is needed). No new colors except one paper-text token.
+
+| Token | Value | Use |
+|---|---|---|
+| `--ip-on-paper-muted` | `#535A6E` in **both** themes | "Blank page" label and icon drawn on a blank page thumbnail. Pages are always white (`paper`), so dark-mode `fg-muted` (`#A2A8BA`, 2.37:1 on white) must not be used there. |
+| `--ip-insert-size` | 24px | Visible circle of an insert point ("+"). Hit area is 44×44 (F1 `--ip-tap-min`). |
+| `--ip-slot-bar` | 3px | Width of the drop / insert indicator bar drawn in the grid gap. |
+| `--ip-lift-scale` | 1.03 | Scale of the dragged ghost. |
+| `--ip-selbar-h` | 56px | Height of the floating selection bar (M-4). |
+| `--ip-z-drag` | 35 | Drag ghost: above notices (30), below the drop overlay (40). Menus and dialogs use the native top layer (`popover` / `<dialog>`), so they need no z-index. |
+| `--ip-z-selbar` | 25 | Floating selection bar: above the dock (20), below notices (30). |
+| `--ip-sheet-max-h` | 85dvh | Options bottom sheet below 1024 px (F1 said 80dvh; 85 fits all seven options at 375×667 with one scroll). |
+
+**New contrast pairs (WCAG 2.1, measured)**
+
+| Pair | Light | Dark | Where |
+|---|---|---|---|
+| `on-paper-muted` on `paper` | 6.87 | 6.87 | "Blank page" label on blank thumbnails |
+| `border-strong` on `paper` (non-text) | 3.82 | 3.82 | dashed outline inside a blank page thumbnail |
+| `primary` on `surface` (non-text) | 7.01 | 6.64 | drop / insert indicator bar, selection outline |
+| `primary` on `surface-raised` (non-text) | 7.57 | 6.10 | selection outline on cards, focus inside menus |
+| `border-strong` on `surface` / `surface-raised` (non-text) | 3.54 / 3.82 | 3.85 / 3.54 | insert point circle outline, end "Add" tile dashed border |
+| `primary` on `primary-soft` (icon) | 6.53 | 5.43 | insert point "+" when hovered / focused / open |
+| `on-primary-soft` on `primary-soft` | 8.79 | 8.97 | source letter badge on a selected tile, "2 changed" chip |
+| `fg` on `primary-soft` | 15.27 | 12.62 | selection bar count text |
+
+Every selected, dragged, invalid or "changed" state also has a non-color cue (check mark, outline width, icon, text).
+
+### M-3. Layout
+
+The shared skeleton is F1 U-3: `ToolIntro`, the workspace (`section aria-label="Your files"`, `surface` canvas, sticky 52 px toolbar), and the `ControlDock` (sticky 320 px column at ≥ 1024, fixed bottom bar below). Merge uses `optionsDensity: "full"`: at ≥ 1024 the options live in the dock column; below 1024 the dock holds an **Options** button that opens a bottom sheet (M-4 `MergeOptionsSheet`).
+
+#### 1280 px, files view (≥ 1024 behaves the same)
+
+```
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ InstaPDF  [▦ All tools ▾]  Merge  Rotate                                       │ header 56
+├────────────────────────────────────────────────────────────────────────────────┤
+│ Merge PDF                                                                      │ h1 2xl
+│ Join PDFs and images into a single document                                    │ fg-muted
+│ ┌────────────────────────────────────────────────────┐ ┌─────────────────────┐ │
+│ │ [Files|Pages]  [⇅ Sort ▾]  [+ Add files] [Add pages ▾] │ │ Options             │ │ toolbar 52, sticky
+│ │────────────────────────────────────────────────────│ │ Contents page       │ │
+│ │ ┌A──────────×┐ ┌B──────────×┐ ┌C──────────×┐ ┌ ─ ─ ─ ─┐│ │ [None|Names|Titles] │ │
+│ │ │    ▯       │ │    ▭       │ │    ▯       │ │   +    ││ │ ( ) First file is a │ │
+│ │ │ [⟲][⟳][⤢]  │ │ [⟲][⟳][⤢]  │ │ [⟲][⟳][⤢]  │ │ Add    ││ │     cover           │ │
+│ │ └────────────┘ └────────────┘ └────────────┘ │ files  ││ │ Bookmarks           │ │
+│ │ alpha.pdf      bravo.pdf      charlie.png    └ ─ ─ ─ ─┘│ │ [Keep all       ▾]  │ │
+│ │ 3 pages·1.2 MB 2 pages·80 KB  Image·1 page             │ │ Page layout         │ │
+│ │ [←]  1 of 3 [→][←]  2 of 3 [→][←]  3 of 3 [→]          │ │ ( ) File name in    │ │
+│ │                                                    │ │     footer          │ │
+│ │                                                    │ │ ( ) Same width      │ │
+│ │                                                    │ │ ( ) Double-sided    │ │
+│ │                                                    │ │ Form fields         │ │
+│ │                                                    │ │ [Merge, rename… ▾]  │ │
+│ │                                                    │ │ Reset options       │ │
+│ │                                                    │ │─────────────────────│ │
+│ │                                                    │ │ 6 pages · 3 files   │ │
+│ │                                                    │ │ [   Merge PDFs    ] │ │ primary lg 52
+│ └────────────────────────────────────────────────────┘ └─────────────────────┘ │
+└────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- Two columns as F1 (workspace `minmax(0,1fr)`, dock 320, gap 24). Grid columns `repeat(auto-fill, var(--ip-thumb-size))`, gap 16: 5 cards per row at 160 px.
+- **Toolbar** (left to right): `ViewToggle` (Files · Pages, shown from **one** file, §3a) → `SortMenu` (icon + "Sort" + chevron) → spacer → `Add files` (secondary sm, + icon; a plain button, since cloud sources are hidden, F1 D-5) → `Add pages` (secondary sm menu button: "From a file…", "Blank page"). The thumbnail size slider is shown in the pages view only (F1), between Sort and the spacer.
+- **File card** (`SegmentCard`, M-4): box, name line, meta line, then a 44 px **position row**: `[← Move earlier]  "1 of 3"  [Move later →]`. Every card has the same height (box + 20 + 16 + 44 + gaps), so cards never jump. Top-start of the box: source letter badge; top-end: Remove (F1). Bottom of the box: floating action bar (Rotate left, Rotate right, Enlarge), shown on hover, focus-within and always on touch.
+- **End tile**: the last grid cell is a dashed "Add files" tile the same size as a card box. It opens the file picker directly (one click). Its position is always last, so adding files moves it once (user-initiated).
+- Options column scrolls inside the dock when taller than the dock (at 900 px viewport height it fits without scrolling).
+
+#### 1280 px, pages view
+
+```
+│ ┌────────────────────────────────────────────────────┐ ┌─────────────────────┐ │
+│ │ [Files|Pages] [⇅ Sort ▾] ─○── size  [+ Add files] [Add pages ▾]│ (same dock)        │ │
+│ │────────────────────────────────────────────────────│ │                     │ │
+│ │ ⊕┌──────✓┐⊕┌───────┐⊕┌───────┐⊕┌───────┐⊕┌───────┐⊕ │ │                     │ │ ⊕ = insert point
+│ │  │   ▯   │ │   ▯   │ │   ▯   │ │  ▭    │ │  ▭    │  │ │                     │ │     (hover / focus)
+│ │  │[⟲][⟳][🗑][⋯]│     │       │ │       │ │       │  │ │                     │ │
+│ │  └───────┘ └───────┘ └───────┘ └───────┘ └───────┘  │ │                     │ │
+│ │     A1        A2        A3        B1        B2      │ │                     │ │ label xs 500
+│ │  ┌ ─ ─ ─ ┐                                         │ │                     │ │
+│ │  │  +    │ Add                                     │ │                     │ │ end "Add" tile
+│ │  └ ─ ─ ─ ┘                                         │ │                     │ │
+│ └────────────────────────────────────────────────────┘ │ 5 pages · 2 files   │ │
+│        ┌─────────────────────────────────────────┐     │ [   Merge PDFs    ] │ │
+│        │ 2 selected  [⟲] [⟳] [🗑 Remove]  [Clear] │     └─────────────────────┘ │ floating selection bar
+│        └─────────────────────────────────────────┘                             │
+```
+
+- One flat grid in output order (no per-file group headers: pages from different files interleave). Tile label below the box: source letter + page number (`A1`), `xs` 500 `fg`, `tabular-nums`; blank pages: "Blank".
+- **Insert points** sit centered in the 16 px gap at the vertical middle of the page box: one before the first tile, one after every tile. Visible circle 24 px (`surface-raised`, 1 px `border-strong`, `+` 14 px `fg-muted`); hit area 44×44 overlapping the tile edges (the tile's own controls are at its center and bottom, so they never collide). With a fine pointer they are invisible until the pointer is within the gap strip (a 24 px wide hover zone per gap) or the insert point has focus or its menu is open. When shown, a 3 px `primary` slot bar is drawn the full box height in the gap.
+- **Selection bar** (`SelectionBar`): floating, centered over the workspace column, `bottom: 24px` at ≥ 1024 (notices stack above it while it is shown). Only present with ≥ 1 selected page.
+
+#### 768 px (640–1023), both views
+
+```
+┌──────────────────────────────────────────────┐
+│ InstaPDF  [▦ All tools ▾]  Merge Rotate      │
+├──────────────────────────────────────────────┤
+│ Merge PDF                                    │
+│ Join PDFs and images into a single document  │
+│ ┌──────────────────────────────────────────┐ │
+│ │[Files|Pages] [⇅ Sort▾] [+ Add files][Add pages▾]│ │ toolbar (pages view adds the size slider)
+│ │ ┌A────×┐ ┌B────×┐ ┌C────×┐ ┌ ─ ─ ┐       │ │ 4 per row at 160
+│ │ │  ▯   │ │  ▭   │ │  ▯   │ │ +   │       │ │
+│ │ └──────┘ └──────┘ └──────┘ └ ─ ─ ┘       │ │
+│ │ alpha.pdf bravo.pdf charlie.png          │ │
+│ │ [←]1 of 3[→] …                           │ │
+│ └──────────────────────────────────────────┘ │
+│      ┌──────────────────────────────────┐    │ selection bar (pages view), above the dock
+│      │ 2 selected [⟲][⟳][🗑]   [Clear]  │    │
+│      └──────────────────────────────────┘    │
+├──────────────────────────────────────────────┤ fixed dock, 76 + safe area
+│ [⚙ Options · 2 changed]          [Merge PDFs]│
+└──────────────────────────────────────────────┘
+```
+
+- Gutters 24, single column, fixed one-row dock (F1). Toolbar at 768: view toggle (~150), Sort (~96), slider (pages view, ~170), Add files (~120), Add pages (~130): 616 + gaps fits the 672 px toolbar; between 640 and 767 the slider is dropped and Sort becomes icon-only (container query on the toolbar, not the viewport, so it also holds at 200% zoom).
+- Dock row: `MergeOptionsButton` (secondary md, gear icon, label "Options", plus a `primary-soft` chip "2 changed" when any option differs from the defaults) on the left; primary (min width 200) on the right. `DockStatus` visually hidden (F1).
+- Selection bar: `bottom: calc(var(--ip-dock-actual) + 12px)`, notices stack above it.
+
+#### 375 px (< 640), both views
+
+```
+┌───────────────────────────────┐
+│ InstaPDF          [▦ Tools ▾] │
+├───────────────────────────────┤
+│ Merge PDF                     │ h1 xl
+│ Join PDFs and images into a…  │
+│ [Files|Pages]   [⇅]  [+ Add ▾]│ toolbar 52: one Add menu, icon-only Sort
+│ ┌A─────────×┐ ┌B─────────×┐   │ 2 columns, square boxes
+│ │     ▯     │ │     ▭     │   │
+│ │ [⟲][⟳][⤢] │ │ [⟲][⟳][⤢] │   │ 3 × 44 action bar, always visible (touch)
+│ └───────────┘ └───────────┘   │
+│ alpha.pdf      bravo.pdf      │
+│ 3 pages·1.2 MB 2 pages·80 KB  │
+│ [←] 1 of 2 [→] [←] 2 of 2 [→] │ 44 px position row
+├───────────────────────────────┤ fixed dock, 128 + safe area
+│ [⚙ Options      · 2 changed ] │ row 1: 44, full width
+│ [        Merge PDFs         ] │ row 2: 48, full width
+└───────────────────────────────┘
+```
+
+Pages view at 375:
+
+```
+│ [Files|Pages]   [⇅]  [+ Add ▾]│
+│⊕┌─────────○┐⊕┌─────────●┐⊕   │ ○/● selection check, always visible on touch
+│ │    ▯     │ │    ▯     │    │
+│ │[⟳][🗑][⋯]│ │[⟳][🗑][⋯]│    │ 3 × 44 per-page bar
+│ └──────────┘ └──────────┘    │
+│     A1           A2          │
+│⊕┌──────────┐⊕┌ ─ ─ ─ ─ ┐     │
+│ │    ▯     │ │  + Add  │     │ end tile
+│ └──────────┘ └ ─ ─ ─ ─ ┘     │
+│     A3                       │
+│ ┌───────────────────────────┐ │ selection bar, above the dock
+│ │ 1 selected [⟳][🗑]  [Clear]│ │
+│ └───────────────────────────┘ │
+├───────────────────────────────┤
+│ [⚙ Options                  ] │
+│ [        Merge PDFs         ] │
+└───────────────────────────────┘
+```
+
+- Gutters 16, workspace padding 12, gap 12: each box is about 153 px. Three 44 px buttons plus 4 px gaps and 4 px padding is 148 px, so every action is a full 44×44 target (AC-75). No horizontal scroll at 375 in any state.
+- Toolbar: `ViewToggle` short labels ("Files" / "Pages"), Sort icon-only (`aria-label="Sort"`, tooltip on focus), and **one** "Add" menu button (+ icon and the word "Add") with "Files…", "Pages from a file…", "Blank page". The slider is hidden (F1).
+- Insert points are always visible on touch (`hover: none`), as 24 px circles in the gap, so they are discoverable without hover.
+- The primary is visible without scrolling in every ready state (dock is fixed, AC-75). At 375×667, the title, toolbar and the first row of cards are above the fold.
+- Dialogs (picker, move, confirm) use the F2 `fullscreen` variant for the picker and the default centered variant (width `min(440px, 100vw - 32px)`) for move and confirm.
+
+#### Page picker dialog (all widths)
+
+```
+1280 / 768 (Dialog wide: min(880px, 100vw - 64px), max-height 85dvh)
+┌──────────────────────────────────────────────────────────────┐
+│ Add pages from three-pages.pdf                          [×]  │ title lg 600, name middle-truncated
+│ Pick the pages to add. They go after A3.                     │ sm fg-muted ("at the end" from the toolbar)
+│ [Select all] [Select none]                  2 of 3 selected  │ 44 row
+│ ┌──────────────────────────────────────────────────────────┐ │
+│ │ ┌────✓┐ ┌─────┐ ┌────✓┐                                  │ │ grid scrolls inside, tiles 120 px
+│ │ │  ▯  │ │  ▯  │ │  ▯  │                                  │ │
+│ │ └─────┘ └─────┘ └─────┘                                  │ │
+│ │   C1      C2      C3                                     │ │
+│ └──────────────────────────────────────────────────────────┘ │
+│                                  [Cancel]  [ Add 2 pages ]   │ footer, Add = primary
+└──────────────────────────────────────────────────────────────┘
+
+375 (Dialog fullscreen, F2): title bar with [×], helper line, the Select all / none row,
+2-column grid filling the height, sticky footer [Cancel] [Add 2 pages] (both 48, 50/50).
+```
+
+#### Move-to-position dialog and remove confirm
+
+```
+┌──────────────────────────────────────┐   ┌──────────────────────────────────────┐
+│ Move A3                              │   │ Remove pages?                        │
+│ Now at position 3 of 9.              │   │ A3 is one of 3 selected pages.       │
+│ New position (1–9)                   │   │                                      │
+│ ┌──────────────────────────────────┐ │   │ [Cancel] [Only this page]            │
+│ │ 3                                │ │   │          [Remove all 3 selected]     │ danger
+│ └──────────────────────────────────┘ │   └──────────────────────────────────────┘
+│ (!) Enter a number from 1 to 9.      │ reserved 20 px error line
+│                   [Cancel]  [ Move ] │
+└──────────────────────────────────────┘
+```
+
+Below 400 px both footers stack (primary or danger on top, F1 rule).
+
+### M-4. Component tree
+
+Reuse first. New primitives go to `components/ui/`, shared editing pieces that Organize (F5) will reuse go to `components/page-edit/`, and Merge-only pieces to `tools/merge/`.
+
+```
+app/merge-pdf/page.tsx (server)  → <RecordVisit slug="merge-pdf"/> + <MergeTool/>
+<MergeTool>                                         tools/merge/MergeTool.tsx (client)
+└─ <ToolFlow tool renderOptions renderWorkspace toolbar process …>      F1, extended (M-11 #1)
+   ├─ <ToolIntro/> <DropOverlay mode="add"|"insert"/> <LiveRegion/>     F1
+   ├─ empty:  <DropCard> <FilePicker/> <LimitsNote/> <PrivacyNote/> </DropCard>   F1, Merge copy
+   ├─ ready/loading/processing:
+   │   ├─ <WorkspaceToolbar>                                            F1
+   │   │    <ViewToggle/> <SortMenu/> <ThumbSizeSlider/> <AddFilesButton/> <AddPagesMenu/> | <AddMenu/> (< 640)
+   │   ├─ files view: <SegmentGrid>                                     page-edit
+   │   │                 <SegmentCard/>* <AddTile kind="files"/>
+   │   │               </SegmentGrid>
+   │   ├─ pages view: <EditablePageGrid>                                page-edit
+   │   │                 <InsertPoint/> (<EditablePageTile/> <InsertPoint/>)* <AddTile kind="pages"/>
+   │   │               </EditablePageGrid>
+   │   ├─ <SelectionBar/>                                               page-edit (pages view, ≥ 1 selected)
+   │   ├─ <DragLayer/>                                                  page-edit, lazy (M-10)
+   │   └─ <ControlDock options={<MergeOptions/>}>                       F1
+   │        ≥ 1024: <MergeOptions/> inline · < 1024: <MergeOptionsButton/> → <MergeOptionsSheet/>
+   │        <DockStatus/> <PrimaryAction/> | <ProcessingBar/> | <ProcessError/>
+   ├─ done: <ResultCard/>                                               F1
+   ├─ <NoticeStack/>  (+ undo and duplicate notices, M-6)               F1, extended
+   ├─ <PasswordDialog/> <PagePreviewDialog/> <LeaveGuard/>              F1
+   ├─ <PagePickerDialog/>          lazy                                 page-edit
+   ├─ <MoveToPositionDialog/>      lazy                                 page-edit
+   └─ <RemoveSelectedDialog/>      lazy                                 page-edit
+```
+
+#### New primitives (`components/ui/`)
+
+| Component | Props | Notes |
+|---|---|---|
+| `Menu` / `MenuButton` / `MenuItem` / `MenuSeparator` | `MenuButton`: `label`, `icon?`, `iconOnly?`, `variant` (Button variants), `size`; `Menu`: `items: {id, label, icon?, disabled?, onSelect}[] \| "separator"`, `placement: "bottom-start" \| "bottom-end"` | WAI-ARIA menu button pattern: trigger `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`; popup `role="menu"` with `role="menuitem"` buttons. Enter/Space/ArrowDown opens on the first item, ArrowUp on the last; arrows move, Home/End, type-ahead on the first letter, Escape closes and returns focus to the trigger, Tab closes and moves on. Rendered with the native `popover="auto"` attribute (top layer, light dismiss, no z-index fights) and positioned by a few lines of JS from the trigger's rect: below, flipped above when there is not enough room (it opens upward from the end "Add" tile near the dock). `surface-raised`, `rounded-lg`, `shadow-lg`, 4 px padding, items 44 px high (36 at ≥ 1024 with a fine pointer), `sm` 500, 20 px icon, hover/focus `surface-sunken`, separator 1 px `border`. Min width 200, max `calc(100vw - 32px)`. Opening and closing: opacity + 4 px translate (`fast`). No library. |
+| `Select` | `label`, `value`, `options: {value, label}[]`, `description?`, `onChange`, `id` | Native `<select>` (best on mobile, free accessibility), 44 px, `rounded-md`, 1 px `border-strong`, `surface-raised`, custom chevron (`appearance: none` + `ChevronDownIcon`), focus ring F1. Visible `<label>` above (`sm` 500); `description` below (`xs fg-muted`, `aria-describedby`), its height reserved for two lines so changing the choice moves nothing. |
+| `Switch` | F2 H-5, unchanged | Used for the four on/off options; each gets a description line (`xs fg-muted`, `aria-describedby`). Tooltips are not used for option help (they don't work on touch). |
+| `Dialog` | add `variant: "sheet"` | Below 1024: anchored to the bottom, full width, `rounded-t-xl`, max height `--ip-sheet-max-h`, slide-up (`base`, transform) and fade. A 4 px × 36 px grabber is drawn for affordance only (no swipe-to-dismiss in F3; Escape, the close button and "Done" close it). Body scrolls; header and footer stay. |
+
+#### Shared editing components (`components/page-edit/`, reused by Organize in F5)
+
+| Component | Props | Behavior and look |
+|---|---|---|
+| `PageListModel` (not a component; `lib/page-list.ts`) | ordered `PageRef[]` (`{uid, sourceId, sourceIndex \| "blank", rotation, size}`), sources map (`letter`, `name`, `lastModified`, `size`) | Pure functions with unit tests: `segments()`, `move(uids, toIndex)`, `remove`, `duplicate`, `insert`, `sortBy(name \| date, dir)`, `reverseSegments()`, `snapshot()` / `restore()` (for undo). Both views render from it. Source letters: A–Z, then AA, AB… (50 files + picker files can exceed 26). |
+| `SegmentGrid` | `segments`, `onMove`, `onRemove`, `onRotate`, `onPreview` | Replaces F1 `FileGrid` for Merge (F1 `FileGrid` stays for Rotate). `role="list"`, `aria-label="Files in merge order"`, `aria-describedby` the hint "Use arrow keys to move between files. Alt with an arrow key moves the file." Same column rules as F1. Roving tabindex across the card buttons (F1 U-7 keys). Hosts pointer drag (M-7). |
+| `SegmentCard` | `segment` (`source`, `pageRange`, `pageCount`, `blankCount`, `rotation`, `status`), `position`, `total` | Extends F1 `FileCard` visuals. `role="listitem"`. Box: first page thumbnail (with the segment's rotation applied via transform, F1 rule: rotating never changes the box). **Main control** is a full-box button (like F1 `PageTile`), accessible name "alpha.pdf, 3 pages" (+ ", pages 2–3" for partial segments, + ", rotated 90°" when rotated); click / Enter opens `PagePreviewDialog` on the segment's pages. Top-start: `SourceBadge`. Top-end: Remove `IconButton` "Remove alpha.pdf" (F1). Floating action bar (bottom of the box, F1 `PageActionBar` style): Rotate left, Rotate right, Enlarge ("Rotate alpha.pdf left", …). Below the box: name (`sm` 500, ellipsis, `title`), meta (`xs fg-muted`, `tabular-nums`): "3 pages · 1.2 MB", "pages 2–3 of 3", "Image · 1 page", "3 pages (1 blank)". Position row (44 px): `IconButton` "Move alpha.pdf earlier" (chevron-left) · `xs fg-muted` "1 of 3" (`aria-hidden`; the list conveys position) · `IconButton` "Move alpha.pdf later"; disabled at the ends (AC-11). Rotation badge (F1 "+90°" pill) sits next to the letter badge. Loading and locked: F1 `FileCard` states, in the file's sorted position (§4). |
+| `SourceBadge` | `letter`, `selected?` | `xs` 600, `h-5 min-w-5 px-1`, `rounded-sm`, `surface-raised` 90% with `shadow-sm`, `fg` text (17.7:1); on a selected tile `primary-soft` / `on-primary-soft`. `aria-hidden` (the letter is in the accessible name). |
+| `EditablePageGrid` | `pages`, `selection`, `onSelectionChange`, `onMove`, `onAction`, `onInsert` | Replaces F1 `PageGrid` for Merge: **one** flat list in output order (no file sections). `role="list"`, `aria-label="Pages in merge order"`, `aria-describedby` hint "Arrow keys move between pages. Space selects. Alt with an arrow key moves the page. Shift+F10 opens page actions." Keeps F1 lazy thumbnails (one `IntersectionObserver`, ≤ 1 row overscan, AC-52 of F1) and roving tabindex. Hosts pointer drag and rubber-band-free selection (no lasso in F3). |
+| `EditablePageTile` | `page`, `label` ("A1" / "Blank"), `selected`, `active`, `rotation`, `inserted?` (highlight) | Extends F1 `PageTile` (same square box, page drawn contained, rotation by transform, placeholder pulse). Main control: full-box `button` with **`aria-pressed`** = selected (M-8 explains why not `aria-selected`), accessible name "A1, page 1 of alpha.pdf" / "Blank page", + ", rotated 90°" when rotated. Selected look: 2 px `primary` outline inset 2 px + check badge top-end (`primary` circle, `on-primary` check) + letter badge in `primary-soft`: three cues, one not color. Unselected on touch (`hover: none`) and on hover/focus: an empty 20 px ring at top-end (`border-strong` 1.5 px on `surface-raised` 90%) so multi-select is discoverable. Clicking the ring toggles (additive, like Ctrl+click); it is `aria-hidden` and not focusable because Space on the tile does the same. Rotation badge "+90°" top-start (F1). Action bar (bottom, floating): ≥ 640: Rotate left, Rotate right, Remove, More (⋯); < 640: Rotate right, Remove, More (rotate left moves into More). When the box is narrower than 136 px (slider at 80–128) the bar shows only More (container query). Blank page: white `paper` box at the neighbour's size with a 1 px dashed `border-strong` inset 8 px, a 24 px blank-page icon and "Blank page" in `on-paper-muted` `xs`. `inserted`: a `primary-soft` glow overlay fades out over 1.2 s (opacity only). |
+| `PageMoreMenu` | `page`, `selectionCount` | `Menu` from the tile's More button. Items: (Rotate left, < 640 only) · Duplicate · Move to position… · Move earlier · Move later · separator · Blank page after · Pages from a file after… · Files after… · separator · Enlarge. When the tile is selected and others are too, item labels say so ("Duplicate 3 pages", "Move 3 pages to position…") so the scope is never a surprise (§3c: actions on a selected tile apply to the selection). |
+| `InsertPoint` | `after: PageRef \| null`, `onChoose(kind)` | `MenuButton` rendered as the 24 px circle (M-3). Accessible name "Insert here, after A3" / "Insert here, at the start". Menu: "Files here…" · "Pages from a file here…" · "Blank page here" (§3c). While its menu is open the circle is `primary-soft` with a `primary` "+" and the slot bar shows. Not a Tab stop of its own: it is reachable in the active tile's Tab sequence (M-8), so a 1,000-page grid adds no Tab stops. |
+| `AddTile` | `kind: "files" \| "pages"` | Last grid cell, the size of a card/tile box, `rounded-lg`, 2 px dashed `border-strong`, `surface` fill, + icon 24 `primary`, `sm` 500 "Add files" / "Add". Files view: a button that opens the file picker directly. Pages view: a `MenuButton` with the same three items as `InsertPoint` ("at the end"). Hover: border `primary`, fill `primary-soft` (`fast`). Its label row (20 px) and position row keep it aligned with the cards. |
+| `SelectionBar` | `count`, `onRotate(dir)`, `onRemove`, `onClear` | Fixed, floating (M-3), `surface-raised`, `rounded-xl`, `shadow-lg`, height `--ip-selbar-h`, padding 6/8. Contents: count "{n} selected" (`sm` 600, `tabular-nums`, `min-w` for 4 digits so it never jitters) → `IconButton` "Rotate selected pages left" / "… right" → `Button ghost sm` with trash icon "Remove" (icon-only < 640, `aria-label="Remove selected pages"`; no confirm, undo notice instead) → `Button ghost sm` "Clear" (AC-21 "Clear selection"; `aria-label="Clear selection"`). `role="toolbar"`, `aria-label="Selected pages"`, arrow keys move inside (roving), and it is placed in the DOM right after the grid (before the dock) so Tab order matches reading order. Appears/disappears with opacity + 8 px translate (`base`); nothing else moves. |
+| `DragLayer` | – | Portal for the drag ghost and the slot bar during pointer drags (M-7). Lazy chunk. |
+| `PagePickerDialog` | `source` (the picked file, already through intake), `insertAfter`, `onConfirm(indexes)`, `onCancel` | `Dialog wide` (≥ 640) / `fullscreen` (< 640). Grid of 120 px tiles (2 columns < 640) with labels "D1"…; same selection model and keys as the page grid (click / Ctrl / Shift / Space / Shift+Space / Ctrl+A), no action bars, no drag. Header row: `Button ghost sm` "Select all", "Select none", and "{n} of {total} selected" (`sm`, `tabular-nums`, `aria-live="polite"` off: announced through the flow `LiveRegion` only on Select all / none to avoid chatter). Footer: `Button secondary` "Cancel", `Button primary` "Add {n} pages" ("Add 1 page"; "Add pages" and `disabled` when 0, with `aria-describedby` → "Select at least one page." line). Initial focus: the first tile. Thumbnails lazy inside the scroll container (its own `IntersectionObserver` root). |
+| `MoveToPositionDialog` | `subject` ("A3" or "3 pages"), `current`, `total`, `onMove(pos)` | `Dialog` default. Input `type="text" inputmode="numeric" autocomplete="off" enterkeyhint="done"`, label "New position (1–{total})", prefilled with the current position, all selected, focused. Enter or "Move" validates: not an integer in 1…total → error line "Enter a whole number from 1 to {total}." (reserved 20 px, `danger`, alert icon), `aria-invalid="true"`, `aria-describedby` → error, input keeps focus with its text selected; nothing moves (AC-24). Valid → closes, focus returns to the moved tile, live announcement. |
+| `RemoveSelectedDialog` | `clicked`, `count`, `onOnlyThis`, `onAll` | `Dialog` default. Title "Remove pages?", body "{A3} is one of {3} selected pages." Footer: `ghost` "Cancel", `secondary` "Only this page", `danger` "Remove all {3} selected" (AC-26 wording "All selected" stays recognizable). Initial focus: "Only this page" (least destructive of the two actions; undo exists for both). |
+
+#### Merge pieces (`tools/merge/`)
+
+| Component | Content |
+|---|---|
+| `MergeTool` | Owns the page list, selection, undo snapshot, options state (`localStorage["instapdf:merge-options"]`), and passes `renderWorkspace` / toolbar items to `ToolFlow`. |
+| `SortMenu` | `MenuButton` (icon `sort`, label "Sort", icon-only < 768) with items: "Name A to Z", "Name Z to A", "Oldest first", "Newest first", separator, "Reverse order". These are actions, not a persistent state, so they are `menuitem`s (no checkmarks). After choosing: the list animates to its new order (FLIP, `base`), focus returns to the Sort button, polite announcement "Sorted by name, A to Z" / "Order reversed". With one segment the menu still opens, but the items are disabled with the menu's first line "Add more files to sort" (`xs fg-muted`, not focusable). |
+| `AddPagesMenu` (≥ 640) / `AddMenu` (< 640) | See M-3. "From a file…" opens a single-file picker (`multiple` off, same `accept`); "Blank page" follows §3c (after the last selected page, else at the end) and switches to the pages view if needed, then focuses the new blank tile. |
+| `MergeOptions` | The options panel (M-5). Same component inside the dock column and inside the sheet. |
+| `MergeOptionsButton` | < 1024 dock row: `Button secondary md` with gear icon, "Options", and the `primary-soft` chip "{n} changed" (hidden when 0; the chip slot has a fixed `min-w` so the button never changes width). `aria-haspopup="dialog"`, `aria-expanded`. Accessible name "Options, 2 changed". |
+| `MergeOptionsSheet` | `Dialog variant="sheet"`, title "Merge options", close `IconButton`. Body: `MergeOptions`. Footer (sticky): `Button ghost` "Reset options" · `Button secondary` "Done" · `Button primary` "Merge PDFs". The primary in the sheet runs directly (close sheet → run), which saves a tap after changing options. Initial focus: the first control. |
+
+### M-5. Options panel (all options from §3f)
+
+Order follows how often people need them and keeps related controls together. Defaults per AC-40. Every option is saved on change.
+
+| Group (heading `sm` 600 `fg-muted`) | Control | Labels (our copy) | Description line (`xs fg-muted`, always visible) |
+|---|---|---|---|
+| Contents page | `SegmentedControl` full width | "None" · "File names" · "Document titles" (short at < 360 px container: "None" · "Names" · "Titles") | None: "No contents page." Names: "Adds a clickable list of files at the front." Titles: "Like file names, but uses each PDF's title when it has one." |
+| | `Switch` "First file is a cover" | | "Puts the contents page after the first file and leaves the cover out of the list." When Contents = None the switch stays enabled and the line reads "Only used with a contents page." (§3f) |
+| Bookmarks | `Select` | "Keep all" · "Remove all" · "One per file" · "One per file, keep existing inside" | Changes with the value: "Keeps each file's bookmarks as they are." / "The merged file has no bookmarks." / "Adds one bookmark per file, named after it." / "One bookmark per file, with that file's bookmarks inside it." |
+| Page layout | `Switch` "Add file name to the footer" | | "Writes the file's name small at the bottom of each of its pages." |
+| | `Switch` "Make all pages the same width" | | "Scales pages to the width of the first page. Nothing is cropped." |
+| | `Switch` "Pad for double-sided printing" | | "Adds a blank page after each file with an odd page count, so every file starts on a front side." |
+| Form fields | `Select` | "Merge, rename duplicates" · "Merge" · "Flatten" · "Remove" | "Keeps every field. Repeated names get a number." / "Fields with the same name share one value." / "Turns fields into plain page content." / "Removes all form fields." |
+| – | `Button ghost sm` "Reset options" | | Disabled when all are at defaults. Announces "Options reset". |
+
+- Dock column (≥ 1024): groups separated by 20 px, no dividers. At 1280×800 the whole panel is 600 px tall and fits the 640 px dock with the footer, so the dock does not scroll at common laptop heights; below that it scrolls inside (F1).
+- Sheet (< 1024): the same panel, 16 px side padding, groups separated by a 1 px `border` divider for scanning. At 375×667 it is one short scroll.
+- **Compact vs full on mobile:** the dock bar never shows individual options below 1024 (they don't fit a 44 px row without truncating labels). It shows the "Options" button with the changed count, which is the compact summary; the sheet is the full panel. Changes in the sheet apply immediately (no Apply/Cancel pair); "Done" just closes.
+- While processing the whole panel is in the F1 `fieldset disabled`; the Options button stays enabled so the user can still read the settings (the sheet opens with disabled controls).
+
+### M-6. States
+
+All F1 U-6 states apply. Additions and changes:
+
+| State | Workspace | Dock | Focus / announcement |
+|---|---|---|---|
+| **Empty** | F1 drop card. Button "Choose files"; hint "PDFs and images · or drop them here · paste with Ctrl+V"; limits "PDF, JPG, PNG, GIF, BMP, WebP, TIFF · up to 50 files, 100 MB each, 500 MB and 1,000 pages in total" (TIFF only if §8a decision 9 is met). | Options button / panel disabled; status "Add files to start"; primary disabled. | F1. |
+| **Loading** | Files view (default). Cards appear immediately in **sorted** position for the first batch (natural name order, §2), each in F1 loading state (spinner, "Reading…"), so the order the user will get is visible from the first frame and nothing re-sorts when files finish. Images show "Reading…" then their decoded thumbnail. | Primary disabled, status "Reading files…". | "Reading 3 files". |
+| **Password** | Locked card in its sorted position, F1 locked look. F1 `PasswordDialog`. | F1. | F1. |
+| **Ready, one file** | One card, toolbar with view toggle (AC-18), end tile "Add files" reads "Add more files" at this count. | Primary enabled; status "3 pages · 1 file · add more to merge". | "alpha.pdf ready, 3 pages". |
+| **Ready, files view** | Cards with position rows, end tile. | Status "{pages} pages · {files} files" (`files` = distinct sources). | – |
+| **Ready, pages view** | Flat tile grid, insert points, end tile. | Same. | On switching: focus stays on the toggle; the grid scrolls so the first page of the previously focused card is in view. |
+| **Selection** (pages view) | Selected tiles show outline, check and tinted badge; `SelectionBar` floats. | Unchanged. | "2 selected" (debounced 300 ms while Shift-extending). |
+| **Menu open** (sort, add, more, insert) | Native popover, page stays interactive behind it (light dismiss). | – | Focus on the first item. |
+| **Pointer drag** | Ghost under the pointer, source slot at 40% opacity with a dashed outline, slot bar at the target gap, auto-scroll near the top (below the sticky toolbar) and bottom (above the dock) edges. | Unchanged. | Start: "Moving A3. Press Escape to cancel." Drop: "A3 moved to position 1 of 5." (AC-76) Cancel: "Move cancelled." |
+| **Keyboard move** | No ghost; the moved item animates to its new slot (FLIP) and keeps focus. | – | "bravo.pdf moved to position 1 of 3." / "3 pages moved to positions 4 to 6 of 9." At an end: "alpha.pdf is already first." (no move). |
+| **OS files dragged over a ready grid** | Over the grid: no full overlay; the slot bar shows at the nearest gap and a small label "Drop to add here" follows above it (insert at that point, §2). Elsewhere on the page: F1 `DropOverlay` "Drop to add at the end". | – | None (pointer only; keyboard uses Add). |
+| **Picker open** | `PagePickerDialog`. While the picked file is parsing, the dialog is already open with the title, placeholder tiles (count known after parse) and a spinner in the count slot; a locked file shows the F1 `PasswordDialog` first, then the picker. Wrong type / corrupt: no dialog, F1 error notice. | – | Focus: first tile when ready. |
+| **Move dialog** / **Remove-selected confirm** | M-4. | – | M-4. |
+| **Undo available** (AC-79) | `NoticeStack` info notice: "Removed bravo.pdf." / "Removed 3 pages." with action **Undo** and Dismiss. `role="status"`. Stays **10 s**, paused while the pointer is over it or focus is inside it (WCAG 2.2.1), then fades. A newer remove replaces it; any other edit (move, rotate, insert, sort, option changes don't count) dismisses it (single level). | Unchanged. | Focus moves to the next item (the one that took the removed item's place, or the previous one at the end; to the end tile if nothing is left before it). Announcement: "bravo.pdf removed. Undo is available, press Ctrl+Z." **Ctrl/Cmd+Z** triggers Undo while the notice is shown (ignored in text fields). Undo restores the list, focuses the first restored item and announces "bravo.pdf restored at position 2". |
+| **Duplicate file added** (AC-80) | Info notice: title "alpha.pdf was added twice", body "If that was a mistake, remove the copy." Action **"Remove the copy"** (removes the newly added one, with the normal undo notice) and Dismiss. Not auto-dismissed. Several duplicates in one batch become one notice listing them (F1 rule). The copy's card shows normally (no special styling). | – | `role="status"`, no focus move. |
+| **Removed last item** | Back to the F1 empty state (drop card), undo notice still offered: Undo returns to the ready state with everything back. | – | Focus to "Choose files". |
+| **Processing** | F1: workspace inert, 60% opacity; menus close; any drag is cancelled; selection bar hidden; open sheet stays open but disabled. | `ProcessingBar` "Merging… 42%" (pages written / total). When the Unicode font is needed (footer or contents on), the first phase reads "Preparing fonts…" with an indeterminate bar, then switches to the determinate one in the same box. | "Merging". |
+| **Done** | F1 `ResultCard`: preview of output page 1 (the TOC page when contents is on), "alpha-merged.pdf", "1.4 MB · 6 pages", Download (focused), Share, privacy note, not-encrypted note when any input was locked, Continue with (Rotate, Merge), Start over, Back to options (keeps page edits, selection cleared, options and view). | – | F1. |
+| **Processing error** | F1 `ProcessError`; page list and options kept. If the font failed to load: "Couldn't load the font for file names. Check your connection and try again." | – | F1. |
+| **Limit / intake errors** | F1 notices with Merge caps and image messages: "{name} couldn't be read as an image." / "{name} is larger than 50 megapixels, the limit for images." / "This tool takes up to 50 files at a time. We loaded the first 50." | – | F1. |
+
+### M-7. Drag and drop (pointer and touch)
+
+**No drag library.** A small in-house module `components/page-edit/drag.ts` (Pointer Events, about 3–4 KB min+gzip) covers both grids. dnd-kit (MIT) and SortableJS (MIT) would work license-wise but each adds 12–20 KB gzip and their own focus/announcement models that duplicate ours. The module is a lazy chunk (M-10).
+
+- **Mouse / pen:** `pointerdown` on a card or tile box (not on its buttons) → lift after 4 px of movement. Click without movement keeps its normal meaning (select in the pages view, preview in the files view).
+- **Touch:** press and hold **350 ms** without moving more than 8 px → lift (a short `navigator.vibrate(10)` where supported). Moving earlier than that is a normal scroll. Cards and tiles use `touch-action: pan-y` at rest; once lifted, `touchmove` is cancelled (listener registered with `{ passive: false }`) so the page doesn't scroll under the finger, and auto-scroll takes over near the edges. Tap = the normal click meaning. The **always-visible alternatives** are Move earlier / Move later on every card, and Move earlier / Move later / Move to position in each tile's More menu; QA's AC-75 mobile checks use these.
+- **While lifted:** a ghost (a snapshot of the box, `scale(var(--ip-lift-scale))`, `shadow-lg`, `cursor: grabbing`, `position: fixed`, `z-index: var(--ip-z-drag)`) follows the pointer with `transform` only. Multi-page drags show a stack of 2 offset layers and a count badge "3" (`primary`/`on-primary`). The source slot(s) stay in place at 40% opacity with a dashed `border-strong` outline: the grid does **not** reflow during the drag (no shift, no jitter). The target slot shows the 3 px `primary` slot bar in the gap nearest the pointer (left/right half of the hovered box decides before/after; rows are respected).
+- **Drop:** the list updates once; items animate from old to new positions with FLIP transforms (`base`, `ease-out`; 0 ms under reduced motion). Focus goes to the moved item's main control (to the first one for a multi-move).
+- **Cancel:** Escape, `pointercancel`, window blur or dropping outside the grid → the ghost animates back (`fast`) and nothing changes (AC-76).
+- **Files view:** dropping a segment next to another segment of the same source joins them into one card (segments are maximal runs, §3e); the announcement says so: "alpha.pdf moved to position 1 of 2. Joined with its other pages."
+- **Auto-scroll:** within 64 px of the top of the visible grid area (below the sticky toolbar) or of the bottom (above the dock), scroll by up to 16 px per frame, scaled by distance.
+
+### M-8. Keyboard flow, focus order and ARIA
+
+**Focus order, ready, files view (all widths).** Skip link → header → toolbar: View (radiogroup, 1 stop) → Sort → Add files → Add pages (≥ 640) or Add (< 640) → file grid (1 stop, roving) → active card's controls: Remove, Rotate left, Rotate right, Enlarge, Move earlier, Move later → end tile "Add files" → dock: options (≥ 1024, in panel order) or Options button (< 1024) → Reset options → primary → notices (action, Dismiss).
+
+**Focus order, ready, pages view.** … → View → Sort → Thumbnail size (−, slider, +; ≥ 640) → Add files → Add pages → page grid (1 stop) → active tile's controls: action bar buttons (Rotate left, Rotate right, Remove, More), then its **insert point after it** ("Insert here, after A3"); for the first tile the "Insert here, at the start" point comes **before** the tile in the Tab sequence → end tile "Add" → selection bar (when shown; `role="toolbar"`, 1 stop, arrows inside) → dock → notices.
+
+Only the active tile's buttons and insert point have `tabindex=0` (F1 rule), so the grid costs at most 6 Tab stops whatever its size.
+
+**Grid keys (both views; roving tabindex, F1 U-7 navigation unchanged).**
+
+| Keys (focus on a card or tile main control) | Files view | Pages view |
+|---|---|---|
+| Arrows, Home/End, Page Up/Down | Move focus (F1) | Move focus (F1) |
+| Shift + Arrow / Home / End | – | Move focus and extend the selection from the anchor |
+| Space | Open preview | Toggle selection of the focused tile (AC-22); sets the anchor |
+| Shift+Space | – | Select the range anchor → focused tile |
+| Enter | Open preview | Toggle selection (it is a toggle button) |
+| Ctrl/Cmd+A | – | Select all pages |
+| Escape | – | Clear selection (AC-21); if nothing is selected, no effect |
+| **Alt+ArrowLeft / Alt+ArrowUp** | Move the card one position earlier | Move the tile (or the selection, if the tile is selected) one position earlier |
+| **Alt+ArrowRight / Alt+ArrowDown** | One position later (AC-10) | One position later |
+| **Alt+Home / Alt+End** | Move to first / last | Move to first / last (AC-20) |
+| Delete / Backspace | Remove the card (undo notice) | Remove the page; confirm dialog if others are selected (§3c) |
+| `[` / `]` | Rotate the card left / right | Rotate the page (or selection) left / right |
+| Shift+F10 or the Menu key | – | Open the tile's More menu |
+| Ctrl/Cmd+Z | Undo the last remove while the undo notice is shown | Same |
+
+Alt+arrow moves are one position per press, by **list position**, not by visual row, so Up/Down mean "earlier/later" and match the screen-reader's list order. All Alt shortcuts call `preventDefault()` (Alt+ArrowLeft is "Back" in Chromium and Firefox on Windows/Linux; see M-11 #2). The grid hints (`aria-describedby`) name these keys, and the shortcuts are listed in a "Keyboard shortcuts" disclosure below the grid (`Button ghost sm`, collapsed by default, `Kbd` chips), so sighted keyboard users can find them.
+
+**Single-character shortcuts** (`[`, `]`) only fire when a card or tile main control has focus, which satisfies WCAG 2.1.4.
+
+**Dialogs and menus.** Picker: first tile → Select all → Select none → Cancel → Add (Tab wraps, native modal). Move: input → Cancel → Move. Confirm: Only this page (initial) → Remove all → Cancel. Sheet: first control … → Reset → Done → Merge PDFs. Every dialog returns focus to its opener; if the opener is gone (e.g. the tile was removed), to the item now at that position, else the grid's first item, else the `ToolIntro` heading (F1 fallback). Menus: focus returns to the trigger on Escape and after choosing an item, except where the item moves focus on purpose (Blank page → the new tile; picker/move dialogs → the dialog).
+
+**ARIA summary (additions to F1 U-7).**
+
+| Element | Role / attributes |
+|---|---|
+| File grid / page grid | `role="list"` with `aria-label` "Files in merge order" / "Pages in merge order", `aria-describedby` the key hint |
+| Card main control | `button`, name "alpha.pdf, 3 pages[, pages 2–3][, rotated 90°]", `aria-describedby` hint |
+| Tile main control | `button` with **`aria-pressed`** for selection, name "A1, page 1 of alpha.pdf[, rotated 90°]" / "Blank page". We use `aria-pressed` instead of `aria-selected` because `aria-selected` is only valid on `option`/`gridcell`/`row`/`tab`, and an `option` may not contain the per-page buttons (axe `nested-interactive`, AC-74). This is the "equivalent" AC-21 allows; QA asserts `aria-pressed="true"`. |
+| Insert point | `button` `aria-haspopup="menu"`, name "Insert here, after A3" |
+| Sort / Add / More | menu button pattern (M-4 `Menu`) |
+| Selection bar | `role="toolbar"`, `aria-label="Selected pages"`; count text is not live (the flow `LiveRegion` announces changes, debounced) |
+| Move earlier / later | `IconButton`s with names including the file ("Move alpha.pdf later"), native `disabled` at the ends |
+| Options | `Switch` (`role="switch"`), `Select` (native), `SegmentedControl` (radiogroup); each with `aria-describedby` → its description line |
+| Options button (< 1024) | `aria-haspopup="dialog"`, `aria-expanded`, name "Options, 2 changed" |
+| Move dialog input | `aria-invalid`, `aria-describedby` → error line (`role="alert"` on the error) |
+| Undo / duplicate notices | F1 `Notice tone="info"` → `role="status"`; action buttons "Undo" / "Remove the copy"; Dismiss "Dismiss: Removed bravo.pdf" |
+| Drag ghost, slot bars, insert hover zones, selection ring | `aria-hidden="true"` |
+| Live messages | One polite `LiveRegion` (F1). Messages: reading/ready (F1), "Sorted by name, A to Z", "Order reversed", "{x} moved to position {n} of {total}", "Moving {x}. Press Escape to cancel.", "Move cancelled.", "{n} selected", "Selection cleared", "{x} removed. Undo is available, press Ctrl+Z.", "{x} restored at position {n}", "Blank page added after A3", "2 pages added after A3", "Rotated {x} right", "Options reset", "Merging", "Your PDF is ready". Repeated identical messages get the F1 trailing-space trick so they are re-read. |
+
+**Contrast.** All text uses the F1 U-2 / F2 H-2 pairs plus M-2. Selection outline, slot bar and insert point outline are ≥ 3:1 non-text against their backgrounds (M-2). The blank-page label uses `on-paper-muted` (6.87:1 on white in both themes). Disabled Move buttons use `fg-disabled` (exempt) and native `disabled`.
+
+**Target size and reflow.** Every card and tile action is 44×44 below 1024 (M-3 math). At ≥ 1024 with a fine pointer, `sm` buttons are 32 visual with 44 hit areas (F1). At 320 CSS px (400% zoom) the grid becomes 2 columns of about 132 px: tile action bars drop to "More" only (container query, M-4), card position rows keep their two 44 px buttons and hide the "1 of 3" text, and the toolbar wraps Add into an icon button. No horizontal scroll.
+
+### M-9. Micro-interactions
+
+All on `opacity`/`transform`, token durations, 0 ms under reduced motion (F1 U-8).
+
+| Moment | Interaction |
+|---|---|
+| First batch arrives | Cards appear in their sorted slots with no motion (F1: placeholders define layout); thumbnails fade in (`fast`). |
+| Sort / Reverse | Items glide to their new positions (FLIP, `base`, `ease-out`). One animation per action; rapid repeats retarget. |
+| Keyboard move | The moved item glides one slot (`fast`); neighbours glide too. Focus ring stays on the item throughout. |
+| Drag lift | Ghost scales to 1.03 and gains `shadow-lg` (`instant`); source dims to 40% (`fast`). Slot bar fades in at each new gap (`instant`). |
+| Drop / cancel | FLIP to the new slots (`base`) / ghost returns (`fast`). |
+| Select / deselect | Outline and check badge fade/scale in (`fast`, check scales from 0.6). Selection bar slides up 8 px and fades in (`base`) on the first selection; count text swaps without motion. |
+| Insert point hover | Circle fades in (`fast`) and scales 0.8 → 1; slot bar fades in. |
+| Insert blank page / picked pages | New tiles appear in place; the rest glide (FLIP, `base`). New tiles get the `primary-soft` glow that fades out over 1.2 s (opacity). Focus on the first new tile. |
+| View switch | Crossfade between the two grids (`fast`). No slide (it would suggest a different list). |
+| Remove | Item fades and scales to 0.96 (`fast`), then the rest glide (FLIP, `base`). Undo: restored items fade in in place with the glow. |
+| Rotate (card or tile) | F1 rotation animation (`base`) with the "+90°" badge. |
+| Options sheet | Slides up from the bottom (`base`, `ease-out`), scrim fades (`fast`). "2 changed" chip fades in. |
+| Option toggled | F2 `Switch` thumb transform (`fast`). Description line text swaps with no motion (height reserved). |
+| Move dialog invalid | F1 shake (240 ms, ±4 px) on the input, error fades in. |
+| Processing / done | F1. |
+
+### M-10. Performance: `/merge-pdf` first-load JS under 150 KB gzip
+
+| Piece | When it loads | Notes |
+|---|---|---|
+| Next/React runtime | first load | About 100–105 KB (shared with every route). |
+| Shared flow + primitives (`ToolFlow`, dock, notices, `Dialog`, `Menu`, `Select`, `Switch`, icons) | first load | Shared with `/rotate-pdf`; `Menu` and `Select` add about 2 KB. |
+| `MergeTool`, `MergeOptions`, `SegmentGrid`/`SegmentCard`, `EditablePageGrid`/`EditablePageTile`, `SelectionBar`, `lib/page-list.ts` | first load | About 10–14 KB. If the route measures above 140 KB, move `EditablePageGrid`, `SelectionBar` and `PageMoreMenu` behind `next/dynamic`, prefetched on hover/focus of the "Pages" toggle and loaded on idle after the first ready state. |
+| **pdf.js** (`pdfjs-dist`, Apache-2.0) | `import()` on first intake, prefetched on hover/focus of "Choose files" / drag-enter (F1) | Thumbnails and page sizes. Never on first load. |
+| **pdf-lib** (MIT) + the merge engine (`lib/pdf/merge.ts`: page copy, outlines, TOC, footer, padding, same-width, forms, image embedding) | Inside the processing Web Worker, loaded when the user runs | Never in the main bundle (F1 worker pattern). |
+| **Drag module** `components/page-edit/drag.ts` (in-house, no dependency) | `import()` on idle (`requestIdleCallback`, fallback 1 s timeout) after the first ready state, and immediately on the first `pointerdown` on a card/tile if not loaded yet (the lift waits for it; 4 KB is imperceptible) | No third-party drag library. |
+| `PagePickerDialog`, `MoveToPositionDialog`, `RemoveSelectedDialog`, `MergeOptionsSheet` | `next/dynamic`, loaded on first open (prefetched on hover/focus of their triggers) | Each 1–3 KB. |
+| **Unicode font** (SIL OFL 1.1, e.g. a Noto Sans subset, §8a decision 8) | Fetched **by the worker only when a run starts with the footer or contents option on** (or, if the engineer keeps the standard font for Latin-1, only when a name needs other glyphs). Never on page load, never on toggling the option. | Served as a static file from our origin, cached immutable. ProcessingBar shows "Preparing fonts…" during the fetch (M-6). License text added to the third-party notices. |
+| TIFF decoder (e.g. UTIF.js, MIT, if §8a decision 9 passes) | `import()` on the first TIFF in an intake | Never on first load. |
+| GIF/BMP/WebP/PNG/JPEG thumbnails | Browser-native `createImageBitmap` (no pdf.js) | Downscaled to the thumbnail bucket. |
+
+No-shift checklist additions: card height fixed (position row reserved); insert points, slot bars, ghost, selection bar, menus, sheet and notices float; option descriptions reserve two lines; Options chip has a fixed slot; Move dialog error line reserved; first batch placed in sorted slots before parsing finishes (no re-sort jump).
+
+### M-11. Decisions and open questions for the engineer
+
+1. **ToolFlow extension points.** F1's `ToolFlow` renders `FileGrid`/`PageGrid` from its file list and does not implement `optionsDensity: "full"` (no sheet yet), notice actions with timeouts, or the Ctrl+Z hook. Proposal: add `renderWorkspace?(ctx)` (replaces the grids), `toolbarItems?` (slots between the view toggle and Add files), `onIntake?(files, insertAt)` (so Merge places new files by name or at an insert point), the sheet in `ControlDock` for `full` density, and `FlowNotice.action` + `timeoutMs`. Rotate keeps the defaults, so F1 tests stay green. The engineer owns the exact API.
+2. **Alt+ArrowLeft and browser Back.** On Windows/Linux Chromium and Firefox, Alt+Left is history Back. `preventDefault()` on `keydown` at the focused control should stop it; QA must verify on all three Playwright engines. If any engine still navigates, keep the shortcut (AC-10 needs it) and also guard with a `popstate` sentinel while the task is in progress (the F2 leave guard covers link clicks only).
+3. **`aria-pressed` for selection** (M-8): please make the AC-21/AC-22 tests assert `aria-pressed="true"`; that is the "equivalent" AC-21 allows and keeps axe clean.
+4. **Undo scope.** I kept undo to removals (AC-79). Sort and Reverse can wipe a careful manual order in one click; the same snapshot would make them undoable for almost no cost. Recommend extending the undo notice to sort/reverse ("Sorted by name. Undo") in this feature if the engineer agrees; otherwise note it for F5.
+5. **iOS long-press.** Safari shows its own callout/selection on long-press: set `-webkit-touch-callout: none` and `user-select: none` on cards/tiles, and `draggable="false"` on thumbnail images/canvases. If the 350 ms hold still conflicts with scrolling on a real device, the buttons remain the supported path; tell me and I'll adjust the timing.
+6. **Image thumbnails** need a path in the F1 thumbnail renderer that is not pdf.js (`createImageBitmap` with `resizeWidth`), and a page size for image pages (the A4 output page from §6, so the tile shows the output shape, not the raw image).
+7. **Source letters beyond Z** use AA, AB… (M-4). Confirm the label format doesn't break tests that expect single letters (none of the ACs go past E).
+8. **Tokens** in M-2 are mine to own; the engineer can add them to `tokens.css` in the feature PR, or I can add them in a follow-up `docs`/`style` commit before the build starts. Say which.
+9. **Bundle check:** report the `next build` first-load size for `/merge-pdf` in the PR; the fallback split in M-10 applies above 140 KB.
+
+### M-12. Copy (our own wording; keep strings in `tools/merge/copy.ts`)
+
+| Key | Text |
+|---|---|
+| intro.title / summary | "Merge PDF" / "Join PDFs and images into a single document" (registry) |
+| picker.button / hint | "Choose files" / "PDFs and images · or drop them here · paste with Ctrl+V" |
+| action / progress | "Merge PDFs" / "Merging… {n}%"; font phase "Preparing fonts…" |
+| status | "Add files to start" · "Reading files…" · "{p} pages · {f} files" · "{p} pages · 1 file · add more to merge" |
+| toolbar | "Files" · "Pages" · "Sort" · "Add files" · "Add pages" · "Add" |
+| sort items | "Name A to Z" · "Name Z to A" · "Oldest first" · "Newest first" · "Reverse order" · "Add more files to sort" |
+| add items | "Files…" · "Pages from a file…" · "Blank page" (insert-point: "Files here…" · "Pages from a file here…" · "Blank page here") |
+| card | "Move {name} earlier" · "Move {name} later" · "{i} of {n}" · "pages {a}–{b} of {n}" · "Image · 1 page" · "{n} pages ({b} blank)" |
+| tile | "Blank page" · More menu: "Duplicate" · "Move to position…" · "Move earlier" · "Move later" · "Blank page after" · "Pages from a file after…" · "Files after…" · "Enlarge" |
+| selection | "{n} selected" · "Remove" · "Clear" |
+| picker dialog | "Add pages from {name}" · "Pick the pages to add. They go after {A3}." / "…They go at the end." · "Select all" · "Select none" · "{n} of {t} selected" · "Add {n} pages" / "Add 1 page" / "Add pages" · "Select at least one page." |
+| move dialog | "Move {A3}" / "Move {n} pages" · "Now at position {i} of {t}." · "New position (1–{t})" · "Enter a whole number from 1 to {t}." · "Move" |
+| confirm | "Remove pages?" · "{A3} is one of {n} selected pages." · "Only this page" · "Remove all {n} selected" |
+| undo | "Removed {name}." / "Removed {n} pages." · "Undo" |
+| duplicate | "{name} was added twice" · "If that was a mistake, remove the copy." · "Remove the copy" |
+| options | M-5 labels and descriptions · "Options" · "{n} changed" · "Merge options" · "Reset options" · "Done" |
+| errors | "{name} couldn't be read as an image." · "{name} is larger than 50 megapixels, the limit for images." · "This tool takes up to 50 files at a time. We loaded the first 50." · "Couldn't load the font for file names. Check your connection and try again." |
