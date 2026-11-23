@@ -1,6 +1,6 @@
 # F16: PDF editor (beat the reference editor)
 
-Status: steps 1 (Analyze) and 2 (Research) done; step 3 (Design) outline included, to be detailed by `ux-designer` before Build. **Proposed scope change:** the backlog previously limited F16 to "add text, images, whiteout, annotate (no editing of existing text)". This spec brings existing-text editing back in, phased, because research shows it is feasible fully in the browser with permissive libraries and it is the reference product's main draw. Owner approval of the scope change is needed before Build.
+Status: steps 1 (Analyze) and 2 (Research) done; step 3 (Design) outline included, to be detailed by `ux-designer` before Build. **Scope approved by the owner on 2026-11-23:** F16 includes existing-text editing (phases E2/E3), uses PDFium WASM as the edit engine, and is the top-priority feature.
 
 Reference observed: `pdf-editor` on the live reference site, 2026-11-23, with synthetic fixtures only (Playwright, network recorded). Two "Apply changes" tasks were run (within the 3/hour rule in CLAUDE.md).
 Companion research (competitors, libraries, licences): `docs/specs/f16-pdf-editor-research.md`.
@@ -275,8 +275,8 @@ Parity with the reference is reached at the end of E3; E1 alone already beats it
 
 Prerequisites: Q2 real-world corpus should include the editor fixtures above plus a sample of real PDFs (Word, Google Docs, LaTeX, InDesign, scanned) for the "zero crashes" gate.
 
-## 13. Decisions for the owner
+## 13. Owner decisions (2026-11-23)
 
-1. Approve bringing existing-text editing back into F16 (E2/E3), against the earlier backlog note that excluded it.
-2. Approve PDFium-WASM as the edit engine (adds ~4.6 MB lazy-loaded WASM; BSD-style licence), subject to confirming source availability of the chosen build.
-3. Where F16 sits in the backlog: recommended right after F4/F5 (page-list model is reused) and before server tools, because it is browser-only and the highest-value tool.
+1. **Approved:** existing-text editing is in F16 (E2/E3), replacing the earlier backlog note that excluded it.
+2. **Approved:** PDFium WASM is the edit engine (~4.6 MB, lazy-loaded, BSD-style licence). Before Build, confirm that the source of the chosen PDFium build is public; otherwise build PDFium ourselves.
+3. **Approved:** the editor is top priority. Phase E1 is the next feature to enter Build once its UI design step is done; the lead orchestrator schedules it.
