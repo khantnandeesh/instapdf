@@ -4,7 +4,7 @@
  * pages lead to their fields, which become the new AcroForm. Flattening
  * happens on each source before copying (see merge.ts).
  */
-import { PDFArray, PDFBool, PDFDict, PDFHexString, PDFName, PDFRef, PDFString, type PDFContext, type PDFDocument, type PDFObject, type PDFPage } from "@cantoo/pdf-lib";
+import { PDFArray, PDFBool, PDFDict, PDFHexString, PDFName, PDFRef, PDFStream, PDFString, type PDFContext, type PDFDocument, type PDFObject, type PDFPage } from "@cantoo/pdf-lib";
 
 export type FormMode = "remove" | "merge" | "rename" | "flatten";
 
@@ -324,6 +324,8 @@ export function buildAcroForm(doc: PDFDocument, pages: PDFPage[], mode: "merge" 
   doc.catalog.set(N("AcroForm"), ctx.register(form));
 }
 
+/** pdf-lib's private PDFForm methods used here (canary test in merge.test.ts). */
+export const FORM_INTERNALS = ["findWidgetPage", "findWidgetAppearanceRef", "flattenWidgetOntoPage"] as const;
 type FormInternals = {
   findWidgetPage: (w: unknown) => PDFPage | undefined;
   findWidgetAppearanceRef: (field: unknown, w: unknown) => PDFRef;
@@ -346,18 +348,25 @@ export function flattenFields(doc: PDFDocument): string[] {
   const internals = form as unknown as FormInternals;
   const kept: string[] = [];
   for (const field of form.getFields()) {
+    // Check every widget before drawing any, so a field is never half drawn and still fillable.
+    let plan: { w: unknown; page: PDFPage; ref: PDFRef }[];
     try {
-      const plan = field.acroField.getWidgets().map((w) => {
+      plan = field.acroField.getWidgets().map((w) => {
         const page = internals.findWidgetPage(w);
         const ref = internals.findWidgetAppearanceRef(field, w);
-        if (!page || !ref) throw new Error("No appearance");
+        if (!page || !(ref instanceof PDFRef) || !(doc.context.lookup(ref) instanceof PDFStream)) throw new Error("No appearance");
         return { w, page, ref };
       });
-      for (const { w, page, ref } of plan) internals.flattenWidgetOntoPage(page, w, ref);
-      form.removeField(field);
     } catch {
       kept.push(field.getName());
+      continue;
     }
+    try {
+      for (const { w, page, ref } of plan) internals.flattenWidgetOntoPage(page, w, ref);
+    } catch {
+      // Something was drawn already: the drawn appearance wins, the field goes.
+    }
+    form.removeField(field);
   }
   return kept;
 }

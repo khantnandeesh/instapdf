@@ -51,29 +51,52 @@ const needsShaping = (cp: number) => (cp >= 0x0600 && cp <= 0x08ff) || (cp >= 0x
 /** Hebrew (and its presentation forms): drawn right to left. */
 const isRtl = (cp: number) => (cp >= 0x0590 && cp <= 0x05ff) || (cp >= 0xfb1d && cp <= 0xfb4f);
 
+const isDigit = (cp: number) => cp >= 0x30 && cp <= 0x39;
+/** Neutral characters that join a right-to-left run when they sit inside it (spaces and common name punctuation). */
+const isNeutral = (cp: number) => cp === 0x20 || cp === 0x2d || cp === 0x5f || cp === 0x2e || cp === 0x2c || cp === 0x28 || cp === 0x29 || cp === 0x5b || cp === 0x5d;
+const MIRROR: Record<string, string> = { "(": ")", ")": "(", "[": "]", "]": "[" };
+
 /**
- * Visual order for a left-to-right line: each run of right-to-left
- * characters (with the spaces between them) is reversed.
+ * Visual order for a left-to-right line (file names), a simplified bidi:
+ * - a right-to-left run starts at a Hebrew letter and takes in the spaces,
+ *   "-", "_", ".", ",", brackets and digits that follow, as long as another
+ *   Hebrew letter or a number comes after them (neutrals at the end of the
+ *   run, before Latin text or the end, stay left to right: ".pdf");
+ * - the run is reversed, but each group of digits keeps its own order;
+ * - brackets inside the run are mirrored.
+ * Mixed nesting and Arabic-style shaping are not supported (spec F3 §5).
  */
 export function visualOrder(text: string): string {
   const chars = Array.from(text);
+  const cps = chars.map((c) => c.codePointAt(0)!);
   const out: string[] = [];
   for (let i = 0; i < chars.length; ) {
-    const cp = chars[i].codePointAt(0)!;
-    if (!isRtl(cp)) {
+    if (!isRtl(cps[i])) {
       out.push(chars[i++]);
       continue;
     }
+    // Extend over Hebrew, digits and neutrals; the run ends at its last Hebrew letter or digit.
     let j = i;
-    let lastRtl = i;
-    while (j < chars.length) {
-      const c = chars[j].codePointAt(0)!;
-      if (isRtl(c)) lastRtl = j;
-      else if (c !== 0x20) break;
+    let last = i;
+    while (j < chars.length && (isRtl(cps[j]) || isDigit(cps[j]) || isNeutral(cps[j]))) {
+      if (isRtl(cps[j]) || isDigit(cps[j])) last = j;
       j++;
     }
-    out.push(...chars.slice(i, lastRtl + 1).reverse());
-    i = lastRtl + 1;
+    // Tokens: digit groups stay whole; everything else is one character.
+    const tokens: string[] = [];
+    for (let k = i; k <= last; ) {
+      if (isDigit(cps[k])) {
+        let e = k;
+        while (e <= last && isDigit(cps[e])) e++;
+        tokens.push(chars.slice(k, e).join(""));
+        k = e;
+      } else {
+        tokens.push(MIRROR[chars[k]] ?? chars[k]);
+        k++;
+      }
+    }
+    out.push(...tokens.reverse());
+    i = last + 1;
   }
   return out.join("");
 }

@@ -95,6 +95,35 @@ describe("TIFF structure walker (review fix)", () => {
     expect(readTiff(ifdTiff(image(8000, 8000), 0))).toEqual({ problem: "tooLarge" });
     expect(readTiff(ifdTiff(image(7000, 7000, [[277, 3, 1, 4], [258, 3, 1, 16]]), 0))).toEqual({ problem: "tooLarge" });
   });
+  it("refuses many IFDs sharing one large block (per-file budget), fast and without blowing memory", async () => {
+    const before = process.memoryUsage().heapUsed;
+    const t = Date.now();
+    expect(readTiff(await fx("shared-region.tiff"))).toEqual({ problem: "unreadable" });
+    // The reviewer's 16 MB variant: 200 IFDs x 4M values.
+    const N = 200;
+    const VALS = 4_000_000;
+    const ifd = 2 + 6 * 12 + 4;
+    const b = new Uint8Array(8 + VALS * 4 + N * ifd);
+    const v = new DataView(b.buffer);
+    b.set([0x49, 0x49, 42, 0]);
+    let off = 8 + VALS * 4;
+    v.setUint32(4, off, true);
+    for (let i = 0; i < N; i++) {
+      v.setUint16(off, 6, true);
+      [[256, 3, 1, 10], [257, 3, 1, 10], [258, 3, 1, 8], [277, 3, 1, 1], [273, 4, VALS, 8], [279, 4, VALS, 8]].forEach(([tag, type, num, val], k) => {
+        const p = off + 2 + k * 12;
+        v.setUint16(p, tag, true);
+        v.setUint16(p + 2, type, true);
+        v.setUint32(p + 4, num, true);
+        v.setUint32(p + 8, val, true);
+      });
+      v.setUint32(off + 2 + 72, i < N - 1 ? off + ifd : 0, true);
+      off += ifd;
+    }
+    expect(readTiff(b)).toEqual({ problem: "unreadable" });
+    expect(Date.now() - t).toBeLessThan(5000); // before the budget: about 8 s and 3 GB
+    expect(process.memoryUsage().heapUsed - before).toBeLessThan(400 * 1024 * 1024);
+  });
   it("accepts a plain frame", () => {
     expect(tiffFrameSizes(ifdTiff(image(2, 2), 0, 16))).toEqual([{ width: 2, height: 2 }]);
   });

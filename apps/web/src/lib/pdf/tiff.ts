@@ -24,6 +24,15 @@ export const MAX_TIFF_BITS_PER_PIXEL = 64;
 /** Estimated memory to decode one frame (raw buffer + RGBA). */
 export const MAX_TIFF_DECODE_BYTES = 400 * 1024 * 1024;
 const MAX_VALUES_PER_TAG = 4_000_000;
+/**
+ * Per-file budget: many IFDs can point their tags at one shared block, so
+ * per-tag limits alone let a small file expand without bound. All tags
+ * together may read at most twice the file (plus a little) and 8M values.
+ */
+const MAX_TOTAL_VALUES = 8_000_000;
+const budgetBytes = (len: number) => 2 * len + 64 * 1024;
+/** Tags UTIF.decodeImage reads; everything else is skipped (and costs nothing). */
+const KEEP_TAGS = new Set([254, 256, 257, 258, 259, 262, 266, 273, 277, 278, 279, 284, 317, 320, 322, 323, 324, 325, 338, 339, 347, 513, 514, 529, 530, 531, 532]);
 
 const TYPE_SIZE: Record<number, number> = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8 };
 
@@ -55,6 +64,8 @@ function walk(b: Uint8Array): TiffFile {
   const frames: TiffFrame[] = [];
   let offset = u32(4);
   let ifdCount = 0;
+  let spentBytes = 0;
+  let spentValues = 0;
   while (offset !== 0) {
     if (visited.has(offset) || offset < 8 || offset + 2 > len) throw new Bad("unreadable");
     visited.add(offset);
@@ -69,15 +80,23 @@ function walk(b: Uint8Array): TiffFile {
       const type = u16(e + 2);
       const num = u32(e + 4);
       const size = TYPE_SIZE[type];
-      if (!size || num === 0) continue; // unknown types are skipped, as UTIF does
+      if (!size || num === 0 || !KEEP_TAGS.has(tag)) continue; // unknown types and tags UTIF does not read are skipped
       if (num > MAX_VALUES_PER_TAG) throw new Bad("unreadable");
       const bytes = size * num;
+      spentBytes += bytes;
+      spentValues += num;
+      if (spentBytes > budgetBytes(len) || spentValues > MAX_TOTAL_VALUES) throw new Bad("unreadable");
       const at = bytes <= 4 ? e + 8 : u32(e + 8);
       if (at + bytes > len) throw new Bad("unreadable");
       let values: unknown;
       if (type === 1 || type === 7 || type === 6) values = b.subarray(at, at + num);
       else if (type === 2) values = [String.fromCharCode(...b.subarray(at, at + Math.min(1024, Math.max(0, num - 1))))];
-      else {
+      else if (type === 3 || type === 4) {
+        // Compact typed arrays (UTIF only indexes them and reads .length).
+        const arr = type === 3 ? new Uint16Array(num) : new Uint32Array(num);
+        for (let k = 0; k < num; k++) arr[k] = type === 3 ? u16(at + k * 2) : u32(at + k * 4);
+        values = arr;
+      } else {
         const arr: number[] = new Array(num);
         for (let k = 0; k < num; k++) {
           const o = at + k * size;
@@ -113,25 +132,27 @@ function walk(b: Uint8Array): TiffFile {
   return { frames };
 }
 
-const num0 = (ifd: TiffIfd, tag: string) => (Array.isArray(ifd[tag]) ? Number((ifd[tag] as unknown[])[0]) || 0 : 0);
+type NumList = ArrayLike<number>;
+const isList = (v: unknown): v is NumList => Array.isArray(v) || ArrayBuffer.isView(v);
+const num0 = (ifd: TiffIfd, tag: string) => (isList(ifd[tag]) ? Number((ifd[tag] as NumList)[0]) || 0 : 0);
 
 /** Size and data checks that keep a hostile frame away from the decoder. */
 function check(ifd: TiffIfd, width: number, height: number, len: number) {
-  const bps = Array.isArray(ifd.t258) ? (ifd.t258 as number[]) : [1];
+  const bps = isList(ifd.t258) ? Array.from(ifd.t258 as NumList) : [1];
   const spp = num0(ifd, "t277") || bps.length || 1;
-  const bitsPerPixel = Math.max(...bps, 1) * Math.max(spp, bps.length);
+  const bitsPerPixel = bps.reduce((m, v) => Math.max(m, v), 1) * Math.max(spp, bps.length);
   if (bitsPerPixel > MAX_TIFF_BITS_PER_PIXEL) throw new Bad("unreadable");
   if (exceedsPixelCap(width, height)) throw new Bad("tooLarge");
   if (width * height * (4 + bitsPerPixel / 8) > MAX_TIFF_DECODE_BYTES) throw new Bad("tooLarge");
-  const offsets = (ifd.t273 ?? ifd.t324) as number[] | undefined;
-  const counts = (ifd.t279 ?? ifd.t325) as number[] | undefined;
-  if (!Array.isArray(offsets) || !offsets.length) throw new Bad("unreadable");
-  if (Array.isArray(counts)) {
+  const offsets = (ifd.t273 ?? ifd.t324) as NumList | undefined;
+  const counts = (ifd.t279 ?? ifd.t325) as NumList | undefined;
+  if (!isList(offsets) || !offsets.length) throw new Bad("unreadable");
+  if (isList(counts)) {
     if (counts.length < offsets.length) throw new Bad("unreadable");
-    offsets.forEach((o, i) => {
-      if (o + counts[i] > len) throw new Bad("unreadable");
-    });
-  } else if (offsets.some((o) => o >= len)) throw new Bad("unreadable");
+    for (let i = 0; i < offsets.length; i++) if (offsets[i] + counts[i] > len) throw new Bad("unreadable");
+  } else {
+    for (let i = 0; i < offsets.length; i++) if (offsets[i] >= len) throw new Bad("unreadable");
+  }
   if (ifd.t322 !== undefined) {
     const tw = num0(ifd, "t322");
     const th = num0(ifd, "t323");

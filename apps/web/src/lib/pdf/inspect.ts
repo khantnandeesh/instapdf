@@ -6,25 +6,34 @@
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { PdfInspector } from "@/components/tool-flow/ToolFlow";
 
-/** Catalog keys found in a file's raw bytes (keys inside compressed object streams are not seen). */
-export type PdfMarkers = { signed: boolean; outputIntents: boolean; structTree: boolean };
+import type { PdfMarkers } from "./scan";
 
-/** True when `needle` (ASCII) occurs in `bytes`. */
-export function hasBytes(bytes: Uint8Array, needle: string): boolean {
-  const first = needle.charCodeAt(0);
-  outer: for (let i = bytes.indexOf(first); i !== -1 && i <= bytes.length - needle.length; i = bytes.indexOf(first, i + 1)) {
-    for (let k = 1; k < needle.length; k++) if (bytes[i + k] !== needle.charCodeAt(k)) continue outer;
-    return true;
+let worker: Worker | null = null;
+let nextId = 1;
+const pending = new Map<number, (m: PdfMarkers) => void>();
+const NONE: PdfMarkers = { signed: false, outputIntents: false, structTree: false };
+
+/** Scans the file in the scan worker (one pass, chunked); never on the main thread. */
+export function scanInWorker(blob: Blob): Promise<PdfMarkers> {
+  if (typeof Worker === "undefined") return Promise.resolve(NONE);
+  if (!worker) {
+    worker = new Worker(new URL("./scan.worker.ts", import.meta.url), { type: "module", name: "instapdf-scan" });
+    worker.onmessage = (e: MessageEvent<{ id: number; markers: PdfMarkers }>) => {
+      pending.get(e.data.id)?.(e.data.markers);
+      pending.delete(e.data.id);
+    };
+    worker.onerror = () => {
+      for (const done of pending.values()) done(NONE);
+      pending.clear();
+      worker?.terminate();
+      worker = null;
+    };
   }
-  return false;
-}
-
-export function scanMarkers(bytes: Uint8Array): PdfMarkers {
-  return {
-    signed: hasBytes(bytes, "/ByteRange") || hasBytes(bytes, "/SigFlags"),
-    outputIntents: hasBytes(bytes, "/OutputIntents"),
-    structTree: hasBytes(bytes, "/StructTreeRoot"),
-  };
+  const id = nextId++;
+  return new Promise((resolve) => {
+    pending.set(id, resolve);
+    worker!.postMessage({ id, blob });
+  });
 }
 
 export type LostProperty = "tags" | "pdfa" | "layers" | "attachments" | "signatures";
@@ -66,6 +75,6 @@ export async function lostPropertiesNotice(name: string, doc: PDFDocumentProxy, 
 }
 
 export const inspector: PdfInspector = {
-  scan: scanMarkers,
+  scan: scanInWorker,
   notice: (name, doc, scanned) => lostPropertiesNotice(name, doc, (scanned as PdfMarkers | undefined) ?? { signed: false, outputIntents: false, structTree: false }),
 };

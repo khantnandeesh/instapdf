@@ -109,7 +109,7 @@ export type ToolFlowProps = {
   onFilesChange?: (files: LoadedFile[]) => void;
   /**
    * Loads an inspector for each PDF (lazily, so it is not in the first load):
-   * `scan` reads the raw bytes before pdf.js takes them, `notice` looks at the
+   * `scan` reads the raw file in a worker, `notice` looks at the
    * opened document; a returned sentence is shown as a non-blocking notice
    * (Merge: properties the output will not keep).
    */
@@ -311,7 +311,7 @@ export function ToolFlow({
         return "ok";
       }
       const inspector = inspectPdf ? await inspectPdf().catch(() => null) : null;
-      const scanned = inspector?.scan(bytes); // before pdf.js takes the buffer
+      const scanned = inspector?.scan(entry.source); // in a worker, in parallel with pdf.js
       const result = await openPdf(bytes, password);
       if (!filesRef.current.some((f) => f.id === id)) {
         if (result.ok) void result.pdf.task.destroy();
@@ -355,8 +355,8 @@ export function ToolFlow({
       patchFile(id, { status: "ready", pages });
       announce(copy.fileReady(entry.name, pdf.pageCount));
       if (inspector)
-        void inspector
-          .notice(entry.name, pdf.doc, scanned)
+        void Promise.resolve(scanned)
+          .then((markers) => inspector.notice(entry.name, pdf.doc, markers))
           .then((note) => note && filesRef.current.some((f) => f.id === id) && pushNotice({ tone: "warning", title: note, sticky: true }))
           .catch(() => {});
       return "ok";
@@ -916,8 +916,8 @@ export function ToolFlow({
   );
 }
 
-/** See `inspectPdf`. `scan` returns whatever `notice` needs from the raw bytes. */
-export type PdfInspector = { scan: (bytes: Uint8Array) => unknown; notice: (name: string, doc: OpenedPdf["doc"], scanned: unknown) => Promise<string | null> };
+/** See `inspectPdf`. `scan` reads the file (off the main thread) for whatever `notice` needs. */
+export type PdfInspector = { scan: (file: Blob) => Promise<unknown>; notice: (name: string, doc: OpenedPdf["doc"], scanned: unknown) => Promise<string | null> };
 
 /** Re-render thumbnails only in steps, scaling with CSS in between. */
 function renderBucket(size: number): number {

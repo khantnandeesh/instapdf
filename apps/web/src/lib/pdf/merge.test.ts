@@ -10,7 +10,7 @@ import type { FontManifest, FontSource } from "./text";
 const fixtures = new URL("../../../tests/fixtures/", import.meta.url);
 const blob = async (name: string) => new Blob([new Uint8Array(await readFile(new URL(name, fixtures)))]);
 
-const PAGES: Record<string, number> = { "alpha.pdf": 3, "bravo.pdf": 2, "echo.pdf": 1, "three-pages.pdf": 3, "form-a.pdf": 1, "form-b.pdf": 1, "pre-rotated.pdf": 3, "résumé-日本.pdf": 1, "sixty-pages.pdf": 60, "user-pw.pdf": 3, "charlie.png": 1, "delta.jpg": 1, "fox.tiff": 2, "sig-no-ap.pdf": 1, "indirect-box.pdf": 1, "lang-labels.pdf": 3, "tagged-features.pdf": 1 };
+const PAGES: Record<string, number> = { "alpha.pdf": 3, "bravo.pdf": 2, "echo.pdf": 1, "three-pages.pdf": 3, "form-a.pdf": 1, "form-b.pdf": 1, "pre-rotated.pdf": 3, "résumé-日本.pdf": 1, "sixty-pages.pdf": 60, "user-pw.pdf": 3, "charlie.png": 1, "delta.jpg": 1, "fox.tiff": 2, "sig-no-ap.pdf": 1, "indirect-box.pdf": 1, "lang-labels.pdf": 3, "tagged-features.pdf": 1, "lang-bad.pdf": 1 };
 
 async function source(name: string, id = name, password?: string): Promise<MergeSourceInput> {
   return { id, name, kind: /\.(png|jpe?g|tiff?)$/.test(name) ? "image" : "pdf", source: await blob(name), password };
@@ -461,7 +461,7 @@ describe("expert review (PR #7 addendum)", () => {
   it("C: carries /Lang and /PageLabels; drops dangling /StructParents", async () => {
     const r = await merge(["alpha.pdf", "lang-labels.pdf", "tagged-features.pdf"]);
     const doc = await plain(r.bytes);
-    expect(String(doc.catalog.lookup(PDFName.of("Lang")))).toBe("(de-DE)");
+    expect((doc.catalog.lookup(PDFName.of("Lang")) as unknown as { decodeText: () => string }).decodeText()).toBe("de-DE");
     for (const page of doc.getPages()) expect(page.node.get(PDFName.of("StructParents"))).toBeUndefined();
     expect(doc.catalog.get(PDFName.of("StructTreeRoot"))).toBeUndefined();
     const pdf = await pdfjs(r.bytes);
@@ -471,6 +471,29 @@ describe("expert review (PR #7 addendum)", () => {
     const plainMerge = await plain((await merge(["alpha.pdf", "bravo.pdf"])).bytes);
     expect(plainMerge.catalog.get(PDFName.of("PageLabels"))).toBeUndefined();
     expect(plainMerge.catalog.get(PDFName.of("Lang"))).toBeUndefined();
+  });
+  it("C: a /Lang that is not a language tag is not copied, and the output still opens", async () => {
+    const r = await merge(["lang-bad.pdf", "lang-labels.pdf"]);
+    const doc = await plain(r.bytes);
+    expect((doc.catalog.lookup(PDFName.of("Lang")) as unknown as { decodeText: () => string }).decodeText()).toBe("de-DE");
+    const alone = await merge(["lang-bad.pdf"]);
+    expect((await plain(alone.bytes)).catalog.get(PDFName.of("Lang"))).toBeUndefined();
+    const pdf = await pdfjs(alone.bytes);
+    expect(pdf.numPages).toBe(1);
+    await pdf.loadingTask.destroy();
+  });
+  it("C: page labels use a capped, sorted range walk", async () => {
+    const { PDFDocument: Doc, PDFNumber: Num, PDFName: Name } = await import("@cantoo/pdf-lib");
+    const { readPageLabels } = await import("./doc-props");
+    const doc = await Doc.create();
+    for (let i = 0; i < 3; i++) doc.addPage();
+    const nums: unknown[] = [];
+    for (let k = 0; k < 50_000; k++) nums.push(Num.of(100_000 - k), doc.context.obj({ S: "D" })); // far past the last page
+    nums.push(Num.of(1), doc.context.obj({ S: "r" }));
+    doc.catalog.set(Name.of("PageLabels"), doc.context.obj({ Nums: nums as never }));
+    const t = performance.now();
+    expect(readPageLabels(doc)).toEqual([null, { S: "r", P: undefined, St: 1 }, { S: "r", P: undefined, St: 2 }]);
+    expect(performance.now() - t).toBeLessThan(3000);
   });
   it("D: canary - pdf-lib's object copier still exposes traversedObjects and honours seeded refs", async () => {
     const { PDFDocument: Doc, PDFObjectCopier, PDFNull: Null } = await import("@cantoo/pdf-lib");
@@ -483,6 +506,12 @@ describe("expert review (PR #7 addendum)", () => {
     (traversed as Map<unknown, unknown>).set(page.ref, Null);
     const copied = copier.copy(src.context.obj([page.ref])) as unknown as { get: (i: number) => unknown };
     expect(copied.get(0), "a seeded ref must be used as is (links to dropped pages)").toBe(Null);
+  });
+  it("D: canary - the private PDFForm methods the safe flatten uses still exist", async () => {
+    const { PDFDocument: Doc } = await import("@cantoo/pdf-lib");
+    const { FORM_INTERNALS } = await import("./forms");
+    const form = (await Doc.create()).getForm() as unknown as Record<string, unknown>;
+    for (const name of FORM_INTERNALS) expect(typeof form[name], `PDFForm.${name} is gone: forms.ts flattenFields uses it`).toBe("function");
   });
   it("F: NeedAppearances only when a widget has no appearance", async () => {
     const renamed = await plain((await merge(["form-a.pdf", "form-b.pdf"])).bytes);

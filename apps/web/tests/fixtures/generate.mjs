@@ -347,6 +347,13 @@ async function textDoc(size, lines, title) {
   await save("sig-no-ap.pdf", doc);
 }
 
+{
+  // /Lang that is not a language tag and would break a literal string: "en) /Evil (\\".
+  const doc = await textDoc([595, 842], ["Bad lang 1"], null);
+  doc.catalog.set(PDFName.of("Lang"), PDFHexString.fromText("en) /Evil (\\"));
+  await save("lang-bad.pdf", doc);
+}
+
 // A 26-byte TIFF whose only IFD points back at itself (review fix: must be refused, never loop).
 {
   const b = Buffer.alloc(26);
@@ -360,6 +367,37 @@ async function textDoc(size, lines, title) {
   b.writeUInt16LE(10, 18);
   b.writeUInt32LE(8, 22); // next IFD = itself
   await writeFile(join(here, "cyclic-ifd.tiff"), b);
+}
+// TIFF where many IFDs point their strip tags at one shared block (must hit the per-file budget).
+{
+  const N = 80;
+  const VALS = 60_000;
+  const region = VALS * 4;
+  const ifdSize = 2 + 6 * 12 + 4;
+  const b = Buffer.alloc(8 + region + N * ifdSize);
+  b.write("II", 0, "ascii");
+  b.writeUInt16LE(42, 2);
+  let off = 8 + region;
+  b.writeUInt32LE(off, 4);
+  for (let i = 0; i < N; i++) {
+    const entry = (k, tag, type, num, val) => {
+      const p = off + 2 + k * 12;
+      b.writeUInt16LE(tag, p);
+      b.writeUInt16LE(type, p + 2);
+      b.writeUInt32LE(num, p + 4);
+      b.writeUInt32LE(val, p + 8);
+    };
+    b.writeUInt16LE(6, off);
+    entry(0, 256, 3, 1, 10);
+    entry(1, 257, 3, 1, 10);
+    entry(2, 258, 3, 1, 8);
+    entry(3, 277, 3, 1, 1);
+    entry(4, 273, 4, VALS, 8);
+    entry(5, 279, 4, VALS, 8);
+    b.writeUInt32LE(i < N - 1 ? off + ifdSize : 0, off + 2 + 6 * 12);
+    off += ifdSize;
+  }
+  await writeFile(join(here, "shared-region.tiff"), b);
 }
 await writeFile(join(here, "broken.png"), "These are text bytes with a .png name, not an image.\n");
 // Raster fixtures (charlie.png, delta.jpg, fox.tiff ...) come from gen-images.py.

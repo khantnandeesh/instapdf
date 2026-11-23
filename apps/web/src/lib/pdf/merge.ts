@@ -23,7 +23,6 @@ import {
   PDFObjectCopier,
   PDFPage,
   PDFRef,
-  PDFString,
   concatTransformationMatrix,
   degrees,
   drawObject,
@@ -34,7 +33,7 @@ import {
 } from "@cantoo/pdf-lib";
 import { segmentsOf, type PageSize } from "../page-list";
 import { imagePlacement, probeImage, sniffFormat, type ImageFormat } from "./images";
-import { dropStructureLinks, readLang, readPageLabels, writePageLabels, type PageLabel } from "./doc-props";
+import { dropStructureLinks, readLang, readPageLabels, writeLang, writePageLabels, type PageLabel } from "./doc-props";
 import { buildAcroForm, detachAnnotations, flattenFields, removeWidgets } from "./forms";
 import type { MergeOptions } from "./merge-options";
 import { baseName } from "./naming";
@@ -498,7 +497,7 @@ export async function mergePdf(input: MergeInput, env: MergeEnv, onProgress: (fr
 
   // ---- document language and page labels ----
   const lang = [...firstOfSource.keys()].map((id) => meta.get(id)?.lang).find(Boolean);
-  if (lang) out.catalog.set(PDFName.of("Lang"), PDFString.of(lang));
+  if (lang) writeLang(out, lang);
   if ([...meta.values()].some((m) => m.labels)) writePageLabels(out, made.map((m) => m.label ?? null));
 
   // ---- bookmarks ----
