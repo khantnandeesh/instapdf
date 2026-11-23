@@ -6,6 +6,7 @@
  * at a time; each output is handed off (single PDF) or streamed into the ZIP
  * before the next input is read, so at most one input and one output are held.
  */
+import { mergePdf, type MergeEnv, type MergeInput } from "./merge";
 import { pdfOutputName, uniqueNames } from "./naming";
 import { rotatePdf } from "./rotate";
 import { createZipWriter } from "./zip";
@@ -19,7 +20,9 @@ export type RotateJob = {
   zipName: string;
 };
 
-export type Job = RotateJob;
+export type MergeJob = { kind: "merge"; name: string } & MergeInput;
+
+export type Job = RotateJob | MergeJob;
 
 export type JobOutput = {
   name: string;
@@ -33,13 +36,32 @@ export type JobOutput = {
   wasEncrypted: boolean;
 };
 
-export type ProgressFn = (fraction: number) => void;
+/** `phase` "fonts" = a font download (indeterminate); "pages" = back to the fraction. */
+export type ProgressFn = (fraction: number, phase?: "fonts" | "pages") => void;
 
-export async function runJob(job: Job, onProgress: ProgressFn): Promise<JobOutput> {
+/** What only the worker can provide (font fetches, browser image decoding). Absent in unit tests unless stubbed. */
+export type JobEnv = Omit<MergeEnv, "onPhase">;
+
+export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {}): Promise<JobOutput> {
   switch (job.kind) {
     case "rotate":
       return runRotate(job, onProgress);
+    case "merge":
+      return runMerge(job, onProgress, env);
   }
+}
+
+async function runMerge(job: MergeJob, onProgress: ProgressFn, env: JobEnv): Promise<JobOutput> {
+  let phase: "fonts" | "pages" = "pages";
+  let last = 0;
+  const r = await mergePdf(job, { ...env, onPhase: (p) => onProgress(last, (phase = p)) }, (f) => onProgress((last = f), phase));
+  return {
+    name: job.name,
+    type: "application/pdf",
+    blob: new Blob([r.bytes as Uint8Array<ArrayBuffer>], { type: "application/pdf" }),
+    pageCount: r.pageCount,
+    wasEncrypted: r.wasEncrypted,
+  };
 }
 
 async function runRotate(job: RotateJob, onProgress: ProgressFn): Promise<JobOutput> {

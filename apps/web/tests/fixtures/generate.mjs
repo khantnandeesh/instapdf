@@ -223,6 +223,83 @@ function grayPng(width, height, pixel) {
   await save("non-latin.pdf", doc);
 }
 
+// ---- F3 Merge fixtures (spec F3 §7) ----
+
+/** Writes a (nested) outline: items are { title, page (0-based), children? }. */
+function addOutline(doc, items) {
+  const ctx = doc.context;
+  const pages = doc.getPages();
+  const rootRef = ctx.nextRef();
+  const build = (list, parentRef) => {
+    const refs = list.map(() => ctx.nextRef());
+    let count = 0;
+    list.forEach((item, i) => {
+      const dict = ctx.obj({ Title: PDFHexString.fromText(item.title), Parent: parentRef, Dest: [pages[item.page].ref, "XYZ", null, null, null] });
+      if (i > 0) dict.set(PDFName.of("Prev"), refs[i - 1]);
+      if (i < refs.length - 1) dict.set(PDFName.of("Next"), refs[i + 1]);
+      if (item.children?.length) {
+        const kids = build(item.children, refs[i]);
+        dict.set(PDFName.of("First"), kids.refs[0]);
+        dict.set(PDFName.of("Last"), kids.refs.at(-1));
+        dict.set(PDFName.of("Count"), PDFNumber.of(kids.count));
+        count += kids.count;
+      }
+      ctx.assign(refs[i], dict);
+      count++;
+    });
+    return { refs, count };
+  };
+  const top = build(items, rootRef);
+  ctx.assign(rootRef, ctx.obj({ Type: "Outlines", First: top.refs[0], Last: top.refs.at(-1), Count: PDFNumber.of(top.count) }));
+  doc.catalog.set(PDFName.of("Outlines"), rootRef);
+}
+
+/** One text line per page, e.g. "Alpha 1"; `title` null leaves the Info /Title out. */
+async function textDoc(size, lines, title) {
+  const doc = await PDFDocument.create({ updateMetadata: false });
+  doc.setCreationDate(FIXED_DATE);
+  doc.setModificationDate(FIXED_DATE);
+  doc.setProducer("InstaPDF fixtures");
+  if (title) doc.setTitle(title);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  for (const line of lines) {
+    const page = doc.addPage(size);
+    page.drawText(line, { x: 72, y: size[1] - 100, size: 36, font });
+  }
+  return doc;
+}
+
+{
+  const alpha = await textDoc([595, 842], ["Alpha 1", "Alpha 2", "Alpha 3"], "Alpha Report");
+  addOutline(alpha, [
+    { title: "Alpha intro", page: 0, children: [{ title: "Alpha detail", page: 1 }] },
+    { title: "Alpha end", page: 2 },
+  ]);
+  await save("alpha.pdf", alpha);
+  const bravo = await textDoc([792, 612], ["Bravo 1", "Bravo 2"], "Bravo Brief");
+  addOutline(bravo, [{ title: "Bravo start", page: 0 }]);
+  await save("bravo.pdf", bravo);
+  await save("echo.pdf", await textDoc([595, 842], ["Echo 1"], null));
+  await save("file2.pdf", await textDoc([595, 842], ["File 2"], null));
+  await save("File10.pdf", await textDoc([595, 842], ["File 10"], null));
+  await save("résumé-日本.pdf", await textDoc([595, 842], ["Unicode 1"], null));
+  for (const [file, value, withCheck] of [["form-a.pdf", "Ann", true], ["form-b.pdf", "Ben", false]]) {
+    const doc = await textDoc([595, 842], [file === "form-a.pdf" ? "Form A" : "Form B"], null);
+    const form = doc.getForm();
+    const name = form.createTextField("name");
+    name.setText(value);
+    name.addToPage(doc.getPage(0), { x: 72, y: 600, width: 300, height: 28 });
+    if (withCheck) {
+      const agree = form.createCheckBox("agree");
+      agree.check();
+      agree.addToPage(doc.getPage(0), { x: 72, y: 550, width: 20, height: 20 });
+    }
+    await save(file, doc);
+  }
+}
+await writeFile(join(here, "broken.png"), "These are text bytes with a .png name, not an image.\n");
+// Raster fixtures (charlie.png, delta.jpg, fox.tiff ...) come from gen-images.py.
+
 // The large fixture (>= 40 MB) is generated at test time by e2e/support/large-pdf.ts, never committed.
 
 await writeFile(join(here, "corrupt.pdf"), "This is not a PDF file, only plain text with a .pdf extension.\n");

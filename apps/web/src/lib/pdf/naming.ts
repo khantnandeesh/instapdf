@@ -61,3 +61,13 @@ export function formatBytes(bytes: number): string {
   }
   return `${value >= 100 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
 }
+
+/**
+ * Merge output (spec F3 §6): "<first file's base name>-merged.pdf". Characters
+ * not allowed in file names on common systems are replaced with "-".
+ */
+export function mergedName(firstInputName: string | undefined): string {
+  const base = firstInputName ? baseName(firstInputName) : "";
+  const safe = base.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-").replace(/^[\s.]+|[\s.]+$/g, "");
+  return `${safe || "instapdf"}-merged.pdf`;
+}

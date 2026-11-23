@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-fonts.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-fonts.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -13,17 +15,21 @@
     "gen:icons": "node scripts/gen-tool-icons.mjs"
   },
   "dependencies": {
+    "@cantoo/fontkit": "2.0.12",
     "@cantoo/pdf-lib": "2.11.1",
     "fflate": "0.8.2",
     "next": "15.5.29",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.5.438",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "utif": "3.1.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
     "@eslint/eslintrc": "^3",
+    "@fontsource/noto-sans": "5.3.0",
+    "@fontsource/noto-sans-jp": "5.3.1",
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

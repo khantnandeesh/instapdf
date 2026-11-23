@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baseName, fileNameOnly, formatBytes, pdfOutputName, uniqueNames, zipName } from "./naming";
+import { baseName, mergedName, fileNameOnly, formatBytes, pdfOutputName, uniqueNames, zipName } from "./naming";
 
 describe("pdfOutputName", () => {
   it("AC-41: keeps the original name", () => {
@@ -46,5 +46,19 @@ describe("formatBytes", () => {
     expect(formatBytes(4300)).toBe("4.2 KB");
     expect(formatBytes(1.2 * 1024 * 1024)).toBe("1.2 MB");
     expect(formatBytes(150 * 1024 * 1024)).toBe("150 MB");
+  });
+});
+
+describe("mergedName (F3 §6, AC-66)", () => {
+  it("names the merge after the first file", () => {
+    expect(mergedName("alpha.pdf")).toBe("alpha-merged.pdf");
+    expect(mergedName("charlie.png")).toBe("charlie-merged.pdf");
+    expect(mergedName("résumé-日本.pdf")).toBe("résumé-日本-merged.pdf");
+  });
+  it("replaces characters file systems do not allow", () => {
+    expect(mergedName('a:b*c?"d<e>f|g.pdf')).toBe("a-b-c--d-e-f-g-merged.pdf");
+    expect(mergedName("folder/x.pdf")).toBe("x-merged.pdf");
+    expect(mergedName(undefined)).toBe("instapdf-merged.pdf");
+    expect(mergedName("....pdf")).toBe("instapdf-merged.pdf");
   });
 });

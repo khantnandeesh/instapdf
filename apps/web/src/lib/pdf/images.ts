@@ -1,0 +1,195 @@
+/**
+ * Images as Merge input (spec F3 §2, §6). Pure functions, unit tested:
+ * header sniffing (format and pixel size without decoding), the A4 page an
+ * image becomes, where the image sits on it, and a small RGBA -> PNG encoder
+ * for decoded frames (TIFF, and the browser-decoded GIF/BMP/WebP).
+ */
+import { zlibSync } from "fflate";
+import type { PageSize } from "../page-list";
+
+export type ImageFormat = "png" | "jpeg" | "gif" | "bmp" | "webp" | "tiff";
+
+/** Decode cap per image (memory): 50 megapixels. */
+export const MAX_IMAGE_PIXELS = 50_000_000;
+/** Margin around an image on its page, in points. */
+export const IMAGE_MARGIN = 36;
+
+const IMAGE_EXTENSIONS: Record<string, ImageFormat> = {
+  ".png": "png",
+  ".jpg": "jpeg",
+  ".jpeg": "jpeg",
+  ".gif": "gif",
+  ".bmp": "bmp",
+  ".webp": "webp",
+  ".tif": "tiff",
+  ".tiff": "tiff",
+};
+
+/** Image format implied by a file name, or null for anything else (PDFs included). */
+export function imageFormatOfName(name: string): ImageFormat | null {
+  const lower = name.toLowerCase();
+  const dot = lower.lastIndexOf(".");
+  return dot >= 0 ? (IMAGE_EXTENSIONS[lower.slice(dot)] ?? null) : null;
+}
+
+export type ImageProbe = { format: ImageFormat; width: number; height: number };
+
+const u16be = (b: Uint8Array, o: number) => (b[o] << 8) | b[o + 1];
+const u16le = (b: Uint8Array, o: number) => b[o] | (b[o + 1] << 8);
+const u24le = (b: Uint8Array, o: number) => b[o] | (b[o + 1] << 8) | (b[o + 2] << 16);
+const u32be = (b: Uint8Array, o: number) => ((b[o] << 24) >>> 0) + ((b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]);
+const i32le = (b: Uint8Array, o: number) => b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24);
+const ascii = (b: Uint8Array, o: number, n: number) => String.fromCharCode(...b.subarray(o, o + n));
+
+/** Format from the first bytes (the content decides, not the name). */
+export function sniffFormat(b: Uint8Array): ImageFormat | null {
+  if (b.length >= 8 && b[0] === 0x89 && ascii(b, 1, 3) === "PNG") return "png";
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpeg";
+  if (b.length >= 6 && (ascii(b, 0, 6) === "GIF87a" || ascii(b, 0, 6) === "GIF89a")) return "gif";
+  if (b.length >= 2 && ascii(b, 0, 2) === "BM") return "bmp";
+  if (b.length >= 12 && ascii(b, 0, 4) === "RIFF" && ascii(b, 8, 4) === "WEBP") return "webp";
+  if (b.length >= 4 && ((b[0] === 0x49 && b[1] === 0x49 && b[2] === 42 && b[3] === 0) || (b[0] === 0x4d && b[1] === 0x4d && b[2] === 0 && b[3] === 42))) return "tiff";
+  return null;
+}
+
+function jpegSize(b: Uint8Array): { width: number; height: number } | null {
+  let o = 2;
+  while (o + 9 < b.length) {
+    if (b[o] !== 0xff) return null;
+    const marker = b[o + 1];
+    if (marker === 0xff) {
+      o++;
+      continue;
+    }
+    if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      o += 2;
+      continue;
+    }
+    const len = u16be(b, o + 2);
+    const isSof = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+    if (isSof) return { height: u16be(b, o + 5), width: u16be(b, o + 7) };
+    o += 2 + len;
+  }
+  return null;
+}
+
+/**
+ * Pixel size from the header, without decoding. Null when the bytes are not
+ * an image we can read. TIFF needs its decoder (multi-frame): see `tiff.ts`.
+ */
+export function probeImage(b: Uint8Array): ImageProbe | null {
+  const format = sniffFormat(b);
+  let size: { width: number; height: number } | null = null;
+  switch (format) {
+    case "png":
+      if (b.length >= 24 && ascii(b, 12, 4) === "IHDR") size = { width: u32be(b, 16), height: u32be(b, 20) };
+      break;
+    case "jpeg":
+      size = jpegSize(b);
+      break;
+    case "gif":
+      if (b.length >= 10) size = { width: u16le(b, 6), height: u16le(b, 8) };
+      break;
+    case "bmp":
+      if (b.length >= 26) {
+        const header = b[14] | (b[15] << 8);
+        size = header === 12 ? { width: u16le(b, 18), height: u16le(b, 20) } : { width: Math.abs(i32le(b, 18)), height: Math.abs(i32le(b, 22)) };
+      }
+      break;
+    case "webp": {
+      const chunk = b.length >= 16 ? ascii(b, 12, 4) : "";
+      if (chunk === "VP8 " && b.length >= 30) size = { width: u16le(b, 26) & 0x3fff, height: u16le(b, 28) & 0x3fff };
+      else if (chunk === "VP8L" && b.length >= 25) {
+        const b1 = b[22], b2 = b[23], b3 = b[24];
+        size = { width: 1 + (b[21] | ((b1 & 0x3f) << 8)), height: 1 + ((b1 >> 6) | (b2 << 2) | ((b3 & 0x0f) << 10)) };
+      } else if (chunk === "VP8X" && b.length >= 30) size = { width: 1 + u24le(b, 24), height: 1 + u24le(b, 27) };
+      break;
+    }
+    default:
+      return null;
+  }
+  if (!format || !size || size.width < 1 || size.height < 1) return null;
+  return { format, ...size };
+}
+
+export const exceedsPixelCap = (width: number, height: number) => width * height > MAX_IMAGE_PIXELS;
+
+/** The A4 page an image becomes: portrait for portrait or square images, landscape for landscape ones. */
+export function imagePageSize(width: number, height: number): PageSize {
+  return width > height ? { width: 842, height: 595 } : { width: 595, height: 842 };
+}
+
+/**
+ * Where the image is drawn on its page: centered, inside the margin, aspect
+ * ratio kept, and never larger than its size at 72 dpi (1 px = 1 pt).
+ */
+export function imagePlacement(width: number, height: number): { page: PageSize; x: number; y: number; width: number; height: number } {
+  const page = imagePageSize(width, height);
+  const scale = Math.min(1, (page.width - 2 * IMAGE_MARGIN) / width, (page.height - 2 * IMAGE_MARGIN) / height);
+  const w = width * scale;
+  const h = height * scale;
+  return { page, width: w, height: h, x: (page.width - w) / 2, y: (page.height - h) / 2 };
+}
+
+let crcTable: Uint32Array | null = null;
+function crc32(data: Uint8Array): number {
+  if (!crcTable) {
+    crcTable = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      crcTable[n] = c >>> 0;
+    }
+  }
+  let c = 0xffffffff;
+  for (let i = 0; i < data.length; i++) c = crcTable[(c ^ data[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+/** Encodes 8-bit RGBA pixels as a PNG (RGB when every pixel is opaque). */
+export function encodePng(rgba: Uint8Array, width: number, height: number): Uint8Array {
+  let opaque = true;
+  for (let i = 3; i < rgba.length; i += 4) {
+    if (rgba[i] !== 255) {
+      opaque = false;
+      break;
+    }
+  }
+  const channels = opaque ? 3 : 4;
+  const stride = width * channels + 1;
+  const raw = new Uint8Array(stride * height);
+  for (let y = 0; y < height; y++) {
+    let o = y * stride + 1; // filter byte 0 (none)
+    for (let x = 0; x < width; x++) {
+      const p = (y * width + x) * 4;
+      raw[o++] = rgba[p];
+      raw[o++] = rgba[p + 1];
+      raw[o++] = rgba[p + 2];
+      if (!opaque) raw[o++] = rgba[p + 3];
+    }
+  }
+  const chunk = (type: string, data: Uint8Array) => {
+    const out = new Uint8Array(12 + data.length);
+    const view = new DataView(out.buffer);
+    view.setUint32(0, data.length);
+    for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+    out.set(data, 8);
+    view.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+    return out;
+  };
+  const ihdr = new Uint8Array(13);
+  const hv = new DataView(ihdr.buffer);
+  hv.setUint32(0, width);
+  hv.setUint32(4, height);
+  ihdr[8] = 8;
+  ihdr[9] = opaque ? 2 : 6;
+  const parts = [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlibSync(raw, { level: 6 })), chunk("IEND", new Uint8Array(0))];
+  const total = parts.reduce((s, p) => s + p.length, 0);
+  const png = new Uint8Array(total);
+  let off = 0;
+  for (const p of parts) {
+    png.set(p, off);
+    off += p.length;
+  }
+  return png;
+}
