@@ -1,6 +1,6 @@
 # F16: PDF editor (beat the reference editor)
 
-Status: steps 1 (Analyze) and 2 (Research) done; step 3 (Design) outline included, to be detailed by `ux-designer` before Build. **Scope approved by the owner on 2026-11-23:** F16 includes existing-text editing (phases E2/E3), uses PDFium WASM as the edit engine, and is the top-priority feature.
+Status: steps 1 (Analyze) and 2 (Research) done; step 3 (Design) outline included, to be detailed by `ux-designer` before Build. **Scope approved by the owner on 2026-11-23:** F16 includes existing-text editing (phases E2/E3), and is the top-priority feature. **Revised 2026-11-23 after deeper research (§3):** the edit engine is a Rust core (WASM in the browser, same code native on the server as a consented fallback), not PDFium. This needs the owner's OK.
 
 Reference observed: `pdf-editor` on the live reference site, 2026-11-23, with synthetic fixtures only (Playwright, network recorded). Two "Apply changes" tasks were run (within the 3/hour rule in CLAUDE.md).
 Companion research (competitors, libraries, licences): `docs/specs/f16-pdf-editor-research.md`.
@@ -61,6 +61,17 @@ Let anyone change a PDF the way they expect a document editor to work: click tex
 | Recovery | "Recover unsaved changes" prompt for a previously edited file. | Match, local only. |
 | Save | "Apply changes" → result page (download, cloud save, share, continue in other tool, back to editing, delete files). | Download directly from the editor, no round trip; keep editing after download. |
 
+### 2a-bis. Micro details of existing-text editing (observed 2026-11-23, Chrome-exported fixture with subset Identity-H fonts)
+
+- The Text tool is active by default for documents without forms; for documents with forms the Forms tool is active instead.
+- **Edit unit = one style run within a line**, not a whole line. In a justified line with a bold word, clicking the start gives only "This  agreement  is  made  between  the " (it stops at the bold "Provider"). Justification gaps show up as double spaces in the edit box.
+- A line whose first glyph comes from a different font (the ₹ sign, drawn by a Type 3 fallback font) splits into separate edit boxes at the font change.
+- Editing the ₹ run silently switched the whole run to a different-looking sans font in the preview, so it no longer matched "Total amount due:" (`assets/f16-pdf-editor/ref-07-font-switch.png`).
+- Typing past the original width overlaps the next run; nothing moves out of the way.
+- Editing a justified run drops the justification: "the Provider" became "theProvider" in the preview, because the gap was spacing, not a space character.
+- The preview draws edited text with a bundled web font (Caladea here), so what you see while typing is not necessarily the embedded subset.
+- Picking a file uploads it immediately (about 0.5 s to first page for a 44 KB file). Apply → completed took 3.7 s, and pick → downloaded took 13.6 s for the same file.
+
 ### 2b. Limits and gates (reference)
 
 Free tier: 3 tasks/hour (each Apply is a task, with a countdown), 50 MB per file, 5 MB per image, single file per task, a page cap (crawl shows 50 and 200-page messages in different places), "Too many attempts" throttle. Paid: up to 500 MB, longer processing.
@@ -83,32 +94,62 @@ Free tier: 3 tasks/hour (each Apply is a task, with a countdown), 50 MB per file
 
 Sejda, iLovePDF, Smallpdf, PDF24 and Adobe online all upload to a server. Smallpdf and Adobe keep existing-text editing behind Pro; PDF24 has none; PDFgear online has none (desktop only). Only Apryse WebViewer (commercial SDK, powers Xodo) edits paragraphs in the browser. **No free, browser-only product edits existing text with font matching and form creation.** That is the gap.
 
-## 3. Architecture recommendation
+## 3. Engine decision (revised 2026-11-23, supersedes the earlier "PDFium as edit engine" decision)
 
-All client-side. No server, no new GCP spend.
+**Bar set by the owner:** the best result wins. Edit existing text in place, in the same font, without complaining, at least as well as the reference, and give its premium features away free. Server processing is allowed when it gives a better result.
 
-| Layer | Choice | Licence | Why |
-|---|---|---|---|
-| Edit engine | **PDFium compiled to WASM** (`@embedpdf/pdfium`, or our own build of PDFium if that fork's source is not public) in a Web Worker | BSD-3 style + MIT wrapper | Exposes page objects: read text objects and their fonts, `FPDFText_SetText`, remove/insert objects, `FPDFPage_GenerateContent`, form fields, and redaction primitives. It rewrites content streams for us, so we never hand-parse `TJ`. |
-| Renderer | PDFium in the same worker (one engine for what you see and what you save), pdf.js kept for the existing thumbnail grid | Apache-2.0 | Avoids glyph-position mismatch between display and output. |
-| Overlay UI | DOM/SVG layer per page (no canvas framework) | – | Accessible, crisp, simple hit-testing, animatable with CSS. |
-| Document model | Operation log (command pattern) applied to an in-worker PDFium document; persisted to IndexedDB | – | Undo/redo, autosave, crash recovery, no upload. |
-| Forms, links, attachments, page ops | `@cantoo/pdf-lib` where simpler than PDFium | MIT | Already our writer; maintained fork. |
-| Fonts | fontkit (inspect embedded fonts, cmap coverage), harfbuzzjs (shaping + subsetting), self-hosted OFL set (Liberation, Carlito, Caladea, Noto incl. Devanagari, Amiri) | MIT / OFL | Font matching and complex scripts. |
-| Final pass | qpdf-WASM (object streams, compression, structural check) | Apache-2.0 | Small, valid output. |
-| OCR (scan → editable) | tesseract.js, small jobs only | Apache-2.0 | Phase E4. |
+### 3a. How the reference actually does it (evidence: `f16-engine-research.md`)
 
-Feasibility verdicts:
-- **Edit existing text (line/run level): feasible** with PDFium. Reuse the embedded font when it covers every new glyph (visually identical); otherwise switch the run to the matched OFL font, subset it, embed as CID/Identity-H with ToUnicode, and show a notice. Type3 or no-ToUnicode text is read-only with a whiteout-and-retype fallback.
-- **Paragraph editing with reflow: feasible inside the paragraph's own box.** Build paragraph detection (baseline, leading, alignment, font) and re-break lines with harfbuzz advances; the box grows downward; we never move other page content in v1. Opt-in per edit, like a "reflow" toggle.
-- **Font matching: feasible.** Strip subset prefix, read FontDescriptor flags and name; map to metric-compatible OFL families; fall back by serif/sans/mono flags.
-- **Forms: fill and create feasible.** XFA: render via pdf.js and fill where an AcroForm fallback exists; pure XFA is read-only with a notice.
-- **Complex scripts: feasible for new text** (harfbuzz shaping). Existing Devanagari/Arabic runs: replace the whole run with a newly shaped run. This beats the reference, which refuses.
-- **True redaction: feasible** with PDFium redaction APIs, verified by tests (no text in extraction or raw streams; images cut; full rewrite).
+- The editor engine is **closed source**: a Scala jar on top of their open SAMBox (Apache-2.0, a PDFBox fork) and sejda-sdk (AGPL). Editing existing text was open from Sept 2016 to Feb 2017, so the method is readable in history. We describe it in our own words only and copy nothing.
+- The technique is **"redact and re-append"**:
+  1. The browser (pdf.js) finds the text run and its font object id.
+  2. The server replays the page's content stream and drops only the show-text operators whose glyphs fall in the edited box. Inside a `TJ` array it swaps the removed part for an equal-width spacing number, so neighbours do not move.
+  3. It appends a new `BT … ET` block at the original position, reusing the **same font object** when that font covers every glyph.
+  4. Coverage is checked properly: encode, check each glyph outline is non-empty, CID→GID is not 0, and decode(encode(text)) equals the text.
+  5. If glyphs are missing, it never extends the subset. It falls back per character, in order: the original full font, then a similar family, then a chain of metric-compatible open fonts (Liberation, Carlito, Caladea, Noto…). One line can mix the original subset and fallback runs.
+- That is why it "rarely complains": the dialog appears only when the embedded subset lacks a typed glyph.
 
-Risks: PDFium WASM is ~4.6 MB (lazy-load on editor open, brotli, cache in a service worker; first paint uses pdf.js so the page appears at once); the EmbedPDF PDFium fork's source availability must be confirmed before adoption (fallback: build PDFium ourselves); memory on phones (render one page window at a time).
+### 3b. What our own prototype showed (`assets/f16-pdf-editor/prototype/`)
 
-CSP: the editor route keeps `connect-src 'self'` and loads fonts/WASM from our own origin only.
+We prototyped the edit with PDFium (via pypdfium2, the same C++ engine as the WASM build) on four test files:
+
+| Case | Result |
+|---|---|
+| Standard-14 fonts (reportlab), word swap in a line | Correct |
+| LibreOffice export (subset TrueType, WinAnsi), "Friday" → "Monday" | Correct, original subset font reused, +400 bytes |
+| Same file, inserted "(₹ 5,000 fee)" (glyphs not in the subset) | **Wrong.** PDFium's glyph lookup reported the glyphs present, and the output shows empty boxes |
+| Chrome export (per-glyph text objects, Identity-H subsets, mixed bold/italic), heading edit | Line grouping and style runs worked. Two problems: **tofu boxes** for glyphs missing from the subset, and **PDFium's full-page content regeneration dropped Type 3 text elsewhere on the page** (the ₹ sign vanished from an untouched line) |
+
+Lessons:
+1. Recognising lines and style runs is solvable; we did it in about 100 lines.
+2. The hard, engine-independent part is **fonts**: a reliable coverage check against the embedded font program itself (parse the font; do not trust the engine's lookup), plus per-run fallback.
+3. **Never regenerate a whole page.** Rewrite only the affected operators, like the reference does. PDFium's whole-page regeneration is lossy (Type 3), so it can't be our writer.
+
+### 3c. Options compared
+
+| Option | Runs in browser | Runs on server | Fidelity ceiling | Licence | Verdict |
+|---|---|---|---|---|---|
+| PDFium page-object API (WASM / native) | yes (4.6 MB) | yes | Limited by whole-page regeneration (loses Type 3) and an unreliable subset check | BSD/Apache | **Not the writer.** Keep it as a test oracle and a possible renderer |
+| PDFBox / SAMBox (Java) | no | yes (JVM cold starts on scale-to-zero) | High (it is what the reference uses) | Apache-2.0 | Viable server engine, but no browser and slow cold starts |
+| TypeScript: pdf.js + pdf-lib + fontkit + our own content-stream rewriter | yes | yes (Node) | High | Apache/MIT | Viable, but slower on big files, and hand-written stream parsing in JS is fragile |
+| **Rust core compiled to WASM and native** (lopdf for objects and content streams, ttf-parser/skrifa for coverage, harfrust for shaping, subsetter for fallback subsets, pdf-writer for new streams) | **yes** | **yes, same code** | **Highest**: exact control of every operator and font | MIT / Apache-2.0 (checked on crates.io today) | **Recommended** |
+| MuPDF / PyMuPDF, iText, sejda-sdk | – | – | – | AGPL | Forbidden (CLAUDE.md rule 3) |
+
+### 3d. Recommendation: "Berry engine", one Rust core, browser first with a server fallback
+
+- **One codebase, two targets.** A Rust crate `berry-engine` compiled to WASM runs in a Web Worker (default, private, free to run) and natively in the worker service on Cloud Run (fallback). Both produce byte-identical results because they are the same code.
+- **When the server is used:** only if the browser can't (out of memory on a phone, a file over about 150 MB, or the user explicitly asks), always with consent ("Process on our server? Deleted within 2 hours"). The default stays 100% on device, and that is our headline.
+- **Pipeline per edit:**
+  1. **Recognise:** parse the content stream with a text-state interpreter, giving glyphs with position, font, size, colour and render mode. Group them into runs, lines and paragraphs. pdf.js stays the on-screen renderer for instant first paint; the engine's own parse is the truth for edits, so display and output never disagree.
+  2. **Coverage:** parse the embedded font program (ttf-parser / CFF), map Unicode to the glyph through ToUnicode or the encoding plus cmap, and check the outline is non-empty.
+  3. **Font choice per run:** original subset if covered. Else, *better than the reference*: if the original font is an open family we ship (Carlito, Caladea, Liberation, Noto…) or one the user has locally, embed a fresh subset of the **same family**, so it is visually identical. Else use a metric-compatible substitute, and width-fit with `Tz` so the line keeps its length.
+  4. **Rewrite surgically:** drop only the affected show-text operators (split `TJ` arrays with equal-width spacing), copy a shared Form XObject before editing it, and append the new text block in a separate content stream. Never re-serialise the whole page.
+  5. **Shape:** HarfRust for Devanagari and Arabic, with ToUnicode so copy and search still work.
+  6. **Verify every save:** run a render diff of untouched regions (they must be pixel-identical) and confirm the extracted text equals the expected text. If a check fails, roll back that edit and tell the user. That is our "never silently corrupt" guarantee.
+- **Effort:** about 3–5 agent-weeks to reach reference parity on existing-text editing, and 4–6 more to beat it (paragraph reflow, same-family re-subsetting, shaping). The JS-only tools (add text, sign, annotate…) are not blocked by the engine.
+- **What changes from the earlier decision:** PDFium is **no longer the edit engine**. It becomes a CI oracle (render diff, text extraction) and an optional renderer. The owner approved PDFium earlier; this revision replaces that approval and needs the owner's OK.
+
+Other layers are unchanged: a DOM/SVG overlay, an operation log in IndexedDB (undo/redo, recovery), `@cantoo/pdf-lib` for forms, links, attachments and page operations until the engine covers them, a qpdf-WASM final pass, tesseract.js for small OCR jobs, and self-hosted OFL fonts. CSP stays `connect-src 'self'`; the server fallback is a separate, consented flow on a separate route.
 
 ## 4. Inputs
 
@@ -162,6 +203,7 @@ Priority: P0 = parity must-have; P1 = parity nice-to-have or key differentiator;
 - **AC-2 (P0)** The editor page's CSP has `connect-src 'self'`; a test that tries `fetch` to another origin from the page is blocked.
 - **AC-3 (P1)** (improvement) A visible indicator shows "0 bytes uploaded" (our wording) and links to how to verify it.
 - **AC-4 (P0)** Downloading 5 times in a row within 10 minutes never shows a limit, countdown or upgrade message.
+- **AC-1b (P0)** If the server fallback is used, it starts only after an explicit consent step that says what is uploaded and when it is deleted (≤ 2 h). Without consent, nothing leaves the device.
 - **AC-5 (P1)** `big-300p.pdf` (300 pages) opens and can be edited and downloaded without a page-limit message.
 
 ### Open and view
@@ -173,6 +215,11 @@ Priority: P0 = parity must-have; P1 = parity nice-to-have or key differentiator;
 - **AC-9 (P0)** In `para-times.pdf`, clicking line 2 with the Text tool makes it editable; changing "page" to "sheet" and downloading gives a PDF whose extracted text contains "sheet" and not the old line's "page", and the old line's glyphs are not drawn (render diff of that line area vs expected).
 - **AC-10 (P0)** The edited text keeps font family, size and colour when the embedded font covers all glyphs (`subset-carlito.pdf`: change "thirty" to "tithe" → output font for that run is the original embedded font object).
 - **AC-11 (P0)** Typing a character missing from a subset font (e.g. "Q" when absent) switches the run to the matched open font (Carlito for Calibri/Carlito) and shows an inline notice naming both fonts; the output renders the character.
+- **AC-11b (P0)** Fidelity guard: after any existing-text edit, every page region outside the edited runs renders pixel-identical to the input (PDFium and pdf.js render diff at 2×), including Type 3 text, images and vector art.
+- **AC-11c (P0)** Neighbours stay put: editing one word inside a `TJ` array does not move any other glyph on the line by more than 0.1 pt, unless reflow is on.
+- **AC-11d (P1)** (improvement) Same-family re-subset: when a subset lacks a glyph and the family is one we ship (Carlito, Caladea, Liberation, Noto) or a local font, the new text uses a fresh subset of that same family, and the run is visually indistinguishable from the original (glyph-shape diff below threshold).
+- **AC-11e (P1)** (improvement) Substitute fonts are width-fitted (`Tz` within 90–110%) so the edited run keeps its original width when the text length is unchanged.
+- **AC-11f (P0)** On the micro-benchmark corpus (docs/process/parity-lab.md), our existing-text edit fidelity score is at least the reference's on every file, and higher in total.
 - **AC-12 (P1)** Bold, italic, size, family and colour changes on an existing line are reflected in the output.
 - **AC-13 (P1)** Existing text can be moved by drag and deleted.
 - **AC-14 (P1)** (improvement) Paragraph mode: in `para-times.pdf`, inserting 12 words into line 1 reflows the paragraph inside its original left/right bounds; no line exceeds the right bound (text positions in output); the box grows downward and the line count increases.
@@ -266,17 +313,19 @@ Each phase is a separate backlog item that passes the full pipeline and evaluato
 
 | Phase | Scope | ACs | Key risk | Rough size |
 |---|---|---|---|---|
+| **E0 Engine spike** | `berry-engine` Rust crate: content-stream interpreter (glyph positions), run/line grouping, embedded-font coverage check, surgical show-text removal with `TJ` splitting, append block, same-family re-subset, WASM + native builds, fidelity guard. Run on the Parity Lab corpus against the reference | 11b, 11c, 11f (engine level) | Font edge cases (Type 3, no ToUnicode, CFF, vertical) | M (1–2 weeks) |
 | **E1 Editor core** | Editor shell, PDFium worker + lazy load, overlay model, op log, undo/redo, autosave/recovery, add text, image, whiteout, shapes, annotate, sign (type/draw/upload), page ops, download, mobile toolbar | 1–8, 23–27, 31–32, 41, 43–46, 48–52 | WASM size and two-engine alignment | L |
 | **E2 Edit existing text (line)** | Line edit via PDFium text objects, font reuse + coverage check, OFL substitution + notice, style changes, move/delete, find & replace, scan/Type3 fallbacks | 9–13, 17–19 | Subset fonts, odd encodings | L |
 | **E3 Paragraphs, links, forms** | Paragraph detection + reflow inside box, toggle; links; form fill + create, tab order, repeat on pages, rotated pages, XFA banner, detect fields, stamps, attachments | 14–16, 28–30, 34–40, 42 | Paragraph detection quality across real files | L |
 | **E4 Beyond parity** | True redaction, Devanagari/Arabic shaping (new + replace run), OCR scan-to-editable (tesseract.js, small docs), camera signature, local fonts | 20–22, 33, 47 | Shaping correctness, redaction completeness | M–L |
 
-Parity with the reference is reached at the end of E3; E1 alone already beats it on privacy, limits, speed and mobile for the most common jobs (fill, sign, add text, whiteout, annotate).
+E0 and E1 can run in parallel (E1 needs no engine). Parity with the reference is reached at the end of E3; E1 alone already beats it on privacy, limits, speed and mobile for the most common jobs (fill, sign, add text, whiteout, annotate).
 
 Prerequisites: Q2 real-world corpus should include the editor fixtures above plus a sample of real PDFs (Word, Google Docs, LaTeX, InDesign, scanned) for the "zero crashes" gate.
 
 ## 13. Owner decisions (2026-11-23)
 
-1. **Approved:** existing-text editing is in F16 (E2/E3), replacing the earlier backlog note that excluded it.
-2. **Approved:** PDFium WASM is the edit engine (~4.6 MB, lazy-loaded, BSD-style licence). Before Build, confirm that the source of the chosen PDFium build is public; otherwise build PDFium ourselves.
-3. **Approved:** the editor is top priority. Phase E1 is the next feature to enter Build once its UI design step is done; the lead orchestrator schedules it.
+1. **Approved:** existing-text editing is in F16 (E2/E3).
+2. **Revised, needs OK:** the edit engine is a Rust core (`berry-engine`) that runs as WASM in the browser and natively on the server as a consented fallback. PDFium is no longer the engine; it becomes a test oracle. Reason: our prototype showed PDFium's whole-page regeneration drops Type 3 text and its glyph check is unreliable for subset fonts (§3b).
+3. **Approved:** the editor is top priority. E0 (engine spike) and E1 (editor core) start first, in parallel.
+4. **Approved direction:** every premium editor feature of the reference is free here, and server processing is allowed when it gives a better result, always with consent.

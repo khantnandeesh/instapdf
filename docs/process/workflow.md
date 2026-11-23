@@ -26,5 +26,6 @@ backlog → 1 Analyze → 2 Research → 3 Design → 4 Build → 5 Test → 6 R
 - **PR:** one feature per PR. The body lists the `AC-n` items it covers and links the spec.
 - **CI gates (required):** lint, typecheck, unit tests, build, e2e on the preview.
 - **Evaluator pass bar:** every P0 AC passes; at least 90% of all ACs pass; Lighthouse performance ≥ 90 on mobile; no critical a11y violations (axe); and, once the Q2 corpus exists, the tool runs over the real-world PDF corpus with zero crashes and its oracle checks green (`qpdf --check`, render diff, text equality).
+- **Parity Lab:** from F16 on, a feature also needs a Parity Lab run (`docs/process/parity-lab.md`) showing it meets or beats the reference on every metric group, with zero untouched-region pixel diff. Team principles: `docs/process/principles.md`.
 - **Design:** all UI follows the owner's Mint Paper system (`docs/design/mint-paper.md`): mint action, sand wash, leaf-cornered tool cards, Atkinson Hyperlegible, light only (dark mode pending the designer's definition). Deviations from Mint Paper are listed there with measured contrast.
 - **Competitor research:** adopt/skip decisions must not rest on unverified claims.
