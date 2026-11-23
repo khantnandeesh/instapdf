@@ -131,3 +131,47 @@ export const ShieldIcon: IconComponent = (p) => (
     <path d="m9 12 2 2 4-4" />
   </Icon>
 );
+export const SearchIcon: IconComponent = (p) => (
+  <Icon {...p}>
+    <circle cx="10.5" cy="10.5" r="6.5" />
+    <path d="m15.5 15.5 5 5" />
+  </Icon>
+);
+export const GridIcon: IconComponent = (p) => (
+  <Icon {...p}>
+    <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+    <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+    <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+    <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+  </Icon>
+);
+export const ChevronDownIcon: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="m5 9 7 7 7-7" />
+  </Icon>
+);
+export const ClockIcon: IconComponent = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
+  </Icon>
+);
+/** A laptop: "runs on your device". */
+export const DeviceIcon: IconComponent = (p) => (
+  <Icon {...p}>
+    <rect x="4.5" y="5" width="15" height="10.5" rx="1.5" />
+    <path d="M2.5 19h19" />
+  </Icon>
+);
+export const ArrowRightIcon: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M4.5 12h15" />
+    <path d="m13 5.5 6.5 6.5-6.5 6.5" />
+  </Icon>
+);
+export const ArrowLeftIcon: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M19.5 12h-15" />
+    <path d="m11 5.5-6.5 6.5 6.5 6.5" />
+  </Icon>
+);

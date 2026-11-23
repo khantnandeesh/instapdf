@@ -22,6 +22,7 @@ export function Dialog({
   icon,
   className,
   wide,
+  variant = "default",
 }: {
   open: boolean;
   onClose: (reason: DialogCloseReason) => void;
@@ -36,10 +37,17 @@ export function Dialog({
   icon?: ReactNode;
   className?: string;
   wide?: boolean;
+  /**
+   * "fullscreen" (spec F2 H-5): covers the viewport, renders `children` as is
+   * under a visually hidden title, and focuses that title unless
+   * `initialFocusRef` is set (no on-screen keyboard popping up on open).
+   */
+  variant?: "default" | "fullscreen";
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const titleId = useId();
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const descId = useId();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -50,7 +58,7 @@ export function Dialog({
     if (open && !dialog.open) {
       opener.current = document.activeElement as HTMLElement | null;
       dialog.showModal();
-      const target = initialFocusRef?.current;
+      const target = initialFocusRef?.current ?? (variant === "fullscreen" ? titleRef.current : null);
       if (target) requestAnimationFrame(() => target.focus());
     } else if (!open && dialog.open) {
       dialog.close();
@@ -60,7 +68,7 @@ export function Dialog({
       const el = back && back !== document.body && back.isConnected && !back.closest("[inert]") ? back : fallbackFocus?.();
       el?.focus();
     }
-  }, [open, initialFocusRef, returnFocusRef, fallbackFocus]);
+  }, [open, initialFocusRef, returnFocusRef, fallbackFocus, variant]);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -96,14 +104,27 @@ export function Dialog({
       ref={ref}
       onKeyDown={wrapTab}
       aria-labelledby={titleId}
+      aria-modal={variant === "fullscreen" ? true : undefined}
       aria-describedby={description ? descId : undefined}
       className={cx(
-        "m-auto max-h-[calc(100dvh-32px)] rounded-xl bg-surface-raised p-0 text-fg shadow-lg backdrop:bg-scrim",
-        wide ? "w-[min(880px,calc(100vw-32px))]" : "w-[min(440px,calc(100vw-32px))]",
+        variant === "fullscreen"
+          ? "ip-rise-in m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto overscroll-contain border-0 bg-bg p-0 text-fg backdrop:bg-transparent"
+          : cx(
+              "m-auto max-h-[calc(100dvh-32px)] rounded-xl bg-surface-raised p-0 text-fg shadow-lg backdrop:bg-scrim",
+              wide ? "w-[min(880px,calc(100vw-32px))]" : "w-[min(440px,calc(100vw-32px))]",
+            ),
         className,
       )}
     >
-      {open && (
+      {open && variant === "fullscreen" && (
+        <>
+          <h2 id={titleId} ref={titleRef} tabIndex={-1} className="sr-only">
+            {title}
+          </h2>
+          {children}
+        </>
+      )}
+      {open && variant === "default" && (
         <div className="flex flex-col gap-4 p-6 max-sm:p-5">
           <div className="flex min-w-0 items-start gap-3">
             {icon && <span className="mt-0.5 shrink-0 text-fg-muted">{icon}</span>}
