@@ -5,7 +5,7 @@
  */
 import { runJob, type Job, type JobOutput } from "./jobs";
 
-export type WorkerRequest = { id: number; job: Job; fault?: boolean };
+export type WorkerRequest = { id: number; job: Job };
 export type WorkerResponse =
   | { id: number; type: "progress"; value: number }
   | { id: number; type: "done"; output: JobOutput }
@@ -14,10 +14,9 @@ export type WorkerResponse =
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 
 scope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
-  const { id, job, fault } = event.data;
+  const { id, job } = event.data;
   const post = (msg: WorkerResponse, transfer: Transferable[] = []) => scope.postMessage(msg, transfer);
   try {
-    if (fault) throw new Error("Injected test fault");
     let last = 0;
     const output = await runJob(job, (value) => {
       const now = performance.now();

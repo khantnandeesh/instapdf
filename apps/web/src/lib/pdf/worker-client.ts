@@ -16,15 +16,6 @@ function resetWorker() {
   worker = null;
 }
 
-/** Fault hook for e2e tests only. Compiled out unless NEXT_PUBLIC_E2E_HOOKS=1 at build time. */
-function takeTestFault(): boolean {
-  if (process.env.NEXT_PUBLIC_E2E_HOOKS !== "1") return false;
-  const w = window as unknown as { __INSTAPDF_FAULT__?: number };
-  if (!w.__INSTAPDF_FAULT__) return false;
-  w.__INSTAPDF_FAULT__ -= 1;
-  return true;
-}
-
 export function runInWorker(
   job: Job,
   { signal, onProgress, transfer }: { signal?: AbortSignal; onProgress?: (fraction: number) => void; transfer?: Transferable[] },
@@ -61,7 +52,7 @@ export function runInWorker(
     w.addEventListener("message", onMessage);
     w.addEventListener("error", onError);
     signal?.addEventListener("abort", onAbort);
-    const request: WorkerRequest = { id, job, fault: takeTestFault() };
+    const request: WorkerRequest = { id, job };
     w.postMessage(request, transfer ?? []);
   });
 }
