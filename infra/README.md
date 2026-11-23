@@ -75,8 +75,11 @@ itself has to enforce it:
    enable "Restrict creations", "Restrict updates" and "Restrict deletions",
    bypass list = the repo owner only.
 
-Without (1), the prod deploy job fails (its token cannot impersonate
-`gh-deploy-prod`); without (2), anyone with write access could cut a release tag.
+Apply both before the first `v*` tag. GitHub auto-creates an unprotected
+`production` environment the first time a workflow references it, so (1) on its
+own does not block a release. WIF already limits the prod identity to `v*` tag
+refs running in `production`; (2) is the control that stops users with write
+access from tagging an unreviewed commit and cutting a release.
 
 ### Before F6 adds sensitive config
 
