@@ -45,11 +45,11 @@ export function runInWorker(job: Job, { signal, onProgress }: { signal?: AbortSi
     };
     const onError = (event: ErrorEvent) => {
       fail(new Error(event.message || "Worker failed"));
-      disposeWorker();
+      if (worker === w) disposeWorker(); // never kill a newer worker
     };
     const onAbort = () => {
       fail(new DOMException("Aborted", "AbortError"));
-      disposeWorker(); // the only way to stop a job that is mid-way
+      if (worker === w) disposeWorker(); // the only way to stop a job that is mid-way
     };
     inFlight.add(fail);
     w.addEventListener("message", onMessage);
