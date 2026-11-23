@@ -5,7 +5,7 @@ import { categories, tools } from "../../src/tools/registry";
 export { categories, tools };
 export const usableTools = tools.filter((t) => t.status !== "planned");
 export const plannedTools = tools.filter((t) => t.status === "planned");
-export const RECENT_KEY = "instapdf:recent-tools";
+export const RECENT_KEY = "berrypdf:recent-tools";
 
 export const isDesktop = (projectName: string) => projectName === "desktop";
 

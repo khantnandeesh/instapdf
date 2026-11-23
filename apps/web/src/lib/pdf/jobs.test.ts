@@ -12,7 +12,7 @@ describe("runJob rotate", () => {
   it("AC-41: returns one PDF that keeps the input name for one file", async () => {
     const progress: number[] = [];
     const out = await runJob(
-      { kind: "rotate", zipName: "instapdf-rotate.zip", files: [{ name: "three-pages.pdf", source: await blob("three-pages.pdf"), deltas: [90, 90, 90] }] },
+      { kind: "rotate", zipName: "berrypdf-rotate.zip", files: [{ name: "three-pages.pdf", source: await blob("three-pages.pdf"), deltas: [90, 90, 90] }] },
       (v) => progress.push(v),
     );
     expect(out.name).toBe("three-pages.pdf");
@@ -26,7 +26,7 @@ describe("runJob rotate", () => {
   it("F1 G-2: progress advances per stage and page before a single file is done", async () => {
     const progress: number[] = [];
     await runJob(
-      { kind: "rotate", zipName: "instapdf-rotate.zip", files: [{ name: "sixty-pages.pdf", source: await blob("sixty-pages.pdf"), deltas: Array(60).fill(90) }] },
+      { kind: "rotate", zipName: "berrypdf-rotate.zip", files: [{ name: "sixty-pages.pdf", source: await blob("sixty-pages.pdf"), deltas: Array(60).fill(90) }] },
       (v) => progress.push(v),
     );
     const between = progress.filter((v) => v > 0 && v < 1);
@@ -41,7 +41,7 @@ describe("runJob rotate", () => {
     await runJob(
       {
         kind: "rotate",
-        zipName: "instapdf-rotate.zip",
+        zipName: "berrypdf-rotate.zip",
         files: [
           { name: "a.pdf", source: await blob("three-pages.pdf"), deltas: [90, 90, 90] },
           { name: "b.pdf", source: await blob("sixty-pages.pdf"), deltas: Array(60).fill(90) },
@@ -59,7 +59,7 @@ describe("runJob rotate", () => {
     const out = await runJob(
       {
         kind: "rotate",
-        zipName: "instapdf-rotate.zip",
+        zipName: "berrypdf-rotate.zip",
         files: [
           { name: "three-pages.pdf", source: await blob("three-pages.pdf"), deltas: [90, 90, 90] },
           { name: "sixty-pages.pdf", source: await blob("sixty-pages.pdf"), deltas: Array(60).fill(180) },
@@ -67,7 +67,7 @@ describe("runJob rotate", () => {
       },
       () => {},
     );
-    expect(out.name).toBe("instapdf-rotate.zip");
+    expect(out.name).toBe("berrypdf-rotate.zip");
     expect(out.type).toBe("application/zip");
     expect(out.entries).toEqual([
       { name: "three-pages.pdf", pageCount: 3 },
@@ -83,7 +83,7 @@ describe("runJob rotate", () => {
     const out = await runJob(
       {
         kind: "rotate",
-        zipName: "instapdf-rotate.zip",
+        zipName: "berrypdf-rotate.zip",
         files: [
           { name: "doc.pdf", source: await blob("user-pw.pdf"), password: "test", deltas: [90] },
           { name: "doc.pdf", source: await blob("three-pages.pdf"), deltas: [] },

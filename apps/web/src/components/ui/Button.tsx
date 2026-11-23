@@ -3,14 +3,15 @@ import { cx } from "./cx";
 import { Spinner } from "./Spinner";
 
 /**
- * Mint Paper button variants (docs/design/mint-paper.md, Button):
- * - primary: the one mint fill per view (label colour: --ip-on-primary)
- * - ghost: mint tint, floods to mint on hover
- * - soft: 7% mint, 14px system font (in-app secondary actions)
- * - line: 1px mint outline, 14px system font (panel actions)
- * - outline / secondary: white with a grey outline
- * - tool: working-mode editing tool (EditorToolbar look)
- * - plain: a mint text action
+ * BerryPDF button variants (docs/design/berrypdf.md, Button):
+ * - primary: the berry button, the one filled action per view: sits on a solid lip, lifts 1px on
+ *   hover and presses 3px down onto the lip in 40ms
+ * - ghost: pink tint on a pale lip ("Select", quiet dialog action)
+ * - soft: small pink tint, no lip ("More options", in-app secondary actions)
+ * - line: white with a berry outline (panel actions)
+ * - outline / secondary: white with a grey-pink outline
+ * - tool: working-mode editing tool (blueberry EditorToolbar look)
+ * - plain: a berry text action
  */
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "soft" | "line" | "outline" | "tool" | "plain";
 export type ButtonSize = "sm" | "md" | "lg";

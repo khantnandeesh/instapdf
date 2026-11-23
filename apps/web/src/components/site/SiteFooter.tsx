@@ -3,15 +3,13 @@ import { tools } from "@/tools/registry";
 import { Wordmark } from "./BrandMark";
 import { infoPages, siteCopy } from "./copy";
 
-/* Mint Paper Footer links: near-black, 14px, 24px rows (a 24px target, WCAG 2.5.8), underline on hover. */
-const linkClass = "block text-sm leading-6 text-[var(--mp-footer-link)] no-underline hover:underline";
-/* Small bold uppercase headings. */
-const headingClass = "mb-2.5 text-sm font-bold tracking-[0.5px] text-ink uppercase";
+/* Footer links: ink, 14px, 24px targets (WCAG 2.5.8); berry and underlined on hover. */
+const linkClass = "mp-footer__link";
 
 /**
- * Footer on every page (spec F2 §3g), Mint Paper Footer: a tall, light sitemap on surface-footer
- * with 40px top padding; a small muted sign-off on the left, then plain link columns under small
- * bold uppercase headings. No icons, no social row, no dividers.
+ * Footer on every page (spec F2 §3g), compact (owner 2026-11-23: minimal text). One row: the
+ * wordmark and copyright, then All tools and the Company and Legal links inline (their headings
+ * are for screen readers). The A–Z tool list (AC-53) sits folded under a small "Tools A–Z" toggle.
  */
 export function SiteFooter() {
   const az = [...tools].sort((a, b) => a.name.localeCompare(b.name, "en"));
@@ -19,45 +17,40 @@ export function SiteFooter() {
   const company = (["about", "help"] as const).map((s) => ({ href: `/${s}`, label: infoPages[s] }));
   const legal = (["privacy", "terms", "cookies", "licenses", "security"] as const).map((s) => ({ href: `/${s}`, label: infoPages[s] }));
   return (
-    <footer className="ip-site-footer bg-surface-footer">
-      <div className="mx-auto grid max-w-[1170px] grid-cols-2 gap-[30px] px-[30px] pt-(--space-7) pb-(--space-7) text-sm lg:grid-cols-[1.4fr_3fr_1fr_1fr]">
-        <div className="col-span-2 lg:col-span-1">
+    <footer className="ip-site-footer mp-footer">
+      <div className="mx-auto flex max-w-[1170px] flex-wrap items-center justify-between gap-x-8 gap-y-3 px-[15px] pt-5 pb-3">
+        <div className="flex items-center gap-3">
           <Wordmark />
-          <small className="mt-2 block text-sm leading-6 text-muted">
-            {siteCopy.footerTagline}
-            <br />© {year} InstaPDF · {siteCopy.footerPrivacy}
-          </small>
-          <Link href="/#tools" prefetch={false} className={`${linkClass} mt-2`}>
-            {siteCopy.footerAllTools} →
-          </Link>
+          <small className="text-sm text-muted">© {year} BerryPDF</small>
         </div>
-        <nav aria-labelledby="footer-tools" className="col-span-2 lg:col-span-1">
-          <h2 id="footer-tools" className={headingClass}>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+          <Link href="/#tools" prefetch={false} className={linkClass}>
+            {siteCopy.footerAllTools}
+          </Link>
+          <FooterNav id="footer-company" title="Company" links={company} />
+          <FooterNav id="footer-legal" title="Legal" links={legal} />
+        </div>
+      </div>
+      <details className="mp-footer__az mx-auto max-w-[1170px] px-[15px] pb-5">
+        <summary className="mp-footer__link w-fit cursor-pointer">Tools A–Z</summary>
+        <nav aria-labelledby="footer-tools">
+          <h2 id="footer-tools" className="sr-only">
             Tools A–Z
           </h2>
-          <ul className="columns-2 gap-6 sm:columns-3 xl:columns-4" data-testid="footer-az">
+          <ul className="mt-2 columns-2 gap-6 sm:columns-4 lg:columns-6" data-testid="footer-az">
             {az.map((t) => (
               <li key={t.slug} className="break-inside-avoid">
                 <Link href={`/${t.slug}`} prefetch={false} className={linkClass}>
                   <span>
                     {t.name}
-                    {t.status === "planned" && (
-                      <>
-                        <span aria-hidden="true" className="ms-1.5 text-xs text-muted">
-                          Soon
-                        </span>
-                        <span className="sr-only">, coming soon</span>
-                      </>
-                    )}
+                    {t.status === "planned" && <span className="sr-only">, coming soon</span>}
                   </span>
                 </Link>
               </li>
             ))}
           </ul>
         </nav>
-        <FooterNav id="footer-company" title="Company" links={company} />
-        <FooterNav id="footer-legal" title="Legal" links={legal} />
-      </div>
+      </details>
     </footer>
   );
 }
@@ -65,10 +58,10 @@ export function SiteFooter() {
 function FooterNav({ id, title, links }: { id: string; title: string; links: { href: string; label: string }[] }) {
   return (
     <nav aria-labelledby={id}>
-      <h2 id={id} className={headingClass}>
+      <h2 id={id} className="sr-only">
         {title}
       </h2>
-      <ul>
+      <ul className="flex flex-wrap gap-x-5 gap-y-1">
         {links.map((l) => (
           <li key={l.href}>
             <Link href={l.href} prefetch={false} className={linkClass}>

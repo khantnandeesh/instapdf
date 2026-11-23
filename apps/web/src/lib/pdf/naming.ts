@@ -19,9 +19,9 @@ export function pdfOutputName(inputName: string): string {
   return /\.pdf$/i.test(only) ? only : `${baseName(only)}.pdf`;
 }
 
-/** "instapdf-<tool>.zip", with the tool slug's trailing "-pdf" removed. */
+/** "berrypdf-<tool>.zip", with the tool slug's trailing "-pdf" removed. */
 export function zipName(toolSlug: string): string {
-  return `instapdf-${toolSlug.replace(/-pdf$/, "")}.zip`;
+  return `berrypdf-${toolSlug.replace(/-pdf$/, "")}.zip`;
 }
 
 /**

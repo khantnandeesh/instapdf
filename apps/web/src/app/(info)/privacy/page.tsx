@@ -11,8 +11,8 @@ import { Code, Contact, Fill, LegalPage, List, Section, Sub, Summary, TextLink }
 import { legalFacts as f } from "@/components/legal/facts";
 
 export const metadata: Metadata = {
-  title: "Privacy · InstaPDF",
-  description: "How InstaPDF handles your files and data: browser tools process files on your device and upload nothing.",
+  title: "Privacy · BerryPDF",
+  description: "How BerryPDF handles your files and data: browser tools process files on your device and upload nothing.",
 };
 
 export default function PrivacyPage() {
@@ -21,7 +21,7 @@ export default function PrivacyPage() {
       title="Privacy"
       intro={
         <p>
-          InstaPDF is built so that we learn as little about you as possible. This page explains what happens to your files, what little information reaches our
+          BerryPDF is built so that we learn as little about you as possible. This page explains what happens to your files, what little information reaches our
           servers, and how you can check our claims yourself.
         </p>
       }
@@ -124,18 +124,18 @@ export default function PrivacyPage() {
       </Section>
 
       <Section id="children" title="Children">
-        <p>InstaPDF is not aimed at children and we don&apos;t knowingly collect information from them. With no accounts, we hold no profile of anyone.</p>
+        <p>BerryPDF is not aimed at children and we don&apos;t knowingly collect information from them. With no accounts, we hold no profile of anyone.</p>
       </Section>
 
       <Section id="changes" title="Changes to this policy">
         <p>
-          If the way InstaPDF handles data changes, for example when server tools launch, we will update this page before the change takes effect and change the
+          If the way BerryPDF handles data changes, for example when server tools launch, we will update this page before the change takes effect and change the
           date at the top.
         </p>
       </Section>
 
       <Section id="contact" title="Who we are and how to reach us">
-        <p>InstaPDF is run by:</p>
+        <p>BerryPDF is run by:</p>
         <Contact />
       </Section>
     </LegalPage>

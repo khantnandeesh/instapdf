@@ -4,13 +4,14 @@
  */
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { LeafIcon } from "../ui/icons";
 
-/** Mint Paper Prose column: about 680px, centered, left-aligned. */
+/** BerryPDF Prose column: about 680px, centred, left-aligned; no decoration. */
 export const legalContainer = "mx-auto w-full max-w-[710px] px-[15px] pt-(--space-8) pb-(--space-8) outline-none";
 
 /**
  * Text only the owner can supply (company name, contact email, governing law, dates).
- * Rendered visibly bracketed and highlighted (bold ink on sand, 10.23:1) so nobody ships it by mistake.
+ * Rendered visibly bracketed and highlighted (bold ink on sand, 11.15:1) so nobody ships it by mistake.
  */
 export function Fill({ children }: { children: string }) {
   return (
@@ -20,7 +21,7 @@ export function Fill({ children }: { children: string }) {
   );
 }
 
-/** Mint Paper Prose: page-title, a small italic date line, #555 body at 16/28, 24px paragraph gap, mint links. */
+/** BerryPDF Prose: Fredoka headings, a small muted date line, warm-brown 16/28 body, 24px paragraph gap, bold berry links. */
 export function LegalPage({ title, intro, updated = true, children }: { title: string; intro: ReactNode; updated?: boolean; children: ReactNode }) {
   return (
     <main id="main" tabIndex={-1} className={legalContainer}>
@@ -54,19 +55,19 @@ export function Section({ id, title, children }: { id: string; title: string; ch
 export function Sub({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="space-y-3">
-      <h3 className="font-bold text-[var(--mp-prose-h2)]">{title}</h3>
+      <h3 className="font-display text-[17px] font-semibold text-ink">{title}</h3>
       {children}
     </div>
   );
 }
 
 export function List({ children }: { children: ReactNode }) {
-  return <ul className="list-disc space-y-1.5 ps-6 marker:text-muted">{children}</ul>;
+  return <ul className="mp-seedlist space-y-1.5">{children}</ul>;
 }
 
-/** Mint Paper inline code chip (yellow tint). */
+/** BerryPDF inline code chip (pale yellow), in Fredoka like everything else. */
 export function Code({ children }: { children: string }) {
-  return <code className="rounded-[3px] bg-[var(--code-yellow)] px-1.5 py-0.5 font-mono text-code-chip break-words text-ink">{children}</code>;
+  return <code className="rounded-[6px] bg-[var(--code-yellow)] px-[7px] py-[3px] font-mono text-[13px] leading-4 font-medium break-words text-ink">{children}</code>;
 }
 
 export function TextLink({ href, children }: { href: string; children: ReactNode }) {
@@ -77,12 +78,15 @@ export function TextLink({ href, children }: { href: string; children: ReactNode
   );
 }
 
-/** Short "in brief" box at the top of a legal page: a Mint Paper Callout. */
+/** Short "in brief" box at the top of a legal page: a BerryPDF Callout (pink band, leaf, seed bullets). */
 export function Summary({ children }: { children: ReactNode }) {
   return (
     <div className="mp-callout">
-      <h2 className="m-0 text-[17px] leading-[25.5px] text-ink">In short</h2>
-      <ul className="mt-2 list-disc space-y-1.5 ps-6 marker:text-muted">{children}</ul>
+      <LeafIcon size={22} />
+      <div className="min-w-0">
+        <h2 className="m-0 font-display text-[17px] leading-[25.5px] font-semibold text-ink">In short</h2>
+        <ul className="mp-seedlist mt-1 text-ink">{children}</ul>
+      </div>
     </div>
   );
 }

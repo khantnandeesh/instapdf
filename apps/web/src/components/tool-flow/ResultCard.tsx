@@ -5,7 +5,7 @@ import { openPdf } from "@/lib/pdf/pdfjs";
 import { renderPage } from "@/lib/pdf/thumbnails";
 import type { FlowTool } from "@/tools/registry";
 import { Button, buttonClasses } from "../ui/Button";
-import { cx } from "../ui/cx";
+import { BerryLoader } from "../berry/Berry";
 import { CheckIcon, DownloadIcon, FilesIcon, ShareIcon } from "../ui/icons";
 import { Notice } from "../ui/Notice";
 import { copy } from "./copy";
@@ -72,13 +72,12 @@ export function ResultCard({
   const titleId = "ip-result-title";
 
   return (
-    // Mint Paper Panel: one centered white panel; Download is the single mint action.
-    <section aria-labelledby={titleId} className="mp-panel mx-auto w-full max-w-[760px] p-5 sm:p-10" data-testid="result">
-      <h2 id={titleId} className="flex items-center gap-3 text-prose-h2 tracking-[-0.5px] text-ink">
-        <span className="grid size-8 place-items-center rounded-full bg-brand-soft text-brand-strong">
-          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-            <path d="m5 12.5 4.5 4.5L19 7.5" />
-          </svg>
+    // BerryPDF Panel: one centred white panel (20px radius, sand outline, soft pink shadow);
+    // Download is the single berry action. A leaf-green tick says "done" (success, not category).
+    <section aria-labelledby={titleId} className="mp-panel mp-pop-in mx-auto w-full max-w-[760px] p-5 sm:p-10" data-testid="result">
+      <h2 id={titleId} className="flex items-center gap-3 font-display text-[22px] leading-[1.2] font-semibold text-ink-black">
+        <span className="mp-tick-in grid size-10 place-items-center rounded-full bg-[var(--mp-alert-ok-bg)] text-leaf">
+          <CheckIcon size={24} />
         </span>
         {copy.resultTitle(isZip)}
       </h2>
@@ -86,7 +85,7 @@ export function ResultCard({
         <ResultPreview output={output} />
         <div className="flex w-full min-w-0 flex-1 flex-col gap-4">
           <div>
-            <p className="text-tile-title font-bold break-all text-ink-black" data-testid="result-name">
+            <p className="text-tile-title break-all text-ink-black" data-testid="result-name">
               {output.name}
             </p>
             <p id="ip-result-summary" className="text-sm text-muted tabular-nums">
@@ -130,7 +129,7 @@ export function ResultCard({
           </div>
           {!isZip && continueTargets.length > 0 && (
             <div>
-              <h3 className="text-sm font-bold text-ink">{copy.resultContinue}</h3>
+              <h3 className="font-display text-[15px] font-semibold text-ink">{copy.resultContinue}</h3>
               <div className="mt-2 flex flex-wrap gap-2">
                 {continueTargets.map((t) => (
                   <Button key={t.slug} variant="soft" onClick={() => onContinue(t)}>
@@ -142,11 +141,11 @@ export function ResultCard({
           )}
         </div>
       </div>
-      <div className="mt-[30px] flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-[30px] flex flex-col gap-2 border-t-[1.5px] border-sand pt-5 sm:flex-row sm:items-center sm:justify-between">
         <Button variant="ghost" onClick={onStartOver} className="max-sm:w-full">
           Start over
         </Button>
-        <button type="button" onClick={onBack} className="h-11 rounded-sm px-2 text-nav text-brand-strong underline-offset-4 hover:underline max-sm:w-full">
+        <button type="button" onClick={onBack} className="h-11 rounded-sm px-2 font-display text-[16px] font-medium text-brand-strong underline-offset-4 hover:underline max-sm:w-full">
           Back to options
         </button>
       </div>
@@ -206,8 +205,9 @@ function ResultPreview({ output }: { output: ToolOutput }) {
     };
   }, [output, isPdf]);
   return (
-    <div className={cx("mp-tray grid size-[200px] shrink-0 place-items-center sm:size-[240px]", !ready && isPdf && "ip-pulse")}>
-      {isPdf ? <span ref={host} className="grid h-full w-full place-items-center" /> : <FilesIcon size={64} className="text-muted" />}
+    <div className="mp-tray relative grid size-[200px] shrink-0 place-items-center p-4 sm:size-[240px]">
+      {isPdf ? <span ref={host} className="grid h-full w-full place-items-center" /> : <FilesIcon size={64} className="text-brand-strong" />}
+      {!ready && isPdf && <BerryLoader size="sm" className="absolute" />}
     </div>
   );
 }

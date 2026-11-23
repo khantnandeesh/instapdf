@@ -1,81 +1,106 @@
 /*
- * InstaPDF design tokens on the owner's Mint Paper design system (light only).
- * Source of truth: docs/design/mint-paper.md (token mapping, category hues, measured contrast,
- * and the list of deliberate deviations from Mint Paper).
+ * BerryPDF design tokens (the owner's design system, light only).
+ * Source of truth: docs/design/berrypdf.md (token mapping, category hues, measured contrast and
+ * the short list of deliberate deviations). Values come from BerryPDF's tokens.json exactly;
+ * its `{gooseberry}`-style aliases are resolved here.
  *
  * Three layers:
- * 1. Mint Paper's own tokens, with Mint Paper's names and exact values (--brand, --sand,
- *    --cat-*, --space-*, --dur-*, --z-*; radius, shadow, easing, families and type styles
- *    live in `@theme static` below so Tailwind emits them under the same names).
- * 2. Our --ip-* role tokens, mapped onto Mint Paper. Feature code keeps using these names.
+ * 1. BerryPDF's own tokens, with BerryPDF's names and exact values (--brand, --sand, --cat-*,
+ *    --space-*, --dur-*, --z-*; radius, shadow, easing, families and type styles live in
+ *    `@theme static` below so Tailwind emits them under the same names).
+ * 2. Our --ip-* role tokens, mapped onto BerryPDF. Feature code keeps using these names.
  * 3. `@theme inline`: Tailwind utilities (bg-surface, text-fg-muted, bg-brand, bg-sand, ...).
  *
- * Dark mode: Mint Paper does not define one yet ("not yet defined"), so we ship light only.
+ * Dark mode: BerryPDF does not define one yet ("not yet defined"), so we ship light only.
  * `color-scheme: light` keeps native controls light when the OS is in dark mode.
  */
 
-/* ---- 1. Mint Paper colour, spacing, duration and z-index tokens (exact values) ------------ */
+/* ---- 1. BerryPDF colour, spacing, duration and z-index tokens (exact values) -------------- */
 :root {
   color-scheme: light;
 
-  --brand: #00bb88; /* primary fill only: main button, logo, default icon tint */
-  --brand-bright: #00cc99; /* large text and icons only (2.08:1 on surface); also the primary hover fill */
-  --brand-strong: #00805c; /* mint for body-size text and links (4.95:1 on surface) */
-  --brand-tint: rgba(0, 204, 153, 0.06); /* ghost button fill */
-  --brand-tint-border: rgba(0, 204, 153, 0.1); /* ghost button border */
-  --brand-deep: #00a37a; /* NEW pill fill in the token list; the bundle's pill uses #00805c (see Pill) */
-  --brand-soft: rgba(0, 187, 136, 0.07); /* soft button, icon button and step-number fill */
-  --ink: #333333; /* headings and body text */
-  --ink-black: #000000; /* card titles, nav links */
-  --muted: #666666; /* descriptions, secondary text (5.74:1 on surface, 4.65:1 on sand) */
-  --subtle: #9aa5aa; /* defined; not used for text here (2.52:1 fails even large text), see mint-paper.md */
+  --brand: #d92b4b; /* strawberry red: the one filled action, logo, default icon tint (white 4.78:1) */
+  --brand-bright: #f0506e; /* large accents and icons only (3.41:1 on the grid ground) */
+  --brand-strong: #b01e3c; /* berry text and links at body size (6.78:1 on surface) */
+  --brand-tint: #fdeef1; /* ghost and soft buttons, tab track, trays, selected tiles */
+  --brand-tint-border: #f6cfd6; /* the pale lip under ghost buttons and selected tiles */
+  --brand-deep: #b01e3c; /* NEW pill background, promo pill link text */
+  --brand-soft: #fdeef1; /* soft button, icon button and step-number fill */
+  --ink: #3a2a2e; /* headings and body text: warm dark brown */
+  --ink-black: #2a1c20; /* titles, prices, card names */
+  --muted: #7a6468; /* descriptions, help, hints (5.45:1 on surface) */
+  --subtle: #b39aa0; /* decorative text only (2.61:1): never used for reading text here */
   --surface: #ffffff;
-  --surface-soft: #f8f8f8; /* nav chip, hover rows */
+  --surface-soft: #fff8f3; /* nav chip, hover rows */
   --surface-footer: #f8f9fa;
-  --band: #eeeeee; /* full-width grey band */
-  --sand: #f3e5d8; /* warm section wash (fades to surface) and tool-card border */
-  --border: #eeeeee; /* hairline on chips */
-  --border-card: #e9ecef;
-  --link: #0282e5; /* selected state, focus ring, editing-tool edges (3.94:1: not for small text) */
-  --danger: #ff3268; /* field error border and glow */
-  --cat-merge: #2dc36a;
-  --cat-split: #83b31f;
-  --cat-edit: #0282e5;
-  --cat-compress: #29aad2;
-  --cat-scans: #e6405c;
-  --cat-convert-from: #f9812e;
-  --cat-convert-to: #6b0bff;
-  --cat-other: #da00ac;
-  --choice-bg: #eaf2ef; /* selected choice tile */
-  --tool-active-bg: #d9f0fa; /* editor toolbar button, active */
-  --tool-active-ink: #01518d; /* editor toolbar button text, active or hover */
-  --tool-glow: #9ecaed; /* glow around floating editor toolbars */
-  --canvas: #e8e8e8; /* editor backdrop */
-  --panel-border: #dadce0;
-  --page-tray: #eeeeee; /* tray behind a page thumbnail */
-  --switch-off: #cccccc; /* defined; the off track uses --ip-field-line instead (1.61:1), see mint-paper.md */
-  --hint: #aaaaaa; /* defined; hint text uses the bundle's #767676 (4.54:1) instead */
-  --code-yellow: rgba(241, 196, 15, 0.1);
-  --code-blue: rgba(52, 152, 219, 0.1);
-  --code-orange: rgba(243, 156, 18, 0.1);
-  --syntax-keyword: #0077aa;
-  --syntax-string: #669900;
+  --band: #fff1f3; /* pink band behind callouts, menu hovers, soft sections */
+  --sand: #fbe4e1; /* strawberry-cream wash and tool-card border */
+  --border: #f3d9dc; /* hairline on chips and dividers */
+  --border-card: #f6dfe2; /* plan card border */
+  --link: #4a63d9; /* blueberry: focus rings, editing tools, information */
+  --danger: #9f1d14; /* errors: brick red, never confused with the primary */
+  --gooseberry: #7fae2a;
+  --leaf: #287a3c; /* strawberry leaf: success, checks, the loader's leaves (white 5.33:1) */
+  --blueberry: #4a63d9;
+  --huckleberry: #2f7fa8;
+  --blackberry: #4b2a63;
+  --cloudberry: #f08c2e;
+  --elderberry: #6b3fd1;
+  --mulberry: #a03a8c;
+  --cat-merge: var(--gooseberry);
+  --cat-split: var(--leaf);
+  --cat-edit: var(--blueberry);
+  --cat-compress: var(--huckleberry);
+  --cat-scans: var(--blackberry);
+  --cat-convert-from: var(--cloudberry);
+  --cat-convert-to: var(--elderberry);
+  --cat-other: var(--mulberry);
+  --choice-bg: #fbeaee; /* selected choice tile */
+  --tool-active-bg: #e2e7ff; /* editor toolbar button, active (pale blueberry) */
+  --tool-active-ink: #24338f; /* editor toolbar text, active */
+  --tool-glow: #c5cdf7; /* blueberry halo around floating toolbars */
+  --canvas: #f4eef0; /* warm grey behind the white page in the editor */
+  --panel-border: #fbe4e1;
+  --page-tray: #fdeef1; /* tray behind a page preview thumbnail */
+  --switch-off: #e6d3d6; /* defined; the off track uses --ip-field-line (deviation, see berrypdf.md) */
+  --hint: #7a6468;
+  --code-yellow: #fff1c9;
+  --code-blue: #e2e7ff;
+  --code-orange: #ffe3c9;
+  --syntax-keyword: #3147b8;
+  --syntax-string: #3d7a1a;
+  --berry-flesh: #ffd9df;
+  --berry-seed: #ffe9a8;
+  --cream: #fff8f3; /* whipped cream: jam labels, progress track, footer */
+  --milk: #ffeef0; /* strawberry milk: lower end of the waves, soft pink fills */
+  --blossom: #ffffff;
+  --blossom-heart: #ffd84d;
+  --jam: #d92b4b;
 
-  /* Values Mint Paper's component bundle uses that have no token of their own. */
-  --mp-hint-ink: #767676; /* .mp-hint, tray page numbers: 4.54:1 on surface */
-  --mp-row-hover: #f5f5f5; /* menu row hover */
-  --mp-menu-border: rgba(0, 0, 0, 0.15);
-  --mp-input-border: #cccccc; /* source input border (1.61:1); fields use --ip-field-line */
-  --mp-outline-border: #bbbbbb; /* outline button border */
-  --mp-alert-edge: #00523c; /* darker bottom edge of the mint alert */
-  --mp-alert-danger: #c4124a; /* destructive alert fill (white text 5.94:1) */
-  --mp-alert-danger-edge: #8a0c34;
-  --mp-prose: #555555; /* legal/help body (7.46:1) */
-  --mp-prose-h2: #444444;
-  --mp-footer-link: #222222;
-  --mp-callout: rgba(0, 128, 92, 0.06);
-  --mp-focus-glow: rgba(2, 130, 229, 0.5); /* input focus glow */
-  --mp-input-inset: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+  /* Values BerryPDF's component bundle uses that have no token of their own. */
+  --mp-grid-ground: #fffdfb; /* grid paper: warm white under faint pink lines */
+  --mp-grid-line: rgba(217, 43, 75, 0.07);
+  --mp-pink-hover: #fbdde3; /* soft, ghost and icon button hover */
+  --mp-card-hover-border: #f5b9c3;
+  --mp-field-border-src: #ecd5d9; /* the bundle's field edge (1.39:1); fields use --ip-field-line */
+  --mp-check-border-src: #e2b9c1; /* the bundle's checkbox edge (1.76:1) */
+  --mp-outline-border: #e6d3d6; /* outline button ring */
+  --mp-outline-lip: #efe0e2;
+  --mp-choice-lip: #f3e3e6;
+  --mp-tool-ink: #3147b8; /* editing-tool label (7.71:1) */
+  --mp-tool-hover: #f1f3ff;
+  --mp-prose: #5b484c; /* long reading text (8.48:1) */
+  --mp-alert-ok-bg: #e9f6ec;
+  --mp-alert-ok-ink: #1d5f2d;
+  --mp-alert-ok-border: #bfe3c7;
+  --mp-alert-danger-bg: #fdecea;
+  --mp-alert-danger-ink: #8a1a12;
+  --mp-alert-danger-border: #f3c1bb;
+  --mp-alert-info-bg: #eceffd;
+  --mp-alert-info-ink: #2c3fa8;
+  --mp-alert-info-border: #c9d1f7;
+  --mp-jam-border: #f1c9cf;
+  --mp-backdrop: rgba(58, 20, 30, 0.34);
 
   --space-1: 4px;
   --space-2: 8px;
@@ -87,106 +112,106 @@
   --space-8: 60px;
   --space-9: 120px;
 
-  --dur-fast: 0.15s; /* focus: border-color, box-shadow */
-  --dur-base: 0.2s; /* hover: background, halo opacity */
-  --dur-move: 0.3s; /* transforms: logo spin, modal in */
-  --dur-slow: 0.5s; /* button enter, card nudge, width changes */
-  --dur-attention: 1s; /* alert slide-down, brand-name colour fade */
-  --dur-tool: 0.4s; /* editor toolbar colour changes, switch */
+  --dur-fast: 0.15s; /* focus ring */
+  --dur-base: 0.2s; /* hovers: card lift, fills, icon tilt */
+  --dur-move: 0.3s; /* transforms: logo, modal in, switch */
+  --dur-slow: 0.5s; /* width changes (jam progress) */
+  --dur-attention: 1s;
+  --dur-tool: 0.4s; /* editor toolbar colour changes */
+  --dur-loader: 2.6s; /* one berry loader cycle */
+  --dur-press: 0.04s; /* motion.md: the button press, 40ms */
+  --dur-lift: 0.12s; /* motion.md: button lift, control press */
 
   --z-header: 899;
   --z-header-link: 900;
   --z-progress: 1000;
 }
 
-/* ---- 2. InstaPDF role tokens (names kept; values from Mint Paper) --------------------------- */
+/* ---- 2. --ip-* role tokens (names kept; values from BerryPDF) ----------------------------- */
 :root {
   /* Grounds */
-  --ip-bg: var(--surface);
-  --ip-surface: var(--surface-footer); /* secondary ground: footer */
+  --ip-bg: var(--mp-grid-ground); /* the page: grid paper */
+  --ip-surface: var(--cream); /* secondary ground: footer */
   --ip-surface-raised: var(--surface); /* cards, panels, fields */
   --ip-surface-overlay: var(--surface); /* menus, dialogs, floating bars */
   --ip-chrome: var(--surface); /* sticky bars: header, tool toolbar */
   --ip-well: var(--page-tray); /* tray behind a framed page */
   --ip-surface-sunken: var(--band); /* tags, tracks, placeholders */
-  --ip-hover: var(--mp-row-hover); /* hover rows */
-  --ip-pressed: var(--band);
+  --ip-hover: var(--band); /* hover rows */
+  --ip-pressed: var(--mp-pink-hover);
 
   /* Edges */
-  --ip-border: var(--border); /* hairlines */
-  /* Deviation (WCAG 1.4.11): Mint Paper's #ccc field border is 1.61:1. Text-field and switch-track
-     edges use the bundle's own #767676 instead (4.54:1 on surface, 3.68:1 on sand). */
-  --ip-field-line: var(--mp-hint-ink);
+  --ip-border: var(--sand); /* hairlines */
+  /* Deviation (WCAG 1.4.11): BerryPDF's pale-pink field, checkbox and switch edges are 1.39-1.76:1.
+     They use the checkbox pink darkened to 3:1 on the pinkest ground (3.39:1 on surface). */
+  --ip-field-line: #a2848a;
   --ip-field-line-hover: var(--muted);
-  --ip-border-strong: var(--mp-hint-ink);
+  --ip-border-strong: #a2848a;
 
   /* Text */
   --ip-fg: var(--ink);
   --ip-fg-muted: var(--muted);
-  --ip-fg-disabled: var(--hint);
+  --ip-fg-disabled: var(--muted);
   --ip-paper: #ffffff;
   --ip-inverse: var(--ink);
   --ip-on-inverse: #ffffff;
 
-  /* Mint */
-  --ip-accent: var(--brand); /* marks, progress */
+  /* Berry */
+  --ip-accent: var(--brand);
   --ip-primary: var(--brand); /* the one filled action */
-  --ip-primary-hover: var(--brand-bright);
+  --ip-primary-hover: var(--brand);
   --ip-primary-active: var(--brand);
-  /* The primary button's label colour, in one place. Mint Paper pairs #00bb88 with white
-     (2.48:1, fails WCAG AA at every size). Until the owner decides we use the system's own
-     ink-black: 8.46:1 on brand, 10.10:1 on brand-bright (hover). Strict Mint Paper: #ffffff. */
-  --ip-on-primary: var(--ink-black);
-  --ip-primary-ink: var(--brand-strong); /* mint as text */
+  --ip-on-primary: #ffffff; /* white on brand: 4.78:1 (BerryPDF: "about 4.8:1") */
+  --ip-primary-ink: var(--brand-strong); /* berry as text */
   --ip-primary-soft: var(--brand-soft);
   --ip-on-primary-soft: var(--brand-strong);
   --ip-primary-faint: var(--brand-tint);
-  --ip-primary-ring: var(--mp-focus-glow);
+  --ip-primary-ring: rgba(217, 43, 75, 0.16); /* field focus ring */
   --ip-focus-ring: var(--link);
 
-  /* Status. Mint Paper has a mint alert and a danger alert; it defines no success/warning hues. */
-  --ip-danger: var(--danger); /* error borders and glows */
-  --ip-danger-hover: var(--mp-alert-danger-edge);
-  --ip-danger-soft: rgba(255, 50, 104, 0.08);
-  --ip-danger-strong: var(--mp-alert-danger); /* alert fill, danger icons */
+  /* Status. BerryPDF: leaf for success, brick for errors, blueberry for information. */
+  --ip-danger: var(--danger);
+  --ip-danger-hover: var(--mp-alert-danger-ink);
+  --ip-danger-soft: var(--mp-alert-danger-bg);
+  --ip-danger-strong: var(--danger);
   --ip-on-danger: #ffffff;
-  --ip-success: var(--brand-strong);
-  --ip-success-soft: var(--brand-soft);
-  --ip-warning: var(--brand-strong);
-  --ip-warning-soft: var(--mp-callout);
+  --ip-success: var(--leaf);
+  --ip-success-soft: var(--mp-alert-ok-bg);
+  --ip-warning: var(--mp-alert-info-ink);
+  --ip-warning-soft: var(--band);
 
   /* Overlays */
-  --ip-scrim: rgb(0 0 0 / 0.45);
-  --ip-drop-overlay: rgb(234 242 239 / 0.94); /* choice-bg, nearly opaque */
+  --ip-scrim: var(--mp-backdrop);
+  --ip-drop-overlay: rgb(253 238 241 / 0.94); /* brand-tint, nearly opaque */
 
   /* Elevation */
   --ip-shadow-sm: var(--shadow-card);
   --ip-shadow-md: var(--shadow-panel);
   --ip-shadow-lg: var(--shadow-menu);
-  --ip-shadow-paper: 0 0 0 1px rgb(0 0 0 / 0.08), 0 1px 3px rgb(0 0 0 / 0.08); /* a PDF page on its tray */
+  --ip-shadow-paper: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(58, 42, 46, 0.06); /* a PDF page on its tray */
 
-  /* Catalogue categories -> Mint Paper cat-* hues (icon disc and icon), plus a text shade for the
-     UPPERCASE eyebrow. Deviation: the cat-* hues are 1.86-3.72:1 on sand, so eyebrow words use the
-     same hue darkened until it reaches 4.5:1 on sand (see mint-paper.md). */
-  --ip-cat-organize: var(--cat-merge);
-  --ip-cat-organize-text: #1b7640;
-  --ip-cat-edit: var(--cat-edit);
-  --ip-cat-edit-text: #026aba;
-  --ip-cat-optimize: var(--cat-compress);
-  --ip-cat-optimize-text: #1b6f89;
-  --ip-cat-security: var(--cat-split);
-  --ip-cat-security-text: #527013;
-  --ip-cat-convert-from: var(--cat-convert-from);
-  --ip-cat-convert-from-text: #ad4a05;
-  --ip-cat-convert-to: var(--cat-convert-to);
-  --ip-cat-convert-to-text: var(--cat-convert-to); /* already 5.46:1 on sand */
-  --ip-cat-scans: var(--cat-scans);
-  --ip-cat-scans-text: #c91a38;
-  --ip-cat-automate: var(--cat-other);
-  --ip-cat-automate-text: #c00098;
+  /* Catalogue categories -> BerryPDF's berry hues (icon disc and icon), plus a text shade for the
+     UPPERCASE eyebrow. Deviation: three hues are under 4.5:1 for 15px text on the grid paper (measured
+     on a grid line), so their eyebrow words use the same hue darkened to 4.5:1 (see berrypdf.md). */
+  --ip-cat-organize: var(--cat-merge); /* gooseberry */
+  --ip-cat-organize-text: #53721c;
+  --ip-cat-edit: var(--cat-edit); /* blueberry */
+  --ip-cat-edit-text: var(--cat-edit); /* 4.56:1 on a grid line, unchanged */
+  --ip-cat-optimize: var(--cat-compress); /* huckleberry */
+  --ip-cat-optimize-text: #297094;
+  --ip-cat-security: var(--cat-split); /* leaf */
+  --ip-cat-security-text: var(--cat-split); /* 4.73:1, unchanged */
+  --ip-cat-convert-from: var(--cat-convert-from); /* cloudberry */
+  --ip-cat-convert-from-text: #98591d;
+  --ip-cat-convert-to: var(--cat-convert-to); /* elderberry, 5.31:1 unchanged */
+  --ip-cat-convert-to-text: var(--cat-convert-to);
+  --ip-cat-scans: var(--cat-scans); /* blackberry, 9.55:1 unchanged */
+  --ip-cat-scans-text: var(--cat-scans);
+  --ip-cat-automate: var(--cat-other); /* mulberry, 4.97:1 unchanged */
+  --ip-cat-automate-text: var(--cat-other);
 
   /* Layout metrics (shared tool flow, header, menu) */
-  --ip-header-h: 57px; /* sticky header height: 15px top padding + 41px row + 1px */
+  --ip-header-h: 64px; /* sticky header: 62.5px row incl. the 1.5px sand line, rounded */
   --ip-dock-w: 360px; /* options panel column at >= 1024px */
   --ip-dock-h: 176px; /* fixed bottom dock below 640px */
   --ip-dock-h-md: 104px; /* fixed bottom dock 640-1023px */
@@ -194,90 +219,92 @@
   --ip-tap-min: 44px;
   --ip-z-header: 20;
   --ip-z-header-open: 50;
-  --ip-recent-h: 92px;
+  --ip-recent-h: 96px;
 }
 
 @media (min-width: 640px) {
   :root {
-    --ip-recent-h: 96px;
+    --ip-recent-h: 100px;
   }
 }
 
-/* ---- Tailwind: Mint Paper radius, shadow, easing, families and type styles ------------------ */
+/* ---- Tailwind: BerryPDF radius, shadow, easing, families and type styles ------------------ */
 @theme static {
-  --radius-sm: 4px; /* medium buttons, menus, tabs, fields */
-  --radius-md: 5px; /* nav chip, alerts, modal */
-  --radius-lg: 6px; /* large buttons */
-  --radius-card: 10px; /* tool card: three corners */
-  --radius-leaf: 25px; /* tool card bottom-right only */
-  --radius-pill: 20px; /* hover halo on icon-only buttons */
-  --radius-panel: 8px; /* app panels */
-  --radius-tray: 10px; /* page tray, promo pill */
-  --radius-round: 26px; /* switch track, round icon buttons */
+  --radius-sm: 8px; /* small chips, code chips */
+  --radius-md: 12px; /* text fields, code blocks, toolbar ends */
+  --radius-lg: 14px; /* buttons, menus, alerts, callouts, trays */
+  --radius-card: 16px; /* tool card, choice tile */
+  --radius-leaf: 28px; /* the leaf corner, bottom right */
+  --radius-pill: 999px; /* tabs, pills, switch */
+  --radius-panel: 20px; /* app panels */
+  --radius-tray: 14px; /* page preview trays */
+  --radius-round: 24px; /* modals */
 
-  --shadow-card: rgba(243, 229, 216, 0.5) 0px 2px 3px 0px, rgba(0, 0, 0, 0.08) 0px 1px 3px 0px;
-  --shadow-button: rgba(50, 50, 93, 0.11) 0px 4px 6px 0px, rgba(0, 0, 0, 0.08) 0px 1px 3px 0px;
-  --shadow-menu: rgba(0, 0, 0, 0.176) 0px 6px 12px 0px;
-  --shadow-plan: rgba(0, 0, 0, 0.06) 0px 10px 22px 0px;
-  --shadow-pressed: rgba(0, 0, 0, 0.125) 0px 3px 5px 0px inset;
-  --shadow-panel: rgba(50, 50, 93, 0.06) 0px 4px 7px 0px, rgba(0, 0, 0, 0.04) 0px 1px 4px 0px;
-  --shadow-glow: #9ecaed 0px 0px 10px 0px;
-  --shadow-window: #acacac 0px 0px 20px 0px;
+  --shadow-card: rgba(217, 43, 75, 0.1) 0px 6px 16px 0px, rgba(0, 0, 0, 0.04) 0px 1px 2px 0px;
+  --shadow-button: #b01e3c 0px 4px 0px 0px, rgba(217, 43, 75, 0.22) 0px 10px 18px 0px;
+  --shadow-menu: rgba(120, 20, 40, 0.16) 0px 12px 28px 0px;
+  --shadow-plan: rgba(217, 43, 75, 0.16) 0px 12px 24px 0px, rgba(0, 0, 0, 0.05) 0px 2px 4px 0px;
+  --shadow-lift: rgba(217, 43, 75, 0.16) 0px 12px 24px 0px, rgba(0, 0, 0, 0.05) 0px 2px 4px 0px; /* = shadow-plan */
+  --shadow-pressed: #b01e3c 0px 1px 0px 0px;
+  --shadow-panel: rgba(217, 43, 75, 0.07) 0px 3px 8px 0px;
+  --shadow-glow: rgba(74, 99, 217, 0.14) 0px 0px 0px 4px, rgba(74, 99, 217, 0.16) 0px 6px 14px 0px;
+  --shadow-window: rgba(217, 43, 75, 0.1) 0px 6px 16px 0px;
 
   --ease-standard: ease-in-out;
   --ease-enter: ease-out;
   --ease-progress-a: cubic-bezier(0.65, 0.815, 0.735, 0.395);
   --ease-progress-b: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --ease-loader: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1); /* the bundle's small overshoot: modal, switch */
 
-  /* Mint Paper's family stacks. Atkinson Hyperlegible is self-hosted with next/font
-     (layout.tsx defines --font-atkinson); the named family follows as in Mint Paper. */
-  --font-sans: var(--font-atkinson), "Atkinson Hyperlegible", Atkinson, system-ui, sans-serif;
-  --font-mono: Menlo, Monaco, Consolas, "Courier New", monospace;
-  --font-ui: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  /* One family everywhere: Fredoka, self-hosted with next/font (layout.tsx defines --font-fredoka).
+     BerryPDF has no second font: the App styles ("ui") and code use it too. */
+  --font-sans: var(--font-fredoka), Fredoka, system-ui, sans-serif;
+  --font-display: var(--font-fredoka), Fredoka, system-ui, sans-serif;
+  --font-ui: var(--font-fredoka), Fredoka, system-ui, sans-serif;
+  --font-mono: var(--font-fredoka), Fredoka, system-ui, sans-serif;
 
-  /* Mint Paper type styles -> text-<style> utilities (size, line height, tracking, weight). */
-  --text-hero: 39px;
-  --text-hero--line-height: 42.9px;
-  --text-hero--letter-spacing: -1px;
+  /* BerryPDF type styles -> text-<style> utilities (size, line height, weight). */
+  --text-hero: 44px;
+  --text-hero--line-height: 48px;
   --text-hero--font-weight: 700;
   --text-page-title: 36px;
-  --text-page-title--line-height: 39.6px;
-  --text-page-title--letter-spacing: -1px;
-  --text-page-title--font-weight: 700;
+  --text-page-title--line-height: 40px;
+  --text-page-title--font-weight: 600;
   --text-section-title: 30px;
-  --text-section-title--line-height: 33px;
-  --text-section-title--letter-spacing: -0.5px;
-  --text-section-title--font-weight: 700;
-  --text-card-heading: 26px;
-  --text-card-heading--line-height: 28.6px;
-  --text-card-heading--letter-spacing: -0.5px;
-  --text-card-heading--font-weight: 700;
-  --text-subtitle: 26px;
-  --text-subtitle--line-height: 28.6px;
-  --text-subtitle--font-weight: 500; /* Atkinson Hyperlegible ships 400/700 only: renders at 400 */
+  --text-section-title--line-height: 34px;
+  --text-section-title--font-weight: 600;
+  --text-card-heading: 24px;
+  --text-card-heading--line-height: 28px;
+  --text-card-heading--font-weight: 600;
+  --text-subtitle: 24px;
+  --text-subtitle--line-height: 30px;
+  --text-subtitle--font-weight: 500;
   --text-body: 17px;
   --text-body--line-height: 25.5px;
   --text-tile-title: 18px;
   --text-tile-title--line-height: 28px;
+  --text-tile-title--font-weight: 600;
   --text-tile-desc: 14px;
   --text-tile-desc--line-height: 16px;
-  --text-eyebrow: 18px;
+  --text-eyebrow: 15px;
   --text-eyebrow--line-height: 24px;
-  --text-button: 18px;
-  --text-button--line-height: 25.7px;
-  --text-button--font-weight: 700;
-  --text-button-lg: 22px;
-  --text-button-lg--line-height: 29px;
-  --text-button-lg--font-weight: 700;
+  --text-eyebrow--font-weight: 600;
+  --text-button: 17px;
+  --text-button--line-height: 17px;
+  --text-button--font-weight: 600;
+  --text-button-lg: 20px;
+  --text-button-lg--line-height: 20px;
+  --text-button-lg--font-weight: 600;
   --text-nav: 17px;
   --text-nav--line-height: 24.3px;
-  --text-tool-button: 14px; /* with font-ui */
+  --text-tool-button: 14px;
   --text-tool-button--line-height: 20px;
-  --text-choice-label: 15px; /* with font-ui */
+  --text-choice-label: 15px;
   --text-choice-label--line-height: 20px;
-  --text-pill: 10px; /* with font-ui */
+  --text-pill: 10px;
   --text-pill--line-height: 12px;
-  --text-help: 12px; /* with font-ui */
+  --text-help: 12px;
   --text-help--line-height: 17px;
   --text-prose-h2: 22px;
   --text-prose-h2--line-height: 26px;
@@ -286,28 +313,33 @@
   --text-prose-body--line-height: 28px;
   --text-step-title: 20px;
   --text-step-title--line-height: 28px;
+  --text-blog-title: 35.2px;
+  --text-blog-title--line-height: 40px;
+  --text-blog-title--font-weight: 700;
+  --text-blog-body: 20px;
+  --text-blog-body--line-height: 30px;
   --text-code: 13px;
   --text-code--line-height: 19px;
   --text-code-chip: 12px;
   --text-code-chip--line-height: 16px;
 
-  /* Generic sizes re-pointed at the Mint Paper scale, so no off-scale size can slip in. */
+  /* Generic sizes re-pointed at the BerryPDF scale, so no off-scale size can slip in. */
   --text-xs: 12px; /* help */
   --text-xs--line-height: 17px;
-  --text-sm: 14px; /* tile-desc / tool-button size */
+  --text-sm: 14px; /* tile-desc, tool-button */
   --text-sm--line-height: 20px;
   --text-base: 17px; /* body */
   --text-base--line-height: 25.5px;
-  --text-lg: 18px; /* tile-title, eyebrow, button */
+  --text-lg: 18px; /* tile-title */
   --text-lg--line-height: 28px;
-  --text-xl: 20px; /* step-title */
+  --text-xl: 20px; /* step-title, button-lg */
   --text-xl--line-height: 28px;
-  --text-2xl: 22px; /* prose-h2, button-lg */
+  --text-2xl: 22px; /* prose-h2 */
   --text-2xl--line-height: 26px;
-  --text-3xl: 26px; /* card-heading, subtitle */
-  --text-3xl--line-height: 28.6px;
+  --text-3xl: 24px; /* card-heading, subtitle */
+  --text-3xl--line-height: 30px;
   --text-4xl: 30px; /* section-title */
-  --text-4xl--line-height: 33px;
+  --text-4xl--line-height: 34px;
 }
 
 /* ---- 3. Colour utilities ---------------------------------------------------------------------- */
@@ -355,7 +387,7 @@
   --color-scrim: var(--ip-scrim);
   --color-drop-overlay: var(--ip-drop-overlay);
 
-  /* Mint Paper names */
+  /* BerryPDF names */
   --color-brand: var(--brand);
   --color-brand-bright: var(--brand-bright);
   --color-brand-strong: var(--brand-strong);
@@ -364,9 +396,12 @@
   --color-ink: var(--ink);
   --color-ink-black: var(--ink-black);
   --color-muted: var(--muted);
-  --color-hint-ink: var(--mp-hint-ink);
+  --color-hint-ink: var(--hint);
   --color-sand: var(--sand);
   --color-band: var(--band);
+  --color-cream: var(--cream);
+  --color-milk: var(--milk);
+  --color-leaf: var(--leaf);
   --color-surface-soft: var(--surface-soft);
   --color-surface-footer: var(--surface-footer);
   --color-link: var(--link);

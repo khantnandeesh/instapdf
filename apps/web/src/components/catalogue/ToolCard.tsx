@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { splitAt, type Range } from "@/lib/catalogue/search";
 import { Badge } from "../ui/Badge";
 import { cx } from "../ui/cx";
-import { RuntimeMarker } from "../ui/RuntimeMarker";
+import { RUNTIME_CLIENT_TEXT } from "../ui/RuntimeMarker";
 import { catalogueCopy as copy } from "./copy";
 import { usable, type ToolIndexItem } from "./types";
 
@@ -38,83 +38,82 @@ export function NameSep() {
   );
 }
 
-/** Badge and runtime marker, each preceded by a NameSep. */
-function Meta({ item, className }: { item: ToolIndexItem; className?: string }) {
+/**
+ * The card's one visible status mark (owner 2026-11-23, minimal text): a small "Soon" tag for a
+ * planned tool or the "Beta" pill. The full words ("Coming soon") and the runtime fact ("Runs in
+ * your browser") stay in the link's accessible name (AC-9, AC-59), visually hidden. Each piece is
+ * preceded by a NameSep so the name reads "Merge, Join PDFs…, Coming soon, Runs in your browser".
+ */
+function Meta({ item }: { item: ToolIndexItem }) {
   const badge = badgeText(item);
-  if (!badge && item.runtime !== "client") return null;
   return (
-    <span className={cx("flex min-h-5 flex-wrap items-center gap-x-2 gap-y-1", className)}>
+    <>
       {badge && (
         <>
           <NameSep />
-          <Badge tone={item.status === "planned" ? "soon" : "beta"}>{badge}</Badge>
+          {item.status === "planned" ? (
+            <Badge tone="soon" className="mp-card__mark">
+              <span aria-hidden="true">{copy.soonShort}</span>
+              <span className="sr-only">{badge}</span>
+            </Badge>
+          ) : (
+            <Badge tone="beta" className="mp-card__mark">
+              {badge}
+            </Badge>
+          )}
         </>
       )}
       {item.runtime === "client" && (
         <>
           <NameSep />
-          <RuntimeMarker />
+          <span className="sr-only">{RUNTIME_CLIENT_TEXT}</span>
         </>
       )}
-    </span>
+    </>
   );
 }
 
-/** The 32px icon halo: the category hue at 20% behind a thin icon in the full hue (Mint Paper ToolCard). */
+/** The 40px icon disc: the category berry at 16% behind the duotone icon in the full colour (BerryPDF ToolCard). */
 function Halo({ item }: { item: ToolIndexItem }) {
   return <span className="mp-halo">{item.icon}</span>;
 }
 
-/** Leaf-cornered Mint Paper tool card. Colour means category: `ip-cat-*` sets the hue. */
+/** Leaf-cornered BerryPDF tool card. Colour means category: `ip-cat-*` sets the hue. */
 const cardClass = (item: ToolIndexItem, extra?: string) => cx("mp-card", `ip-cat-${item.category}`, extra);
 
-/** Full catalogue card: the whole card is one link (AC-7). */
+/**
+ * Catalogue card: icon, name and at most one small status mark; the whole card is one link (AC-7).
+ * The summary is not shown (owner 2026-11-23): it stays in the accessible name (visually hidden)
+ * and is the hover tooltip.
+ */
 export function ToolCard({ item, idPrefix = "cat", nameRange, summaryRange }: { item: ToolIndexItem; idPrefix?: string; nameRange?: Range; summaryRange?: Range }) {
   const base = `${idPrefix}-${item.slug}`;
-  // The name comes from the content, in visual order: name, summary, badge, marker (AC-56).
+  // The name comes from the content, in DOM order: name, summary, badge, marker (AC-56).
   return (
-    <Link href={`/${item.slug}`} prefetch={false} className={cardClass(item)} data-planned={usable(item) ? undefined : ""}>
-      <span className="mp-card__top">
-        <Halo item={item} />
-        <span id={`${base}-name`} className="min-w-0 [overflow-wrap:anywhere]">
-          <Highlighted text={item.name} range={nameRange} />
-        </span>
+    <Link href={`/${item.slug}`} prefetch={false} title={item.summary} className={cardClass(item)} data-planned={usable(item) ? undefined : ""}>
+      <Halo item={item} />
+      <span id={`${base}-name`} className="mp-card__name">
+        <Highlighted text={item.name} range={nameRange} />
       </span>
       <NameSep />
-      <span id={`${base}-summary`} className="mp-card__desc">
+      <span id={`${base}-summary`} className="sr-only">
         <Highlighted text={item.summary} range={summaryRange} />
       </span>
-      <Meta item={item} className="mb-1 ms-1.5" />
+      <Meta item={item} />
     </Link>
   );
 }
 
-/** Popular-row card. The summary shows at >= 1024 px and is always part of the link's name. */
+/** Popular-row card: the same card, without search highlights. */
 export function ToolTile({ item, idPrefix = "pop" }: { item: ToolIndexItem; idPrefix?: string }) {
-  const base = `${idPrefix}-${item.slug}`;
-  // Name from content, in visual order: name, summary (visible at >= 1024 px), badge, marker (AC-56).
-  return (
-    <Link href={`/${item.slug}`} prefetch={false} className={cardClass(item)} data-planned={usable(item) ? undefined : ""}>
-      <span className="mp-card__top">
-        <Halo item={item} />
-        <span id={`${base}-name`} className="min-w-0 [overflow-wrap:anywhere]">
-          {item.name}
-        </span>
-      </span>
-      <NameSep />
-      <span id={`${base}-summary`} className="sr-only lg:not-sr-only lg:mt-1.5 lg:mb-2 lg:ms-1.5 lg:block lg:text-sm lg:leading-4 lg:text-muted">
-        {item.summary}
-      </span>
-      <Meta item={item} className="mt-1 mb-1 ms-1.5" />
-    </Link>
-  );
+  return <ToolCard item={item} idPrefix={idPrefix} />;
 }
 
-/** Recent-tools chip (usable tools only, so no badges): the Mint Paper nav chip, icon in its category hue. */
+/** Recent-tools chip (usable tools only, so no badges): the BerryPDF nav chip, icon in its category colour. */
 export function ToolChip({ item, children }: { item: ToolIndexItem; children?: ReactNode }) {
   return (
     <Link href={`/${item.slug}`} className={cx("mp-navlink mp-navlink--chip gap-2", `ip-cat-${item.category}`)}>
-      <span className="text-(--c) [&_svg]:size-4">{item.icon}</span>
+      <span className="text-(--c) [&_svg]:size-[18px]">{item.icon}</span>
       {item.name}
       {children}
     </Link>

@@ -2,13 +2,23 @@
 @import "../styles/tokens.css";
 
 /*
- * Mint Paper components (docs/design/mint-paper.md). Class names follow Mint Paper's `mp-` bundle;
- * values are Mint Paper's. Where we deviate for WCAG AA the rule says so and the doc lists it.
+ * BerryPDF components and motifs (docs/design/berrypdf.md). Class names follow BerryPDF's `mp-`
+ * bundle and its values are the bundle's. Where we deviate for WCAG AA the rule says so and the
+ * doc lists it. All decoration is CSS and same-document SVG: no inline styles anywhere (strict CSP).
  */
 
 @layer base {
+  /* Grid paper: the default background behind everything (Backgrounds, mp-bg-grid). */
+  html,
+  body {
+    background-color: var(--mp-grid-ground);
+    background-image:
+      linear-gradient(var(--mp-grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--mp-grid-line) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
   html {
-    background: var(--surface);
     color: var(--ink);
   }
 
@@ -16,219 +26,257 @@
     /* Safety net: nothing should widen the page (clip keeps sticky working). */
     overflow-x: clip;
     margin: 0;
-    background: var(--surface);
     color: var(--ink);
-    font-family: var(--font-sans);
-    font-size: 17px;
-    line-height: 25.5px;
+    font: 400 17px/1.5 var(--font-sans);
   }
 
-  /* One focus style everywhere (Mint Paper button focus): 3px link-blue, 2px offset.
-     3.94:1 on surface, 3.19:1 on sand, 3.62:1 on band. */
+  /* One focus ring everywhere: 3px blueberry (BerryPDF Button), 2px away; buttons, icon buttons,
+     tabs and choice tiles sit 3px away (below). */
   :focus-visible {
     outline: 3px solid var(--link);
     outline-offset: 2px;
   }
 
   ::selection {
-    background: rgba(2, 130, 229, 0.2);
+    background: var(--berry-flesh);
   }
 }
 
 @layer components {
-  /* ---- Button ------------------------------------------------------------------------------- */
+  /* The berry sprite (BerrySprite): definitions only, takes no space. */
+  .mp-sprite {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+  }
+
+  /* ---- Button: a pillowy, press-down berry ---------------------------------------------------- */
   .mp-btn {
     position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    font: 700 18px/25.7px var(--font-sans);
-    padding: 8px 16px;
-    border: 1px solid var(--brand);
-    border-radius: var(--radius-sm);
+    font: 600 17px/1 var(--font-display);
+    padding: 13px 22px;
+    border: 0;
+    border-radius: var(--radius-lg);
     background: var(--brand);
     color: var(--ip-on-primary);
     cursor: pointer;
     text-decoration: none;
     white-space: nowrap;
     user-select: none;
-    box-shadow: var(--shadow-button);
+    box-shadow:
+      0 4px 0 var(--brand-strong),
+      0 10px 18px rgba(217, 43, 75, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35);
     transition:
-      transform var(--dur-slow),
-      opacity var(--dur-slow),
+      transform var(--dur-lift) ease,
+      box-shadow var(--dur-lift) ease,
+      filter var(--dur-base),
       background-color var(--dur-base),
-      border-color var(--dur-base),
       color var(--dur-base);
   }
   .mp-btn .light {
-    font-weight: 400;
+    font-weight: 500;
+    opacity: 0.92;
   }
-  .mp-btn:hover:not(:disabled) {
-    background: var(--brand-bright);
-    border-color: var(--brand-bright);
+  /* Hover lifts 1px and brightens. Deviation: brightness 1.03, not the bundle's 1.06, which would
+     drop white on the fill to 4.31:1; at 1.03 it stays 4.53:1. */
+  .mp-btn:hover:not(:disabled, [aria-disabled="true"]) {
+    transform: translateY(-1px);
+    filter: brightness(1.03);
   }
-  .mp-btn:active {
-    box-shadow: var(--shadow-pressed);
+  /* Press drops 3px onto the lip in 40ms. */
+  .mp-btn:active:not(:disabled, [aria-disabled="true"]) {
+    transform: translateY(3px);
+    box-shadow:
+      0 1px 0 var(--brand-strong),
+      0 3px 6px rgba(217, 43, 75, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    transition-duration: var(--dur-press);
+  }
+  .mp-btn:focus-visible,
+  .mp-iconbtn:focus-visible,
+  .mp-tab:focus-visible,
+  .mp-choice:focus-visible {
+    outline: 3px solid var(--link);
+    outline-offset: 3px;
   }
   .mp-btn:disabled,
   .mp-btn[aria-disabled="true"] {
     opacity: 0.5;
     cursor: not-allowed;
+    transform: none;
+    filter: none;
   }
   .mp-btn--lg {
-    font-size: 22px;
-    line-height: 29px;
-    padding: 10px 16px;
-    border-radius: var(--radius-lg);
-    box-shadow: none;
+    font-size: 20px;
+    padding: 16px 28px;
+    border-radius: 16px;
   }
-  /* Small: the 14px system-font size Mint Paper uses for in-app buttons. */
   .mp-btn--sm {
-    font: 400 14px/20px var(--font-ui);
-    padding: 6px 12px;
+    font-size: 14px;
+    line-height: 20px;
+    padding: 9px 14px;
+    border-radius: 10px;
     gap: 6px;
   }
   .mp-btn--ghost {
     background: var(--brand-tint);
-    border-color: var(--brand-tint-border);
     color: var(--brand-strong);
-    box-shadow: none;
-    padding: 6px 12px;
+    box-shadow: 0 3px 0 var(--brand-tint-border);
+  }
+  .mp-btn--ghost:active:not(:disabled) {
+    box-shadow: 0 1px 0 var(--brand-tint-border);
   }
   .mp-btn--soft {
-    background: var(--brand-soft);
-    border-color: transparent;
+    background: var(--brand-tint);
     color: var(--brand-strong);
     box-shadow: none;
-    font: 400 14px/20px var(--font-ui);
-    padding: 6px 12px;
+    font-size: 14px;
+    line-height: 20px;
+    padding: 9px 14px;
+    border-radius: 10px;
     gap: 6px;
-  }
-  /* Ghost and soft flood to mint on hover; their words take the primary label colour there. */
-  .mp-btn--ghost:hover:not(:disabled) {
-    background: var(--brand-bright);
-    border-color: var(--brand-bright);
-    color: var(--ip-on-primary);
   }
   .mp-btn--soft:hover:not(:disabled) {
-    background: var(--brand);
-    border-color: transparent;
-    color: var(--ip-on-primary);
+    background: var(--mp-pink-hover);
+    transform: none;
+    filter: none;
+  }
+  .mp-btn--soft:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: none;
   }
   .mp-btn--line {
-    background: transparent;
-    border-color: var(--brand);
+    background: var(--surface);
     color: var(--brand-strong);
-    box-shadow: none;
-    font: 400 14px/20px var(--font-ui);
-    padding: 6px 11px;
+    box-shadow: inset 0 0 0 1.5px var(--brand);
+    font-size: 14px;
+    line-height: 20px;
+    padding: 9px 14px;
+    border-radius: 10px;
     gap: 6px;
-    border-radius: 3px;
   }
-  .mp-btn--line:hover:not(:disabled) {
-    background: var(--brand-soft);
-    border-color: var(--brand);
+  .mp-btn--line:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: inset 0 0 0 1.5px var(--brand);
   }
   .mp-btn--outline {
     background: var(--surface);
     color: var(--ink);
-    border-color: var(--mp-outline-border);
-    box-shadow: none;
-    font-weight: 400;
+    box-shadow:
+      inset 0 0 0 1.5px var(--mp-outline-border),
+      0 3px 0 var(--mp-outline-lip);
+    font-weight: 500;
     font-size: 15px;
-    line-height: 20px;
-  }
-  .mp-btn--outline:hover:not(:disabled) {
-    background: var(--surface-soft);
-    border-color: var(--mp-outline-border);
   }
   .mp-btn--outline.mp-btn--sm {
-    font: 400 14px/20px var(--font-ui);
+    font-size: 14px;
   }
-  /* Working mode: an editing-tool button (EditorToolbar). Deviation: the label is tool-active-ink
-     (8.19:1) at rest instead of link blue (3.94:1, fails 4.5:1 at 14px); edge and glow stay blue. */
+  .mp-btn--outline:active:not(:disabled) {
+    box-shadow:
+      inset 0 0 0 1.5px var(--mp-outline-border),
+      0 1px 0 var(--mp-outline-lip);
+  }
+  /* Working mode: an editing tool (EditorToolbar). Blueberry outline and label, no lift or press,
+     colour changes over dur-tool. */
   .mp-btn--tool {
-    font: 400 14px/20px var(--font-ui);
-    padding: 6px 12px;
+    font: 500 14px/20px var(--font-display);
+    padding: 8px 13px;
     gap: 6px;
     background: var(--surface);
-    color: var(--tool-active-ink);
-    border-color: var(--link);
+    color: var(--mp-tool-ink);
+    border: 1.5px solid var(--link);
+    border-radius: var(--radius-md);
     box-shadow: none;
     transition:
       background-color var(--dur-tool),
       color var(--dur-tool),
       box-shadow var(--dur-tool);
   }
-  .mp-btn--tool:hover:not(:disabled) {
-    background: #f6f6f6;
-    border-color: var(--link);
-    color: var(--tool-active-ink);
+  .mp-btn--tool:hover:not(:disabled),
+  .mp-btn--tool:active:not(:disabled) {
+    background: var(--mp-tool-hover);
+    transform: none;
+    filter: none;
+    box-shadow: none;
   }
   .mp-btn.mp-btn--tool[aria-pressed="true"],
-  .mp-btn.mp-btn--tool[data-active],
-  .mp-btn.mp-btn--tool:active:not(:disabled) {
+  .mp-btn.mp-btn--tool[data-active] {
     background: var(--tool-active-bg);
     color: var(--tool-active-ink);
-    box-shadow: var(--shadow-pressed);
+    box-shadow: inset 0 2px 4px rgba(49, 71, 184, 0.18);
   }
   .mp-btn--plain {
     background: transparent;
-    border-color: transparent;
     color: var(--brand-strong);
     box-shadow: none;
-    font: 400 14px/20px var(--font-ui);
+    font-size: 14px;
+    line-height: 20px;
     padding: 6px 8px;
   }
   .mp-btn--plain:hover:not(:disabled) {
-    background: transparent;
-    border-color: transparent;
+    transform: none;
+    filter: none;
     text-decoration: underline;
   }
+  .mp-btn--plain:active:not(:disabled) {
+    transform: none;
+    box-shadow: none;
+  }
 
-  /* Joined toolbar: buttons share edges, wrapped in the soft blue glow. */
+  /* Joined toolbar: blueberry tools sharing edges inside a soft blueberry halo. */
   .mp-toolbar {
     display: inline-flex;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
+    background: var(--surface);
     box-shadow: var(--shadow-glow);
   }
   .mp-toolbar > * {
     border-radius: 0;
-    margin-left: -1px;
+    margin-left: -1.5px;
   }
   .mp-toolbar > :first-child {
     margin-left: 0;
-    border-radius: 4px 0 0 4px;
+    border-radius: 12px 0 0 12px;
   }
   .mp-toolbar > :last-child {
-    border-radius: 0 4px 4px 0;
+    border-radius: 0 12px 12px 0;
   }
   .mp-toolbar > :only-child {
-    border-radius: 4px;
+    border-radius: 12px;
   }
   .mp-toolbar > :focus-visible {
     z-index: 1;
   }
 
-  /* Round soft icon button (30px). The hit area is 44px through ::before. */
+  /* Round icon button (34px). The hit area is 44px through ::before. */
   .mp-iconbtn {
     position: relative;
     display: inline-grid;
     place-items: center;
     flex: none;
-    width: 30px;
-    height: 30px;
-    border: 1px solid transparent;
-    border-radius: 15px;
-    background: var(--brand-soft);
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--brand-tint);
     color: var(--brand-strong);
     cursor: pointer;
-    transition: background-color var(--dur-base), color var(--dur-base);
+    transition:
+      background-color var(--dur-base),
+      color var(--dur-base),
+      transform var(--dur-lift);
   }
   .mp-iconbtn:hover:not(:disabled) {
-    background: var(--brand);
-    color: var(--ip-on-primary);
+    background: var(--mp-pink-hover);
+  }
+  .mp-iconbtn:active:not(:disabled) {
+    transform: scale(0.92);
   }
   .mp-iconbtn::before {
     content: "";
@@ -239,17 +287,16 @@
     height: 44px;
     transform: translate(-50%, -50%);
   }
-  /* Quiet header-style icon button: no fill, round halo on hover. */
+  /* Quiet icon button: no fill, a milk-pink round halo on hover (header links' hover). */
   .mp-iconbtn--plain {
     width: 40px;
     height: 40px;
-    border-radius: var(--radius-pill);
     background: transparent;
     color: var(--ink);
   }
   .mp-iconbtn--plain:hover:not(:disabled) {
-    background: var(--surface-soft);
-    color: var(--ink-black);
+    background: var(--milk);
+    color: var(--brand-strong);
   }
   .mp-iconbtn[aria-pressed="true"] {
     background: var(--tool-active-bg);
@@ -258,76 +305,89 @@
   .mp-iconbtn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    background: var(--brand-soft);
-    color: var(--brand-strong);
-  }
-  .mp-iconbtn--plain:disabled {
-    background: transparent;
-    color: var(--ink);
   }
 
-  /* ---- Tool card ---------------------------------------------------------------------------- */
+  /* ---- Tool card: leaf-cornered tile (icon, name, one small mark); lifts on hover, presses down */
   .mp-card {
     position: relative;
-    display: block;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
     box-sizing: border-box;
-    min-height: 100px;
+    min-height: 112px;
     height: 100%;
-    padding: 15px 20px 7px 7px;
+    padding: 14px 14px 14px 14px;
     background: var(--surface);
-    border: 1px solid var(--sand);
+    border: 1.5px solid var(--sand);
     border-radius: var(--radius-card) var(--radius-card) var(--radius-leaf) var(--radius-card);
     box-shadow: var(--shadow-card);
     color: var(--ink-black);
     text-decoration: none;
-    transition: background-color var(--dur-base);
+    transition:
+      transform var(--dur-base) var(--ease-pop),
+      box-shadow var(--dur-base) ease,
+      border-color var(--dur-base);
   }
   .mp-card:hover {
-    animation: mp-nudge var(--dur-slow) linear;
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lift);
+    border-color: var(--mp-card-hover-border);
   }
-  .mp-card__top {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 18px;
-    line-height: 28px;
+  .mp-card:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: var(--shadow-card);
+    transition-duration: var(--dur-press);
+  }
+  .mp-card__name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font: 600 17px/1.2 var(--font-display);
     text-transform: capitalize;
   }
-  .mp-card__desc {
-    display: block;
-    margin: 6px 0 8px 6px;
-    font-size: 14px;
-    line-height: 16px;
-    color: var(--muted);
+  .mp-card__mark {
+    position: absolute;
+    top: 12px;
+    right: 12px;
   }
+  .mp-card .mp-tag,
+  .mp-tag--sm {
+    font-size: 12px;
+    line-height: 16px;
+    padding: 2px 8px;
+  }
+  /* The icon disc: the category colour at 16% behind the icon in the full colour. */
+  /* --c comes from the card's ip-cat-* class (berry red when there is none). */
   .mp-halo {
-    --c: var(--brand);
     position: relative;
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     flex: none;
     display: grid;
     place-items: center;
-    margin-left: 4px;
+    transition: transform var(--dur-base) ease;
   }
   .mp-halo::before {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    background: var(--c);
-    opacity: 0.2;
+    background: var(--c, var(--brand));
+    opacity: 0.16;
     transition: opacity var(--dur-base);
   }
   .mp-halo svg {
     position: relative;
-    width: 15px;
-    height: 15px;
-    stroke: var(--c);
-    fill: none;
-    /* 1.5px rendered on a 24-unit icon drawn at 15px */
-    stroke-width: 2.4;
-    transition: stroke 0.25s ease-in-out;
+    width: 22px;
+    height: 22px;
+    color: var(--c, var(--brand));
+    transition: color var(--dur-base);
+  }
+  /* Hover (and keyboard focus): the disc fills, the icon turns white and tips 8 degrees. */
+  .mp-card:hover .mp-halo,
+  .mp-card:focus-visible .mp-halo {
+    transform: rotate(-8deg) scale(1.06);
   }
   .mp-card:hover .mp-halo::before,
   .mp-card:focus-visible .mp-halo::before {
@@ -335,7 +395,7 @@
   }
   .mp-card:hover .mp-halo svg,
   .mp-card:focus-visible .mp-halo svg {
-    stroke: #fff;
+    color: #fff;
   }
   /* A planned tool: same card, neutral disc (the eyebrow above still names its category). */
   .mp-card[data-planned] .mp-halo {
@@ -343,8 +403,9 @@
   }
 
   .mp-eyebrow {
-    font: 400 18px/24px var(--font-sans);
+    font: 600 15px/1.4 var(--font-display);
     text-transform: uppercase;
+    letter-spacing: 0.8px;
     color: var(--c-text, var(--ink));
     padding: 10px 20px;
   }
@@ -358,41 +419,66 @@
   .ip-cat-convert-to { --c: var(--ip-cat-convert-to); --c-text: var(--ip-cat-convert-to-text); }
   .ip-cat-scans { --c: var(--ip-cat-scans); --c-text: var(--ip-cat-scans-text); }
   .ip-cat-automate { --c: var(--ip-cat-automate); --c-text: var(--ip-cat-automate-text); }
-  /* "Most popular" uses cat-edit (Mint Paper token usage). */
+  /* "Most popular" uses cat-edit (BerryPDF token usage). */
   .ip-cat-popular { --c: var(--cat-edit); --c-text: var(--ip-cat-edit-text); }
 
-  /* Sand wash: the signature section ground, fading to white. */
+  /* Sand wash: the strawberry-cream section ground, fading out. */
   .mp-sand {
     background: linear-gradient(var(--sand), rgba(255, 255, 255, 0));
   }
 
-  /* ---- Header nav chip and links ------------------------------------------------------------ */
+  /* ---- Header: a white bar with a thin sand line ------------------------------------------- */
+  .mp-header {
+    background: var(--surface);
+    border-bottom: 1.5px solid var(--sand);
+  }
+  .mp-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-black);
+    text-decoration: none;
+    font: 600 21px/1 var(--font-display);
+  }
+  .mp-mark {
+    flex: none;
+    overflow: visible;
+    transition: transform var(--dur-move) ease-in-out;
+  }
+  .mp-brand:hover .mp-mark {
+    transform: rotate(-14deg) scale(1.1);
+  }
   .mp-navlink {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    color: var(--ink-black);
+    color: var(--ink);
     text-decoration: none;
-    padding: 6px 8px;
-    border: 1px solid transparent;
-    border-radius: var(--radius-md);
-    font: 400 17px/24.3px var(--font-sans);
+    padding: 8px 12px;
+    border-radius: 10px;
+    font: 400 16px/24px var(--font-sans);
     white-space: nowrap;
-    transition: color var(--dur-base);
+    transition:
+      background-color var(--dur-base),
+      color var(--dur-base);
   }
-  .mp-navlink:hover {
+  .mp-navlink:hover,
+  .mp-navlink[aria-current="page"] {
+    background: var(--milk);
     color: var(--brand-strong);
   }
   .mp-navlink--chip {
-    background: var(--surface-soft);
-    border-color: var(--border);
+    background: var(--cream);
+    box-shadow: inset 0 0 0 1.5px var(--sand);
+    border-radius: 999px;
+    padding: 8px 14px;
   }
 
   /* ---- Menu --------------------------------------------------------------------------------- */
   .mp-menu {
     background: var(--surface);
-    border: 1px solid var(--mp-menu-border);
-    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--sand);
+    border-radius: var(--radius-lg);
     box-shadow: var(--shadow-menu);
     animation: mp-modal-in 0.15s ease;
   }
@@ -400,265 +486,428 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 3px 15px;
+    padding: 8px 12px;
+    border-radius: 9px;
     color: var(--ink);
     text-decoration: none;
-    font-size: 17px;
+    font-size: 16px;
     line-height: 1.43;
-    transition: background-color var(--dur-base);
+    transition:
+      background-color var(--dur-base),
+      color var(--dur-base);
   }
   .mp-menu-row:hover {
-    background: var(--mp-row-hover);
-    color: #262626;
+    background: var(--band);
+  }
+  .mp-menu-row:hover .ip-menu-name {
+    color: var(--brand-strong);
+  }
+
+  /* ---- Tabs: a soft segmented pill (2-4 modes) ---------------------------------------------- */
+  .mp-tabs {
+    display: inline-flex;
+    padding: 4px;
+    gap: 4px;
+    background: var(--brand-tint);
+    border-radius: 999px;
+  }
+  .mp-tab {
+    padding: 9px 20px;
+    border-radius: 999px;
+    color: var(--muted);
+    text-decoration: none;
+    font: 600 15px/1 var(--font-display);
+    cursor: pointer;
+    transition:
+      background-color var(--dur-base),
+      color var(--dur-base);
+  }
+  .mp-tab:hover {
+    color: var(--brand-strong);
+  }
+  .mp-tab[aria-selected="true"],
+  .mp-tab[aria-checked="true"] {
+    background: #fff;
+    color: var(--brand-strong);
+    box-shadow: 0 2px 6px rgba(217, 43, 75, 0.16);
   }
 
   /* ---- Fields (Input) ----------------------------------------------------------------------- */
   .ip-field {
-    font: 400 17px/1.43 var(--font-sans);
+    font: 400 16px/1.4 var(--font-sans);
     color: var(--ink);
     background: var(--surface);
-    /* Deviation: --ip-field-line (#767676) instead of #ccc, for WCAG 1.4.11. */
-    border: 1px solid var(--ip-field-line);
-    border-radius: var(--radius-sm);
-    box-shadow: var(--mp-input-inset);
+    /* Deviation: --ip-field-line (3.39:1) instead of the bundle's #ecd5d9 (1.39:1), WCAG 1.4.11. */
+    border: 1.5px solid var(--ip-field-line);
+    border-radius: var(--radius-md);
     transition:
       border-color var(--dur-fast) ease-in-out,
       box-shadow var(--dur-fast) ease-in-out;
+  }
+  .ip-field:hover {
+    border-color: var(--ip-field-line-hover);
   }
   .ip-field:focus,
   .ip-field:focus-visible {
     /* Transparent, not none: forced-colors mode paints it, so focus stays visible there. */
     outline: 2px solid transparent;
     outline-offset: 0;
-    border-color: var(--link);
-    box-shadow: var(--mp-input-inset), 0 0 8px var(--mp-focus-glow);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 4px var(--ip-primary-ring);
   }
   .ip-field[aria-invalid="true"] {
     border-color: var(--danger);
-    box-shadow: var(--mp-input-inset), 0 0 8px var(--danger);
   }
+  .ip-field[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 4px rgba(159, 29, 20, 0.16);
+  }
+  /* Deviation: muted placeholder (5.45:1), not the bundle's #a8959a (2.83:1). */
   .ip-field::placeholder {
     color: var(--muted);
   }
 
+  /* Checkbox (FormControls): 22px, 7px radius; checked fills berry with a white tick. */
+  .mp-checkbox {
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    flex: none;
+    border: 1.5px solid var(--ip-field-line);
+    border-radius: 7px;
+    background: #fff;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-fast),
+      border-color var(--dur-fast),
+      transform var(--dur-lift);
+  }
+  .mp-checkbox:checked {
+    border-color: var(--brand);
+    background: var(--brand)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='11'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='M1.5 5.5l3.5 3.5 7.5-7.5'/%3E%3C/svg%3E")
+      no-repeat center;
+  }
+  .mp-checkbox:active {
+    transform: scale(0.9);
+  }
+
   /* ---- Choice tile -------------------------------------------------------------------------- */
-  /* Edges are drawn with inset shadows (1px #ccc, mint when selected), so in forced colors the
-     selected tile alone gets a real Highlight border (below). */
+  /* Edges are inset shadows (pale pink, berry when selected) on a pale lip, so in forced colors
+     the selected tile alone gets a real Highlight border (below). */
   .mp-choice {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 10px;
-    padding: 25px;
+    padding: 22px 16px;
     text-align: center;
     background: var(--surface);
-    border-radius: var(--radius-sm);
-    box-shadow: inset 0 0 0 1px var(--mp-input-border);
+    border-radius: var(--radius-card);
+    box-shadow:
+      inset 0 0 0 1.5px var(--mp-field-border-src),
+      0 3px 0 var(--mp-choice-lip);
     color: var(--ink);
     cursor: pointer;
-    font: 400 15px/20px var(--font-ui);
-    transition: background-color var(--dur-base);
+    font: 500 15px/20px var(--font-display);
+    transition:
+      transform var(--dur-lift),
+      box-shadow var(--dur-lift),
+      background-color var(--dur-base);
+  }
+  .mp-choice:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 0 0 1.5px var(--mp-check-border-src),
+      0 3px 0 var(--mp-choice-lip);
   }
   .mp-choice svg {
     color: var(--muted);
   }
   .mp-choice[aria-checked="true"],
   .mp-choice[aria-pressed="true"] {
-    background: var(--choice-bg);
+    background: var(--brand-tint);
+    color: var(--brand-strong);
     box-shadow:
-      inset 0 0 0 1px var(--brand),
-      var(--shadow-pressed);
-    /* Deviation: label in ink, not brand-strong (4.35:1 on choice-bg). The icon stays brand-strong. */
-    color: var(--ink);
+      inset 0 0 0 1.5px var(--brand),
+      0 3px 0 var(--brand-tint-border);
   }
   .mp-choice[aria-checked="true"] svg,
   .mp-choice[aria-pressed="true"] svg {
     color: var(--brand-strong);
   }
+  /* The leaf-green tick badge on the selected tile's top-right corner. */
+  .mp-choice[aria-checked="true"]::after,
+  .mp-choice[aria-pressed="true"]::after {
+    content: "";
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--leaf)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='10'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M1.5 5l3 3 6-6.5'/%3E%3C/svg%3E")
+      no-repeat center;
+    box-shadow: 0 0 0 2px #fff;
+  }
   .mp-choice:disabled {
     cursor: not-allowed;
     opacity: 0.5;
   }
+  /* Numbered step title inside a tool, with the number in a soft berry disc. */
   .mp-step {
-    font: 400 20px/28px var(--font-sans);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font: 600 20px/1.3 var(--font-display);
     color: var(--ink);
   }
+  .mp-step__n {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--brand-soft);
+    color: var(--brand-strong);
+    font-size: 16px;
+  }
   .mp-hint {
-    color: var(--mp-hint-ink);
+    color: var(--muted);
     font-size: 14px;
     line-height: 20px;
   }
 
-  /* ---- Switch ------------------------------------------------------------------------------- */
+  /* ---- Switch: 50x28 pill, 22px thumb with a tiny bounce ----------------------------------- */
   .mp-switch-track {
     position: relative;
     display: inline-block;
     flex: none;
-    width: 48px;
-    height: 26px;
-    border-radius: var(--radius-round);
-    /* Deviation: off track #767676 (Mint Paper #ccc is 1.61:1), on track brand-strong (brand is
-       2.48:1); WCAG 1.4.11 needs 3:1 for the state. */
-    background: var(--ip-border-strong);
-    transition: background-color var(--dur-tool);
+    width: 50px;
+    height: 28px;
+    border-radius: 28px;
+    /* Deviation: the off track is --ip-field-line (3.39:1), not #e6d3d6 (1.43:1), WCAG 1.4.11. */
+    background: var(--ip-field-line);
+    transition: background-color var(--dur-move);
   }
   .mp-switch-track::before {
     content: "";
     position: absolute;
-    width: 18px;
-    height: 18px;
-    left: 4px;
-    bottom: 4px;
+    width: 22px;
+    height: 22px;
+    left: 3px;
+    top: 3px;
     background: #fff;
     border-radius: 50%;
-    transition: transform var(--dur-tool);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: transform var(--dur-move) var(--ease-pop);
   }
   .mp-switch-track[data-on] {
-    background: var(--brand-strong);
+    background: var(--brand);
   }
   .mp-switch-track[data-on]::before {
     transform: translateX(22px);
   }
 
   /* ---- Pills -------------------------------------------------------------------------------- */
-  /* White on #00805c (4.95:1), as the bundle's pill; the token list's brand-deep would be 3.22:1. */
   .mp-pill {
     display: inline-block;
-    font: 400 10px/12px var(--font-ui);
+    font: 600 11px/1 var(--font-display);
     text-transform: uppercase;
+    letter-spacing: 0.5px;
     color: #fff;
     background: var(--brand-strong);
-    padding: 3px 6px 1px;
-    border-radius: 5px;
+    padding: 4px 8px;
+    border-radius: 999px;
     vertical-align: middle;
     white-space: nowrap;
   }
+  .mp-pill--leaf {
+    background: var(--leaf);
+  }
   .mp-tag {
     display: inline-block;
-    font-size: 14px;
-    line-height: 20px;
+    font-size: 13px;
+    line-height: 18px;
     color: var(--muted);
-    background: var(--band);
-    padding: 3px 6px;
-    border-radius: 5px;
+    background: var(--canvas);
+    padding: 3px 9px;
+    border-radius: 999px;
     white-space: nowrap;
   }
 
-  /* ---- Alert -------------------------------------------------------------------------------- */
+  /* ---- Alert: tinted, with icon and bold words; drops in from the top ---------------------- */
   .mp-alert {
     display: flex;
     align-items: flex-start;
-    gap: 20px;
-    padding: 12px 30px;
-    border-radius: var(--radius-md);
-    background: var(--brand-strong);
-    color: #fff;
-    border-bottom: 1px solid var(--mp-alert-edge);
-    animation: mp-slide-down var(--dur-attention) ease-out forwards;
+    gap: 10px;
+    padding: 12px 14px 12px 16px;
+    border-radius: var(--radius-lg);
+    background: var(--mp-alert-ok-bg);
+    color: var(--mp-alert-ok-ink);
+    border: 1.5px solid var(--mp-alert-ok-border);
+    font-weight: 600;
+    animation: mp-slide-down 0.9s ease-out both;
   }
   .mp-alert--danger {
-    background: var(--mp-alert-danger);
-    border-bottom-color: var(--mp-alert-danger-edge);
+    background: var(--mp-alert-danger-bg);
+    color: var(--mp-alert-danger-ink);
+    border-color: var(--mp-alert-danger-border);
+  }
+  .mp-alert--info {
+    background: var(--mp-alert-info-bg);
+    color: var(--mp-alert-info-ink);
+    border-color: var(--mp-alert-info-border);
   }
   .mp-alert a,
   .mp-alert button.mp-alert__link {
-    color: #fff;
+    color: inherit;
     text-decoration: underline;
   }
-  /* Close: Mint Paper rests it at 0.6 opacity (2.83:1 on the mint alert); 0.75 keeps the icon at 3:1+. */
+  /* Round close button; at rest 70% (3.51-4.26:1 on the three tints). */
   .mp-alert__close {
     position: relative;
     display: inline-grid;
     place-items: center;
     flex: none;
-    width: 24px;
-    height: 24px;
-    margin: 0 -8px 0 0;
-    color: #fff;
-    opacity: 0.75;
+    width: 26px;
+    height: 26px;
+    margin: -2px -4px -2px 0;
+    border-radius: 50%;
+    color: inherit;
+    opacity: 0.7;
     cursor: pointer;
-    transition: opacity var(--dur-base);
+    transition:
+      opacity var(--dur-base),
+      background-color var(--dur-base);
   }
   .mp-alert__close:hover {
     opacity: 1;
+    background: rgba(0, 0, 0, 0.06);
   }
   .mp-alert__close::before {
     content: "";
     position: absolute;
-    inset: -10px;
+    inset: -9px;
   }
 
-  /* ---- Callout ------------------------------------------------------------------------------ */
+  /* ---- Callout: a gentle aside, pink band with a sand outline and a leaf -------------------- */
   .mp-callout {
-    padding: 20px;
-    background: var(--mp-callout);
-    border-radius: 2px;
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--band);
+    border: 1.5px solid var(--sand);
+    border-radius: var(--radius-lg);
     color: var(--ink);
   }
   .mp-callout a {
     color: var(--brand-strong);
-    text-decoration: underline;
+    font-weight: 700;
+  }
+  .mp-callout > svg {
+    flex: none;
+    margin-top: 2px;
+    color: var(--leaf);
   }
 
-  /* ---- Progress (3px line fixed to the top of the viewport) --------------------------------- */
-  .mp-progress {
-    position: relative;
-    height: 3px;
-    width: 100%;
-    overflow: hidden;
-    background: var(--brand-tint);
-  }
+  /* ---- Progress: jam (known amounts, or a gliding segment) -------------------------- */
   .mp-progress--fixed {
     position: fixed;
-    top: 0;
+    top: var(--ip-header-h);
     left: 0;
     right: 0;
     z-index: var(--z-progress);
+    pointer-events: none;
   }
-  .mp-progress__bar {
+  .mp-jam {
+    position: relative;
+    height: 18px;
+    width: 100%;
+    border-radius: 10px;
+    background: var(--cream);
+    border: 1.5px solid var(--mp-jam-border);
+    overflow: hidden;
+  }
+  .mp-jam > i {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    background: var(--brand);
+    inset: 0 auto 0 0;
+    border-radius: 10px;
+    background: var(--jam)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='40'%3E%3Cg fill='%23a80d28'%3E%3Cellipse cx='9' cy='7' rx='3.6' ry='4.2'/%3E%3Cellipse cx='27' cy='27' rx='3.6' ry='4.2'/%3E%3C/g%3E%3Cg fill='%23ffe9a6'%3E%3Cellipse cx='9' cy='8.5' rx='1.8' ry='2.6'/%3E%3Cellipse cx='27' cy='28.5' rx='1.8' ry='2.6'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 24px 27px;
+    box-shadow:
+      inset 0 3px 0 rgba(255, 255, 255, 0.35),
+      inset 0 -3px 0 rgba(0, 0, 0, 0.12);
     transition: width var(--dur-slow);
-  }
-  .mp-progress--indeterminate::before,
-  .mp-progress--indeterminate::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    background: var(--brand);
-    will-change: left, right;
-  }
-  .mp-progress--indeterminate::before {
-    animation: mp-indet 2.1s var(--ease-progress-a) infinite;
-  }
-  .mp-progress--indeterminate::after {
-    animation: mp-indet-short 2.1s var(--ease-progress-b) 1.15s infinite;
+    animation: mp-jam-flow 2.4s linear infinite;
   }
 
-  /* ---- Modal -------------------------------------------------------------------------------- */
+  /* ---- Modal: a pale-pink wave on top, a 40px leaf corner, rises with a small overshoot ----- */
+  .mp-modal {
+    position: relative;
+    box-sizing: border-box;
+    border-radius: 24px 24px 40px 24px;
+    background: var(--surface)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='56' preserveAspectRatio='none'%3E%3Cpath fill='%23fdeef1' d='M0 0h400v30c-50 22-100 22-150 4s-100-20-150 0-70 16-100 6z'/%3E%3C/svg%3E")
+      no-repeat top / 100% 56px;
+    box-shadow:
+      0 30px 70px rgba(58, 20, 30, 0.3),
+      0 4px 12px rgba(58, 20, 30, 0.1);
+    color: var(--ink);
+    animation: mp-modal-in var(--dur-move) var(--ease-pop);
+  }
+  .mp-modal::backdrop {
+    background: var(--mp-backdrop);
+    backdrop-filter: blur(8px);
+  }
+  .mp-modal__icon {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: #fff;
+    color: var(--brand);
+    box-shadow:
+      0 0 0 6px var(--brand-tint),
+      0 6px 14px rgba(217, 43, 75, 0.18);
+  }
+  .mp-modal__icon svg {
+    width: 30px;
+    height: 30px;
+  }
   .mp-modal-in {
-    animation: mp-modal-in var(--dur-move) ease;
+    animation: mp-modal-in var(--dur-move) var(--ease-pop);
   }
 
   /* ---- Panel and page tray (working mode) --------------------------------------------------- */
   .mp-panel {
     background: var(--surface);
-    border: 1px solid var(--panel-border);
+    border: 1.5px solid var(--panel-border);
     border-radius: var(--radius-panel);
-    box-shadow: var(--shadow-panel);
+    box-shadow: var(--shadow-card);
   }
   .mp-tray {
     background: var(--page-tray);
-    padding: 20px;
+    padding: 16px 16px 10px;
     border-radius: var(--radius-tray);
+    transition: box-shadow var(--dur-base);
+  }
+  .mp-tray[aria-selected="true"],
+  .mp-tray[data-selected] {
+    box-shadow: 0 0 0 2.5px var(--brand);
+  }
+  .mp-tray__n {
+    font: 600 13px/20px var(--font-display);
+    color: var(--muted);
   }
 
-  /* ---- Prose -------------------------------------------------------------------------------- */
+  /* ---- Prose: the long-reading column ------------------------------------------------------- */
   .mp-prose {
     max-width: 680px;
     color: var(--mp-prose);
@@ -666,38 +915,255 @@
     line-height: 28px;
   }
   .mp-prose h1 {
-    font-size: 36px;
-    line-height: 39.6px;
-    letter-spacing: -1px;
-    font-weight: 700;
-    color: var(--ink);
-    margin: 0 0 10px;
+    font: 600 36px/1.1 var(--font-display);
+    color: var(--ink-black);
+    margin: 0 0 8px;
   }
   .mp-prose h2 {
-    font-size: 22px;
-    line-height: 26px;
-    font-weight: 700;
-    color: var(--mp-prose-h2);
+    font: 600 22px/1.2 var(--font-display);
+    color: var(--ink);
     margin: 10px 0;
   }
-  .mp-prose p {
-    margin: 0 0 24px;
-  }
+  .mp-prose p,
   .mp-prose ul,
   .mp-prose ol,
   .mp-prose table {
     margin: 0 0 24px;
   }
-  /* Underlined: mint vs #555 body is only 1.51:1, so colour alone would not mark a link (WCAG 1.4.1). */
+  /* Bold berry links. Deviation: also underlined, because berry vs the prose brown is only 1.25:1,
+     so colour and weight alone would not mark a link (WCAG 1.4.1). */
   .mp-prose a {
     color: var(--brand-strong);
+    font-weight: 700;
     text-decoration: underline;
-    text-underline-offset: 2px;
+    text-decoration-color: var(--mp-card-hover-border);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
   }
   .mp-prose a:hover {
-    text-decoration-thickness: 2px;
+    text-decoration-color: currentColor;
   }
   .mp-prose em {
+    font-size: 14px;
+    font-style: normal;
+    color: var(--muted);
+  }
+
+  /* ---- Footer: a calm sitemap on cream, set off by spacing -------------------------------- */
+  .mp-footer {
+    background: var(--cream);
+  }
+  .mp-footer__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 14px;
+    line-height: 24px;
+    transition: color var(--dur-base);
+  }
+  .mp-footer__link:hover {
+    color: var(--brand-strong);
+    text-decoration: underline;
+  }
+  .mp-footer__az > summary {
+    color: var(--muted);
+    list-style: none;
+  }
+  .mp-footer__az > summary::-webkit-details-marker {
+    display: none;
+  }
+  .mp-footer__az > summary::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    margin-left: 8px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: translateY(-2px) rotate(45deg);
+    transition: transform var(--dur-base);
+  }
+  .mp-footer__az[open] > summary::after {
+    transform: translateY(1px) rotate(-135deg);
+  }
+
+  /* ---- Hero --------------------------------------------------------------------------------- */
+  .mp-hero {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+  }
+  .mp-hero h1 {
+    margin: 0 auto 8px;
+    max-width: 16em;
+    font: 700 clamp(28px, 5.2vw, 44px) / 1.1 var(--font-display);
+    color: var(--ink-black);
+  }
+  .mp-hero__sub {
+    margin: 0 auto 26px;
+    font: 500 clamp(18px, 3vw, 24px) / 1.25 var(--font-display);
+    color: var(--brand-strong);
+  }
+
+  /* ---- Empty state -------------------------------------------------------------------------- */
+  .mp-empty {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    text-align: center;
+    border-radius: var(--radius-card);
+  }
+  .mp-empty__in {
+    position: relative;
+    z-index: 1;
+    padding: 46px 20px 50px;
+  }
+  .mp-empty h2,
+  .mp-empty h3 {
+    margin: 10px 0 6px;
+    font: 600 26px/1.2 var(--font-display);
+    letter-spacing: -0.5px;
+    color: var(--ink-black);
+  }
+
+  /* ---- Berry kit: the one background ------------------------------------------------------------
+     Grid paper only (24px squares, 7% berry red, on #fffdfb), carried by html/body above. No waves,
+     glows, patterns or coloured bands behind sections; white surfaces stay solid white. */
+  .mp-bg-grid {
+    background-color: var(--mp-grid-ground);
+    background-image:
+      linear-gradient(var(--mp-grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--mp-grid-line) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  /* ---- Berry kit: dividers -------------------------------------------------------------------- */
+  .mp-drip {
+    height: 46px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='46'%3E%3Cpath fill='%23d92b4b' d='M0 0h260v10c-8 0-10 6-10 14s-4 12-9 12-9-4-9-12 0-12-9-13-12 2-13 6-4 6-8 6-7-2-8-6-4-7-12-7-10 5-10 16-4 20-10 20-10-9-10-20-2-15-10-16-12 3-13 8-4 8-9 8-8-3-9-8-5-8-13-8-10 4-10 10-4 9-9 9-9-3-9-9-2-10-10-10-12 4-12 12-5 12-10 12-9-4-10-12S8 10 0 10z'/%3E%3Cpath fill='%23fff' opacity='.35' d='M6 4h248v2H6z'/%3E%3C/svg%3E")
+      repeat-x top left;
+  }
+  .mp-scallop {
+    height: 18px;
+    background: radial-gradient(circle at 14px 0, var(--cream) 13px, transparent 14px) repeat-x;
+    background-size: 28px 18px;
+  }
+  /* Indeterminate jam: a short segment glides across the track. */
+  .mp-jam--indeterminate > i {
+    width: 34%;
+    animation:
+      mp-jam-flow 2.4s linear infinite,
+      mp-jam-glide 1.4s var(--ease-standard, ease-in-out) infinite;
+  }
+
+  /* ---- Berry kit: small parts ----------------------------------------------------------------- */
+  /* Seed list: yellow seed teardrops with a berry-red outline. */
+  .mp-seedlist {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .mp-seedlist li {
+    position: relative;
+    padding-left: 22px;
+    margin: 4px 0;
+  }
+  .mp-seedlist li::before {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 6px;
+    width: 10px;
+    height: 13px;
+    background: var(--blossom-heart);
+    border: 1.5px solid var(--brand-strong);
+    border-radius: 50% 50% 50% 50% / 65% 65% 35% 35%;
+    transform: rotate(180deg);
+  }
+  /* Jam label: cream tag with a dashed berry stitch. */
+  .mp-jamtag {
+    display: inline-block;
+    padding: 5px 14px;
+    background: var(--cream);
+    color: var(--brand-strong);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    border-radius: 4px;
+    outline: 1.5px dashed var(--brand-strong);
+    outline-offset: -5px;
+    box-shadow: 0 0 0 1px var(--sand);
+  }
+  /* Die-cut sticker: a white edge and a soft shadow. */
+  .mp-sticker {
+    display: inline-block;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff) drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff)
+      drop-shadow(0 3px 4px rgba(0, 0, 0, 0.15));
+  }
+  .mp-sticker--tilt-l {
+    transform: rotate(-14deg);
+  }
+  .mp-sticker--tilt-r {
+    transform: rotate(12deg);
+  }
+
+  /* ---- Floating berries and blossoms (levitation) ------------------------------------------- */
+  .mp-floaties {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    perspective: 700px;
+    pointer-events: none;
+  }
+  .mp-floaty {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    width: var(--s, 56px);
+    height: var(--s, 56px);
+    margin: calc(var(--s, 56px) / -2) 0 0 calc(var(--s, 56px) / -2);
+    transform-style: preserve-3d;
+    will-change: transform;
+    animation: mp-levitate var(--d, 6s) ease-in-out var(--delay, 0s) infinite;
+    filter: drop-shadow(0 calc(var(--s, 56px) * 0.26) calc(var(--s, 56px) * 0.16) rgba(150, 24, 50, 0.24));
+  }
+  .mp-floaty svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    display: block;
+  }
+  .mp-floaty--mid {
+    filter: drop-shadow(0 10px 7px rgba(150, 24, 50, 0.18));
+    opacity: 0.92;
+  }
+  .mp-floaty--far {
+    filter: drop-shadow(0 5px 4px rgba(150, 24, 50, 0.12));
+    opacity: 0.6;
+  }
+  .mp-floaty--back {
+    filter: none;
+    opacity: 0.3;
+  }
+  @media (max-width: 640px) {
+    .mp-floaty:not(.mp-floaty--far):not(.mp-floaty--back) {
+      display: none;
+    }
+    /* The hero's back layer is placed for a wide hero; on phones it would sit on the words. */
+    .mp-floaties--hero .mp-floaty--back {
+      display: none;
+    }
+  }
+
+  /* ---- Berry loader (tossed, sliced, halves fall, juice splatters) -------------------------- */
+  .mp-loading {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted);
     font-size: 14px;
   }
 
@@ -718,18 +1184,26 @@
     .mp-switch-track::before {
       background: ButtonText;
     }
+    .mp-tray[data-selected] {
+      outline: 2px solid Highlight;
+    }
+    /* Our drawn checkbox paints its tick as a white image on a berry fill, and forced colors
+       repaints the fill, so the tick vanishes. Hand the box back to the system checkbox, which
+       draws its checked state in system colours. */
+    .mp-checkbox,
+    .mp-checkbox:checked {
+      appearance: auto;
+      background: none;
+      border: 0;
+    }
+    .mp-floaties,
+    .mp-sticker {
+      display: none;
+    }
   }
 }
 
 /* ---- Keyframes (motion.md) -------------------------------------------------------------------- */
-@keyframes mp-nudge {
-  50% {
-    transform: translateX(-2px);
-  }
-  100% {
-    transform: translateX(0);
-  }
-}
 @keyframes mp-slide-down {
   0% {
     transform: translateY(-30px);
@@ -745,39 +1219,34 @@
 }
 @keyframes mp-modal-in {
   0% {
-    transform: scale(0.96);
+    transform: translateY(14px) scale(0.94);
     opacity: 0;
   }
   100% {
-    transform: scale(1);
+    transform: none;
     opacity: 1;
   }
 }
-@keyframes mp-indet {
-  0% {
-    left: -35%;
-    right: 100%;
+@keyframes mp-jam-glide {
+  from {
+    transform: translateX(-100%);
   }
-  60%,
-  100% {
-    left: 100%;
-    right: -90%;
-  }
-}
-@keyframes mp-indet-short {
-  0% {
-    left: -200%;
-    right: 100%;
-  }
-  60%,
-  100% {
-    left: 107%;
-    right: -8%;
-  }
-}
-@keyframes mp-float {
   to {
-    transform: translateY(-8px);
+    transform: translateX(300%);
+  }
+}
+@keyframes mp-jam-flow {
+  to {
+    background-position: 24px 0;
+  }
+}
+@keyframes mp-levitate {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotateX(7deg) rotateY(-9deg) rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: translate3d(0, calc(var(--amp, 10px) * -1), 0) rotateX(-5deg) rotateY(9deg) rotate(calc(var(--r, 0deg) + 4deg));
   }
 }
 
@@ -797,9 +1266,6 @@
   }
   .ip-tooltip {
     animation: ip-fade-in var(--dur-fast) ease-out 300ms both;
-  }
-  .ip-float {
-    animation: mp-float 4s ease infinite alternate;
   }
 }
 
@@ -834,8 +1300,92 @@
   }
 }
 
-/* Mint Paper: under reduced motion, drop every animation and transition. The busy spinner is the
-   one exception (F1 U-4): it carries state, so it pulses instead of freezing. */
+/* ---- Motion pass (owner 2026-11-23): quiet entrances, at most 400ms, CSS only -------------- */
+@layer components {
+  /* Tool tiles rise in, staggered per grid (the first dozen 30ms apart, the rest together). */
+  .mp-rise > li {
+    animation: mp-rise-in 360ms var(--ease-enter) both;
+  }
+  .mp-rise > li:nth-child(2) { animation-delay: 30ms; }
+  .mp-rise > li:nth-child(3) { animation-delay: 60ms; }
+  .mp-rise > li:nth-child(4) { animation-delay: 90ms; }
+  .mp-rise > li:nth-child(5) { animation-delay: 120ms; }
+  .mp-rise > li:nth-child(6) { animation-delay: 150ms; }
+  .mp-rise > li:nth-child(7) { animation-delay: 180ms; }
+  .mp-rise > li:nth-child(8) { animation-delay: 210ms; }
+  .mp-rise > li:nth-child(9) { animation-delay: 240ms; }
+  .mp-rise > li:nth-child(10) { animation-delay: 270ms; }
+  .mp-rise > li:nth-child(n + 11) { animation-delay: 300ms; }
+  /* Hero: title, line, button and note fade up one after another. */
+  /* The h1 is the largest paint, so it shows at once (AC-55). */
+  .mp-hero > p,
+  .mp-hero > div {
+    animation: mp-fade-up 400ms var(--ease-enter) both;
+  }
+  .mp-hero > p:first-of-type { animation-delay: 70ms; }
+  .mp-hero > div { animation-delay: 140ms; }
+  .mp-hero > p.mp-hero__note { animation-delay: 210ms; }
+  .mp-intro > h1,
+  .mp-enter {
+    animation: mp-fade-up 360ms var(--ease-enter) both;
+  }
+  /* Panels (drop card, result) pop in with the bundle's small overshoot. */
+  .mp-pop-in {
+    animation: mp-pop-in 380ms var(--ease-pop) both;
+  }
+  .mp-tick-in {
+    animation: mp-pop-in 400ms var(--ease-pop) 160ms both;
+  }
+  /* The empty-state card's outline breathes in pale berry, inviting a drop. */
+  .mp-dropcard {
+    animation:
+      mp-pop-in 380ms var(--ease-pop) both,
+      mp-breathe 3.2s ease-in-out 400ms 1; /* breathes once: no motion past 5s (WCAG 2.2.2) */
+  }
+  /* Rendered page thumbnails ease in (fade + settle from 98%). */
+  .mp-thumb-in {
+    animation: mp-thumb-in 300ms var(--ease-enter) both;
+  }
+}
+@keyframes mp-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+@keyframes mp-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes mp-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+}
+@keyframes mp-thumb-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@keyframes mp-breathe {
+  0%,
+  100% {
+    border-color: var(--sand);
+    box-shadow: var(--shadow-card), 0 0 0 0 rgba(217, 43, 75, 0);
+  }
+  50% {
+    border-color: var(--mp-card-hover-border);
+    box-shadow: var(--shadow-card), 0 0 0 8px rgba(217, 43, 75, 0.07);
+  }
+}
+
+/* BerryPDF (motion.md): under reduced motion, drop every animation and transition; the berry loader
+   stands still as a whole berry (below). The one exception is the small busy indicator (F1 U-4: it
+   carries state), which pulses instead of freezing. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -848,38 +1398,39 @@
   }
 }
 
-/* Range input (thumbnail size): field-line track (>= 3:1), mint thumb. */
+/* Range input (thumbnail size): field-line track (>= 3:1), berry thumb. */
 .ip-range {
   appearance: none;
   background: transparent;
   cursor: pointer;
 }
 .ip-range::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 2px;
+  height: 6px;
+  border-radius: 3px;
   background: var(--ip-border-strong);
 }
 .ip-range::-moz-range-track {
-  height: 4px;
-  border-radius: 2px;
+  height: 6px;
+  border-radius: 3px;
   background: var(--ip-border-strong);
 }
 .ip-range::-webkit-slider-thumb {
   appearance: none;
-  margin-top: -7px;
-  width: 18px;
-  height: 18px;
+  margin-top: -8px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--brand);
-  border: 2px solid var(--surface);
-  box-shadow: 0 0 0 1px var(--brand-strong);
+  border: 3px solid var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 .ip-range::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--brand);
-  border: 2px solid var(--surface);
+  border: 3px solid var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 /* ---- F2: site chrome and home catalogue (docs/specs/f2-home.md) ---------------- */
@@ -892,7 +1443,7 @@
 
 /* Search highlight: tinted, plus an underline so it does not rely on colour; no width change. */
 .ip-mark {
-  background: var(--choice-bg);
+  background: var(--berry-flesh);
   color: inherit;
   border-radius: 3px;
   padding-inline: 2px;
@@ -947,13 +1498,94 @@
   }
 }
 
-/* Faint dotted circles in the hero's far corners (decorative). */
-.mp-dots {
-  position: absolute;
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  background-image: radial-gradient(var(--sand) 2px, transparent 2.5px);
-  background-size: 14px 14px;
-  pointer-events: none;
+/* ---- Berry loader (BerryPDF BerryLoader, the bundle's CSS) and floaty positions ------------- */
+.mp-berry{--t:2.6s;width:96px;height:96px;display:inline-block;overflow:hidden}
+.mp-berry--sm{width:40px;height:40px}.mp-berry--lg{width:180px;height:180px}
+.mp-berry g{transform-box:view-box;transform-origin:100px 94px;animation:0s linear infinite;animation-duration:var(--t)}
+.mp-berry .tilt{transform-origin:0 0;animation:none}
+.mp-berry .whole{animation-name:mp-b-show-whole}.mp-berry .halves,.mp-berry .juice{animation-name:mp-b-show-halves}
+.mp-berry .wx{animation-name:mp-b-wx}.mp-berry .wy{animation-name:mp-b-wy}.mp-berry .wr{animation-name:mp-b-wr}
+.mp-berry .hx-l{animation-name:mp-b-hxl}.mp-berry .hy-l{animation-name:mp-b-hyl}.mp-berry .hr-l{animation-name:mp-b-hrl}
+.mp-berry .hx-r{animation-name:mp-b-hxr}.mp-berry .hy-r{animation-name:mp-b-hyr}.mp-berry .hr-r{animation-name:mp-b-hrr}
+.mp-berry .skin{animation-name:mp-b-skin}.mp-berry .face{animation-name:mp-b-face}
+.mp-berry .splash{animation-name:mp-b-splash}
+.mp-berry .lines{opacity:0;animation-name:mp-b-lines}.mp-berry .flash{opacity:0;animation-name:mp-b-flash}
+.mp-berry .tw{animation-name:mp-b-tw}.mp-berry .tw1{transform-origin:159px 49px}.mp-berry .tw2{transform-origin:40px 64px;animation-delay:-.9s}.mp-berry .tw3{transform-origin:163px 125px;animation-delay:-1.7s}
+@keyframes mp-b-lines{0%,33%{opacity:0;transform:scale(1.15)}35%{opacity:.9;transform:scale(1)}46%,100%{opacity:0;transform:scale(.92)}}
+@keyframes mp-b-flash{0%,33%{opacity:0;transform:scale(.2) rotate(0)}35.5%{opacity:1;transform:scale(1) rotate(20deg)}42%,100%{opacity:0;transform:scale(.3) rotate(45deg)}}
+@keyframes mp-b-tw{0%,100%{transform:scale(.2) rotate(0);opacity:0}50%{transform:scale(1) rotate(45deg);opacity:1}}
+.mp-berry .slash{transform-origin:100px 244px;animation-name:mp-b-slash}
+@keyframes mp-b-show-whole{0%,34%{opacity:1}34.01%,100%{opacity:0}}
+@keyframes mp-b-show-halves{0%,34%{opacity:0}34.01%,80%{opacity:1}88%,100%{opacity:0}}
+@keyframes mp-b-wx{0%{transform:translateX(-36px)}34%,100%{transform:none}}
+@keyframes mp-b-wy{0%{transform:translateY(160px);animation-timing-function:cubic-bezier(.333,.667,.667,1)}34%,100%{transform:none}}
+@keyframes mp-b-wr{0%{transform:rotate(-95deg)}34%,100%{transform:rotate(-22deg)}}
+@keyframes mp-b-hxl{0%,34%{transform:none}86%,100%{transform:translateX(-92px)}}
+@keyframes mp-b-hyl{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.087,.667,0.246)}86%,100%{transform:translateY(317px)}}
+@keyframes mp-b-hrl{0%,34%{transform:rotate(-22deg)}86%,100%{transform:rotate(-200deg)}}
+@keyframes mp-b-hxr{0%,34%{transform:none}86%,100%{transform:translateX(104px)}}
+@keyframes mp-b-hyr{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.150,.667,0.184)}86%,100%{transform:translateY(276px)}}
+@keyframes mp-b-hrr{0%,34%{transform:rotate(-22deg)}86%,100%{transform:rotate(190deg)}}
+@keyframes mp-b-skin{0%,34%{transform:none}41%,100%{transform:scaleX(.8)}}
+@keyframes mp-b-face{0%,34%{transform:scaleX(0)}41%{transform:scaleX(.4)}86%,100%{transform:scaleX(.5)}}
+@keyframes mp-b-splash{0%,34%{transform:scale(.2);opacity:0}35%{opacity:.95}40%{transform:scale(1.05)}48%,100%{transform:scale(1.25);opacity:0}}
+@keyframes mp-b-slash{0%,30%{transform:scaleY(0);opacity:1}35%{transform:scaleY(1);opacity:1}44%,100%{transform:scale(.2,1);opacity:0}}
+.mp-berry .dx,.mp-berry .dy{transform-origin:100px 94px}
+@keyframes mp-dx0{0%,34%{transform:none}78%,100%{transform:translateX(-58px)}}@keyframes mp-dy0{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.632,.667,-0.299)}78%,100%{transform:translateY(95px)}}.mp-berry .dx0{animation-name:mp-dx0}.mp-berry .dy0{animation-name:mp-dy0}
+@keyframes mp-dx1{0%,34%{transform:none}78%,100%{transform:translateX(-68px)}}@keyframes mp-dy1{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.169,.667,0.164)}78%,100%{transform:translateY(182px)}}.mp-berry .dx1{animation-name:mp-dx1}.mp-berry .dy1{animation-name:mp-dy1}
+@keyframes mp-dx2{0%,34%{transform:none}78%,100%{transform:translateX(81px)}}@keyframes mp-dy2{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.160,.667,0.174)}78%,100%{transform:translateY(186px)}}.mp-berry .dx2{animation-name:mp-dx2}.mp-berry .dy2{animation-name:mp-dy2}
+@keyframes mp-dx3{0%,34%{transform:none}78%,100%{transform:translateX(-64px)}}@keyframes mp-dy3{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-4.606,.667,-4.272)}78%,100%{transform:translateY(19px)}}.mp-berry .dx3{animation-name:mp-dx3}.mp-berry .dy3{animation-name:mp-dy3}
+@keyframes mp-dx4{0%,34%{transform:none}78%,100%{transform:translateX(43px)}}@keyframes mp-dy4{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.326,.667,0.007)}78%,100%{transform:translateY(139px)}}.mp-berry .dx4{animation-name:mp-dx4}.mp-berry .dy4{animation-name:mp-dy4}
+@keyframes mp-dx5{0%,34%{transform:none}78%,100%{transform:translateX(-84px)}}@keyframes mp-dy5{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-1.449,.667,-1.116)}78%,100%{transform:translateY(51px)}}.mp-berry .dx5{animation-name:mp-dx5}.mp-berry .dy5{animation-name:mp-dy5}
+@keyframes mp-dx6{0%,34%{transform:none}78%,100%{transform:translateX(49px)}}@keyframes mp-dy6{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.270,.667,0.063)}78%,100%{transform:translateY(152px)}}.mp-berry .dx6{animation-name:mp-dx6}.mp-berry .dy6{animation-name:mp-dy6}
+@keyframes mp-dx7{0%,34%{transform:none}78%,100%{transform:translateX(64px)}}@keyframes mp-dy7{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.392,.667,-0.058)}78%,100%{transform:translateY(126px)}}.mp-berry .dx7{animation-name:mp-dx7}.mp-berry .dy7{animation-name:mp-dy7}
+@keyframes mp-dx8{0%,34%{transform:none}78%,100%{transform:translateX(-165px)}}@keyframes mp-dy8{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.272,.667,0.061)}78%,100%{transform:translateY(151px)}}.mp-berry .dx8{animation-name:mp-dx8}.mp-berry .dy8{animation-name:mp-dy8}
+@keyframes mp-dx9{0%,34%{transform:none}78%,100%{transform:translateX(88px)}}@keyframes mp-dy9{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.553,.667,-0.220)}78%,100%{transform:translateY(103px)}}.mp-berry .dx9{animation-name:mp-dx9}.mp-berry .dy9{animation-name:mp-dy9}
+@keyframes mp-dx10{0%,34%{transform:none}78%,100%{transform:translateX(-122px)}}@keyframes mp-dy10{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-3.903,.667,-3.569)}78%,100%{transform:translateY(22px)}}.mp-berry .dx10{animation-name:mp-dx10}.mp-berry .dy10{animation-name:mp-dy10}
+.mp-loading{display:inline-flex;flex-direction:column;align-items:center;gap:10px;color:var(--muted);font-size:14px}
+@media (prefers-reduced-motion:reduce){.mp-berry .whole{opacity:1!important}.mp-berry .halves,.mp-berry .juice,.mp-berry .slash,.mp-berry .lines,.mp-berry .flash{display:none}.mp-berry .wr{transform:none!important}}
+/* Inline busy indicators (Spinner) draw the loader at 16, 20, 24 or 28px. */
+.mp-berry.mp-berry--16 { width: 16px; height: 16px; }
+.mp-berry.mp-berry--20 { width: 20px; height: 20px; }
+.mp-berry.mp-berry--24 { width: 24px; height: 24px; }
+.mp-berry.mp-berry--28 { width: 28px; height: 28px; }
+/* F1 U-4: the small busy indicator carries state, so under reduced motion it pulses (still berry). */
+@media (prefers-reduced-motion: reduce) {
+  .mp-berry.ip-busy {
+    animation: ip-pulse 1.2s linear infinite !important;
+  }
 }
+
+.mp-floaties--hero > :nth-child(1) { --x:6%;--y:66%;--s:30px;--r:-16deg;--d:7.2s;--amp:7px;--delay:0s; }
+.mp-floaties--hero > :nth-child(2) { --x:11%;--y:44%;--s:30px;--r:22deg;--d:5.4s;--amp:7px;--delay:-1.4s; }
+.mp-floaties--hero > :nth-child(3) { --x:3%;--y:20%;--s:26px;--r:-10deg;--d:6.0s;--amp:6px;--delay:-3.1s; }
+.mp-floaties--hero > :nth-child(4) { --x:94%;--y:62%;--s:28px;--r:14deg;--d:6.6s;--amp:7px;--delay:-2.6s; }
+.mp-floaties--hero > :nth-child(5) { --x:89%;--y:42%;--s:28px;--r:-24deg;--d:5.2s;--amp:6px;--delay:-4.0s; }
+.mp-floaties--hero > :nth-child(6) { --x:97%;--y:18%;--s:24px;--r:12deg;--d:5.8s;--amp:6px;--delay:-0.8s; }
+.mp-floaties--hero > :nth-child(7) { --x:18%;--y:72%;--s:24px;--r:0deg;--d:5.6s;--amp:6px;--delay:-2.2s; }
+.mp-floaties--hero > :nth-child(8) { --x:83%;--y:74%;--s:26px;--r:0deg;--d:6.2s;--amp:7px;--delay:-3.6s; }
+.mp-floaties--hero > :nth-child(9) { --x:27%;--y:7%;--s:28px;--r:-12deg;--d:6.4s;--amp:7px;--delay:-1.1s; }
+.mp-floaties--hero > :nth-child(10) { --x:26%;--y:90%;--s:34px;--r:10deg;--d:7.0s;--amp:7px;--delay:-2.9s; }
+.mp-floaties--hero > :nth-child(11) { --x:74%;--y:90%;--s:30px;--r:-16deg;--d:6.6s;--amp:7px;--delay:-4.3s; }
+.mp-floaties--hero > :nth-child(12) { --x:74%;--y:6%;--s:26px;--r:18deg;--d:5.9s;--amp:6px;--delay:-0.4s; }
+.mp-floaties--hero > :nth-child(13) { --x:12%;--y:92%;--s:18px;--r:0deg;--d:5.5s;--amp:5px;--delay:-3.3s; }
+.mp-floaties--hero > :nth-child(14) { --x:35%;--y:62%;--s:20px;--r:0deg;--d:6.1s;--amp:6px;--delay:-5.1s; }
+.mp-floaties--empty > :nth-child(1) { --x:7%;--y:26%;--s:34px;--r:-18deg;--d:7.5s;--amp:7px;--delay:0s; }
+.mp-floaties--empty > :nth-child(2) { --x:15%;--y:76%;--s:30px;--r:14deg;--d:6.2s;--amp:7px;--delay:-2.1s; }
+.mp-floaties--empty > :nth-child(3) { --x:18%;--y:16%;--s:30px;--r:24deg;--d:5.4s;--amp:7px;--delay:-1.2s; }
+.mp-floaties--empty > :nth-child(4) { --x:89%;--y:22%;--s:32px;--r:16deg;--d:6.8s;--amp:7px;--delay:-3.4s; }
+.mp-floaties--empty > :nth-child(5) { --x:96%;--y:56%;--s:28px;--r:-12deg;--d:5.8s;--amp:7px;--delay:-0.6s; }
+.mp-floaties--empty > :nth-child(6) { --x:86%;--y:80%;--s:34px;--r:-8deg;--d:8.2s;--amp:7px;--delay:-4.6s; }
+.mp-floaties--empty > :nth-child(7) { --x:97%;--y:90%;--s:26px;--r:-26deg;--d:5.0s;--amp:6px;--delay:-2.8s; }
+.mp-floaties--empty > :nth-child(8) { --x:5%;--y:92%;--s:34px;--r:10deg;--d:5.6s;--amp:7px;--delay:-3.9s; }
+.mp-floaties--empty > :nth-child(9) { --x:3%;--y:58%;--s:32px;--r:28deg;--d:6.4s;--amp:8px;--delay:-5.2s; }
+.mp-floaties--empty > :nth-child(10) { --x:17%;--y:46%;--s:24px;--r:0deg;--d:5.2s;--amp:6px;--delay:-1.7s; }
+.mp-floaties--empty > :nth-child(11) { --x:83%;--y:50%;--s:26px;--r:0deg;--d:6.0s;--amp:7px;--delay:-4.1s; }
+.mp-floaties--empty > :nth-child(12) { --x:78%;--y:12%;--s:20px;--r:0deg;--d:5.5s;--amp:5px;--delay:-2.4s; }
+.mp-floaties--empty > :nth-child(13) { --x:31%;--y:24%;--s:34px;--r:-14deg;--d:6.6s;--amp:7px;--delay:-0.9s; }
+.mp-floaties--empty > :nth-child(14) { --x:44%;--y:78%;--s:40px;--r:12deg;--d:7.4s;--amp:8px;--delay:-3.3s; }
+.mp-floaties--empty > :nth-child(15) { --x:58%;--y:18%;--s:28px;--r:20deg;--d:5.9s;--amp:6px;--delay:-4.4s; }
+.mp-floaties--empty > :nth-child(16) { --x:69%;--y:70%;--s:36px;--r:-10deg;--d:6.9s;--amp:7px;--delay:-1.9s; }
+.mp-floaties--empty > :nth-child(17) { --x:36%;--y:58%;--s:22px;--r:0deg;--d:5.7s;--amp:6px;--delay:-2.7s; }
+.mp-floaties--empty > :nth-child(18) { --x:63%;--y:44%;--s:22px;--r:0deg;--d:6.3s;--amp:6px;--delay:-5.0s; }
+.mp-floaties--empty > :nth-child(19) { --x:50%;--y:10%;--s:18px;--r:0deg;--d:5.3s;--amp:5px;--delay:-3.7s; }

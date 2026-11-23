@@ -5,7 +5,7 @@ import { siteCopy } from "./copy";
 
 /**
  * Up to 5 usable-tool links (3 below 1024 px, none below 768 px). Never a planned tool (AC-31).
- * Mint Paper: 17px ink-black, 6x8 padding, no underline and no active pill (aria-current stays).
+ * BerryPDF Header links: 16px, 8x12 padding, 10px radius; hover (and the current page) gets a milk-pink fill and berry text.
  */
 export function HeaderShortcuts({ links }: { links: { slug: string; name: string }[] }) {
   const pathname = usePathname();

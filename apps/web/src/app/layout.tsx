@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { BerrySprite } from "@/components/berry/Berry";
 import { ToolIndexProvider } from "@/components/catalogue/ToolIndexProvider";
 import { buildToolIndex } from "@/components/catalogue/toolIndex";
 import { siteCopy } from "@/components/site/copy";
@@ -10,17 +11,14 @@ import { SkipLink } from "@/components/site/SkipLink";
 import "./globals.css";
 
 /**
- * Atkinson Hyperlegible (Mint Paper's one family), latin subset, weights 400 and 700, self-hosted
- * from @fontsource/atkinson-hyperlegible (SIL OFL 1.1, see THIRD-PARTY-NOTICES.md). No request
- * leaves our origin. Falls back to the system stack, metric-adjusted so the swap does not shift.
- * The package has no 500; Mint Paper's 500 subtitle renders at 400.
+ * Fredoka (BerryPDF's one family), latin subset, as one variable-weight file (300-700) self-hosted
+ * from @fontsource-variable/fredoka (SIL OFL 1.1, see THIRD-PARTY-NOTICES.md): a single ~30 KB
+ * preload covers the 400, 500, 600 and 700 we use, instead of four static files (~64 KB).
+ * No request leaves our origin. Falls back to the system stack, metric-adjusted so the swap does not shift.
  */
-const atkinson = localFont({
-  src: [
-    { path: "../../node_modules/@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-400-normal.woff2", weight: "400", style: "normal" },
-    { path: "../../node_modules/@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-700-normal.woff2", weight: "700", style: "normal" },
-  ],
-  variable: "--font-atkinson",
+const fredoka = localFont({
+  src: [{ path: "../../node_modules/@fontsource-variable/fredoka/files/fredoka-latin-wght-normal.woff2", weight: "300 700", style: "normal" }],
+  variable: "--font-fredoka",
   display: "swap",
   preload: true,
   adjustFontFallback: "Arial",
@@ -39,15 +37,16 @@ export default function RootLayout({
 }>) {
   return (
     // The pre-paint script may add data-recent to <html> before hydration.
-    <html lang="en" className={atkinson.variable} suppressHydrationWarning>
+    <html lang="en" className={fredoka.variable} suppressHydrationWarning>
       <head>
         <RecentPrepaintScript />
       </head>
       <body className="flex min-h-dvh flex-col antialiased">
+        <BerrySprite />
         <SkipLink />
         <ToolIndexProvider index={buildToolIndex()}>
           <SiteHeader />
-          <div className="flex-1">{children}</div>
+          <div className="flex-1 pb-(--space-8)">{children}</div>
           <SiteFooter />
         </ToolIndexProvider>
       </body>

@@ -219,7 +219,7 @@ Priority: P0 = parity must-have; P1 = parity nice-to-have or key differentiator;
 - **AC-11c (P0)** Neighbours stay put: editing one word inside a `TJ` array does not move any other glyph on the line by more than 0.1 pt, unless reflow is on.
 - **AC-11d (P1)** (improvement) Same-family re-subset: when a subset lacks a glyph and the family is one we ship (Carlito, Caladea, Liberation, Noto) or a local font, the new text uses a fresh subset of that same family, and the run is visually indistinguishable from the original (glyph-shape diff below threshold).
 - **AC-11e (P1)** (improvement) Substitute fonts are width-fitted (`Tz` within 90–110%) so the edited run keeps its original width when the text length is unchanged.
-- **AC-11f (P0)** On the micro-benchmark corpus (docs/process/parity-lab.md), our existing-text edit fidelity score is at least the reference's on every file, and higher in total.
+- **AC-11f (P0)** On the micro-benchmark corpus (`docs/process/editor-micro-checks.md`, the editor annex to the M1–M11 checks in `docs/process/mission.md`), our existing-text edit fidelity score is at least the reference's on every file, and higher in total.
 - **AC-12 (P1)** Bold, italic, size, family and colour changes on an existing line are reflected in the output.
 - **AC-13 (P1)** Existing text can be moved by drag and deleted.
 - **AC-14 (P1)** (improvement) Paragraph mode: in `para-times.pdf`, inserting 12 words into line 1 reflows the paragraph inside its original left/right bounds; no line exceeds the right bound (text positions in output); the box grows downward and the line count increases.

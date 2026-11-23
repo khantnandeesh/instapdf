@@ -28,7 +28,7 @@ test("AC-41: after opening /rotate-pdf, Rotate is first in Recent on the home pa
 
 test("AC-41: client-side navigation back to / shows the new entry at once", async ({ page }) => {
   await openHydrated(page, "/rotate-pdf");
-  await page.getByRole("link", { name: "InstaPDF home" }).click();
+  await page.getByRole("link", { name: "BerryPDF home" }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(homeRecent(page).getByRole("link").first()).toHaveAttribute("href", "/rotate-pdf");
 });
@@ -56,7 +56,16 @@ test("AC-44: a corrupt value gives a working page without Recent, and the next v
   await expect(page.locator("[data-testid=category]").first()).toBeVisible();
   await expect(homeRecent(page)).toHaveCount(0);
   await openHydrated(page, "/rotate-pdf");
-  await expect.poll(async () => JSON.parse((await storedRecent(page)) ?? "null")?.[0]).toBe("rotate-pdf");
+  // Until the visit is recorded the stored value is still the corrupt one, so parse failures retry.
+  await expect
+    .poll(async () => {
+      try {
+        return JSON.parse((await storedRecent(page)) ?? "null")?.[0];
+      } catch {
+        return undefined;
+      }
+    })
+    .toBe("rotate-pdf");
   expect(errors).toEqual([]);
 });
 

@@ -27,7 +27,7 @@ describe("flow config", () => {
     expect(rotate.flow.actionLabel).toBe("Rotate PDF");
     expect(rotate.flow.title).toBe("Rotate PDF");
     expect(rotate.flow.outputName(["three-pages.pdf"])).toBe("three-pages.pdf");
-    expect(rotate.flow.outputName(["a.pdf", "b.pdf"])).toBe("instapdf-rotate.zip");
+    expect(rotate.flow.outputName(["a.pdf", "b.pdf"])).toBe("berrypdf-rotate.zip");
   });
   it("keeps every other tool planned", () => {
     expect(tools.filter((t) => t.status !== "planned").map((t) => t.slug)).toEqual(["rotate-pdf"]);

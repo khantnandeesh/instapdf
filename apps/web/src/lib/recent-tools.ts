@@ -1,11 +1,15 @@
 /**
  * Recently used tools, kept on this device only (spec F2 §3f).
- * localStorage["instapdf:recent-tools"] = JSON array of slugs, newest first.
+ * localStorage["berrypdf:recent-tools"] = JSON array of slugs, newest first.
+ * Lists saved under the product's old key ("instapdf:recent-tools") are moved to the new
+ * key on first read, transparently, and the old key is removed.
  * Every storage access is wrapped: a corrupt value or a blocked/throwing
  * localStorage reads as an empty list and never raises.
  */
 
-export const RECENT_KEY = "instapdf:recent-tools";
+export const RECENT_KEY = "berrypdf:recent-tools";
+/** The key used before the product was renamed; read once and migrated. */
+export const LEGACY_RECENT_KEY = "instapdf:recent-tools";
 export const RECENT_STORED_MAX = 12;
 export const RECENT_SHOWN_MAX = 6;
 
@@ -49,22 +53,50 @@ function storage(): Storage | null {
   }
 }
 
+/** Moves a list stored under the old key to the new one (the new key wins if both exist). */
+export function migrateRecent(s: Storage) {
+  const legacy = s.getItem(LEGACY_RECENT_KEY);
+  if (legacy === null) return;
+  if (s.getItem(RECENT_KEY) === null) s.setItem(RECENT_KEY, legacy);
+  s.removeItem(LEGACY_RECENT_KEY);
+}
+
 function readRaw(): string | null {
   try {
-    return storage()?.getItem(RECENT_KEY) ?? null;
+    const s = storage();
+    if (!s) return null;
+    try {
+      migrateRecent(s);
+    } catch {
+      // Blocked or full storage: fall back to whichever key is readable.
+      return s.getItem(RECENT_KEY) ?? s.getItem(LEGACY_RECENT_KEY);
+    }
+    return s.getItem(RECENT_KEY);
   } catch {
     return null;
   }
 }
 
 function write(list: string[] | null) {
-  try {
-    const s = storage();
-    if (!s) return;
-    if (list === null) s.removeItem(RECENT_KEY);
-    else s.setItem(RECENT_KEY, JSON.stringify(list));
-  } catch {
-    // Storage full or blocked: recent tools are a convenience, so stay silent.
+  const s = storage();
+  if (s) {
+    if (list === null) {
+      // Clear removes both keys, each on its own: when the migration could not run (storage
+      // full), the old key is still there and must not bring the list back after Clear.
+      for (const key of [RECENT_KEY, LEGACY_RECENT_KEY]) {
+        try {
+          s.removeItem(key);
+        } catch {
+          // Blocked: nothing more we can do.
+        }
+      }
+    } else {
+      try {
+        s.setItem(RECENT_KEY, JSON.stringify(list));
+      } catch {
+        // Storage full or blocked: recent tools are a convenience, so stay silent.
+      }
+    }
   }
   emit();
 }
@@ -78,7 +110,7 @@ function emit() {
 export function subscribeRecent(cb: () => void): () => void {
   listeners.add(cb);
   const onStorage = (e: StorageEvent) => {
-    if (e.key === RECENT_KEY || e.key === null) cb();
+    if (e.key === RECENT_KEY || e.key === LEGACY_RECENT_KEY || e.key === null) cb();
   };
   if (typeof window !== "undefined") window.addEventListener("storage", onStorage);
   return () => {
@@ -114,7 +146,7 @@ export function clearRecent() {
  * Recent row's space and nothing shifts after hydration. Same rules as above.
  */
 export function recentPrepaintScript(usableSlugs: readonly string[]): string {
-  return `(function(){try{var u=${JSON.stringify(usableSlugs)};var v=JSON.parse(localStorage.getItem(${JSON.stringify(
-    RECENT_KEY,
+  return `(function(){try{var u=${JSON.stringify(usableSlugs)};var v=JSON.parse(localStorage.getItem(${JSON.stringify(RECENT_KEY)})||localStorage.getItem(${JSON.stringify(
+    LEGACY_RECENT_KEY,
   )})||"[]");if(Array.isArray(v)&&v.some(function(s){return typeof s==="string"&&u.indexOf(s)>=0})&&v.every(function(s){return typeof s==="string"}))document.documentElement.setAttribute("data-recent","")}catch(e){}})();`;
 }
