@@ -21,24 +21,29 @@ const scopes: { value: RotateScope; label: string; shortLabel: string }[] = [
 /** Pending rotation per file id: unbounded display degrees per page. */
 type Deltas = Record<string, number[]>;
 
+/**
+ * Hands the in-memory Files (Blobs) to the worker without reading them here;
+ * the worker reads, rotates and emits one file at a time.
+ */
 const process: (deltas: Deltas) => ProcessFn = (deltas) => async (files, signal, onProgress) => {
-  const jobFiles = await Promise.all(
-    files.map(async (f) => ({
-      name: f.name,
-      buffer: await f.source.arrayBuffer(),
-      password: f.password,
-      deltas: Array.from({ length: f.pageCount }, (_, i) => normalizeRotation(deltas[f.id]?.[i] ?? 0)),
-    })),
-  );
   const out = await runInWorker(
-    { kind: "rotate", files: jobFiles, zipName: tool.flow.outputName(files.map((f) => f.name)) },
-    { signal, onProgress, transfer: jobFiles.map((f) => f.buffer) },
+    {
+      kind: "rotate",
+      zipName: tool.flow.outputName(files.map((f) => f.name)),
+      files: files.map((f) => ({
+        name: f.name,
+        source: f.source,
+        password: f.password,
+        deltas: Array.from({ length: f.pageCount }, (_, i) => normalizeRotation(deltas[f.id]?.[i] ?? 0)),
+      })),
+    },
+    { signal, onProgress },
   );
   return {
     name: out.name,
     type: out.type,
-    blob: new Blob([out.bytes as Uint8Array<ArrayBuffer>], { type: out.type }),
-    size: out.bytes.byteLength,
+    blob: out.blob,
+    size: out.blob.size,
     pageCount: out.pageCount,
     entries: out.entries,
     wasEncrypted: out.wasEncrypted,

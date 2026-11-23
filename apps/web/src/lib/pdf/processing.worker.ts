@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 /**
  * Processing Web Worker: runs browser tools off the main thread.
- * Files arrive as transferred ArrayBuffers and never leave the device.
+ * Files arrive as Blobs (passed by reference) and never leave the device.
  */
 import { runJob, type Job, type JobOutput } from "./jobs";
 
@@ -15,7 +15,7 @@ const scope = self as unknown as DedicatedWorkerGlobalScope;
 
 scope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const { id, job } = event.data;
-  const post = (msg: WorkerResponse, transfer: Transferable[] = []) => scope.postMessage(msg, transfer);
+  const post = (msg: WorkerResponse) => scope.postMessage(msg);
   try {
     let last = 0;
     const output = await runJob(job, (value) => {
@@ -24,7 +24,7 @@ scope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       last = now;
       post({ id, type: "progress", value });
     });
-    post({ id, type: "done", output }, [output.bytes.buffer as ArrayBuffer]);
+    post({ id, type: "done", output });
   } catch (error) {
     // Log the failure without any file content.
     const message = error instanceof Error ? error.message : String(error);

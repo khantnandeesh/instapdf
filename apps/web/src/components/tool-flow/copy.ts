@@ -9,7 +9,7 @@ export const copy = {
   privacyIntro: "Your files stay on this device. Nothing is uploaded.",
   privacyResult: "Done on this device. Your file was never uploaded.",
   limits: (f: ToolFlowConfig) =>
-    `PDF only · up to ${f.multiFile ? plural(f.maxFiles, "file") : "1 file"}, ${Math.round(f.maxFileBytes / 1024 / 1024)} MB each, ${f.maxTotalPages.toLocaleString("en-US")} pages in total`,
+    `PDF only · up to ${f.multiFile ? plural(f.maxFiles, "file") : "1 file"}, ${Math.round(f.maxFileBytes / 1024 / 1024)} MB each, ${Math.round(f.maxTotalBytes / 1024 / 1024)} MB and ${f.maxTotalPages.toLocaleString("en-US")} pages in total`,
   statusEmpty: "Add a PDF to start",
   statusLoading: "Reading files…",
   statusPassword: "Waiting for a password",
@@ -19,6 +19,7 @@ export const copy = {
   errorType: (name: string) => `${name} isn't a PDF, so it was skipped. This tool accepts PDF files.`,
   errorCorrupt: (name: string) => `${name} couldn't be opened. It may be damaged or not really a PDF.`,
   errorSize: (name: string, mb: number) => `${name} is larger than ${mb} MB, the limit for this tool.`,
+  errorTotal: (name: string, mb: number) => `${name} would take this task past ${mb} MB in total, so it was skipped.`,
   errorPages: (name: string, max: number) => `${name} would take this task past ${max.toLocaleString("en-US")} pages, so it was skipped.`,
   errorCount: (max: number) => `This tool takes up to ${max} files at a time. We loaded the first ${max}.`,
   errorProcess: (label: string) => `Something went wrong while ${label.toLowerCase()}. Your files and settings are still here.`,

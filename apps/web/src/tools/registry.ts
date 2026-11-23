@@ -30,6 +30,8 @@ export type ToolFlowConfig = {
   multiFile: boolean;
   maxFiles: number;
   maxFileBytes: number;
+  /** Total size of every file in one task. */
+  maxTotalBytes: number;
   /** Total pages across every file in one task. */
   maxTotalPages: number;
   defaultView: "pages" | "files";
@@ -68,6 +70,7 @@ const clientPdfFlow = (
   multiFile: true,
   maxFiles: 20,
   maxFileBytes: 100 * MB,
+  maxTotalBytes: 500 * MB,
   maxTotalPages: 1000,
   defaultView: "pages",
   requiredPermissions: [],

@@ -20,6 +20,7 @@ describe("flow config", () => {
     expect(rotate.flow.maxFiles).toBe(20);
     expect(rotate.flow.maxFileBytes).toBe(100 * 1024 * 1024);
     expect(rotate.flow.maxTotalPages).toBe(1000);
+    expect(rotate.flow.maxTotalBytes).toBe(500 * 1024 * 1024);
     expect(rotate.flow.requiredPermissions).toEqual([]);
     expect(rotate.flow.actionLabel).toBe("Rotate PDF");
     expect(rotate.flow.title).toBe("Rotate PDF");

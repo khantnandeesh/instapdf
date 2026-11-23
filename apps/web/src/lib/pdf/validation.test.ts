@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { acceptAttribute, fitsPageBudget, hasAcceptedType, screenFiles, type IntakeLimits } from "./validation";
 
 const accept = { mime: ["application/pdf"], extensions: [".pdf"] };
-const limits: IntakeLimits = { accept, multiFile: true, maxFiles: 20, maxFileBytes: 100 * 1024 * 1024 };
+const MB = 1024 * 1024;
+const limits: IntakeLimits = { accept, multiFile: true, maxFiles: 20, maxFileBytes: 100 * MB, maxTotalBytes: 500 * MB };
 const f = (name: string, size = 1000, type = "application/pdf") => ({ name, size, type });
 
 describe("hasAcceptedType", () => {
@@ -50,6 +51,26 @@ describe("screenFiles", () => {
     const r = screenFiles([f("a.pdf"), f("b.pdf")], { ...limits, multiFile: false }, 1);
     expect(r.accepted.map((x) => x.name)).toEqual(["a.pdf"]);
     expect(r.overCount).toEqual(["b.pdf"]);
+  });
+});
+
+describe("screenFiles total size", () => {
+  it("rejects a file that would take the task past 500 MB and keeps the rest", () => {
+    const files = [f("a.pdf", 100 * MB), f("b.pdf", 100 * MB), f("c.pdf", 100 * MB), f("d.pdf", 100 * MB), f("e.pdf", 100 * MB), f("f.pdf", 100 * MB), f("g.pdf", 1)];
+    const r = screenFiles(files, limits, 0);
+    expect(r.accepted.map((x) => x.name)).toEqual(["a.pdf", "b.pdf", "c.pdf", "d.pdf", "e.pdf"]);
+    expect(r.rejected).toEqual([
+      { name: "f.pdf", reason: "total" },
+      { name: "g.pdf", reason: "total" },
+    ]);
+  });
+  it("counts bytes already loaded and lets a smaller later file fit", () => {
+    const r = screenFiles([f("big.pdf", 60 * MB), f("small.pdf", 10 * MB)], limits, 5, 450 * MB);
+    expect(r.rejected).toEqual([{ name: "big.pdf", reason: "total" }]);
+    expect(r.accepted.map((x) => x.name)).toEqual(["small.pdf"]);
+  });
+  it("allows exactly the cap", () => {
+    expect(screenFiles([f("x.pdf", 100 * MB)], limits, 4, 400 * MB).accepted).toHaveLength(1);
   });
 });
 

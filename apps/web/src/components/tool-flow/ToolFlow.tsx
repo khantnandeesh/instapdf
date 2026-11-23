@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { setHandoff, takeHandoff } from "@/lib/pdf/handoff";
 import { openPdf, readPageSizes, type OpenedPdf } from "@/lib/pdf/pdfjs";
 import { ThumbnailRenderer } from "@/lib/pdf/thumbnails";
+import { disposeWorker } from "@/lib/pdf/worker-client";
 import { acceptAttribute, fitsPageBudget, screenFiles } from "@/lib/pdf/validation";
 import { continueTargets, type FlowTool } from "@/tools/registry";
 import { Button } from "../ui/Button";
@@ -257,8 +258,16 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
       // Info notices last until the next intake; errors stay until dismissed.
       setNotices((prev) => prev.filter((n) => n.tone === "danger"));
 
-      const screened = screenFiles(incoming, { accept: flow.accept, multiFile: flow.multiFile, maxFiles: flow.maxFiles, maxFileBytes: flow.maxFileBytes }, filesRef.current.length);
-      const problems = screened.rejected.map((r) => (r.reason === "type" ? copy.errorType(r.name) : copy.errorSize(r.name, Math.round(flow.maxFileBytes / 1024 / 1024))));
+      const screened = screenFiles(
+        incoming,
+        { accept: flow.accept, multiFile: flow.multiFile, maxFiles: flow.maxFiles, maxFileBytes: flow.maxFileBytes, maxTotalBytes: flow.maxTotalBytes },
+        filesRef.current.length,
+        filesRef.current.reduce((sum, f) => sum + f.size, 0),
+      );
+      const mb = (bytes: number) => Math.round(bytes / 1024 / 1024);
+      const problems = screened.rejected.map((r) =>
+        r.reason === "type" ? copy.errorType(r.name) : r.reason === "size" ? copy.errorSize(r.name, mb(flow.maxFileBytes)) : copy.errorTotal(r.name, mb(flow.maxTotalBytes)),
+      );
       if (screened.overCount.length) pushNotice({ tone: "warning", title: copy.errorCount(flow.maxFiles), items: screened.overCount.map((n) => `Not loaded: ${n}`) });
 
       const entries: LoadedFile[] = screened.accepted.map((file) => ({
@@ -410,10 +419,13 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
     if (handed) void intake(handed, null);
   }, [intake, tool.slug]);
 
-  // Release pdf.js documents on unmount.
+  // On unmount: stop any running job, shut the processing worker down and
+  // release the pdf.js documents.
   useEffect(() => {
     const map = docs.current;
     return () => {
+      abort.current?.abort();
+      disposeWorker();
       for (const d of map.values()) void d.task.destroy();
       map.clear();
     };
