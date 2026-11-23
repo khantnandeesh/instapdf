@@ -13,7 +13,7 @@ importers:
       '@cantoo/pdf-lib':
         specifier: 2.11.1
         version: 2.11.1(html-entities@2.6.0)
-      '@fontsource/atkinson-hyperlegible':
+      '@fontsource/fredoka':
         specifier: 5.3.0
         version: 5.3.0
       fflate:
@@ -41,6 +41,9 @@ importers:
       '@eslint/eslintrc':
         specifier: ^3
         version: 3.3.7
+      '@phosphor-icons/core':
+        specifier: 2.1.1
+        version: 2.1.1
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
@@ -62,9 +65,6 @@ importers:
       eslint-config-next:
         specifier: 15.5.29
         version: 15.5.29(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
-      lucide-static:
-        specifier: 1.78.0
-        version: 1.78.0
       tailwindcss:
         specifier: ^4
         version: 4.3.5
@@ -139,8 +139,8 @@ packages:
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@fontsource/atkinson-hyperlegible@5.3.0':
-    resolution: {integrity: sha512-Sp8Ve8+rQmENY2Lv02VH7sLpntzTTvnncnJMTbRE7DX6TLxGraN4ykZfzaUWIoCFmaomwkvNiqmlPkrKBuDoSA==}
+  '@fontsource/fredoka@5.3.0':
+    resolution: {integrity: sha512-s2IhjQ50wDnKkkaKmjhtL0rxQg6ITsVusiipM3m7zUwVZZbbCKsscNDkngwp28xVzfIt7neWrkgU1qKqyTycQg==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -336,6 +336,9 @@ packages:
 
   '@pdf-lib/upng@1.0.1':
     resolution: {integrity: sha512-dQK2FUMQtowVP00mtIksrlZhdFXQZPC+taih1q4CvPZ5vqdxR/LKBaFg0oAfzd1GlHZXXSPdQfzQnt+ViGvEIQ==}
+
+  '@phosphor-icons/core@2.1.1':
+    resolution: {integrity: sha512-v4ARvrip4qBCImOE5rmPUylOEK4iiED9ZyKjcvzuezqMaiRASCHKcRIuvvxL/twvLpkfnEODCOJp5dM4eZilxQ==}
 
   '@playwright/test@1.63.0':
     resolution: {integrity: sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ==}
@@ -1526,9 +1529,6 @@ packages:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
 
-  lucide-static@1.78.0:
-    resolution: {integrity: sha512-iEVJ83JKHCP8O1LA5G4x2ybQjIdr86PcyrH0GrU2Y22uHaF+rAIGKNKOiJO/Xd+qMWcpzDUjeQ6IHr7Q399VyA==}
-
   magic-string@1.4.5:
     resolution: {integrity: sha512-oLLC2+YvQUfAa+vxoufE/yc1icb87M9iXIRqAoR/2EhE/8cb3SF/+Gi0c2By1B+5Vz2e2vQtUvHiu1+63Znh+w==}
 
@@ -2168,7 +2168,7 @@ snapshots:
       '@eslint/core': 0.17.0
       levn: 0.4.1
 
-  '@fontsource/atkinson-hyperlegible@5.3.0': {}
+  '@fontsource/fredoka@5.3.0': {}
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -2315,6 +2315,8 @@ snapshots:
   '@pdf-lib/upng@1.0.1':
     dependencies:
       pako: 1.0.11
+
+  '@phosphor-icons/core@2.1.1': {}
 
   '@playwright/test@1.63.0':
     dependencies:
@@ -3582,8 +3584,6 @@ snapshots:
   loose-envify@1.4.0:
     dependencies:
       js-tokens: 4.0.0
-
-  lucide-static@1.78.0: {}
 
   magic-string@1.4.5:
     dependencies:

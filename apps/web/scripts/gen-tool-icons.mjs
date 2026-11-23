@@ -1,83 +1,118 @@
 #!/usr/bin/env node
 /**
- * Generates the tool icons from lucide-static (ISC; some icons MIT via Feather).
+ * Generates every icon the app draws from Phosphor's Duotone set (@phosphor-icons/core, MIT),
+ * the icon family of the BerryPDF design system (docs/design/berrypdf.md, Icons).
  *
  *   node scripts/gen-tool-icons.mjs
  *
- * Writes:
- *   src/tools/tool-icon-names.ts  the list of icon names (and the ToolIconName type)
- *   src/tools/tool-icons.tsx      one server-safe SVG per icon (no hooks, no "use client")
+ * Writes (both committed, both server-safe: no hooks, no "use client"):
+ *   src/tools/tool-icon-names.ts   the tool icon names (and the ToolIconName type)
+ *   src/tools/tool-icons.tsx       <ToolIcon name=...>: one inline SVG per tool icon
+ *   src/components/ui/icons.tsx    the interface icons (FileIcon, CloseIcon, ...)
  *
- * Only path data is vendored, so lucide-static stays a devDependency and nothing
- * is added at runtime. The build fails here if an icon name goes missing.
- * Both generated files are committed. Spec: docs/specs/f2-home.md, H-3.
+ * Only path data is vendored, so @phosphor-icons/core stays an exact-pinned devDependency and
+ * nothing is added to the client bundle at runtime. The build fails here if a name goes missing.
+ * Every tool has its own icon (BerryPDF: "Give every tool its own icon"); a duplicate fails too.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
-const pkgDir = dirname(require.resolve("lucide-static/package.json"));
+// The package exports only its JS entry, so find the folder from node_modules directly.
+const pkgDir = join(here, "..", "node_modules", "@phosphor-icons", "core");
 const pkg = JSON.parse(readFileSync(join(pkgDir, "package.json"), "utf8"));
 
-/** Every icon a registry tool may use. Add a name here, then rerun the script. */
-const ICONS = [
-  "align-left",
-  "book-marked",
-  "bookmark",
-  "columns-2",
-  "combine",
-  "contrast",
+/** Every icon a registry tool may use (Phosphor names, duotone weight). Add a name, then rerun. */
+const TOOL_ICONS = [
+  "angle",
+  "arrow-clockwise",
+  "arrows-in",
+  "arrows-merge",
+  "arrows-out",
+  "arrows-split",
+  "bookmark-simple",
+  "bookmarks",
+  "cards",
+  "circle-half",
+  "columns",
   "crop",
   "eraser",
+  "export",
+  "file-doc",
   "file-image",
   "file-minus",
-  "file-output",
-  "file-pen",
-  "file-text",
-  "file-type",
-  "flip-horizontal-2",
+  "file-pdf",
+  "file-ppt",
+  "file-txt",
+  "file-xls",
+  "flip-horizontal",
+  "flow-arrow",
   "globe",
-  "grid-2x2",
+  "grid-four",
   "hash",
   "image",
   "images",
-  "layers",
-  "layout-grid",
-  "list-ordered",
-  "lock-keyhole",
-  "lock-keyhole-open",
-  "merge",
-  "panel-top",
-  "presentation",
-  "rotate-cw",
+  "list-numbers",
+  "lock",
+  "lock-open",
+  "pencil-simple-line",
+  "rows",
   "ruler",
-  "scaling",
   "scan",
-  "scan-text",
-  "sheet",
-  "shrink",
   "shuffle",
   "signature",
-  "split",
-  "square-pen",
+  "squares-four",
+  "stack-simple",
   "stamp",
-  "tags",
-  "text-cursor-input",
-  "text-search",
-  "workflow",
+  "tag",
+  "text-aa",
+  "text-columns",
+  "textbox",
   "wrench",
 ];
 
-const iconFile = (n) => join(pkgDir, "icons", `${n}.svg`);
-const license = readFileSync(join(pkgDir, "LICENSE"), "utf8").trim();
+/** Interface icons: exported component name -> Phosphor name. */
+const UI_ICONS = {
+  FileIcon: "file",
+  FilesIcon: "files",
+  PlusIcon: "plus",
+  MinusIcon: "minus",
+  RotateLeftIcon: "arrow-counter-clockwise",
+  RotateRightIcon: "arrow-clockwise",
+  ResetIcon: "arrow-u-up-left",
+  CloseIcon: "x",
+  EyeIcon: "eye",
+  LockIcon: "lock-simple",
+  CheckIcon: "check",
+  CheckCircleIcon: "check-circle",
+  DownloadIcon: "download-simple",
+  UploadIcon: "upload-simple",
+  ShareIcon: "share-network",
+  AlertIcon: "warning-circle",
+  ErrorIcon: "x-circle",
+  InfoIcon: "info",
+  EnlargeIcon: "arrows-out-simple",
+  ChevronLeftIcon: "caret-left",
+  ChevronRightIcon: "caret-right",
+  ChevronDownIcon: "caret-down",
+  ShieldIcon: "shield-check",
+  SearchIcon: "magnifying-glass",
+  GridIcon: "squares-four",
+  ClockIcon: "clock",
+  DeviceIcon: "browser",
+  ArrowRightIcon: "arrow-right",
+  ArrowLeftIcon: "arrow-left",
+  LeafIcon: "leaf",
+};
 
+const iconFile = (n) => join(pkgDir, "assets", "duotone", `${n}-duotone.svg`);
+const license = readFileSync(join(pkgDir, "LICENSE"), "utf8").trim();
 const camel = (name) => name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 const esc = (v) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
-const missing = ICONS.filter((n) => {
+const all = [...new Set([...TOOL_ICONS, ...Object.values(UI_ICONS)])];
+const missing = all.filter((n) => {
   try {
     readFileSync(iconFile(n));
     return false;
@@ -86,14 +121,19 @@ const missing = ICONS.filter((n) => {
   }
 });
 if (missing.length) {
-  console.error(`gen-tool-icons: not in lucide-static ${pkg.version}: ${missing.join(", ")}`);
+  console.error(`gen-tool-icons: not in @phosphor-icons/core ${pkg.version} (duotone): ${missing.join(", ")}`);
+  process.exit(1);
+}
+const dupes = TOOL_ICONS.filter((n, i) => TOOL_ICONS.indexOf(n) !== i);
+if (dupes.length) {
+  console.error(`gen-tool-icons: duplicate tool icons: ${dupes.join(", ")}`);
   process.exit(1);
 }
 
 const header = `/*
- * GENERATED by scripts/gen-tool-icons.mjs from lucide-static ${pkg.version}. Do not edit.
+ * GENERATED by scripts/gen-tool-icons.mjs from @phosphor-icons/core ${pkg.version} (Duotone). Do not edit.
  *
- * Icons: Lucide (https://lucide.dev). License notices, as shipped in lucide-static:
+ * Icons: Phosphor Icons (https://phosphoricons.com). License notice, as shipped in @phosphor-icons/core:
  *
 ${license
   .split("\n")
@@ -102,66 +142,73 @@ ${license
  */
 `;
 
-const names = `${header}
-export const toolIconNames = [
-${ICONS.map((n) => `  "${n}",`).join("\n")}
-] as const;
-
-export type ToolIconName = (typeof toolIconNames)[number];
-`;
-
 const SHAPES = new Set(["path", "circle", "rect", "line", "polyline", "polygon", "ellipse"]);
 
-/** The shape elements inside one lucide-static SVG file (the outer <svg> frame is ours). */
+/** The shape elements inside one Phosphor SVG file (the outer <svg> frame is ours). */
 function shapesOf(name) {
   const svg = readFileSync(iconFile(name), "utf8");
   const body = svg.slice(svg.indexOf(">", svg.indexOf("<svg")) + 1, svg.lastIndexOf("</svg>"));
   const out = [];
   for (const m of body.matchAll(/<([a-z]+)\s([^>]*?)\/?>/g)) {
     const [, tag, rawAttrs] = m;
-    if (!SHAPES.has(tag)) throw new Error(`gen-tool-icons: unexpected <${tag}> in ${name}.svg`);
+    if (!SHAPES.has(tag)) throw new Error(`gen-tool-icons: unexpected <${tag}> in ${name}`);
     const props = [...rawAttrs.matchAll(/([a-z0-9-]+)="([^"]*)"/g)].map(([, k, v]) => `${camel(k)}="${esc(v)}"`).join(" ");
     out.push(`<${tag} ${props} />`);
   }
-  if (!out.length) throw new Error(`gen-tool-icons: no shapes in ${name}.svg`);
-  return out;
+  if (!out.length) throw new Error(`gen-tool-icons: no shapes in ${name}`);
+  return out.join("");
 }
 
-const shapes = ICONS.map((n) => {
-  const children = shapesOf(n).join("");
-  return `  "${n}": <>${children}</>,`;
-}).join("\n");
+const names = `${header}
+export const toolIconNames = [
+${TOOL_ICONS.map((n) => `  "${n}",`).join("\n")}
+] as const;
 
-const icons = `${header}
+export type ToolIconName = (typeof toolIconNames)[number];
+`;
+
+const toolIcons = `${header}
 import type { ReactElement } from "react";
 import type { ToolIconName } from "./tool-icon-names";
 
 const shapes: Record<ToolIconName, ReactElement> = {
-${shapes}
+${TOOL_ICONS.map((n) => `  "${n}": <>${shapesOf(n)}</>,`).join("\n")}
 };
 
-/** A tool icon: 24x24 line art in currentColor, decorative (aria-hidden). Server-safe. */
-export function ToolIcon({ name, size = 20, className }: { name: ToolIconName; size?: number; className?: string }) {
+/**
+ * A tool icon: Phosphor Duotone on a 256 grid, drawn in currentColor with its main shape at 20%.
+ * Decorative (aria-hidden). Server-safe.
+ */
+export function ToolIcon({ name, size = 22, className }: { name: ToolIconName; size?: number; className?: string }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-      className={className}
-    >
+    <svg width={size} height={size} viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" focusable="false" className={className}>
       {shapes[name]}
     </svg>
   );
 }
 `;
 
+const uiIcons = `${header}
+import type { SVGProps } from "react";
+
+type IconProps = SVGProps<SVGSVGElement> & { size?: number };
+
+/** Phosphor Duotone frame: 256 grid, currentColor, decorative (aria-hidden). */
+function Icon({ size = 20, children, ...rest }: IconProps & { children: React.ReactNode }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" focusable="false" {...rest}>
+      {children}
+    </svg>
+  );
+}
+
+export type IconComponent = (props: IconProps) => React.ReactElement;
+${Object.entries(UI_ICONS)
+  .map(([comp, n]) => `\n/** Phosphor "${n}" (duotone). */\nexport const ${comp}: IconComponent = (p) => <Icon {...p}>${shapesOf(n)}</Icon>;`)
+  .join("\n")}
+`;
+
 writeFileSync(join(here, "../src/tools/tool-icon-names.ts"), names);
-writeFileSync(join(here, "../src/tools/tool-icons.tsx"), icons);
-console.log(`gen-tool-icons: wrote ${ICONS.length} icons from lucide-static ${pkg.version}`);
+writeFileSync(join(here, "../src/tools/tool-icons.tsx"), toolIcons);
+writeFileSync(join(here, "../src/components/ui/icons.tsx"), uiIcons);
+console.log(`gen-tool-icons: wrote ${TOOL_ICONS.length} tool icons and ${Object.keys(UI_ICONS).length} interface icons from @phosphor-icons/core ${pkg.version}`);

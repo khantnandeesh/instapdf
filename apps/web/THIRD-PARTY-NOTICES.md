@@ -1,18 +1,19 @@
 # Third-party notices
 
 Assets shipped to browsers by `apps/web` that carry their own license terms.
-(npm code dependencies keep their license files in `node_modules`; this file covers bundled assets.)
+(npm code dependencies keep their license files in `node_modules`; this file covers bundled assets.
+The build-time scan, `scripts/licenses.mjs`, also lists them on `/licenses` and in `public/third-party-notices.txt`.)
 
-## Atkinson Hyperlegible (font)
+## Fredoka (font)
 
-- Package: `@fontsource/atkinson-hyperlegible` 5.3.0 (pinned; files `files/atkinson-hyperlegible-latin-400-normal.woff2` and `files/atkinson-hyperlegible-latin-700-normal.woff2`, latin subset)
-- Upstream: Braille Institute of America (via Google Fonts, https://github.com/google/fonts)
-- Copyright 2020 Braille Institute of America, Inc.
+- Package: `@fontsource/fredoka` 5.3.0 (pinned; files `files/fredoka-latin-400-normal.woff2`, `-500-`, `-600-` and `-700-normal.woff2`, latin subset)
+- Upstream: The Fredoka Project Authors (https://github.com/hafontia/Fredoka-One, via Google Fonts)
+- Copyright 2016 The Fredoka Project Authors
 - License: SIL Open Font License, Version 1.1 (OFL-1.1, as declared in the installed package's `package.json` and `LICENSE`), reproduced below
-- Use: subset by Fontsource; served as distributed, self-hosted from our own origin by `next/font/local` in `src/app/layout.tsx`.
+- Use: subset by Fontsource; served as distributed, self-hosted from our own origin by `next/font/local` in `src/app/layout.tsx`. The package ships only CSS and font files (no JavaScript), so the license scan treats it as a font.
 
 ```
-Copyright 2020 Braille Institute of America, Inc. AtkinsonHyperlegible-Italic.ttf: Copyright 2020 Braille Institute of America, Inc. AtkinsonHyperlegible-Bold.ttf: Copyright 2020 Braille Institute of America, Inc. AtkinsonHyperlegible-BoldItalic.ttf: Copyright 2020 Braille Institute of America, Inc.
+Copyright 2016 The Fredoka Project Authors (https://github.com/hafontia/Fredoka-One)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:
@@ -106,3 +107,38 @@ DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 ```
+
+## Phosphor Icons (icon paths)
+
+- Package: `@phosphor-icons/core` 2.1.1 (pinned devDependency; Duotone SVGs under `assets/duotone/`)
+- Upstream: https://github.com/phosphor-icons/core (Helena Zhang and Tobias Fried)
+- License: MIT, reproduced below
+- Use: `scripts/gen-tool-icons.mjs` copies the path data of the icons we use into `src/tools/tool-icons.tsx` and `src/components/ui/icons.tsx` (each file carries this notice), rendered as inline SVG on the server. Nothing from the package runs in the browser.
+
+```
+MIT License
+
+Copyright (c) 2023 Phosphor Icons
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## BerryPDF design system artwork
+
+- The berry mark, berry loader, blossom, leaf, vine, jam-drip, waves and gingham drawings in `src/components/berry/Berry.tsx` and `src/app/globals.css` come from the owner's BerryPDF design system (commissioned for this product).
