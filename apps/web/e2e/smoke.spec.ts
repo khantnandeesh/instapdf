@@ -5,7 +5,7 @@ test("home lists every tool", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   for (const t of tools) {
-    const link = page.locator(`a[href="/${t.slug}"]`);
+    const link = page.locator(`[data-testid=category] a[href="/${t.slug}"]`);
     await expect(link).toBeVisible();
     await expect(link).toContainText(t.name);
   }
