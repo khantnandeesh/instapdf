@@ -44,8 +44,9 @@ export class ThumbnailRenderer {
   }
 
   unregister(fileId: string): void {
+    const entry = this.docs.get(fileId);
     this.docs.delete(fileId);
-    dropBitmaps(fileId);
+    dropBitmaps(fileId, !!entry && isImage(entry) && entry.format === "tiff");
     for (const r of [...this.queue, ...this.active]) {
       if (!r.key.startsWith(`${fileId}:`)) continue;
       r.cancelled = true;
@@ -154,7 +155,8 @@ const BITMAP_MAX = 800;
 const BITMAP_CACHE = 12;
 const bitmaps = new Map<string, Promise<ImageBitmap>>();
 
-function dropBitmaps(fileId: string) {
+function dropBitmaps(fileId: string, tiff: boolean) {
+  if (tiff) void import("./tiff-client").then((m) => m.forgetTiff(fileId)).catch(() => {});
   for (const [key, bmp] of bitmaps) {
     if (!key.startsWith(`${fileId}:`)) continue;
     bitmaps.delete(key);
@@ -162,16 +164,16 @@ function dropBitmaps(fileId: string) {
   }
 }
 
-async function decodeFrame(entry: ImageEntry, index: number): Promise<ImageBitmap> {
+async function decodeFrame(fileId: string, entry: ImageEntry, index: number): Promise<ImageBitmap> {
   const frame = entry.frames[index] ?? entry.frames[0];
   const scale = Math.min(1, BITMAP_MAX / Math.max(frame.width, frame.height));
   const size = { resizeWidth: Math.max(1, Math.round(frame.width * scale)), resizeHeight: Math.max(1, Math.round(frame.height * scale)), resizeQuality: "medium" as const };
-  let source: Blob | ImageData = entry.blob;
   if (entry.format === "tiff") {
-    const { decodeTiffFrame } = await import("./tiff");
-    const f = await decodeTiffFrame(new Uint8Array(await entry.blob.arrayBuffer()), index);
-    source = new ImageData(new Uint8ClampedArray(f.rgba.buffer as ArrayBuffer, f.rgba.byteOffset, f.rgba.length), f.width, f.height);
+    // Walked once per file and decoded in the TIFF worker; comes back downscaled.
+    const { tiffThumb } = await import("./tiff-client");
+    return tiffThumb(fileId, entry.blob, index, BITMAP_MAX);
   }
+  const source: Blob = entry.blob;
   try {
     return await createImageBitmap(source, size);
   } catch {
@@ -183,7 +185,7 @@ function bitmapFor(fileId: string, entry: ImageEntry, index: number): Promise<Im
   const key = `${fileId}:${index}`;
   let p = bitmaps.get(key);
   if (!p) {
-    p = decodeFrame(entry, index);
+    p = decodeFrame(fileId, entry, index);
     p.catch(() => bitmaps.delete(key));
     bitmaps.set(key, p);
     if (bitmaps.size > BITMAP_CACHE) {

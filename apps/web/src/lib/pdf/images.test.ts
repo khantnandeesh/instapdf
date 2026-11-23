@@ -1,8 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { exceedsPixelCap, imageFormatOfName, imagePageSize, imagePlacement, probeImage, sniffFormat } from "./images";
-import { encodePng } from "./png";
-import { decodeTiffFrame, tiffFrameSizes } from "./tiff";
+import { decodeTiffFrame, readTiff, tiffFrameSizes, type TiffFile } from "./tiff";
 
 const fx = async (name: string) => new Uint8Array(await readFile(new URL(`../../../tests/fixtures/${name}`, import.meta.url)));
 
@@ -43,21 +42,60 @@ describe("image intake", () => {
     expect(big.y).toBeGreaterThanOrEqual(36);
     expect(big.height / big.width).toBeCloseTo(4 / 3);
   });
-  it("encodes RGBA as a PNG the header reader understands", () => {
-    const rgba = new Uint8Array(3 * 2 * 4).fill(255);
-    const png = encodePng(rgba, 3, 2);
-    expect(probeImage(png)).toEqual({ format: "png", width: 3, height: 2 });
-    rgba[3] = 0;
-    expect(encodePng(rgba, 3, 2)[25]).toBe(6); // RGBA color type when not opaque
-  });
   it("reads TIFF frames and decodes them (AC-8)", async () => {
     const bytes = await fx("fox.tiff");
     expect(await tiffFrameSizes(bytes)).toEqual([
       { width: 200, height: 200 },
       { width: 200, height: 200 },
     ]);
-    const frame = await decodeTiffFrame(bytes, 1);
+    const frame = await decodeTiffFrame(bytes, readTiff(bytes) as TiffFile, 1);
     expect(frame.rgba.length).toBe(200 * 200 * 4);
     expect(await tiffFrameSizes(await fx("broken.png"))).toBeNull();
+  });
+});
+
+describe("TIFF structure walker (review fix)", () => {
+  const ifdTiff = (entries: [number, number, number, number][], next: number, extra = 0) => {
+    const b = new Uint8Array(8 + 2 + entries.length * 12 + 4 + extra);
+    const v = new DataView(b.buffer);
+    b.set([0x49, 0x49, 42, 0]);
+    v.setUint32(4, 8, true);
+    v.setUint16(8, entries.length, true);
+    entries.forEach(([tag, type, num, value], i) => {
+      const e = 10 + i * 12;
+      v.setUint16(e, tag, true);
+      v.setUint16(e + 2, type, true);
+      v.setUint32(e + 4, num, true);
+      if (type === 3 && num === 1) v.setUint16(e + 8, value, true);
+      else v.setUint32(e + 8, value, true);
+    });
+    v.setUint32(10 + entries.length * 12, next, true);
+    return b;
+  };
+  const image = (w: number, h: number, more: [number, number, number, number][] = []) => [
+    [256, 3, 1, w],
+    [257, 3, 1, h],
+    [273, 4, 1, 8],
+    [279, 4, 1, 4],
+    ...more,
+  ] as [number, number, number, number][];
+
+  it("refuses an IFD that points at itself, fast", async () => {
+    const started = Date.now();
+    expect(readTiff(await fx("cyclic-ifd.tiff"))).toEqual({ problem: "unreadable" });
+    expect(tiffFrameSizes(ifdTiff(image(10, 10), 8))).toBeNull();
+    expect(Date.now() - started).toBeLessThan(200);
+  });
+  it("refuses offsets past the end of the file", () => {
+    expect(readTiff(ifdTiff(image(10, 10), 99_999))).toEqual({ problem: "unreadable" });
+    expect(readTiff(ifdTiff([...image(10, 10).slice(0, 2), [273, 4, 1, 5000], [279, 4, 1, 4]], 0))).toEqual({ problem: "unreadable" });
+  });
+  it("refuses more than 64 bits per pixel and frames over the decode budget", () => {
+    expect(readTiff(ifdTiff(image(10, 10, [[277, 3, 1, 3], [258, 3, 1, 32]]), 0))).toEqual({ problem: "unreadable" });
+    expect(readTiff(ifdTiff(image(8000, 8000), 0))).toEqual({ problem: "tooLarge" });
+    expect(readTiff(ifdTiff(image(7000, 7000, [[277, 3, 1, 4], [258, 3, 1, 16]]), 0))).toEqual({ problem: "tooLarge" });
+  });
+  it("accepts a plain frame", () => {
+    expect(tiffFrameSizes(ifdTiff(image(2, 2), 0, 16))).toEqual([{ width: 2, height: 2 }]);
   });
 });
