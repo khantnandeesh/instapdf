@@ -1,6 +1,6 @@
 # F1: Shared flow (pick files → set options → run → result)
 
-Status: step 1 (Analyze) done. Next: competitor research, then UX.
+Status: steps 1 (Analyze) and 2 (Research) done. Next: UX.
 Reference observed: rotate-pdf-pages, merge-pdf and pdf-editor on the live reference site, 2026-11-23. We uploaded synthetic fixtures only and did **not** run any task, so the processing and result screens are taken from the discovery crawl and are marked *unverified* below.
 Internal screenshots: `docs/specs/assets/f1-shared-flow/` (reference only, never ship).
 
@@ -200,3 +200,37 @@ All ACs run on `/rotate-pdf`.
 ## 8. Screenshot index (internal)
 
 01 empty · 02 source dropdown · 03/04 URL modal and invalid address · 05 ready (pages view) · 06 per-page hover toolbar · 07 all rotated · 08 odd scope plus cumulative rotation · 09 reset · 10 second file refused by the free tier · 11–13 user-password modal (prompt, wrong, accepted) · 14 owner-restricted file on Rotate (no prompt) · 15 corrupt file · 16 wrong type · 20–23 Merge empty, files view, pages view · 25–27 Merge file hover, add-files menu, reorder menu · 28–31 Editor limited-permission banner and owner-password modal.
+
+## Improvements
+
+Researched 2026-11-23. **Source caveat:** ilovepdf.com, smallpdf.com and tools.pdf24.org could not be reached from the research session (the network allowlist blocked them), so we could not inspect those sites live. Items marked † come from the competitors' own help pages found through web search. Items marked ‡ come from the researcher's prior knowledge of the product and were not re-checked live. Nothing was run on any competitor, and no competitor text, assets or code is reused (Stirling-PDF is "open-core" with mixed licensing, so we take ideas only).
+
+| # | Idea | Seen at | User benefit | Cost | Adopt/skip | Reason |
+|---|---|---|---|---|---|---|
+| I-1 | Lazy (viewport-based) thumbnail rendering: the ready state and primary action don't wait for every thumbnail | Adobe Acrobat online, iLovePDF, Smallpdf ‡ (progressive grids) | Big files (up to our 1,000-page cap) become usable in seconds instead of freezing the tab; less memory on phones; helps the Lighthouse ≥ 90 mobile gate | M | **Adopt** → AC-52, AC-53 | Browser-only. Without it the 1,000-page cap from §5 is not realistic on mobile. |
+| I-2 | Preview of the output's first page on the result screen | Smallpdf ‡, Adobe Acrobat online ‡ | Confirms the rotation is right before downloading, which helps most on mobile, where opening the PDF is awkward | S | **Adopt** → AC-54 | Reuses the pdf.js thumbnail renderer and runs locally. |
+| I-3 | Paste a PDF from the clipboard (Ctrl/Cmd+V) to add it | PDF24 ‡ | Copy the file in Explorer/Finder and paste it, with no dialog | S | **Adopt** → AC-55 | One `paste` listener feeding the same intake path as drop. No new dependency. |
+| I-4 | Native Share of the result (send it to WhatsApp, mail or Files) on mobile | PDFgear mobile app ‡, Smallpdf mobile app ‡ (in-app share) | One tap to send the result on a phone. Our web equivalent uses the Web Share API with files, with no server link | S | **Adopt** → AC-56 | Browser-only, and the button only appears where `navigator.canShare({files})` is true. |
+| I-5 | Say "processed on your device, nothing uploaded" on the result screen too, not just the empty state | Positioning of browser-local rivals; competitors that upload delete files later and say so on the result screen (iLovePDF, Smallpdf ‡) | Trust: it confirms the privacy promise at the moment it matters | S | **Adopt** → AC-57 | Copy only. This is our main advantage over the upload-based competitors. |
+| I-6 | Portrait/Landscape page filter in the rotate scope | iLovePDF † (sidebar: All / Portrait / Landscape) | Fix only the sideways pages in a mixed scan | S | Skip (for F1) | This is a Rotate option, not part of the shared flow. Handed to F4's option review as a recommended adopt. |
+| I-7 | Select pages (click, Shift-click) and then rotate only the selection | Adobe Acrobat online ‡, Stirling-PDF ‡ | Faster than rotating one page at a time on large files | M | Skip (for F1) | The selection model is shared with Delete/Extract/Organize. Build it with the first of those so it is designed once. |
+| I-8 | Undo/redo of pending page edits (Ctrl+Z) | Adobe Acrobat online ‡, Stirling-PDF ‡ | Recover from a mistaken click | M | Skip | Reset (AC-35) and per-page rotate cover the Rotate case. Revisit with Organize. |
+| I-9 | Share link, QR code or email the result | iLovePDF ‡, Smallpdf ‡ | Hand the file to another device | M | Skip | Needs uploading and storing the output, which goes against browser-first (rule 4) and adds storage cost. I-4 covers the mobile need locally. |
+| I-10 | Save the result to Google Drive / Dropbox | iLovePDF ‡, Smallpdf ‡, PDF24 ‡ | Cloud users skip the download | M | Skip | Already deferred as D-5 (needs OAuth app review). Not for F1. |
+| I-11 | Download starts automatically when processing finishes | iLovePDF ‡ | Saves one click | S | Skip | Browsers block or prompt for repeated automatic downloads, it is surprising on mobile, and it conflicts with previewing (I-2) and Continue-in-another-tool. |
+| I-12 | Offline use (PWA / service worker) for browser tools | PDFgear and PDF24 desktop apps ‡ (offline) | Works on bad connections and proves nothing is uploaded | M | Skip (for F1) | Worth doing as a later `chore:` across all browser tools. Caching rules risk stale deploys, which is out of scope for the first feature. |
+| I-13 | Auto-detect sideways pages (OCR orientation) | Adobe Acrobat ‡, PDF24 ‡ | One-click fix for scans | L | Skip | Needs OCR on the worker (server cost and an upload). Candidate for the OCR feature. |
+| I-14 | Sort files A–Z / Z–A in the files view | iLovePDF ‡ (Merge) | Order many files quickly | S | Skip (for F1) | Matters for Merge. Hand to F3. |
+
+### Improvement ACs
+
+These run on `/rotate-pdf` like the others. The evaluator does not compare them with the reference, but they must pass.
+
+- **AC-52 (P1) (improvement)** With `sixty-pages.pdf` loaded in a 1280×800 viewport, the primary action is enabled before every thumbnail has rendered: at the moment it becomes enabled, at most 30 page tiles hold a rendered image (canvas or `img` with a source). The other tiles show a placeholder of the right size, so scrolling does not jump.
+- **AC-53 (P1) (improvement)** After scrolling to the end of the grid from AC-52, the thumbnail for page 60 renders within 2 s. Pending rotations applied before scrolling (rotate right on all pages) show on tiles that render later. Running still gives `/Rotate 90` on all 60 pages.
+- **AC-54 (P2) (improvement)** For a single output, the result screen shows a preview of the output's first page, rendered locally from the output bytes. After AC-30 (all pages +90° on portrait `three-pages.pdf`), the preview is landscape (rendered width > height). For a ZIP output, the result screen lists the entry names instead.
+- **AC-55 (P2) (improvement)** In the empty state, a `paste` event on the document whose clipboard holds `three-pages.pdf` reaches the same ready state as AC-2. Pasting plain text does nothing and shows no error. A paste whose target is a text input (for example the password field) is never treated as a file.
+- **AC-56 (P2) (improvement)** When `navigator.canShare({ files })` returns true, the result screen shows a Share control. Activating it calls `navigator.share` with exactly one `File` (the output, with the same name as the Download, of type `application/pdf` or `application/zip`). When the API is missing or returns false, no Share control is rendered. QA stubs the API with an init script.
+- **AC-57 (P2) (improvement)** The result screen of a browser tool shows a short note that the file was processed on this device and not uploaded. The note is absent for server tools (checked in F6).
+
+**Improvement totals: 6 ACs: 2 P1, 4 P2.** Grand total with §7: 57 ACs (17 P0, 30 P1, 10 P2).
