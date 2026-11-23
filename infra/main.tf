@@ -154,6 +154,13 @@ resource "google_cloud_run_v2_service" "web" {
   ingress             = "INGRESS_TRAFFIC_ALL"
   deletion_protection = each.key == "prod"
 
+  # Service-level scaling. The API always returns this block (min 0, manual 0)
+  # even when unset, so declaring it keeps `terraform plan` free of a
+  # perpetual diff. Min stays 0: scale to zero, no idle cost.
+  scaling {
+    min_instance_count = 0
+  }
+
   template {
     service_account                  = google_service_account.web_runtime[each.key].email
     max_instance_request_concurrency = 80
