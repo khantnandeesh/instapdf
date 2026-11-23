@@ -4,13 +4,13 @@ Status values: `todo` · `in-progress (step n)` · `done`. The orchestrator keep
 
 | # | Feature | Sejda slugs | Status |
 |---|---|---|---|
-| F0 | Foundation: monorepo, CI, design tokens, app shell, tool registry | – | in-progress |
-| F1 | Shared upload → options → process → result flow (incl. encrypted-PDF password prompts) | shared-chrome | todo |
+| F0 | Foundation: monorepo, CI, design tokens, app shell, tool registry, GCP infra + deploy pipelines | – | in-progress (infra PR #1 in review; GCP blocked on owner enabling Service Usage / Resource Manager / Billing APIs) |
+| F1 | Shared upload → options → process → result flow (incl. encrypted-PDF password prompts) | shared-chrome | in-progress (step 2) — spec on `feat/f1-shared-flow`, vehicle tool: Rotate |
 | F2 | Home page + tool catalogue + header menu | home | todo |
 | F3 | Merge (files + pages view, reorder, options) | merge-pdf | todo |
-| F4 | Split by pages / Extract / Delete / Rotate | split-pdf, extract-pdf-pages, delete-pdf-pages, rotate-pdf-pages | todo |
+| F4 | Split by pages / Extract / Delete / Rotate | split-pdf, extract-pdf-pages, delete-pdf-pages, rotate-pdf-pages | todo (Rotate ships in F1; F4 reuses it) |
 | F5 | Organize / Visual combine / Alternate & mix | organize-pdf, visually-combine-reorder-pdf, alternate-mix-pdf | todo |
-| F6 | Compress (server worker + infra) | compress-pdf | todo |
+| F6 | Compress (server worker + infra) | compress-pdf | todo — **must ship a scale-to-zero cleaner that deletes job files ≤2h after upload (Scheduler every 15 min or per-upload Cloud Tasks) before any upload code goes live** |
 | F7 | Split by outline / size / text / in half | split-pdf-by-* , split-pdf-down-the-middle | todo |
 | F8 | Crop / Resize / Flip / N-up | crop-pdf, resize-pdf, flip-pdf, n-up-pdf | todo |
 | F9 | Watermark / Page numbers / Header-footer / Bates | watermark-pdf, page-numbers-pdf, header-footer-pdf, bates-numbering-pdf | todo |

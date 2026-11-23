@@ -6,3 +6,11 @@ __pycache__/
 apps/web/playwright-report/
 apps/web/test-results/
 next-env.d.ts
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log

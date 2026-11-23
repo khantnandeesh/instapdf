@@ -1,0 +1,117 @@
+name: Deploy prod
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  REGION: us-central1
+  SERVICE: web-prod
+  IMAGE: us-central1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/instapdf/web:${{ github.sha }}
+
+jobs:
+  deploy:
+    # Skip until the GCP bootstrap is done and the repo variables exist (infra/README.md).
+    if: ${{ vars.GCP_WIF_PROVIDER != '' && vars.GCP_DEPLOYER_SA_PROD != '' }}
+    # Gate enforced by GitHub (deployment rule: tags v*) and by WIF, which only
+    # lets the prod deployer be impersonated from this environment.
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Only release commits that are on main (and so went through staging).
+      - name: Verify tagged commit is on main
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::${GITHUB_REF_NAME} (${GITHUB_SHA}) is not on main; refusing to deploy"
+            exit 1
+          fi
+
+      - uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA_PROD }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Prod never builds: it promotes the exact image staging built and tested.
+      - name: Require staging image for this commit
+        run: |
+          if ! gcloud artifacts docker images describe "$IMAGE" >/dev/null 2>&1; then
+            echo "::error::${IMAGE} not found. Let deploy-staging finish for ${GITHUB_SHA} first, then re-run."
+            exit 1
+          fi
+
+      - name: Record current live revision
+        id: prev
+        run: |
+          prev="$(gcloud run services describe "$SERVICE" --region "$REGION" --format=json \
+            | jq -r '[.status.traffic[] | select(.percent == 100) | .revisionName][0] // empty')"
+          echo "Current 100% revision: ${prev:-<none>}"
+          if [ -z "$prev" ]; then
+            echo "::warning::No single revision serves 100% of ${SERVICE} traffic; automatic rollback is disabled for this run."
+          fi
+          echo "revision=${prev}" >> "$GITHUB_OUTPUT"
+
+      # New revision gets 0% traffic and a "candidate" URL until it passes.
+      - name: Deploy candidate revision (no traffic)
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --image "$IMAGE" \
+            --region "$REGION" \
+            --update-env-vars "APP_VERSION=${GITHUB_SHA}" \
+            --no-traffic \
+            --tag candidate \
+            --quiet
+
+      - name: Smoke test candidate
+        id: candidate
+        run: |
+          json="$(gcloud run services describe "$SERVICE" --region "$REGION" --format=json)"
+          url="$(jq -r '.status.traffic[] | select(.tag == "candidate") | .url' <<<"$json")"
+          rev="$(jq -r '.status.traffic[] | select(.tag == "candidate") | .revisionName' <<<"$json")"
+          echo "revision=${rev}" >> "$GITHUB_OUTPUT"
+          .github/scripts/smoke-test.sh "$url" "$GITHUB_SHA"
+
+      # Before the shift, so a tagging error can never trigger a rollback.
+      - name: Tag released image
+        run: |
+          gcloud artifacts docker tags add "$IMAGE" \
+            "${IMAGE%:*}:${GITHUB_REF_NAME}" --quiet
+
+      - name: Shift 100% traffic to the new revision
+        id: shift
+        env:
+          NEW_REVISION: ${{ steps.candidate.outputs.revision }}
+        run: |
+          echo "shifted=true" >> "$GITHUB_OUTPUT"
+          gcloud run services update-traffic "$SERVICE" --region "$REGION" \
+            --to-revisions "${NEW_REVISION}=100" --quiet
+
+      - name: Smoke test live URL
+        run: |
+          url="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
+          .github/scripts/smoke-test.sh "$url" "$GITHUB_SHA"
+
+      - name: Roll back traffic
+        if: ${{ failure() && steps.shift.outputs.shifted == 'true' && steps.prev.outputs.revision != '' }}
+        env:
+          PREV_REVISION: ${{ steps.prev.outputs.revision }}
+        run: |
+          echo "::warning::Rolling ${SERVICE} back to ${PREV_REVISION}"
+          gcloud run services update-traffic "$SERVICE" --region "$REGION" \
+            --to-revisions "${PREV_REVISION}=100" --quiet
