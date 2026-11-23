@@ -214,6 +214,7 @@ Copy the behavior, not the wording.
 | Picker confirm with nothing selected | Button stays active (result not tested) | Button disabled. |
 | Removing every page in the pages view | Not tested | Returns to the empty state (same as removing the last file). |
 | TOC or footer text the standard PDF font cannot show (non-Latin names) | Not observed | The text must still appear correctly: embed a subset of a permissively licensed Unicode font, loaded only when needed. (Geist is already used under SIL OFL in F1; the font choice and license need the code-reviewer's check against CLAUDE.md rule 3.) |
+| TOC or footer text in Arabic (or another script that needs contextual shaping: Syriac, Thaana, N'Ko) | Not observed | **Known limitation (build, PR #7 review):** pdf-lib cannot shape these scripts, so each such character is written as "?" (the rest of the name is kept). Covered: Latin, Greek, Cyrillic, Vietnamese, Devanagari, Hebrew (right to left), Thai, Japanese, Korean, Simplified Chinese (Noto Sans families, SIL OFL 1.1, fetched only when needed). Revisit with a shaping engine (e.g. HarfBuzz WASM, MIT) in a later feature. |
 | Processing failure | Generic retry message | F1 processing-error panel; page edits and options are kept. |
 
 ## 6. Output

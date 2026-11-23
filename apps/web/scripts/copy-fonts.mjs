@@ -1,8 +1,9 @@
 // Copies the Noto Sans font slices used for Merge's footer and contents text
 // into public/fonts/noto/ and writes manifest.json (file + code point ranges,
 // in order of preference). Runs before `next build` / `next dev`; the output
-// is generated, not committed. Fonts: SIL Open Font License 1.1 (OFL.txt is
-// copied next to them). The browser only fetches a slice when a run needs a
+// is generated, not committed. Fonts: SIL Open Font License 1.1 (each
+// family's license is copied next to them as OFL-<family>.txt).
+// The browser only fetches a slice when a run needs a
 // glyph Helvetica cannot show (spec F3 §8a decision 8).
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -19,10 +20,16 @@ const parse = (css) =>
     return [parseInt(lo, 16), parseInt(hi ?? lo, 16)];
   });
 
+const named = (...names) => (u) => names.filter((k) => u[k]);
+const sliced = (u) => Object.keys(u).filter((k) => /^\[\d+\]$/.test(k));
+// In order of preference: a character uses the first slice that covers it.
 const packages = [
-  // Noto Sans first (Latin, Greek, Cyrillic, Vietnamese, Devanagari), then the Japanese slices.
-  { pkg: "@fontsource/noto-sans", prefix: "noto-sans", keys: (u) => ["latin", "latin-ext", "greek", "greek-ext", "cyrillic", "cyrillic-ext", "vietnamese", "devanagari"].filter((k) => u[k]) },
-  { pkg: "@fontsource/noto-sans-jp", prefix: "noto-sans-jp", keys: (u) => Object.keys(u).filter((k) => /^\[\d+\]$/.test(k)) },
+  { pkg: "@fontsource/noto-sans", prefix: "noto-sans", keys: named("latin", "latin-ext", "greek", "greek-ext", "cyrillic", "cyrillic-ext", "vietnamese", "devanagari") },
+  { pkg: "@fontsource/noto-sans-hebrew", prefix: "noto-sans-hebrew", keys: named("hebrew") },
+  { pkg: "@fontsource/noto-sans-thai", prefix: "noto-sans-thai", keys: named("thai") },
+  { pkg: "@fontsource/noto-sans-jp", prefix: "noto-sans-jp", keys: sliced },
+  { pkg: "@fontsource/noto-sans-kr", prefix: "noto-sans-kr", keys: sliced },
+  { pkg: "@fontsource/noto-sans-sc", prefix: "noto-sans-sc", keys: sliced },
 ];
 
 await rm(outDir, { recursive: true, force: true });
@@ -37,7 +44,8 @@ for (const { pkg, prefix, keys } of packages) {
     await copyFile(join(root, "files", file), join(outDir, file));
     fonts.push({ file, ranges: parse(unicode[key]) });
   }
-  if (prefix === "noto-sans") await copyFile(join(root, "LICENSE"), join(outDir, "OFL.txt"));
+  // Each family ships its own copy of its license (SIL OFL 1.1).
+  await copyFile(join(root, "LICENSE"), join(outDir, `OFL-${prefix}.txt`));
 }
 await writeFile(join(outDir, "manifest.json"), JSON.stringify({ fonts }));
-console.log(`copy-fonts: ${fonts.length} Noto Sans slices -> public/fonts/noto/`);
+console.log(`copy-fonts: ${fonts.length} Noto Sans slices from ${packages.length} families -> public/fonts/noto/`);

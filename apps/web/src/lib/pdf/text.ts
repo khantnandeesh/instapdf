@@ -1,9 +1,16 @@
 /**
  * Text that Merge writes into the output (file-name footer, contents page).
  * Names the standard Helvetica font can encode (WinAnsi) use it, with no
- * download. Any other name is drawn with Noto Sans (SIL OFL 1.1), fetched
- * slice by slice (only the slices its characters need), never at page load
- * (spec F3 §5 and §8a decision 8). Characters no slice covers become "?".
+ * download. Any other name is drawn with Noto Sans (SIL OFL 1.1): Latin,
+ * Greek, Cyrillic, Vietnamese, Devanagari, Hebrew, Thai, Japanese, Korean and
+ * Simplified Chinese, fetched slice by slice (only the slices its characters
+ * need), never at page load (spec F3 §5 and §8a decision 8).
+ *
+ * Known limitation: Arabic (and other scripts needing contextual shaping)
+ * cannot be drawn correctly without a shaping engine, so those characters,
+ * like any character no slice covers, become "?". Hebrew runs are laid out
+ * right to left (no full bidi algorithm: one level, which is what file names
+ * need).
  */
 import { degrees, StandardFonts, type Color, type PDFDocument, type PDFFont, type PDFPage } from "@cantoo/pdf-lib";
 
@@ -36,6 +43,39 @@ export function parseUnicodeRange(css: string): [number, number][] {
       if (lo.includes("?")) return [parseInt(lo.replace(/\?/g, "0"), 16), parseInt(lo.replace(/\?/g, "F"), 16)] as [number, number];
       return [parseInt(lo, 16), parseInt(hi ?? lo, 16)] as [number, number];
     });
+}
+
+/** Arabic, Syriac, Thaana, N'Ko and their presentation forms: need contextual shaping we cannot do. */
+const needsShaping = (cp: number) => (cp >= 0x0600 && cp <= 0x08ff) || (cp >= 0xfb50 && cp <= 0xfdff) || (cp >= 0xfe70 && cp <= 0xfeff);
+
+/** Hebrew (and its presentation forms): drawn right to left. */
+const isRtl = (cp: number) => (cp >= 0x0590 && cp <= 0x05ff) || (cp >= 0xfb1d && cp <= 0xfb4f);
+
+/**
+ * Visual order for a left-to-right line: each run of right-to-left
+ * characters (with the spaces between them) is reversed.
+ */
+export function visualOrder(text: string): string {
+  const chars = Array.from(text);
+  const out: string[] = [];
+  for (let i = 0; i < chars.length; ) {
+    const cp = chars[i].codePointAt(0)!;
+    if (!isRtl(cp)) {
+      out.push(chars[i++]);
+      continue;
+    }
+    let j = i;
+    let lastRtl = i;
+    while (j < chars.length) {
+      const c = chars[j].codePointAt(0)!;
+      if (isRtl(c)) lastRtl = j;
+      else if (c !== 0x20) break;
+      j++;
+    }
+    out.push(...chars.slice(i, lastRtl + 1).reverse());
+    i = lastRtl + 1;
+  }
+  return out.join("");
 }
 
 const covers = (ranges: [number, number][], cp: number) => ranges.some(([lo, hi]) => cp >= lo && cp <= hi);
@@ -73,6 +113,7 @@ export async function createTextWriter(doc: PDFDocument, texts: readonly string[
     for (const t of needsUnicode) {
       for (const ch of t) {
         const cp = ch.codePointAt(0)!;
+        if (needsShaping(cp)) continue;
         const hit = manifest.fonts.find((f) => covers(f.ranges, cp));
         if (hit) wanted.add(hit.file);
       }
@@ -84,13 +125,20 @@ export async function createTextWriter(doc: PDFDocument, texts: readonly string[
     }
   }
 
+  // A slice's range can claim code points its font has no glyph for: check the real set.
+  const charsets = new Map<string, Set<number>>();
+  const charset = (file: string) => {
+    let set = charsets.get(file);
+    if (!set) charsets.set(file, (set = new Set(byFile.get(file)!.getCharacterSet())));
+    return set;
+  };
   const runsOf = (text: string): Run[] => {
     if (isWinAnsi(text)) return [{ font: helvetica, text }];
     if (!manifest) return [{ font: helvetica, text: Array.from(text, (ch) => (isWinAnsi(ch) ? ch : "?")).join("") }];
     const runs: Run[] = [];
     for (const ch of text) {
       const cp = ch.codePointAt(0)!;
-      const entry = manifest.fonts.find((f) => covers(f.ranges, cp) && byFile.has(f.file));
+      const entry = needsShaping(cp) ? undefined : manifest.fonts.find((f) => covers(f.ranges, cp) && byFile.has(f.file) && charset(f.file).has(cp));
       const font = entry ? byFile.get(entry.file)! : helvetica;
       const piece = entry ? ch : "?";
       const last = runs[runs.length - 1];
@@ -120,7 +168,7 @@ export async function createTextWriter(doc: PDFDocument, texts: readonly string[
       const rad = (rotate * Math.PI) / 180;
       let cx = x;
       let cy = y;
-      for (const run of runsOf(text)) {
+      for (const run of runsOf(visualOrder(text))) {
         page.drawText(run.text, { x: cx, y: cy, size, font: run.font, color, rotate: degrees(rotate) });
         const w = run.font.widthOfTextAtSize(run.text, size);
         cx += Math.cos(rad) * w;
