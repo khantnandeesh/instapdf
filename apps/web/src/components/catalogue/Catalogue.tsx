@@ -16,6 +16,9 @@ import { useRecentTools } from "./useRecentTools";
 
 const LIVE_DELAY_MS = 400;
 
+/** Tool tiles: 2 columns on phones, 3 from 640px, 4 from 1024px; each tile rises in, staggered (mp-rise). */
+const TOOL_GRID = "mp-rise grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4";
+
 const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
@@ -66,7 +69,6 @@ export function Catalogue() {
     const ranked = items.filter((i) => i.popularRank !== undefined).sort((a, b) => a.popularRank! - b.popularRank!);
     return [...ranked.filter(usable), ...(readyOnly ? [] : ranked.filter((i) => !usable(i)))];
   }, [items, readyOnly]);
-  const readyCount = items.filter(usable).length;
 
   // Polite announcement after typing stops (AC-21); none on load.
   useEffect(() => {
@@ -115,14 +117,13 @@ export function Catalogue() {
 
   return (
     // BerryPDF Home: the catalogue, grouped under coloured eyebrows, right on the grid paper (the only
-    // background); the hero above is set off by spacing and one vine divider (page.tsx).
+    // background); the hero above is set off by spacing only (page.tsx).
     <section aria-labelledby="tools-heading" className="pt-(--space-7) pb-(--space-8)" data-testid="catalogue">
       <div className="mx-auto max-w-[1170px] px-[15px]">
         <div id="tools" ref={headingRef} className="scroll-mt-[calc(var(--ip-header-h)+16px)] text-center">
           <h2 id="tools-heading" className="text-section-title text-ink">
             {copy.title}
           </h2>
-          <p className="mt-2.5 text-subtitle text-muted tabular-nums">{copy.summary(items.length, readyCount)}</p>
         </div>
 
         <div className="mx-auto mt-6 flex max-w-[957px] flex-wrap items-center justify-center gap-x-5 gap-y-2">
@@ -139,15 +140,10 @@ export function Catalogue() {
             shortcutHint
             className="w-full md:max-w-[480px] md:flex-1"
           />
-          <div className="flex flex-1 flex-wrap items-center justify-between gap-x-5 md:flex-none md:contents">
-            <Switch id="ready-only" label={copy.readyOnly} checked={readyOnly} onChange={(v) => {
-              userChanged.current = true;
-              setReadyOnly(v);
-            }} />
-            <span className="min-w-[8ch] text-end text-sm text-muted tabular-nums" data-testid="catalogue-count">
-              {copy.shown(matches.length)}
-            </span>
-          </div>
+          <Switch id="ready-only" label={copy.readyOnly} checked={readyOnly} onChange={(v) => {
+            userChanged.current = true;
+            setReadyOnly(v);
+          }} />
         </div>
         <LiveRegion message={live} />
 
@@ -159,7 +155,6 @@ export function Catalogue() {
                 <li key={g.id} className="shrink-0">
                   <a href={`#cat-${g.id}`} className="mp-navlink mp-navlink--chip">
                     {g.label}
-                    <span className="ms-1 text-muted tabular-nums">{g.matches.length}</span>
                   </a>
                 </li>
               ))}
@@ -179,7 +174,7 @@ export function Catalogue() {
               <h3 id="popular-heading" className="mp-eyebrow">
                 {copy.popularTitle}
               </h3>
-              <ul className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-[repeat(3,300px)] lg:gap-x-[28.5px]">
+              <ul className={TOOL_GRID}>
                 {popular.map((item) => (
                   <li key={item.slug} className={`ip-cat-${item.category}`}>
                     <ToolTile item={item} />
@@ -204,13 +199,10 @@ function CategorySection({ id, label, matches, searching }: { id: string; label:
   return (
     <section id={`cat-${id}`} aria-labelledby={`cat-${id}-heading`} className={`ip-cat-${id} mt-8 scroll-mt-[calc(var(--ip-header-h)+16px)]`} data-testid="category">
       {/* BerryPDF eyebrow: UPPERCASE Fredoka in the category's berry colour (text shade, see tokens.css). */}
-      <div className="flex items-baseline gap-3">
-        <h3 id={`cat-${id}-heading`} className="mp-eyebrow">
-          {label}
-        </h3>
-        <span className="text-sm text-muted tabular-nums">{copy.groupCount(matches.length)}</span>
-      </div>
-      <ul role="list" className="grid grid-cols-1 gap-y-5 sm:grid-cols-2 sm:gap-x-5 lg:grid-cols-[repeat(3,300px)] lg:gap-x-[28.5px]">
+      <h3 id={`cat-${id}-heading`} className="mp-eyebrow">
+        {label}
+      </h3>
+      <ul role="list" className={TOOL_GRID}>
         {matches.map((m) => (
           <li key={m.item.slug}>
             <ToolCard item={m.item} nameRange={searching ? m.name : undefined} summaryRange={searching ? m.summary : undefined} />
@@ -228,8 +220,6 @@ function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
         <SearchIcon size={30} />
       </span>
       <p className="mt-2 font-bold [overflow-wrap:anywhere]">{copy.none(query)}</p>
-      {/* Same size as the line above: a bold line over a smaller one reads as a heading to axe (p-as-heading). */}
-      <p className="text-muted">{copy.tip}</p>
       <Button variant="outline" className="mt-2" onClick={onClear}>
         {copy.clear}
       </Button>

@@ -10,7 +10,6 @@ import { continueTargets, type FlowTool } from "@/tools/registry";
 import { Button } from "../ui/Button";
 import { BerryLoader } from "../berry/Berry";
 import { PlusIcon, UploadIcon } from "../ui/icons";
-import { VineStrip } from "../ui/ProgressBar";
 import { LiveRegion } from "../ui/LiveRegion";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { Slider } from "../ui/Slider";
@@ -519,7 +518,6 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
   const ctx: FlowContext = { files, readyFiles, state, disabled: optionsDisabled, announce };
   const decorate = decoratePage ?? (() => ({ pendingDelta: 0, inScope: false }));
   const previewFile = preview ? readyFiles.find((f) => f.id === preview.fileId) : undefined;
-  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
   const accept = acceptAttribute(flow.accept);
   const ownerFile = ownerFor ? readyFiles.find((f) => f.id === ownerFor) : undefined;
 
@@ -533,7 +531,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
     <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" style={thumbSize === THUMB_DEFAULT ? undefined : { ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
       <DropOverlay active={dragging && acceptsDrop} mode={flow.multiFile || files.length === 0 ? "add" : "replace"} />
       <LiveRegion message={message} />
-      <ToolIntro ref={heading} title={flow.title} summary={tool.summary} />
+      <ToolIntro ref={heading} title={flow.title} />
 
       {state === "done" && output ? (
         <ResultCard
@@ -559,8 +557,8 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
                   onFiles={(f, t) => void intake(f, t)}
                   inputTestId="file-input"
                 />
-                <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copy.pickerHint(isMac)}</p>
-                <LimitsNote text={copy.limits(flow)} />
+                <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copy.pickerHint}</p>
+                <LimitsNote text={copy.limits(flow)} full={copy.limitsFull(flow)} />
                 <PrivacyNote runtime={tool.runtime} context="intro" />
               </DropCard>
             ) : (
@@ -592,8 +590,6 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
                       valueText={(v) => `Thumbnail size ${v} pixels`}
                     />
                   )}
-                  {/* While processing, the vine Progress strip grows in the row's free space (decorative). */}
-                  {state === "processing" ? <VineStrip className="min-w-0 flex-1" /> : null}
                   <span className="ms-auto">
                     <FilePicker
                       ref={picker}

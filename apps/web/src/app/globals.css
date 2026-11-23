@@ -307,14 +307,18 @@
     cursor: not-allowed;
   }
 
-  /* ---- Tool card: leaf-cornered, lifts 3px on hover ------------------------------------------ */
+  /* ---- Tool card: leaf-cornered tile (icon, name, one small mark); lifts on hover, presses down */
   .mp-card {
     position: relative;
-    display: block;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
     box-sizing: border-box;
-    min-height: 104px;
+    min-height: 112px;
     height: 100%;
-    padding: 16px 18px 12px 14px;
+    padding: 14px 14px 14px 14px;
     background: var(--surface);
     border: 1.5px solid var(--sand);
     border-radius: var(--radius-card) var(--radius-card) var(--radius-leaf) var(--radius-card);
@@ -322,7 +326,7 @@
     color: var(--ink-black);
     text-decoration: none;
     transition:
-      transform var(--dur-base) ease,
+      transform var(--dur-base) var(--ease-pop),
       box-shadow var(--dur-base) ease,
       border-color var(--dur-base);
   }
@@ -331,19 +335,27 @@
     box-shadow: var(--shadow-lift);
     border-color: var(--mp-card-hover-border);
   }
-  .mp-card__top {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font: 600 18px/1.2 var(--font-display);
+  .mp-card:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: var(--shadow-card);
+    transition-duration: var(--dur-press);
+  }
+  .mp-card__name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font: 600 17px/1.2 var(--font-display);
     text-transform: capitalize;
   }
-  .mp-card__desc {
-    display: block;
-    margin: 8px 0 6px 2px;
-    font-size: 14px;
-    line-height: 19px;
-    color: var(--muted);
+  .mp-card__mark {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+  }
+  .mp-card .mp-tag,
+  .mp-tag--sm {
+    font-size: 12px;
+    line-height: 16px;
+    padding: 2px 8px;
   }
   /* The icon disc: the category colour at 16% behind the icon in the full colour. */
   /* --c comes from the card's ip-cat-* class (berry red when there is none). */
@@ -802,7 +814,7 @@
     color: var(--leaf);
   }
 
-  /* ---- Progress: the growing vine strip, and jam for known amounts -------------------------- */
+  /* ---- Progress: jam (known amounts, or a gliding segment) -------------------------- */
   .mp-progress--fixed {
     position: fixed;
     top: var(--ip-header-h);
@@ -937,27 +949,43 @@
     color: var(--muted);
   }
 
-  /* ---- Footer: a calm sitemap on cream, introduced by the vine ------------------------------ */
+  /* ---- Footer: a calm sitemap on cream, set off by spacing -------------------------------- */
   .mp-footer {
     background: var(--cream);
   }
-  .mp-footer h2 {
-    margin: 0 0 10px;
-    font: 600 14px/1 var(--font-display);
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--brand-strong);
-  }
   .mp-footer__link {
-    display: block;
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
     color: var(--ink);
     text-decoration: none;
-    font-size: 15px;
-    line-height: 27px;
+    font-size: 14px;
+    line-height: 24px;
+    transition: color var(--dur-base);
   }
   .mp-footer__link:hover {
     color: var(--brand-strong);
     text-decoration: underline;
+  }
+  .mp-footer__az > summary {
+    color: var(--muted);
+    list-style: none;
+  }
+  .mp-footer__az > summary::-webkit-details-marker {
+    display: none;
+  }
+  .mp-footer__az > summary::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    margin-left: 8px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: translateY(-2px) rotate(45deg);
+    transition: transform var(--dur-base);
+  }
+  .mp-footer__az[open] > summary::after {
+    transform: translateY(1px) rotate(-135deg);
   }
 
   /* ---- Hero --------------------------------------------------------------------------------- */
@@ -1020,19 +1048,12 @@
     background: radial-gradient(circle at 14px 0, var(--cream) 13px, transparent 14px) repeat-x;
     background-size: 28px 18px;
   }
-  /* The strawberry runner: wavy stem, leaves, a hanging berry and a blossom per 220px repeat.
-     Still, it is a section break; moving (.mp-progress), it is the loading strip. */
-  .mp-vine,
-  .mp-progress {
-    height: 44px;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='44'%3E%3Cpath fill='none' stroke='%232f9e48' stroke-width='2.6' stroke-linecap='round' d='M-55 22c18.3 13 36.7 13 55 0s36.7-13 55 0 36.7 13 55 0 36.7-13 55 0 36.7 13 55 0 36.7-13 55 0'/%3E%3Cpath fill='none' stroke='%232f9e48' stroke-width='1.6' stroke-linecap='round' d='M82 29c1 1 1 2 0 3'/%3E%3Cpath transform='translate(22 13) rotate(-35) scale(1)' fill='%235cc46f' d='M0 0C-5-3-6-10 0-15 6-10 5-3 0 0z'/%3E%3Cpath transform='translate(36 13) rotate(40) scale(0.85)' fill='%235cc46f' d='M0 0C-5-3-6-10 0-15 6-10 5-3 0 0z'/%3E%3Cpath transform='translate(128 13) rotate(-150) scale(0.85)' fill='%235cc46f' d='M0 0C-5-3-6-10 0-15 6-10 5-3 0 0z'/%3E%3Cpath transform='translate(146 14) rotate(150) scale(1)' fill='%235cc46f' d='M0 0C-5-3-6-10 0-15 6-10 5-3 0 0z'/%3E%3Cpath transform='translate(186 30) rotate(200) scale(0.8)' fill='%235cc46f' d='M0 0C-5-3-6-10 0-15 6-10 5-3 0 0z'/%3E%3Cpath transform='translate(200 29) rotate(165) scale(0.9)' fill='%235cc46f' d='M0 0C-5-3-6-10 0-15 6-10 5-3 0 0z'/%3E%3Cg transform='translate(82 37) rotate(6) scale(0.62)'%3E%3Cpath fill='%232f9e48' d='M0-9l-7-5 6 1-2-6 3 4 3-4-2 6 6-1z'/%3E%3Cpath fill='%23ee2238' d='M0 12C-6 9-11 2-10-4c1-4 5-6 10-4 5-2 9 0 10 4 1 6-4 13-10 16z'/%3E%3Cg fill='%23ffe9a6'%3E%3Cellipse cx='-4' cy='-2' rx='.9' ry='1.4'/%3E%3Cellipse cx='4' cy='-2' rx='.9' ry='1.4'/%3E%3Cellipse cy='3' rx='.9' ry='1.4'/%3E%3Cellipse cx='-3' cy='6' rx='.8' ry='1.2'/%3E%3Cellipse cx='3' cy='6' rx='.8' ry='1.2'/%3E%3C/g%3E%3Cpath fill='%23fff' opacity='.7' d='M-7-2c0-3 2-4 4-4-2 1-3 3-3 5z'/%3E%3C/g%3E%3Cg transform='translate(138 12) scale(0.85)'%3E%3Cg fill='%23fff' stroke='%23f7b9c4' stroke-width='.8'%3E%3Cellipse rx='3.4' ry='4.4' cy='-4.6' transform='rotate(0)'/%3E%3Cellipse rx='3.4' ry='4.4' cy='-4.6' transform='rotate(72)'/%3E%3Cellipse rx='3.4' ry='4.4' cy='-4.6' transform='rotate(144)'/%3E%3Cellipse rx='3.4' ry='4.4' cy='-4.6' transform='rotate(216)'/%3E%3Cellipse rx='3.4' ry='4.4' cy='-4.6' transform='rotate(288)'/%3E%3C/g%3E%3Ccircle r='2.6' fill='%23ffd84d'/%3E%3C/g%3E%3C/svg%3E")
-      repeat-x left center;
-  }
-  .mp-progress {
-    width: 100%;
-    animation: mp-vine-grow 4.4s linear infinite;
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  /* Indeterminate jam: a short segment glides across the track. */
+  .mp-jam--indeterminate > i {
+    width: 34%;
+    animation:
+      mp-jam-flow 2.4s linear infinite,
+      mp-jam-glide 1.4s var(--ease-standard, ease-in-out) infinite;
   }
 
   /* ---- Berry kit: small parts ----------------------------------------------------------------- */
@@ -1175,9 +1196,7 @@
       border: 0;
     }
     .mp-floaties,
-    .mp-sticker,
-    .mp-vine,
-    .mp-progress {
+    .mp-sticker {
       display: none;
     }
   }
@@ -1207,9 +1226,12 @@
     opacity: 1;
   }
 }
-@keyframes mp-vine-grow {
+@keyframes mp-jam-glide {
+  from {
+    transform: translateX(-100%);
+  }
   to {
-    background-position-x: 220px;
+    transform: translateX(300%);
   }
 }
 @keyframes mp-jam-flow {
@@ -1459,10 +1481,10 @@
 .mp-floaties--hero > :nth-child(7) { --x:18%;--y:72%;--s:24px;--r:0deg;--d:5.6s;--amp:6px;--delay:-2.2s; }
 .mp-floaties--hero > :nth-child(8) { --x:83%;--y:74%;--s:26px;--r:0deg;--d:6.2s;--amp:7px;--delay:-3.6s; }
 .mp-floaties--hero > :nth-child(9) { --x:27%;--y:7%;--s:28px;--r:-12deg;--d:6.4s;--amp:7px;--delay:-1.1s; }
-.mp-floaties--hero > :nth-child(10) { --x:42%;--y:84%;--s:34px;--r:10deg;--d:7.0s;--amp:7px;--delay:-2.9s; }
-.mp-floaties--hero > :nth-child(11) { --x:64%;--y:86%;--s:30px;--r:-16deg;--d:6.6s;--amp:7px;--delay:-4.3s; }
+.mp-floaties--hero > :nth-child(10) { --x:26%;--y:90%;--s:34px;--r:10deg;--d:7.0s;--amp:7px;--delay:-2.9s; }
+.mp-floaties--hero > :nth-child(11) { --x:74%;--y:90%;--s:30px;--r:-16deg;--d:6.6s;--amp:7px;--delay:-4.3s; }
 .mp-floaties--hero > :nth-child(12) { --x:74%;--y:6%;--s:26px;--r:18deg;--d:5.9s;--amp:6px;--delay:-0.4s; }
-.mp-floaties--hero > :nth-child(13) { --x:50%;--y:90%;--s:18px;--r:0deg;--d:5.5s;--amp:5px;--delay:-3.3s; }
+.mp-floaties--hero > :nth-child(13) { --x:12%;--y:92%;--s:18px;--r:0deg;--d:5.5s;--amp:5px;--delay:-3.3s; }
 .mp-floaties--hero > :nth-child(14) { --x:35%;--y:62%;--s:20px;--r:0deg;--d:6.1s;--amp:6px;--delay:-5.1s; }
 .mp-floaties--empty > :nth-child(1) { --x:7%;--y:26%;--s:34px;--r:-18deg;--d:7.5s;--amp:7px;--delay:0s; }
 .mp-floaties--empty > :nth-child(2) { --x:15%;--y:76%;--s:30px;--r:14deg;--d:6.2s;--amp:7px;--delay:-2.1s; }

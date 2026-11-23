@@ -44,12 +44,16 @@ test.describe("hero and page basics", () => {
     await expect(catalogueSearch(page)).toBeFocused();
   });
 
-  test("AC-4: the see-all link shows the registry count and scrolls to the catalogue", async ({ page }) => {
+  // AC-4 changed 2026-11-23 per owner (minimal text): the hero is title, one line, the main action
+  // and one privacy note; the separate see-all link is gone (the main action leads to the catalogue).
+  test("AC-4: the hero is just the title, one line, the main action and one short privacy note", async ({ page }) => {
     await page.goto("/");
-    const link = page.getByTestId("hero-see-all");
-    await expect(link).toHaveText(new RegExp(`See all ${tools.length} tools`));
-    await link.click();
-    await expect(page.getByRole("heading", { level: 2, name: "All tools" })).toBeInViewport();
+    const hero = page.locator(".mp-hero");
+    await expect(hero.getByTestId("hero-see-all")).toHaveCount(0);
+    await expect(hero.locator("h1")).toHaveCount(1);
+    await expect(hero.locator("p")).toHaveCount(2);
+    await expect(hero.locator("a")).toHaveCount(1);
+    await expect(hero.locator("ul")).toHaveCount(0);
   });
 });
 
@@ -76,13 +80,17 @@ test.describe("catalogue", () => {
     }
   });
 
-  test("AC-7: each card shows name and summary and is a single link", async ({ page }) => {
+  // AC-7 changed 2026-11-23 per owner (minimal text): the card shows the name; the summary is
+  // no longer drawn but stays in the link's accessible name and is its tooltip.
+  test("AC-7: each card shows its name, carries its summary in its name and tooltip, and is a single link", async ({ page }) => {
     await page.goto("/");
+    const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     for (const t of tools) {
       const card = page.locator(`[data-testid=category] a[href="/${t.slug}"]`);
       await expect(card).toHaveCount(1);
-      await expect(card).toContainText(t.name);
-      await expect(card).toContainText(t.summary);
+      await expect(card.locator(".mp-card__name")).toHaveText(t.name);
+      await expect(card).toHaveAccessibleName(new RegExp(esc(t.summary)));
+      await expect(card).toHaveAttribute("title", t.summary);
       expect(await card.locator("a").count()).toBe(0);
     }
   });
@@ -119,11 +127,13 @@ test.describe("catalogue", () => {
     await expect(page.locator('input[type=file][accept*=".pdf"]')).toBeAttached();
   });
 
-  test("AC-9: every planned card shows Coming soon in its visible text and accessible name; usable ones do not", async ({ page }) => {
+  // AC-9 changed 2026-11-23 per owner (minimal text): the visible mark is a short "Soon"; the
+  // accessible name still says "Coming soon".
+  test("AC-9: every planned card shows a Soon mark and says Coming soon in its accessible name; usable ones do not", async ({ page }) => {
     await page.goto("/");
     for (const t of plannedTools) {
       const card = page.locator(`[data-testid=category] a[href="/${t.slug}"]`);
-      await expect(card.getByText("Coming soon")).toBeVisible();
+      await expect(card.getByText("Soon", { exact: true })).toBeVisible();
       await expect(card).toHaveAccessibleName(/Coming soon/);
     }
     for (const t of usableTools) await expect(page.locator(`[data-testid=category] a[href="/${t.slug}"]`)).not.toContainText("Coming soon");
@@ -349,8 +359,10 @@ test.describe("search", () => {
 });
 
 test.describe("improvements", () => {
+  // AC-59 changed 2026-11-23 per owner (minimal text): the marker is no longer drawn; it stays in the name.
   test("AC-59: client tools carry 'Runs in your browser' in the card and menu entry name; server tools do not", async ({ page }) => {
     await openHydrated(page);
+    await expect(page.getByTestId("catalogue").getByText("Runs in your browser").first()).toHaveClass(/sr-only/);
     for (const t of tools) {
       const card = page.locator(`[data-testid=category] a[href="/${t.slug}"]`);
       if (t.runtime === "client") await expect(card, t.slug).toHaveAccessibleName(/Runs in your browser/);
@@ -364,8 +376,8 @@ test.describe("improvements", () => {
     }
   });
 
-  test("AC-56/AC-59: card, Popular tile and menu entry names are the visible content in order, comma-separated", async ({ page }) => {
-    await page.setViewportSize({ width: 1366, height: 900 }); // tile summaries are visible at >= 1024 px
+  test("AC-56/AC-59: card, Popular tile and menu entry names are the content in order, comma-separated", async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
     await openHydrated(page);
     const merge = tools.find((t) => t.slug === "merge-pdf")!;
     const rotate = tools.find((t) => t.slug === "rotate-pdf")!;

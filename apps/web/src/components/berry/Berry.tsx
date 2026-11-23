@@ -1,6 +1,6 @@
 /**
  * BerryPDF motifs (docs/design/berrypdf.md, "Berry motifs"): the berry sprite, the berry mark,
- * the berry loader, floating berries and blossoms, stickers and the vine divider.
+ * the berry loader, floating berries and blossoms, and stickers.
  *
  * All markup is the design system's own SVG, converted to JSX with classes only (no style
  * attributes: the strict CSP allows none in server HTML). Motion lives in globals.css; under
@@ -655,7 +655,3 @@ export function Sticker({ kind, size, className }: { kind: "berry" | "blossom" |
   );
 }
 
-/** The strawberry-vine divider: a section break (still). Moving, the same vine is the loading strip. */
-export function VineDivider({ className }: { className?: string }) {
-  return <div className={cx("mp-vine", className)} aria-hidden="true" />;
-}

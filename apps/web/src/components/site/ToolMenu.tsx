@@ -17,7 +17,7 @@ import { Dialog } from "../ui/Dialog";
 import { ChevronDownIcon, CloseIcon } from "../ui/icons";
 import { IconButton } from "../ui/IconButton";
 import { LiveRegion } from "../ui/LiveRegion";
-import { RuntimeMarker } from "../ui/RuntimeMarker";
+import { RUNTIME_CLIENT_TEXT } from "../ui/RuntimeMarker";
 import { SearchField } from "../ui/SearchField";
 import { siteCopy } from "./copy";
 
@@ -277,7 +277,8 @@ function MenuContent({
       className="min-w-0 flex-1 md:max-w-[420px]"
     />
   );
-  const count = <span className="min-w-[9ch] text-sm text-muted tabular-nums">{copy.ofTotal(matches.length, items.length)}</span>;
+  // Only while filtering (owner 2026-11-23: minimal text); the live region announces it too.
+  const count = searching ? <span className="min-w-[9ch] text-sm text-muted tabular-nums">{copy.ofTotal(matches.length, items.length)}</span> : null;
 
   return (
     <div
@@ -297,7 +298,7 @@ function MenuContent({
             {search}
             {closeButton}
           </div>
-          <div className="mt-1 text-xs">{count}</div>
+          {count && <div className="mt-1 text-xs">{count}</div>}
         </div>
       )}
 
@@ -359,24 +360,32 @@ function MenuContent({
 
 function MenuEntry({ item }: { item: ToolIndexItem }) {
   const badge = badgeText(item);
-  // Name from content, in visual order: name, badge, runtime marker (AC-56, AC-59).
+  // Name from content, in DOM order: name, badge, runtime marker (AC-56, AC-59). Visible: icon,
+  // name and a short "Soon"/"Beta" mark; the full status and runtime words are visually hidden.
   return (
     // BerryPDF Menu row: icon + label, 8x12 padding, 9px radius; hover gives a pink band and berry text.
-    <Link href={`/${item.slug}`} prefetch={false} className="mp-menu-row mx-2 gap-0.5 max-md:min-h-11">
+    <Link href={`/${item.slug}`} prefetch={false} title={item.summary} className="mp-menu-row mx-2 gap-0.5 max-md:min-h-11">
       <span className="flex items-center gap-2">
         <span className={cx("shrink-0 [&_svg]:size-5", usable(item) ? "text-(--c)" : "text-muted")}>{item.icon}</span>
         <span className="ip-menu-name min-w-0 flex-1 [overflow-wrap:anywhere] text-ink">{item.name}</span>
         {badge && (
           <>
             <NameSep />
-            <Badge tone={item.status === "planned" ? "soon" : "beta"}>{badge}</Badge>
+            {item.status === "planned" ? (
+              <Badge tone="soon" className="mp-tag--sm">
+                <span aria-hidden="true">{copy.soonShort}</span>
+                <span className="sr-only">{badge}</span>
+              </Badge>
+            ) : (
+              <Badge tone="beta">{badge}</Badge>
+            )}
           </>
         )}
       </span>
       {item.runtime === "client" && (
         <>
           <NameSep />
-          <RuntimeMarker className="ps-7" />
+          <span className="sr-only">{RUNTIME_CLIENT_TEXT}</span>
         </>
       )}
     </Link>

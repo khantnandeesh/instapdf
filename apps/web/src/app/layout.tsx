@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { BerrySprite, VineDivider } from "@/components/berry/Berry";
+import { BerrySprite } from "@/components/berry/Berry";
 import { ToolIndexProvider } from "@/components/catalogue/ToolIndexProvider";
 import { buildToolIndex } from "@/components/catalogue/toolIndex";
 import { siteCopy } from "@/components/site/copy";
@@ -46,9 +46,7 @@ export default function RootLayout({
         <SkipLink />
         <ToolIndexProvider index={buildToolIndex()}>
           <SiteHeader />
-          <div className="flex-1">{children}</div>
-          {/* BerryPDF: the footer is introduced by the vine divider. */}
-          <VineDivider className="mt-(--space-7)" />
+          <div className="flex-1 pb-(--space-8)">{children}</div>
           <SiteFooter />
         </ToolIndexProvider>
       </body>

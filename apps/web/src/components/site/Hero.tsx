@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { featured, isUsable, toolBySlug, tools } from "@/tools/registry";
+import { featured, isUsable, toolBySlug } from "@/tools/registry";
 import { Floaties, Sticker } from "../berry/Berry";
 import { buttonClasses } from "../ui/Button";
-import { ChevronDownIcon, SearchIcon } from "../ui/icons";
+import { SearchIcon, ShieldIcon } from "../ui/icons";
 import { siteCopy } from "./copy";
 
 /**
  * Home hero (spec F2 §3a), BerryPDF Hero: centred on the grid paper, 120px of air above the title
- * (60px on phones), the headline in ink-black (28-44px), a berry subtitle one step smaller, one
- * berry button, then a small muted link to the catalogue and the reassurance lines as a seed list.
+ * (60px on phones), the headline in ink-black (28-44px), one short berry line, one berry button and
+ * one small privacy note (owner 2026-11-23: minimal text; the see-all link and seed list are gone,
+ * the button already leads to the catalogue). Each piece rises in, staggered (mp-hero).
  * Small pale berries and blossoms float behind the text layer, and two die-cut stickers sit in the
  * margins at >= 1024px (never over text). No photo, no large hero berry.
  *
@@ -39,16 +40,10 @@ export function Hero() {
             </a>
           )}
         </div>
-        <p className="mt-[18px] text-sm text-muted">
-          <a href="#tools" className="inline-flex min-h-6 items-center gap-1 underline-offset-4 hover:text-brand-strong hover:underline" data-testid="hero-see-all">
-            {siteCopy.heroSeeAll(tools.length)}
-            <ChevronDownIcon size={16} />
-          </a>
+        <p className="mp-hero__note mt-5 inline-flex items-center gap-1.5 text-sm text-muted">
+          <ShieldIcon size={16} className="shrink-0 text-brand-strong" />
+          {siteCopy.trustUpload}
         </p>
-        <ul className="mp-seedlist mt-5 flex flex-col items-center justify-center gap-x-8 text-[15px] text-ink sm:flex-row">
-          <li>{siteCopy.trustUpload}</li>
-          <li>{siteCopy.trustAccount}</li>
-        </ul>
       </div>
     </div>
   );

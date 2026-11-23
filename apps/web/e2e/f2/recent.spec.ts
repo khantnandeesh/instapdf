@@ -56,7 +56,16 @@ test("AC-44: a corrupt value gives a working page without Recent, and the next v
   await expect(page.locator("[data-testid=category]").first()).toBeVisible();
   await expect(homeRecent(page)).toHaveCount(0);
   await openHydrated(page, "/rotate-pdf");
-  await expect.poll(async () => JSON.parse((await storedRecent(page)) ?? "null")?.[0]).toBe("rotate-pdf");
+  // Until the visit is recorded the stored value is still the corrupt one, so parse failures retry.
+  await expect
+    .poll(async () => {
+      try {
+        return JSON.parse((await storedRecent(page)) ?? "null")?.[0];
+      } catch {
+        return undefined;
+      }
+    })
+    .toBe("rotate-pdf");
   expect(errors).toEqual([]);
 });
 

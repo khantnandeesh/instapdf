@@ -3,13 +3,13 @@ import { tools } from "@/tools/registry";
 import { Wordmark } from "./BrandMark";
 import { infoPages, siteCopy } from "./copy";
 
-/* BerryPDF Footer links: ink, 15px on 27px rows (also a 24px target, WCAG 2.5.8); berry and underlined on hover. */
+/* Footer links: ink, 14px, 24px targets (WCAG 2.5.8); berry and underlined on hover. */
 const linkClass = "mp-footer__link";
 
 /**
- * Footer on every page (spec F2 §3g), BerryPDF Footer: a calm sitemap on cream, introduced by the
- * vine divider (layout.tsx). Left: the berry mark, the name and a small muted sign-off; then plain
- * link columns under small uppercase Fredoka headings in berry red. No social row, no boxes.
+ * Footer on every page (spec F2 §3g), compact (owner 2026-11-23: minimal text). One row: the
+ * wordmark and copyright, then All tools and the Company and Legal links inline (their headings
+ * are for screen readers). The A–Z tool list (AC-53) sits folded under a small "Tools A–Z" toggle.
  */
 export function SiteFooter() {
   const az = [...tools].sort((a, b) => a.name.localeCompare(b.name, "en"));
@@ -18,44 +18,39 @@ export function SiteFooter() {
   const legal = (["privacy", "terms", "cookies", "licenses", "security"] as const).map((s) => ({ href: `/${s}`, label: infoPages[s] }));
   return (
     <footer className="ip-site-footer mp-footer">
-      <div className="mx-auto grid max-w-[1170px] grid-cols-2 gap-[30px] px-[30px] pt-[26px] pb-[34px] text-[15px] lg:grid-cols-[1.4fr_3fr_1fr_1fr]">
-        <div className="col-span-2 lg:col-span-1">
+      <div className="mx-auto flex max-w-[1170px] flex-wrap items-center justify-between gap-x-8 gap-y-3 px-[15px] pt-5 pb-3">
+        <div className="flex items-center gap-3">
           <Wordmark />
-          <small className="mt-3 block text-sm leading-[1.7] text-muted">
-            {siteCopy.footerTagline}
-            <br />© {year} BerryPDF · {siteCopy.footerPrivacy}
-          </small>
-          <Link href="/#tools" prefetch={false} className={`${linkClass} mt-2`}>
-            {siteCopy.footerAllTools} →
-          </Link>
+          <small className="text-sm text-muted">© {year} BerryPDF</small>
         </div>
-        <nav aria-labelledby="footer-tools" className="col-span-2 lg:col-span-1">
-          <h2 id="footer-tools">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+          <Link href="/#tools" prefetch={false} className={linkClass}>
+            {siteCopy.footerAllTools}
+          </Link>
+          <FooterNav id="footer-company" title="Company" links={company} />
+          <FooterNav id="footer-legal" title="Legal" links={legal} />
+        </div>
+      </div>
+      <details className="mp-footer__az mx-auto max-w-[1170px] px-[15px] pb-5">
+        <summary className="mp-footer__link w-fit cursor-pointer">Tools A–Z</summary>
+        <nav aria-labelledby="footer-tools">
+          <h2 id="footer-tools" className="sr-only">
             Tools A–Z
           </h2>
-          <ul className="columns-2 gap-6 sm:columns-3 xl:columns-4" data-testid="footer-az">
+          <ul className="mt-2 columns-2 gap-6 sm:columns-4 lg:columns-6" data-testid="footer-az">
             {az.map((t) => (
               <li key={t.slug} className="break-inside-avoid">
                 <Link href={`/${t.slug}`} prefetch={false} className={linkClass}>
                   <span>
                     {t.name}
-                    {t.status === "planned" && (
-                      <>
-                        <span aria-hidden="true" className="ms-1.5 text-xs text-muted">
-                          Soon
-                        </span>
-                        <span className="sr-only">, coming soon</span>
-                      </>
-                    )}
+                    {t.status === "planned" && <span className="sr-only">, coming soon</span>}
                   </span>
                 </Link>
               </li>
             ))}
           </ul>
         </nav>
-        <FooterNav id="footer-company" title="Company" links={company} />
-        <FooterNav id="footer-legal" title="Legal" links={legal} />
-      </div>
+      </details>
     </footer>
   );
 }
@@ -63,10 +58,10 @@ export function SiteFooter() {
 function FooterNav({ id, title, links }: { id: string; title: string; links: { href: string; label: string }[] }) {
   return (
     <nav aria-labelledby={id}>
-      <h2 id={id}>
+      <h2 id={id} className="sr-only">
         {title}
       </h2>
-      <ul>
+      <ul className="flex flex-wrap gap-x-5 gap-y-1">
         {links.map((l) => (
           <li key={l.href}>
             <Link href={l.href} prefetch={false} className={linkClass}>
