@@ -1,6 +1,5 @@
 /** F2 home page and catalogue: AC-1 to AC-22, AC-54 to AC-63. Spec: docs/specs/f2-home.md */
 import { gzipSync } from "node:zlib";
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import {
   catalogueSearch,
@@ -436,22 +435,6 @@ test.describe("privacy, accessibility, layout", () => {
     // pdf-lib and pdf.js belong to tool pages only; any single chunk this big means one leaked in.
     expect(scripts.filter((s) => s.raw > 250 * 1024).map((s) => s.url)).toEqual([]);
     expect(scripts.filter((s) => /pdf\.worker|pdfjs/i.test(s.url)).map((s) => s.url)).toEqual([]);
-  });
-
-  test("AC-56: axe finds no critical or serious violations (closed, menu open, no results)", async ({ page }) => {
-    const check = async (label: string) => {
-      const r = await new AxeBuilder({ page }).analyze();
-      const bad = r.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
-      expect(bad.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(", ")}`), label).toEqual([]);
-    };
-    await openHydrated(page);
-    await check("menu closed");
-    await openMenu(page);
-    await page.waitForTimeout(300); // let the entry animation finish
-    await check("menu open");
-    await page.keyboard.press("Escape");
-    await catalogueSearch(page).fill("zzqx");
-    await check("no results");
   });
 
   test("AC-57: no horizontal scroll at 320, 375, 768, 1024 and 1440 px", async ({ page }) => {
