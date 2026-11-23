@@ -74,27 +74,29 @@ export function ControlDock({
       data-ip-dock=""
       role="region"
       aria-label={label}
+      // Below 1024 px: BerryPDF's strawberry-cream action tab fixed to the bottom (EditorToolbar).
+      // From 1024 px: an app Panel (white, sand outline, 20px radius, soft pink shadow) in a sticky column.
       className={[
-        "fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface-raised shadow-md",
-        "px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] sm:px-6",
-        "lg:sticky lg:top-[calc(var(--ip-header-h)+24px)] lg:z-auto lg:flex lg:h-[calc(100dvh-var(--ip-header-h)-48px)] lg:max-h-[640px] lg:flex-col lg:rounded-xl lg:border lg:p-5 lg:shadow-sm",
+        "fixed inset-x-0 bottom-0 z-20 rounded-t-[18px] bg-sand shadow-menu",
+        "px-[15px] pt-3 pb-[calc(14px+env(safe-area-inset-bottom))]",
+        "lg:sticky lg:top-[calc(var(--ip-header-h)+24px)] lg:z-auto lg:flex lg:h-[calc(100dvh-var(--ip-header-h)-48px)] lg:max-h-[640px] lg:flex-col lg:rounded-panel lg:border-[1.5px] lg:border-panel-border lg:bg-surface-raised lg:p-7 lg:shadow-card",
       ].join(" ")}
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 lg:h-full lg:flex-col lg:items-stretch">
         {(!full || desktop !== false) &&
           (full ? (
             // The scrolling panel stays keyboard-reachable while every control in it is disabled (axe scrollable-region-focusable).
-            <div tabIndex={optionsDisabled ? 0 : undefined} className="min-w-0 rounded-md focus-visible:outline-focus max-lg:hidden lg:flex-1 lg:overflow-y-auto">
+            <div tabIndex={optionsDisabled ? 0 : undefined} className="min-w-0 rounded-lg focus-visible:outline-focus max-lg:hidden lg:flex-1 lg:overflow-y-auto">
               <fieldset disabled={optionsDisabled} className="min-w-0">
                 <legend className="sr-only">{label}</legend>
-                <h2 className="mb-3 hidden text-sm font-semibold text-fg-muted lg:block">Options</h2>
+                <h2 className="mb-5 hidden font-display text-[22px] leading-[1.2] font-semibold text-ink-black lg:block">Options</h2>
                 {options}
               </fieldset>
             </div>
           ) : (
             <fieldset disabled={optionsDisabled} className="min-w-0 sm:flex-1 lg:flex-1 lg:overflow-y-auto">
               <legend className="sr-only">{label}</legend>
-              <h2 className="mb-3 hidden text-sm font-semibold text-fg-muted lg:block">Options</h2>
+              <h2 className="mb-5 hidden font-display text-[22px] leading-[1.2] font-semibold text-ink-black lg:block">Options</h2>
               {options}
             </fieldset>
           ))}
@@ -109,16 +111,16 @@ export function ControlDock({
             onClick={() => setSheetOpen(true)}
             data-testid="options-button"
             iconStart={
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
                 <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
-                <circle cx="16" cy="7" r="2" />
-                <circle cx="10" cy="17" r="2" />
+                <circle cx="16" cy="7" r="2" fill="currentColor" fillOpacity={0.2} />
+                <circle cx="10" cy="17" r="2" fill="currentColor" fillOpacity={0.2} />
               </svg>
             }
           >
             Options
             <span className="inline-flex min-w-[84px] justify-start" aria-hidden="true">
-              {sheet?.badge && <span className="rounded-sm bg-primary-soft px-1.5 py-0.5 text-xs font-medium text-on-primary-soft">{sheet.badge}</span>}
+              {sheet?.badge && <span className="mp-tag mp-tag--sm">{sheet.badge}</span>}
             </span>
           </Button>
         )}
@@ -149,20 +151,23 @@ export function ControlDock({
 
 export function DockStatus({ id, text, extra }: { id: string; text: string; extra?: string }) {
   return (
-    <p id={id} className="truncate text-sm text-fg-muted tabular-nums" data-testid="dock-status">
+    <p id={id} className="truncate text-sm text-muted tabular-nums" data-testid="dock-status">
       {text}
       {extra ? ` · ${extra}` : ""}
     </p>
   );
 }
 
-/** Same box as the primary button (52 px), so swapping them moves nothing. */
-/** `phaseLabel` (e.g. "Preparing fonts…") replaces the percentage with an indeterminate bar. */
+/**
+ * Same box as the primary button, so swapping them moves nothing: the "Merging… 42%" line over
+ * BerryPDF's JamProgress (the progressbar). `phaseLabel` (e.g. "Preparing fonts…") replaces the
+ * percentage with the indeterminate jam.
+ */
 export const ProcessingBar = forwardRef<HTMLDivElement, { label: string; value: number; phaseLabel?: string }>(function ProcessingBar({ label, value, phaseLabel }, ref) {
   const pct = Math.round(value * 100);
   return (
-    <div ref={ref} tabIndex={-1} className="ip-settle flex h-[52px] w-full flex-col justify-center gap-2 rounded-md outline-none" data-testid="processing">
-      <span className="text-sm font-medium tabular-nums">{phaseLabel ?? copy.progress(label, pct)}</span>
+    <div ref={ref} tabIndex={-1} className="flex h-[56px] w-full flex-col justify-center gap-1.5 rounded-lg outline-none" data-testid="processing">
+      <span className="font-display text-[17px] leading-5 font-semibold text-ink tabular-nums">{phaseLabel ?? copy.progress(label, pct)}</span>
       {phaseLabel ? <ProgressBar label={phaseLabel} /> : <ProgressBar label={label} value={pct} valueText={`${pct}%`} />}
     </div>
   );
@@ -176,10 +181,10 @@ export const ProcessError = forwardRef<HTMLButtonElement, { message: string; onR
     <div className="flex flex-col gap-2" data-testid="process-error">
       <Notice tone="danger">{message}</Notice>
       <div className="flex gap-2">
-        <Button ref={ref} variant="primary" className="flex-1" onClick={onRetry}>
+        <Button ref={ref} variant="primary" size="lg" className="flex-1" onClick={onRetry}>
           Try again
         </Button>
-        <Button variant="ghost" className="flex-1" onClick={onStartOver}>
+        <Button variant="ghost" size="lg" className="flex-1" onClick={onStartOver}>
           Start over
         </Button>
       </div>

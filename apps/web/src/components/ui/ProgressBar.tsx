@@ -1,7 +1,13 @@
 import { cx } from "./cx";
 
-/** Determinate when `value` (0-100) is set, indeterminate otherwise. Animates transform only. */
-export function ProgressBar({ label, value, valueText, className }: { label: string; value?: number; valueText?: string; className?: string }) {
+/**
+ * BerryPDF progress.
+ * - Determinate (`value` 0-100 set): JamProgress, an 18px cream track filling with strawberry jam
+ *   whose seeds drift sideways; the width eases over 0.5s. Show the number in text beside it.
+ * - Indeterminate: the same jam track with a short jam segment gliding across it.
+ * Both are `role="progressbar"` with the same ARIA as before (F1 U-4).
+ */
+export function ProgressBar({ label, value, valueText, fixed, className }: { label: string; value?: number; valueText?: string; fixed?: boolean; className?: string }) {
   const determinate = typeof value === "number";
   const v = determinate ? Math.max(0, Math.min(100, value)) : 0;
   return (
@@ -12,16 +18,11 @@ export function ProgressBar({ label, value, valueText, className }: { label: str
       aria-valuemax={100}
       aria-valuenow={determinate ? Math.round(v) : undefined}
       aria-valuetext={valueText}
-      className={cx("relative h-2 w-full overflow-hidden rounded-full bg-surface-sunken", className)}
+      className={cx("mp-jam", !determinate && "mp-jam--indeterminate", fixed && "mp-progress--fixed", className)}
     >
-      {determinate ? (
-        <div
-          className="absolute inset-0 origin-left rounded-full bg-primary transition-transform duration-(--ip-duration-fast) ease-linear"
-          style={{ transform: `scaleX(${v / 100})` }}
-        />
-      ) : (
-        <div className="ip-indeterminate absolute inset-y-0 left-0 w-[30%] rounded-full bg-primary" />
-      )}
+      {/* The fill's width is set after hydration through the CSSOM (never in server HTML). */}
+      {determinate ? <i style={{ width: `${v}%` }} /> : <i />}
     </div>
   );
 }
+

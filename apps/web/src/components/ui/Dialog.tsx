@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
 import { cx } from "./cx";
+import { IconButton } from "./IconButton";
+import { CloseIcon } from "./icons";
 
 export type DialogCloseReason = "escape" | "action";
 
@@ -112,12 +114,15 @@ export function Dialog({
       aria-describedby={description ? descId : undefined}
       className={cx(
         variant === "fullscreen"
-          ? "ip-rise-in m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto overscroll-contain border-0 bg-bg p-0 text-fg backdrop:bg-transparent"
+          ? "mp-modal-in m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto overscroll-contain border-0 bg-surface-raised p-0 text-ink backdrop:bg-transparent"
           : variant === "sheet"
-            ? "ip-rise-in mx-0 mt-auto mb-0 max-h-(--ip-sheet-max-h) w-screen max-w-none rounded-t-xl border-0 bg-surface-raised p-0 text-fg shadow-lg backdrop:bg-scrim"
+            ? // BerryPDF bottom sheet: white, 24px top corners, the modal's blurred berry backdrop; rises in (0.3s overshoot).
+              "mp-sheet mx-0 mt-auto mb-0 max-h-(--ip-sheet-max-h) w-screen max-w-none border-0 p-0"
             : cx(
-              "m-auto max-h-[calc(100dvh-32px)] rounded-xl bg-surface-raised p-0 text-fg shadow-lg backdrop:bg-scrim",
-              wide ? "w-[min(880px,calc(100vw-32px))]" : "w-[min(440px,calc(100vw-32px))]",
+              // BerryPDF Modal: 380px, 24px corners with a 40px leaf corner, a pale-pink wave across the top,
+              // one deep soft shadow on a blurred berry-tinted backdrop; rises 14px and pops in (0.3s overshoot).
+              "mp-modal m-auto max-h-[calc(100dvh-32px)] p-0",
+              wide ? "w-[min(880px,calc(100vw-32px))]" : "w-[min(380px,calc(100vw-32px))]",
             ),
         className,
       )}
@@ -132,47 +137,37 @@ export function Dialog({
       )}
       {open && variant === "sheet" && (
         <div className="flex max-h-(--ip-sheet-max-h) flex-col">
-          <div className="flex shrink-0 flex-col items-stretch border-b border-border px-4 pt-2 pb-2">
-            <span aria-hidden="true" className="mx-auto mb-2 h-1 w-9 rounded-full bg-border-strong" />
+          <div className="flex shrink-0 flex-col items-stretch border-b-[1.5px] border-sand px-4 pt-2 pb-2">
+            <span aria-hidden="true" className="mx-auto mb-2 h-1.5 w-10 rounded-pill bg-sand" />
             <div className="flex items-center justify-between gap-3">
-              <h2 id={titleId} className="text-lg font-semibold">
+              <h2 id={titleId} className="text-tile-title text-ink-black">
                 {title}
               </h2>
-              {onCloseButton && (
-                <button
-                  type="button"
-                  aria-label="Close"
-                  onClick={onCloseButton}
-                  className="relative grid size-11 place-items-center rounded-md text-fg hover:bg-surface-sunken"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round">
-                    <path d="M6 6l12 12M18 6 6 18" />
-                  </svg>
-                </button>
-              )}
+              {onCloseButton && <IconButton label="Close" icon={<CloseIcon size={18} />} variant="soft" tooltip={false} onClick={onCloseButton} />}
             </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">{children}</div>
-          {footer && <div className="flex shrink-0 flex-wrap gap-2 border-t border-border px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">{footer}</div>}
+          {footer && <div className="flex shrink-0 flex-wrap gap-2 border-t-[1.5px] border-sand px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">{footer}</div>}
         </div>
       )}
       {open && variant === "default" && (
-        <div className="flex flex-col gap-4 p-6 max-sm:p-5">
-          <div className="flex min-w-0 items-start gap-3">
-            {icon && <span className="mt-0.5 shrink-0 text-fg-muted">{icon}</span>}
-            <div className="min-w-0 flex-1">
-              <h2 id={titleId} className="text-lg font-semibold break-words">
-                {title}
-              </h2>
-              {description && (
-                <div id={descId} className="mt-1 text-sm text-fg-muted">
-                  {description}
-                </div>
-              )}
-            </div>
+        <div className="flex flex-col gap-5 px-7 pt-[34px] pb-[26px]">
+          <div className="min-w-0 text-center">
+            {/* One icon says what the dialog is about: berry duotone in a white circle with a pink ring, on the wave. */}
+            {icon && <span className="mp-modal__icon">{icon}</span>}
+            <h2 id={titleId} className="text-card-heading break-words text-ink-black">
+              {title}
+            </h2>
+            {description && (
+              <div id={descId} className="mt-2 leading-[1.45] text-muted">
+                {description}
+              </div>
+            )}
           </div>
           {children}
-          {footer && <div className="flex flex-col-reverse gap-2 min-[400px]:flex-row min-[400px]:justify-end">{footer}</div>}
+          {/* BerryPDF: equal-width buttons, the quiet one on the left and the filled one on the right (DOM order = Tab order).
+              Below 640px they stack full width (filled one last), so three buttons never overflow a phone. */}
+          {footer && <div className="grid grid-cols-1 gap-3 sm:auto-cols-fr sm:grid-flow-col sm:grid-cols-none [&>*]:px-2.5" data-testid="dialog-footer">{footer}</div>}
         </div>
       )}
     </dialog>

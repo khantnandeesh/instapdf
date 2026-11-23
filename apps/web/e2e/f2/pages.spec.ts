@@ -23,13 +23,13 @@ test("AC-48: every planned tool has a coming-soon page", async ({ request }) => 
   }
 });
 
-test("AC-49: coming-soon and placeholder pages are noindex; home and usable tools are not", async ({ page }) => {
+test("AC-49: coming-soon and placeholder pages are noindex; home, usable tools and the legal pages (Q1) are not", async ({ page }) => {
   const robots = async (path: string) => {
     await page.goto(path);
     return page.locator('meta[name="robots"]').getAttribute("content").catch(() => null);
   };
-  for (const path of ["/split-pdf", "/about", "/help", "/privacy", "/terms", "/cookies", "/security"]) expect(await robots(path), path).toMatch(/noindex/);
-  for (const path of ["/", "/rotate-pdf", "/merge-pdf"]) {
+  for (const path of ["/split-pdf", "/about", "/help", "/security"]) expect(await robots(path), path).toMatch(/noindex/);
+  for (const path of ["/", "/rotate-pdf", "/merge-pdf", "/privacy", "/terms", "/cookies", "/licenses"]) {
     await page.goto(path);
     await expect(page.locator('meta[name="robots"]'), path).toHaveCount(0);
   }
@@ -51,7 +51,7 @@ test("AC-50: unknown slugs, near-miss tool slugs and nested paths are all 404 wi
     expect(res.status(), path).toBe(404);
     const html = await res.text();
     expect(html, path).toContain('href="/#tools"');
-    expect(html, path).toContain("InstaPDF home");
+    expect(html, path).toContain("BerryPDF home");
   }
 });
 
@@ -76,12 +76,12 @@ test("AC-52: every page has the footer links and the current year; each link ret
     await page.goto(path);
     const footer = page.locator("footer");
     await expect(footer.locator('a[href="/#tools"]'), path).toHaveCount(1);
-    for (const name of ["About", "Help", "Privacy", "Terms", "Cookies", "Security"]) {
+    for (const name of ["About", "Help", "Privacy", "Terms", "Cookies", "Licenses", "Security"]) {
       const link = footer.getByRole("link", { name, exact: true });
       await expect(link, `${path} ${name}`).toBeVisible();
       if (path === "/") expect((await request.get((await link.getAttribute("href"))!)).status(), name).toBe(200);
     }
-    await expect(footer, path).toContainText(`© ${year} InstaPDF`);
+    await expect(footer, path).toContainText(`© ${year} BerryPDF`);
   }
 });
 

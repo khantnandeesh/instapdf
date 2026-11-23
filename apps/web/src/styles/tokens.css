@@ -1,144 +1,417 @@
 /*
- * InstaPDF design tokens (light + dark).
- * Source of truth: docs/specs/f1-shared-flow.md, "## UI" > "Design tokens".
- * Raw values live in CSS custom properties; `@theme inline` exposes them as
- * Tailwind v4 utilities (bg-surface, text-fg-muted, ring-focus, duration-base, ...).
- * Contrast ratios for every text/background pair are listed in the spec.
- * Dark mode follows the OS, and `data-theme="light|dark"` on <html> forces one.
+ * BerryPDF design tokens (the owner's design system, light only).
+ * Source of truth: docs/design/berrypdf.md (token mapping, category hues, measured contrast and
+ * the short list of deliberate deviations). Values come from BerryPDF's tokens.json exactly;
+ * its `{gooseberry}`-style aliases are resolved here.
+ *
+ * Three layers:
+ * 1. BerryPDF's own tokens, with BerryPDF's names and exact values (--brand, --sand, --cat-*,
+ *    --space-*, --dur-*, --z-*; radius, shadow, easing, families and type styles live in
+ *    `@theme static` below so Tailwind emits them under the same names).
+ * 2. Our --ip-* role tokens, mapped onto BerryPDF. Feature code keeps using these names.
+ * 3. `@theme inline`: Tailwind utilities (bg-surface, text-fg-muted, bg-brand, bg-sand, ...).
+ *
+ * Dark mode: BerryPDF does not define one yet ("not yet defined"), so we ship light only.
+ * `color-scheme: light` keeps native controls light when the OS is in dark mode.
  */
 
+/* ---- 1. BerryPDF colour, spacing, duration and z-index tokens (exact values) -------------- */
 :root {
   color-scheme: light;
 
-  /* Neutrals */
-  --ip-bg: #ffffff;
-  --ip-surface: #f5f6fa; /* app canvas behind the grid */
-  --ip-surface-raised: #ffffff; /* cards, dock, dialogs */
-  --ip-surface-sunken: #eceef4; /* placeholders, wells, segmented track */
-  --ip-border: #dfe2ea; /* decorative dividers only, never the only cue */
-  --ip-border-strong: #7c8296; /* input and control borders, >= 3:1 */
-  --ip-fg: #151823;
-  --ip-fg-muted: #535a6e;
-  --ip-fg-disabled: #8a90a3;
-  --ip-paper: #ffffff; /* PDF page thumbnails: always white, both themes */
+  --brand: #d92b4b; /* strawberry red: the one filled action, logo, default icon tint (white 4.78:1) */
+  --brand-bright: #f0506e; /* large accents and icons only (3.41:1 on the grid ground) */
+  --brand-strong: #b01e3c; /* berry text and links at body size (6.78:1 on surface) */
+  --brand-tint: #fdeef1; /* ghost and soft buttons, tab track, trays, selected tiles */
+  --brand-tint-border: #f6cfd6; /* the pale lip under ghost buttons and selected tiles */
+  --brand-deep: #b01e3c; /* NEW pill background, promo pill link text */
+  --brand-soft: #fdeef1; /* soft button, icon button and step-number fill */
+  --ink: #3a2a2e; /* headings and body text: warm dark brown */
+  --ink-black: #2a1c20; /* titles, prices, card names */
+  --muted: #7a6468; /* descriptions, help, hints (5.45:1 on surface) */
+  --subtle: #b39aa0; /* decorative text only (2.61:1): never used for reading text here */
+  --surface: #ffffff;
+  --surface-soft: #fff8f3; /* nav chip, hover rows */
+  --surface-footer: #f8f9fa;
+  --band: #fff1f3; /* pink band behind callouts, menu hovers, soft sections */
+  --sand: #fbe4e1; /* strawberry-cream wash and tool-card border */
+  --border: #f3d9dc; /* hairline on chips and dividers */
+  --border-card: #f6dfe2; /* plan card border */
+  --link: #4a63d9; /* blueberry: focus rings, editing tools, information */
+  --danger: #9f1d14; /* errors: brick red, never confused with the primary */
+  --gooseberry: #7fae2a;
+  --leaf: #287a3c; /* strawberry leaf: success, checks, the loader's leaves (white 5.33:1) */
+  --blueberry: #4a63d9;
+  --huckleberry: #2f7fa8;
+  --blackberry: #4b2a63;
+  --cloudberry: #f08c2e;
+  --elderberry: #6b3fd1;
+  --mulberry: #a03a8c;
+  --cat-merge: var(--gooseberry);
+  --cat-split: var(--leaf);
+  --cat-edit: var(--blueberry);
+  --cat-compress: var(--huckleberry);
+  --cat-scans: var(--blackberry);
+  --cat-convert-from: var(--cloudberry);
+  --cat-convert-to: var(--elderberry);
+  --cat-other: var(--mulberry);
+  --choice-bg: #fbeaee; /* selected choice tile */
+  --tool-active-bg: #e2e7ff; /* editor toolbar button, active (pale blueberry) */
+  --tool-active-ink: #24338f; /* editor toolbar text, active */
+  --tool-glow: #c5cdf7; /* blueberry halo around floating toolbars */
+  --canvas: #f4eef0; /* warm grey behind the white page in the editor */
+  --panel-border: #fbe4e1;
+  --page-tray: #fdeef1; /* tray behind a page preview thumbnail */
+  --switch-off: #e6d3d6; /* defined; the off track uses --ip-field-line (deviation, see berrypdf.md) */
+  --hint: #7a6468;
+  --code-yellow: #fff1c9;
+  --code-blue: #e2e7ff;
+  --code-orange: #ffe3c9;
+  --syntax-keyword: #3147b8;
+  --syntax-string: #3d7a1a;
+  --berry-flesh: #ffd9df;
+  --berry-seed: #ffe9a8;
+  --cream: #fff8f3; /* whipped cream: jam labels, progress track, footer */
+  --milk: #ffeef0; /* strawberry milk: lower end of the waves, soft pink fills */
+  --blossom: #ffffff;
+  --blossom-heart: #ffd84d;
+  --jam: #d92b4b;
 
-  /* Brand / primary (indigo-violet, our own) */
-  --ip-primary: #3d3bd4;
-  --ip-primary-hover: #312fb3;
-  --ip-primary-active: #28269a;
-  --ip-on-primary: #ffffff;
-  --ip-primary-soft: #ecedff;
-  --ip-on-primary-soft: #2f2da8;
+  /* Values BerryPDF's component bundle uses that have no token of their own. */
+  --mp-grid-ground: #fffdfb; /* grid paper: warm white under faint pink lines */
+  --mp-grid-line: rgba(217, 43, 75, 0.07);
+  --mp-pink-hover: #fbdde3; /* soft, ghost and icon button hover */
+  --mp-card-hover-border: #f5b9c3;
+  --mp-field-border-src: #ecd5d9; /* the bundle's field edge (1.39:1); fields use --ip-field-line */
+  --mp-check-border-src: #e2b9c1; /* the bundle's checkbox edge (1.76:1) */
+  --mp-outline-border: #e6d3d6; /* outline button ring */
+  --mp-outline-lip: #efe0e2;
+  --mp-choice-lip: #f3e3e6;
+  --mp-tool-ink: #3147b8; /* editing-tool label (7.71:1) */
+  --mp-tool-hover: #f1f3ff;
+  --mp-prose: #5b484c; /* long reading text (8.48:1) */
+  --mp-alert-ok-bg: #e9f6ec;
+  --mp-alert-ok-ink: #1d5f2d;
+  --mp-alert-ok-border: #bfe3c7;
+  --mp-alert-danger-bg: #fdecea;
+  --mp-alert-danger-ink: #8a1a12;
+  --mp-alert-danger-border: #f3c1bb;
+  --mp-alert-info-bg: #eceffd;
+  --mp-alert-info-ink: #2c3fa8;
+  --mp-alert-info-border: #c9d1f7;
+  --mp-jam-border: #f1c9cf;
+  --mp-backdrop: rgba(58, 20, 30, 0.34);
 
-  /* Status */
-  --ip-danger: #b3261e;
-  --ip-danger-soft: #fdf1f0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 30px;
+  --space-7: 40px;
+  --space-8: 60px;
+  --space-9: 120px;
+
+  --dur-fast: 0.15s; /* focus ring */
+  --dur-base: 0.2s; /* hovers: card lift, fills, icon tilt */
+  --dur-move: 0.3s; /* transforms: logo, modal in, switch */
+  --dur-slow: 0.5s; /* width changes (jam progress) */
+  --dur-attention: 1s;
+  --dur-tool: 0.4s; /* editor toolbar colour changes */
+  --dur-loader: 2.6s; /* one berry loader cycle */
+  --dur-press: 0.04s; /* motion.md: the button press, 40ms */
+  --dur-lift: 0.12s; /* motion.md: button lift, control press */
+
+  --z-header: 899;
+  --z-header-link: 900;
+  --z-progress: 1000;
+}
+
+/* ---- 2. --ip-* role tokens (names kept; values from BerryPDF) ----------------------------- */
+:root {
+  /* Grounds */
+  --ip-bg: var(--mp-grid-ground); /* the page: grid paper */
+  --ip-surface: var(--cream); /* secondary ground: footer */
+  --ip-surface-raised: var(--surface); /* cards, panels, fields */
+  --ip-surface-overlay: var(--surface); /* menus, dialogs, floating bars */
+  --ip-chrome: var(--surface); /* sticky bars: header, tool toolbar */
+  --ip-well: var(--page-tray); /* tray behind a framed page */
+  --ip-surface-sunken: var(--band); /* tags, tracks, placeholders */
+  --ip-hover: var(--band); /* hover rows */
+  --ip-pressed: var(--mp-pink-hover);
+
+  /* Edges */
+  --ip-border: var(--sand); /* hairlines */
+  /* Deviation (WCAG 1.4.11): BerryPDF's pale-pink field, checkbox and switch edges are 1.39-1.76:1.
+     They use the checkbox pink darkened to 3:1 on the pinkest ground (3.39:1 on surface). */
+  --ip-field-line: #a2848a;
+  --ip-field-line-hover: var(--muted);
+  --ip-border-strong: #a2848a;
+
+  /* Text */
+  --ip-fg: var(--ink);
+  --ip-fg-muted: var(--muted);
+  --ip-fg-disabled: var(--muted);
+  --ip-paper: #ffffff;
+  --ip-inverse: var(--ink);
+  --ip-on-inverse: #ffffff;
+
+  /* Berry */
+  --ip-accent: var(--brand);
+  --ip-primary: var(--brand); /* the one filled action */
+  --ip-primary-hover: var(--brand);
+  --ip-primary-active: var(--brand);
+  --ip-on-primary: #ffffff; /* white on brand: 4.78:1 (BerryPDF: "about 4.8:1") */
+  --ip-primary-ink: var(--brand-strong); /* berry as text */
+  --ip-primary-soft: var(--brand-soft);
+  --ip-on-primary-soft: var(--brand-strong);
+  --ip-primary-faint: var(--brand-tint);
+  --ip-primary-ring: rgba(217, 43, 75, 0.16); /* field focus ring */
+  --ip-focus-ring: var(--link);
+
+  /* Status. BerryPDF: leaf for success, brick for errors, blueberry for information. */
+  --ip-danger: var(--danger);
+  --ip-danger-hover: var(--mp-alert-danger-ink);
+  --ip-danger-soft: var(--mp-alert-danger-bg);
+  --ip-danger-strong: var(--danger);
   --ip-on-danger: #ffffff;
-  --ip-success: #0b7a47;
-  --ip-success-soft: #eaf7f0;
-  --ip-warning: #9a5200;
-  --ip-warning-soft: #fff6e6;
+  --ip-success: var(--leaf);
+  --ip-success-soft: var(--mp-alert-ok-bg);
+  --ip-warning: var(--mp-alert-info-ink);
+  --ip-warning-soft: var(--band);
 
-  /* Focus, overlays */
-  --ip-focus-ring: #3d3bd4;
-  --ip-scrim: rgb(13 15 21 / 0.5);
-  --ip-drop-overlay: rgb(236 237 255 / 0.92);
+  /* Overlays */
+  --ip-scrim: var(--mp-backdrop);
+  --ip-drop-overlay: rgb(253 238 241 / 0.94); /* brand-tint, nearly opaque */
 
   /* Elevation */
-  --ip-shadow-sm: 0 1px 2px rgb(21 24 35 / 0.08);
-  --ip-shadow-md: 0 2px 8px rgb(21 24 35 / 0.1), 0 1px 2px rgb(21 24 35 / 0.06);
-  --ip-shadow-lg: 0 12px 32px rgb(21 24 35 / 0.18);
-  --ip-shadow-paper: 0 0 0 1px rgb(21 24 35 / 0.08), 0 1px 3px rgb(21 24 35 / 0.12);
+  --ip-shadow-sm: var(--shadow-card);
+  --ip-shadow-md: var(--shadow-panel);
+  --ip-shadow-lg: var(--shadow-menu);
+  --ip-shadow-paper: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(58, 42, 46, 0.06); /* a PDF page on its tray */
 
-  /* Layout metrics (used by the shared tool flow) */
-  --ip-header-h: 56px;
-  --ip-dock-w: 320px; /* control dock column at >= 1024px */
-  --ip-dock-h: 128px; /* fixed bottom dock below 640px (2 rows) */
-  --ip-dock-h-md: 76px; /* fixed bottom dock 640-1023px (1 row) */
-  --ip-thumb-size: 160px; /* default page-tile box; slider range 80-400 */
-  --ip-tap-min: 44px; /* minimum touch target */
+  /* Catalogue categories -> BerryPDF's berry hues (icon disc and icon), plus a text shade for the
+     UPPERCASE eyebrow. Deviation: three hues are under 4.5:1 for 15px text on the grid paper (measured
+     on a grid line), so their eyebrow words use the same hue darkened to 4.5:1 (see berrypdf.md). */
+  --ip-cat-organize: var(--cat-merge); /* gooseberry */
+  --ip-cat-organize-text: #53721c;
+  --ip-cat-edit: var(--cat-edit); /* blueberry */
+  --ip-cat-edit-text: var(--cat-edit); /* 4.56:1 on a grid line, unchanged */
+  --ip-cat-optimize: var(--cat-compress); /* huckleberry */
+  --ip-cat-optimize-text: #297094;
+  --ip-cat-security: var(--cat-split); /* leaf */
+  --ip-cat-security-text: var(--cat-split); /* 4.73:1, unchanged */
+  --ip-cat-convert-from: var(--cat-convert-from); /* cloudberry */
+  --ip-cat-convert-from-text: #98591d;
+  --ip-cat-convert-to: var(--cat-convert-to); /* elderberry, 5.31:1 unchanged */
+  --ip-cat-convert-to-text: var(--cat-convert-to);
+  --ip-cat-scans: var(--cat-scans); /* blackberry, 9.55:1 unchanged */
+  --ip-cat-scans-text: var(--cat-scans);
+  --ip-cat-automate: var(--cat-other); /* mulberry, 4.97:1 unchanged */
+  --ip-cat-automate-text: var(--cat-other);
 
-  /* F2: site header, tool menu, home catalogue (docs/specs/f2-home.md, H-2) */
+  /* Layout metrics (shared tool flow, header, menu) */
+  --ip-header-h: 64px; /* sticky header: 62.5px row incl. the 1.5px sand line, rounded */
+  --ip-dock-w: 360px; /* options panel column at >= 1024px */
+  --ip-dock-h: 176px; /* fixed bottom dock below 640px */
+  --ip-dock-h-md: 104px; /* fixed bottom dock 640-1023px */
+  --ip-thumb-size: 160px; /* default page box inside its tray; slider range 80-400 */
+  --ip-tap-min: 44px;
   --ip-z-header: 20;
-  --ip-z-header-open: 50; /* above the F1 dock (20), notices (30) and drop overlay (40) */
-  --ip-menu-max-h: calc(100dvh - var(--ip-header-h) - 32px);
-  --ip-recent-h: 92px;
+  --ip-z-header-open: 50;
+  --ip-recent-h: 96px;
 }
 
 @media (min-width: 640px) {
   :root {
-    --ip-recent-h: 96px;
+    --ip-recent-h: 100px;
   }
 }
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --ip-bg: #0d0f15;
-  --ip-surface: #141720;
-  --ip-surface-raised: #1b1f2a;
-  --ip-surface-sunken: #090b10;
-  --ip-border: #2a2f3d;
-  --ip-border-strong: #6e7488;
-  --ip-fg: #eceef4;
-  --ip-fg-muted: #a2a8ba;
-  --ip-fg-disabled: #5d6375;
-  --ip-paper: #ffffff;
-  --ip-primary: #8f93ff;
-  --ip-primary-hover: #a9acff;
-  --ip-primary-active: #c4c6ff;
-  --ip-on-primary: #0d0f15;
-  --ip-primary-soft: #23254a;
-  --ip-on-primary-soft: #c4c6ff;
-  --ip-danger: #ff8a80;
-  --ip-danger-soft: #3a1715;
-  --ip-on-danger: #0d0f15;
-  --ip-success: #4fd18b;
-  --ip-success-soft: #0f2e1f;
-  --ip-warning: #f5b451;
-  --ip-warning-soft: #33240b;
-  --ip-focus-ring: #a9acff;
-  --ip-scrim: rgb(0 0 0 / 0.6);
-  --ip-drop-overlay: rgb(35 37 74 / 0.92);
-  --ip-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --ip-shadow-md: 0 2px 8px rgb(0 0 0 / 0.45);
-  --ip-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
-  --ip-shadow-paper: 0 0 0 1px rgb(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5);
+/* ---- Tailwind: BerryPDF radius, shadow, easing, families and type styles ------------------ */
+@theme static {
+  --radius-sm: 8px; /* small chips, code chips */
+  --radius-md: 12px; /* text fields, code blocks, toolbar ends */
+  --radius-lg: 14px; /* buttons, menus, alerts, callouts, trays */
+  --radius-card: 16px; /* tool card, choice tile */
+  --radius-leaf: 28px; /* the leaf corner, bottom right */
+  --radius-pill: 999px; /* tabs, pills, switch */
+  --radius-panel: 20px; /* app panels */
+  --radius-tray: 14px; /* page preview trays */
+  --radius-round: 24px; /* modals */
+
+  --shadow-card: rgba(217, 43, 75, 0.1) 0px 6px 16px 0px, rgba(0, 0, 0, 0.04) 0px 1px 2px 0px;
+  --shadow-button: #b01e3c 0px 4px 0px 0px, rgba(217, 43, 75, 0.22) 0px 10px 18px 0px;
+  --shadow-menu: rgba(120, 20, 40, 0.16) 0px 12px 28px 0px;
+  --shadow-plan: rgba(217, 43, 75, 0.16) 0px 12px 24px 0px, rgba(0, 0, 0, 0.05) 0px 2px 4px 0px;
+  --shadow-lift: rgba(217, 43, 75, 0.16) 0px 12px 24px 0px, rgba(0, 0, 0, 0.05) 0px 2px 4px 0px; /* = shadow-plan */
+  --shadow-pressed: #b01e3c 0px 1px 0px 0px;
+  --shadow-panel: rgba(217, 43, 75, 0.07) 0px 3px 8px 0px;
+  --shadow-glow: rgba(74, 99, 217, 0.14) 0px 0px 0px 4px, rgba(74, 99, 217, 0.16) 0px 6px 14px 0px;
+  --shadow-window: rgba(217, 43, 75, 0.1) 0px 6px 16px 0px;
+
+  --ease-standard: ease-in-out;
+  --ease-enter: ease-out;
+  --ease-progress-a: cubic-bezier(0.65, 0.815, 0.735, 0.395);
+  --ease-progress-b: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --ease-loader: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1); /* the bundle's small overshoot: modal, switch */
+
+  /* One family everywhere: Fredoka, self-hosted with next/font (layout.tsx defines --font-fredoka).
+     BerryPDF has no second font: the App styles ("ui") and code use it too. */
+  --font-sans: var(--font-fredoka), Fredoka, system-ui, sans-serif;
+  --font-display: var(--font-fredoka), Fredoka, system-ui, sans-serif;
+  --font-ui: var(--font-fredoka), Fredoka, system-ui, sans-serif;
+  --font-mono: var(--font-fredoka), Fredoka, system-ui, sans-serif;
+
+  /* BerryPDF type styles -> text-<style> utilities (size, line height, weight). */
+  --text-hero: 44px;
+  --text-hero--line-height: 48px;
+  --text-hero--font-weight: 700;
+  --text-page-title: 36px;
+  --text-page-title--line-height: 40px;
+  --text-page-title--font-weight: 600;
+  --text-section-title: 30px;
+  --text-section-title--line-height: 34px;
+  --text-section-title--font-weight: 600;
+  --text-card-heading: 24px;
+  --text-card-heading--line-height: 28px;
+  --text-card-heading--font-weight: 600;
+  --text-subtitle: 24px;
+  --text-subtitle--line-height: 30px;
+  --text-subtitle--font-weight: 500;
+  --text-body: 17px;
+  --text-body--line-height: 25.5px;
+  --text-tile-title: 18px;
+  --text-tile-title--line-height: 28px;
+  --text-tile-title--font-weight: 600;
+  --text-tile-desc: 14px;
+  --text-tile-desc--line-height: 16px;
+  --text-eyebrow: 15px;
+  --text-eyebrow--line-height: 24px;
+  --text-eyebrow--font-weight: 600;
+  --text-button: 17px;
+  --text-button--line-height: 17px;
+  --text-button--font-weight: 600;
+  --text-button-lg: 20px;
+  --text-button-lg--line-height: 20px;
+  --text-button-lg--font-weight: 600;
+  --text-nav: 17px;
+  --text-nav--line-height: 24.3px;
+  --text-tool-button: 14px;
+  --text-tool-button--line-height: 20px;
+  --text-choice-label: 15px;
+  --text-choice-label--line-height: 20px;
+  --text-pill: 10px;
+  --text-pill--line-height: 12px;
+  --text-help: 12px;
+  --text-help--line-height: 17px;
+  --text-prose-h2: 22px;
+  --text-prose-h2--line-height: 26px;
+  --text-prose-h2--font-weight: 700;
+  --text-prose-body: 16px;
+  --text-prose-body--line-height: 28px;
+  --text-step-title: 20px;
+  --text-step-title--line-height: 28px;
+  --text-blog-title: 35.2px;
+  --text-blog-title--line-height: 40px;
+  --text-blog-title--font-weight: 700;
+  --text-blog-body: 20px;
+  --text-blog-body--line-height: 30px;
+  --text-code: 13px;
+  --text-code--line-height: 19px;
+  --text-code-chip: 12px;
+  --text-code-chip--line-height: 16px;
+
+  /* Generic sizes re-pointed at the BerryPDF scale, so no off-scale size can slip in. */
+  --text-xs: 12px; /* help */
+  --text-xs--line-height: 17px;
+  --text-sm: 14px; /* tile-desc, tool-button */
+  --text-sm--line-height: 20px;
+  --text-base: 17px; /* body */
+  --text-base--line-height: 25.5px;
+  --text-lg: 18px; /* tile-title */
+  --text-lg--line-height: 28px;
+  --text-xl: 20px; /* step-title, button-lg */
+  --text-xl--line-height: 28px;
+  --text-2xl: 22px; /* prose-h2 */
+  --text-2xl--line-height: 26px;
+  --text-3xl: 24px; /* card-heading, subtitle */
+  --text-3xl--line-height: 30px;
+  --text-4xl: 30px; /* section-title */
+  --text-4xl--line-height: 34px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --ip-bg: #0d0f15;
-    --ip-surface: #141720;
-    --ip-surface-raised: #1b1f2a;
-    --ip-surface-sunken: #090b10;
-    --ip-border: #2a2f3d;
-    --ip-border-strong: #6e7488;
-    --ip-fg: #eceef4;
-    --ip-fg-muted: #a2a8ba;
-    --ip-fg-disabled: #5d6375;
-    --ip-paper: #ffffff;
-    --ip-primary: #8f93ff;
-    --ip-primary-hover: #a9acff;
-    --ip-primary-active: #c4c6ff;
-    --ip-on-primary: #0d0f15;
-    --ip-primary-soft: #23254a;
-    --ip-on-primary-soft: #c4c6ff;
-    --ip-danger: #ff8a80;
-    --ip-danger-soft: #3a1715;
-    --ip-on-danger: #0d0f15;
-    --ip-success: #4fd18b;
-    --ip-success-soft: #0f2e1f;
-    --ip-warning: #f5b451;
-    --ip-warning-soft: #33240b;
-    --ip-focus-ring: #a9acff;
-    --ip-scrim: rgb(0 0 0 / 0.6);
-    --ip-drop-overlay: rgb(35 37 74 / 0.92);
-    --ip-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-    --ip-shadow-md: 0 2px 8px rgb(0 0 0 / 0.45);
-    --ip-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
-    --ip-shadow-paper: 0 0 0 1px rgb(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5);
-  }
+/* ---- 3. Colour utilities ---------------------------------------------------------------------- */
+@theme inline {
+  /* Role names (feature code) */
+  --color-bg: var(--ip-bg);
+  --color-surface: var(--ip-surface);
+  --color-surface-raised: var(--ip-surface-raised);
+  --color-surface-sunken: var(--ip-surface-sunken);
+  --color-surface-overlay: var(--ip-surface-overlay);
+  --color-chrome: var(--ip-chrome);
+  --color-well: var(--ip-well);
+  --color-hover: var(--ip-hover);
+  --color-pressed: var(--ip-pressed);
+  --color-field-line: var(--ip-field-line);
+  --color-field-line-hover: var(--ip-field-line-hover);
+  --color-inverse: var(--ip-inverse);
+  --color-on-inverse: var(--ip-on-inverse);
+  --color-accent: var(--ip-accent);
+  --color-primary: var(--ip-primary);
+  --color-primary-hover: var(--ip-primary-hover);
+  --color-primary-active: var(--ip-primary-active);
+  --color-on-primary: var(--ip-on-primary);
+  --color-primary-ink: var(--ip-primary-ink);
+  --color-primary-soft: var(--ip-primary-soft);
+  --color-on-primary-soft: var(--ip-on-primary-soft);
+  --color-primary-faint: var(--ip-primary-faint);
+  --color-primary-ring: var(--ip-primary-ring);
+  --color-border: var(--ip-border);
+  --color-border-strong: var(--ip-border-strong);
+  --color-fg: var(--ip-fg);
+  --color-fg-muted: var(--ip-fg-muted);
+  --color-fg-disabled: var(--ip-fg-disabled);
+  --color-paper: var(--ip-paper);
+  --color-danger: var(--ip-danger);
+  --color-danger-hover: var(--ip-danger-hover);
+  --color-danger-soft: var(--ip-danger-soft);
+  --color-danger-strong: var(--ip-danger-strong);
+  --color-on-danger: var(--ip-on-danger);
+  --color-success: var(--ip-success);
+  --color-success-soft: var(--ip-success-soft);
+  --color-warning: var(--ip-warning);
+  --color-warning-soft: var(--ip-warning-soft);
+  --color-focus: var(--ip-focus-ring);
+  --color-scrim: var(--ip-scrim);
+  --color-drop-overlay: var(--ip-drop-overlay);
+
+  /* BerryPDF names */
+  --color-brand: var(--brand);
+  --color-brand-bright: var(--brand-bright);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-tint: var(--brand-tint);
+  --color-brand-soft: var(--brand-soft);
+  --color-ink: var(--ink);
+  --color-ink-black: var(--ink-black);
+  --color-muted: var(--muted);
+  --color-hint-ink: var(--hint);
+  --color-sand: var(--sand);
+  --color-band: var(--band);
+  --color-cream: var(--cream);
+  --color-milk: var(--milk);
+  --color-leaf: var(--leaf);
+  --color-surface-soft: var(--surface-soft);
+  --color-surface-footer: var(--surface-footer);
+  --color-link: var(--link);
+  --color-choice-bg: var(--choice-bg);
+  --color-tool-active-bg: var(--tool-active-bg);
+  --color-tool-active-ink: var(--tool-active-ink);
+  --color-canvas: var(--canvas);
+  --color-panel-border: var(--panel-border);
+  --color-page-tray: var(--page-tray);
+  --color-prose: var(--mp-prose);
 }
 
 /*
@@ -146,7 +419,7 @@
  * no existing token value is changed here.
  */
 :root {
-  --ip-on-paper-muted: #535a6e; /* text on a blank page thumbnail: pages are always white, both themes */
+  --ip-on-paper-muted: #7a6468; /* text on a blank page thumbnail (BerryPDF muted; pages are always white) */
   --ip-insert-size: 24px; /* visible insert-point circle; hit area is --ip-tap-min */
   --ip-slot-bar: 3px; /* drop / insert indicator in the grid gap */
   --ip-lift-scale: 1.03; /* dragged ghost */
@@ -158,93 +431,4 @@
 
 @theme inline {
   --color-on-paper-muted: var(--ip-on-paper-muted);
-}
-
-/* Motion. Reduced motion collapses every duration to 0 (opacity fades included). */
-:root {
-  --ip-duration-instant: 80ms;
-  --ip-duration-fast: 120ms;
-  --ip-duration-base: 180ms;
-  --ip-duration-slow: 280ms;
-  --ip-ease-out: cubic-bezier(0.2, 0, 0, 1);
-  --ip-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --ip-duration-instant: 0ms;
-    --ip-duration-fast: 0ms;
-    --ip-duration-base: 0ms;
-    --ip-duration-slow: 0ms;
-  }
-}
-
-@theme inline {
-  /* Colors -> bg-*, text-*, border-*, ring-*, outline-* utilities */
-  --color-bg: var(--ip-bg);
-  --color-surface: var(--ip-surface);
-  --color-surface-raised: var(--ip-surface-raised);
-  --color-surface-sunken: var(--ip-surface-sunken);
-  --color-border: var(--ip-border);
-  --color-border-strong: var(--ip-border-strong);
-  --color-fg: var(--ip-fg);
-  --color-fg-muted: var(--ip-fg-muted);
-  --color-fg-disabled: var(--ip-fg-disabled);
-  --color-paper: var(--ip-paper);
-  --color-primary: var(--ip-primary);
-  --color-primary-hover: var(--ip-primary-hover);
-  --color-primary-active: var(--ip-primary-active);
-  --color-on-primary: var(--ip-on-primary);
-  --color-primary-soft: var(--ip-primary-soft);
-  --color-on-primary-soft: var(--ip-on-primary-soft);
-  --color-danger: var(--ip-danger);
-  --color-danger-soft: var(--ip-danger-soft);
-  --color-on-danger: var(--ip-on-danger);
-  --color-success: var(--ip-success);
-  --color-success-soft: var(--ip-success-soft);
-  --color-warning: var(--ip-warning);
-  --color-warning-soft: var(--ip-warning-soft);
-  --color-focus: var(--ip-focus-ring);
-  --color-scrim: var(--ip-scrim);
-  --color-drop-overlay: var(--ip-drop-overlay);
-
-  /* Kept for the existing placeholder home page */
-  --color-background: var(--ip-bg);
-  --color-foreground: var(--ip-fg);
-
-  /* Type */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --text-xs: 0.75rem;
-  --text-xs--line-height: 1rem;
-  --text-sm: 0.875rem;
-  --text-sm--line-height: 1.25rem;
-  --text-base: 1rem;
-  --text-base--line-height: 1.5rem;
-  --text-lg: 1.125rem;
-  --text-lg--line-height: 1.625rem;
-  --text-xl: 1.375rem;
-  --text-xl--line-height: 1.875rem;
-  --text-2xl: 1.75rem;
-  --text-2xl--line-height: 2.25rem;
-  --text-3xl: 2.25rem;
-  --text-3xl--line-height: 2.75rem;
-  --text-4xl: 3rem;
-  --text-4xl--line-height: 3.5rem;
-
-  /* Radius */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-
-  /* Elevation */
-  --shadow-sm: var(--ip-shadow-sm);
-  --shadow-md: var(--ip-shadow-md);
-  --shadow-lg: var(--ip-shadow-lg);
-  --shadow-paper: var(--ip-shadow-paper);
-
-  /* Motion -> duration-*, ease-* utilities */
-  --ease-out: var(--ip-ease-out);
-  --ease-in-out: var(--ip-ease-in-out);
 }

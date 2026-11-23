@@ -1,10 +1,16 @@
 "use client";
-import { useRef, type KeyboardEvent } from "react";
+import { useRef, type KeyboardEvent, type ReactNode } from "react";
 import { cx } from "./cx";
 
-export type SegmentOption<T extends string> = { value: T; label: string; shortLabel?: string };
+export type SegmentOption<T extends string> = { value: T; label: string; shortLabel?: string; icon?: ReactNode };
 
-/** Radio group with roving tabindex; arrow keys move and select. */
+/**
+ * Radio group with roving tabindex; arrow keys move and select. Three BerryPDF looks:
+ * - "toolbar": joined blueberry editing tools in their halo (EditorToolbar); selected = active.
+ * - "tiles": ChoiceTiles (icon over a Fredoka label, on a pale lip); selected = berry edge and text
+ *   on the pink tint with a leaf-green tick badge.
+ * - "tabs": the soft segmented pill (Tabs) for 2-4 modes; selected = white pill with berry text.
+ */
 export function SegmentedControl<T extends string>({
   label,
   value,
@@ -13,6 +19,7 @@ export function SegmentedControl<T extends string>({
   disabled,
   className,
   fullWidth,
+  look = "toolbar",
 }: {
   label: string;
   value: T;
@@ -21,6 +28,7 @@ export function SegmentedControl<T extends string>({
   disabled?: boolean;
   className?: string;
   fullWidth?: boolean;
+  look?: "toolbar" | "tiles" | "tabs";
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const current = Math.max(0, options.findIndex((o) => o.value === value));
@@ -37,13 +45,15 @@ export function SegmentedControl<T extends string>({
     refs.current[next]?.focus();
   }
 
+  const tiles = look === "tiles";
+  const tabs = look === "tabs";
   return (
     <div
       role="radiogroup"
       aria-label={label}
       aria-disabled={disabled || undefined}
       onKeyDown={onKeyDown}
-      className={cx("inline-flex h-11 rounded-md bg-surface-sunken p-1 lg:h-10", fullWidth && "flex w-full", className)}
+      className={cx(tiles ? "grid grid-flow-col auto-cols-fr gap-3" : tabs ? "mp-tabs" : "mp-toolbar", fullWidth && (tiles ? "w-full" : "flex w-full"), className)}
     >
       {options.map((o, i) => {
         const checked = i === current;
@@ -60,12 +70,13 @@ export function SegmentedControl<T extends string>({
             disabled={disabled}
             onClick={() => onChange(o.value)}
             className={cx(
-              "min-w-11 flex-1 rounded-[7px] px-3 text-sm whitespace-nowrap transition-colors duration-(--ip-duration-fast)",
-              checked ? "bg-primary-soft font-semibold text-on-primary-soft shadow-sm" : "font-medium text-fg-muted hover:text-fg",
-              "disabled:text-fg-disabled",
-              checked && "disabled:bg-surface-raised",
+              tiles ? "mp-choice min-w-0 px-2 py-4 max-lg:flex-row max-lg:gap-1.5 max-lg:py-2.5" : tabs ? "mp-tab" : "mp-btn mp-btn--tool flex-1",
+              checked && "ip-seg-checked",
             )}
+            // The toolbar look shows the pressed state through aria-checked styling below.
+            data-active={!tiles && !tabs && checked ? "" : undefined}
           >
+            {tiles && o.icon}
             {o.shortLabel ? (
               <>
                 <span className="lg:hidden">{o.shortLabel}</span>

@@ -348,14 +348,14 @@ export function RemoveSelectedDialog({
       fallbackFocus={fallbackFocus}
       footer={
         <>
+          <Button variant="ghost" onClick={onCancel}>
+            {labels.cancel}
+          </Button>
           <Button ref={only} variant="secondary" onClick={onOnlyThis}>
             {labels.onlyThis}
           </Button>
-          <Button variant="danger" onClick={onAll}>
+          <Button variant="primary" onClick={onAll}>
             {labels.all}
-          </Button>
-          <Button variant="ghost" onClick={onCancel}>
-            {labels.cancel}
           </Button>
         </>
       }

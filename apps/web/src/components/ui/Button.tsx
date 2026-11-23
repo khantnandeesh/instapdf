@@ -2,32 +2,42 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { cx } from "./cx";
 import { Spinner } from "./Spinner";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+/**
+ * BerryPDF button variants (docs/design/berrypdf.md, Button):
+ * - primary: the berry button, the one filled action per view: sits on a solid lip, lifts 1px on
+ *   hover and presses 3px down onto the lip in 40ms
+ * - ghost: pink tint on a pale lip ("Select", quiet dialog action)
+ * - soft: small pink tint, no lip ("More options", in-app secondary actions)
+ * - line: white with a berry outline (panel actions)
+ * - outline / secondary: white with a grey-pink outline
+ * - tool: working-mode editing tool (blueberry EditorToolbar look)
+ * - plain: a berry text action
+ */
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "soft" | "line" | "outline" | "tool" | "plain";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-active",
-  secondary: "bg-surface-raised text-fg border border-border-strong hover:bg-surface-sunken",
-  ghost: "bg-transparent text-fg hover:bg-surface-sunken",
-  danger: "bg-danger text-on-danger hover:opacity-90",
+  primary: "",
+  secondary: "mp-btn--outline",
+  outline: "mp-btn--outline",
+  ghost: "mp-btn--ghost",
+  soft: "mp-btn--soft",
+  line: "mp-btn--line",
+  tool: "mp-btn--tool",
+  plain: "mp-btn--plain",
 };
 
 const sizes: Record<ButtonSize, string> = {
-  sm: "h-9 px-3 text-sm gap-1.5",
-  md: "h-11 px-4 text-sm gap-2",
-  lg: "h-[52px] px-5 text-base gap-2",
+  sm: "mp-btn--sm",
+  md: "",
+  lg: "mp-btn--lg",
 };
 
 /** Shared base classes, also used by link-styled anchors that look like buttons. */
 export function buttonClasses(variant: ButtonVariant = "secondary", size: ButtonSize = "md", extra?: string) {
-  return cx(
-    "relative inline-flex select-none items-center justify-center rounded-md font-medium whitespace-nowrap",
-    "transition-[background-color,color,transform] duration-(--ip-duration-fast) ease-out active:scale-[0.98]",
-    "disabled:pointer-events-none disabled:border-transparent disabled:bg-surface-sunken disabled:text-fg-disabled",
-    variants[variant],
-    sizes[size],
-    extra,
-  );
+  // sm only changes primary, ghost and outline: soft, line, tool and plain are already 14px.
+  const sized = size === "sm" && !["primary", "ghost", "outline", "secondary"].includes(variant) ? "" : sizes[size];
+  return cx("mp-btn", variants[variant], sized, extra);
 }
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {

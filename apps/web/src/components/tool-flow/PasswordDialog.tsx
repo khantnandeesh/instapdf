@@ -94,7 +94,8 @@ export function PasswordDialog({
           if (!busy) onSubmit(value, showApplyToAll && applyAll);
         }}
       >
-        <label htmlFor={inputId} className="text-sm font-medium">
+        {/* BerryPDF AuthForm field: placeholder in view, the label visually hidden (still the accessible name). */}
+        <label htmlFor={inputId} className="sr-only">
           Password
         </label>
         <div key={attempt} className={error && attempt > 0 ? "ip-shake relative" : "relative"}>
@@ -105,19 +106,20 @@ export function PasswordDialog({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             readOnly={busy}
+            placeholder="Password"
             autoComplete="off"
             autoCapitalize="off"
             spellCheck={false}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? errorId : undefined}
-            className="h-11 w-full rounded-md border border-border-strong bg-surface-raised ps-3 pe-12 text-base text-fg aria-invalid:border-danger"
+            className="ip-field h-12 w-full ps-[14px] pe-12"
           />
           <IconButton
             label="Show password"
             pressed={visible}
             size="sm"
             tooltip={false}
-            className="absolute top-1.5 right-1.5"
+            className="absolute top-[7px] right-[7px]"
             icon={<EyeIcon size={18} />}
             onClick={() => {
               const el = input.current;
@@ -133,13 +135,13 @@ export function PasswordDialog({
           {error && (
             <>
               <AlertIcon size={16} className="mt-0.5 shrink-0" />
-              <span className="text-fg">{error}</span>
+              <span className="font-semibold">{error}</span>
             </>
           )}
         </p>
         {showApplyToAll && (
-          <label className="mt-1 flex min-h-11 cursor-pointer items-start gap-2 text-sm">
-            <input type="checkbox" checked={applyAll} onChange={(e) => setApplyAll(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-(--ip-primary)" />
+          <label className="mt-1 flex min-h-11 cursor-pointer items-start gap-[9px] text-start text-[15px]">
+            <input type="checkbox" checked={applyAll} onChange={(e) => setApplyAll(e.target.checked)} className="mp-checkbox" />
             {copy.pwApplyAll}
           </label>
         )}

@@ -105,7 +105,7 @@ Copy the behavior only, never the wording.
 ## 6. Output (Rotate)
 
 - **One input file:** a single PDF that **keeps the original file name** (`<basename>.pdf`), downloaded directly. *Assumption:* the reference result was not seen because no task was run. The evaluator should confirm the reference's name on its first real Rotate task, and we follow it if it differs.
-- **Two or more input files:** one rotated PDF per input, packed in a ZIP named `instapdf-rotate.zip`. The entries keep the original file names. Duplicate names get ` (2)`, ` (3)` and so on.
+- **Two or more input files:** one rotated PDF per input, packed in a ZIP named `berrypdf-rotate.zip`. The entries keep the original file names. Duplicate names get ` (2)`, ` (3)` and so on.
 - **What changes in the PDF:** only the `/Rotate` entry of each affected page, set to `(original + delta) mod 360`. Page count, page order, content streams, extractable text, page boxes, document metadata and bookmarks are unchanged. Pages are not rasterized.
 - **Encrypted inputs:** the output is saved **without encryption** (it opens without a password). The result screen says so and offers "Protect" in the continue-in-another-tool list once F11 exists. *Assumption, to be confirmed against the reference by the evaluator.*
 - Output size stays within the input size plus 10% (no re-encoding bloat).
@@ -171,7 +171,7 @@ All ACs run on `/rotate-pdf`.
 ### Result screen
 
 - **AC-41 (P0)** After processing, a result screen appears with a Download control. Clicking it downloads a file named `three-pages.pdf` that is a valid PDF.
-- **AC-42 (P1)** With two inputs (`three-pages.pdf`, `sixty-pages.pdf`) the download is `instapdf-rotate.zip`. It contains exactly two PDFs with the original names and 3 and 60 pages, each rotated as chosen.
+- **AC-42 (P1)** With two inputs (`three-pages.pdf`, `sixty-pages.pdf`) the download is `berrypdf-rotate.zip`. It contains exactly two PDFs with the original names and 3 and 60 pages, each rotated as chosen.
 - **AC-43 (P1)** The result screen offers "continue in another tool". Choosing Rotate there opens the tool already in the ready state with the previous output loaded (3 thumbnails already shown rotated, no file picker step). Rotating right again and running gives `/Rotate 180` on every page.
 - **AC-44 (P0)** Start over returns to the empty state. No thumbnails remain, and picking a new file works normally.
 - **AC-45 (P2)** "Back to options" returns to the ready state with the same file and pending rotations.
@@ -238,7 +238,9 @@ These run on `/rotate-pdf` like the others. The evaluator does not compare them 
 
 ## UI
 
-Designed 2026-11-23 by ux-designer. This section is the build contract for the shared flow. Every later tool reuses these components and only adds its own options panel, per-page actions and `process()`. The look is InstaPDF's own (indigo-violet primary on cool neutrals, Geist type, square page tiles, one control dock). Do not use the reference screenshots as a visual guide; they are for behavior only.
+Designed 2026-11-23 by ux-designer. This section is the build contract for the shared flow. Every later tool reuses these components and only adds its own options panel, per-page actions and `process()`. The look is InstaPDF's own, built on the owner's BerryPDF system (grid-paper page, one berry action, pink page trays, blueberry editing tools, one control dock; re-themed 2026-11-23, see `docs/design/berrypdf.md`). Do not use the reference screenshots as a visual guide; they are for behavior only.
+
+> **Design system:** all visual values (tokens, category hues, Fredoka type, Phosphor Duotone icons, motifs, shape, motion, measured contrast and the deviations list) live in [`docs/design/berrypdf.md`](../design/berrypdf.md) (the owner's BerryPDF system, light only; dark mode is pending the designer's definition); where this section names an older visual, that document wins.
 
 ### U-1. Design principles for this flow
 
@@ -251,60 +253,13 @@ Designed 2026-11-23 by ux-designer. This section is the build contract for the s
 
 The tokens existed only as two colors, so this feature defines the full set. Implemented in `apps/web/src/styles/tokens.css` (imported by `apps/web/src/app/globals.css`) as `--ip-*` CSS custom properties and exposed to Tailwind v4 through `@theme inline`. Use the Tailwind utilities (`bg-surface-raised`, `text-fg-muted`, `bg-primary text-on-primary`, `outline-focus`, `shadow-paper`, `rounded-lg` ...) and never raw hex values in components.
 
-**Theme switching.** Dark follows `prefers-color-scheme`. `data-theme="light"` or `"dark"` on `<html>` forces one (no toggle UI in F1). PDF thumbnails always sit on `--ip-paper` (white) in both themes, because pages are white.
-
-**Color (light / dark)**
-
-| Token | Light | Dark | Use |
-|---|---|---|---|
-| `bg` | `#FFFFFF` | `#0D0F15` | page background, header |
-| `surface` | `#F5F6FA` | `#141720` | workspace canvas behind the grid |
-| `surface-raised` | `#FFFFFF` | `#1B1F2A` | cards, dock, dialogs, notices |
-| `surface-sunken` | `#ECEEF4` | `#090B10` | thumbnail placeholders, segmented track, wells |
-| `border` | `#DFE2EA` | `#2A2F3D` | decorative dividers only |
-| `border-strong` | `#7C8296` | `#6E7488` | input, checkbox, slider track, secondary-button borders (≥ 3:1) |
-| `fg` | `#151823` | `#ECEEF4` | body text |
-| `fg-muted` | `#535A6E` | `#A2A8BA` | helper text, page numbers, meta |
-| `fg-disabled` | `#8A90A3` | `#5D6375` | disabled control labels (exempt from 1.4.3) |
-| `paper` | `#FFFFFF` | `#FFFFFF` | thumbnail page background |
-| `primary` / `-hover` / `-active` | `#3D3BD4` / `#312FB3` / `#28269A` | `#8F93FF` / `#A9ACFF` / `#C4C6FF` | primary button, links, scope outline, progress fill |
-| `on-primary` | `#FFFFFF` | `#0D0F15` | text and icons on primary |
-| `primary-soft` / `on-primary-soft` | `#ECEDFF` / `#2F2DA8` | `#23254A` / `#C4C6FF` | selected segment, rotation badge, info notice |
-| `danger` / `danger-soft` / `on-danger` | `#B3261E` / `#FDF1F0` / `#FFFFFF` | `#FF8A80` / `#3A1715` / `#0D0F15` | errors |
-| `success` / `success-soft` | `#0B7A47` / `#EAF7F0` | `#4FD18B` / `#0F2E1F` | result check, privacy note icon |
-| `warning` / `warning-soft` | `#9A5200` / `#FFF6E6` | `#F5B451` / `#33240B` | limit notices, "not password-protected" note |
-| `focus` | `#3D3BD4` | `#A9ACFF` | focus outline |
-| `scrim` | `rgb(13 15 21 / .5)` | `rgb(0 0 0 / .6)` | dialog backdrop |
-| `drop-overlay` | `rgb(236 237 255 / .92)` | `rgb(35 37 74 / .92)` | drag-over overlay |
-
-**Measured contrast (WCAG 2.1, all pass AA; most pass AAA)**
-
-| Pair | Light | Dark |
-|---|---|---|
-| `fg` on `bg` / `surface` / `surface-raised` / `surface-sunken` | 17.7 / 16.4 / 17.7 / 15.3 | 16.5 / 15.4 / 14.2 / 17.0 |
-| `fg-muted` on `bg` / `surface` / `surface-raised` / `primary-soft` | 6.9 / 6.4 / 6.9 / 5.9 | 8.1 / 7.5 / 6.9 / 6.2 |
-| `on-primary` on `primary` / `primary-hover` | 7.6 / 9.6 | 7.1 / 9.2 |
-| `primary` as link text on `bg` / `surface` / `surface-raised` | 7.6 / 7.0 / 7.6 | 7.1 / 6.6 / 6.1 |
-| `on-primary-soft` on `primary-soft` | 8.8 | 9.0 |
-| `danger` on `bg` / `danger-soft`; `on-danger` on `danger` | 6.5 / 5.9 / 6.5 | 8.4 / 7.0 / 8.4 |
-| `success` on `bg` / `success-soft` | 5.4 / 4.9 | 9.9 / 7.6 |
-| `warning` on `bg` / `warning-soft` | 5.9 / 5.5 | 10.5 / 8.3 |
-| `border-strong` on `bg` / `surface` / `surface-raised` (non-text, 1.4.11 needs 3:1) | 3.8 / 3.5 / 3.8 | 4.1 / 3.9 / 3.5 |
-| `focus` outline on `bg` / `surface` / `surface-raised` (non-text) | 7.6 / 7.0 / 7.6 | 9.2 / 8.6 / 7.9 |
-
-Rule: text below 18.66 px bold / 24 px regular uses only the pairs above. `border` (decorative) never carries meaning alone. Selected and error states always add a non-color cue (icon, outline width, text).
-
-**Type.** Geist Sans / Geist Mono, already self-hosted by `next/font` in `layout.tsx` (SIL OFL 1.1, a font license; no extra JS). Scale (size / line height): `xs` 12/16, `sm` 14/20, `base` 16/24, `lg` 18/26, `xl` 22/30, `2xl` 28/36, `3xl` 36/44. Weights: 400 body, 500 labels and buttons, 600 headings. Numbers that change (page counts, sizes, percent) use `tabular-nums` so they don't jitter.
+Values, the token mapping, type, the measured contrast table and the deviations: see [`docs/design/berrypdf.md`](../design/berrypdf.md) (single source of truth).
 
 **Spacing.** Tailwind's 4 px scale. Flow rhythm: 4 / 8 / 12 / 16 / 24 / 32 / 48. Page gutters: 16 (≤ 639), 24 (640–1023), 32 (≥ 1024). Grid gap 16 (12 below 640).
 
-**Radius.** `sm` 6 (badges, checkbox), `md` 10 (buttons, inputs, segmented), `lg` 14 (cards, tiles, notices), `xl` 20 (drop card, dialogs, result card). Pill (`rounded-full`) only for the progress track and rotation badge.
+**Radius, elevation, motion.** See [`docs/design/berrypdf.md`](../design/berrypdf.md).
 
-**Elevation.** `shadow-sm` cards at rest, `shadow-md` hover/focused tile and dock (at < 1024 px), `shadow-lg` dialogs and notices, `shadow-paper` the thumbnail page itself.
-
-**Motion.** `--ip-duration-instant` 80 ms (press), `-fast` 120 ms (fades, hover), `-base` 180 ms (rotation, crossfades), `-slow` 280 ms (result check mark). Easing `--ease-out` for entering and rotation, `--ease-in-out` for progress. Under `prefers-reduced-motion: reduce` every duration is 0 ms. Tailwind v4 `duration-*` takes numbers, so write `duration-(--ip-duration-base)`. Animate only `opacity` and `transform`, never width/height/top (no layout work, no CLS).
-
-**Layout metrics.** `--ip-header-h` 56 px, `--ip-dock-w` 320 px, `--ip-dock-h` 128 px (< 640), `--ip-dock-h-md` 76 px (640–1023), `--ip-thumb-size` 160 px default, `--ip-tap-min` 44 px (every touch target is at least 44×44 px, including icon buttons).
+**Layout metrics.** `--ip-header-h` 57 px, `--ip-dock-w` 360 px, `--ip-dock-h` 176 px (< 640), `--ip-dock-h-md` 104 px (640–1023), `--ip-thumb-size` 160 px default, `--ip-tap-min` 44 px (every touch target is at least 44×44 px, including icon buttons).
 
 **Z-index.** content 0 · sticky toolbar 10 · dock 20 · notice stack 30 · drop overlay 40 · dialog (native top layer, no z-index needed).
 
@@ -318,7 +273,7 @@ The tool route renders `SiteHeader` (56 px: wordmark linking to `/`, "All tools"
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ InstaPDF                                                     All tools   │ header 56
+│ BerryPDF                                                     All tools   │ header 56
 ├──────────────────────────────────────────────────────────────────────────┤
 │  Rotate PDF                                                              │ h1 2xl
 │  Turn pages and save the rotation                                        │ fg-muted
@@ -346,7 +301,7 @@ The tool route renders `SiteHeader` (56 px: wordmark linking to `/`, "All tools"
 
 ```
 ┌────────────────────────────────────────────┐
-│ InstaPDF                        All tools  │
+│ BerryPDF                        All tools  │
 ├────────────────────────────────────────────┤
 │ Rotate PDF                                 │
 │ Turn pages and save the rotation           │
@@ -368,7 +323,7 @@ The tool route renders `SiteHeader` (56 px: wordmark linking to `/`, "All tools"
 
 ```
 ┌───────────────────────────────┐
-│ InstaPDF            All tools │
+│ BerryPDF            All tools │
 ├───────────────────────────────┤
 │ Rotate PDF                    │ h1 xl
 │ Turn pages and save the rot…  │
@@ -412,7 +367,7 @@ Location: primitives in `apps/web/src/components/ui/` (design-system, owned by u
 
 ```
 <ToolFlow tool={toolConfig} options={<RotateOptions/>} pageActions={RotatePageActions} process={rotate}>
-├─ <ToolIntro/>                         h1 + summary
+├─ <ToolIntro/>                         h1
 ├─ <DropOverlay/>                        fixed, shown while dragging over the page
 ├─ <NoticeStack/>                        floating intake and limit notices
 ├─ <LiveRegion/>
@@ -440,10 +395,10 @@ Location: primitives in `apps/web/src/components/ui/` (design-system, owned by u
 | Component | Props / slots | Behavior and look |
 |---|---|---|
 | `ToolFlow` | `tool: ToolFlowConfig` (see U-9), `options: ReactNode`, `pageActions?: ComponentType<PageActionProps>`, `pageTransform?: (pageRef) => {rotate: number}` (what the tile should display), `canRun?: () => true \| string` (string = reason shown in `DockStatus`), `process: (files, signal, onProgress) => Promise<ToolOutput>`, `initialFiles?: File[] \| ToolOutput` (continue-in-another-tool) | Owns the state machine, intake, password queue, notices, leave guard and paste listener. Renders the layout grid. `data-state` attribute on its root (`empty`, `loading`, `password`, `ready`, `processing`, `done`, `error`) for tests and CSS. Root is a drop target. |
-| `ToolIntro` | `title`, `summary` | `h1` (`2xl`, `xl` below 640) and one `fg-muted` line. Same in every state, so the page never jumps. |
+| `ToolIntro` | `title` | `h1` (`2xl`, `xl` below 640); the `fg-muted` summary line is gone *(changed 2026-11-23 per owner: minimal text)*. Same in every state, so the page never jumps. |
 | `DropCard` | children | `surface-raised` card, 2 px dashed `border-strong`, `rounded-xl`. Center stack: file icon (48, `primary`), primary `Button lg` "Choose PDF files", hint line "or drop them here · paste with Ctrl+V" (`⌘V` on macOS; only for `pointer: fine`), then `LimitsNote` and `PrivacyNote`. Hover on the card: border turns `primary`. The whole card is not a button (avoids a giant ambiguous target); the button is the control. |
 | `FilePicker` | `accept: string`, `multiple: boolean`, `onFiles(files: File[])`, `label`, `variant`, `sources?: ReactNode` (dropdown slot, AC-11) | Visible `Button` that clicks a visually hidden `<input type="file">` (keep the input in the DOM, `class="sr-only"`, `tabindex=-1`, so `setInputFiles` works). Resets `input.value` after each pick so the same file can be picked twice. `sources` slot: in F1 render nothing (AC-11 "no entries"); later a caret `IconButton` "More ways to add files" opening a menu. Prefetch: on `pointerenter`/`focus` of the button, start `import()` of the pdf.js loader so parsing starts warm. |
-| `LimitsNote` | `tool` | `sm fg-muted`: "PDF only · up to 20 files, 100 MB each, 500 MB and 1,000 pages in total". Built from registry caps. |
+| `LimitsNote` | `tool` | `sm fg-muted`: "Up to 20 files, 100 MB each"; the full "PDF only · up to 20 files, 100 MB each, 500 MB and 1,000 pages in total" is its tooltip and screen-reader text *(changed 2026-11-23 per owner: minimal text)*. Built from registry caps. |
 | `PrivacyNote` | `runtime: "client" \| "server"`, `context: "intro" \| "result"` | Lock icon (`success`) + `sm` text. Client/intro: "Your files stay on this device. Nothing is uploaded." Client/result: "Done on this device. Your file was never uploaded." (AC-57). Server: different copy owned by F6; result variant not rendered for server (AC-57). |
 | `DropOverlay` | `active: boolean`, `mode: "add" \| "replace"` | `position: fixed; inset: 0`, `drop-overlay` background, inner `inset: 12px` 2 px dashed `primary` border `rounded-xl`, centered icon and `lg` text "Drop to add files" / "Drop to replace the file". `aria-hidden`, `pointer-events: none`. Driven by a drag counter (`dragenter` ++ / `dragleave` --) so nested elements don't flicker; reset on `drop` and on `dragend`/window `blur`. Only reacts when `dataTransfer.types` includes `Files`. |
 | `NoticeStack` | `notices: {id, tone, title, body, fileName?}[]`, `onDismiss(id)` | Fixed, anchored above the dock: bottom `calc(dock height + 12px)` below 1024; at ≥ 1024 bottom-left of the workspace column (`bottom: 24px`, inset to the workspace). Width `min(480px, 100vw - 32px)`. Newest on top, max 3 visible plus "+N more" button that expands. **Errors never auto-dismiss.** Info notices (e.g. "Loaded 20 of 21 files") also stay until dismissed or the next intake. Because it floats, adding or removing a notice never moves content. |
@@ -487,11 +442,11 @@ Location: primitives in `apps/web/src/components/ui/` (design-system, owned by u
 
 | Key | Text |
 |---|---|
-| intro.rotate.title / summary | "Rotate PDF" / "Turn pages and save the rotation" (from the registry) |
+| intro.rotate.title | "Rotate PDF" (the summary line is no longer shown on the page; it stays the meta description) *(changed 2026-11-23 per owner: minimal text)* |
 | picker.button | "Choose PDF files" ("Choose PDF file" for single-file tools) |
-| picker.hint | "or drop them here · paste with Ctrl+V" |
-| privacy.intro | "Your files stay on this device. Nothing is uploaded." |
-| privacy.result | "Done on this device. Your file was never uploaded." |
+| picker.hint | "or drop them here" (paste still works, AC-55; it is just not advertised) *(changed 2026-11-23 per owner: minimal text)* |
+| privacy.intro | "Your files stay on this device." *(changed 2026-11-23 per owner: minimal text)* |
+| privacy.result | "Done on this device. Never uploaded." *(changed 2026-11-23 per owner: minimal text)* |
 | status.empty / loading / password / ready | "Add a PDF to start" / "Reading files…" / "Waiting for a password" / "{pages} pages · {files} file(s)" |
 | action.rotate | "Rotate PDF" (registry `actionLabel`) |
 | progress.rotate | "Rotating… {n}%" |
@@ -593,7 +548,7 @@ Every state keeps the same skeleton (header, `ToolIntro`, workspace, dock), so s
 | State changes | one polite `LiveRegion`: "Reading 2 files", "three-pages.pdf ready, 3 pages", "Rotating", "Your PDF is ready", "All pages will rotate 90° clockwise" (after toolbar rotate), "Rotation reset" |
 | Result preview | `img` (or canvas with `role="img"`) `aria-label="Preview of page 1 of the result"` |
 
-**Contrast and visibility checks.** All text pairs are in U-2. Disabled controls use `fg-disabled` (exempt). Focus outline 2 px `focus` with 2 px offset reaches ≥ 7:1 against every surface. The scope outline (`primary`, 2 px) is ≥ 6:1 against `surface`. The page image on `paper` inside dark mode gets `shadow-paper` with a 1 px light ring so its edge is visible (decorative). Target sizes: every interactive element ≥ 44×44 px at < 1024 and ≥ 32×32 visual with 44×44 hit area at ≥ 1024. Zoom to 200% and 400% (320 CSS px reflow) works: at 320 px the dock's options row wraps to two rows (dock grows; `main` padding uses the measured dock height via a `ResizeObserver` writing `--ip-dock-actual`).
+**Contrast and visibility checks.** All text pairs are in U-2. Disabled controls use `fg-disabled` (exempt). Focus outline 3 px `focus` (BerryPDF `link`, blueberry #4a63d9) with 2 px offset (3 px on buttons, icon buttons, tabs and choice tiles): 5.15:1 on surface, 4.58:1 on the pink trays, 4.24:1 on sand (non-text, ≥ 3:1). Pages in the chosen scope get BerryPDF's 2.5 px berry ring around their pink tray (4.25:1 against the tray) plus a leaf tick. The page image sits on its tray with `shadow-paper` (a hairline ring and soft shadow). There is no dark mode until BerryPDF defines one. Measured values and deviations: [`docs/design/berrypdf.md`](../design/berrypdf.md). Target sizes: every interactive element ≥ 44×44 px at < 1024 and ≥ 32×32 visual with 44×44 hit area at ≥ 1024. Zoom to 200% and 400% (320 CSS px reflow) works: at 320 px the dock's options row wraps to two rows (dock grows; `main` padding uses the measured dock height via a `ResizeObserver` writing `--ip-dock-actual`).
 
 ### U-8. Micro-interactions
 
@@ -624,7 +579,7 @@ The UI needs these per tool (names are a proposal; the engineer owns the type): 
 ### U-10. Performance and no-shift checklist
 
 - Route JS: `ToolFlow`, primitives and Rotate options only. **pdf.js and pdf-lib are loaded with `import()`** on first intake (prefetched on hover/focus of the picker), and processing runs in a Web Worker. No UI libraries, no animation library, no icon package; icons are inline SVG.
-- Fonts: Geist via `next/font` (already in the layout, `display: swap`, size-adjusted fallback, so no font-swap shift).
+- Fonts: Inter, self-hosted via `next/font/local` (one preloaded latin woff2, `swap`, metric-adjusted fallback, so no third-party request and no swap shift).
 - Fixed boxes: tiles (square), placeholders (page aspect from viewport), file cards, preview box (240/200 square), dock (fixed or sticky with constant height per breakpoint), progress (same box as primary), password error line (reserved), toolbar (52 px constant even when the toggle is hidden).
 - Floating, never in-flow: notices, drop overlay, dialogs, tooltips, page action bar.
 - Thumbnail rendering: DPR-aware but capped at 2×; size = current `--ip-thumb-size`; re-render only after the slider stops (debounce 150 ms), with CSS scaling in between.
@@ -635,5 +590,5 @@ The UI needs these per tool (names are a proposal; the engineer owns the type): 
 2. **Thumbnail renderer location:** pdf.js render in a worker with `OffscreenCanvas` where supported, falling back to main-thread canvas. Either is fine for the design as long as AC-52 holds.
 3. **Hand-off store for Continue-with:** in-memory (module-level or `sessionStorage` key holding a `Blob` URL) is the engineer's call; the design only requires that the target tool opens directly in the ready state with no picker step (AC-43).
 4. **`sessionStorage` for the slider value** is optional polish; drop it if it complicates SSR.
-5. **Dark-mode toggle UI** is not in F1; tokens already support `data-theme`.
+5. **Dark mode** is not shipped: BerryPDF does not define one yet, so the tokens are light only (no `data-theme` switch). It is pending the designer's definition; see [`docs/design/berrypdf.md`](../design/berrypdf.md).
 6. **The 768 px `DockStatus`** is visually hidden; if testing shows users miss the disabled reason, show it as a one-line caption above the dock (fixed position, no shift).

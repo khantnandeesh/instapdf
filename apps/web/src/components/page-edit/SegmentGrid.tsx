@@ -200,13 +200,13 @@ export function SegmentGrid({
                 onPointerDown={(e) => onPointerDown(e, card)}
                 className={cx(
                   "ip-no-callout relative grid aspect-square w-(--ip-thumb-size) touch-pan-y place-items-center rounded-lg bg-surface-raised shadow-sm max-sm:w-full",
-                  "transition-[opacity,box-shadow] duration-(--ip-duration-fast) group-hover/card:shadow-md group-focus-within/card:shadow-md",
+                  "transition-[opacity,box-shadow] duration-(--dur-fast) group-hover/card:shadow-md group-focus-within/card:shadow-md",
                   dragKey === card.key && "opacity-40 outline-2 outline-offset-[-2px] outline-border-strong outline-dashed",
                 )}
               >
                 {card.status === "ready" && card.fileId && card.thumbSize ? (
                   <span
-                    className="relative block overflow-hidden shadow-paper transition-transform duration-(--ip-duration-base) ease-out"
+                    className="relative block overflow-hidden shadow-paper transition-transform duration-(--dur-base) ease-out"
                     style={{ ...pageBoxStyle(card.thumbSize), transform: `rotate(${card.rotation}deg)` }}
                   >
                     <PageThumb fileId={card.fileId} index={card.thumbIndex} />
@@ -250,7 +250,7 @@ export function SegmentGrid({
                     data-no-drag=""
                     className={cx(
                       "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1 rounded-md bg-surface-raised/90 p-0.5 shadow-md",
-                      "opacity-0 transition-opacity duration-(--ip-duration-fast) group-hover/card:opacity-100 group-focus-within/card:opacity-100 [@media(hover:none)]:opacity-100",
+                      "opacity-0 transition-opacity duration-(--dur-fast) group-hover/card:opacity-100 group-focus-within/card:opacity-100 [@media(hover:none)]:opacity-100",
                     )}
                   >
                     <IconButton label={labels.rotateLeft(card.name)} size="sm" tabIndex={tab} className="max-lg:size-11" icon={<RotateLeftIcon size={18} />} onClick={() => onRotate(card.key, -90)} />
@@ -298,7 +298,7 @@ export function SegmentGrid({
             disabled={dimmed}
             className={cx(
               "grid aspect-square w-(--ip-thumb-size) place-items-center rounded-lg border-2 border-dashed border-border-strong bg-surface max-sm:w-full",
-              "transition-colors duration-(--ip-duration-fast) hover:border-primary hover:bg-primary-soft",
+              "transition-colors duration-(--dur-fast) hover:border-primary hover:bg-primary-soft",
             )}
             data-testid="add-tile"
           >

@@ -1,6 +1,7 @@
 # Evaluation: F2 Home page, tool catalogue and header menu
 
-- **Verdict: PASS** (with one P1 failure: AC-56, see gap G-1. It must be fixed, but it does not block the gate)
+- **Current verdict (re-evaluation, 2026-11-23, build `b5ef96c`): PASS. 62/62 evaluated ACs pass (P0 19/19, P1 29/29, P2 14/14 + AC-34 dropped). See "Re-evaluation" at the end.**
+- Original verdict (first evaluation, below): PASS with one P1 failure: AC-56 (gap G-1)
 - Evaluated: 2026-11-23, 17:00–17:20 UTC, by parity-evaluator
 - Spec: `docs/specs/f2-home.md` (63 ACs: 19 P0, 29 P1, 15 P2. AC-34 is dropped by design)
 - Reference: https://www.sejda.com/ (home page and its "All tools" menu)
@@ -157,3 +158,74 @@ Lighthouse's accessibility score is 100 because its bundled axe ruleset does not
 - Ground truth for the registry (slugs, groups, popular order, runtime) came from the spec (H-3 slug table, §3b popular order, H-4 group counts) and from consistency checks between the catalogue, the menu and the footer. The evaluator does not read `apps/`.
 - In the AC-10 crawl, `/does-not-exist` shows up as 404 only because the evaluator opened that page itself; it is not linked from anywhere.
 - Evaluator scripts and raw JSON results are in the session scratchpad and are not committed. Reference observations are in `docs/evals/cache/f2-home/`.
+
+## Re-evaluation (2026-11-23, 17:45–18:05 UTC)
+
+- Build: staging `/api/health` version `b5ef96c87a8766058d9c3045ec51eb684499c5d6` ("fix: F2 accessible names match visible text (AC-56) + evaluator gaps").
+- Spec re-read: H-5 / H-7 / H-11 item 6 now say cards, tiles and menu entries take their accessible name from the visible content, in visual order, with `sr-only` ", " separators, and have no `aria-labelledby` / `aria-describedby`. The ACs themselves are unchanged.
+- Same harness as before: Playwright with Chrome for Testing 153, axe-core 4.14.1 (same version), Lighthouse CLI mobile. No Sejda requests or tasks.
+- Scope: AC-56 in the same states; G-2 and G-3; a regression pass. In the end I re-ran **all** AC scripts, not only the P0 ones, because they are cheap. I changed one script: AC-7 had relied on `aria-labelledby`, which is now gone by design, so it now checks the link's own content.
+
+### Verdict: PASS
+
+| Gate | Bar | Result | OK |
+|---|---|---|---|
+| P0 ACs | all pass | 19 / 19 | yes |
+| All ACs | at least 90% | 62 / 62 evaluated (100%); AC-34 dropped by design | yes |
+| Lighthouse performance (mobile) | at least 90 | 99 (runs: 99 / 99 / 98) | yes |
+| axe critical issues | none | 0 violations of any impact in all 12 states (plus 1 control page) | yes |
+
+By priority: **P0 19/19**, **P1 29/29**, **P2 14/14** (+ AC-34 dropped by design).
+
+### AC rows that changed
+
+| AC | Pri | Sejda result | InstaPDF result (re-evaluation) | Pass |
+|---|---|---|---|---|
+| AC-56 | P1 | n/a | axe 4.14.1 (default ruleset and the WCAG 2.0–2.2 A/AA + best-practice tags): **0 violations** in every state from the first run. That covers `/` with the menu closed, the desktop menu open, menu search and catalogue search each showing no results, Recent populated with only-ready on, `/` at 375 px, and the mobile menu open. It also covers the coming-soon page and the 404 page at 1366 and 375, and `/privacy`. The control page `/rotate-pdf` is also clean. `label-content-name-mismatch` is gone | **PASS** (was FAIL) |
+| AC-7 | P0 | icon + name + description card | 45 cards, each one `<a>` that is the only interactive element in its `li`. Visible name and summary are inside it. No card has `aria-labelledby` or `aria-describedby` (new spec). Example accessible name: "Compress , Make your PDF smaller , Coming soon" | PASS (re-verified with the updated method) |
+| AC-9, AC-13, AC-25, AC-59 | P0/P1 | – | Accessible names now come from content. 44 "Coming soon" in the catalogue and the menu, "Beta" on the Rotate card and menu entry, 33 "Runs in your browser" in both (same counts as before) | PASS (unchanged) |
+
+Every other AC row gives the same result as in the first table. AC-27 and AC-53 hit the same harness issues described in G-3 and in the first run's harness notes. Checked directly (coordinate click on the scrim; A–Z order of the names without the badges), both pass.
+
+### Regression pass, P0 (all PASS)
+
+- **AC-1:** 200, 1 `h1`.
+- **AC-2:** CTA bottom edge at 300 px (1366×900) and 308 px (375×812).
+- **AC-3:** click and Enter both give `#tools`, the heading in view and the search focused.
+- **AC-5:** 45 unique links, the exact slug set.
+- **AC-6:** same 8 headings; grouping matches the menu.
+- **AC-7:** see above.
+- **AC-8:** Rotate opens with `accept=".pdf,application/pdf"`.
+- **AC-9:** 44 / 44.
+- **AC-10:** 53 internal URLs, all 200; 0 external.
+- **AC-15:** `split` gives the 5 Split cards.
+- **AC-23:** same header on all 5 pages.
+- **AC-24, AC-25, AC-26:** all pass.
+- **AC-36:** 0 shortcuts; scrollWidth 375.
+- **AC-37:** modal `<dialog>`, 45 links, focus returns to the trigger.
+- **AC-48:** pass.
+- **AC-52:** all 7 links return 200; "© 2026 InstaPDF".
+- **AC-54:** only the staging origin; 0 cookies.
+- **Console:** no errors on `/`, `/rotate-pdf`, `/merge-pdf`, `/compress-pdf`, `/about` or `/?q=split`. The only error is the expected 404 resource error on the 404 page.
+
+### Lighthouse (mobile) re-run
+
+| Run | Perf | A11y | Best practices | SEO | FCP | LCP | TBT | CLS | SI |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 99 | 100 | 100 | 100 | 1.0 s | 1.0 s | 130 ms | 0 | 1.3 s |
+| 2 | 99 | 100 | 100 | 100 | 1.0 s | 1.0 s | 140 ms | 0 | 1.3 s |
+| 3 | 98 | 100 | 100 | 100 | 1.0 s | 1.0 s | 160 ms | 0 | 1.3 s |
+
+### Gap list status
+
+1. **G-1 (P1, AC-56): fixed.** 0 axe violations in all states (details above).
+2. **G-2 (info): focus part fixed; strip size unchanged (as specified).**
+   - A backdrop click now closes the menu and returns focus to the All tools button. I checked this at 1366×900 and at 1280×720, with the menu opened by mouse, by Enter and by Tab + Enter.
+   - The focus is not `:focus-visible` after a pointer close, which is correct.
+   - The panel is still 868 px tall at 1366×900 (688 px at 1280×720), so the clickable backdrop is a 32 px strip. This follows `--ip-menu-max-h` in the spec, so I'm not raising it as a gap.
+3. **G-3 (info, e2e): still open; no user impact.**
+   - `locator('[data-testid=tool-menu-scrim]').click()` still times out. The scrim covers the whole area under the header and the panel sits on top of its centre, so Playwright's actionability check never succeeds.
+   - Builder e2e tests should click a point on the scrim outside the panel, e.g. `page.mouse.click(x, viewportHeight - 10)` or `click({ position })` below the panel.
+4. **G-4 (info, AC-60 licence): still not verifiable by the evaluator** (out of read scope). Nothing changed.
+5. **G-5 (new, info, not an AC).** At 375 px axe returns one *needs review* item (not a violation): `aria-valid-attr-value` on the All tools button. Its `aria-controls="tool-menu"` points to an id that only exists while the menu is open, because the panel is unmounted when closed. The same item was there in the first run. Optional fix: set `aria-controls` only while the menu is open, or keep an empty `#tool-menu` container mounted.
+6. **G-6 (new, cosmetic, not an AC).** The new accessible names have a space before each separator: "Compress , Make your PDF smaller , Coming soon". The real whitespace sits before the `sr-only` ", ". Screen readers barely voice this, but moving the whitespace after the comma would give cleaner names ("Compress, Make your PDF smaller, Coming soon").

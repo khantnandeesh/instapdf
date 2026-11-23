@@ -25,7 +25,7 @@ export type SearchFieldProps = {
 };
 
 /**
- * Labeled `type=search` field with a fixed 44 px end slot that holds either the
+ * Labeled `type=search` field with a fixed 40 px end slot that holds either the
  * "/" hint or a Clear button, so swapping them never changes the width.
  */
 export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function SearchField(
@@ -41,11 +41,11 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
   }
   return (
     <div className={cx("min-w-0", className)}>
-      <label htmlFor={id} className={hideLabel ? "sr-only" : "mb-1 block text-sm font-medium"}>
+      <label htmlFor={id} className={hideLabel ? "sr-only" : "mb-1 block text-sm font-bold"}>
         {label}
       </label>
       <div className="relative">
-        <SearchIcon size={20} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-muted" />
+        <SearchIcon size={20} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-brand-strong" />
         <input
           ref={ref}
           id={id}
@@ -60,7 +60,8 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
           aria-describedby={cx(shortcutHint && hintId, describedBy) || undefined}
           aria-controls={controls}
           className={cx(
-            "ip-search w-full rounded-md border border-border-strong bg-surface-raised ps-10 pe-12 text-base text-fg placeholder:text-fg-muted",
+            // BerryPDF Input: 1.5px edge, 12px radius, 16px text; focus turns the edge berry with a 4px pink ring.
+            "ip-search ip-field w-full ps-10 pe-11",
             size === "lg" ? "h-12" : "h-11",
           )}
         />
@@ -69,7 +70,7 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
             Press slash to search.
           </span>
         )}
-        <span className="absolute inset-y-0 end-0 grid w-11 place-items-center">
+        <span className="absolute inset-y-0 end-0 grid w-10 place-items-center">
           {value ? (
             <button
               type="button"
@@ -79,7 +80,7 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
                 (e.currentTarget.closest("div")?.querySelector("input") as HTMLInputElement | null)?.focus();
                 onClear?.();
               }}
-              className="ip-fade-in grid size-11 place-items-center rounded-md text-fg-muted hover:bg-surface-sunken hover:text-fg"
+              className="ip-fade-in grid size-9 place-items-center rounded-pill text-muted transition-colors duration-(--dur-base) hover:bg-milk hover:text-brand-strong"
             >
               <CloseIcon size={18} />
             </button>

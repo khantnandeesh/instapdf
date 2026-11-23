@@ -42,19 +42,23 @@ export function PageTile({
 }) {
   const badge = formatDelta(pendingDelta);
   const label = `Page ${index + 1} of ${pageCount}, ${describeDelta(pendingDelta)}`;
+  // BerryPDF PagePreview: each white page sits in a pink tray (14px radius) with its page number
+  // below in Fredoka; a page in the selected scope gets the 2.5px berry ring (and a leaf tick).
   return (
-    <div role="listitem" className="group/tile flex min-w-0 flex-col items-center gap-1" data-page-index={index} data-file-id={fileId}>
+    <div
+      role="listitem"
+      className="group/tile mp-tray flex min-w-0 flex-col items-center gap-2 max-sm:p-3"
+      data-selected={inScope ? "" : undefined}
+      data-page-index={index}
+      data-file-id={fileId}
+    >
       <div
-        className={cx(
-          "relative grid aspect-square w-(--ip-thumb-size) place-items-center rounded-lg max-sm:w-full",
-          "transition-shadow duration-(--ip-duration-fast) group-hover/tile:shadow-md group-focus-within/tile:shadow-md",
-          inScope && "outline-2 -outline-offset-2 outline-primary",
-        )}
+        className="relative grid aspect-square w-(--ip-thumb-size) place-items-center max-sm:w-full"
         data-testid="page-tile"
         data-rotation={pendingDelta}
       >
         <span
-          className="relative block overflow-hidden shadow-paper transition-transform duration-(--ip-duration-base) ease-out"
+          className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
           style={{ ...pageBoxStyle(size), transform: `rotate(${pendingDelta}deg)` }}
           data-testid="page-visual"
         >
@@ -69,30 +73,31 @@ export function PageTile({
           onFocus={onFocus}
           onClick={onOpen}
           onKeyDown={onKeyDown}
-          className="absolute inset-0 rounded-lg focus-visible:outline-focus"
+          className="absolute inset-0 rounded-sm focus-visible:outline-offset-3"
         />
         {badge && (
-          <span className="pointer-events-none absolute top-1.5 left-1.5 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-on-primary-soft tabular-nums">
+          <span className="pointer-events-none absolute top-1.5 left-1.5 z-[1] rounded-pill bg-surface-raised px-2 py-0.5 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">
             {badge}
           </span>
         )}
         {inScope && (
-          <span className="pointer-events-none absolute top-1.5 right-1.5 grid size-5 place-items-center rounded-full bg-primary text-on-primary">
-            <CheckIcon size={14} strokeWidth={2.5} />
+          <span className="pointer-events-none absolute top-1.5 right-1.5 z-[1] grid size-[22px] place-items-center rounded-full bg-leaf text-white ring-2 ring-white">
+            <CheckIcon size={14} />
           </span>
         )}
         {actions && !dimmed && (
           <div
             className={cx(
-              "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1 rounded-md bg-surface-raised/90 p-1 shadow-md",
-              "opacity-0 transition-opacity duration-(--ip-duration-fast) group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100",
+              "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1.5 rounded-lg border-[1.5px] border-sand bg-surface-raised p-1.5 shadow-menu",
+              "opacity-0 transition-opacity duration-(--dur-base) group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100",
             )}
           >
             {actions}
           </div>
         )}
       </div>
-      <span className="h-5 text-xs text-fg-muted tabular-nums" aria-hidden="true">
+      {/* Page number in Fredoka 600, muted (4.85:1 on the tray). */}
+      <span className="mp-tray__n h-5 tabular-nums" aria-hidden="true">
         {index + 1}
       </span>
     </div>

@@ -111,21 +111,52 @@ test.describe("AC-49 at 375 px", () => {
     const out = await downloadResult(page);
     expect(await rotationsOf(out.bytes)).toEqual([90, 90, 90]);
   });
+
+  test("the page preview dialog stacks its three buttons and nothing overflows at 375 px", async ({ page }) => {
+    await pickReady(page, "three-pages.pdf");
+    await page.getByRole("button", { name: /^Page 1 of 3/ }).click();
+    await expect(dialog(page)).toBeVisible();
+    const buttons = dialog(page).getByTestId("dialog-footer").getByRole("button");
+    await expect(buttons).toHaveCount(3);
+    const boxes = await buttons.evaluateAll((els) =>
+      els.map((e) => {
+        const r = e.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, fits: e.scrollWidth <= e.clientWidth };
+      }),
+    );
+    for (const b of boxes) {
+      expect(b.left).toBeGreaterThanOrEqual(0);
+      expect(b.right).toBeLessThanOrEqual(375);
+      expect(b.fits, "button label is not clipped").toBe(true);
+    }
+    // Stacked: each button sits below the previous one.
+    expect(boxes[1].top).toBeGreaterThan(boxes[0].top);
+    expect(boxes[2].top).toBeGreaterThan(boxes[1].top);
+    expect(await noHorizontalScroll(page)).toBe(true);
+  });
 });
 
-test("AC-50: axe finds no critical or serious violations in empty, password, ready and result states", async ({ page }) => {
-  const check = (state: string) => expectNoSeriousAxeViolations(page, state);
-  await check("empty");
-  await pick(page, "user-pw.pdf");
-  await expect(dialog(page)).toBeVisible();
-  await check("password");
-  await passwordField(page).fill("test");
-  await page.keyboard.press("Enter");
-  await expect(flow(page)).toHaveAttribute("data-state", "ready");
-  await check("ready");
-  await run(page);
-  await check("result");
-});
+// Light only until BerryPDF defines a dark mode: "dark" runs with the OS in dark mode, which must
+// keep the light palette and stay clean.
+for (const scheme of ["light", "dark"] as const) {
+  test.describe(`${scheme === "light" ? "light" : "OS dark preference (light palette)"}`, () => {
+    test.use({ colorScheme: scheme });
+
+    test(`AC-50: axe finds no critical or serious violations in empty, password, ready and result states (${scheme})`, async ({ page }) => {
+      const check = (state: string) => expectNoSeriousAxeViolations(page, `${scheme}, ${state}`);
+      await check("empty");
+      await pick(page, "user-pw.pdf");
+      await expect(dialog(page)).toBeVisible();
+      await check("password");
+      await passwordField(page).fill("test");
+      await page.keyboard.press("Enter");
+      await expect(flow(page)).toHaveAttribute("data-state", "ready");
+      await check("ready");
+      await run(page);
+      await check("result");
+    });
+  });
+}
 
 test("AC-51: with files loaded, leaving the page asks for confirmation (and not when empty)", async ({ page }) => {
   // Empty: no prompt.

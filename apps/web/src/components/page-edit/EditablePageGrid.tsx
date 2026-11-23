@@ -268,7 +268,7 @@ export default function EditablePageGrid({
         tabIndex={tab}
         className={cx(
           "group/ins grid size-11 place-items-center rounded-full outline-none",
-          "opacity-0 transition-opacity duration-(--ip-duration-fast) hover:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 [@media(hover:none)]:opacity-100",
+          "opacity-0 transition-opacity duration-(--dur-fast) hover:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 [@media(hover:none)]:opacity-100",
         )}
         data-testid="insert-point"
       >
@@ -323,7 +323,7 @@ export default function EditablePageGrid({
                 onPointerDown={(e) => onPointerDown(e, t)}
                 className={cx(
                   "ip-no-callout relative grid aspect-square w-(--ip-thumb-size) touch-pan-y place-items-center rounded-lg max-sm:w-full",
-                  "transition-[opacity,box-shadow] duration-(--ip-duration-fast) group-hover/tile:shadow-md group-focus-within/tile:shadow-md",
+                  "transition-[opacity,box-shadow] duration-(--dur-fast) group-hover/tile:shadow-md group-focus-within/tile:shadow-md",
                   t.selected && "outline-2 -outline-offset-2 outline-primary",
                   dragging.has(t.uid) && "opacity-40 outline-2 outline-border-strong outline-dashed",
                 )}
@@ -332,7 +332,7 @@ export default function EditablePageGrid({
                 data-rotation={t.rotation}
               >
                 <span
-                  className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--ip-duration-base) ease-out"
+                  className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-base) ease-out"
                   style={{ ...pageBoxStyle(t.size), transform: `rotate(${t.rotation}deg)` }}
                 >
                   {t.blank ? (
@@ -402,7 +402,7 @@ export default function EditablePageGrid({
                     data-no-drag=""
                     className={cx(
                       "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1 rounded-md bg-surface-raised/90 p-0.5 shadow-md",
-                      "opacity-0 transition-opacity duration-(--ip-duration-fast) group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 has-[[aria-expanded=true]]:opacity-100 [@media(hover:none)]:opacity-100",
+                      "opacity-0 transition-opacity duration-(--dur-fast) group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 has-[[aria-expanded=true]]:opacity-100 [@media(hover:none)]:opacity-100",
                     )}
                   >
                     {!narrow && <IconButton label={labels.rotateTileLeft(t.label)} size="sm" tabIndex={tab} className="max-lg:size-11" icon={<RotateLeftIcon size={18} />} onClick={(e) => onAction(t.uid, "rotate-left", e.currentTarget)} />}
@@ -453,7 +453,7 @@ export default function EditablePageGrid({
             disabled={dimmed}
             className={cx(
               "grid aspect-square w-(--ip-thumb-size) place-items-center rounded-lg border-2 border-dashed border-border-strong bg-surface max-sm:w-full",
-              "transition-colors duration-(--ip-duration-fast) hover:border-primary hover:bg-primary-soft",
+              "transition-colors duration-(--dur-fast) hover:border-primary hover:bg-primary-soft",
             )}
             data-testid="add-tile"
           >

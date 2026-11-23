@@ -60,7 +60,7 @@ function makeGhost(source: HTMLElement, count: number): HTMLElement {
     pointerEvents: "none",
     cursor: "grabbing",
     transformOrigin: "center",
-    transition: "transform var(--ip-duration-fast) var(--ip-ease-out)",
+    transition: "transform var(--dur-fast) ease-out",
   } satisfies Partial<CSSStyleDeclaration>);
   if (count > 1) {
     const badge = document.createElement("span");

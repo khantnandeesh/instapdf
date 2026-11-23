@@ -11,8 +11,8 @@ import { acceptAttribute, fitsPageBudget, screenFiles } from "@/lib/pdf/validati
 import { exceedsPixelCap, imageFormatOfName, imagePageSize, probeImage, sniffFormat } from "@/lib/pdf/images";
 import { continueTargets, type FlowTool } from "@/tools/registry";
 import { Button } from "../ui/Button";
-import { cx } from "../ui/cx";
-import { PlusIcon } from "../ui/icons";
+import { BerryLoader } from "../berry/Berry";
+import { PlusIcon, UploadIcon } from "../ui/icons";
 import { LiveRegion } from "../ui/LiveRegion";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { Slider } from "../ui/Slider";
@@ -55,6 +55,8 @@ type Phase = "idle" | "processing" | "done" | "error";
 const MIN_PROCESSING_MS = 300;
 const THUMB_MIN = 80;
 const THUMB_MAX = 400;
+/** Same as --ip-thumb-size in tokens.css, so the server HTML needs no style attribute (strict CSP style-src). */
+const THUMB_DEFAULT = 160;
 
 let fileSeq = 0;
 
@@ -100,7 +102,7 @@ export type ToolFlowProps = {
   /** Below 640 px, the toolbar's Add files shows only its icon. */
   compactAddFiles?: boolean;
   /** Merge's own wording for the empty state and the wrong-type error. */
-  copyOverrides?: { pickerButton?: string; pickerHint?: string; limits?: string; statusEmpty?: string; errorType?: (name: string) => string };
+  copyOverrides?: { pickerButton?: string; pickerHint?: string; limits?: string; limitsFull?: string; statusEmpty?: string; errorType?: (name: string) => string };
   /** Chip on the Options button below 1024 px ("2 changed"), for `optionsDensity: "full"`. */
   optionsBadge?: string;
   /** Receives the flow API (for keyboard handlers outside render). */
@@ -167,7 +169,7 @@ export function ToolFlow({
   const [message, setMessage] = useState("");
   const announce = useCallback((m: string) => setMessage((prev) => (prev === m ? `${m} ` : m)), []);
   const [viewChoice, setViewChoice] = useState<"pages" | "files" | null>(null);
-  const [thumbSize, setThumbSize] = useState(160);
+  const [thumbSize, setThumbSize] = useState(THUMB_DEFAULT);
   const [renderSize, setRenderSize] = useState(160);
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<{ items: PreviewItem[]; at: number } | null>(null);
@@ -699,7 +701,6 @@ export function ToolFlow({
     });
     return items.length ? { items, at: Math.min(preview.at, items.length - 1) } : null;
   }, [preview, readyFiles]);
-  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
   const accept = acceptAttribute(flow.accept);
   const ownerFile = ownerFor ? readyFiles.find((f) => f.id === ownerFor) : undefined;
 
@@ -710,10 +711,10 @@ export function ToolFlow({
   );
 
   return (
-    <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" style={{ ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
+    <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" style={thumbSize === THUMB_DEFAULT ? undefined : { ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
       <DropOverlay active={dragging && acceptsDrop} mode={flow.multiFile || files.length === 0 ? "add" : "replace"} />
       <LiveRegion message={message} />
-      <ToolIntro ref={heading} title={flow.title} summary={tool.summary} />
+      <ToolIntro ref={heading} title={flow.title} />
 
       {state === "done" && output ? (
         <ResultCard
@@ -726,8 +727,8 @@ export function ToolFlow({
           announce={announce}
         />
       ) : (
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-6">
-          <section aria-label="Your files" className={cx("min-w-0", state !== "empty" && "rounded-xl bg-surface")}>
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]">
+          <section aria-label="Your files" className="min-w-0">
             {state === "empty" ? (
               <DropCard>
                 <FilePicker
@@ -735,18 +736,22 @@ export function ToolFlow({
                   accept={accept}
                   multiple={flow.multiFile}
                   label={copyOverrides?.pickerButton ?? copy.pickerButton(flow.multiFile)}
+                  icon={<UploadIcon size={24} />}
                   onFiles={(f, t) => void intake(f, t)}
                   inputTestId="file-input"
                 />
-                <p className="hidden text-sm text-fg-muted [@media(pointer:fine)]:block">{copyOverrides?.pickerHint ?? copy.pickerHint(isMac)}</p>
-                <LimitsNote text={copyOverrides?.limits ?? copy.limits(flow)} />
+                <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copyOverrides?.pickerHint ?? copy.pickerHint}</p>
+                <LimitsNote text={copyOverrides?.limits ?? copy.limits(flow)} full={copyOverrides?.limitsFull ?? copy.limitsFull(flow)} />
                 <PrivacyNote runtime={tool.runtime} context="intro" />
               </DropCard>
             ) : (
-              <>
-                <div className="sticky top-(--ip-header-h) z-10 flex h-[52px] items-center gap-3 rounded-t-xl border-b border-border bg-surface px-3 sm:px-6">
+              // BerryPDF working mode: plain seed-cream, no decoration. A sticky row of editing tools
+              // (blueberry EditorToolbar look, Tabs for the view) above the pink page trays.
+              <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 sm:px-5">
+                <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] items-center gap-3 rounded-t-panel bg-cream px-3 sm:-mx-5 sm:gap-4 sm:px-5">
                   {showViewToggle && (
                     <SegmentedControl
+                      look="tabs"
                       label="View"
                       value={view}
                       onChange={setViewChoice}
@@ -783,9 +788,10 @@ export function ToolFlow({
                       multiple={flow.multiFile}
                       label={flow.multiFile ? "Add files" : "Replace file"}
                       compact={compactAddFiles}
-                      variant="secondary"
+                      variant="tool"
                       size="sm"
-                      icon={<PlusIcon size={18} />}
+                      className="shadow-glow"
+                      icon={<PlusIcon size={16} />}
                       disabled={state === "processing"}
                       onFiles={(f, t) => void intake(f, t, { replace: !flow.multiFile })}
                       inputTestId="file-input"
@@ -793,7 +799,7 @@ export function ToolFlow({
                   </span>
                   {toolbarEnd?.(wctx)}
                 </div>
-                <div className="flex flex-col gap-4 p-3 sm:p-6" style={{ minHeight: "calc(var(--ip-thumb-size) + 36px)" }} inert={state === "processing" ? true : undefined}>
+                <div className="flex flex-col gap-4 pt-3 pb-6" style={{ minHeight: "calc(var(--ip-thumb-size) + 76px)" }} inert={state === "processing" ? true : undefined}>
                   {ownerBlocked.map((f) => (
                     <OwnerPermissionNotice
                       key={f.id}
@@ -829,7 +835,19 @@ export function ToolFlow({
                     />
                   </ThumbContext.Provider>
                 </div>
-              </>
+                {state === "processing" && (
+                  // A full wait: the berry loader over the dimmed pages, kept in view while scrolling.
+                  // Decorative; the dock's progress bar and status carry the state for assistive tech.
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[11]" data-testid="processing-loader">
+                    <div className="sticky top-[calc(var(--ip-header-h)+120px)] flex justify-center pt-16">
+                      <div className="mp-loading rounded-panel border-[1.5px] border-sand bg-surface-raised px-8 pt-5 pb-4 shadow-card">
+                        <BerryLoader size="md" />
+                        <span className="tabular-nums">{copy.progress(flow.progressLabel, Math.round(progress * 100))}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </section>
 

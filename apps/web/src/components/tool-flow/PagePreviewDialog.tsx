@@ -84,7 +84,7 @@ export function PagePreviewDialog({
           aria-label={`Page ${index + 1} of ${file.name}`}
         >
           <span
-            className="relative block bg-paper shadow-paper transition-transform duration-(--ip-duration-base)"
+            className="relative block bg-paper shadow-paper transition-transform duration-(--dur-move)"
             style={{
               width: (file.pages[index].width * size) / Math.max(file.pages[index].width, file.pages[index].height),
               maxWidth: "100%",

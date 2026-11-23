@@ -23,7 +23,7 @@ test("AC-23: every kind of page shows the same header: logo link to / and the Al
   for (const path of pages) {
     await page.goto(path);
     const header = page.locator("header").first();
-    await expect(header.getByRole("link", { name: "InstaPDF home" }), path).toHaveAttribute("href", "/");
+    await expect(header.getByRole("link", { name: "BerryPDF home" }), path).toHaveAttribute("href", "/");
     await expect(header.getByRole("button", { name: "All tools" }), path).toBeVisible();
   }
 });
@@ -232,7 +232,7 @@ test.describe("mobile (375x812)", () => {
 
   test("AC-36: logo and menu button, no shortcuts, no horizontal scroll", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("link", { name: "InstaPDF home" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "BerryPDF home" })).toBeVisible();
     await expect(menuButton(page)).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Quick links" })).toBeHidden();
     expect(await noHorizontalScroll(page)).toBe(true);

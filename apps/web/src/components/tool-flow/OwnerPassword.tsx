@@ -61,8 +61,8 @@ export function OwnerPasswordDialog({
         </>
       }
     >
-      <IconButton label="Close" className="absolute top-2 right-2" tooltip={false} icon={<CloseIcon />} onClick={onClose} />
-      <ul className="list-disc ps-5 text-sm">
+      <IconButton label="Close" size="sm" className="absolute top-3 right-3" tooltip={false} icon={<CloseIcon size={18} />} onClick={onClose} />
+      <ul className="mp-seedlist mx-auto text-start text-[15px]">
         {denied.map((p) => (
           <li key={p}>{permissionLabels[p]}</li>
         ))}
@@ -75,7 +75,7 @@ export function OwnerPasswordDialog({
           onSubmit(value);
         }}
       >
-        <label htmlFor={inputId} className="text-sm font-medium">
+        <label htmlFor={inputId} className="sr-only">
           Owner password
         </label>
         <div className="relative">
@@ -85,18 +85,19 @@ export function OwnerPasswordDialog({
             type={visible ? "text" : "password"}
             value={value}
             onChange={(e) => setValue(e.target.value)}
+            placeholder="Owner password"
             autoComplete="off"
             spellCheck={false}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? errorId : undefined}
-            className="h-11 w-full rounded-md border border-border-strong bg-surface-raised ps-3 pe-12 text-base"
+            className="ip-field h-12 w-full ps-[14px] pe-12"
           />
-          <IconButton label="Show password" pressed={visible} size="sm" tooltip={false} className="absolute top-1.5 right-1.5" icon={<EyeIcon size={18} />} onClick={() => setVisible((v) => !v)} />
+          <IconButton label="Show password" pressed={visible} size="sm" tooltip={false} className="absolute top-[7px] right-[7px]" icon={<EyeIcon size={18} />} onClick={() => setVisible((v) => !v)} />
         </div>
-        <p id={errorId} role="alert" className="flex h-5 items-center gap-1.5 text-sm">
+        <p id={errorId} role="alert" className="flex min-h-5 items-center gap-1.5 text-sm font-semibold text-danger">
           {error && (
             <>
-              <AlertIcon size={16} className="text-danger" />
+              <AlertIcon size={16} />
               {error}
             </>
           )}
