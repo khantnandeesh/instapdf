@@ -30,7 +30,7 @@ import { ResultCard } from "./ResultCard";
 import { createVisibilityWatcher, ThumbContext } from "./Thumbnail";
 import { ToolIntro } from "./ToolIntro";
 import type { FlowContext, FlowState, LoadedFile, PageDecoration, ProcessFn, ReadyFile, ToolOutput } from "./types";
-import { useLeaveGuard } from "./useLeaveGuard";
+import { LeaveGuard } from "./LeaveGuard";
 
 type Phase = "idle" | "processing" | "done" | "error";
 
@@ -490,7 +490,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
     };
   }, [acceptsDrop, intake]);
 
-  useLeaveGuard(files.length > 0 && state !== "done" && state !== "empty");
+  const guardLeave = files.length > 0 && state !== "done" && state !== "empty";
 
   // ---- thumbnail size (kept for the session; read after mount, no SSR mismatch) ---
   useEffect(() => {
@@ -682,6 +682,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
           setOwnerError(undefined);
         }}
       />
+      <LeaveGuard active={guardLeave} />
       <ReplaceFileDialog
         open={!!pendingReplace}
         fileName={files[0]?.name ?? ""}
