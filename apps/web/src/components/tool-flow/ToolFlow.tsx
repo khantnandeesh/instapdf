@@ -462,9 +462,11 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
       reset();
       if (acceptsDrop) void intake(Array.from(e.dataTransfer.files), null);
     };
+    // On window so a paste aimed at the document or window itself is handled too (F1 eval G-1).
+    // The target is then not an element, so the editable-field guard only applies to elements.
     const onPaste = (e: ClipboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']") || t.isContentEditable)) return;
+      const t = e.target instanceof Element ? e.target : null;
+      if (t && (t.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']") || (t as HTMLElement).isContentEditable)) return;
       const pasted = Array.from(e.clipboardData?.files ?? []);
       if (!pasted.length || !acceptsDrop) return; // plain text: do nothing, say nothing
       e.preventDefault();
@@ -476,7 +478,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
     window.addEventListener("drop", onDrop);
     window.addEventListener("dragend", reset);
     window.addEventListener("blur", reset);
-    document.addEventListener("paste", onPaste);
+    window.addEventListener("paste", onPaste);
     return () => {
       window.removeEventListener("dragenter", onEnter);
       window.removeEventListener("dragover", onOver);
@@ -484,7 +486,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
       window.removeEventListener("drop", onDrop);
       window.removeEventListener("dragend", reset);
       window.removeEventListener("blur", reset);
-      document.removeEventListener("paste", onPaste);
+      window.removeEventListener("paste", onPaste);
     };
   }, [acceptsDrop, intake]);
 

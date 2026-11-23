@@ -23,6 +23,38 @@ describe("runJob rotate", () => {
     expect(progress.at(-1)).toBe(1);
   });
 
+  it("F1 G-2: progress advances per stage and page before a single file is done", async () => {
+    const progress: number[] = [];
+    await runJob(
+      { kind: "rotate", zipName: "instapdf-rotate.zip", files: [{ name: "sixty-pages.pdf", source: await blob("sixty-pages.pdf"), deltas: Array(60).fill(90) }] },
+      (v) => progress.push(v),
+    );
+    const between = progress.filter((v) => v > 0 && v < 1);
+    expect(between.length).toBeGreaterThanOrEqual(60); // at least one step per page
+    expect(progress).toEqual([...progress].sort((a, b) => a - b)); // never goes back
+    expect(Math.max(...between)).toBeLessThan(1);
+    expect(progress.at(-1)).toBe(1);
+  });
+
+  it("F1 G-2: progress moves inside each file of a batch", async () => {
+    const progress: number[] = [];
+    await runJob(
+      {
+        kind: "rotate",
+        zipName: "instapdf-rotate.zip",
+        files: [
+          { name: "a.pdf", source: await blob("three-pages.pdf"), deltas: [90, 90, 90] },
+          { name: "b.pdf", source: await blob("sixty-pages.pdf"), deltas: Array(60).fill(90) },
+        ],
+      },
+      (v) => progress.push(v),
+    );
+    const firstFileShare = 3 / 63;
+    expect(progress.some((v) => v > 0 && v < firstFileShare)).toBe(true);
+    expect(progress.some((v) => v > firstFileShare && v < 1)).toBe(true);
+    expect(progress).toEqual([...progress].sort((a, b) => a - b));
+  });
+
   it("AC-42: returns a ZIP with one PDF per input for two files", async () => {
     const out = await runJob(
       {
