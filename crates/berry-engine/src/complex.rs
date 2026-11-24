@@ -464,57 +464,42 @@ impl Engine {
         }
         let plan = Plan { removed, want, anchor, after: false, segs: Vec::new(), insert_at: start - u_of(anchor), drop_ops };
 
-        // 6. Apply in a transaction, check, then keep or roll back. When only the reading order
-        // is wrong (digits or Latin inside a right-to-left line, which readers rebuild from glyph
-        // positions with their own bidi rules), try once more with the whole new segment in one
-        // ActualText span, which states its logical text outright.
-        let mut whole_span = false;
-        let (after, touched, new_lines, paragraphs) = loop {
-            let snapshot = (self.doc.max_id, self.dirty.clone(), self.embeds.clone());
-            let mut backup: Vec<(ObjectId, Option<Object>)> = Vec::new();
-            let outcome = self.emit(page_id, &ctx, &pieces, &mut backup).and_then(|(mut items, expect)| {
-                if whole_span {
-                    items.insert(0, Item::BeginSpan(segment.clone()));
-                    items.push(Item::EndSpan);
-                }
-                self.apply_items(page_id, &pc, &plan, &items, new_width, &mut backup)?;
-                let after = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
-                let (touched, map) = check(&pc, &after, &plan, &expect, start, ang, &state)?;
-                if self.overflows(page, &pc, &line.glyphs, &after, &touched) {
-                    return Err(verify("overflow", "the line would run past the page edge".into()));
-                }
-                if Self::collides(&pc, &line.glyphs, &after, &touched) {
-                    return Err(verify("overlap", "the line would run into other text on its baseline".into()));
-                }
-                let (new_lines, paragraphs) = layout::group(&after);
-                // The edited line must read back exactly as asked.
-                let probe = touched.first().copied().or_else(|| line.glyphs.iter().find_map(|&g| map[g]));
-                let reads = probe.and_then(|g| new_lines.iter().find(|l| l.glyphs.contains(&g))).map(|l| l.text.clone());
-                // Nothing left to probe: the whole line was deleted, which is right when nothing visible was asked for.
-                let gone = probe.is_none() && expected.trim().is_empty();
-                if !gone && reads.as_deref().map(script::canonical_marks) != Some(script::canonical_marks(&expected)) {
-                    return Err(verify(
-                        "text-mismatch",
-                        format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
-                    ));
-                }
-                Ok((after, touched, new_lines, paragraphs))
-            });
-            match outcome {
-                Ok(v) => break v,
-                Err(e) => {
-                    self.rollback(backup, snapshot);
-                    if !whole_span && matches!(e, Error::Verify { reason: "text-mismatch", .. }) {
-                        whole_span = true;
-                        for p in &mut pieces {
-                            if let Piece::Word { actual, .. } = p {
-                                *actual = false;
-                            }
-                        }
-                        continue;
-                    }
-                    return Err(e);
-                }
+        // 6. Apply in a transaction, check, then keep or roll back. A line that reads back in
+        // another order than typed (digits or Latin inside a right-to-left line, which readers
+        // rebuild from glyph positions with their own bidi rules) is refused: wrapping it in one
+        // ActualText span would satisfy this check but not readers that go by the glyphs
+        // (pdfium, pdf.js). The editor then offers "Replace with new text".
+        let snapshot = (self.doc.max_id, self.dirty.clone(), self.embeds.clone());
+        let mut backup: Vec<(ObjectId, Option<Object>)> = Vec::new();
+        let outcome = self.emit(page_id, &ctx, &pieces, &mut backup).and_then(|(items, expect)| {
+            self.apply_items(page_id, &pc, &plan, &items, new_width, &mut backup)?;
+            let after = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
+            let (touched, map) = check(&pc, &after, &plan, &expect, start, ang, &state)?;
+            if self.overflows(page, &pc, &line.glyphs, &after, &touched) {
+                return Err(verify("overflow", "the line would run past the page edge".into()));
+            }
+            if Self::collides(&pc, &line.glyphs, &after, &touched) {
+                return Err(verify("overlap", "the line would run into other text on its baseline".into()));
+            }
+            let (new_lines, paragraphs) = layout::group(&after);
+            // The edited line must read back exactly as asked.
+            let probe = touched.first().copied().or_else(|| line.glyphs.iter().find_map(|&g| map[g]));
+            let reads = probe.and_then(|g| new_lines.iter().find(|l| l.glyphs.contains(&g))).map(|l| l.text.clone());
+            // Nothing left to probe: the whole line was deleted, which is right when nothing visible was asked for.
+            let gone = probe.is_none() && expected.trim().is_empty();
+            if !gone && reads.as_deref().map(script::canonical_marks) != Some(script::canonical_marks(&expected)) {
+                return Err(verify(
+                    "text-mismatch",
+                    format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
+                ));
+            }
+            Ok((after, touched, new_lines, paragraphs))
+        });
+        let (after, touched, new_lines, paragraphs) = match outcome {
+            Ok(v) => v,
+            Err(e) => {
+                self.rollback(backup, snapshot);
+                return Err(e);
             }
         };
         self.edited_pages.insert(page);

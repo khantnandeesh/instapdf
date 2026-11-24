@@ -154,8 +154,11 @@ fn running_past_the_page_edge_is_refused() {
     e.replace_line(0, 0, "Ends near the edges").unwrap();
 }
 
-/// Latin, digits and an en dash typed into a right-to-left line: the reader rebuilds their order
-/// with its own bidi rules, so the new text is written in one ActualText span.
+/// Latin, digits and an en dash typed into a right-to-left line: readers rebuild their order from
+/// the glyph positions with their own bidi rules. The edit is kept only when the line reads back
+/// as typed without any ActualText help; otherwise it is refused ("text-mismatch") and the page is
+/// left as it was (the editor offers "Replace with new text"). Extraction by pdfium and pdf.js of
+/// the kept edits is checked in apps/web (mixed-direction.test.ts).
 #[cfg(feature = "shaping")]
 #[test]
 fn mixed_direction_text_in_an_arabic_line() {
@@ -168,9 +171,19 @@ fn mixed_direction_text_in_an_arabic_line() {
             let p = e.page_text(0).unwrap();
             let id = line_id(&p, starts);
             let want = format!("{}{tail}", p.lines[id].text);
-            let r = e.replace_line(0, id, &want).unwrap_or_else(|err| panic!("{file} {tail:?}: {err:?}"));
-            assert!(texts(&r.page).contains(&want), "{file}: {:?}", texts(&r.page));
-            e.save().unwrap();
+            match e.replace_line(0, id, &want) {
+                Ok(r) => {
+                    assert!(texts(&r.page).contains(&want), "{file}: {:?}", texts(&r.page));
+                    // No ActualText span covers the new text: the glyphs alone read as typed.
+                    let out = e.save().unwrap().0;
+                    let n = |b: &[u8]| b.windows(11).filter(|w| w == b"/ActualText").count();
+                    assert_eq!(n(&out[read(file).len()..]), 0, "{file} {tail:?}: the edit leans on ActualText");
+                }
+                Err(err) => {
+                    assert!(matches!(err, Error::Verify { reason: "text-mismatch", .. }), "{file} {tail:?}: {err:?}");
+                    assert_eq!(texts(&e.page_text(0).unwrap()), texts(&p), "{file} {tail:?}: a refused edit changed the page");
+                }
+            }
         }
     }
 }
