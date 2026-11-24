@@ -901,3 +901,56 @@ Numbered after the recording ACs (53–73) and the live-check ACs (74–84). The
 3. **Focus mode and the site header.** The editor covers the site header while a file is open (the berry mark in the top bar links home). The thread fixing the shared tool layout should confirm that this doesn't conflict with its header rules.
 4. **AC-6 vs AC-90.** AC-6 (1.5 s, `para-times.pdf`) and AC-90 (< 1 s, 10 pages) overlap. The suggestion is to keep both: AC-6 as P0 parity, AC-90 as the "beat it" target.
 5. **Signature faces.** Choose the 8 OFL handwriting families (candidates to check per font: Caveat, Dancing Script, Great Vibes, Homemade Apple (Apache-2.0), Kalam, Sacramento, Satisfy (Apache-2.0), Yellowtail (Apache-2.0)). Each one's licence must be confirmed before it's added.
+
+## UI (phase E3 forms slice)
+
+Designed 2026-11-24 in the forms thread. It builds on the E1 contract above: same rail, popover, context strip, snapping, undo and motion rules. Logic lives in `apps/web/src/lib/forms/`; the components go in `apps/web/src/tools/forms/` and plug into the editor shell after #25.
+
+### U-F1. Entry points
+- **Form tool** (Phosphor `textbox`, key **F**): its own rail slot between Sign and Mark (pending the lead's confirmation; otherwise under More). On phones it joins the dock priority list after Sign.
+- **Filling never needs the Form tool.** With any tool, clicking a field of the file types into it (text, dropdown, list), toggles it (checkbox, radio) or opens the Sign dialog (signature field, which places the signature inside the field box). **Tab** and Shift+Tab move between fields in tab order, across pages.
+- When the file has fields, a one-line chip in the top bar reads "12 fields" and opens a "Next empty field" jump. When required fields are empty at Download, the chip turns to "2 required empty". Download still goes ahead; the chip is a nudge, not a block (AC-233).
+
+### U-F2. Form tool options (top-bar slot, or the context strip below 1024)
+`SegmentedControl` of kinds (icons with tooltips): Text `textbox`, Multi-line `text-align-left`, Checkbox `check-square`, Radio `radio-button`, Dropdown `caret-circle-down`, List `list-bullets`, Signature `signature`. Then a divider and two buttons: **Detect** (`sparkle`) and **Tab order** (`list-numbers`).
+- Create gesture: drag a box. A click without a drag gives the kind's default size (`defaultSize` in model.ts) centred on the click. Radio: each click while the new group is selected adds a button to the same group. Shift+click starts a new group.
+- The tool stays armed (forms are repetitive). Escape returns to Select.
+- While the Form tool is active, every field shows its outline and name tag (10 px, muted). Outside it, fields show only the light fill.
+
+### U-F3. Field look on the canvas (editor only, never saved)
+- Fill: `--blueberry` at 8% (a light blue), with a 1 px `--blueberry` 40% outline on hover. Required fields carry a 6 px berry dot at the top-right corner (not colour alone: it has a "Required" tooltip and an `aria-required`).
+- Proposed fields (Detect): a 1.5 px dashed `--brand` outline, a 12% fill, and a small ✓ / ✕ pair at the top-right (24 px hit area, 44 px on coarse pointers).
+- The first time a file with fields opens, an inline toast says "Field shading shows in the editor only". It shows once per device, never in a modal (AC-65).
+
+### U-F4. Field properties popover (selected field, Form tool or Select)
+| Kind | Popover controls (in order) | ⋯ menu |
+|---|---|---|
+| Text | Name (inline field), Required, Size (auto / −field+), Colour, Delete | Tooltip, Default value, Max length, Comb (N boxes, with N = max length), Multi-line, Align, Border, Background, Read-only, Repeat on all pages, Duplicate |
+| Checkbox | Name, Required, Delete | Export value, Checked by default, Border, Background, Read-only, Repeat on all pages, Duplicate |
+| Radio | Group name, This button's value, Add button, Delete | Required, Selected by default, Border, Background, Read-only |
+| Dropdown / List | Name, Options (opens a small list editor: one per line, drag to reorder, default marked with a radio), Delete | Editable (dropdown), Multi-select (list), Size, Colour, Required, Read-only, Tooltip, Duplicate |
+| Signature | Name, Required, Delete | Tooltip, Repeat on all pages, Duplicate |
+- The name field checks as the user types (`checkName`). A duplicate, a dot or an empty name shows a one-line note under the field with the suggested name as a button ("Use full_name_2"). The note uses no colour alone: it has a ⚠ icon and text (AC-235).
+- A multi-line hint: when a single-line text field is drawn taller than 2.5 lines of its font size, a quiet chip offers "Make multi-line".
+
+### U-F5. Detect fields flow (AC-240, AC-244, AC-246)
+1. Detect asks nothing. It runs at once on every page, and the button turns into a jam-progress ring with "Page n of N" and a ✕ that cancels. The editor stays usable: pages scroll and nothing is locked.
+2. Results arrive per page, and outlines fade in (150 ms) as each page finishes.
+3. A **review pill** floats above the view pill. It reads "13 fields on 2 pages", with ‹ › to step through proposals (scrolling to each and focusing its ✓), then **Add all** (berry) and **Discard**. Enter on a focused proposal accepts it and Delete rejects it.
+4. Accepting one, or Add all, is one undo step and turns the proposals into normal fields (now selected and editable). When none are found, the pill says "No new fields found" and fades after 3 s.
+5. On pages that already have fields, only new proposals appear. The pill counts only those (AC-244).
+
+### U-F6. Tab order panel (AC-239)
+- It opens as the side panel's third segment, **Pages | Objects | Tab order**, so it never covers the page. On phones it's a sheet.
+- Buttons: **Rows**, **Columns** and **Original**. Under them is a list of chips grouped by page (name, kind icon and number), draggable, with keyboard support: Space picks a chip up, arrows move it, and Space drops it.
+- **While the panel is open, every field on the canvas shows its number in a badge.** Clicking fields in sequence renumbers them from the one clicked ("click to set order"). This beats a list-only dialog: the order is visible where the fields are.
+
+### U-F7. Phone (390 × 844)
+The Form tool's options become the context strip: kinds as a scrollable-free 4 + ⋯ group, with Detect and Tab order in ⋯. The review pill is full width above the dock. Properties use the existing bottom sheet. No control is wider than the viewport (AC-98).
+
+### U-F8. UI acceptance criteria
+- **AC-248 (P0)** Fields of an opened file can be filled with any tool active: typing into text fields, picking in dropdowns and lists, and toggling checkboxes and radios. Tab and Shift+Tab follow the tab order across pages. The download carries the values (AC-231).
+- **AC-249 (P1)** With the Form tool, a drag creates the chosen kind at the dragged box, and a click creates the default size. The field is selected with its properties popover open, and Delete, nudge keys, duplicate, snapping and undo work as for other objects.
+- **AC-250 (P1)** The Detect review pill shows the count, steps through proposals, and accepts or discards one or all. Accept all is one undo step. Cancel during the run stops it and leaves no proposals.
+- **AC-251 (P1)** With the Tab order panel open, every field shows its number on the canvas, and dragging a chip in the list renumbers the badges at once.
+- **AC-252 (P1)** Field shading, outlines, name tags, badges and proposal outlines never appear in the downloaded file (render diff of an untouched page area against the source).
