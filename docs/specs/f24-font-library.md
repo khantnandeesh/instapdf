@@ -107,3 +107,22 @@ Review follow-ups (not blocking): arrow-key movement in the font list; parse lar
 - **Serving.** The staging deploy builds with `FONTS_ORIGIN` when the bucket has a `manifest.json`; `/fonts/lib/*` is then passed through to the bucket and the image carries no fonts. `FONTS_ORIGIN` is checked (a Cloud Storage bucket address only) and only the library's own paths are passed through. Caching comes from the objects' own metadata, set at upload (a year for content-addressed files, five minutes for `manifest.json`).
 - **Notices.** With the bucket, the notices page lists every library family with its licence and links to its licence text at `/fonts/lib/licences/<id>.txt`.
 - Checked by hand against a six-family library with every weight and script slice (Roboto, Inter, Noto Sans, Noto Sans Devanagari, Noto Sans JP, ABeeZee) served through the passthrough: menu, matching, typing Devanagari with a library font and the download all work, and no request leaves our address.
+
+## Editing a line in the PDF's own font (third PR)
+
+Owner, 2026-11-24: on a click the line's font changed to another one while typing and changed back on Enter ("why show font B at all?"); a letter the font lacks should be told while typing, with fonts to choose from; the flow must be well structured.
+
+**Reference.** Our research (`f16-pdf-editor-research.md`) records that Sejda opens the clicked text in its own stand-in font and replaces a missing font without saying so. We keep what is useful (the edit happens in place) and go further: the box is drawn in the document's own font, so nothing changes on screen; a missing character is told as it is typed; and the font chosen for it applies at once.
+
+**How.** The engine hands over a document font's embedded program and where it keeps each character (`fontProgram`). `lib/font-library/embedded-face.ts` adds what a browser needs and a PDF leaves out (character map, name and metrics tables; an OpenType file around a bare CFF program), and the result is loaded as a font of the page only (`tools/editor/doc-face.ts`): nothing is fetched or sent, and it goes when another file is opened. Where a program can't be used (not embedded, Type 1, Type 3), the closest library font stands in, as before.
+
+- **AC-298 (P0)** A line opens in an edit box that draws every part of it in the font that part has in the PDF (a bold or italic word keeps its own font), in its colour, over the page's own paper colour, on the same baseline and start and at the same length as on the page. No other font is shown in its place at any moment: until the font is ready the page's own drawing shows through the box.
+- **AC-299 (P0)** A click opens the line with the caret where the click landed; the keyboard opens it with the caret at the end. Nothing is selected or animated on opening.
+- **AC-300 (P0)** A typed character the line's font can't draw is underlined where it stands and named under the box as it is typed. Typing is never blocked and focus never leaves the box.
+- **AC-301 (P0)** Next to the name of the missing characters the closest fonts that have them are offered (at most three, the closest first and already in use). Picking one draws the characters with it in the box at once and writes the file with it on Enter; it is remembered for that document font.
+- **AC-302 (P1)** For characters of another alphabet (Greek, Cyrillic, Hebrew, Arabic, Devanagari, Thai) the fonts offered and tried include library families of the same kind that have that alphabet.
+- **AC-303 (P1)** The edit box lays glyphs out as a PDF does (no kerning or ligatures of the browser's own), and its text is fitted to the line's length on the page (justified text).
+
+Checked in `e2e/f24/line-edit-font.spec.ts` (the box's ink is compared with the page's, pixel for pixel in place) and `lib/font-library/embedded-face.test.ts`.
+
+Not in this PR: lines turned on the page and right-to-left lines open in their own font but centred in the box, not on their baseline; a CFF font is covered by a made-up program in the tests because the corpus has no PDF with one.

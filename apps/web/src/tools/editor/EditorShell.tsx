@@ -29,6 +29,7 @@ import { missingInObjects } from "./coverage-browser";
 import { addAsset, IMAGE_ACCEPT, imageError, imageFromFile, isImageFile, plainAssets, releaseAssets } from "./assets";
 import { EnginePill } from "./EngineProgress";
 import { resetDocFonts } from "./font-service";
+import { resetDocFaces } from "./doc-face";
 import { disposeMatcher } from "@/lib/font-library/match-client";
 import { FontNotice } from "./FontMenu";
 import { AnnotsToggle, DOCK_ORDER, MoreTools, PageChip, PageHeader, PrivacyChip, SaveChip, ToolDock, ToolRail, TopBar, TOOLS, ViewPill } from "./Chrome";
@@ -205,6 +206,7 @@ export function EditorShell(props: ShellProps) {
       if (!alive) return;
       const store = createStore({ ...initialState(initialPages(src), wide), readOnly: restricted });
       resetDocFonts();
+      resetDocFaces();
       made = createController(store, rt, { announce: say, toast: showToast });
       setCtl(made);
       say(`${props.name} opened, ${src.length} ${src.length === 1 ? "page" : "pages"}`);

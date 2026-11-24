@@ -1203,6 +1203,94 @@
 .ed-input {
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.12);
 }
+/* The font is still being made: the page's own drawing of the line shows through, so no other
+   font is ever seen in its place. */
+.ed-input--settling {
+  background: transparent;
+  color: transparent;
+  box-shadow: none;
+  caret-color: var(--color-ink-black, #111);
+}
+.ed-input {
+  box-sizing: border-box;
+  width: max-content;
+  overflow: hidden;
+  white-space: pre;
+  border: 0;
+  /* Drawn as a PDF draws text: glyph after glyph, no kerning or ligatures of the browser's own. */
+  font-kerning: none;
+  font-variant-ligatures: none;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+/* A typed character the line's font can't draw. */
+::highlight(ed-miss) {
+  text-decoration: underline wavy var(--color-warning, #b45309);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.12em;
+}
+.ed-input__hint {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  width: max-content;
+  max-width: min(calc(100vw - 32px), 420px);
+  margin: 0;
+  padding: 4px 6px 4px 10px;
+  border-radius: 14px;
+  font: 500 12px/1.4 var(--font-sans, system-ui, sans-serif);
+  color: var(--color-ink);
+  animation: ed-hint-in var(--dur-base, 160ms) ease-out;
+}
+.ed-input__hint--end {
+  left: auto;
+  right: 0;
+}
+.ed-input__chars {
+  font-weight: 700;
+}
+.ed-input__picks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ed-input__pick {
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-ink) 16%, transparent);
+  background: transparent;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--color-ink);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-base, 160ms) ease-out,
+    border-color var(--dur-base, 160ms) ease-out;
+}
+.ed-input__pick:hover {
+  background: color-mix(in srgb, var(--color-brand) 8%, transparent);
+}
+.ed-input__pick--on {
+  border-color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+}
+@keyframes ed-hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ed-input__hint {
+    animation: none;
+  }
+}
 
 /* ---- side panel, thumbnails, lists ------------------------------------------------------ */
 .ed-side {
@@ -1515,7 +1603,6 @@
   .ed-toast,
   .ed-recover,
   .ed-hint,
-  .ed-input,
   .ed-notice {
     animation: ed-rise 180ms var(--ease-enter) both;
   }

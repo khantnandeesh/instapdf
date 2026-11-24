@@ -77,7 +77,7 @@ test("slow 3G: the first page and Add text work before the engine; a line clicke
   }
   await expect(input).toBeFocused();
   const tEngine = Date.now() - t0;
-  await expect(input).toHaveValue(LINE.text);
+  await expect(input).toHaveText(LINE.text);
   await expect(progress).toHaveCount(0);
   expect(seen.length, `percent values seen: ${seen.join(", ")}`).toBeGreaterThanOrEqual(3);
   for (let i = 1; i < seen.length; i++) expect(seen[i]).toBeGreaterThanOrEqual(seen[i - 1]!);

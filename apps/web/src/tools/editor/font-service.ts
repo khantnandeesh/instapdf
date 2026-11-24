@@ -132,11 +132,25 @@ export function chooseStandIn(key: string, id: string | undefined): void {
 }
 export const chosenStandIn = (key: string) => choices.get(key);
 
+/** The library's name for the character set a character belongs to, where a font must have that set to draw it. */
+function setOf(cp: number): string | null {
+  if (cp >= 0x370 && cp <= 0x3ff) return "greek";
+  if (cp >= 0x400 && cp <= 0x4ff) return "cyrillic";
+  if (cp >= 0x590 && cp <= 0x5ff) return "hebrew";
+  if (cp >= 0x600 && cp <= 0x6ff) return "arabic";
+  if (cp >= 0x900 && cp <= 0x97f) return "devanagari";
+  if (cp >= 0xe00 && cp <= 0xe7f) return "thai";
+  return null;
+}
+/** How many library families are added for a character set the closer fonts may not have. */
+const SET_FONTS = 4;
+
 /**
  * Font ids to try for the characters a document font lacks, best first: the person's choice,
- * the closest library font by shape, the families the engine names, then our default.
+ * the closest library font by shape, the families the engine names, our default, then (for
+ * `chars` of another alphabet) library families of the same kind that have that alphabet.
  */
-export async function standInCandidates(info: FontInfo | undefined, request: FontRequest): Promise<string[]> {
+export async function standInCandidates(info: FontInfo | undefined, request: FontRequest, chars = ""): Promise<string[]> {
   const out: string[] = [];
   const add = (id?: string) => id && !out.includes(id) && out.push(id);
   add(choices.get(foldName(request.families[0] ?? "")));
@@ -148,6 +162,12 @@ export async function standInCandidates(info: FontInfo | undefined, request: Fon
   for (const name of request.families) add(lib ? familyByName(lib, name)?.i : TEXT_FONTS.find((f) => foldName(f.label) === foldName(name))?.id);
   add(TEXT_FONTS.find((f) => f.class === (info?.monospace ? "mono" : info?.serif ? "serif" : "sans"))?.id);
   add("arimo");
+  const sets = [...new Set([...chars].map((c) => setOf(c.codePointAt(0)!)).filter((x): x is string => !!x))];
+  if (lib && sets.length) {
+    const kind = info?.monospace ? "monospace" : info?.serif ? "serif" : "sans-serif";
+    const having = lib.families.filter((f) => sets.every((x) => f.s.includes(x)));
+    for (const f of [...having.filter((f) => f.c === kind), ...having.filter((f) => f.c !== kind && f.c !== "display" && f.c !== "handwriting")].slice(0, SET_FONTS)) add(f.i);
+  }
   return out;
 }
 

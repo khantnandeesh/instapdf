@@ -39,7 +39,7 @@ async function editLine(page: Page, containing: string, from: string, to: string
   await line.click();
   const input = page.getByTestId("line-input");
   await expect(input).toBeFocused();
-  await expect(input).toHaveValue(before);
+  await expect(input).toHaveText(before);
   await input.fill(before.replace(from, to));
   await input.press("Enter");
   await expect(page.locator(`[data-testid="line"][data-text*="${before.replace(from, to)}"]`)).toHaveCount(1);
@@ -137,7 +137,7 @@ test("keyboard: one tab stop per page, arrows pick a line, Enter edits, Esc retu
   await page.keyboard.press("Enter");
   const input = page.getByTestId("line-input");
   await expect(input).toBeFocused();
-  const before = await input.inputValue();
+  const before = (await input.textContent()) ?? "";
   await input.fill(`${before} `);
   await page.keyboard.press("Enter");
   await expect(input).toHaveCount(0);
