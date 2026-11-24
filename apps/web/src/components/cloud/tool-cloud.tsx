@@ -16,6 +16,7 @@
 import "./cloud.css";
 import { useEffect, useState } from "react";
 import { buildNames, buildProviders, providerName, type CloudProvider } from "@/lib/cloud/names";
+import { popupFeatures } from "@/lib/cloud/popup";
 import type { FlowTool } from "@/tools/registry";
 import type { FlowNoticeInput } from "../tool-flow/types";
 import { cx } from "../ui/cx";
@@ -78,6 +79,11 @@ export type CloudHub = {
 /** A blank window opened in the click before the cloud chunk was here: the intake sends it on. Null: blocked. */
 export type PreOpened = { win: Window | null };
 
+/** The tap the cloud chunk is on its way for: the latest choice, and the one window opened for it. */
+let early: { p: CloudProvider; trigger: HTMLElement; pre?: PreOpened } | undefined;
+/** A blank window at the cloud window's usual size, in the click. Offline: none (the intake says why). */
+const blank = (): PreOpened | undefined => (navigator.onLine === false ? undefined : { win: window.open("", "", popupFeatures(window)) });
+
 const providers = buildProviders();
 
 /** The tool page's hub (one ToolFlow per page), for the parts that live outside it (Save to cloud, Merge's menus). */
@@ -138,18 +144,30 @@ export function pickedFromDevice() {
 
 /**
  * Opens a provider's window for the page: call it synchronously in the click (the browser allows a
- * window only then). Without the cloud chunk yet, a blank window opens here and the chunk sends it
- * on to the provider's page. Offline: no window (the intake says why).
+ * window only then). Without the cloud chunk yet, a blank window opens here and the chunk sends it on
+ * to the provider's page. Taps before the chunk is here share that one window and the last one wins:
+ * one cloud window at a time, and no window is left behind waiting for a pick that was replaced.
  */
 function pick(hub: CloudHub, p: CloudProvider, trigger: HTMLElement) {
   if (hub.ui) return hub.ui.openCloud(p, trigger);
-  // The window's usual size (lib/cloud/opener.ts popupFeatures, which comes with the chunk): a tab on phones.
-  const pre = navigator.onLine === false ? undefined : { win: window.open("", "", innerWidth < 640 ? "" : "popup,width=480,height=640") };
+  if (early) {
+    Object.assign(early, { p, trigger });
+    // Its window again, or a new one if it was closed (or blocked) meanwhile.
+    const win = early.pre?.win;
+    if (win && !win.closed) win.focus();
+    else early.pre = blank();
+    return;
+  }
+  const tap = (early = { p, trigger, pre: blank() });
   hub.load().then(
-    (m) => m.openCloud(p, trigger, {}, pre),
+    (m) => {
+      early = undefined;
+      m.openCloud(tap.p, tap.trigger, {}, tap.pre);
+    },
     () => {
-      pre?.win?.close();
-      offline(hub, providerName[p]);
+      early = undefined;
+      tap.pre?.win?.close();
+      offline(hub, providerName[tap.p]);
     },
   );
 }

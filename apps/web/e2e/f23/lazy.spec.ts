@@ -54,6 +54,30 @@ test("a tap on the row before the cloud chunk is here still opens the window ins
   await closed(win);
 });
 
+test("M-1: two taps on different clouds before the chunk is here leave one window, the second one's", { tag: "@serial" }, async ({ page, context }) => {
+  await page.waitForLoadState("networkidle");
+  await slowScripts(page, 3000);
+  const windows = () => context.pages().filter((p) => p !== page && !p.isClosed());
+  await Promise.all([context.waitForEvent("page"), rowButton(page, "Dropbox").click()]);
+  // Back to the tool tab, then the other cloud, while the chunk is still on its way.
+  await page.bringToFront();
+  await rowButton(page, "Google Drive").click();
+  await expect(page.getByTestId("notice").filter({ hasText: "Waiting for Google Drive" })).toBeVisible({ timeout: 15_000 });
+  expect(windows()).toHaveLength(1);
+  const [win] = windows();
+  await expect(win.getByTestId("cloud-window")).toBeVisible();
+  await expect(win.getByRole("heading", { level: 1 })).toHaveText("Google Drive");
+  await expect(page.getByTestId("notice").filter({ hasText: "Waiting for Dropbox" })).toHaveCount(0);
+  // Past the time a window takes to see it lost its tool: still that one window, and it still works.
+  await page.waitForTimeout(4000);
+  expect(windows()).toHaveLength(1);
+  expect(windows()[0]).toBe(win);
+  await expect(win.getByText(/lost/i)).toHaveCount(0);
+  await mockPick(win, ["alpha.pdf"]);
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await closed(win);
+});
+
 test("a press on the caret before the cloud chunk is here opens the menu once it arrives; keyboard focus carries over", async ({ page }) => {
   await page.waitForLoadState("networkidle");
   await slowScripts(page, 1500);

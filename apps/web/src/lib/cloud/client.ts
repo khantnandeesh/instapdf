@@ -194,6 +194,8 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
       if (ready) post({ t: "save", file });
     },
     cancel: () => {
+      // Closed from here too: a window that has not opened its channel yet would miss "cancel" and be left behind.
+      if (!ended) opened.win.close();
       post({ t: "cancel" });
       end();
     },

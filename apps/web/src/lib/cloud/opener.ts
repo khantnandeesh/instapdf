@@ -4,7 +4,10 @@
  * that arrive before the rest of the tool-side code has loaded are kept and replayed
  * (client.ts), so the window's first "ready" is never missed.
  */
+import { popupFeatures } from "./popup";
 import type { CloudProvider, CloudRoute } from "./providers";
+
+export { popupFeatures };
 
 export const channelName = (req: string) => `cloud:${req}`;
 
@@ -35,19 +38,8 @@ export function newRequestId(): string {
   return crypto.randomUUID();
 }
 
-/** Popup features: a small window on desktop, a plain new tab on phones (no features). */
-export function popupFeatures(win: { innerWidth: number; screenX?: number; screenY?: number; outerWidth?: number; outerHeight?: number; matchMedia?: (q: string) => { matches: boolean } }): string {
-  const phone = win.innerWidth < 640 || !!win.matchMedia?.("(pointer: coarse)").matches;
-  if (phone) return "";
-  const w = 480;
-  const h = 640;
-  const left = Math.round((win.screenX ?? 0) + Math.max(0, ((win.outerWidth ?? w) - w) / 2));
-  const top = Math.round((win.screenY ?? 0) + Math.max(0, ((win.outerHeight ?? h) - h) / 2));
-  return `popup,width=${w},height=${h},left=${left},top=${top}`;
-}
-
-/** An opened window's channel plus what it said before anyone handled it. */
-export type OpenedWindow = { channel: BroadcastChannel; buffered: MessageEvent[] };
+/** An opened window's channel plus what it said before anyone handled it, and the window itself (to close it). */
+export type OpenedWindow = { channel: BroadcastChannel; buffered: MessageEvent[]; win: Window };
 
 export type OpenDeps = {
   open?: (url: string, target: string, features: string) => Window | null;
@@ -67,5 +59,5 @@ export function openWindowNow(route: CloudRoute, params: WindowParams, deps: Ope
     channel.close();
     return null;
   }
-  return { channel, buffered };
+  return { channel, buffered, win };
 }

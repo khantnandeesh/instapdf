@@ -48,7 +48,7 @@ describe("openCloudWindow (tool tab)", () => {
     let opened = "";
     const files: string[] = [];
     const events = { onFiles: (f: { file: File }[]) => files.push(...f.map((x) => x.file.name)), onDone: vi.fn(), onReady: vi.fn() };
-    const s = openCloudWindow("mock", params, events, { Channel, open: (u) => ((opened = u), {} as Window), hidden: () => false })!;
+    const s = openCloudWindow("mock", params, events, { Channel, open: (u) => ((opened = u), { close() {} } as Window), hidden: () => false })!;
     expect(opened).toContain(`/cloud/mock?req=${REQ}`);
     const win = peer();
     const fromTool: unknown[] = [];
@@ -69,7 +69,7 @@ describe("openCloudWindow (tool tab)", () => {
 
   it("adopts a window opened in the click handler and replays what it said before the session started", async () => {
     let url = "";
-    const opened = openWindowNow("mock", params, { Channel, open: (u) => ((url = u), {} as Window) })!;
+    const opened = openWindowNow("mock", params, { Channel, open: (u) => ((url = u), { close() {} } as Window) })!;
     expect(url).toContain(`/cloud/mock?req=${REQ}`);
     const win = peer();
     const fromTool: unknown[] = [];
@@ -98,7 +98,7 @@ describe("openCloudWindow (tool tab)", () => {
   it("treats heartbeat silence as a closed window, but not while this tab is hidden", async () => {
     let hidden = true;
     const onClosed = vi.fn();
-    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => hidden });
+    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({ close() {} }) as Window, hidden: () => hidden });
     const win = peer();
     win.postMessage(wrap("window", REQ, { t: "ready" }));
     await vi.waitFor(() => expect(true).toBe(true));
@@ -113,7 +113,7 @@ describe("openCloudWindow (tool tab)", () => {
 
   it("gives a loading window longer before the first message", () => {
     const onClosed = vi.fn();
-    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false });
+    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({ close() {} }) as Window, hidden: () => false });
     vi.advanceTimersByTime(WINDOW_LOST_MS + 1000);
     expect(onClosed).not.toHaveBeenCalled();
     vi.advanceTimersByTime(FIRST_CONTACT_MS);
@@ -122,7 +122,7 @@ describe("openCloudWindow (tool tab)", () => {
 
   it("an 'away' notice (sign-in page) holds off the watchdog for that long, then falls back to the first-contact wait", async () => {
     const onClosed = vi.fn();
-    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false });
+    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({ close() {} }) as Window, hidden: () => false });
     const win = peer();
     win.postMessage(wrap("window", REQ, { t: "ready" }));
     win.postMessage(wrap("window", REQ, { t: "away", ms: 60_000 }));
@@ -139,7 +139,7 @@ describe("openCloudWindow (tool tab)", () => {
   it("a sign-in page gets at most SIGN_IN_AWAY_MS (10 minutes), whatever the window asks for", async () => {
     expect(SIGN_IN_AWAY_MS).toBe(10 * 60_000);
     const onClosed = vi.fn();
-    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => false });
+    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({ close() {} }) as Window, hidden: () => false, focused: () => false });
     const win = peer();
     win.postMessage(wrap("window", REQ, { t: "ready" }));
     win.postMessage(wrap("window", REQ, { t: "away", ms: 60 * 60_000 })); // refused (over MAX_AWAY_MS): no hold-off at all
@@ -156,7 +156,7 @@ describe("openCloudWindow (tool tab)", () => {
     let focused = true;
     const onClosed = vi.fn();
     const onGaveUp = vi.fn();
-    openCloudWindow("mock", params, { onClosed, onGaveUp }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => focused });
+    openCloudWindow("mock", params, { onClosed, onGaveUp }, { Channel, open: () => ({ close() {} }) as Window, hidden: () => false, focused: () => focused });
     const win = peer();
     win.postMessage(wrap("window", REQ, { t: "ready" }));
     win.postMessage(wrap("window", REQ, { t: "away", ms: SIGN_IN_AWAY_MS }));
@@ -181,7 +181,7 @@ describe("openCloudWindow (tool tab)", () => {
 
   it("never gives up while this tab is in the background (the person is still signing in there)", async () => {
     const onGaveUp = vi.fn();
-    openCloudWindow("mock", params, { onGaveUp }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => false });
+    openCloudWindow("mock", params, { onGaveUp }, { Channel, open: () => ({ close() {} }) as Window, hidden: () => false, focused: () => false });
     const win = peer();
     win.postMessage(wrap("window", REQ, { t: "ready" }));
     win.postMessage(wrap("window", REQ, { t: "away", ms: SIGN_IN_AWAY_MS }));
@@ -196,7 +196,7 @@ describe("openCloudWindow (tool tab)", () => {
     const onResumed = vi.fn();
     const onClosed = vi.fn();
     const onProgress = vi.fn();
-    openCloudWindow("mock", params, { onGaveUp, onResumed, onClosed, onProgress }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => true });
+    openCloudWindow("mock", params, { onGaveUp, onResumed, onClosed, onProgress }, { Channel, open: () => ({ close() {} }) as Window, hidden: () => false, focused: () => true });
     const win = peer();
     win.postMessage(wrap("window", REQ, { t: "ready" }));
     win.postMessage(wrap("window", REQ, { t: "away", ms: SIGN_IN_AWAY_MS }));
@@ -224,7 +224,7 @@ describe("openCloudWindow (tool tab)", () => {
   it("a window back from its sign-in ('ready') is no longer away: focus here does not end it", async () => {
     const onClosed = vi.fn();
     const onGaveUp = vi.fn();
-    openCloudWindow("mock", params, { onClosed, onGaveUp }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => true });
+    openCloudWindow("mock", params, { onClosed, onGaveUp }, { Channel, open: () => ({ close() {} }) as Window, hidden: () => false, focused: () => true });
     const win = peer();
     win.postMessage(wrap("window", REQ, { t: "ready" }));
     win.postMessage(wrap("window", REQ, { t: "away", ms: 60_000 }));
@@ -242,9 +242,22 @@ describe("openCloudWindow (tool tab)", () => {
     win.close();
   });
 
+  it("cancel closes the window itself too (one that has not opened its channel yet would miss the message), but not after the session ended", async () => {
+    const close = vi.fn();
+    const s = openCloudWindow("mock", params, {}, { Channel, open: () => ({ close }) as unknown as Window, hidden: () => false })!;
+    s.cancel();
+    expect(close).toHaveBeenCalledTimes(1);
+    s.cancel();
+    expect(close).toHaveBeenCalledTimes(1);
+    const done = openCloudWindow("mock", params, {}, { Channel, open: () => ({ close }) as unknown as Window, hidden: () => false })!;
+    done.dispose();
+    done.cancel();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
   it("a cancel from the window ends the session quietly", async () => {
     const onClosed = vi.fn();
-    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false });
+    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({ close() {} }) as Window, hidden: () => false });
     const win = peer();
     win.postMessage(wrap("window", REQ, { t: "cancel" }));
     await vi.waitFor(() => expect(onClosed).toHaveBeenCalledWith("cancel"));
@@ -252,7 +265,7 @@ describe("openCloudWindow (tool tab)", () => {
   });
 
   it("sends the file to save only after the window is ready", async () => {
-    const s = openCloudWindow("mock", { ...params, mode: "save" }, {}, { Channel, open: () => ({}) as Window, hidden: () => false })!;
+    const s = openCloudWindow("mock", { ...params, mode: "save" }, {}, { Channel, open: () => ({ close() {} }) as Window, hidden: () => false })!;
     const win = peer();
     const got: { t: string; file?: File }[] = [];
     win.onmessage = (e) => got.push(e.data);
@@ -267,7 +280,7 @@ describe("openCloudWindow (tool tab)", () => {
   });
 
   it("re-sends the file on every 'ready' until the session ends (a window back from a sign-in redirect is a new page)", async () => {
-    const s = openCloudWindow("mock", { ...params, mode: "save" }, {}, { Channel, open: () => ({}) as Window, hidden: () => false })!;
+    const s = openCloudWindow("mock", { ...params, mode: "save" }, {}, { Channel, open: () => ({ close() {} }) as Window, hidden: () => false })!;
     const win = peer();
     const saves: string[] = [];
     win.onmessage = (e) => e.data.t === "save" && saves.push(e.data.file.name);
@@ -389,8 +402,9 @@ describe("WindowLink (cloud window)", () => {
 
 describe("popupFeatures", () => {
   it("a 480x640 popup on desktop, a plain tab on phones", () => {
-    expect(popupFeatures({ innerWidth: 1366, screenX: 0, screenY: 0, outerWidth: 1366, outerHeight: 768 })).toBe("popup,width=480,height=640,left=443,top=64");
-    expect(popupFeatures({ innerWidth: 390 })).toBe("");
+    const fine = () => ({ matches: false });
+    expect(popupFeatures({ innerWidth: 1366, screenX: 0, screenY: 0, outerWidth: 1366, outerHeight: 768, matchMedia: fine })).toBe("popup,width=480,height=640,left=443,top=64");
+    expect(popupFeatures({ innerWidth: 390, matchMedia: fine })).toBe("");
     expect(popupFeatures({ innerWidth: 1024, matchMedia: () => ({ matches: true }) })).toBe("");
   });
 });
