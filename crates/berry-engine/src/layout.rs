@@ -230,10 +230,6 @@ fn clusters(pc: &PageContent) -> Vec<Cluster> {
     for cs in by_key.values_mut() {
         cs.sort_by(|a, b| out[*a].u0.total_cmp(&out[*b].u0));
     }
-    // The largest cluster size per baseline key: a constant bound keeps the search window's
-    // predicates monotone along the sorted clusters.
-    let max_size: HashMap<(bool, i64), f64> =
-        by_key.iter().map(|(k, cs)| (*k, cs.iter().map(|&ci| out[ci].size).fold(0.0, f64::max))).collect();
     let mut leftovers: Vec<usize> = Vec::new();
     for gi in marks {
         let g = &pc.glyphs[gi];
@@ -254,11 +250,13 @@ fn clusters(pc: &PageContent) -> Vec<Cluster> {
         let mut best: Option<(f64, usize)> = None;
         if let Some(cs) = by_key.get(&key) {
             // Only clusters that can reach the mark horizontally.
-            let reach = g.size.max(max_size[&key]);
-            let lo = cs.partition_point(|&ci| out[ci].u0 < m0 - 4.0 * reach);
+            // A window bounded by the mark's own size: monotone along the sorted clusters, and
+            // one huge glyph elsewhere on the page does not widen it.
+            let reach = 4.0 * g.size;
+            let lo = cs.partition_point(|&ci| out[ci].u0 < m0 - reach);
             for &ci in &cs[lo..] {
                 let c = &out[ci];
-                if c.u0 > m1 + 0.3 * reach {
+                if c.u0 > m1 + reach {
                     break;
                 }
                 if c.u0 > m1 + 0.3 * c.size {
@@ -544,7 +542,17 @@ fn build_line(pc: &PageContent, id: usize, clusters: Vec<&Cluster>) -> Line {
     // Visual units, with virtual spaces for positioning gaps.
     let mut units: Vec<Unit> = Vec::new();
     let mut prev_end: Option<f64> = None;
+    // Glyphs under an empty ActualText read as nothing: they ride with a neighbouring character.
+    let mut silent: Vec<usize> = Vec::new();
     for c in &clusters {
+        if c.actual && c.text.is_empty() {
+            match units.iter_mut().rev().find(|u| u.start.is_some()) {
+                Some(u) => u.glyphs.extend(&c.glyphs),
+                None => silent.extend(&c.glyphs),
+            }
+            prev_end = Some(prev_end.map_or(c.u1, |p: f64| p.max(c.u1)));
+            continue;
+        }
         if let Some(pe) = prev_end {
             let prev_space = units.last().map(|u| u.text.ends_with(char::is_whitespace)).unwrap_or(true);
             if c.u0 - pe > SPACE_GAP * c.size && !prev_space && !c.text.starts_with(char::is_whitespace) {
@@ -552,8 +560,15 @@ fn build_line(pc: &PageContent, id: usize, clusters: Vec<&Cluster>) -> Line {
             }
         }
         let text = if c.text.is_empty() { "\u{fffd}".to_string() } else { c.text.clone() };
-        units.push(Unit { text, actual: c.actual, glyphs: c.glyphs.clone(), start: Some(c.start(pc)), u0: c.u0, u1: c.u1 });
+        let mut glyphs = std::mem::take(&mut silent);
+        glyphs.extend(&c.glyphs);
+        units.push(Unit { text, actual: c.actual, glyphs, start: Some(c.start(pc)), u0: c.u0, u1: c.u1 });
         prev_end = Some(prev_end.map_or(c.u1, |p: f64| p.max(c.u1)));
+    }
+    if units.is_empty() {
+        // Only empty ActualText on the line: keep it selectable as one unknown character.
+        let c = clusters[0];
+        units.push(Unit { text: "\u{fffd}".into(), actual: true, glyphs: silent, start: Some(c.start(pc)), u0: c.u0, u1: c.u1 });
     }
     let size = clusters[0].size;
     if units.iter().any(|u| u.text.chars().any(script::is_indic)) {

@@ -737,6 +737,32 @@ impl Engine {
         let outcome = self.apply(page_id, &pc, &plan, &state, &mut backup).and_then(|()| {
             let after = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
             let touched = check_edit(&pc, &after, &plan, ang)?;
+            // Where marked content changed, the glyphs alone do not prove how the line reads.
+            if !plan.drop_ops.is_empty() || line.glyphs.iter().any(|&g| pc.glyphs[g].span.is_some()) {
+                let text_of = |r: std::ops::Range<usize>| line.chars[r].iter().map(|c| c.text.as_str()).collect::<String>();
+                let expected = format!("{}{}{}", text_of(0..a), inserted, text_of(b..n));
+                let (new_lines, _) = layout::group(&after);
+                // The line holding a new or moved glyph; failing that (a deletion at the end), the
+                // line that overlaps the old one most.
+                let overlap = |r: &Rect| {
+                    let o = &line.bbox;
+                    (r.x1.min(o.x1) - r.x0.max(o.x0)).max(0.0) * (r.y1.min(o.y1) - r.y0.max(o.y0)).max(0.0)
+                };
+                let edited = match touched.first() {
+                    Some(&g) => new_lines.iter().find(|l| l.glyphs.contains(&g)),
+                    None => new_lines
+                        .iter()
+                        .filter(|l| overlap(&l.bbox) > 0.0)
+                        .max_by(|x, y| overlap(&x.bbox).total_cmp(&overlap(&y.bbox))),
+                };
+                let reads = edited.map(|l| l.text.clone());
+                let gone = edited.is_none() && expected.trim().is_empty();
+                if !gone && reads.as_deref() != Some(expected.as_str()) {
+                    return Err(Error::Verify {
+                        message: format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
+                    });
+                }
+            }
             Ok((after, touched))
         });
         let (after, touched) = match outcome {

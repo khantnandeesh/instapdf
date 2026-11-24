@@ -99,17 +99,15 @@ pub fn mark_split_texts(text: &str, glyphs: &[Shaped], gid_of: impl Fn(char) -> 
     let mut out = cluster_texts(text, glyphs);
     for i in 0..glyphs.len() {
         let mut rest: Vec<char> = out[i].chars().collect();
-        if rest.len() < 2 {
+        if rest.len() != 2 {
             continue;
         }
-        for j in 0..glyphs.len() {
-            if j == i || glyphs[j].cluster != glyphs[i].cluster || !out[j].is_empty() || rest.len() < 2 {
-                continue;
-            }
-            let own = rest.iter().position(|&c| crate::script::is_any_mark(c) && gid_of(c) == Some(glyphs[j].gid));
-            if let Some(k) = own {
-                out[j] = rest.remove(k).to_string();
-            }
+        // Only a single mark glyph: with several, readers disagree on their order.
+        let others: Vec<usize> = (0..glyphs.len()).filter(|&j| j != i && glyphs[j].cluster == glyphs[i].cluster).collect();
+        let [j] = others[..] else { continue };
+        let own = rest.iter().position(|&c| crate::script::is_any_mark(c) && gid_of(c) == Some(glyphs[j].gid));
+        if let Some(k) = own {
+            out[j] = rest.remove(k).to_string();
         }
         out[i] = rest.into_iter().collect();
     }

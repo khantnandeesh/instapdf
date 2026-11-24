@@ -164,6 +164,75 @@ fn a_hostile_cmap_does_not_slow_bracket_mirroring() {
     assert_eq!(p.lines[0].direction, "rtl");
 }
 
+#[test]
+fn property_keywords_survive_a_rewrite() {
+    let pdf = build(
+        "BT /F1 12 Tf 72 700 Td (o) Tj /Span <</MCID 4 /Foo true /Arr [1 null 2] /ActualText (ffi)>> BDC (X) Tj EMC (ce) Tj ET",
+        |_, _| {},
+    );
+    // The writer cannot reproduce true/null, so the span stays and the edit is refused.
+    let r = edit(pdf, "ffi", None, "rif");
+    assert!(matches!(r, Err(Error::Unsupported { ref reason }) if reason == "actual-text-span"), "{r:?}");
+}
+
+#[test]
+fn empty_actualtext_reads_as_nothing() {
+    let pdf = build("BT /F1 12 Tf 72 700 Td (exam) Tj /Span <</ActualText <FEFF>>> BDC (-) Tj EMC ( more) Tj ET", |_, _| {});
+    let mut e = Engine::open(pdf.clone(), None).unwrap();
+    assert_eq!(texts(&mut e), ["exam more"]);
+    let (after, reopened, _) = edit(pdf, "more", None, "less").unwrap();
+    assert_eq!(after, ["exam less"]);
+    assert_eq!(reopened, ["exam less"]);
+}
+
+#[test]
+fn a_span_inside_a_form_inside_a_span_is_caught_by_the_read_back() {
+    let mut doc = Document::with_version("1.5");
+    let pages_id = doc.new_object_id();
+    let helv = doc.add_object(
+        dictionary! { "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica", "Encoding" => "WinAnsiEncoding" },
+    );
+    let form = doc.add_object(Stream::new(
+        dictionary! { "Type" => "XObject", "Subtype" => "Form", "BBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+        "Resources" => dictionary! { "Font" => dictionary! { "FH" => helv } } },
+        b"BT /FH 12 Tf 72 700 Td /Span <</ActualText (zz)>> BDC (X) Tj EMC ET".to_vec(),
+    ));
+    let c = doc.add_object(Stream::new(dictionary! {}, b"/Span <</ActualText (ffi)>> BDC /Fm Do EMC".to_vec()));
+    let page = doc.add_object(dictionary! { "Type" => "Page", "Parent" => pages_id, "Contents" => c,
+    "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+    "Resources" => dictionary! { "XObject" => dictionary! { "Fm" => form } } });
+    doc.objects.insert(
+        pages_id,
+        Object::Dictionary(dictionary! { "Type" => "Pages", "Count" => 1, "Kids" => vec![Object::Reference(page)] }),
+    );
+    let catalog = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+    doc.trailer.set("Root", catalog);
+    let mut pdf = Vec::new();
+    doc.save_to(&mut pdf).unwrap();
+    let mut e = Engine::open(pdf, None).unwrap();
+    assert_eq!(texts(&mut e), ["ffi"]);
+    // The inner span would keep the new text reading "zz": refused, never silently wrong.
+    let r = edit_engine(&mut e, "ffi", None, "abc");
+    assert!(r.is_err(), "{r:?}");
+    assert_eq!(texts(&mut e), ["ffi"]);
+}
+
+#[test]
+fn one_huge_glyph_does_not_slow_mark_grouping() {
+    let mut s = String::from("BT /F1 1000000 Tf 10 10 Td (A) Tj ET BT /F1 10 Tf ");
+    for r in 0..200 {
+        s.push_str(&format!("1 0 0 1 20 {} Tm (", 20 + (r % 700)));
+        s.push_str(&"a\\001".repeat(100));
+        s.push_str(") Tj ");
+    }
+    s.push_str("ET");
+    let mut e = Engine::open(build(&s, |_, _| {}), None).unwrap();
+    let t = Instant::now();
+    let _ = e.page_text(0);
+    // 20,000 marks scanned the whole page each: about 6 s in release builds.
+    assert!(t.elapsed() < Duration::from_secs(5), "{:?}", t.elapsed());
+}
+
 #[cfg(feature = "shaping")]
 mod shaping {
     use super::*;
@@ -247,6 +316,18 @@ mod shaping {
             let line = after.iter().find(|l| l.contains("نِبت")).unwrap_or_else(|| panic!("{f}: {after:?}"));
             assert!(line.starts_with("نبت "), "{f}: {line:?}");
             assert!(reopened.contains(line), "{f}: {reopened:?}");
+        }
+    }
+
+    #[test]
+    fn arabic_words_with_stacked_marks() {
+        for f in ["scripts-chrome.pdf", "scripts-libreoffice.pdf"] {
+            for w in ["لِلّٰه", "الرَّحْمٰنِ", "مُحَمَّدٌ", "رَبِّ"] {
+                let mut e = Engine::open(read(f), None).unwrap();
+                e.add_font("Noto Naskh Arabic", false, false, read("fonts/NotoNaskhArabic-Regular.ttf"));
+                let (after, _, _) = edit_engine(&mut e, "هذا", None, w).unwrap_or_else(|x| panic!("{f} {w}: {x:?}"));
+                assert!(after.iter().any(|l| l.contains(w)), "{f} {w}: {after:?}");
+            }
         }
     }
 }

@@ -237,6 +237,8 @@ impl<'a> Lexer<'a> {
                             (Some(k), v) => entries.push((k, v)),
                             (None, _) => {}
                         },
+                        // true, false, null: kept as values the writer refuses to drop.
+                        Tok::Keyword(_) if key.is_some() => entries.push((key.take().unwrap(), Operand::Other)),
                         _ => key = None,
                     }
                 }
@@ -266,8 +268,9 @@ impl<'a> Lexer<'a> {
                     match self.next() {
                         Tok::Operand(o) => items.push(o),
                         Tok::ArrayEnd | Tok::Eof => break,
-                        // Keywords inside arrays (true/false/null or junk) are ignored.
-                        Tok::Keyword(_) | Tok::DictEnd => {}
+                        // Keywords inside arrays (true/false/null or junk) hold their place.
+                        Tok::Keyword(_) => items.push(Operand::Other),
+                        Tok::DictEnd => {}
                     }
                 }
                 self.depth -= 1;
