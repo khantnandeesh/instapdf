@@ -1,5 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { flip } from "@/lib/motion/flow";
 import { clearRecent } from "@/lib/recent-tools";
 import { matchTools, normalizeQuery, type ToolMatch } from "@/lib/catalogue/search";
 import { Button } from "../ui/Button";
@@ -34,6 +36,7 @@ export function Catalogue() {
   const [live, setLive] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const headingRef = useRef<HTMLDivElement>(null);
+  const results = useRef<HTMLDivElement>(null);
 
   // Sticky search bar: `stuck` once the sentinel above it has gone under the header; the bar's height
   // goes to --ip-catbar-h so category jumps land below the pinned bar, not under it.
@@ -75,9 +78,11 @@ export function Catalogue() {
     if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
   }, [query]);
 
+  // Each query change FLIPs the tiles to their new slots (motion.md S4): staying tiles move in 200ms,
+  // arriving ones fade in; typing never waits (a new key completes the running move at once).
   const updateQuery = useCallback((q: string) => {
     userChanged.current = true;
-    setQuery(q);
+    flip(results.current, () => flushSync(() => setQuery(q)), "filter");
   }, []);
 
   // ---- filtering -------------------------------------------------------------------
@@ -219,7 +224,7 @@ export function Catalogue() {
           )}
         </div>
 
-        <div className="mx-auto lg:w-[957px]">
+        <div ref={results} className="mx-auto lg:w-[957px]">
           {!searching && (
             <div className="ip-recent-slot mt-8">
               <RecentStrip items={readyOnly ? recent.filter(usable) : recent} onClear={onClearRecent} idPrefix="home" />
@@ -256,12 +261,12 @@ function CategorySection({ id, label, matches, searching }: { id: string; label:
   return (
     <section id={`cat-${id}`} aria-labelledby={`cat-${id}-heading`} className={`ip-cat-${id} mt-8 scroll-mt-[calc(var(--ip-header-h)+var(--ip-catbar-h,0px)+16px)]`} data-testid="category">
       {/* BerryPDF eyebrow: UPPERCASE Fredoka in the category's berry colour (text shade, see tokens.css). */}
-      <h3 id={`cat-${id}-heading`} className="mp-eyebrow">
+      <h3 id={`cat-${id}-heading`} className="mp-eyebrow" data-flip>
         {label}
       </h3>
       <ul role="list" className={TOOL_GRID}>
         {matches.map((m) => (
-          <li key={m.item.slug}>
+          <li key={m.item.slug} data-flip>
             <ToolCard item={m.item} nameRange={searching ? m.name : undefined} summaryRange={searching ? m.summary : undefined} />
           </li>
         ))}

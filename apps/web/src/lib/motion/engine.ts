@@ -162,6 +162,8 @@ export function flip(container: HTMLElement, mutate: () => void, p: Preset): voi
   const state = Flip.getState(before, { simple: true });
   mutate();
   const after = flipTargets(container).filter(inViewport);
+  // A CSS entrance on a re-inserted item would fight the move: GSAP owns these items now.
+  for (const el of after) for (const a of el.getAnimations()) if (a instanceof CSSAnimation) a.finish();
   running = inCtx(() =>
     Flip.from(state, {
       targets: after,

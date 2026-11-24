@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { exit, motionReady, settle } from "@/lib/motion";
 import { cx } from "./cx";
 // Styles: ./dialog.css (modal and sheet) is imported by the screens that open them (ToolFlow, ControlDock, the
@@ -21,10 +21,10 @@ export type DialogCloseReason = "escape" | "action";
 export function Dialog({
   open,
   onClose,
-  title,
-  description,
-  children,
-  footer,
+  title: titleNow,
+  description: descriptionNow,
+  children: childrenNow,
+  footer: footerNow,
   initialFocusRef,
   returnFocusRef,
   fallbackFocus,
@@ -62,12 +62,18 @@ export function Dialog({
   const descId = useId();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
-  // The content stays while the dialog leaves (motion.md S7, S11, S13).
+  // The content stays while the dialog leaves (motion.md S7, S11, S13), as it was when it closed: the
+  // screen behind may already have cleared what it showed.
   const [shown, setShown] = useState(open);
   if (open && !shown) setShown(true);
   const body = open || shown;
+  const now = { title: titleNow, description: descriptionNow, children: childrenNow, footer: footerNow };
+  const kept = useRef(now);
+  if (open) kept.current = now;
+  const { title, description, children, footer } = open ? now : kept.current;
 
-  useEffect(() => {
+  // A layout effect: the dialog opens and closes in the same commit as its content, never a frame apart.
+  useLayoutEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
     // What fades on close: the panel; for the full-screen variant only its content, so its opaque

@@ -1,6 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { InsertKind, PageAction } from "@/components/page-edit/EditablePageGrid";
 import { loadCloud } from "@/components/cloud/tool-cloud";
 import { onIntent } from "@/components/tool-flow/intent";
@@ -33,6 +34,7 @@ import {
   type SortKey,
   type SourceInfo,
 } from "@/lib/page-list";
+import { flip } from "@/lib/motion/flow";
 import { changedCount, defaultMergeOptions, MERGE_OPTIONS_KEY, parseMergeOptions, type MergeOptions as Options } from "@/lib/pdf/merge-options";
 import { mergedName } from "@/lib/pdf/naming";
 import { acceptAttribute } from "@/lib/pdf/validation";
@@ -601,7 +603,8 @@ export function MergeTool() {
   const sortBy = (key: SortKey | "reverse") => {
     const list = pagesRef.current;
     const next = key === "reverse" ? reverseSegments(list) : sortPages(list, sourcesRef.current, key);
-    commit(next, { undo: c.sorted[key] });
+    // The visible grid FLIPs into the new order (T9; a crossfade above 40 items).
+    flip(document.querySelector<HTMLElement>("[data-flip-root]"), () => flushSync(() => commit(next, { undo: c.sorted[key] })), "reorder");
     announce(c.sorted[key]);
   };
 

@@ -2,6 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { flushSync } from "react-dom";
+import { flip } from "@/lib/motion/flow";
 import { usePresence } from "@/lib/motion/react";
 import { clearRecent } from "@/lib/recent-tools";
 import { matchTools } from "@/lib/catalogue/search";
@@ -298,7 +300,8 @@ function MenuContent({
       label={copy.searchLabel}
       hideLabel
       value={query}
-      onChange={setQuery}
+      // Rows FLIP to their new places as the query changes (motion.md S4).
+      onChange={(q) => flip(resultsRef.current, () => flushSync(() => setQuery(q)), "filter")}
       onEnter={() => firstLink()?.click()}
       onArrowDown={() => firstLink()?.focus()}
       placeholder={copy.searchLabel}
@@ -361,13 +364,13 @@ function MenuContent({
                 data-testid="tool-menu-group"
               >
                 {/* Category eyebrow: UPPERCASE in the category's text shade. */}
-                <h2 id={`menu-cat-${g.id}`} className="mp-eyebrow flex break-after-avoid items-baseline gap-2 px-[15px] pt-1.5 pb-1">
+                <h2 id={`menu-cat-${g.id}`} className="mp-eyebrow flex break-after-avoid items-baseline gap-2 px-[15px] pt-1.5 pb-1" data-flip>
                   {g.label}
                   <span className="text-sm text-muted normal-case tabular-nums">{g.items.length}</span>
                 </h2>
                 <ul>
                   {g.items.map((item) => (
-                    <li key={item.slug} className="break-inside-avoid">
+                    <li key={item.slug} className="break-inside-avoid" data-flip>
                       <MenuEntry item={item} />
                     </li>
                   ))}

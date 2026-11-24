@@ -1,6 +1,8 @@
 "use client";
 import "./page-edit.css";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { flushSync } from "react-dom";
+import { flip } from "@/lib/motion/flow";
 import { pageBoxStyle } from "@/components/tool-flow/PageTile";
 import { PageThumb } from "@/components/tool-flow/Thumbnail";
 import { Button } from "@/components/ui/Button";
@@ -188,7 +190,8 @@ export default function EditablePageGrid({
     const step = moveStepFor(e);
     if (step) {
       e.preventDefault(); // Alt+Left is "Back" in some browsers
-      onMove(tile.uid, step);
+      // The moved tile and its neighbours FLIP to their new slots (200ms, T9).
+      flip(list.current, () => flushSync(() => onMove(tile.uid, step)), "reorder");
       return;
     }
     const next = navTarget(e.key, i, tiles.length, gridColumns(list.current));
@@ -294,6 +297,7 @@ export default function EditablePageGrid({
       </span>
       <div
         ref={list}
+        data-flip-root
         role="list"
         aria-label={labels.list}
         aria-describedby="ip-pages-hint"
@@ -324,7 +328,7 @@ export default function EditablePageGrid({
           ];
           return (
             // BerryPDF PagePreview tray: the page on a pink tray, its label below in Fredoka; a selected page gets the berry ring and a leaf tick.
-            <div key={t.uid} role="listitem" className="group/tile mp-tray relative flex min-w-0 flex-col items-center gap-2 max-sm:p-2" data-selected={t.selected || undefined} data-uid={t.uid}>
+            <div key={t.uid} role="listitem" className="group/tile mp-tray relative flex min-w-0 flex-col items-center gap-2 max-sm:p-2" data-selected={t.selected || undefined} data-uid={t.uid} data-flip>
               {i === 0 && insertPoint(0, labels.insertStart, tab, "start")}
               <div
                 data-tile-box=""
@@ -446,7 +450,7 @@ export default function EditablePageGrid({
             </div>
           );
         })}
-        <div role="listitem" className="flex min-w-0 flex-col">
+        <div role="listitem" className="flex min-w-0 flex-col" data-flip>
           <MenuButton
             label={labels.addAtEnd}
             items={insertItems(tiles.length)}
