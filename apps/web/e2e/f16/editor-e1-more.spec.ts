@@ -326,3 +326,23 @@ test("AC-78: an edited line can be highlighted, and a Mark drag never moves it",
   const annots = doc.getPage(0).node.Annots();
   expect(annots?.size() ?? 0).toBeGreaterThan(0);
 });
+
+test("AC-94: with Draw, one finger draws and two fingers do not", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "Touch input");
+  await openFile(page, "report-form-3p.pdf");
+  await tool(page, "p");
+  const cdp = await page.context().newCDPSession(page);
+  const a = await at(page, 1, 0.2, 0.6);
+  const touch = (type: string, pts: { x: number; y: number }[]) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts.map((p, i) => ({ ...p, id: i })) });
+  await touch("touchStart", [a]);
+  for (let i = 1; i <= 8; i++) await touch("touchMove", [{ x: a.x + i * 12, y: a.y + i * 4 }]);
+  await touch("touchEnd", []);
+  await expect(page.locator('[data-kind="ink"]')).toHaveCount(1);
+  // Two fingers: a pan or pinch, never a stroke.
+  const b = await at(page, 1, 0.3, 0.7);
+  await touch("touchStart", [b, { x: b.x + 80, y: b.y }]);
+  for (let i = 1; i <= 6; i++) await touch("touchMove", [{ x: b.x + i * 6, y: b.y - i * 10 }, { x: b.x + 80 + i * 6, y: b.y - i * 10 }]);
+  await touch("touchEnd", []);
+  await page.waitForTimeout(300);
+  await expect(page.locator('[data-kind="ink"]')).toHaveCount(1);
+});
