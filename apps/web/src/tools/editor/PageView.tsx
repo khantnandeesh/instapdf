@@ -25,6 +25,7 @@ import { lineAt } from "@/lib/editor/line-hit";
 import { release, renderPage, swapCanvas } from "./render";
 import { shallowArray, useStore, type EditorState } from "./store";
 import { TOOL_NAMES, onPage, reflowText } from "./controller";
+import { FieldPopover, PageFields } from "@/tools/forms/EditorForms";
 
 type Gesture =
   | { type: "move"; ids: string[]; start: Pt; origin: EditorObject[]; moved: boolean; pointer: number }
@@ -68,6 +69,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
   const fresh = useStore(store, useCallback((s: EditorState) => (src != null ? !!s.fresh[src] : false), [src]));
   const rasterRev = useStore(store, useCallback((s: EditorState) => (src != null ? (s.rasterRev[src] ?? 0) : 0), [src]));
   const pdfRev = useStore(store, (s) => s.pdfRev);
+  const formsOn = useStore(store, (s) => !!H.current(s.history).forms);
   const lineEdit = useStore(store, useCallback((s: EditorState) => (src != null && s.lineEdit?.src === src && firstOfSrc ? s.lineEdit : null), [src, firstOfSrc]));
   const lineFlash = useStore(store, useCallback((s: EditorState) => (src != null && s.lineFlash?.src === src && firstOfSrc ? s.lineFlash : null), [src, firstOfSrc]));
   const flash = useStore(store, (s) => s.flash);
@@ -129,9 +131,9 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
       setDrawn("ok");
       return;
     }
-    const key = `${pdfRev}:${rasterRev}:${scale.toFixed(4)}:${rotation}:${retry}`;
+    const key = `${pdfRev}:${rasterRev}:${scale.toFixed(4)}:${rotation}:${retry}:${formsOn}`;
     if (drawnFor.current === key) return;
-    const job = renderPage(rt.pdf, src, scale, rotation, index);
+    const job = renderPage(rt.pdf, src, scale, rotation, index, formsOn);
     let live = true;
     void job.promise.then((canvas) => {
       if (!live) {
@@ -152,7 +154,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
       live = false;
       job.cancel();
     };
-  }, [visible, src, rasterRev, pdfRev, scale, rotation, rt, index, retry, ctl]);
+  }, [visible, src, rasterRev, pdfRev, scale, rotation, rt, index, retry, ctl, formsOn]);
 
   // ---- coordinates ----
   const toFrame = useCallback(
@@ -316,7 +318,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     if (s.busy) return;
     const p = toFrame(e.clientX, e.clientY);
     const target = e.target as HTMLElement;
-    if (target.closest("textarea, input, [data-popover]")) return;
+    if (target.closest("textarea, input, select, [data-popover], .bf-field, .bf-proposal, .bf-draw")) return;
     const handle = target.closest<HTMLElement>("[data-handle]")?.dataset.handle;
     const objEl = target.closest<HTMLElement>("[data-obj-id]");
     const t = s.tool;
@@ -656,6 +658,8 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
             <span key={i} aria-hidden="true" className={`ed-guide ed-guide--${g.axis}`} style={g.axis === "x" ? { left: g.at * scale, top: g.from * scale, height: (g.to - g.from) * scale } : { top: g.at * scale, left: g.from * scale, width: (g.to - g.from) * scale }} />
           ))}
           <div ref={marquee} aria-hidden="true" className="ed-marquee" />
+          {/* Fields above objects, as viewers draw widgets above page content. */}
+          <PageFields entry={entry} scale={scale} />
         </div>
         {readout && selectedHere.length + (draft?.["__new"]?.page === entry.id ? 1 : 0) > 0 && <Readout text={readout} objs={draft?.["__new"]?.page === entry.id ? [draft["__new"]] : selectedHere} entry={entry} scale={scale} />}
         {placement && (
@@ -666,6 +670,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
         {wide && selectedHere.length > 0 && !draft && !editing && (
           <PropertiesPopover objs={selectedHere} anchor={displayedBounds(unionBox(selectedHere.map(objectBounds)), entry, scale)} pageHeight={disp.height} />
         )}
+        <FieldPopover entry={entry} place={(b) => displayedBounds(b, entry, scale)} pageWidth={disp.width} pageHeight={disp.height} />
       </section>
     </div>
   );

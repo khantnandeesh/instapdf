@@ -4,6 +4,7 @@
  * (< 1024), the view pill, the save and privacy chips, and each page's header row.
  * Icons only (Phosphor Bold, no boxes); names and shortcuts are in tooltips and accessible names.
  */
+import { FieldsChipSlot } from "@/tools/forms/EditorForms";
 import { useEffect, useLayoutEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { BerryMark } from "@/components/berry/Berry";
@@ -50,6 +51,7 @@ import {
   EyeBold,
   EyeSlashBold,
 } from "./icons";
+import { TextFieldIcon } from "@/tools/forms/icons";
 import { Pop } from "./Pop";
 import { ToolOptions } from "./Properties";
 import { useStore, type ToolId } from "./store";
@@ -61,6 +63,7 @@ export const TOOLS: ToolDef[] = [
   { id: "edit", key: "E", hint: "Click a line to change its words", icon: <EditTextBold size={22} /> },
   { id: "text", key: "T", hint: "Click to type, drag for a box · Esc to stop", icon: <TextBold size={22} /> },
   { id: "sign", key: "S", hint: "Sign or add initials", icon: <SignBold size={22} /> },
+  { id: "form", key: "F", hint: "Add form fields, or find them with Detect", icon: <TextFieldIcon size={22} /> },
   { id: "mark", key: "H", hint: "Drag across words to mark them", icon: <MarkBold size={22} /> },
   { id: "draw", key: "P", hint: "Draw freehand", icon: <DrawBold size={22} /> },
   { id: "shapes", key: "R", hint: "Drag to draw a shape", icon: <ShapesBold size={22} /> },
@@ -68,7 +71,7 @@ export const TOOLS: ToolDef[] = [
   { id: "whiteout", key: "W", hint: "Drag to cover an area", icon: <WhiteoutBold size={22} /> },
 ];
 /** Dock order on phones and tablets (U-E2 < 640): most used first. */
-export const DOCK_ORDER: ToolId[] = ["text", "sign", "mark", "whiteout", "draw", "image", "shapes", "select", "edit"];
+export const DOCK_ORDER: ToolId[] = ["text", "sign", "mark", "whiteout", "draw", "image", "shapes", "select", "edit", "form"];
 
 const toolDef = (id: ToolId) => TOOLS.find((t) => t.id === id)!;
 
@@ -337,6 +340,7 @@ export function TopBar({ wide, fileMenu, onClose }: { wide: boolean; fileMenu: M
         <CaretDownBold size={12} className="shrink-0" />
       </MenuButton>
       <div className="ed-top__slot">{wide && <ToolOptions />}</div>
+      <FieldsChipSlot />
       <UndoRedo />
       {wide && <PrivacyChip />}
       <DownloadButton compact={!wide} />

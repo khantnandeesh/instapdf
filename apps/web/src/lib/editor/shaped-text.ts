@@ -104,7 +104,7 @@ export async function buildShaped(
         },
       };
       // The first pass decrypts (pdf-lib writes the file without encryption); later ones get plain bytes.
-      bytes = await build(bytes, defer, { layer, layers });
+      bytes = await build(bytes, defer, { layer, layers, last: layer === count - 1 });
       if (!defer.lines.length) continue;
       const doc = new engine.BerryDocument(bytes);
       try {

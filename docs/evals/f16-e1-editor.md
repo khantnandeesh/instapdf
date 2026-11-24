@@ -166,6 +166,15 @@ Same two lines added with the Text tool on both sites: a Hindi sentence ("the fu
 
 Known limit: shaped lines are drawn after the other added objects, so an object added later that overlaps such a line sits under it instead of on top.
 
+## Mixed-direction line edits: refused where other readers would misread them
+
+Checked with pdf.js and pdfium (pypdfium2) on the saved file, not only with the engine's own read-back (`apps/web/src/lib/editor/mixed-direction.test.ts`, `crates/berry-engine/tests/latex.rs`).
+
+- **Refused (`text-mismatch`), with "Replace with new text" offered:** a new word in a right-to-left line that would read as typed only through ActualText, which pdf.js ignores. On `scripts-plain.pdf` that covers " 2024" (pdf.js read "202v") and " abc 12" (pdf.js read "abc s2", pdfium "12 abc").
+- **AC-206 on `scripts-plain.pdf` is refused for now.** The Arabic font's digit glyphs map elsewhere in its ToUnicode, so "2500" → "3750" read "u750" in pdf.js. Accepted by the lead for now: the sibling-font fix in the Hindi thread is to turn these refusals into correct edits. AC-206 still passes on the Chrome and LibreOffice files.
+- **Exemption:** lines already drawn with ActualText spans (Chrome and LibreOffice Arabic) are not refused. Both readers already garble those lines before any edit.
+- **Known pdf.js ordering limit (kept, confirmed by the lead):** a word drawn in a font the line doesn't otherwise use (".!" after "تجريبي.", the subset having no "!") is its own text item. pdf.js orders a line's items by content order, so it reads that word ahead of the line; pdfium reads it in place. AC-205 and Arabic appends that need a registered face behave the same way in pdf.js. Recorded in `crates/README.md`.
+
 ## Zoom without a white flash (reported on staging)
 
 Zooming showed the page white for a moment on every re-render: each new bitmap faded in from opacity 0 over the white page. Now:

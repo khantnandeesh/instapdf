@@ -154,6 +154,7 @@ fn running_past_the_page_edge_is_refused() {
     e.replace_line(0, 0, "Ends near the edges").unwrap();
 }
 
+#[cfg(feature = "shaping")]
 /// The `/ActualText` values in the first page's content, decompressed (the streams are
 /// FlateDecode), as their raw string bytes.
 fn actual_texts(bytes: &[u8]) -> Vec<Vec<u8>> {
