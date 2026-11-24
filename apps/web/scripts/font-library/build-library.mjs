@@ -29,7 +29,7 @@
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { lstatSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -51,7 +51,19 @@ function args() {
  * Null (with the reason logged) when the package's own metadata does not pass the licence gate.
  */
 async function packageDir(dir, id) {
-  const meta = JSON.parse(await readFile(join(dir, "metadata.json"), "utf8"));
+  // Plain files only: a link inside a downloaded package must never be followed and published.
+  const plain = (f) => {
+    try {
+      return lstatSync(f).isFile();
+    } catch {
+      return false;
+    }
+  };
+  const text = async (f) => {
+    if (!plain(f)) throw new Error(`${f.slice(dir.length + 1)} is missing or not a plain file`);
+    return readFile(f, "utf8");
+  };
+  const meta = JSON.parse(await text(join(dir, "metadata.json")));
   const g = gate({ ...meta, id, family: meta.family, license: meta.license?.type ?? meta.license }, "fontsource");
   if (!g.ok) {
     console.error(`skip ${id}: ${g.reason}`);
@@ -60,12 +72,12 @@ async function packageDir(dir, id) {
   return {
     entry: g.entry,
     defSubset: meta.defSubset,
-    unicode: JSON.parse(await readFile(join(dir, "unicode.json"), "utf8")),
+    unicode: JSON.parse(await text(join(dir, "unicode.json"))),
     read: async (subset, weight, style) => {
       const f = join(dir, "files", `${id}-${subset}-${weight}-${style}.woff`);
-      return existsSync(f) ? readFile(f) : null;
+      return plain(f) ? readFile(f) : null;
     },
-    licence: () => readFile(join(dir, "LICENSE"), "utf8"),
+    licence: () => text(join(dir, "LICENSE")),
   };
 }
 

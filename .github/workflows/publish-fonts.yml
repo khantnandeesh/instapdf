@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       limit:
-        description: "Only the first N families (a trial run). Empty: all of them."
+        description: "Trial run: build only the first N families and upload nothing. Empty: build all and publish."
         required: false
         default: ""
 
@@ -43,17 +43,18 @@ jobs:
         working-directory: apps/web
         run: |
           case "$LIMIT" in
-            "") extra=(--min-families 1500) ;;
-            *[!0-9]*) echo "limit must be a number" >&2; exit 2 ;;
+            "") extra=(--min-families 1900) ;;
+            *[!0-9]* | 0) echo "limit must be a number above 0" >&2; exit 2 ;;
             *) extra=(--limit "$LIMIT") ;;
           esac
           node --no-warnings scripts/font-library/build-library.mjs \
             --out "$RUNNER_TEMP/library" --source npm \
-            --catalogue "$RUNNER_TEMP/catalogue/catalogue.json" --clean "${extra[@]}" 2> "$RUNNER_TEMP/skipped.txt"
-          echo "Skipped: $(wc -l < "$RUNNER_TEMP/skipped.txt") lines (see the artifact)"
+            --catalogue "$RUNNER_TEMP/catalogue/catalogue.json" --clean "${extra[@]}" 2> >(tee "$RUNNER_TEMP/skipped.txt" | tail -n 40 >&2)
+          echo "Skipped or failed: $(wc -l < "$RUNNER_TEMP/skipped.txt") lines (see the artifact)"
           du -sh "$RUNNER_TEMP/library"
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: font-library-report
           path: |
@@ -63,17 +64,21 @@ jobs:
             ${{ runner.temp }}/library/manifest.json
           retention-days: 30
 
+      # A trial run (limit set) stops here: only a full build is ever published.
       - uses: google-github-actions/auth@v2
+        if: inputs.limit == ''
         with:
           project_id: ${{ vars.GCP_PROJECT_ID }}
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
           service_account: gh-fonts-publish@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
 
       - uses: google-github-actions/setup-gcloud@v2
+        if: inputs.limit == ''
 
       # Content-addressed files first (a name never changes its bytes, so existing ones are left
       # alone), manifest.json last: the site only ever sees a manifest whose files are all there.
       - name: Upload
+        if: inputs.limit == ''
         working-directory: ${{ runner.temp }}/library
         run: |
           forever="public, max-age=31536000, immutable"
@@ -81,8 +86,11 @@ jobs:
           gcloud storage cp --recursive --no-clobber --cache-control="$forever" --gzip-local=json families "gs://$BUCKET/"
           gcloud storage cp --recursive --no-clobber --cache-control="$forever" --gzip-local=json index "gs://$BUCKET/"
           gcloud storage cp --recursive --cache-control="public, max-age=86400" --content-type="text/plain; charset=utf-8" licences "gs://$BUCKET/"
+          # A dated copy of every manifest published: going back is one copy onto manifest.json.
+          gcloud storage cp --cache-control="private, max-age=0" manifest.json "gs://$BUCKET/manifests/$(date -u +%Y%m%dT%H%M%SZ).json"
           gcloud storage cp --cache-control="public, max-age=300" manifest.json "gs://$BUCKET/manifest.json"
 
       - name: Check what the site will read
+        if: inputs.limit == ''
         run: |
           curl -fsS "https://storage.googleapis.com/$BUCKET/manifest.json" | tee /dev/stderr | grep -q '"families"'
