@@ -112,7 +112,7 @@ test("typing Hindi into a Latin line loads the shaping build and retries the edi
   await expect(page.getByTestId("editor-shell")).toHaveAttribute("data-shaping", "ready", { timeout: 30_000 });
   expect(seen.shaping().length).toBeGreaterThan(0);
   // Retried in the shaping build: this file's TeX font has no Devanagari, which is now the reason given.
-  await expect(page.getByTestId("editor-notice")).toContainText("This font in the file has no");
+  await expect(page.getByTestId("editor-notice")).toContainText("This font has no");
 });
 
 // ---- added text (AC-224) ------------------------------------------------------------------------

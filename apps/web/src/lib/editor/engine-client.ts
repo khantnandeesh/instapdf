@@ -168,7 +168,7 @@ export function preloadEngine(priority: "low" | "high" = "low"): Promise<boolean
 export function describeEngineError(e: EngineError): string {
   switch (e.kind) {
     case "missing-glyphs":
-      return `This font in the file has no ${[...new Set(e.chars)].map((c) => `“${c}”`).join(" ")}.`;
+      return `This font has no ${[...new Set(e.chars)].map((c) => `“${c}”`).join(" ")}.`;
     case "read-only":
     case "unsupported":
       return "This line can’t be edited yet.";

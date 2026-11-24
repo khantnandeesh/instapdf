@@ -934,15 +934,16 @@
   color: var(--color-brand-strong);
   font-weight: 700;
 }
-/* Narrow screens: a long notice keeps the full width and its action goes under it. */
-.ed-narrow .ed-toast:has(.ed-toast__act) {
+/* Narrow screens: a long notice keeps the full width and its action goes under it (the font
+   notice is one short row of its own, F24). */
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) {
   flex-wrap: wrap;
   padding-bottom: 8px;
 }
-.ed-narrow .ed-toast:has(.ed-toast__act) > span {
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) > span {
   flex: 1 1 calc(100% - 44px);
 }
-.ed-narrow .ed-toast:has(.ed-toast__act) > .ed-toast__act {
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) > .ed-toast__act {
   order: 3;
   margin-left: -12px;
 }

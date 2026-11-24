@@ -98,6 +98,7 @@ scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: 
           },
           loadFace: withMore.load,
           loadUrl: bytes,
+          labels: input.fonts?.labels,
         },
         (defer) => buildPdf(input, withMore, fontkit, defer),
         input.password,

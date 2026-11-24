@@ -61,7 +61,7 @@ export type BuildInput = {
   objects: EditorObject[];
   assets: Record<string, Asset>;
   /** Library and user faces the objects use (fonts-browser fontsForBuild), and the user's own font bytes. */
-  fonts?: { faces: EditorFontManifest["faces"]; bytes: Record<string, Uint8Array> };
+  fonts?: { faces: EditorFontManifest["faces"]; bytes: Record<string, Uint8Array>; labels?: Record<string, string> };
 };
 
 /** Font files on this device: the editor faces, and the Noto fallback for other scripts. */

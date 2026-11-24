@@ -22,10 +22,15 @@ export type ShapingDeps = {
   /** Editor face file (by name) and shaping font (by URL) bytes. */
   loadFace: (file: string) => Promise<Uint8Array>;
   loadUrl: (url: string) => Promise<Uint8Array>;
+  /** Family names of library and user fonts, by font id. */
+  labels?: Record<string, string>;
 };
 
-/** The family name a face is registered under: its label, e.g. "Arimo" (library and user fonts: their id). */
-export const familyOf = (id: string) => TEXT_FONTS.find((f) => f.id === id)?.label ?? id;
+/**
+ * The family name a face is registered under, which the engine also names the embedded font by:
+ * its label, e.g. "Arimo" or the name inside a font the person added (`labels`, from the page).
+ */
+export const familyOf = (id: string, labels?: Record<string, string>) => labels?.[id] ?? TEXT_FONTS.find((f) => f.id === id)?.label ?? id;
 
 type Style = { font: string; bold: boolean; italic: boolean };
 
@@ -53,7 +58,7 @@ class Fonts {
   /** Adds what `text` in style `s` needs: the box's face files, then the script fonts (in that style, so the engine finds them). */
   async register(doc: BerryDocument, s: Style, text: string, done: Set<string>) {
     const face = this.face(s);
-    const family = familyOf(s.font);
+    const family = familyOf(s.font, this.deps.labels);
     for (const file of filesFor(face, text)) {
       const key = `${family}|${s.bold}|${s.italic}|${file}`;
       if (done.has(key)) continue;
@@ -82,12 +87,12 @@ export async function buildShaped(deps: ShapingDeps, build: (defer: DeferShaped)
   const scratchFonts = new Set<string>();
   try {
     const defer: DeferShaped = {
-      family: familyOf,
+      family: (id) => familyOf(id, deps.labels),
       lines: [],
       measure: async (text, o) => {
         const line = printable(text, fonts.face(o), shaping);
         await fonts.register(scratch, o, line, scratchFonts);
-        return scratch.shape(line, request([familyOf(o.font), "Noto Sans"], o.bold, o.italic), o.size).width;
+        return scratch.shape(line, request([familyOf(o.font, deps.labels), "Noto Sans"], o.bold, o.italic), o.size).width;
       },
     };
     const built = await build(defer);

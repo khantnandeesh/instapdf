@@ -100,10 +100,12 @@ test("an unknown verify failure gets the safe message and the fallback; the log 
   expect(text).toMatch(/₹\s?5/);
 });
 
-test("a character the font in the file lacks is named, with no fallback offered", async ({ page }) => {
+// Characters the file's font lacks are drawn with a stand-in from the font library (F24); one that
+// no font here has (a private-use code point) is named.
+test("a character no font here has is named, with no fallback offered", async ({ page }) => {
   await open(page, "latex-type1c.pdf");
-  await typeInto(page, "Results", (t) => `${t} ₹`);
+  await typeInto(page, "Results", (t) => `${t} \uE123`);
   const notice = page.getByTestId("editor-notice");
-  await expect(notice).toContainText("This font in the file has no “₹”.");
+  await expect(notice).toContainText("This font has no “\uE123”.", { timeout: 30_000 });
   await expect(notice.getByRole("button", { name: "Replace with new text" })).toHaveCount(0);
 });

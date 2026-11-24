@@ -28,7 +28,7 @@ import { listChars } from "@/lib/editor/coverage";
 import { missingInObjects } from "./coverage-browser";
 import { addAsset, IMAGE_ACCEPT, imageError, imageFromFile, isImageFile, plainAssets, releaseAssets } from "./assets";
 import { EnginePill } from "./EngineProgress";
-import { resetDocFonts } from "./font-service";
+import { fontLabel, resetDocFonts } from "./font-service";
 import { disposeMatcher } from "@/lib/font-library/match-client";
 import { FontNotice } from "./FontMenu";
 import { AnnotsToggle, DOCK_ORDER, MoreTools, PageChip, PageHeader, PrivacyChip, SaveChip, ToolDock, ToolRail, TopBar, TOOLS, ViewPill } from "./Chrome";
@@ -44,7 +44,8 @@ import { createStore, shallowArray, useStore, type EditorState, type Placement, 
 async function buildFonts(objects: readonly EditorObject[]) {
   const ids = objects.flatMap((o) => (o.kind === "text" ? [o.font] : []));
   await resolveFonts(ids);
-  return fontsForBuild(ids);
+  // Names for the shaping engine, which embeds a font under the family it was registered as.
+  return { ...fontsForBuild(ids), labels: Object.fromEntries([...new Set(ids)].map((id) => [id, fontLabel(id)])) };
 }
 
 const SignDialog = lazy(() => import("./SignDialog").then((m) => ({ default: m.SignDialog })));
