@@ -1589,3 +1589,17 @@
 .mp-floaties--empty > :nth-child(17) { --x:36%;--y:58%;--s:22px;--r:0deg;--d:5.7s;--amp:6px;--delay:-2.7s; }
 .mp-floaties--empty > :nth-child(18) { --x:63%;--y:44%;--s:22px;--r:0deg;--d:6.3s;--amp:6px;--delay:-5.0s; }
 .mp-floaties--empty > :nth-child(19) { --x:50%;--y:10%;--s:18px;--r:0deg;--d:5.3s;--amp:5px;--delay:-3.7s; }
+
+/* Fold fit: when a tool's options are taller than the panel (short laptop screens), they scroll inside
+   it and soft shadows at the cut edges say so. Pure CSS (background-attachment: local covers the
+   shadow while the content is at that end), so the strict CSP and reduced motion need nothing. */
+@media (min-width: 1024px) {
+  .ip-dock-scroll {
+    overscroll-behavior: contain;
+    background:
+      linear-gradient(var(--ip-surface-raised) 30%, transparent) top / 100% 24px no-repeat local,
+      linear-gradient(transparent, var(--ip-surface-raised) 70%) bottom / 100% 24px no-repeat local,
+      radial-gradient(farthest-side at 50% 0, rgb(0 0 0 / 0.1), transparent) top / 100% 10px no-repeat scroll,
+      radial-gradient(farthest-side at 50% 100%, rgb(0 0 0 / 0.1), transparent) bottom / 100% 10px no-repeat scroll;
+  }
+}

@@ -7,7 +7,9 @@ import { copy } from "./copy";
 
 /**
  * Options and the primary action. A sticky side column at >= 1024 px, a fixed
- * bottom bar below. Its measured height is written to --ip-dock-actual on the
+ * bottom bar below. In both, the primary action never leaves the viewport: from
+ * 1024 px the panel is --ip-work-h tall (fits the first screen), the options
+ * scroll inside it and the status + primary stay pinned at its bottom. Its measured height is written to --ip-dock-actual on the
  * document so `main` keeps the last row of tiles clear of it.
  */
 export function ControlDock({
@@ -50,16 +52,15 @@ export function ControlDock({
       className={[
         "fixed inset-x-0 bottom-0 z-20 rounded-t-[18px] bg-sand shadow-menu",
         "px-[15px] pt-3 pb-[calc(14px+env(safe-area-inset-bottom))]",
-        "lg:sticky lg:top-[calc(var(--ip-header-h)+24px)] lg:z-auto lg:flex lg:h-[calc(100dvh-var(--ip-header-h)-48px)] lg:max-h-[640px] lg:flex-col lg:rounded-panel lg:border-[1.5px] lg:border-panel-border lg:bg-surface-raised lg:p-7 lg:shadow-card",
+        "lg:sticky lg:top-[calc(var(--ip-header-h)+16px)] lg:z-auto lg:flex lg:h-(--ip-work-h) lg:flex-col lg:rounded-panel lg:border-[1.5px] lg:border-panel-border lg:bg-surface-raised lg:p-6 lg:shadow-card",
       ].join(" ")}
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 lg:h-full lg:flex-col lg:items-stretch">
-        <fieldset disabled={optionsDisabled} className="min-w-0 sm:flex-1 lg:flex-1 lg:overflow-y-auto">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 lg:min-h-0 lg:flex-1 lg:flex-col lg:items-stretch">
+        <fieldset disabled={optionsDisabled} className="ip-dock-scroll min-w-0 sm:flex-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto" data-testid="dock-options">
           <legend className="sr-only">{label}</legend>
-          <h2 className="mb-5 hidden font-display text-[22px] leading-[1.2] font-semibold text-ink-black lg:block">Options</h2>
           {options}
         </fieldset>
-        <div className="flex flex-col gap-2 sm:min-w-[200px] lg:min-w-0">
+        <div className="flex shrink-0 flex-col gap-2 sm:min-w-[200px] lg:min-w-0" data-testid="dock-footer">
           <div className="max-lg:sr-only">{status}</div>
           {footer}
         </div>

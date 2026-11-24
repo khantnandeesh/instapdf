@@ -45,6 +45,7 @@ The parity evaluator runs the same tasks with the same fixtures on Sejda and on 
 | M9 | Errors and limits | encrypted, corrupt, huge and wrong-type files: the message shown and the recovery path offered |
 | M10 | Privacy and cost | whether the file is uploaded (network log), the account or paywall prompts shown, the free-tier limits hit |
 | M11 | Look and motion | visual polish, motion, how minimal the text is (owner's UI goals) |
+| M12 | First screen fit | at real browser viewports (1366x657, 1280x632, 1536x730, 1920x969, 390x664): is the whole working UI and the primary action visible without scrolling, on load, after a file loads, and on the result screen; does the primary action stay in view while scrolling a long document. Any primary action below the fold is a lose |
 
 **Pass rule:** a tool can't PASS while any micro-check is a **lose**, unless the owner waives that check in writing (recorded in `docs/evals/<feature>.md`). Ties are allowed. Where Sejda paywalls something we offer free, that check counts as a win.
 

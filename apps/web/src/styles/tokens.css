@@ -213,6 +213,12 @@
   /* Layout metrics (shared tool flow, header, menu) */
   --ip-header-h: 64px; /* sticky header: 62.5px row incl. the 1.5px sand line, rounded */
   --ip-dock-w: 360px; /* options panel column at >= 1024px */
+  /* Fold fit (docs/design/berrypdf.md "Fit the first screen"): the tool head is a fixed height so the
+     workspace row (drop area and options panel) can be sized in pure CSS to end inside the viewport,
+     with the primary action pinned at its bottom. No measuring, so no layout shift on hydration. */
+  --ip-intro-h: 76px; /* tool page head at >= 1024px: one-line title, centred */
+  --ip-fold-gap: 20px; /* space kept under the workspace row at the bottom of the first screen */
+  --ip-work-h: clamp(320px, calc(100dvh - var(--ip-header-h) - var(--ip-intro-h) - var(--ip-fold-gap)), 640px);
   --ip-dock-h: 176px; /* fixed bottom dock below 640px */
   --ip-dock-h-md: 104px; /* fixed bottom dock 640-1023px */
   --ip-thumb-size: 160px; /* default page box inside its tray; slider range 80-400 */

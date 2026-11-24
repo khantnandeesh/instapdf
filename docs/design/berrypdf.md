@@ -8,11 +8,13 @@ The single source of truth for the product's visual design: the owner's **BerryP
 
 ## Owner overrides (2026-11-23)
 
-The owner reviewed the first BerryPDF screens and set three rules that win over BerryPDF where they conflict:
+The owner reviewed the first BerryPDF screens and set four rules that win over BerryPDF where they conflict:
 
 1. **No vine.** The vine divider (home hero → catalogue, before the footer, coming-soon/404 → "Ready now") and the vine progress strip are removed, with their CSS and keyframes. Sections separate by spacing only. Processing keeps the jam bar (an indeterminate jam variant has a short segment gliding) and the berry loader.
 2. **Minimal text.** Show only what a task needs; everything else becomes a tooltip or screen-reader text. Tool cards and menu rows: icon + name + at most one small mark ("Soon" or "Beta"); the summary and "Runs in your browser" stay in the accessible name (sr-only) and the summary is the `title` tooltip. Hero: title, one short line, the main action, one short privacy note (no see-all link, no seed list). Catalogue: no subtitle counts, no group or chip counts, no "N shown" (the live region still announces it); the menu count shows only while searching. Tool pages: the `h1` only (no subtitle); the drop card has three short lines (drop hint, short limits with the full limits as tooltip/sr-only, privacy). Coming-soon: title, "Coming soon" tag, one button, "Ready now". Footer: one compact row (wordmark, ©, links; Company/Legal headings sr-only) with the A–Z list folded under a "Tools A–Z" toggle. Legal page text is unchanged.
 3. **Quiet motion, CSS only.** Tool tiles rise in staggered (360ms, 30ms apart, capped at 300ms); hero pieces fade up one after another (400ms); tool titles and the coming-soon/404 content fade up; the drop card and the result panel pop in with the small overshoot (380ms) and the result tick follows; the drop card's outline then breathes in pale berry (3.2s loop); rendered page thumbnails ease in (300ms). Cards lift on hover with the overshoot and press to 0.98 on click. Every entrance is ≤ 400ms; all of it is off under `prefers-reduced-motion: reduce` (the global rule drops every animation and transition).
+
+4. **The first screen holds the whole task.** On a tool page nothing the user needs is cut off on arrival: the title, the drop area, the options and the primary action fit the viewport on common laptops and phones, and the primary action never leaves the screen. See [Fit the first screen](#fit-the-first-screen) (owner, 2026-11-23, after Rotate PDF's button was half below the fold at 1366x768).
 
 Also from the PR #11 review: Fredoka is one variable-weight file (`@fontsource-variable/fredoka` 5.3.0, OFL-1.1, latin `wght` 300–700, ~30 KB) instead of four static weights (~64 KB), so the page preloads one font file.
 
@@ -106,7 +108,42 @@ BerryPDF pairs Security with `cat-compress`; our Optimize group already takes it
 - **Tabs**: the Pages/Files view switch inside a tool (2 modes): pink track, white selected pill with berry text.
 - **Prose**: legal and placeholder pages: 680px column, Fredoka headings, muted date line, #5b484c 16/28 body, 24px gap, bold berry links (underlined, deviation 5), "In short" Callout, yellow code chips, owner placeholders bracketed in bold ink on sand.
 - **Footer**: compact, on cream (owner override): one row with the berry mark + name and ©, then ink links (All tools, About, Help, Privacy, Terms, Cookies, Licenses, Security) that turn berry on hover; Company/Legal headings are sr-only; the A–Z list is folded under a muted "Tools A–Z" toggle.
-- **Working mode (Rotate)**: centred page title (no subtitle: owner override). Empty: the floating-berry EmptyState on grid paper (floaties, one blossom sticker) around a white leaf-cornered card holding the large upload button and three short muted lines (drop hint, limits, privacy); the card pops in and its outline breathes. Loaded: a seed-cream working area (no decoration) with a sticky row (Tabs for the view, the size slider, "Add files" as a blueberry tool with the glow), each page in a pink tray with its number in Fredoka; pages in scope get the 2.5px berry ring + leaf tick. Options dock = an app Panel at ≥ 1024px (strawberry-cream tab fixed to the bottom below) with numbered steps (number in a soft berry disc): "1 Apply to" ChoiceTiles (selected: berry edge and text on the tint, leaf tick badge), "2 Rotate" blueberry toolbar + soft Reset; berry kept for the one finishing action. Processing: the jam bar with "Rotating… 42%" in the dock (the progressbar), and the 96px berry loader over the dimmed pages. Result: one centred Panel, leaf tick, Download is the only berry fill.
+- **Working mode (Rotate)**: centred page title (no subtitle: owner override). Empty: the floating-berry EmptyState on grid paper (floaties, one blossom sticker) around a white leaf-cornered card holding the large upload button and three short muted lines (drop hint, limits, privacy); the card pops in and its outline breathes. Loaded: a seed-cream working area (no decoration) with a sticky row (Tabs for the view, the size slider, "Add files" as a blueberry tool with the glow), each page in a pink tray with its number in Fredoka; pages in scope get the 2.5px berry ring + leaf tick. Options dock (no visible "Options" title: the numbered steps head it; owner override 2) = an app Panel at ≥ 1024px, as tall as the drop area and fitted to the first screen, (strawberry-cream tab fixed to the bottom below) with numbered steps (number in a soft berry disc): "1 Apply to" ChoiceTiles (selected: berry edge and text on the tint, leaf tick badge), "2 Rotate" blueberry toolbar + soft Reset; berry kept for the one finishing action. Processing: the jam bar with "Rotating… 42%" in the dock (the progressbar), and the 96px berry loader over the dimmed pages. Result: one centred Panel, leaf tick, Download is the only berry fill.
+
+## Fit the first screen
+
+Every tool page is a working surface, not a document. The user arrives to do one task, so the first screen must show the whole task and its finishing button. This holds for every tool and every state (empty, loaded, processing, error, result).
+
+### Why (research, 2026-11-23)
+
+- **The fold still matters.** NN/g: people still spend most of their viewing time above the fold (57% in 2018) and scroll only when what they see promises more. A primary button half under the fold reads as "not ready" or is missed.
+- **Screens are not viewports.** A 1366x768 laptop shows about 1366x657 of page in a browser window (tabs, address bar, bookmarks, the OS bar), 1920x1080 about 1920x969. Designing for the screen resolution is what cut Rotate's button off. StatCounter still puts 1366x768 at about 10% of desktops, so the short laptop is a primary target.
+- **Competitors pin the action.** Captures at 1366x657 (owner's Sejda recording and our own runs, 2026-11-23): on arrival all three show only the title and the upload button in the top half. Once a file is in, Sejda pins "Apply changes" in a full-width bar fixed to the bottom of the window and keeps its one-row toolbar right above the pages; iLovePDF uses a full-height right panel with the action pinned to its bottom; Smallpdf puts "Finish" in a fixed top toolbar. Sejda's result screen has Download at the top of the first screen. None of them make you scroll to the finishing button.
+- **Fitts and the thumb.** The primary action sits at a stable, large, predictable place: the bottom of the options panel on desktop, the bottom bar on phones (thumb zone). It never moves between states (empty, ready, processing all use the same slot).
+
+### Rules (UX designer and frontend engineer)
+
+1. **Primary action always in view.** On load, after a file loads, while the page scrolls, and while processing. Desktop (≥ 1024px): the options panel is sticky and exactly `--ip-work-h` tall; its options scroll inside it and its status line + primary action are pinned at its bottom. Below 1024px: the fixed bottom dock holds the primary action.
+2. **Budget the height, don't hope.** The first screen is `100dvh`: header (`--ip-header-h`, 64px) + tool head (`--ip-intro-h`, 76px, one-line title) + workspace row (`--ip-work-h` = `clamp(320px, 100dvh − header − head − 20px, 640px)`) + 20px gap. Everything that must be seen first lives in those rows. Never size a first-screen element from the screen resolution or with a fixed pixel height taller than `--ip-work-h`.
+3. **Pure CSS, no measuring for fit.** Heights come from tokens and `dvh`, so the server HTML already fits (no jump on hydration, no CLS). JavaScript measuring is allowed only for the fixed phone dock's clearance (`--ip-dock-actual`).
+4. **One line of head.** The tool page head is the `h1` only (owner override 2), one line from 1024px. Nothing else (no subtitle, no banner, no notice) may sit between the header and the workspace on arrival; notices float (NoticeStack) instead of pushing the workspace down.
+5. **Dense options.** Options are numbered steps with short labels; no panel title. If a tool's options are taller than the panel on short screens, they scroll inside the panel (soft edge shadows show there is more); the primary action stays put. Aim to fit every option of a tool without scrolling at 1366x657: if they don't, reconsider the options (group, collapse "More options") before accepting the scroll.
+6. **Drop area = panel height.** In the empty state the drop area is as tall as the options panel, so the first screen is one balanced row that ends inside the viewport.
+7. **Result screen fits too.** Download, the result preview and "keep going" are on the first screen at 1366x657.
+8. **Phones.** Upload button, limits and privacy line sit above the bottom dock; the dock holds the options row and the primary action; nothing important is covered by it (the e2e check hits the element at its centre).
+9. **New layouts inherit this.** A tool with its own workspace (Merge, the editor) keeps the shared head, `--ip-work-h` and the dock's pinned footer, or gives the same guarantees and adds itself to the viewport test.
+
+### Viewport checklist (every UI change; screenshots in the spec's `## UI` and the PR)
+
+| Viewport | Why |
+|---|---|
+| 1280x632, 1366x657, 1536x730, 1440x789, 1920x969 | real browser viewports of the common laptop and desktop screens |
+| 1280x720, 1366x768, 1536x864, 1440x900, 1920x1080 | full-screen / kiosk, and what most tools are tested at |
+| 1024x768 | tablet landscape: first width with the side panel |
+| 768x1024 | tablet portrait: bottom dock |
+| 360x640, 390x664, 412x839 | small Android, iPhone with Safari bars, Pixel 7 with Chrome bars |
+
+For each: primary action fully visible and not covered, on load, after loading a 60-page file, after scrolling that file, and on the result screen; no horizontal scroll; tool head on one line from 1024px. `apps/web/e2e/ui/viewport-fit.spec.ts` enforces this for every usable tool in CI (it reads the registry, so new tools are covered automatically).
 
 ## Motion
 
