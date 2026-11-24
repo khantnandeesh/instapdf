@@ -35,6 +35,7 @@ import { ToolIntro } from "./ToolIntro";
 import type { FlowApi, FlowContext, FlowState, LoadedFile, PageDecoration, PreviewItem, ProcessFn, ReadyFile, ToolOutput, WorkspaceContext } from "./types";
 import { onIntent } from "./intent";
 import { exit, settle } from "@/lib/motion";
+import { enter } from "@/lib/motion/flow";
 // F23 cloud sources: the caret, the row and the hub on tool pages (everything else is the cloud chunk,
 // ui.ts, fetched on intent), compiled out entirely without them (every use sits behind the flag).
 import { CloudCaret, CloudRow, useCloud } from "../cloud/tool-cloud";
@@ -70,8 +71,8 @@ const LeaveGuard = dynamic(() => lazyParts.leave().then((m) => m.LeaveGuard), { 
 
 type Phase = "idle" | "processing" | "done" | "error";
 
-/** Shown for at least this long so a fast run does not flash. */
-const MIN_PROCESSING_MS = 300;
+/** Once shown, the processing card stays at least this long, so a fast run does not flash (motion.md T11). */
+const MIN_PROCESSING_MS = 400;
 const THUMB_MIN = 80;
 const THUMB_MAX = 400;
 /** Same as --ip-thumb-size in tokens.css, so the server HTML needs no style attribute (strict CSP style-src). */
@@ -638,10 +639,21 @@ export function ToolFlow({
     setFocusPickerTick((n) => n + 1);
   }, [announce, onReset, releaseDoc, updateFiles]);
 
-  const backToOptions = useCallback(() => {
+  // Back to options reverses T12: the card fades out (120ms, inert at once), then the work area fades in
+  // (200ms; opacity only, so the sticky dock inside it never gets a transformed containing block). Focus
+  // waits on the tool heading meanwhile, as it does on the way in.
+  const resultCard = useRef<HTMLElement>(null);
+  const [workBack, setWorkBack] = useState(0);
+  const backToOptions = useCallback(async () => {
+    if (resultCard.current?.contains(document.activeElement)) heading.current?.focus({ preventScroll: true });
+    await exit(resultCard.current, "result");
     setOutput(null);
     setPhase("idle");
+    setWorkBack((n) => n + 1);
   }, []);
+  useLayoutEffect(() => {
+    if (workBack) enter(workArea.current, "overlay");
+  }, [workBack]);
 
   const continueWith = useCallback(
     (target: FlowTool) => {
@@ -848,12 +860,13 @@ export function ToolFlow({
 
       {state === "done" && output ? (
         <ResultCard
+          ref={resultCard}
           output={output}
           tool={tool}
           continueTargets={continueTargets(output.type)}
           onContinue={continueWith}
           onStartOver={startOver}
-          onBack={backToOptions}
+          onBack={() => void backToOptions()}
           announce={announce}
         />
       ) : (

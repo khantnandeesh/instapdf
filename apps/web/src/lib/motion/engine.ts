@@ -142,10 +142,12 @@ export function enter(el: HTMLElement | HTMLElement[], p: Preset): void {
   const each = Math.min(STAGGER.each, STAGGER.max / Math.max(1, inView.length - 1), (CAP - duration) / Math.max(1, inView.length - 1));
   track(
     gsap.fromTo(els, start, {
+      // Back to identity on what the preset moves, and nothing else: an opacity-only preset writes no
+      // inline transform (which would make a containing block for fixed descendants mid-tween).
       opacity: 1,
-      x: 0,
-      y: 0,
-      scale: 1,
+      ...("x" in start && { x: 0 }),
+      ...("y" in start && { y: 0 }),
+      ...("scale" in start && { scale: 1 }),
       duration,
       ease: ease(p),
       delay: p === "tick" ? 0.08 : 0,

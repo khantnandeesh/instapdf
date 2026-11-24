@@ -1,6 +1,6 @@
 "use client";
 import "@/components/berry/berry-loader.css";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Ref } from "react";
 import { swap } from "@/lib/motion/flow";
 import { formatBytes } from "@/lib/pdf/naming";
 import { openPdf } from "@/lib/pdf/pdfjs";
@@ -42,6 +42,7 @@ export function ResultCard({
   onStartOver,
   onBack,
   announce,
+  ref,
 }: {
   output: ToolOutput;
   tool: FlowTool;
@@ -50,6 +51,8 @@ export function ResultCard({
   onStartOver: () => void;
   onBack: () => void;
   announce: (message: string) => void;
+  /** The card's root (ToolFlow fades it out on Back to options, T12). */
+  ref?: Ref<HTMLElement>;
 }) {
   // F23: the privacy line when the files came from a cloud or a copy went to one.
   // eslint-disable-next-line react-hooks/rules-of-hooks -- the flag is a build-time constant: the same call on every render
@@ -114,7 +117,7 @@ export function ResultCard({
   return (
     // BerryPDF Panel: one centred white panel (20px radius, sand outline, soft pink shadow);
     // Download is the single berry action. A leaf-green tick says "done" (success, not category).
-    <section aria-labelledby={titleId} className="mp-panel mp-pop-in mx-auto w-full max-w-[760px] p-5 sm:p-10" data-testid="result">
+    <section ref={ref} aria-labelledby={titleId} className="mp-panel mp-pop-in mx-auto w-full max-w-[760px] p-5 sm:p-10" data-testid="result">
       <h2 id={titleId} className="flex items-center gap-3 font-display text-[22px] leading-[1.2] font-semibold text-ink-black">
         <span className="mp-tick-in grid size-10 place-items-center rounded-full bg-[var(--mp-alert-ok-bg)] text-leaf">
           <CheckIcon size={24} />

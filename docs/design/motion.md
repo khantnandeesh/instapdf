@@ -213,6 +213,11 @@ Distances: we use small translates, opacity, and scale close to 1.
 | T13 | Download success | On click, the download starts at once. The button's icon cross-fades and scales 0.8 → 1 from arrow to tick in 200ms `--ease-pop`, and the live region says "Downloaded". After 2.4s the icon goes back to the arrow in 120ms. The button stays enabled throughout (download again). No label change and no confetti. | GSAP swap | icon swaps instantly |
 | T14 | "Keep going" chips, Start over | Chips are CSS hover/press. Start over: the result card fades 120ms and the empty state enters as T1. | CSS + GSAP exit | instant |
 
+**Status of T10–T12 (review of PR #50, 24 Nov):**
+- **T12 is built both ways.** On the way in, focus waits on the tool heading while the work area leaves (it is inert), and the result card then focuses Download. "Back to options" reverses it: the card fades out in 120ms (inert at once, focus on the heading), then the work area fades in over 200ms. That fade is opacity only, because a transform on the work area would give the dock inside it a transformed containing block.
+- **T11: the "stays at least 400ms" part is built** (`MIN_PROCESSING_MS` in `ToolFlow.tsx`). **The 300ms wait before the card shows is deferred.** Focus moves to the progress bar as soon as a run starts (screen readers announce it there), and the e2e suites wait on that state. Hiding the bar for the first 300ms needs its own focus and announcement design.
+- **T10 is deferred.** Removing an item in place means keeping it in the model (and the DOM) for its 120ms exit. The specs check the order right after Remove without retrying (`e2e/f3/files.spec.ts`, `pages.spec.ts`, `options-a11y.spec.ts`), so they would read the leaving item. A ghost clone fading over the gap would repeat the item's test ids and labels in the DOM while it fades. Next step: a ghost with its ids and labels stripped, and an e2e that its fade never shows up in role or test-id queries.
+
 ### Editor (`tools/editor`)
 
 | # | Interaction | Spec | Engine | Reduced |
