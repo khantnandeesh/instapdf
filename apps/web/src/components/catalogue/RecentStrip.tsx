@@ -26,11 +26,11 @@ export function RecentStrip({
   const headingId = `${idPrefix}-recent`;
   if (inline)
     return (
-      <section aria-labelledby={headingId} data-testid={`${idPrefix}-recent`} className="flex min-w-0 flex-1 items-center gap-3">
+      <section aria-labelledby={headingId} data-testid={`${idPrefix}-recent`} className="flex min-w-0 flex-1 items-center gap-3 max-lg:basis-full">
         <H id={headingId} className="mp-eyebrow shrink-0 px-0 py-1">
           {copy.recentTitle}
         </H>
-        <ul className="-my-1 flex min-w-0 scroll-px-1.5 gap-2 overflow-x-auto px-1.5 py-1.5 [scrollbar-width:none]">
+        <ul className="-my-1 flex min-w-0 scroll-px-1.5 gap-2 overflow-x-auto px-1.5 py-1.5 [scrollbar-width:thin]">
           {items.map((item) => (
             <li key={item.slug} className="shrink-0">
               <ToolChip item={item} />

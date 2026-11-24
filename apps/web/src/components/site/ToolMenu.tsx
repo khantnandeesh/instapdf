@@ -197,7 +197,7 @@ export function ToolMenu() {
           <div
             id={MENU_ID}
             className="mp-menu-panel fixed overflow-y-auto overscroll-contain"
-            style={{ top, maxHeight: `calc(100dvh - ${top}px - 48px)` }}
+            style={{ top, maxHeight: `calc(100dvh - ${top}px - 24px)` }}
             data-testid="tool-menu"
           >
             <div className="relative mx-auto max-w-[1280px] px-6 pt-6 pb-5 lg:px-8">{content}</div>
@@ -295,7 +295,7 @@ function MenuContent({
     >
       <LiveRegion message={live} />
       {mode === "panel" ? (
-        <div className="flex items-center gap-6 pe-14">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pe-14">
           {search}
           {count}
           {!searching && recentStrip("inline")}

@@ -1,12 +1,7 @@
 /* Site header and the All tools panel (owner 2026-11-24: a full-width bar, not an inset pill; the
    menu opens as a full-width panel under the bar with the page behind it blurred and dimmed).
-   Component-local so the shared globals.css stays inside its gzip budget. */
-
-@media (min-width: 768px) {
-  :root {
-    --ip-header-h: 72px;
-  }
-}
+   Kept next to the components; it still ships in the shared stylesheet (home CSS budget, F2 AC-55).
+   The bar height (--ip-header-h) lives in tokens.css. */
 
 /* The bar: edge to edge, frosted white with a hairline. The glass sits on ::before, never on the
    header itself: backdrop-filter (like filter, transform, contain) would make the header the
@@ -23,7 +18,7 @@
   background: color-mix(in srgb, var(--surface) 82%, transparent);
   -webkit-backdrop-filter: blur(16px) saturate(1.6);
   backdrop-filter: blur(16px) saturate(1.6);
-  box-shadow: inset 0 -1px 0 var(--sand);
+  border-bottom: 1px solid var(--sand); /* a border, not a shadow, so forced colours keep the edge */
   transition: background-color var(--dur-base);
 }
 .mp-header[data-menu-open]::before {
@@ -35,8 +30,9 @@
   }
 }
 @media (forced-colors: active) {
-  .mp-header::before {
-    box-shadow: inset 0 -1px 0 CanvasText;
+  .mp-header::before,
+  .mp-menu-panel {
+    border-color: CanvasText;
   }
 }
 
@@ -44,11 +40,12 @@
 .mp-menu-panel {
   inset-inline: 0;
   background: var(--surface);
-  box-shadow:
-    inset 0 1px 0 var(--sand),
-    0 24px 48px -24px rgba(120, 20, 40, 0.28);
+  border: 1px solid transparent;
+  border-top: 0;
+  box-shadow: 0 24px 48px -24px rgba(120, 20, 40, 0.28);
   border-radius: 0 0 var(--radius-panel) var(--radius-panel);
-  animation: mp-panel-in var(--dur-move) var(--ease-enter, ease-out) both;
+  /* backwards, not both: no transform is left on the panel once it has arrived. */
+  animation: mp-panel-in var(--dur-move) var(--ease-enter, ease-out) backwards;
 }
 /* The page behind: dimmed and blurred; a click on it closes the panel. */
 .mp-menu-backdrop {
@@ -57,7 +54,7 @@
   background: rgba(42, 28, 32, 0.22);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
-  animation: mp-fade-in var(--dur-move) ease-out both;
+  animation: mp-fade-in var(--dur-move) ease-out backwards;
 }
 @media (prefers-reduced-transparency: reduce) {
   .mp-menu-backdrop {
@@ -84,7 +81,7 @@
   }
 }
 
-/* Denser rows in the panel so every group fits one screen at 1280x720 without names wrapping. */
+/* Denser rows in the panel so every group fits one screen from 1280x632 up. */
 .mp-menu-panel .mp-menu-row {
   padding: 6px 10px;
   font-size: 15px;

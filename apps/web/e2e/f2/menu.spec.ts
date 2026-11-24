@@ -227,26 +227,49 @@ test.describe("AC-33 at 1280x720", () => {
   });
 });
 
-test.describe("full-width panel (owner 2026-11-24) at 1280x720", () => {
-  test.use({ viewport: { width: 1280, height: 720 } });
-  test("the bar spans the viewport, the panel hangs from it full width, groups spread across it, the page behind is blurred, and it all fits one screen", async ({ page }, info) => {
+for (const [width, height] of [
+  [1280, 720],
+  [1280, 632],
+  [1366, 657],
+] as const) {
+  test.describe(`full-width panel (owner 2026-11-24) at ${width}x${height}`, () => {
+    test.use({ viewport: { width, height } });
+    test("the bar spans the viewport, the panel hangs from it full width, groups spread across it, the page behind is blurred, and it all fits one screen", async ({ page }, info) => {
+      test.skip(!isDesktop(info.project.name), "desktop menu");
+      await openHydrated(page);
+      const header = await page.locator("header").first().boundingBox();
+      expect(header).toMatchObject({ x: 0, width, height: 72 });
+      await openMenu(page);
+      await menu(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      const panel = await menu(page).boundingBox();
+      expect(panel).toMatchObject({ x: 0, width, y: 72 });
+      // Groups fill the width evenly: the leftmost and rightmost group start in the outer fifths.
+      const lefts = await menu(page).locator("nav section h2, nav section li").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().left));
+      expect(Math.min(...lefts)).toBeLessThan(width / 5);
+      expect(Math.max(...lefts)).toBeGreaterThan((width * 4) / 5 - 40);
+      // Every entry visible without scrolling the panel.
+      await expect(menu(page).locator("nav a").last()).toBeInViewport();
+      expect(await menu(page).evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+      const backdrop = await page.getByTestId("tool-menu-scrim").evaluate((el) => getComputedStyle(el).backdropFilter);
+      expect(backdrop).toMatch(/blur\(/);
+    });
+  });
+}
+
+test.describe("full-width panel in forced colours", () => {
+  test.use({ viewport: { width: 1280, height: 720 }, colorScheme: "light" });
+  test("the bar and the panel keep a visible edge", async ({ page }, info) => {
     test.skip(!isDesktop(info.project.name), "desktop menu");
+    await page.emulateMedia({ forcedColors: "active" });
     await openHydrated(page);
-    const header = await page.locator("header").first().boundingBox();
-    expect(header).toMatchObject({ x: 0, width: 1280, height: 72 });
+    const bar = await page.locator("header").first().evaluate((el) => getComputedStyle(el, "::before").borderBottomWidth);
+    expect(parseFloat(bar)).toBeGreaterThan(0);
     await openMenu(page);
-    await menu(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
-    const panel = await menu(page).boundingBox();
-    expect(panel).toMatchObject({ x: 0, width: 1280, y: 72 });
-    // Groups fill the width evenly: the leftmost and rightmost group start in the outer fifths.
-    const lefts = await menu(page).locator("nav section h2, nav section li").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().left));
-    expect(Math.min(...lefts)).toBeLessThan(1280 / 5);
-    expect(Math.max(...lefts)).toBeGreaterThan((1280 * 4) / 5 - 40);
-    // Every entry visible without scrolling the panel.
-    await expect(menu(page).locator("nav a").last()).toBeInViewport();
-    expect(await menu(page).evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
-    const backdrop = await page.getByTestId("tool-menu-scrim").evaluate((el) => getComputedStyle(el).backdropFilter);
-    expect(backdrop).toMatch(/blur\(/);
+    const sides = await menu(page).evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return [cs.borderLeftWidth, cs.borderRightWidth, cs.borderBottomWidth].map(parseFloat);
+    });
+    for (const w of sides) expect(w).toBeGreaterThan(0);
   });
 });
 
