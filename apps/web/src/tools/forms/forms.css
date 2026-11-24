@@ -115,8 +115,6 @@ textarea.bf-options { height: auto; padding: 6px 8px; line-height: 1.4; resize: 
 .bf-draw { position: absolute; inset: 0; cursor: crosshair; touch-action: none; pointer-events: auto; }
 /* Placing, drawing and marking go over fields; every other tool still fills them (AC-248). */
 .ed-overlay--place .bf-field, .ed-overlay--draw .bf-field, .ed-overlay--mark .bf-field, .ed-overlay--shapes .bf-field, .ed-overlay--whiteout .bf-field { pointer-events: none; }
-/* The Form tool draws and drags fields: objects on the page stay out of its way. */
-.ed-overlay--form .ed-obj { pointer-events: none; }
 .bf-drag { position: absolute; border: 1.5px dashed var(--blueberry); background: color-mix(in srgb, var(--blueberry) 10%, transparent); border-radius: 2px; pointer-events: none; }
 .bf-layer[data-mode="edit"] .bf-field { touch-action: none; }
 .bf-layer[data-mode="edit"] .bf-inner { pointer-events: none; }

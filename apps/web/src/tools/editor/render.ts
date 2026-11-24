@@ -55,8 +55,8 @@ export function renderPage(pdf: PDFDocumentProxy, src: number, scale: number, ro
         // (pdf.js AnnotationMode.ENABLE_FORMS), so a changed, moved or deleted field never shows twice.
         // Annotations pdf.js gives their own canvas (check boxes, radios, read-only text, no-rotate
         // notes) go to `own` instead of the page; the ones that aren't fields are drawn back.
-        const own = forms ? new Map<string, HTMLCanvasElement>() : undefined;
-        task = page.render({ canvas, viewport, annotationMode: forms ? 2 : 1, annotationCanvasMap: own });
+        const own: OwnCanvases | undefined = forms ? new Map() : undefined;
+        task = page.render({ canvas, viewport, annotationMode: forms ? 2 : 1, annotationCanvasMap: own as Map<string, HTMLCanvasElement> | undefined });
         await task.promise;
         if (own?.size && !job.cancelled) await drawOwnCanvases(page, viewport, canvas, own);
         if (job.cancelled) release(canvas);
@@ -99,19 +99,38 @@ export function swapCanvas(holder: HTMLElement, next: HTMLCanvasElement | null) 
 
 const WIDGET = 20; // pdf.js AnnotationType.WIDGET
 
-/** Draws the non-field annotations pdf.js painted on canvases of their own back onto the page. */
-async function drawOwnCanvases(page: PDFPageProxy, viewport: PageViewport, canvas: HTMLCanvasElement, own: Map<string, HTMLCanvasElement>) {
+/** pdf.js keeps one canvas per annotation, or two (on and off looks) for check boxes and radios. */
+type OwnCanvases = Map<string, HTMLCanvasElement | HTMLCanvasElement[]>;
+
+/**
+ * Draws back the annotations pdf.js painted on canvases of their own that the field layer doesn't
+ * draw: everything but fields, plus push buttons and signature fields (shown as the file has
+ * them). Check boxes, radios and text fields are left to the field layer. Frees every canvas.
+ */
+async function drawOwnCanvases(page: PDFPageProxy, viewport: PageViewport, canvas: HTMLCanvasElement, own: OwnCanvases) {
   try {
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     const annots = await page.getAnnotations({ intent: "display" });
     for (const a of annots) {
-      const c = own.get(a.id);
-      if (!c || !ctx || a.annotationType === WIDGET) continue;
+      const entry = own.get(a.id);
+      const c = Array.isArray(entry) ? entry[0] : entry;
+      if (!c || !c.width || !c.height) continue;
+      if (a.annotationType === WIDGET && !a.pushButton && a.fieldType !== "Sig") continue;
       const [x0, y0] = viewport.convertToViewportPoint(a.rect[0], a.rect[1]) as number[];
       const [x1, y1] = viewport.convertToViewportPoint(a.rect[2], a.rect[3]) as number[];
-      ctx.drawImage(c, Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+      // The canvas holds the annotation upright in its own frame: turn it with the page.
+      const turn = a.noRotate ? 0 : ((viewport.rotation % 360) + 360) % 360;
+      // Its size in the annotation's own (unturned) frame.
+      const dw = Math.abs(a.rect[2] - a.rect[0]) * viewport.scale;
+      const dh = Math.abs(a.rect[3] - a.rect[1]) * viewport.scale;
+      ctx.save();
+      ctx.translate((x0 + x1) / 2, (y0 + y1) / 2);
+      ctx.rotate((turn * Math.PI) / 180);
+      ctx.drawImage(c, -dw / 2, -dh / 2, dw, dh);
+      ctx.restore();
     }
   } finally {
-    for (const c of own.values()) release(c);
+    for (const e of own.values()) for (const c of Array.isArray(e) ? e : [e]) release(c);
   }
 }

@@ -88,9 +88,9 @@ export function moveInOrder(state: FormState, widgetId: string, to: number, page
   return { ...state, orderMode: "custom", order };
 }
 
-/** The tab order of one page's widgets. */
+/** The tab order of one page's widgets (the file's hidden ones left out: nobody can tab to them). */
 export function pageOrder(state: FormState, pageId: string): string[] {
-  const onPage = new Set(state.fields.flatMap((f) => f.widgets.filter((w) => w.page === pageId).map((w) => w.id)));
+  const onPage = new Set(state.fields.flatMap((f) => f.widgets.filter((w) => w.page === pageId && !w.hidden).map((w) => w.id)));
   const listed = state.order.filter((id) => onPage.has(id));
   return [...listed, ...[...onPage].filter((id) => !listed.includes(id))];
 }

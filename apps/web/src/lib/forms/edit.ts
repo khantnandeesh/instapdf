@@ -124,7 +124,7 @@ export function propsFor(kind: FormField["kind"]): { main: PropKey[]; more: Prop
  * buttons and signatures are skipped. Returns a widget id, or null when every field is filled.
  */
 export function nextEmptyWidget(state: FormState, after: string | null = null, requiredFirst = false): string | null {
-  const byWidget = new Map(state.fields.flatMap((f) => f.widgets.map((w) => [w.id, f] as const)));
+  const byWidget = new Map(state.fields.flatMap((f) => f.widgets.filter((w) => !w.hidden).map((w) => [w.id, f] as const)));
   const fillable = (f: FormField) => !f.readOnly && f.kind !== "button" && f.kind !== "signature" && isEmptyValue(f.value);
   const order = state.order.filter((w) => byWidget.has(w));
   const start = after ? order.indexOf(after) + 1 : 0;

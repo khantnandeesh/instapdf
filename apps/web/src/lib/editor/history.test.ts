@@ -95,4 +95,14 @@ describe("history (AC-43, AC-73)", () => {
     ]);
     expect(current(r).forms!.order).toEqual([...name.widgets.map((w) => w.id), ...other.widgets.map((w) => w.id)]);
   });
+  it("reverts the first field on a file with no form without touching later fields (F16 E3)", () => {
+    let h = createHistory(base()); // no form at all
+    const a = createField(emptyForm(), { kind: "text", page: "p0", box: { x: 10, y: 10, w: 100, h: 20 } });
+    h = commit(h, { ...current(h), forms: addField(emptyForm(), a) }, { label: "Add text field", at: 1 });
+    const b = createField(current(h).forms!, { kind: "checkbox", page: "p0", box: { x: 10, y: 50, w: 14, h: 14 } });
+    h = commit(h, { ...current(h), forms: addField(current(h).forms!, b) }, { label: "Add checkbox", at: 2 });
+    h = commit(h, { ...current(h), forms: setValue(current(h).forms!, b.id, "Yes").state }, { label: "Fill in field", at: 3 });
+    const r = revertEntries(h, [0], 4);
+    expect(current(r).forms!.fields.map((f) => [f.id, f.value])).toEqual([[b.id, "Yes"]]);
+  });
 });

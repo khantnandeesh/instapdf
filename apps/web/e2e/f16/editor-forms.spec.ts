@@ -249,22 +249,9 @@ test("AC-237: a signature field takes the signature made for it; a cancelled one
   await page.getByTestId("canvas").focus();
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
-  // Sign into the field: the signature lands inside its box.
-  await field.getByRole("button", { name: /^Sign/ }).click();
-  await page.getByTestId("sign-text").fill("Asha Rao");
-  await page.getByTestId("sign-place").click();
   const sig = page.locator('.ed-obj[data-kind="signature"]');
-  await expect(sig).toHaveCount(1);
-  const fb = (await field.boundingBox())!;
-  const sb = (await sig.boundingBox())!;
-  expect(sb.x).toBeGreaterThanOrEqual(fb.x - 1);
-  expect(sb.x + sb.width).toBeLessThanOrEqual(fb.x + fb.width + 1);
-  // The signature sits on top of the field and can be picked.
-  await sig.click();
-  await expect(page.getByTestId("sign-dialog")).toHaveCount(0);
-  // Ask again, then cancel: the next signature from the Sign tool is placed by hand.
-  await page.keyboard.press("Escape");
-  await field.getByRole("button", { name: /^Sign/ }).click({ position: { x: 4, y: 4 } });
+  // Ask from the field, then cancel: the next signature from the Sign tool is placed by hand.
+  await field.getByRole("button", { name: /^Sign/ }).click();
   await expect(page.getByTestId("sign-dialog")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("sign-dialog")).toHaveCount(0);
@@ -272,8 +259,26 @@ test("AC-237: a signature field takes the signature made for it; a cancelled one
   await page.keyboard.press("s");
   await page.getByTestId("sign-text").fill("Asha Rao");
   await page.getByTestId("sign-place").click();
-  await expect(sig).toHaveCount(1);
+  await expect(sig).toHaveCount(0);
   const q = await at(page, 1, 0.3, 0.7);
   await page.mouse.click(q.x, q.y);
+  await expect(sig).toHaveCount(1);
+  await expect(field).toHaveCount(1);
+  // Sign into the field: the signature lands in its box and takes the field's place (one undo step).
+  await page.keyboard.press("Escape");
+  const fb = (await field.boundingBox())!;
+  await field.getByRole("button", { name: /^Sign/ }).click();
+  await page.getByTestId("sign-text").fill("Asha Rao");
+  await page.getByTestId("sign-place").click();
   await expect(sig).toHaveCount(2);
+  await expect(field).toHaveCount(0);
+  const sb = (await sig.nth(1).boundingBox())!;
+  expect(sb.x).toBeGreaterThanOrEqual(fb.x - 1);
+  expect(sb.x + sb.width).toBeLessThanOrEqual(fb.x + fb.width + 1);
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("Control+z");
+  await expect(sig).toHaveCount(1);
+  await expect(field).toHaveCount(1);
+  const out = await PDFDocument.load(await download(page));
+  expect(out.getForm().getFields().map((f) => f.constructor.name)).toEqual(["PDFSignature"]);
 });

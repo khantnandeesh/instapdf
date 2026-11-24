@@ -12,9 +12,9 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type Point
 import { Dialog } from "@/components/ui/Dialog";
 import * as H from "@/lib/editor/history";
 import { readFormsInWorker } from "@/lib/editor/build-client";
-import { clampDelta, newId, pageSize, totalRotation, type PageEntry } from "@/lib/editor/model";
+import { addObjects, clampDelta, newId, pageSize, totalRotation, type EditorObject, type PageEntry } from "@/lib/editor/model";
 import { nextEmptyWidget } from "@/lib/forms/edit";
-import { addField, addFields, addRadioButton, createField, defaultSize, deleteField, duplicateField, emptyForm, fieldOfWidget, missingRequired, setValue, setWidgetBox } from "@/lib/forms/model";
+import { addField, addFields, addRadioButton, createField, defaultSize, deleteField, deleteWidget, duplicateField, emptyForm, fieldOfWidget, missingRequired, setValue, setWidgetBox } from "@/lib/forms/model";
 import { moveInOrder, pageOrder, restoreOriginal, sortByColumns, sortByRows } from "@/lib/forms/taborder";
 import type { FormField, FormState, Proposal } from "@/lib/forms/types";
 import type { Controller } from "@/tools/editor/controller";
@@ -282,7 +282,11 @@ export function FormsChrome({ wide }: { wide: boolean }) {
         const entry = H.current(s.history).pages.find((p) => p.id === t.page);
         const rot = entry ? (360 - totalRotation(entry)) % 360 : 0;
         store.set({ placement: null });
-        ctl.add([{ kind: "signature", id: newId(), page: t.page, x: t.x + (t.w - w) / 2, y: t.y + (t.h - h) / 2, w, h, rot, role: pl.role ?? "signature", sig: pl.sig!, color: pl.color ?? "#000000" }], "Sign in field");
+        // The signature takes the field's place in one step: a stamped signature under a "Sign here"
+        // field would show the field on top in every viewer.
+        const sig: EditorObject = { kind: "signature", id: newId(), page: t.page, x: t.x + (t.w - w) / 2, y: t.y + (t.h - h) / 2, w, h, rot, role: pl.role ?? "signature", sig: pl.sig!, color: pl.color ?? "#000000" };
+        const doc = ctl.state();
+        ctl.apply({ ...addObjects(doc, [sig]), forms: doc.forms && deleteWidget(doc.forms, t.id) }, "Sign in field", { page: t.page, targets: [sig.id], select: [sig.id] });
         ctl.setTool("select");
         ctl.announce("Signed in the field");
       }),
@@ -409,7 +413,7 @@ export function FieldsChipSlot() {
   const sel = useStore(store, (s) => s.forms.selected?.widget ?? null);
   // Phones keep the top bar for the file name; the nudge comes as a note after Download there.
   const wide = useStore(store, (s) => s.wide);
-  const counts = useMemo(() => (form ? { count: form.fields.filter((f) => !f.readOnly && f.kind !== "button").length, required: missingRequired(form).length } : null), [form]);
+  const counts = useMemo(() => (form ? { count: form.fields.filter((f) => !f.readOnly && f.kind !== "button" && f.widgets.some((w) => !w.hidden)).length, required: missingRequired(form).length } : null), [form]);
   if (!form || !counts || !wide) return null;
   return (
     <FieldsChip

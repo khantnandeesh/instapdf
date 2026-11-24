@@ -254,7 +254,8 @@ export const isEmptyValue = (v: string | string[]) => (Array.isArray(v) ? v.leng
 export function missingRequired(state: FormState): FormField[] {
   const rank = new Map(state.order.map((w, i) => [w, i]));
   const first = (f: FormField) => Math.min(...f.widgets.map((w) => rank.get(w.id) ?? Infinity));
-  return state.fields.filter((f) => f.required && f.kind !== "signature" && f.kind !== "button" && isEmptyValue(f.value)).sort((a, b) => first(a) - first(b));
+  // A field the file hides everywhere can't be filled here, so it is never asked for.
+  return state.fields.filter((f) => f.required && f.kind !== "signature" && f.kind !== "button" && isEmptyValue(f.value) && f.widgets.some((w) => !w.hidden)).sort((a, b) => first(a) - first(b));
 }
 
 /** Every widget on page `from` gets a twin on page `to` (a duplicated page), in the same field. */
@@ -263,7 +264,9 @@ export function duplicateWidgetsToPage(state: FormState, from: string, to: strin
   let changed = false;
   const fields = state.fields.map((f) => {
     if (f.kind === "radio" || !f.widgets.some((w) => w.page === from)) return f;
-    const twins = f.widgets.filter((w) => w.page === from).map((w) => ({ ...w, id: newId("w"), page: to, ref: undefined }));
+    // Hidden widgets get no twin: the writer doesn't carry the file's flags onto new widgets.
+    const twins = f.widgets.filter((w) => w.page === from && !w.hidden).map((w) => ({ ...w, id: newId("w"), page: to, ref: undefined }));
+    if (!twins.length) return f;
     order = [...order, ...twins.map((w) => w.id)];
     changed = true;
     return { ...f, widgets: [...f.widgets, ...twins] };

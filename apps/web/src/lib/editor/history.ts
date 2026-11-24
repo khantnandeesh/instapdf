@@ -5,7 +5,7 @@
  * pointers). Every entry names its change, the page it touched and when, for the tooltip, the
  * live region and the history panel. Reverting a set of entries is itself one undoable step.
  */
-import { prunePages, revertFormChange } from "@/lib/forms/model";
+import { emptyForm, prunePages, revertFormChange } from "@/lib/forms/model";
 import type { DocState } from "./model";
 
 export type Change = {
@@ -129,8 +129,9 @@ export function revertEntries(h: History, chosen: number[], at = Date.now()): Hi
   for (const i of [...picks].sort((a, b) => b - a)) {
     const before = h.states[i].forms;
     const after = h.states[i + 1].forms;
-    if (before === after || !forms) continue;
-    forms = before && after ? revertFormChange(forms, before, after) : before;
+    if (before === after) continue;
+    // A file with no form starts without one: reverting the first field compares against an empty form.
+    forms = revertFormChange(forms ?? emptyForm(), before ?? emptyForm(), after ?? emptyForm());
   }
   if (forms) forms = prunePages(forms, pages.map((p) => p.id));
   const next: DocState = { pages, objects, engine, ...(forms ? { forms } : {}) };

@@ -598,8 +598,6 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
           style={{ width: W, height: H_, left: (disp.width - W) / 2, top: (disp.height - H_) / 2, transform: rotation ? `rotate(${rotation}deg)` : undefined }}
           data-testid={`overlay-${index + 1}`}
         >
-          {/* Fields first: objects placed on them (a signature in a signature field) stay on top and pickable. */}
-          <PageFields entry={entry} scale={scale} />
           {shown.map((o, i) => (
             <ObjectView
               key={o.id}
@@ -625,6 +623,8 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
             <span key={i} aria-hidden="true" className={`ed-guide ed-guide--${g.axis}`} style={g.axis === "x" ? { left: g.at * scale, top: g.from * scale, height: (g.to - g.from) * scale } : { top: g.at * scale, left: g.from * scale, width: (g.to - g.from) * scale }} />
           ))}
           <div ref={marquee} aria-hidden="true" className="ed-marquee" />
+          {/* Fields above objects, as viewers draw widgets above page content. */}
+          <PageFields entry={entry} scale={scale} />
         </div>
         {readout && selectedHere.length + (draft?.["__new"]?.page === entry.id ? 1 : 0) > 0 && <Readout text={readout} objs={draft?.["__new"]?.page === entry.id ? [draft["__new"]] : selectedHere} entry={entry} scale={scale} />}
         {placement && (
