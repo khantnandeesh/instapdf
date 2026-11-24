@@ -340,6 +340,8 @@ impl Engine {
                 runs.push((r, odd));
             }
         }
+        // Whether the line has right-to-left text (see the ActualText check after step 4).
+        let any_rtl = rtl || runs.iter().any(|r| r.1);
         for (range, run_rtl) in runs {
             let run = &segment[range];
             let mut parts: Vec<(bool, &str)> = Vec::new();
@@ -430,6 +432,24 @@ impl Engine {
         }
         if let Some(request) = request {
             return Err(Error::MissingGlyphs { chars: missing, request });
+        }
+        // pdf.js ignores ActualText and pdfium reorders it, so in a line with right-to-left text a
+        // word that reads as typed only through ActualText (digits drawn with an Arabic font's
+        // glyphs, whose ToUnicode maps them elsewhere) is refused; "Replace with new text" covers
+        // it. A word drawn in another font is kept: pdfium reads it in place, while pdf.js, which
+        // puts a line's text items in content order, can read it out of order (crates/README.md).
+        // A line already drawn with ActualText spans (Chrome's output) is left out: neither reader
+        // reads it by its glyphs before the edit either.
+        if any_rtl && !spans_on_line {
+            if let Some(text) = pieces.iter().find_map(|p| match p {
+                Piece::Word { text, actual: true, .. } => Some(text),
+                _ => None,
+            }) {
+                return Err(verify(
+                    "text-mismatch",
+                    format!("{text:?} would read as typed only through ActualText, which pdf.js ignores"),
+                ));
+            }
         }
 
         // 5. Geometry: left-to-right lines keep their start, right-to-left lines their end.

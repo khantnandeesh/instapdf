@@ -54,8 +54,11 @@ codebase that runs as WebAssembly in the browser and natively for the consented 
    properties, such as a tagged PDF's `/MCID`, stay; a named property list holding more than
    the ActualText is left alone and the edit is refused (`actual-text-span`). When the read-back
    of a right-to-left line has the right glyphs in the wrong order (digits or Latin typed into
-   Arabic, which readers reorder with their own bidi rules), the edit is retried once with the
-   whole new segment in one ActualText span.
+   Arabic, which readers reorder with their own bidi rules), the edit is refused
+   (`text-mismatch`), not wrapped in ActualText. In a line with right-to-left text that reads by
+   its glyphs, a new word that would need ActualText (digits drawn with an Arabic font's glyphs,
+   whose ToUnicode maps them elsewhere) is refused the same way, since pdf.js ignores
+   ActualText. The editor offers "Replace with new text" for both.
 7. **Save.** The output is the original bytes plus one appended revision (incremental update).
    It is read back and every object is compared with the engine's copy. A failure is a `save`
    error with a reason code (`write-failed`, `prefix-changed`, `reparse-failed`,
@@ -95,6 +98,14 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
   glyphs' own Unicode where it can (a registered face is preferred over an embedded font whose
   ToUnicode map lacks the new glyphs). Chrome- and LibreOffice-made Arabic, which uses
   ActualText throughout, already reads reversed in PDFium before any edit.
+- pdf.js orders the text items of a line by content order. A word drawn in a font the line
+  doesn't otherwise use (a registered face, for a character the subset lacks, as "!" after
+  "تجريبي.") is its own item, so in a right-to-left line pdf.js can read it ahead of the line
+  ("تجريبي.!مرحبا بالعالم…"); PDFium reads it in place. Refusing these would also refuse plain
+  Arabic word edits that need a registered face (AC-205), so they are kept;
+  `apps/web/src/lib/editor/mixed-direction.test.ts` pins the limit.
+- Lines already drawn with ActualText spans (Chrome and LibreOffice Arabic) are not covered by
+  the ActualText refusal: neither reader reads them by their glyphs before an edit either.
 - Vertical text, CID fonts with a non-Identity CMap and invisible (OCR) text are read-only.
 - A shared Form XObject nested inside another form is refused (`shared-nested-form`).
 - Superscripts and subscripts are separate lines. Table cells closer than 1.5 em read as one line.

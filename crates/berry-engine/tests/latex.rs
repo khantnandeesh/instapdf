@@ -154,6 +154,56 @@ fn running_past_the_page_edge_is_refused() {
     e.replace_line(0, 0, "Ends near the edges").unwrap();
 }
 
+/// The `/ActualText` values in the first page's content, decompressed (the streams are
+/// FlateDecode), as their raw string bytes.
+fn actual_texts(bytes: &[u8]) -> Vec<Vec<u8>> {
+    let doc = Document::load_mem(bytes).unwrap();
+    let page = *doc.get_pages().get(&1).unwrap();
+    let mut content = Vec::new();
+    for id in doc.get_page_contents(page) {
+        let stream = doc.get_object(id).unwrap().as_stream().unwrap();
+        content.extend(stream.decompressed_content().unwrap_or_else(|_| stream.content.clone()));
+        content.push(b'\n');
+    }
+    // Decompressed: the text operators are readable.
+    assert!(content.windows(2).any(|w| w == b"BT"), "page content not decoded");
+    let mut out = Vec::new();
+    let mut at = 0;
+    while let Some(k) = content[at..].windows(11).position(|w| w == b"/ActualText") {
+        let mut i = at + k + 11;
+        while content[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        let mut v = Vec::new();
+        if content[i] == b'<' {
+            let end = i + content[i..].iter().position(|&b| b == b'>').unwrap();
+            let hex: Vec<u8> = content[i + 1..end].iter().copied().filter(|b| b.is_ascii_hexdigit()).collect();
+            v = hex.chunks(2).map(|c| u8::from_str_radix(std::str::from_utf8(c).unwrap(), 16).unwrap_or(0)).collect();
+            i = end;
+        } else if content[i] == b'(' {
+            let (mut depth, mut j) = (1, i + 1);
+            loop {
+                let c = content[j];
+                if c == b'\\' {
+                    v.push(content[j + 1]);
+                    j += 2;
+                    continue;
+                }
+                depth += (c == b'(') as i32 - (c == b')') as i32;
+                if depth == 0 {
+                    break;
+                }
+                v.push(c);
+                j += 1;
+            }
+            i = j;
+        }
+        out.push(v);
+        at = i;
+    }
+    out
+}
+
 /// Latin, digits and an en dash typed into a right-to-left line: readers rebuild their order from
 /// the glyph positions with their own bidi rules. The edit is kept only when the line reads back
 /// as typed without any ActualText help; otherwise it is refused ("text-mismatch") and the page is
@@ -163,7 +213,14 @@ fn running_past_the_page_edge_is_refused() {
 #[test]
 fn mixed_direction_text_in_an_arabic_line() {
     for file in ["scripts-chrome.pdf", "scripts-libreoffice.pdf", "scripts-plain.pdf"] {
-        for (starts, tail) in [("المبلغ", "x"), ("المبلغ", " more"), ("مرحبا", " 1\u{2013}2")] {
+        for (starts, tail) in [
+            ("المبلغ", "x"),
+            ("المبلغ", " more"),
+            ("مرحبا", " 1\u{2013}2"),
+            ("مرحبا", " 2024"),
+            ("مرحبا", " abc 12"),
+            ("مرحبا", "!"),
+        ] {
             let mut e = Engine::open(read(file), None).unwrap();
             assert!(e.add_font("Noto Naskh Arabic", false, false, read("fonts/NotoNaskhArabic-Regular.ttf")));
             let sans = std::fs::read("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf").unwrap();
@@ -176,8 +233,18 @@ fn mixed_direction_text_in_an_arabic_line() {
                     assert!(texts(&r.page).contains(&want), "{file}: {:?}", texts(&r.page));
                     // No ActualText span covers the new text: the glyphs alone read as typed.
                     let out = e.save().unwrap().0;
-                    let n = |b: &[u8]| b.windows(11).filter(|w| w == b"/ActualText").count();
-                    assert_eq!(n(&out[read(file).len()..]), 0, "{file} {tail:?}: the edit leans on ActualText");
+                    // Every ActualText value left on the page was already in the file, where the
+                    // file reads by its glyphs. Chrome's lines already lean on ActualText spans (no
+                    // reader reads them by their glyphs) and are left out of the refusal.
+                    let mut before = actual_texts(&read(file));
+                    if !before.is_empty() {
+                        continue;
+                    }
+                    for v in actual_texts(&out) {
+                        let k = before.iter().position(|b| *b == v);
+                        assert!(k.is_some(), "{file} {tail:?}: the edit leans on ActualText ({v:?})");
+                        before.swap_remove(k.unwrap());
+                    }
                 }
                 Err(err) => {
                     assert!(matches!(err, Error::Verify { reason: "text-mismatch", .. }), "{file} {tail:?}: {err:?}");
