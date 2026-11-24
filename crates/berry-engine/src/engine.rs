@@ -609,15 +609,9 @@ impl Engine {
         }
         let shift = new_width - (pos(b) - pos(a));
         let mut plan = Plan { removed: HashSet::new(), want: HashMap::new(), anchor, after: after_anchor, segs };
-        for i in a..b {
-            if let Some(g) = line.chars[i].glyph {
-                plan.removed.insert(g);
-            }
-        }
-        for i in b..n {
-            if let Some(g) = line.chars[i].glyph {
-                plan.want.insert(g, shift);
-            }
+        plan.removed.extend(line.chars[a..b].iter().filter_map(|c| c.glyph));
+        for g in line.chars[b..n].iter().filter_map(|c| c.glyph) {
+            plan.want.insert(g, shift);
         }
 
         // 6. Apply inside a transaction and check the result before keeping it.
