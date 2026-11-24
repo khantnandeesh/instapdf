@@ -11,7 +11,7 @@ export type MockChoice = Picked[] | "cancel" | "denied" | "unreachable";
 const FIXTURES = ["alpha.pdf", "bravo.pdf", "echo.pdf", "charlie.png", "notes.txt", "user-pw.pdf", "corrupt.pdf", "three-pages.pdf"];
 const MB = 1024 * 1024;
 
-function item(id: string, fixture: string, opts: { as?: string; slow?: boolean; fail?: boolean; size?: number; status?: number; native?: boolean } = {}): Picked {
+function item(id: string, fixture: string, opts: { as?: string; slow?: boolean; fail?: boolean; size?: number; status?: number; reason?: string; native?: boolean } = {}): Picked {
   // A "Google document" arrives as an exported PDF, like the real Drive adapter (AC-141).
   const name = opts.native ? exportName(opts.as ?? fixture) : (opts.as ?? fixture);
   return {
@@ -25,6 +25,7 @@ function item(id: string, fixture: string, opts: { as?: string; slow?: boolean; 
       if (opts.slow) q.set("slow", "1");
       if (opts.fail) q.set("fail", "1");
       if (opts.status) q.set("status", String(opts.status));
+      if (opts.reason) q.set("reason", opts.reason);
       const url = `/cloud-mock/${encodeURIComponent(fixture)}`;
       // Real pickers report each file's size up front; streamed bodies carry no Content-Length.
       const total = opts.status || opts.native ? undefined : Number(await (await fetch(`${url}?size=1`)).text()) || undefined;
@@ -107,7 +108,7 @@ export function MockPicker({ multiple, onChoose }: { multiple: boolean; onChoose
         <Button variant="outline" onClick={() => onChoose(Array.from({ length: 51 }, (_, i) => item(`n${i + 1}`, "alpha.pdf", { as: `file-${String(i + 1).padStart(2, "0")}.pdf` })))}>
           51 files
         </Button>
-        <Button variant="outline" onClick={() => onChoose([item("doc", "three-pages.pdf", { as: "Plan", native: true }), item("big-doc", "alpha.pdf", { as: "Big plan", native: true, status: 403 })])}>
+        <Button variant="outline" onClick={() => onChoose([item("doc", "three-pages.pdf", { as: "Plan", native: true }), item("big-doc", "alpha.pdf", { as: "Big plan", native: true, status: 403, reason: "exportSizeLimitExceeded" })])}>
           Google documents
         </Button>
         <Button variant="outline" onClick={() => onChoose("denied")}>

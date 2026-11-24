@@ -14,7 +14,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ name
   const { name } = await params;
   if (!mockActive() || !FILES.has(name)) return new Response("Not found", { status: 404 });
   const q = new URL(request.url).searchParams;
-  if (q.get("status") === "403") return new Response("Forbidden", { status: 403 });
+  // A refusal; `reason` answers in Google's JSON error shape.
+  if (q.get("status") === "403") {
+    const reason = q.get("reason");
+    return reason ? Response.json({ error: { code: 403, errors: [{ reason }] } }, { status: 403 }) : new Response("Forbidden", { status: 403 });
+  }
   const bytes = new Uint8Array(await readFile(join(process.cwd(), "tests", "fixtures", name)));
   if (q.get("size") === "1") return new Response(String(bytes.length), { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
   const type = name.endsWith(".pdf") ? "application/pdf" : name.endsWith(".png") ? "image/png" : "text/plain";

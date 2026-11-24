@@ -149,8 +149,8 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
         l.send({ t: "files", files: [{ id: p.id, file }] });
       } catch (e) {
         if (ctrl.signal.aborted) patchRow(p.id, { status: "stopped", note: windowCopy.stopped });
-        else if (p.native && e instanceof DownloadError && e.kind === "access") {
-          // Drive refuses to export a document over its size limit (AC-141).
+        else if (p.native && e instanceof DownloadError && e.status === 403 && e.reason === "exportSizeLimitExceeded") {
+          // Drive refuses to export a document over its size limit (AC-141); any other refusal is a plain "can't open".
           patchRow(p.id, { status: "skipped", note: windowCopy.tooBigToExport });
           l.send({ t: "skipped", items: [{ name: p.name, reason: "export", id: p.id }] });
         } else if ((e instanceof DownloadError && e.kind === "access") || (e instanceof CloudError && e.code === "denied")) {

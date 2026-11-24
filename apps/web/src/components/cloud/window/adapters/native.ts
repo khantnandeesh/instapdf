@@ -1,7 +1,8 @@
 /**
  * Google's own documents (Docs, Sheets, Slides) have no file to download: Drive exports them as a
  * PDF (files.export, AC-141). Offered only where the tool takes PDFs. Drive refuses an export over
- * its size limit (10 MB) with a 403, which the window reports by name ("export").
+ * its size limit (10 MB) with a 403 whose reason is `exportSizeLimitExceeded`, which the window
+ * reports by name ("export"); any other refusal is a plain "can't open".
  */
 export const GOOGLE_NATIVE: Record<string, string> = {
   "application/vnd.google-apps.document": "Google Docs",

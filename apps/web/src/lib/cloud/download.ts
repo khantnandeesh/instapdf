@@ -8,12 +8,25 @@ export class DownloadError extends Error {
   constructor(
     readonly kind: "access" | "network" | "aborted",
     readonly status = 0,
+    /** The provider's own reason for a refusal, when it gives one (Google: `exportSizeLimitExceeded`). */
+    readonly reason?: string,
   ) {
     super(`download ${kind}${status ? ` ${status}` : ""}`);
   }
 }
 
 const FOLD_BYTES = 8 * 1024 * 1024;
+
+/** Google APIs explain a 403 in a JSON body: `{ error: { errors: [{ reason }] } }`. */
+export async function refusalReason(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as { error?: { errors?: { reason?: unknown }[] } };
+    const r = body.error?.errors?.[0]?.reason;
+    return typeof r === "string" ? r : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export type DownloadRequest = { url: string; headers?: Record<string, string>; name: string; type?: string; total?: number };
 
@@ -29,7 +42,7 @@ export async function downloadFile(
   } catch {
     throw new DownloadError(signal?.aborted ? "aborted" : "network");
   }
-  if (!res.ok) throw new DownloadError(res.status === 401 || res.status === 403 || res.status === 404 ? "access" : "network", res.status);
+  if (!res.ok) throw new DownloadError(res.status === 401 || res.status === 403 || res.status === 404 ? "access" : "network", res.status, res.status === 403 ? await refusalReason(res) : undefined);
   const header = Number(res.headers.get("content-length"));
   const total = req.total && req.total > 0 ? req.total : Number.isFinite(header) && header > 0 ? header : 0;
   const type = req.type || res.headers.get("content-type")?.split(";")[0] || "";

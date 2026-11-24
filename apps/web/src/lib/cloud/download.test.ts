@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DownloadError, downloadFile, runPool } from "./download";
+import { DownloadError, downloadFile, refusalReason, runPool } from "./download";
 
 function streamResponse(chunks: Uint8Array[], init: ResponseInit & { failAfter?: number } = {}) {
   let i = 0;
@@ -36,6 +36,18 @@ describe("downloadFile", () => {
         throw new TypeError("offline");
       }),
     ).rejects.toMatchObject({ kind: "network" });
+  });
+});
+
+describe("a refused download", () => {
+  it("keeps Google's reason for a 403, so only a real export size refusal reads 'too large' (AC-141)", async () => {
+    const big = async () => Response.json({ error: { code: 403, errors: [{ reason: "exportSizeLimitExceeded" }] } }, { status: 403 });
+    const e = await downloadFile({ url: "u", name: "Plan.pdf" }, () => {}, undefined, big).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(DownloadError);
+    expect(e).toMatchObject({ kind: "access", status: 403, reason: "exportSizeLimitExceeded" });
+    const plain = await downloadFile({ url: "u", name: "Plan.pdf" }, () => {}, undefined, async () => new Response("Forbidden", { status: 403 })).catch((x: unknown) => x);
+    expect(plain).toMatchObject({ kind: "access", status: 403, reason: undefined });
+    expect(await refusalReason(Response.json({ error: { errors: [{ reason: "insufficientFilePermissions" }] } }, { status: 403 }))).toBe("insufficientFilePermissions");
   });
 });
 
