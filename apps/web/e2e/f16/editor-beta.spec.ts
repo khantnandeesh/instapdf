@@ -20,9 +20,10 @@ async function pageTexts(bytes: Uint8Array): Promise<string[]> {
 
 /** Serves the engine's JS glue with `patch` appended (it can wrap BerryDocument methods). */
 async function patchEngine(page: Page, patch: string) {
-  await page.route("**/engine/berry_engine.js", async (route) => {
+  // The glue is served from a content-hashed path (/engine/<sha>/berry_engine.js), compressed.
+  await page.route("**/engine/*/berry_engine.js", async (route) => {
     const res = await route.fetch();
-    await route.fulfill({ response: res, body: `${await res.text()}\n${patch}` });
+    await route.fulfill({ status: 200, contentType: "text/javascript", body: `${await res.text()}\n${patch}` });
   });
 }
 
@@ -49,7 +50,10 @@ async function download(page: Page) {
   return { name: dl.suggestedFilename(), bytes: new Uint8Array(await readFile((await dl.path())!)) };
 }
 
-test("landing: noindex, Beta badge, no engine before a file, and no serious axe violations", async ({ page }) => {
+test("landing: noindex, Beta badge, no engine before a file with Data Saver on, and no serious axe violations", async ({ page }) => {
+  // With Data Saver (or on 2g) the engine waits for a file; otherwise it is fetched on idle
+  // (e2e/f16/editor-slow-network.spec.ts).
+  await page.addInitScript(() => Object.defineProperty(navigator, "connection", { value: { saveData: true, effectiveType: "4g" }, configurable: true }));
   const requests: string[] = [];
   page.on("request", (r) => requests.push(new URL(r.url()).pathname));
   await page.goto("/edit-pdf");
@@ -208,4 +212,19 @@ test("if reopening after a save fails, the edit is dropped and earlier edits sti
   expect(text).not.toContain("Items sold");
   // And the editor keeps working.
   await editLine(page, "Fee", "Fee", "Fees");
+});
+
+test("the engine is served brotli or gzip by what the request accepts, and br;q=0 refuses brotli", async ({ request }) => {
+  const manifest = JSON.parse(await readFile("public/engine/manifest.json", "utf8")) as { files: Record<string, string>; wasmBytes: number };
+  const path = `/engine/${manifest.files["berry_engine_bg.wasm"]!.slice(0, 16)}/berry_engine_bg.wasm`;
+  const get = async (accept: string) => {
+    const res = await request.get(path, { headers: { "accept-encoding": accept } });
+    expect(res.status()).toBe(200);
+    expect(res.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
+    return res.headers()["content-encoding"] ?? "identity";
+  };
+  expect(await get("gzip, deflate, br")).toBe("br");
+  expect(await get("gzip, br;q=0")).toBe("gzip");
+  expect(await get("br;q=0, gzip;q=0")).toBe("identity");
+  expect(await get("identity")).toBe("identity");
 });

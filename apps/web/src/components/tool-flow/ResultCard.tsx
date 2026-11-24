@@ -1,4 +1,5 @@
 "use client";
+import "@/components/berry/berry-loader.css";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { formatBytes } from "@/lib/pdf/naming";

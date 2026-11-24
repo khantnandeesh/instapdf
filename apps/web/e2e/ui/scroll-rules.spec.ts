@@ -116,6 +116,22 @@ for (const [project, sizes] of [
         await expectClean(page, "tools menu open");
       });
 
+      test("/edit-pdf with a file open: the canvas (pages) and the rail scroll side by side; the phone sheet is an overlay", async ({ page }) => {
+        await page.goto("/edit-pdf");
+        await page.getByTestId("editor-input").setInputFiles(fx("sixty-pages.pdf"));
+        await expect(page.getByTestId("page-1")).toHaveAttribute("data-drawn", "true", { timeout: 15_000 });
+        await expectClean(page, "editor open");
+        await page.getByTestId("canvas").evaluate((el) => el.scrollTo(0, el.scrollHeight / 2));
+        await expectClean(page, "editor scrolled");
+        // Phones: the pages sheet (the side panel in a sheet).
+        const chip = page.getByTestId("page-chip");
+        if (await chip.isVisible()) {
+          await chip.click();
+          await expect(page.getByRole("tab", { name: "Pages" })).toBeVisible();
+          await expectClean(page, "pages sheet open");
+        }
+      });
+
       for (const tool of usable) {
         test(`${tool.slug}: empty, loaded and options are free of nested or sideways scrollers`, async ({ page }) => {
           await openTool(page, tool.slug);

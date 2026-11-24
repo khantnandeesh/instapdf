@@ -28,7 +28,7 @@
  */
 
 @layer base {
-  /* Grid paper: the default background behind everything (Backgrounds, mp-bg-grid). */
+  /* Grid paper: the default background behind everything (Backgrounds). */
   html,
   body {
     background-color: var(--mp-grid-ground);
@@ -442,49 +442,7 @@
   /* "Most popular" uses cat-edit (BerryPDF token usage). */
   .ip-cat-popular { --c: var(--cat-edit); --c-text: var(--ip-cat-edit-text); }
 
-  /* Sand wash: the strawberry-cream section ground, fading out. */
-  .mp-sand {
-    background: linear-gradient(var(--sand), rgba(255, 255, 255, 0));
-  }
-
-  /* ---- Header: a floating glass pill (owner 2026-11-24: no white bar, glass instead) ---------- */
-  .mp-header {
-    padding: 10px 10px 0;
-    background: transparent;
-  }
-  /* The glass sits on ::before, not on the div: backdrop-filter (like filter, transform, contain)
-     would make the div the containing block of position:fixed descendants (the All tools menu
-     panel and its scrim), pinning them to the pill instead of the viewport. */
-  .mp-header > div {
-    position: relative;
-    isolation: isolate;
-    height: calc(100% - 10px);
-    padding-inline: 22px;
-    border-radius: 999px;
-  }
-  .mp-header > div::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    border-radius: inherit;
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    background: color-mix(in srgb, var(--surface) 55%, transparent);
-    -webkit-backdrop-filter: blur(18px) saturate(1.7);
-    backdrop-filter: blur(18px) saturate(1.7);
-    box-shadow: 0 10px 30px -16px rgba(140, 30, 60, 0.35);
-  }
-  @media (prefers-reduced-transparency: reduce) {
-    .mp-header > div::before {
-      background: var(--surface);
-    }
-  }
-  @media (forced-colors: active) {
-    .mp-header > div::before {
-      border-color: CanvasText;
-    }
-  }
+  /* ---- Header: the bar and the All tools panel live in components/site/site-header.css ---- */
   .mp-brand {
     display: inline-flex;
     align-items: center;
@@ -728,11 +686,6 @@
     color: var(--brand-strong);
     font-size: 16px;
   }
-  .mp-hint {
-    color: var(--muted);
-    font-size: 14px;
-    line-height: 20px;
-  }
 
   /* ---- Switch: 50x28 pill, 22px thumb with a tiny bounce ----------------------------------- */
   .mp-switch-track {
@@ -778,9 +731,6 @@
     vertical-align: middle;
     white-space: nowrap;
   }
-  .mp-pill--leaf {
-    background: var(--leaf);
-  }
   .mp-tag {
     display: inline-block;
     font-size: 13px;
@@ -815,8 +765,7 @@
     color: var(--mp-alert-info-ink);
     border-color: var(--mp-alert-info-border);
   }
-  .mp-alert a,
-  .mp-alert button.mp-alert__link {
+  .mp-alert a {
     color: inherit;
     text-decoration: underline;
   }
@@ -1187,24 +1136,7 @@
   /* ---- Berry kit: the one background ------------------------------------------------------------
      Grid paper only (24px squares, 7% berry red, on #fffdfb), carried by html/body above. No waves,
      glows, patterns or coloured bands behind sections; white surfaces stay solid white. */
-  .mp-bg-grid {
-    background-color: var(--mp-grid-ground);
-    background-image:
-      linear-gradient(var(--mp-grid-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--mp-grid-line) 1px, transparent 1px);
-    background-size: 24px 24px;
-  }
-  /* ---- Berry kit: dividers -------------------------------------------------------------------- */
-  .mp-drip {
-    height: 46px;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='46'%3E%3Cpath fill='%23d92b4b' d='M0 0h260v10c-8 0-10 6-10 14s-4 12-9 12-9-4-9-12 0-12-9-13-12 2-13 6-4 6-8 6-7-2-8-6-4-7-12-7-10 5-10 16-4 20-10 20-10-9-10-20-2-15-10-16-12 3-13 8-4 8-9 8-8-3-9-8-5-8-13-8-10 4-10 10-4 9-9 9-9-3-9-9-2-10-10-10-12 4-12 12-5 12-10 12-9-4-10-12S8 10 0 10z'/%3E%3Cpath fill='%23fff' opacity='.35' d='M6 4h248v2H6z'/%3E%3C/svg%3E")
-      repeat-x top left;
-  }
-  .mp-scallop {
-    height: 18px;
-    background: radial-gradient(circle at 14px 0, var(--cream) 13px, transparent 14px) repeat-x;
-    background-size: 28px 18px;
-  }
+  /* ---- Berry kit: jam (the drip and scallop dividers were never placed; removed for the home CSS budget) -------------------------------------------------------------------- */
   /* Indeterminate jam: a short segment glides across the track. */
   .mp-jam--indeterminate > i {
     width: 34%;
@@ -1327,9 +1259,6 @@
   /* Forced colors (Windows High Contrast) drop box-shadows and backgrounds, so controls whose edge
      is a shadow get a real system-coloured border, and the selected choice an outline-free border. */
   @media (forced-colors: active) {
-    .ip-edge {
-      border: 1px solid ButtonText;
-    }
     /* A border, not an outline: the checked choice is the one that takes focus, and its focus
        outline must stay free to show. */
     .ip-seg-checked {
@@ -1415,9 +1344,6 @@
 
 /* Small utilities still used by the shared flow (transform/opacity only). */
 @layer utilities {
-  .ip-spin {
-    animation: ip-spin 800ms linear infinite;
-  }
   .ip-pulse {
     animation: ip-pulse 1.4s ease-in-out infinite;
   }
@@ -1433,11 +1359,6 @@
 }
 
 
-@keyframes ip-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 @keyframes ip-pulse {
   50% {
     opacity: 0.55;
@@ -1561,15 +1482,15 @@
     animation: none !important;
     transition: none !important;
   }
-  .ip-spin {
-    animation: ip-pulse 1.2s linear infinite !important;
-  }
 }
 
 /* ---- F2: site chrome and home catalogue (docs/specs/f2-home.md) ---------------- */
 
+/* Smooth jumps only where the page has in-page anchors (the home catalogue: hero CTA, category chips).
+   Not site-wide: a smooth scroll still in flight is not cancelled by an instant scrollTo, so on tool
+   pages it could carry the result screen away after the flow reset it to the top. */
 @media (prefers-reduced-motion: no-preference) {
-  html {
+  :root:has([data-ip-smooth-anchors]) {
     scroll-behavior: smooth;
   }
 }
@@ -1655,64 +1576,7 @@
   }
 }
 
-/* ---- Berry loader (BerryPDF BerryLoader, the bundle's CSS) and floaty positions ------------- */
-.mp-berry{--t:2.6s;width:96px;height:96px;display:inline-block;overflow:hidden}
-.mp-berry--sm{width:40px;height:40px}.mp-berry--lg{width:180px;height:180px}
-.mp-berry g{transform-box:view-box;transform-origin:100px 94px;animation:0s linear infinite;animation-duration:var(--t)}
-.mp-berry .tilt{transform-origin:0 0;animation:none}
-.mp-berry .whole{animation-name:mp-b-show-whole}.mp-berry .halves,.mp-berry .juice{animation-name:mp-b-show-halves}
-.mp-berry .wx{animation-name:mp-b-wx}.mp-berry .wy{animation-name:mp-b-wy}.mp-berry .wr{animation-name:mp-b-wr}
-.mp-berry .hx-l{animation-name:mp-b-hxl}.mp-berry .hy-l{animation-name:mp-b-hyl}.mp-berry .hr-l{animation-name:mp-b-hrl}
-.mp-berry .hx-r{animation-name:mp-b-hxr}.mp-berry .hy-r{animation-name:mp-b-hyr}.mp-berry .hr-r{animation-name:mp-b-hrr}
-.mp-berry .skin{animation-name:mp-b-skin}.mp-berry .face{animation-name:mp-b-face}
-.mp-berry .splash{animation-name:mp-b-splash}
-.mp-berry .lines{opacity:0;animation-name:mp-b-lines}.mp-berry .flash{opacity:0;animation-name:mp-b-flash}
-.mp-berry .tw{animation-name:mp-b-tw}.mp-berry .tw1{transform-origin:159px 49px}.mp-berry .tw2{transform-origin:40px 64px;animation-delay:-.9s}.mp-berry .tw3{transform-origin:163px 125px;animation-delay:-1.7s}
-@keyframes mp-b-lines{0%,33%{opacity:0;transform:scale(1.15)}35%{opacity:.9;transform:scale(1)}46%,100%{opacity:0;transform:scale(.92)}}
-@keyframes mp-b-flash{0%,33%{opacity:0;transform:scale(.2) rotate(0)}35.5%{opacity:1;transform:scale(1) rotate(20deg)}42%,100%{opacity:0;transform:scale(.3) rotate(45deg)}}
-@keyframes mp-b-tw{0%,100%{transform:scale(.2) rotate(0);opacity:0}50%{transform:scale(1) rotate(45deg);opacity:1}}
-.mp-berry .slash{transform-origin:100px 244px;animation-name:mp-b-slash}
-@keyframes mp-b-show-whole{0%,34%{opacity:1}34.01%,100%{opacity:0}}
-@keyframes mp-b-show-halves{0%,34%{opacity:0}34.01%,80%{opacity:1}88%,100%{opacity:0}}
-@keyframes mp-b-wx{0%{transform:translateX(-36px)}34%,100%{transform:none}}
-@keyframes mp-b-wy{0%{transform:translateY(160px);animation-timing-function:cubic-bezier(.333,.667,.667,1)}34%,100%{transform:none}}
-@keyframes mp-b-wr{0%{transform:rotate(-95deg)}34%,100%{transform:rotate(-22deg)}}
-@keyframes mp-b-hxl{0%,34%{transform:none}86%,100%{transform:translateX(-92px)}}
-@keyframes mp-b-hyl{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.087,.667,0.246)}86%,100%{transform:translateY(317px)}}
-@keyframes mp-b-hrl{0%,34%{transform:rotate(-22deg)}86%,100%{transform:rotate(-200deg)}}
-@keyframes mp-b-hxr{0%,34%{transform:none}86%,100%{transform:translateX(104px)}}
-@keyframes mp-b-hyr{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.150,.667,0.184)}86%,100%{transform:translateY(276px)}}
-@keyframes mp-b-hrr{0%,34%{transform:rotate(-22deg)}86%,100%{transform:rotate(190deg)}}
-@keyframes mp-b-skin{0%,34%{transform:none}41%,100%{transform:scaleX(.8)}}
-@keyframes mp-b-face{0%,34%{transform:scaleX(0)}41%{transform:scaleX(.4)}86%,100%{transform:scaleX(.5)}}
-@keyframes mp-b-splash{0%,34%{transform:scale(.2);opacity:0}35%{opacity:.95}40%{transform:scale(1.05)}48%,100%{transform:scale(1.25);opacity:0}}
-@keyframes mp-b-slash{0%,30%{transform:scaleY(0);opacity:1}35%{transform:scaleY(1);opacity:1}44%,100%{transform:scale(.2,1);opacity:0}}
-.mp-berry .dx,.mp-berry .dy{transform-origin:100px 94px}
-@keyframes mp-dx0{0%,34%{transform:none}78%,100%{transform:translateX(-58px)}}@keyframes mp-dy0{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.632,.667,-0.299)}78%,100%{transform:translateY(95px)}}.mp-berry .dx0{animation-name:mp-dx0}.mp-berry .dy0{animation-name:mp-dy0}
-@keyframes mp-dx1{0%,34%{transform:none}78%,100%{transform:translateX(-68px)}}@keyframes mp-dy1{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.169,.667,0.164)}78%,100%{transform:translateY(182px)}}.mp-berry .dx1{animation-name:mp-dx1}.mp-berry .dy1{animation-name:mp-dy1}
-@keyframes mp-dx2{0%,34%{transform:none}78%,100%{transform:translateX(81px)}}@keyframes mp-dy2{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.160,.667,0.174)}78%,100%{transform:translateY(186px)}}.mp-berry .dx2{animation-name:mp-dx2}.mp-berry .dy2{animation-name:mp-dy2}
-@keyframes mp-dx3{0%,34%{transform:none}78%,100%{transform:translateX(-64px)}}@keyframes mp-dy3{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-4.606,.667,-4.272)}78%,100%{transform:translateY(19px)}}.mp-berry .dx3{animation-name:mp-dx3}.mp-berry .dy3{animation-name:mp-dy3}
-@keyframes mp-dx4{0%,34%{transform:none}78%,100%{transform:translateX(43px)}}@keyframes mp-dy4{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.326,.667,0.007)}78%,100%{transform:translateY(139px)}}.mp-berry .dx4{animation-name:mp-dx4}.mp-berry .dy4{animation-name:mp-dy4}
-@keyframes mp-dx5{0%,34%{transform:none}78%,100%{transform:translateX(-84px)}}@keyframes mp-dy5{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-1.449,.667,-1.116)}78%,100%{transform:translateY(51px)}}.mp-berry .dx5{animation-name:mp-dx5}.mp-berry .dy5{animation-name:mp-dy5}
-@keyframes mp-dx6{0%,34%{transform:none}78%,100%{transform:translateX(49px)}}@keyframes mp-dy6{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.270,.667,0.063)}78%,100%{transform:translateY(152px)}}.mp-berry .dx6{animation-name:mp-dx6}.mp-berry .dy6{animation-name:mp-dy6}
-@keyframes mp-dx7{0%,34%{transform:none}78%,100%{transform:translateX(64px)}}@keyframes mp-dy7{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.392,.667,-0.058)}78%,100%{transform:translateY(126px)}}.mp-berry .dx7{animation-name:mp-dx7}.mp-berry .dy7{animation-name:mp-dy7}
-@keyframes mp-dx8{0%,34%{transform:none}78%,100%{transform:translateX(-165px)}}@keyframes mp-dy8{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.272,.667,0.061)}78%,100%{transform:translateY(151px)}}.mp-berry .dx8{animation-name:mp-dx8}.mp-berry .dy8{animation-name:mp-dy8}
-@keyframes mp-dx9{0%,34%{transform:none}78%,100%{transform:translateX(88px)}}@keyframes mp-dy9{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-0.553,.667,-0.220)}78%,100%{transform:translateY(103px)}}.mp-berry .dx9{animation-name:mp-dx9}.mp-berry .dy9{animation-name:mp-dy9}
-@keyframes mp-dx10{0%,34%{transform:none}78%,100%{transform:translateX(-122px)}}@keyframes mp-dy10{0%,34%{transform:none;animation-timing-function:cubic-bezier(.333,-3.903,.667,-3.569)}78%,100%{transform:translateY(22px)}}.mp-berry .dx10{animation-name:mp-dx10}.mp-berry .dy10{animation-name:mp-dy10}
-.mp-loading{display:inline-flex;flex-direction:column;align-items:center;gap:10px;color:var(--muted);font-size:14px}
-@media (prefers-reduced-motion:reduce){.mp-berry .whole{opacity:1!important}.mp-berry .halves,.mp-berry .juice,.mp-berry .slash,.mp-berry .lines,.mp-berry .flash{display:none}.mp-berry .wr{transform:none!important}}
-/* Inline busy indicators (Spinner) draw the loader at 16, 20, 24 or 28px. */
-.mp-berry.mp-berry--16 { width: 16px; height: 16px; }
-.mp-berry.mp-berry--20 { width: 20px; height: 20px; }
-.mp-berry.mp-berry--24 { width: 24px; height: 24px; }
-.mp-berry.mp-berry--28 { width: 28px; height: 28px; }
-/* F1 U-4: the small busy indicator carries state, so under reduced motion it pulses (still berry). */
-@media (prefers-reduced-motion: reduce) {
-  .mp-berry.ip-busy {
-    animation: ip-pulse 1.2s linear infinite !important;
-  }
-}
-
+/* ---- Floaty positions (hero, empty state) --------------------------------------------------------------- */
 .mp-floaties--hero > :nth-child(1) { --x:6%;--y:66%;--s:30px;--r:-16deg;--d:7.2s;--amp:7px;--delay:0s; }
 .mp-floaties--hero > :nth-child(2) { --x:11%;--y:44%;--s:30px;--r:22deg;--d:5.4s;--amp:7px;--delay:-1.4s; }
 .mp-floaties--hero > :nth-child(3) { --x:3%;--y:20%;--s:26px;--r:-10deg;--d:6.0s;--amp:6px;--delay:-3.1s; }
@@ -1727,6 +1591,7 @@
 .mp-floaties--hero > :nth-child(12) { --x:74%;--y:6%;--s:26px;--r:18deg;--d:5.9s;--amp:6px;--delay:-0.4s; }
 .mp-floaties--hero > :nth-child(13) { --x:12%;--y:92%;--s:18px;--r:0deg;--d:5.5s;--amp:5px;--delay:-3.3s; }
 .mp-floaties--hero > :nth-child(14) { --x:35%;--y:62%;--s:20px;--r:0deg;--d:6.1s;--amp:6px;--delay:-5.1s; }
+
 .mp-floaties--empty > :nth-child(1) { --x:7%;--y:26%;--s:34px;--r:-18deg;--d:7.5s;--amp:7px;--delay:0s; }
 .mp-floaties--empty > :nth-child(2) { --x:15%;--y:76%;--s:30px;--r:14deg;--d:6.2s;--amp:7px;--delay:-2.1s; }
 .mp-floaties--empty > :nth-child(3) { --x:18%;--y:16%;--s:30px;--r:24deg;--d:5.4s;--amp:7px;--delay:-1.2s; }
@@ -1749,13 +1614,10 @@
 
 /* Sticky search and filter bar on long lists (home catalogue). Pinned under the header and fully
    transparent (owner, 2026-11-24): no ground, blur, border or shadow, so it never reads as a box on
-   the grid paper. data-stuck stays for tests and future use; it changes nothing visible. */
-.ip-sticky-bar {
-  background: transparent;
-}
+   the grid paper (no rule needed: transparent is the default). data-stuck stays for tests and future use;
+   it changes nothing visible. */
 @media (forced-colors: active) {
   .ip-sticky-bar {
     background: Canvas;
-    backdrop-filter: none;
   }
 }

@@ -14,6 +14,7 @@ const manifest = JSON.parse(read("manifest.json").toString("utf8")) as {
   wasmBindgen: string;
   files: Record<string, string>;
   wasmGzipBytes: number;
+  wasmBytes: number;
 };
 
 describe("engine artifact", () => {
@@ -30,6 +31,10 @@ describe("engine artifact", () => {
     expect(ci).toContain(`rustup toolchain install ${manifest.rust}`);
   });
 
+  it("records the raw WebAssembly size that load progress counts against", () => {
+    expect(manifest.wasmBytes).toBe(read("berry_engine_bg.wasm").length);
+  });
+
   it("stays inside the 1 MB gzip budget", () => {
     expect(gzipSync(read("berry_engine_bg.wasm"), { level: 9 }).length).toBeLessThanOrEqual(1_000_000);
   });
@@ -37,5 +42,11 @@ describe("engine artifact", () => {
   it("ships the engine's typed API unchanged", () => {
     const api = readFileSync(new URL("../../../../../crates/berry-wasm/berry-engine.d.ts", import.meta.url), "utf8");
     expect(readFileSync(new URL("./berry-engine.d.ts", import.meta.url), "utf8")).toBe(api);
+  });
+
+  it("inlines the same hashed paths for the site-wide prefetch (next.config env)", async () => {
+    const { default: config } = await import("../../../next.config");
+    const { ENGINE_JS, ENGINE_WASM } = await import("./engine-assets");
+    expect(config.env).toMatchObject({ ENGINE_JS_PATH: ENGINE_JS, ENGINE_WASM_PATH: ENGINE_WASM });
   });
 });

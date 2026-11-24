@@ -1,4 +1,5 @@
 "use client";
+import "@/components/berry/berry-loader.css";
 import "./tool-flow.css";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -601,7 +602,25 @@ export function ToolFlow({
     if (phase === "processing") progressBox.current?.focus();
     else if (phase === "error") retryButton.current?.focus();
     // Fit the first screen: the result starts at the top, so Download is never under the header.
-    else if (phase === "done" && window.scrollY > 0) window.scrollTo({ top: 0, behavior: "instant" });
+    // A smooth scroll already in flight is only cancelled by an instant scroll that really moves the
+    // page (scrollTo(0, 0) while scrollY still reads 0 is a no-op), so step to 1 and back, now and again
+    // after two frames.
+    else if (phase === "done") {
+      const root = document.documentElement;
+      const before = root.style.scrollBehavior;
+      const toTop = () => {
+        window.scrollTo(0, 1);
+        window.scrollTo(0, 0);
+      };
+      root.style.scrollBehavior = "auto";
+      toTop();
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          toTop();
+          root.style.scrollBehavior = before;
+        }),
+      );
+    }
   }, [phase]);
   // Start over focuses the (re-mounted) picker after the empty state is committed.
   const [focusPickerTick, setFocusPickerTick] = useState(0);

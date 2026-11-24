@@ -50,6 +50,7 @@ const manifest = {
   rust, wasmBindgen: bindgen,
   files: { "berry_engine_bg.wasm": sha("berry_engine_bg.wasm"), "berry_engine.js": sha("berry_engine.js") },
   wasmGzipBytes: Number(gz),
+  wasmBytes: readFileSync(`${out}/berry_engine_bg.wasm`).length,
 };
 writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 2) + "\n");
 ' "$out" "$RUST_VERSION" "$WASM_BINDGEN_VERSION" "$gzip_bytes"
