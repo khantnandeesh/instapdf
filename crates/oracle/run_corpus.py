@@ -13,7 +13,7 @@ with PDFium (pypdfium2) and qpdf (pikepdf):
 Usage: python3 crates/oracle/run_corpus.py [--berry path] [--fonts dir] [--out dir] [--only id]
 Exit status is non-zero when any check fails.
 """
-import argparse, json, os, subprocess, sys
+import argparse, json, os, subprocess, sys, unicodedata
 
 import pikepdf
 import pypdfium2 as pdfium
@@ -51,13 +51,17 @@ def to_pixels(rect, box, rotation):
 
 def page_text(doc, index):
     tp = doc[index].get_textpage()
-    return " ".join(tp.get_text_range().split())
+    # NFC puts stacked marks in canonical order: PDFium reads them in drawing order (an Arabic
+    # shadda before its fatha), which is the same text.
+    return unicodedata.normalize("NFC", " ".join(tp.get_text_range().split()))
 
 
 def run_case(case, args):
     src = os.path.join(CORPUS, case["file"])
     out = os.path.join(args.out, case["id"] + ".pdf")
-    cmd = [args.berry, "replace", src, out, "1", case["find"], case["replace"], "--fonts", args.fonts]
+    # A case can name its own font folder in the corpus (the open fonts its scripts need).
+    fonts = os.path.join(CORPUS, case["fonts"]) if case.get("fonts") else args.fonts
+    cmd = [args.berry, "replace", src, out, "1", case["find"], case["replace"], "--fonts", fonts]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         return [f"engine failed: {proc.stderr.strip()}"]
@@ -91,10 +95,10 @@ def run_case(case, args):
 
     text = page_text(after, 0)
     for want in case.get("expect", []):
-        if want not in text:
+        if unicodedata.normalize("NFC", want) not in text:
             problems.append(f"PDFium does not read {want!r}; it reads {text!r}")
     for gone in case.get("absent", []):
-        if gone in text:
+        if unicodedata.normalize("NFC", gone) in text:
             problems.append(f"PDFium still reads {gone!r}")
     for keep in case.get("other_pages_keep", []):
         for i in range(1, len(after)):

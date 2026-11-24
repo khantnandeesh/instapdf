@@ -3,10 +3,13 @@
 //              --out-dir berry-wasm/pkg --target web --out-name berry_engine
 import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
-import { initSync, BerryDocument } from "./pkg/berry_engine.js";
+// BERRY_ENGINE=berry_engine_shaping runs it against the full engine (complex-script shaping).
+const name = process.env.BERRY_ENGINE ?? "berry_engine";
+const shaping = name === "berry_engine_shaping";
+const { initSync, BerryDocument } = await import(`./pkg/${name}.js`);
 
 const here = new URL(".", import.meta.url);
-initSync({ module: readFileSync(new URL("pkg/berry_engine_bg.wasm", here)) });
+initSync({ module: readFileSync(new URL(`pkg/${name}_bg.wasm`, here)) });
 const pdf = new Uint8Array(readFileSync(new URL("../../tests/parity/editor/chrome-justified-mixed.pdf", here)));
 
 const doc = new BerryDocument(pdf);
@@ -38,4 +41,21 @@ assert.ok(report.original_preserved && report.objects_written === 1);
 assert.deepEqual(bytes.subarray(0, pdf.length), pdf);
 const again = new BerryDocument(bytes);
 assert.match(again.pageText(0).lines[1].text, /is signed between/);
-console.log(`wasm smoke ok: ${pdf.length} → ${bytes.length} bytes, save ${ms.toFixed(1)} ms`);
+// Hindi and Arabic: both engines read logical text and direction. Only the full engine edits;
+// the default one marks such lines "needs-shaping" so the host loads the full engine.
+const scripts = new BerryDocument(new Uint8Array(readFileSync(new URL("../../tests/parity/editor/scripts-plain.pdf", here))));
+const sp = scripts.pageText(0);
+const hindi = sp.lines.findIndex((l) => l.text === "कुल राशि का भुगतान समय पर किया गया।");
+assert.ok(hindi >= 0 && sp.lines[hindi].direction === "ltr");
+assert.ok(sp.lines.some((l) => l.direction === "rtl" && l.text === "مرحبا بالعالم، هذا نص تجريبي."));
+if (shaping) {
+  assert.equal(sp.lines[hindi].read_only_reason, undefined);
+  const shaped = scripts.replaceRange(0, hindi, 0, 3, "संपूर्ण");
+  assert.equal(shaped.substitutions.length, 0);
+  assert.ok(shaped.page.lines.some((l) => l.text === "संपूर्ण राशि का भुगतान समय पर किया गया।"));
+} else {
+  assert.equal(sp.lines[hindi].read_only_reason, "needs-shaping");
+  assert.throws(() => scripts.replaceRange(0, hindi, 0, 3, "संपूर्ण"), (e) => e.kind === "read-only" && e.reason === "needs-shaping");
+}
+
+console.log(`${name} smoke ok: ${pdf.length} → ${bytes.length} bytes, save ${ms.toFixed(1)} ms`);

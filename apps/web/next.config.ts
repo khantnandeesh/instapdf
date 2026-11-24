@@ -9,7 +9,16 @@ import { contentSecurityPolicy, securityHeaders } from "./src/lib/security/csp";
  * by scripts/engine-precompress.mjs when the request accepts it. Route handlers can't send
  * Content-Encoding, so this is a rewrite to the static copy plus headers.
  */
-const ENGINE_TYPES = { "berry_engine_bg.wasm": "application/wasm", "berry_engine.js": "text/javascript; charset=utf-8" } as const;
+const WASM = "application/wasm";
+const JS = "text/javascript; charset=utf-8";
+// The shaping module is served the same way but loaded only on demand (never prefetched).
+const ENGINE_TYPES = {
+  "berry_engine_bg.wasm": WASM,
+  "berry_engine.js": JS,
+  "berry_engine_shaping_bg.wasm": WASM,
+  "berry_engine_shaping.js": JS,
+} as const;
+const PREFETCH_ENV = { "berry_engine.js": "ENGINE_JS_PATH", "berry_engine_bg.wasm": "ENGINE_WASM_PATH" } as const;
 // "br;q=0" refuses brotli: the patterns take a coding only when it is listed without q=0.
 const BR = { type: "header" as const, key: "accept-encoding", value: ACCEPTS_BR };
 const GZIP = { type: "header" as const, key: "accept-encoding", value: ACCEPTS_GZIP };
@@ -18,7 +27,9 @@ const engineFiles = (Object.keys(ENGINE_TYPES) as (keyof typeof ENGINE_TYPES)[])
 const nextConfig: NextConfig = {
   output: "standalone",
   // Inlined at build: the site-wide prefetch (EnginePrefetch) needs only these two strings.
-  env: Object.fromEntries(engineFiles.map(({ file, source }) => [file === "berry_engine.js" ? "ENGINE_JS_PATH" : "ENGINE_WASM_PATH", source])),
+  env: Object.fromEntries(
+    engineFiles.flatMap(({ file, source }) => (file in PREFETCH_ENV ? [[PREFETCH_ENV[file as keyof typeof PREFETCH_ENV], source]] : [])),
+  ),
   poweredByHeader: false,
   reactStrictMode: true,
   // next/image optimisation is unused, and sharp (LGPL-3.0 libvips) is deliberately not installed.

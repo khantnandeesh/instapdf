@@ -11,5 +11,5 @@ name = "berry"
 path = "src/main.rs"
 
 [dependencies]
-berry-engine = { path = "../berry-engine" }
+berry-engine = { path = "../berry-engine", features = ["shaping"] }
 serde_json = "1"

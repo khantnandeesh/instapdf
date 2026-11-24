@@ -33,6 +33,20 @@ codebase that runs as WebAssembly in the browser and natively for the consented 
 6. **Check, then keep.** The page is read again and compared glyph by glyph with the plan: same
    glyph, font, size and colour, at the old position plus the planned shift (0.05 pt
    tolerance). If the check fails, the edit is rolled back and an error is returned.
+   Complex scripts (Hindi and the other Indic scripts, Arabic, Hebrew) take their own path in
+   `complex.rs`: the edit widens to whole words, the new text is laid out with the Unicode
+   bidi algorithm and each word is drawn from the same word already on the page, the embedded
+   font (when it still has its layout tables), or a registered open font shaped with
+   rustybuzz (`shape.rs`). New words get `/ActualText` where their glyphs alone would not read
+   right. Reading (`layout.rs`) rebuilds logical order from ActualText, or from glyph order with
+   the Indic and inverse-bidi rules in `script.rs`; the spec is `docs/specs/f16-complex-scripts.md`.
+   A registered-face glyph keeps the first ToUnicode text written for it; the same glyph
+   needed with another text (a letter with and without its harakat) gets an alias code past
+   the font's glyph ids, mapped through a CIDToGIDMap, so both words read from their glyphs.
+   On either path, an edit that touches an `/ActualText` span (a ligature, replaced text)
+   rewrites the whole span with its real characters and removes the span. Its other
+   properties, such as a tagged PDF's `/MCID`, stay; a named property list holding more than
+   the ActualText is left alone and the edit is refused (`actual-text-span`).
 7. **Save.** The output is the original bytes plus one appended revision (incremental update).
    It is read back and every object is compared with the engine's copy.
 
@@ -42,6 +56,7 @@ codebase that runs as WebAssembly in the browser and natively for the consented 
 cd crates
 cargo test                                  # unit and integration tests
 cargo build -p berry-cli && python3 oracle/run_corpus.py   # PDFium oracle over tests/parity/editor
+python3 oracle/check_shaping.py             # new Hindi words: engine glyphs == HarfBuzz glyphs
 cargo build -p berry-wasm --target wasm32-unknown-unknown --release
 wasm-bindgen target/wasm32-unknown-unknown/release/berry_wasm.wasm --out-dir berry-wasm/pkg --target web --out-name berry_engine
 node berry-wasm/smoke.mjs
@@ -49,7 +64,8 @@ FUZZ_N=1500 FUZZ_OUT=/tmp/fz cargo test --release --test fuzz -- --nocapture   #
 ```
 
 The tests and the oracle need the Liberation, Carlito and Caladea fonts; the oracle also needs
-`pypdfium2`, `pikepdf` and `pillow`.
+`pypdfium2`, `pikepdf` and `pillow`, and `check_shaping.py` needs `uharfbuzz` (Apache-2.0).
+The Hindi and Arabic fixtures use the OFL fonts vendored in `tests/parity/editor/fonts/`.
 
 Hostile files are bounded: 32 levels of array/dictionary nesting, 2,000,000 operators, 1,000,000
 glyphs, 4,000 form invocations, 128 MB per decoded stream and 131,072 entries per width or
@@ -58,18 +74,28 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
 ## Known limits (next steps)
 
 - Edits one line at a time. Paragraph reflow is phase E3.
-- Fallback fonts must have TrueType outlines. Text in a fallback font is not shaped yet
-  (no kerning or ligatures; complex scripts are phase E4 with HarfRust).
+- Fallback fonts must have TrueType outlines. Latin text in a fallback font is not shaped
+  (no kerning or ligatures); complex-script words are.
+- Adding new text (not editing a line) is not in the engine yet, so there is no shaping call for
+  it in the interface.
+- PDFium reverses right-to-left `/ActualText`, so for Arabic and Hebrew the engine relies on the
+  glyphs' own Unicode where it can (a registered face is preferred over an embedded font whose
+  ToUnicode map lacks the new glyphs). Chrome- and LibreOffice-made Arabic, which uses
+  ActualText throughout, already reads reversed in PDFium before any edit.
 - Vertical text, CID fonts with a non-Identity CMap and invisible (OCR) text are read-only.
 - A shared Form XObject nested inside another form is refused (`shared-nested-form`).
 - Superscripts and subscripts are separate lines. Table cells closer than 1.5 em read as one line.
 - Fake-bold text drawn twice reads as doubled characters.
 - No width-fitting (`Tz`) of substitute fonts yet (AC-11e), and no style changes, move or delete
   of existing text (AC-12, AC-13).
-- A line that grows past the next column is not flagged yet, and `/ActualText` spans are not updated.
+- A line that grows past the next column is not flagged yet.
 - Saving holds the original and the new file in memory together (about 2x the file size).
 - Owner-password permission flags are not enforced; that is a product decision for the editor.
-- The WebAssembly module is about 0.72 MB gzip. It is loaded only when the editor opens a file.
+- Two WebAssembly modules with one interface: `berry_engine` (default, about 0.75 MB gzip)
+  reads Hindi and Arabic but marks those lines read-only with `needs-shaping`;
+  `berry_engine_shaping` (cargo feature `shaping`, about 0.98 MB gzip) adds rustybuzz and
+  edits them. The editor loads the second only when someone edits such a line. `berry-cli`
+  always has shaping. Neither module loads until the editor opens a file.
 
 ## Licences
 
@@ -77,5 +103,8 @@ All dependencies are MIT, Apache-2.0 or BSD, except two permissive licences that
 rule 3 does not name: **Zlib** (`zlib-rs`, the inflate code inside `lopdf`) and **Unicode-3.0**
 (Unicode data tables in `unicode-normalization`, `unicode-properties`, `unicode-ident`).
 Neither is copyleft. `oracle/check_licences.py` enforces the list in CI.
+`berry-engine/src/script_tables.rs` (marks, right-to-left letters, digits, scripts and
+presentation forms) is generated by `berry-engine/tools/gen_script_tables.py` from Python's
+Unicode data and fontTools (MIT), so the default module carries no general Unicode crates.
 The tables in `berry-engine/src/tables.rs` are generated from reportlab (BSD) and the Adobe
 Glyph List (BSD-3-Clause).

@@ -11,3 +11,12 @@ lopdf = { version = "0.47", default-features = false }
 ttf-parser = "0.25"
 subsetter = "0.2"
 serde = { version = "1", features = ["derive"] }
+rustybuzz = { version = "0.20.1", optional = true }
+unicode-bidi = { version = "0.3.18", optional = true }
+unicode-bidi-mirroring = "0.4.0"
+
+[features]
+# Editing Hindi, Arabic and other complex-script text: the rustybuzz shaper. Off by default so
+# the engine most people download stays small; without it such lines read correctly but are
+# read-only with "needs-shaping".
+shaping = ["dep:rustybuzz", "dep:unicode-bidi"]
