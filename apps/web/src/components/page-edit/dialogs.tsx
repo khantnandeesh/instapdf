@@ -154,7 +154,7 @@ export function PagePickerDialog({
       <p id={hintId} className={cx("text-help text-muted", count > 0 && "invisible")}>
         {labels.atLeastOne}
       </p>
-      <div className="max-h-[min(50dvh,480px)] overflow-y-auto rounded-tray border-[1.5px] border-sand bg-cream p-3">
+      <div className="max-h-[min(50dvh,480px)] min-h-[132px] overflow-y-auto overscroll-contain rounded-tray border-[1.5px] border-sand bg-cream p-3" data-ip-scroll="overlay">
         <div ref={grid} role="list" className="mp-rise-tiles grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,144px)]" data-testid="picker-grid">
           {pages.map((size, i) => {
             const on = selected.has(i);
