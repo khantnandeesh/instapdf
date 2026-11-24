@@ -1,6 +1,26 @@
 @import "tailwindcss";
 @import "../styles/tokens.css";
 
+/* Tool options layout (docs/design/berrypdf.md "Fit the first screen", rule 6). The ControlDock says
+   which layout it is in with data-ip-dock: "side" (the tall options panel, empty state from 1024 px)
+   or "bar" (one compact row docked at the bottom: phones and tablets always, desktop once a file is
+   loaded so the pages get the screen). Options use these instead of lg:/max-lg: for their layout. */
+@custom-variant dock-side {
+  @media (width >= 64rem) {
+    &:where([data-ip-dock="side"] *) {
+      @slot;
+    }
+  }
+}
+@custom-variant dock-bar {
+  @media (width < 64rem) {
+    @slot;
+  }
+  &:where([data-ip-dock="bar"] *) {
+    @slot;
+  }
+}
+
 /*
  * BerryPDF components and motifs (docs/design/berrypdf.md). Class names follow BerryPDF's `mp-`
  * bundle and its values are the bundle's. Where we deviate for WCAG AA the rule says so and the
@@ -1582,10 +1602,20 @@
   }
 }
 
-/* Tool pages: below 1024 px the F1 dock is fixed at the bottom; keep the footer's end clear of it. */
+/* Tool pages: below 1024 px (and on desktop once a file is loaded) the F1 dock is fixed at the bottom;
+   keep the footer's end clear of it. */
 @media (max-width: 1023px) {
   body:has([data-ip-dock]) .ip-site-footer {
     padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);
+  }
+}
+body:has([data-ip-dock="bar"]) .ip-site-footer {
+  padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);
+}
+/* The desktop bottom bar rises in once a file is loaded (reduced motion: the global rule drops it). */
+@media (min-width: 1024px) {
+  .mp-dock-bar {
+    animation: mp-fade-up 320ms var(--ease-enter) both;
   }
 }
 
@@ -1680,3 +1710,93 @@
 .mp-floaties--empty > :nth-child(17) { --x:36%;--y:58%;--s:22px;--r:0deg;--d:5.7s;--amp:6px;--delay:-2.7s; }
 .mp-floaties--empty > :nth-child(18) { --x:63%;--y:44%;--s:22px;--r:0deg;--d:6.3s;--amp:6px;--delay:-5.0s; }
 .mp-floaties--empty > :nth-child(19) { --x:50%;--y:10%;--s:18px;--r:0deg;--d:5.3s;--amp:5px;--delay:-3.7s; }
+
+/* Fold fit: when a tool's options are taller than the panel (short laptop screens), they scroll inside
+   it and soft shadows at the cut edges say so. Pure CSS (background-attachment: local covers the
+   shadow while the content is at that end), so the strict CSP and reduced motion need nothing. */
+@media (min-width: 1024px) {
+  [data-ip-dock="side"] .ip-dock-scroll {
+    overscroll-behavior: contain;
+    background:
+      linear-gradient(var(--ip-surface-raised) 30%, transparent) top / 100% 24px no-repeat local,
+      linear-gradient(transparent, var(--ip-surface-raised) 70%) bottom / 100% 24px no-repeat local,
+      radial-gradient(farthest-side at 50% 0, rgb(0 0 0 / 0.1), transparent) top / 100% 10px no-repeat scroll,
+      radial-gradient(farthest-side at 50% 100%, rgb(0 0 0 / 0.1), transparent) bottom / 100% 10px no-repeat scroll;
+  }
+}
+
+/* The pages' own scroll area (>= 1024 px): a slim, squarish BerryPDF scroll bar, shown only when the
+   pages overflow (overflow-y: auto). Chrome/Safari/Edge get the shaped bar; Firefox gets the thin
+   coloured one (it has no shape control). */
+@media (min-width: 1024px) {
+  .ip-scroll {
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    .ip-scroll {
+      scrollbar-width: thin;
+      scrollbar-color: var(--subtle) transparent;
+    }
+  }
+  .ip-scroll::-webkit-scrollbar {
+    width: 10px;
+  }
+  .ip-scroll::-webkit-scrollbar-track {
+    margin-block: 6px;
+    background: transparent;
+  }
+  .ip-scroll::-webkit-scrollbar-thumb {
+    border: 2px solid var(--cream);
+    border-radius: 4px;
+    background: var(--subtle);
+  }
+  .ip-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--brand-bright);
+  }
+  .ip-scroll::-webkit-scrollbar-thumb:active {
+    background: var(--brand);
+  }
+}
+
+/* Fold fit, working state (>= 1024 px): once a file is in, the head shrinks to a compact title row so
+   the pages get more of the screen (Sejda scrolls its head away; ours stays, smaller). --ip-pages-h is
+   re-declared here because custom properties resolve where they are declared. */
+@media (min-width: 1024px) {
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) {
+    --ip-intro-h: 56px;
+    --ip-pages-h: max(320px, calc(100vh - var(--ip-header-h) - var(--ip-intro-h) - var(--ip-dock-actual, 88px) - var(--ip-fold-gap)));
+  }
+  @supports (height: 1dvh) {
+    .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) {
+      --ip-pages-h: max(320px, calc(100dvh - var(--ip-header-h) - var(--ip-intro-h) - var(--ip-dock-actual, 88px) - var(--ip-fold-gap)));
+    }
+  }
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) .mp-intro h1 {
+    font-size: 26px;
+    line-height: 32px;
+    transition: font-size var(--dur-move) var(--ease-standard);
+  }
+}
+
+/* Sticky search and filter bar on long lists (home catalogue). Pinned under the header; a frosted
+   grid-paper ground keeps the list from showing through, and a soft pink shadow appears only while it
+   is stuck. The shadow fades in (off under reduced motion via the global rule). */
+.ip-sticky-bar {
+  background: color-mix(in srgb, var(--ip-bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transition: box-shadow var(--dur-base) var(--ease-standard);
+}
+.ip-sticky-bar[data-stuck] {
+  /* A 1.5px sand line and a soft shadow, both as shadows so being stuck never changes the bar's height. */
+  box-shadow:
+    0 1.5px 0 var(--sand),
+    0 10px 18px -12px rgb(176 30 60 / 0.35);
+}
+@media (forced-colors: active) {
+  .ip-sticky-bar {
+    background: Canvas;
+    backdrop-filter: none;
+  }
+}

@@ -47,7 +47,8 @@ export function ResultCard({
   useEffect(() => {
     if (url && !focused.current) {
       focused.current = true;
-      download.current?.focus();
+      // No scroll jump: ToolFlow already brought the result to the top of the page.
+      download.current?.focus({ preventScroll: true });
     }
   }, [url]);
   const [downloaded, setDownloaded] = useState(false);

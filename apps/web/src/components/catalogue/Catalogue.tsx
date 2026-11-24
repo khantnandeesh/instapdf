@@ -34,6 +34,28 @@ export function Catalogue() {
   const [live, setLive] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const headingRef = useRef<HTMLDivElement>(null);
+
+  // Sticky search bar: `stuck` once the sentinel above it has gone under the header; the bar's height
+  // goes to --ip-catbar-h so category jumps land below the pinned bar, not under it.
+  const stickSentinel = useRef<HTMLDivElement>(null);
+  const stickBar = useRef<HTMLDivElement>(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const sentinel = stickSentinel.current;
+    const bar = stickBar.current;
+    if (!sentinel || !bar || typeof IntersectionObserver === "undefined") return;
+    const root = document.documentElement;
+    const headerH = parseFloat(getComputedStyle(root).getPropertyValue("--ip-header-h")) || 64;
+    const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting && e.boundingClientRect.top < headerH), { rootMargin: `-${headerH}px 0px 0px 0px` });
+    io.observe(sentinel);
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => root.style.setProperty("--ip-catbar-h", `${bar.offsetHeight}px`));
+    ro?.observe(bar);
+    return () => {
+      io.disconnect();
+      ro?.disconnect();
+      root.style.removeProperty("--ip-catbar-h");
+    };
+  }, []);
   const userChanged = useRef(false);
   const recent = useRecentTools();
 
@@ -62,7 +84,13 @@ export function Catalogue() {
   const searching = normalizeQuery(query) !== "";
   const matches = useMemo(() => matchTools(items, query).filter((m) => !readyOnly || usable(m.item)), [items, query, readyOnly]);
   const groups = useMemo(
-    () => categories.map((c) => ({ ...c, matches: matches.filter((m) => m.item.category === c.id) })).filter((g) => g.matches.length > 0),
+    () =>
+      categories
+        .map((c) => ({
+          ...c,
+          matches: matches.filter((m) => m.item.category === c.id),
+        }))
+        .filter((g) => g.matches.length > 0),
     [categories, matches],
   );
   const popular = useMemo(() => {
@@ -79,7 +107,10 @@ export function Catalogue() {
 
   // ---- hero call to action: scroll to the catalogue and focus search (AC-3) ----------
   const focusSearch = useCallback(() => {
-    headingRef.current?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+    headingRef.current?.scrollIntoView({
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+      block: "start",
+    });
     searchRef.current?.focus({ preventScroll: true });
   }, []);
   useEffect(() => {
@@ -120,47 +151,62 @@ export function Catalogue() {
     // background); the hero above is set off by spacing only (page.tsx).
     <section aria-labelledby="tools-heading" className="pt-(--space-7) pb-(--space-8)" data-testid="catalogue">
       <div className="mx-auto max-w-[1170px] px-[15px]">
-        <div id="tools" ref={headingRef} className="scroll-mt-[calc(var(--ip-header-h)+16px)] text-center">
+        <div id="tools" ref={headingRef} className="scroll-mt-[calc(var(--ip-header-h)+var(--ip-catbar-h,0px)+16px)] text-center">
           <h2 id="tools-heading" className="text-section-title text-ink">
             {copy.title}
           </h2>
         </div>
 
-        <div className="mx-auto mt-6 flex max-w-[957px] flex-wrap items-center justify-center gap-x-5 gap-y-2">
-          <SearchField
-            ref={searchRef}
-            id={CATALOGUE_SEARCH_ID}
-            label={copy.searchLabel}
-            hideLabel
-            size="lg"
-            value={query}
-            onChange={updateQuery}
-            onEscape={() => updateQuery("")}
-            placeholder={copy.searchPlaceholder}
-            shortcutHint
-            className="w-full md:max-w-[480px] md:flex-1"
-          />
-          <Switch id="ready-only" label={copy.readyOnly} checked={readyOnly} onChange={(v) => {
-            userChanged.current = true;
-            setReadyOnly(v);
-          }} />
-        </div>
-        <LiveRegion message={live} />
+        {/* Sticky search bar (design rule "Sticky search and filter bars"): the search and
+            the jump chips scroll with the page until they reach the header, then stay pinned under it
+            while the list scrolls, and drop back into place on the way up. A sentinel just above it
+            tells when it is stuck, which adds the soft shadow. */}
+        <div ref={stickSentinel} aria-hidden="true" className="mt-6 h-px" />
+        <div ref={stickBar} data-stuck={stuck ? "" : undefined} className="ip-sticky-bar sticky top-(--ip-header-h) z-10 -mx-[15px] px-[15px] pb-2" data-testid="catalogue-bar">
+          {/* Phones: search and the filter share one row (short label) so the pinned bar stays compact. */}
+          <div className="mx-auto flex max-w-[957px] items-center justify-center gap-x-3 gap-y-2 pt-2 max-sm:flex-nowrap sm:flex-wrap sm:gap-x-5">
+            <SearchField
+              ref={searchRef}
+              id={CATALOGUE_SEARCH_ID}
+              label={copy.searchLabel}
+              hideLabel
+              size="lg"
+              value={query}
+              onChange={updateQuery}
+              onEscape={() => updateQuery("")}
+              placeholder={copy.searchPlaceholder}
+              shortcutHint
+              className="min-w-0 max-sm:flex-1 sm:w-full md:max-w-[480px] md:flex-1"
+            />
+            <Switch
+              id="ready-only"
+              label={copy.readyOnly}
+              shortLabel={copy.readyOnlyShort}
+              className="shrink-0"
+              checked={readyOnly}
+              onChange={(v) => {
+                userChanged.current = true;
+                setReadyOnly(v);
+              }}
+            />
+          </div>
+          <LiveRegion message={live} />
 
-        {!searching && (
-          // Inline padding offset by negative margins keeps edge chips' focus outlines inside the scroller.
-          <nav aria-label={copy.jumpLabel} className="ip-scroll-x -mx-1.5 mt-4 px-1.5">
-            <ul className="flex gap-2 py-1.5 max-lg:flex-nowrap lg:flex-wrap lg:justify-center">
-              {groups.map((g) => (
-                <li key={g.id} className="shrink-0">
-                  <a href={`#cat-${g.id}`} className="mp-navlink mp-navlink--chip">
-                    {g.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        )}
+          {!searching && (
+            // Inline padding offset by negative margins keeps edge chips' focus outlines inside the scroller.
+            <nav aria-label={copy.jumpLabel} className="ip-scroll-x -mx-1.5 mt-4 px-1.5">
+              <ul className="flex gap-2 py-1.5 max-lg:flex-nowrap lg:flex-wrap lg:justify-center">
+                {groups.map((g) => (
+                  <li key={g.id} className="shrink-0">
+                    <a href={`#cat-${g.id}`} className="mp-navlink mp-navlink--chip">
+                      {g.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
+        </div>
 
         <div className="mx-auto lg:w-[957px]">
           {!searching && (
@@ -197,7 +243,7 @@ export function Catalogue() {
 
 function CategorySection({ id, label, matches, searching }: { id: string; label: string; matches: ToolMatch<ToolIndexItem>[]; searching: boolean }) {
   return (
-    <section id={`cat-${id}`} aria-labelledby={`cat-${id}-heading`} className={`ip-cat-${id} mt-8 scroll-mt-[calc(var(--ip-header-h)+16px)]`} data-testid="category">
+    <section id={`cat-${id}`} aria-labelledby={`cat-${id}-heading`} className={`ip-cat-${id} mt-8 scroll-mt-[calc(var(--ip-header-h)+var(--ip-catbar-h,0px)+16px)]`} data-testid="category">
       {/* BerryPDF eyebrow: UPPERCASE Fredoka in the category's berry colour (text shade, see tokens.css). */}
       <h3 id={`cat-${id}-heading`} className="mp-eyebrow">
         {label}
