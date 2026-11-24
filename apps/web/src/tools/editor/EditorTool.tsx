@@ -22,6 +22,7 @@ import { earlyFetchAllowed } from "@/lib/editor/engine-load";
 import { openPdf, prefetchPdfjs, type OpenedPdf } from "@/lib/pdf/pdfjs";
 import { warmPdfjs } from "@/lib/pdf/pdfjs-warm";
 import { FilePlusBold, FileUpBold } from "./icons";
+import { prefetchEditorChunks } from "./idle-prefetch";
 import type { ShellProps } from "./EditorShell";
 
 export const MAX_BYTES = 200 * 1024 * 1024;
@@ -53,13 +54,14 @@ export function EditorTool() {
   // Prefetch on idle after the landing has loaded (U-E13), at low priority and not with Data
   // Saver on or on 2g: the editor chunk and pdf.js with its workers first (the first page needs
   // them), then the engine (Edit text). With Data Saver they load on intent or on the pick.
+  // Loaded, not evaluated (idle-prefetch.ts): evaluating the shell and pdf.js waits for intent or the pick.
   useEffect(() => {
     setHydrated(true);
     const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
     const go = () => {
       const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
       if (!earlyFetchAllowed(conn)) return;
-      void prefetchShell();
+      prefetchEditorChunks();
       void warmPdfjs("low").then(() => import("@/lib/editor/engine-client").then((m) => m.preloadEngine("low")));
     };
     const id = w.requestIdleCallback ? w.requestIdleCallback(go, { timeout: 4000 }) : window.setTimeout(go, 2500);

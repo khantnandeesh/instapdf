@@ -221,6 +221,16 @@ pub struct Engine {
     pub(crate) faces: Vec<Face>,
     pub(crate) embeds: Vec<Option<Embed>>,
     pub(crate) edited_pages: BTreeSet<usize>,
+    /// Set while `preview_line` runs: a complex-script edit is drawn, read, then rolled back,
+    /// and what it drew lands in `preview`.
+    #[cfg(feature = "shaping")]
+    pub(crate) dry: bool,
+    #[cfg(feature = "shaping")]
+    pub(crate) preview: Option<crate::complex::LinePreview>,
+    /// Objects numbered above this were made by edits kept in this session (a failed edit's
+    /// are removed again): the file's highest object number when opened, or what
+    /// [`Engine::set_made_after`] restored.
+    pub(crate) opened_max: u32,
 }
 
 /// One planned piece of new text.
@@ -338,6 +348,52 @@ fn fmt_kern(v: f64) -> String {
     }
 }
 
+/// A ToUnicode CMap mapping each code (`width` bytes) to its text, as this engine writes it.
+#[cfg(feature = "shaping")]
+fn to_unicode_cmap(width: usize, entries: &BTreeMap<u32, String>) -> String {
+    let hex = |n: u32| format!("{n:0w$X}", w = 2 * width);
+    let mut cmap = format!(
+        "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<{}> <{}>\nendcodespacerange\n",
+        hex(0),
+        hex(if width == 1 { 0xFF } else { 0xFFFF }),
+    );
+    let entries: Vec<(&u32, &String)> = entries.iter().collect();
+    for chunk in entries.chunks(100) {
+        cmap.push_str(&format!("{} beginbfchar\n", chunk.len()));
+        for (code, text) in chunk {
+            let t: String = text.encode_utf16().map(|u| format!("{u:04X}")).collect();
+            cmap.push_str(&format!("<{}> <{t}>\n", hex(**code)));
+        }
+        cmap.push_str("endbfchar\n");
+    }
+    cmap.push_str("endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n");
+    cmap
+}
+
+/// The `bfchar` entries of a ToUnicode CMap this engine wrote (code → text).
+#[cfg(feature = "shaping")]
+fn bfchar_entries(cmap: &[u8]) -> BTreeMap<u32, String> {
+    let text = String::from_utf8_lossy(cmap);
+    let mut out = BTreeMap::new();
+    let mut inside = false;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.ends_with("beginbfchar") {
+            inside = true;
+        } else if line == "endbfchar" {
+            inside = false;
+        } else if inside {
+            let mut parts = line.split(['<', '>']).filter(|p| !p.trim().is_empty());
+            let (Some(code), Some(units)) = (parts.next(), parts.next()) else { continue };
+            let Ok(code) = u32::from_str_radix(code, 16) else { continue };
+            let units: Vec<u16> =
+                (0..units.len() / 4).filter_map(|i| u16::from_str_radix(&units[4 * i..4 * i + 4], 16).ok()).collect();
+            out.insert(code, String::from_utf16_lossy(&units));
+        }
+    }
+    out
+}
+
 pub(crate) fn new_stream(data: Vec<u8>) -> Stream {
     let mut s = Stream::new(Dictionary::new(), data);
     let _ = s.compress();
@@ -356,6 +412,7 @@ impl Engine {
             return Err(Error::Encrypted);
         }
         let pages: Vec<ObjectId> = doc.get_pages().into_values().collect();
+        let opened_max = doc.max_id;
         Ok(Engine {
             orig: bytes,
             doc,
@@ -365,7 +422,30 @@ impl Engine {
             faces: Vec::new(),
             embeds: Vec::new(),
             edited_pages: BTreeSet::new(),
+            #[cfg(feature = "shaping")]
+            dry: false,
+            #[cfg(feature = "shaping")]
+            preview: None,
+            opened_max,
         })
+    }
+
+    /// The object number above which objects were made by this engine's own edits (a trust
+    /// boundary: see [`Engine::set_made_after`]).
+    pub fn made_after(&self) -> u32 {
+        self.opened_max
+    }
+
+    /// Restores [`Engine::made_after`] after the editor reopens its own output (it reopens the
+    /// saved bytes after every edit). Only the editor's worker calls it, with the value read
+    /// when it first opened the person's file, so a font this session made can be extended
+    /// again. It is clamped to the document's highest object number. A font above it is still
+    /// reused only when it passes the engine's own checks (same program and widths, no other
+    /// text for a code), and extended only when its ToUnicode is exactly one the engine writes
+    /// (see `extendable_sibling`), so a wrong value can miss a reuse but never rewrites a
+    /// mapping the engine did not write.
+    pub fn set_made_after(&mut self, n: u32) {
+        self.opened_max = n.min(self.doc.max_id);
     }
 
     pub fn page_count(&self) -> usize {
@@ -754,6 +834,11 @@ impl Engine {
             return self.edit_complex(page, page_id, pc, lines, line_id, a, b, inserted);
             #[cfg(not(feature = "shaping"))]
             return Err(Error::ReadOnly { reason: "needs-shaping".into() });
+        }
+        // A preview covers complex-script lines only: nothing below may change the file.
+        #[cfg(feature = "shaping")]
+        if self.dry {
+            return Err(limit("preview-simple-script"));
         }
 
         // 2. Positions along the baseline.
@@ -1364,6 +1449,10 @@ impl Engine {
     /// (`width` bytes each) to their text. New text drawn through it reads right everywhere,
     /// while the text already in the original font keeps its own mapping. `widths` (Type 0 only)
     /// adds `/W` entries for codes the font leaves to `/DW`, in a copy of its CIDFont.
+    ///
+    /// `into`: a sibling this session made (see [`Engine::made_here`]) to extend instead of
+    /// making another. Only text this session drew uses it, with codes it already maps, so new
+    /// entries change no other reading; its own entries are kept.
     #[cfg(feature = "shaping")]
     pub(crate) fn sibling_font(
         &mut self,
@@ -1371,18 +1460,23 @@ impl Engine {
         width: usize,
         map: &[(u32, String)],
         widths: &[(u32, f64)],
+        into: Option<ObjectId>,
         backup: &mut Vec<(ObjectId, Option<Object>)>,
     ) -> Result<ObjectId> {
-        let mut dict = self.doc.get_dictionary(font_id).map_err(|_| limit("font-object"))?.clone();
+        let base = into.unwrap_or(font_id);
+        let mut dict = self.doc.get_dictionary(base).map_err(|_| limit("font-object"))?.clone();
         if !widths.is_empty() {
             let cid_ref = dict.get(b"DescendantFonts").ok().and_then(|o| match o {
                 Object::Array(a) => a.first().cloned(),
                 Object::Reference(id) => self.doc.get_object(*id).ok().and_then(|o| o.as_array().ok()?.first().cloned()),
                 _ => None,
             });
-            let mut cid = match cid_ref {
-                Some(Object::Reference(id)) => self.doc.get_dictionary(id).map_err(|_| limit("font-object"))?.clone(),
-                Some(Object::Dictionary(d)) => d,
+            let (mut cid, own) = match &cid_ref {
+                Some(Object::Reference(id)) => (
+                    self.doc.get_dictionary(*id).map_err(|_| limit("font-object"))?.clone(),
+                    into.is_some_and(|f| self.made_here(*id) && self.only_user(*id, f)),
+                ),
+                Some(Object::Dictionary(d)) => (d.clone(), false),
                 _ => return Err(limit("font-object")),
             };
             let mut w: Vec<Object> = match cid.get(b"W") {
@@ -1397,29 +1491,127 @@ impl Engine {
                 w.push(Object::Array(vec![Object::Real(*wd as f32)]));
             }
             cid.set("W", Object::Array(w));
-            let cid_id = self.add_object(Object::Dictionary(cid), backup);
+            let cid_id = match cid_ref {
+                Some(Object::Reference(id)) if own => {
+                    self.touch(id, backup);
+                    self.doc.objects.insert(id, Object::Dictionary(cid));
+                    id
+                }
+                _ => self.add_object(Object::Dictionary(cid), backup),
+            };
             dict.set("DescendantFonts", Object::Array(vec![Object::Reference(cid_id)]));
         }
-        let hex = |n: u32| format!("{n:0w$X}", w = 2 * width);
-        let mut cmap = format!(
-            "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<{}> <{}>\nendcodespacerange\n",
-            hex(0),
-            hex(if width == 1 { 0xFF } else { 0xFFFF }),
-        );
-        let mut entries: Vec<&(u32, String)> = map.iter().collect();
-        entries.sort();
-        for chunk in entries.chunks(100) {
-            cmap.push_str(&format!("{} beginbfchar\n", chunk.len()));
-            for (code, text) in chunk {
-                let t: String = text.encode_utf16().map(|u| format!("{u:04X}")).collect();
-                cmap.push_str(&format!("<{}> <{t}>\n", hex(*code)));
-            }
-            cmap.push_str("endbfchar\n");
+        let old_tu = into.and_then(|_| dict.get(b"ToUnicode").ok()?.as_reference().ok());
+        let mut entries: BTreeMap<u32, String> = match old_tu {
+            Some(id) => self
+                .doc
+                .get_object(id)
+                .ok()
+                .and_then(|o| o.as_stream().ok()?.get_plain_content().ok())
+                .map_or_else(BTreeMap::new, |b| bfchar_entries(&b)),
+            None => BTreeMap::new(),
+        };
+        for (code, text) in map {
+            entries.insert(*code, text.clone());
         }
-        cmap.push_str("endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n");
-        let to_unicode = self.add_object(Object::Stream(new_stream(cmap.into_bytes())), backup);
+        let cmap = to_unicode_cmap(width, &entries);
+        let stream = Object::Stream(new_stream(cmap.into_bytes()));
+        let to_unicode = match old_tu {
+            Some(id) if self.made_here(id) => {
+                self.touch(id, backup);
+                self.doc.objects.insert(id, stream);
+                id
+            }
+            _ => self.add_object(stream, backup),
+        };
         dict.set("ToUnicode", Object::Reference(to_unicode));
-        Ok(self.add_object(Object::Dictionary(dict), backup))
+        match into {
+            Some(id) => {
+                self.touch(id, backup);
+                self.doc.objects.insert(id, Object::Dictionary(dict));
+                // The font object changed: drop cached copies.
+                self.cache.clear();
+                Ok(id)
+            }
+            None => Ok(self.add_object(Object::Dictionary(dict), backup)),
+        }
+    }
+
+    /// True when the object was made by an edit kept in this session.
+    #[cfg(feature = "shaping")]
+    pub(crate) fn made_here(&self, id: ObjectId) -> bool {
+        id.0 > self.opened_max && self.doc.objects.contains_key(&id)
+    }
+
+    /// True when no font dictionary but `font` names `cid` in its DescendantFonts: a CIDFont a
+    /// sibling shares with the font it copies is copied, not changed.
+    #[cfg(feature = "shaping")]
+    fn only_user(&self, cid: ObjectId, font: ObjectId) -> bool {
+        let names = |o: &Object| {
+            let list = match o {
+                Object::Reference(r) => self.doc.get_object(*r).ok(),
+                o => Some(o),
+            };
+            list.and_then(|l| l.as_array().ok()).is_some_and(|a| a.iter().any(|x| x.as_reference().ok() == Some(cid)))
+        };
+        self.doc
+            .objects
+            .iter()
+            .all(|(id, o)| *id == font || !o.as_dict().ok().and_then(|d| d.get(b"DescendantFonts").ok()).is_some_and(names))
+    }
+
+    /// True when the font is a sibling this engine can extend: the font and its ToUnicode were
+    /// made in this session, it is not an embedded fallback face, and the ToUnicode is exactly
+    /// what the engine writes for its entries, none of them empty. So even with
+    /// [`Engine::made_after`] set too low, a font the engine did not write (whose CMap would
+    /// use ranges, or another layout) is never rewritten. (Its CIDFont is changed in place only
+    /// when no other font uses it: see `sibling_font`.)
+    #[cfg(feature = "shaping")]
+    pub(crate) fn extendable_sibling(&self, font: ObjectId, width: usize) -> bool {
+        let Ok(dict) = self.doc.get_dictionary(font) else { return false };
+        let Some(tu) = dict.get(b"ToUnicode").ok().and_then(|o| o.as_reference().ok()) else { return false };
+        let Some(bytes) = self.doc.get_object(tu).ok().and_then(|o| o.as_stream().ok()?.get_plain_content().ok()) else {
+            return false;
+        };
+        let entries = bfchar_entries(&bytes);
+        self.made_here(font)
+            && self.made_here(tu)
+            && !self.embeds.iter().flatten().any(|e| e.type0 == font)
+            && entries.values().all(|t| !t.is_empty() && !t.contains('\0'))
+            && to_unicode_cmap(width, &entries).as_bytes() == bytes
+    }
+
+    /// True when `b` is a sibling of `a` (or `a` of `b`): the same font dictionary but for its
+    /// ToUnicode and, in a Type 0 font, the `/W` of its CIDFont.
+    #[cfg(feature = "shaping")]
+    pub(crate) fn same_font_but_mapping(&self, a: ObjectId, b: ObjectId) -> bool {
+        let doc = &self.doc;
+        let deref = |o: &Object| match o {
+            Object::Reference(id) => doc.get_object(*id).ok().cloned(),
+            o => Some(o.clone()),
+        };
+        let cid = |d: &Dictionary| {
+            let first = match deref(d.get(b"DescendantFonts").ok()?)? {
+                Object::Array(a) => a.first().cloned()?,
+                _ => return None,
+            };
+            deref(&first)?.as_dict().ok().cloned()
+        };
+        let without = |d: &Dictionary, keys: &[&[u8]]| -> Vec<(Vec<u8>, Object)> {
+            d.iter().filter(|(k, _)| !keys.contains(&k.as_slice())).map(|(k, v)| (k.clone(), v.clone())).collect()
+        };
+        let (Ok(da), Ok(db)) = (doc.get_dictionary(a), doc.get_dictionary(b)) else { return false };
+        if without(da, &[b"ToUnicode", b"DescendantFonts"]) != without(db, &[b"ToUnicode", b"DescendantFonts"]) {
+            return false;
+        }
+        match (da.has(b"DescendantFonts"), db.has(b"DescendantFonts")) {
+            (false, false) => true,
+            (true, true) => match (cid(da), cid(db)) {
+                (Some(ca), Some(cb)) => without(&ca, &[b"W"]) == without(&cb, &[b"W"]),
+                _ => false,
+            },
+            _ => false,
+        }
     }
 
     /// Embeds (or extends) the subset of a fallback face and returns its Type 0 font object.

@@ -17,6 +17,8 @@ let sharedWorker: PDFWorker | null = null;
 export const workerUrls = () => [new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString(), new URL("pdfjs-dist/build/pdf.renderer.min.mjs", import.meta.url).toString()] as const;
 
 export function loadPdfjs(): Promise<PdfjsModule> {
+  // The editor's idle prefetch (tools/editor/idle-prefetch.ts) names this same specifier; keep them
+  // equal (idle-prefetch.test.ts checks).
   modulePromise ??= import("pdfjs-dist").then((pdfjs) => {
     const [worker, renderer] = workerUrls();
     pdfjs.GlobalWorkerOptions.workerSrc = worker;

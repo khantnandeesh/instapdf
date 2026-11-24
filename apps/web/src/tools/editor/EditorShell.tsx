@@ -20,6 +20,7 @@ import type { Permission } from "@/tools/registry";
 import { disposeEngine, getEngineStatus, getShapingStatus, subscribeEngine } from "@/lib/editor/engine-client";
 import { fontsForBuild, resolveFonts } from "@/lib/editor/fonts-browser";
 import { screenDeltaToFrame, screenToFrame, displaySize } from "@/lib/editor/geometry";
+import { openZoom, renderDpr } from "@/lib/editor/open-zoom";
 import * as H from "@/lib/editor/history";
 import { clampDelta, initialPages, isPristine, kindName, moveObject, newId, objectBounds, pageSize, totalRotation, type EditorObject, type PageEntry, type Pt } from "@/lib/editor/model";
 import { clearDevice, deleteSession, loadSession, sha256, storageAvailable, writeSession, type LoadedSession } from "@/lib/editor/persist";
@@ -81,8 +82,6 @@ const writeLocal = (k: string, v: string) => {
   }
 };
 
-/** Largest zoom the document opens at on desktop (fit width up to this). */
-const OPEN_ZOOM_CAP = 1.5;
 const reducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function initialState(pages: PageEntry[], wide: boolean): EditorState {
@@ -414,16 +413,18 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     [store, fitZoom, scroller],
   );
   // First fit: fit width, so the page fills the view (M12). On very wide screens the zoom is
-  // capped, so a line of text stays a readable length.
+  // capped (lib/editor/open-zoom): the page stays crisp and a line of text a readable length.
   const fitted = useRef(false);
   useLayoutEffect(() => {
     if (!scroller || fitted.current) return;
     fitted.current = true;
     const inner = innerSize();
     if (inner) setAvail(inner.w);
-    const z = fitZoom("width");
-    if (wide && z > OPEN_ZOOM_CAP) store.set({ zoom: OPEN_ZOOM_CAP, fit: null });
-    else store.set({ zoom: z, fit: "width" });
+    const ps = H.current(store.get().history).pages;
+    const ref = ps[store.get().current] ?? ps[0];
+    const d = ref ? displaySize(ref.view, totalRotation(ref), 1) : { width: 612, height: 792 };
+    const first = openZoom(fitZoom("width"), d.width * BASE_SCALE, d.height * BASE_SCALE, wide, renderDpr(window.devicePixelRatio));
+    store.set(first.capped ? { zoom: first.zoom, fit: null } : { zoom: first.zoom, fit: "width" });
   }, [scroller, wide, fitZoom, store, innerSize]);
   useEffect(() => {
     if (!scroller) return;

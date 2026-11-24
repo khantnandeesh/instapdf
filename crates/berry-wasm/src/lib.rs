@@ -57,6 +57,18 @@ impl BerryDocument {
         Engine::open(bytes.to_vec(), password.as_deref()).map(|engine| BerryDocument { engine }).map_err(fail)
     }
 
+    /// Objects numbered above this were made by this engine's own edits (a trust boundary).
+    #[wasm_bindgen(js_name = madeAfter)]
+    pub fn made_after(&self) -> u32 {
+        self.engine.made_after()
+    }
+
+    /// Restores `madeAfter` after reopening the editor's own output; clamped to the document.
+    #[wasm_bindgen(js_name = setMadeAfter)]
+    pub fn set_made_after(&mut self, n: u32) {
+        self.engine.set_made_after(n)
+    }
+
     #[wasm_bindgen(getter, js_name = pageCount)]
     pub fn page_count(&self) -> usize {
         self.engine.page_count()
@@ -89,6 +101,18 @@ impl BerryDocument {
     #[wasm_bindgen(js_name = replaceRange)]
     pub fn replace_range(&mut self, page: usize, line: usize, start: usize, end: usize, text: &str) -> Result<JsValue, JsValue> {
         to_js(&self.engine.replace_range(page, line, start, end, text).map_err(fail)?)
+    }
+
+    /// How a complex-script line would look with `text` (nothing is changed): `{ paths, glyphs }`.
+    #[wasm_bindgen(js_name = previewLine)]
+    pub fn preview_line(&mut self, page: usize, line: usize, text: &str) -> Result<JsValue, JsValue> {
+        #[cfg(feature = "shaping")]
+        return to_js(&self.engine.preview_line(page, line, text).map_err(fail)?);
+        #[cfg(not(feature = "shaping"))]
+        {
+            let _ = (page, line, text);
+            Err(fail(berry_engine::Error::ReadOnly { reason: "needs-shaping".into() }))
+        }
     }
 
     /// Lays out one line of new text with the registered fonts.
