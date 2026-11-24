@@ -6,13 +6,13 @@ Status: draft, 2026-11-24. Owner-facing proposal with the decisions still open: 
 
 ## 1. Reference behaviour
 
-From the live checks in `f16-pdf-editor.md` §2a and `f16-reference-live-checks.md` (fresh captures of the font menu and Font Replacement dialog are still to be taken for this spec):
+Captured live on 2026-11-24 with `font-coverage-1p.pdf` (images and the full list in the project files under `designs/fonts/sejda/`), plus the earlier checks in `f16-pdf-editor.md` §2a and `f16-reference-live-checks.md`:
 
-- About 45 bundled open fonts, each labelled with the commercial font it stands in for. No visual matching.
-- A character missing from the document's font opens a blocking "Font Replacement" dialog listing 33 fonts, unranked.
-- A missing ₹ silently switched the whole run to a sans face.
-- "More fonts" says fonts on the computer need the desktop app. No font upload.
-- The preview while typing uses a bundled web font, not the font that is saved.
+- The font menu is one flat list of 38 entries: 35 bundled open fonts (some labelled with the commercial font they stand in for) and, at the end, the document's own fonts by PostScript name. No search, no grouping, no ranking by closeness to the page.
+- "More fonts…" opens a dialog saying local fonts are not available online and pointing to the desktop app. There is no font upload.
+- A character missing from the document's font opens a blocking "Font Replacement" dialog listing 33 fonts, unranked (earlier check; not re-captured on 2026-11-24).
+- A missing ₹ silently switched the whole run to a sans face (earlier check).
+- The preview while typing uses a bundled web font, not the font that is saved (earlier check).
 
 ## 2. The font ladder
 
