@@ -366,7 +366,7 @@ test("AC-49 AC-56: tools have names, shortcuts and hints; the open editor has no
   await expectNoSeriousAxeViolations(page, "editor with a selection");
 });
 
-test("AC-44 AC-93: Ctrl+S downloads, a second download works, and the editor stays open", async ({ page }) => {
+test("AC-44 AC-93: Ctrl+S downloads, a second download works, and the editor stays open", { tag: "@serial" }, async ({ page }) => {
   await open(page, "chrome-justified-mixed.pdf");
   await addText(page, "One");
   await page.getByTestId("canvas").focus();

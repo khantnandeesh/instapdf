@@ -11,6 +11,13 @@ export const ALLOWED_CODE = new Set(["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3
 export const ALLOWED_FONT = new Set(["OFL-1.1"]);
 
 /**
+ * SPDX ids the font library may serve (entries with `library: true`): the font licences
+ * CLAUDE.md rule 3 lists for the library. All of them allow redistribution and embedding in
+ * documents. Must stay equal to FONT_LICENCES in scripts/font-library/lib.mjs (policy.test.ts checks).
+ */
+export const ALLOWED_LIBRARY_FONT = new Set(["OFL-1.1", "Apache-2.0", "MIT", "UFL-1.0", "CC0-1.0", "LicenseRef-GUST-Font-License", "Bitstream-Vera"]);
+
+/**
  * npm packages that ship only font files and their CSS (no program code), e.g. self-hosted
  * Fontsource fonts loaded with next/font/local. They are judged as fonts (ALLOWED_FONT), and only
  * if every file in them is a font, stylesheet or metadata file (see isFontOnlyPackage).
@@ -129,7 +136,7 @@ export function isAllowedExpression(expr, allowed = ALLOWED_CODE) {
  */
 export function findViolations(entries, { exceptions = EXCEPTIONS } = {}) {
   return entries.filter((e) => {
-    if (e.kind === "font") return !isAllowedExpression(e.license, ALLOWED_FONT);
+    if (e.kind === "font") return !isAllowedExpression(e.license, e.library ? ALLOWED_LIBRARY_FONT : ALLOWED_FONT);
     if (isAllowedExpression(e.license, ALLOWED_CODE)) return false;
     const ex = exceptions[e.name];
     return !(ex && ex.license === e.license);

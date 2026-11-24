@@ -84,6 +84,121 @@ pub fn request_for(font: &PdfFont) -> FontRequest {
     FontRequest { families, bold: font.is_bold(), italic: font.is_italic() }
 }
 
+/// Open families for every complex script in `text`, best first, for a box whose font has the
+/// normalized family name `stem`.
+pub fn script_families_for_text(text: &str, stem: &str) -> Vec<&'static str> {
+    let serif =
+        ["serif", "times", "georgia", "garamond", "cambria", "tinos", "liberationserif", "book"].iter().any(|k| stem.contains(k))
+            && !stem.contains("sans");
+    let mut scripts: Vec<crate::script::Script> = Vec::new();
+    for c in text.chars() {
+        let sc = crate::script::script(c);
+        if crate::script::is_complex(c) && !scripts.contains(&sc) {
+            scripts.push(sc);
+        }
+    }
+    let mut out: Vec<&'static str> = Vec::new();
+    for sc in scripts {
+        for f in script_families(sc, serif, stem) {
+            if !out.contains(&f) {
+                out.push(f);
+            }
+        }
+    }
+    out
+}
+
+/// Open families for a script, best first, given the original font's look.
+fn script_families(sc: crate::script::Script, serif: bool, stem: &str) -> Vec<&'static str> {
+    use crate::script::Script as S;
+    let naskh = [
+        "times",
+        "timesnew",
+        "timesnewroman",
+        "traditionalarabic",
+        "simplifiedarabic",
+        "arabictypesetting",
+        "amiri",
+        "notonaskharabic",
+        "scheherazade",
+        "lotus",
+        "badr",
+    ];
+    match sc {
+        S::Devanagari => {
+            let serif = serif
+                || ["kokila", "aparajita", "utsaah", "notoserifdevanagari", "sanskrit", "martel"]
+                    .iter()
+                    .any(|k| stem.contains(k));
+            if serif {
+                vec!["Noto Serif Devanagari", "Noto Sans Devanagari"]
+            } else {
+                vec!["Noto Sans Devanagari", "Noto Serif Devanagari"]
+            }
+        }
+        S::Arabic => {
+            if serif || naskh.iter().any(|k| stem.contains(k)) {
+                vec!["Noto Naskh Arabic", "Noto Sans Arabic"]
+            } else {
+                vec!["Noto Sans Arabic", "Noto Naskh Arabic"]
+            }
+        }
+        S::Hebrew => {
+            if serif {
+                vec!["Noto Serif Hebrew", "Noto Sans Hebrew"]
+            } else {
+                vec!["Noto Sans Hebrew", "Noto Serif Hebrew"]
+            }
+        }
+        S::Bengali => vec!["Noto Sans Bengali", "Noto Serif Bengali"],
+        S::Gurmukhi => vec!["Noto Sans Gurmukhi"],
+        S::Gujarati => vec!["Noto Sans Gujarati"],
+        S::Oriya => vec!["Noto Sans Oriya"],
+        S::Tamil => vec!["Noto Sans Tamil"],
+        S::Telugu => vec!["Noto Sans Telugu"],
+        S::Kannada => vec!["Noto Sans Kannada"],
+        S::Malayalam => vec!["Noto Sans Malayalam"],
+        S::Sinhala => vec!["Noto Sans Sinhala"],
+        S::Thai => vec!["Noto Sans Thai"],
+        _ => vec![],
+    }
+}
+
+/// Like [`request_for`], with the families for the scripts in `text` put right after the
+/// original family (a Latin stand-in cannot draw Hindi or Arabic).
+pub fn request_for_text(font: &PdfFont, text: &str) -> FontRequest {
+    let base = request_for(font);
+    let stem = family_stem(&font.base_font);
+    let mut scripts: Vec<crate::script::Script> = Vec::new();
+    for c in text.chars() {
+        let sc = crate::script::script(c);
+        if crate::script::is_complex(c) && !scripts.contains(&sc) {
+            scripts.push(sc);
+        }
+    }
+    if scripts.is_empty() {
+        return base;
+    }
+    let mut families: Vec<String> = Vec::new();
+    let mut push = |f: &str| {
+        if !families.iter().any(|x| normalize(x) == normalize(f)) {
+            families.push(f.to_string());
+        }
+    };
+    if let Some(same) = base.families.first() {
+        push(same);
+    }
+    for sc in scripts {
+        for f in script_families(sc, font.is_serif(), &stem) {
+            push(f);
+        }
+    }
+    for f in &base.families {
+        push(f);
+    }
+    FontRequest { families, bold: base.bold, italic: base.italic }
+}
+
 /// A font file the host registered.
 #[derive(Clone)]
 pub struct Face {
@@ -99,6 +214,23 @@ impl Face {
         let face = ttf_parser::Face::parse(&self.data, 0).ok()?;
         face.glyph_index(ch).map(|g| g.0).filter(|&g| g != 0)
     }
+}
+
+/// Picks the registered face that best matches `req` and has every character of `text`.
+pub fn pick_text(faces: &[Face], req: &FontRequest, text: &str) -> Option<usize> {
+    let style_score = |f: &Face| (f.bold != req.bold) as u32 + (f.italic != req.italic) as u32;
+    let mut best: Option<((usize, u32), usize)> = None;
+    for (i, f) in faces.iter().enumerate() {
+        if !crate::shape::covers(&f.data, text) {
+            continue;
+        }
+        let rank = req.families.iter().position(|fam| normalize(fam) == normalize(&f.family)).unwrap_or(usize::MAX);
+        let key = (rank, style_score(f));
+        if best.map(|(k, _)| key < k).unwrap_or(true) {
+            best = Some((key, i));
+        }
+    }
+    best.map(|(_, i)| i)
 }
 
 /// Picks the registered face that best matches `req` and covers `ch`.

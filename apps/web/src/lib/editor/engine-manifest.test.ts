@@ -15,11 +15,22 @@ const manifest = JSON.parse(read("manifest.json").toString("utf8")) as {
   files: Record<string, string>;
   wasmGzipBytes: number;
   wasmBytes: number;
+  shapingWasmGzipBytes: number;
+  shapingWasmBytes: number;
+  fontmatchWasmGzipBytes: number;
+  fontmatchWasmBytes: number;
 };
 
 describe("engine artifact", () => {
   it("matches the sha256 recorded by the build script", () => {
-    expect(Object.keys(manifest.files).sort()).toEqual(["berry_engine.js", "berry_engine_bg.wasm"]);
+    expect(Object.keys(manifest.files).sort()).toEqual([
+      "berry_engine.js",
+      "berry_engine_bg.wasm",
+      "berry_engine_shaping.js",
+      "berry_engine_shaping_bg.wasm",
+      "berry_fontmatch.js",
+      "berry_fontmatch_bg.wasm",
+    ]);
     for (const [name, sha] of Object.entries(manifest.files)) {
       expect(createHash("sha256").update(read(name)).digest("hex"), name).toBe(sha);
     }
@@ -33,10 +44,34 @@ describe("engine artifact", () => {
 
   it("records the raw WebAssembly size that load progress counts against", () => {
     expect(manifest.wasmBytes).toBe(read("berry_engine_bg.wasm").length);
+    expect(manifest.shapingWasmBytes).toBe(read("berry_engine_shaping_bg.wasm").length);
   });
 
-  it("stays inside the 1 MB gzip budget", () => {
-    expect(gzipSync(read("berry_engine_bg.wasm"), { level: 9 }).length).toBeLessThanOrEqual(1_000_000);
+  it("stays inside the 1 MB gzip budget, both modules", () => {
+    for (const name of ["berry_engine_bg.wasm", "berry_engine_shaping_bg.wasm"]) {
+      expect(gzipSync(read(name), { level: 9 }).length, name).toBeLessThanOrEqual(1_000_000);
+    }
+  });
+
+  // The default module loads on every editor visit, so it must not grow: new features go into the
+  // lazily loaded shaping module. Raising this cap needs the lead's OK (measured as the build
+  // script does, `gzip -9`, recorded in manifest.json; Node's zlib reads about 1% higher). It is
+  // 792,277 bytes; the cap leaves room for the few dozen bytes builds differ by between machines.
+  it("keeps the default module at its size (792 KB gzip)", () => {
+    expect(manifest.wasmGzipBytes).toBeLessThanOrEqual(793_000);
+    expect(gzipSync(read("berry_engine_bg.wasm"), { level: 9 }).length).toBeLessThanOrEqual(803_300);
+  });
+
+  // The font matcher loads only when a match is needed, and must stay a small download.
+  it("keeps the font matcher inside its 150 KB gzip budget", () => {
+    expect(manifest.fontmatchWasmBytes).toBe(read("berry_fontmatch_bg.wasm").length);
+    expect(manifest.fontmatchWasmGzipBytes).toBeLessThanOrEqual(150_000);
+    expect(gzipSync(read("berry_fontmatch_bg.wasm"), { level: 9 }).length).toBeLessThanOrEqual(152_000);
+  });
+
+  it("ships the font matcher's typed API unchanged", () => {
+    const api = readFileSync(new URL("../../../../../crates/berry-fontmatch-wasm/berry-fontmatch.d.ts", import.meta.url), "utf8");
+    expect(readFileSync(new URL("./berry-fontmatch.d.ts", import.meta.url), "utf8")).toBe(api);
   });
 
   it("ships the engine's typed API unchanged", () => {
@@ -48,5 +83,19 @@ describe("engine artifact", () => {
     const { default: config } = await import("../../../next.config");
     const { ENGINE_JS, ENGINE_WASM } = await import("./engine-assets");
     expect(config.env).toEqual({ ENGINE_JS_PATH: ENGINE_JS, ENGINE_WASM_PATH: ENGINE_WASM });
+  });
+
+  it("serves the shaping module from hashed, precompressed paths but never prefetches it", async () => {
+    const { default: config } = await import("../../../next.config");
+    const { ENGINE_SHAPING_JS, ENGINE_SHAPING_WASM } = await import("./engine-assets");
+    const rewrites = (await config.rewrites!()) as { beforeFiles: { source: string; destination: string }[] };
+    for (const [path, file] of [
+      [ENGINE_SHAPING_JS, "berry_engine_shaping.js"],
+      [ENGINE_SHAPING_WASM, "berry_engine_shaping_bg.wasm"],
+    ]) {
+      const dests = rewrites.beforeFiles.filter((r) => r.source === path).map((r) => r.destination);
+      expect(dests, file).toEqual([`/engine/${file}.br`, `/engine/${file}.gz`, `/engine/${file}`]);
+      expect(Object.values(config.env ?? {})).not.toContain(path);
+    }
   });
 });

@@ -83,7 +83,7 @@ test("AC-6: an unreadable image is named in an error and the PDF stays", async (
   expect(await cardNames(page)).toEqual(["alpha.pdf"]);
 });
 
-test("AC-7: a 64-megapixel image is refused fast, naming the 50-megapixel cap", async ({ page }) => {
+test("AC-7: a 64-megapixel image is refused fast, naming the 50-megapixel cap", { tag: "@serial" }, async ({ page }) => {
   const started = Date.now();
   await page.getByTestId("file-input").setInputFiles(await hugePngPayload());
   await expect(page.getByRole("alert").filter({ hasText: /huge\.png.*50 megapixels/ })).toBeVisible({ timeout: 3000 });
@@ -259,7 +259,7 @@ test("AC-80: the same file added twice is added, with a notice; another file sho
   expect(await cardNames(page)).toEqual(["alpha.pdf", "bravo.pdf"]);
 });
 
-test("AC-70 / F1 AC-18 adapted: 51 files load 50 and say so", async ({ page }) => {
+test("AC-70 / F1 AC-18 adapted: 51 files load 50 and say so", { tag: "@serial" }, async ({ page }) => {
   const bytes = await import("node:fs/promises").then((fs) => fs.readFile(fx("echo.pdf")));
   const files = Array.from({ length: 51 }, (_, i) => ({ name: `f${String(i + 1).padStart(2, "0")}.pdf`, mimeType: "application/pdf", buffer: bytes }));
   await page.getByTestId("file-input").setInputFiles(files);

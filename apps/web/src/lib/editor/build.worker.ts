@@ -4,7 +4,7 @@
  * first Download intent. Bytes stay on this device; the only fetches are our own font files.
  */
 import { buildPdf, type BuildInput } from "./build";
-import { FONT_BASE, type EditorFontManifest } from "./fonts";
+import { FONT_BASE, USER_FILE, fontUrl, type EditorFontManifest } from "./fonts";
 import type { FormState } from "@/lib/forms/types";
 
 export type BuildRequest =
@@ -34,7 +34,7 @@ const fonts = {
     manifest.catch(() => (manifest = null));
     return manifest;
   },
-  load: (file: string) => bytes(`${FONT_BASE}${encodeURIComponent(file)}`),
+  load: (file: string) => bytes(fontUrl(file)),
   fallback: {
     manifest: () => {
       noto ??= json("/fonts/noto/manifest.json");
@@ -66,7 +66,21 @@ scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: 
   }
   try {
     const fontkit = (await import("@cantoo/fontkit")).default;
-    const out = await buildPdf(msg.input, fonts, fontkit);
+    // Library and user faces come with the request; the user's own bytes are never fetched.
+    const more = msg.input.fonts;
+    const withMore: typeof fonts = more
+      ? {
+          ...fonts,
+          manifest: async () => ({ faces: { ...more.faces, ...(await fonts.manifest()).faces } }),
+          load: async (file) => {
+            if (!file.startsWith(USER_FILE)) return fonts.load(file);
+            const own = more.bytes[file];
+            if (!own) throw new Error("A font you added is no longer available. Add it again.");
+            return own;
+          },
+        }
+      : fonts;
+    const out = await buildPdf(msg.input, withMore, fontkit);
     scope.postMessage({ id: msg.id, ok: true, bytes: out } satisfies BuildResponse, [out.buffer as ArrayBuffer]);
   } catch (error) {
     // Logged locally only, without file content.

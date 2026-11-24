@@ -48,6 +48,36 @@ pub struct Glyph {
     pub elem: usize,
     /// Byte offset of this code inside its string.
     pub byte: usize,
+    /// The outermost `/ActualText` marked-content span the glyph is in: index into
+    /// [`PageContent::spans`].
+    pub span: Option<usize>,
+    /// Drawn inside `/ReversedChars` marked content (right-to-left text stored in visual order).
+    pub reversed: bool,
+}
+
+/// A marked-content sequence with `/ActualText`: its text replaces the text of every glyph in it.
+#[derive(Clone, Debug)]
+pub struct ActualSpan {
+    pub text: String,
+    /// The stream and operator indices of its `BDC` and matching `EMC` (when there is one).
+    pub source: usize,
+    pub bdc: usize,
+    pub emc: Option<usize>,
+    /// How an edit takes the span out while keeping its other marked-content properties.
+    pub unwrap: Unwrap,
+}
+
+/// How to remove an `/ActualText` span from the content.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Unwrap {
+    /// Nothing else in its properties: drop the `BDC` and its `EMC`.
+    Drop,
+    /// Other properties (such as `/MCID`, which ties the text to the structure tree): rewrite
+    /// the `BDC` to these bytes, without `/ActualText`, and keep its `EMC`.
+    Rewrite(Vec<u8>),
+    /// Named properties that hold more than `/ActualText`, or values that cannot be written
+    /// back: the span cannot be removed safely.
+    Keep,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -72,6 +102,10 @@ pub struct ShowState {
     pub tw: f64,
     /// Page units per text-space unit along the baseline.
     pub scale: f64,
+    /// Text rise (`Ts`) in text space units.
+    pub rise: f64,
+    /// Page-space displacement of one text-space unit of rise.
+    pub rise_dir: (f64, f64),
 }
 
 #[derive(Clone, Debug)]
@@ -115,6 +149,7 @@ pub struct Segment {
 
 pub struct PageContent {
     pub glyphs: Vec<Glyph>,
+    pub spans: Vec<ActualSpan>,
     pub fonts: Vec<Rc<PdfFont>>,
     pub sources: Vec<Source>,
     /// The page's content streams in order; `sources[0].data` is their concatenation.
@@ -219,6 +254,23 @@ pub fn page_resources(doc: &Document, page_id: ObjectId) -> Vec<&Dictionary> {
     out
 }
 
+/// How to take `/ActualText` out of an inline-properties `BDC`.
+fn unwrap_inline(tag: Option<&Operand>, entries: &[(Vec<u8>, Operand)]) -> Unwrap {
+    let rest: Vec<(Vec<u8>, Operand)> = entries.iter().filter(|(k, _)| k != b"ActualText").cloned().collect();
+    if rest.is_empty() {
+        return Unwrap::Drop;
+    }
+    let mut out = Vec::new();
+    let Some(Operand::Name(tag)) = tag else { return Unwrap::Keep };
+    crate::content::fmt_name(tag, &mut out);
+    out.push(b' ');
+    if crate::content::fmt_operand(&Operand::Dict(rest), &mut out).is_none() {
+        return Unwrap::Keep;
+    }
+    out.extend_from_slice(b" BDC");
+    Unwrap::Rewrite(out)
+}
+
 fn lookup<'a>(doc: &'a Document, resources: &[&'a Dictionary], category: &[u8], name: &[u8]) -> Option<&'a Object> {
     for r in resources {
         if let Ok(cat) = r.get(category) {
@@ -300,9 +352,33 @@ struct Interp<'a> {
     invocations: usize,
     ops_seen: usize,
     over_budget: Option<&'static str>,
+    /// Open marked-content sequences, innermost last. Each entry holds the span it opened plus
+    /// the state in effect inside it (outermost span, any `/ReversedChars`), so a glyph reads its
+    /// state in O(1) however deep the nesting.
+    marked: Vec<Marked>,
+}
+
+/// One open marked-content sequence.
+#[derive(Clone, Copy)]
+struct Marked {
+    /// The `/ActualText` span this sequence opened.
+    opened: Option<usize>,
+    /// The outermost `/ActualText` span in effect inside it.
+    span: Option<usize>,
+    /// Whether any enclosing sequence is `/ReversedChars`.
+    reversed: bool,
 }
 
 impl<'a> Interp<'a> {
+    fn push_marked(&mut self, opened: Option<usize>, reversed: bool) {
+        let outer = self.marked.last().copied();
+        self.marked.push(Marked {
+            opened,
+            span: outer.and_then(|m| m.span).or(opened),
+            reversed: reversed || outer.is_some_and(|m| m.reversed),
+        });
+    }
+
     fn font_slot(&mut self, f: Rc<PdfFont>) -> usize {
         let key = Rc::as_ptr(&f) as usize;
         if let Some(&i) = self.font_index.get(&key) {
@@ -327,7 +403,10 @@ impl<'a> Interp<'a> {
                 tx += gs.tw;
             }
             tx *= gs.th;
+            let (span, reversed) = self.marked.last().map_or((None, false), |m| (m.span, m.reversed));
             self.out.glyphs.push(Glyph {
+                span,
+                reversed,
                 text: font.unicode(code).unwrap_or_default(),
                 code,
                 nbytes: nbytes as u8,
@@ -368,6 +447,8 @@ impl<'a> Interp<'a> {
         let mut tm = Matrix::IDENTITY;
         let mut tlm = Matrix::IDENTITY;
         let mut events: Vec<TextEvent> = Vec::new();
+        // Marked content opened outside this stream (around a `Do`) stays open inside it.
+        let marked_base = self.marked.len();
 
         for (i, op) in ops.iter().enumerate() {
             self.ops_seen += 1;
@@ -451,6 +532,12 @@ impl<'a> Interp<'a> {
                         tc: gs.tc,
                         tw: gs.tw,
                         scale: tm.then(&gs.ctm).x_scale(),
+                        rise: gs.trise,
+                        rise_dir: {
+                            let m = tm.then(&gs.ctm);
+                            let (o, y) = (m.apply(0.0, 0.0), m.apply(0.0, 1.0));
+                            (y.0 - o.0, y.1 - o.1)
+                        },
                     };
                     match (kind, op.operands.last()) {
                         (ShowKind::TJ, Some(Operand::Array(items))) => {
@@ -468,6 +555,42 @@ impl<'a> Interp<'a> {
                         _ => {}
                     }
                     events.push(TextEvent::Show { op: i, kind, state, glyphs: first..self.out.glyphs.len() });
+                }
+                b"BMC" => {
+                    let reversed = op.operands.first().and_then(Operand::name) == Some(b"ReversedChars".as_slice());
+                    self.push_marked(None, reversed);
+                }
+                b"BDC" => {
+                    let props = op.operands.get(1);
+                    let actual: Option<(Vec<u8>, Unwrap)> = match props {
+                        Some(Operand::Dict(entries)) => match props.and_then(|p| p.get(b"ActualText")) {
+                            Some(Operand::Str(t)) => Some((t.clone(), unwrap_inline(op.operands.first(), entries))),
+                            _ => None,
+                        },
+                        Some(Operand::Name(n)) => lookup(self.doc, resources, b"Properties", n)
+                            .and_then(|o| deref(self.doc, o).as_dict().ok())
+                            .and_then(|d| {
+                                let t = deref(self.doc, d.get(b"ActualText").ok()?).as_str().ok()?.to_vec();
+                                let only = d.iter().all(|(k, _)| k == b"ActualText" || k == b"Type");
+                                Some((t, if only { Unwrap::Drop } else { Unwrap::Keep }))
+                            }),
+                        _ => None,
+                    };
+                    let span = actual.map(|(t, unwrap)| {
+                        self.out.spans.push(ActualSpan { text: decode_text_string(&t), source, bdc: i, emc: None, unwrap });
+                        self.out.spans.len() - 1
+                    });
+                    let reversed = op.operands.first().and_then(Operand::name) == Some(b"ReversedChars".as_slice());
+                    self.push_marked(span, reversed);
+                }
+                b"EMC" => {
+                    if self.marked.len() > marked_base {
+                        if let Some(Marked { opened: Some(s), .. }) = self.marked.pop() {
+                            if self.out.spans[s].source == source {
+                                self.out.spans[s].emc = Some(i);
+                            }
+                        }
+                    }
                 }
                 b"g" => {
                     gs.fill_cs = ColorSpace::Gray;
@@ -544,8 +667,22 @@ impl<'a> Interp<'a> {
                 _ => {}
             }
         }
+        self.marked.truncate(marked_base);
         self.out.sources[source].events = events;
     }
+}
+
+/// Decodes a PDF text string: UTF-16BE or UTF-8 with a byte-order mark, else PDFDocEncoding
+/// (read as Latin-1, which matches it for every printable character that matters here).
+pub fn decode_text_string(b: &[u8]) -> String {
+    if let Some(rest) = b.strip_prefix(&[0xFE, 0xFF]) {
+        let units: Vec<u16> = rest.chunks(2).map(|c| (c[0] as u16) << 8 | *c.get(1).unwrap_or(&0) as u16).collect();
+        return String::from_utf16_lossy(&units);
+    }
+    if let Some(rest) = b.strip_prefix(&[0xEF, 0xBB, 0xBF]) {
+        return String::from_utf8_lossy(rest).to_string();
+    }
+    b.iter().map(|&c| c as char).collect()
 }
 
 /// Iterates the codes of a string with the byte offset of each.
@@ -580,13 +717,21 @@ pub fn interpret_bytes(
     let mut it = Interp {
         doc,
         cache,
-        out: PageContent { glyphs: Vec::new(), fonts: Vec::new(), sources: Vec::new(), segments, incomplete: false },
+        out: PageContent {
+            glyphs: Vec::new(),
+            spans: Vec::new(),
+            fonts: Vec::new(),
+            sources: Vec::new(),
+            segments,
+            incomplete: false,
+        },
         font_index: HashMap::new(),
         form_stack: Vec::new(),
         forms: HashMap::new(),
         invocations: 0,
         ops_seen: 0,
         over_budget: None,
+        marked: Vec::new(),
     };
     it.out.sources.push(Source {
         kind: SourceKind::Page,

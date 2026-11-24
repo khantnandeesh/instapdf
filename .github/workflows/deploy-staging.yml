@@ -74,10 +74,27 @@ jobs:
         if: steps.fresh.outputs.deploy == 'true'
         env:
           PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          FONTS_BUCKET: ${{ vars.FONTS_BUCKET }}
         run: |
           image="${REGION}-docker.pkg.dev/${PROJECT_ID}/instapdf/web:${SHA}"
           echo "IMAGE=${image}" >> "$GITHUB_ENV"
-          docker build -f apps/web/Dockerfile -t "$image" .
+          # The fonts bucket serves the font library once the publish workflow has filled it
+          # (infra/README.md "Fonts bucket"). The bucket's name comes from a repository variable
+          # set after Terraform created it, never from a guess: bucket names are global, so a
+          # guessed name could be someone else's. No variable, or no manifest yet (404): the
+          # image carries the small in-app copy. Any other answer fails the deploy, so a passing
+          # hiccup can't quietly shrink the library.
+          fonts=""
+          if [ -n "$FONTS_BUCKET" ]; then
+            code="$(curl -sS --max-time 20 --retry 3 -o /dev/null -w '%{http_code}' "https://storage.googleapis.com/${FONTS_BUCKET}/manifest.json")"
+            case "$code" in
+              200) fonts="https://storage.googleapis.com/${FONTS_BUCKET}" ;;
+              404) ;;
+              *) echo "::error::Fonts bucket answered ${code} for manifest.json"; exit 1 ;;
+            esac
+          fi
+          echo "::notice::Font library: ${fonts:-in-app copy}"
+          docker build -f apps/web/Dockerfile --build-arg "FONTS_ORIGIN=${fonts}" -t "$image" .
           docker push "$image"
 
       - name: Deploy to Cloud Run

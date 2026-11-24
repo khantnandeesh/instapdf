@@ -6,6 +6,7 @@ use crate::font::{strip_subset_prefix, FontKind, PdfFont};
 use crate::geom::Rect;
 use crate::interp::{self, FontCache, Glyph, PageContent, Segment, ShowKind, ShowState, SourceKind, TextEvent};
 use crate::layout::{self, Line, Paragraph};
+use crate::script;
 use lopdf::{Dictionary, Document, IncrementalDocument, Object, ObjectId, Stream};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -76,6 +77,28 @@ pub struct FontInfo {
     pub object: Option<u32>,
     /// Open fonts that can stand in for this one, best first.
     pub stand_ins: Vec<String>,
+    /// False for a subset: some characters may be missing.
+    pub complete: bool,
+}
+
+/// One character of a font program: its glyph index (0 when the program is not readable) and
+/// its advance in 1/1000 em.
+#[derive(Clone, Debug, Serialize)]
+pub struct ProgramGlyph {
+    pub cp: u32,
+    pub gid: u16,
+    pub width: f64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct FontProgram {
+    /// "truetype", "cff" (bare CFF) or "none" (not embedded, Type 1 or Type 3: widths only).
+    pub format: &'static str,
+    /// False for a subset.
+    pub complete: bool,
+    pub glyphs: Vec<ProgramGlyph>,
+    #[serde(skip)]
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -144,30 +167,48 @@ pub struct SaveReport {
 }
 
 #[derive(Clone)]
-struct Embed {
+pub(crate) struct Embed {
     type0: ObjectId,
     cid: ObjectId,
     desc: ObjectId,
     file: ObjectId,
     to_unicode: ObjectId,
-    remap: GlyphRemapper,
-    /// New glyph id → (character, glyph id in the full font).
-    chars: BTreeMap<u16, (char, u16)>,
+    pub(crate) remap: GlyphRemapper,
+    /// New glyph id → (text for ToUnicode, glyph id in the full font).
+    chars: BTreeMap<u16, (String, u16)>,
+    /// Extra codes for a glyph already written with another text (a letter with and without
+    /// its harakat): code → (text, glyph id in the full font). They start at `alias_base`, past
+    /// every glyph id, and reach their glyph through a CIDToGIDMap.
+    aliases: BTreeMap<u16, (String, u16)>,
+    alias_base: u16,
+    /// The CIDToGIDMap stream, once there are aliases.
+    cid_map: Option<ObjectId>,
+}
+
+impl Embed {
+    /// The code that draws a glyph of the full font and reads as `text`.
+    pub(crate) fn code_for(&self, gid: u16, text: &str) -> u16 {
+        let Some(n) = self.remap.get(gid) else { return 0 };
+        match self.chars.get(&n) {
+            Some((t, _)) if t != text => self.aliases.iter().find(|(_, (t, g))| *g == gid && t == text).map_or(n, |(c, _)| *c),
+            _ => n,
+        }
+    }
 }
 
 pub struct Engine {
     orig: Vec<u8>,
-    doc: Document,
-    pages: Vec<ObjectId>,
-    cache: FontCache,
-    dirty: BTreeSet<ObjectId>,
-    faces: Vec<Face>,
-    embeds: Vec<Option<Embed>>,
-    edited_pages: BTreeSet<usize>,
+    pub(crate) doc: Document,
+    pub(crate) pages: Vec<ObjectId>,
+    pub(crate) cache: FontCache,
+    pub(crate) dirty: BTreeSet<ObjectId>,
+    pub(crate) faces: Vec<Face>,
+    pub(crate) embeds: Vec<Option<Embed>>,
+    pub(crate) edited_pages: BTreeSet<usize>,
 }
 
 /// One planned piece of new text.
-enum Seg {
+pub(crate) enum Seg {
     /// Bytes in the anchor operator's own font.
     Orig { bytes: Vec<u8>, text: String, width_em: f64, spaces: usize },
     /// Bytes in a fallback face.
@@ -176,22 +217,73 @@ enum Seg {
     Gap { width_em: f64 },
 }
 
-enum Item {
+#[derive(Clone)]
+// Rise and the ActualText items are only written by the shaping build.
+#[cfg_attr(not(feature = "shaping"), allow(dead_code))]
+pub(crate) enum Item {
     Bytes(Vec<u8>),
     Kern(f64),
     Font(Vec<u8>, f64),
     Td(f64),
+    /// Set the text rise (`Ts`), in text space units.
+    Rise(f64),
+    /// Open `/Span <</ActualText …>> BDC` with this text.
+    BeginSpan(String),
+    EndSpan,
 }
 
-struct Plan {
-    removed: HashSet<usize>,
-    want: HashMap<usize, f64>,
-    anchor: usize,
-    after: bool,
-    segs: Vec<Seg>,
+pub(crate) struct Plan {
+    pub(crate) removed: HashSet<usize>,
+    pub(crate) want: HashMap<usize, f64>,
+    pub(crate) anchor: usize,
+    pub(crate) after: bool,
+    pub(crate) segs: Vec<Seg>,
+    /// Where the new text starts along the baseline, relative to the anchor glyph's origin.
+    pub(crate) insert_at: f64,
+    /// Operators to rewrite: (stream, operator, new bytes; empty deletes it), e.g. the BDC/EMC
+    /// of removed ActualText spans.
+    pub(crate) drop_ops: Vec<(usize, usize, Vec<u8>)>,
 }
 
-fn limit(reason: &'static str) -> Error {
+/// The operator rewrites that take whole ActualText spans out of the content, so the glyphs that
+/// replace them read as themselves. Other marked-content properties (such as `/MCID`) stay.
+pub(crate) fn unwrap_spans(pc: &PageContent, spans: impl IntoIterator<Item = usize>) -> Result<Vec<(usize, usize, Vec<u8>)>> {
+    let mut spans: Vec<usize> = spans.into_iter().collect();
+    // Spans nested inside one (glyphs only record the outermost) go with it.
+    let inner: Vec<usize> = spans
+        .iter()
+        .filter_map(|&s| Some((&pc.spans[s], pc.spans[s].emc?)))
+        .flat_map(|(outer, emc)| {
+            pc.spans
+                .iter()
+                .enumerate()
+                .filter(move |(_, t)| t.source == outer.source && t.bdc > outer.bdc && t.emc.is_some_and(|e| e < emc))
+        })
+        .map(|(i, _)| i)
+        .collect();
+    spans.extend(inner);
+    spans.sort_unstable();
+    spans.dedup();
+    let mut ops = Vec::new();
+    for s in spans {
+        let sp = &pc.spans[s];
+        let emc = sp.emc.ok_or_else(|| limit("actual-text-span"))?;
+        match &sp.unwrap {
+            interp::Unwrap::Drop => {
+                ops.push((sp.source, sp.bdc, Vec::new()));
+                ops.push((sp.source, emc, Vec::new()));
+            }
+            interp::Unwrap::Rewrite(bytes) => ops.push((sp.source, sp.bdc, bytes.clone())),
+            interp::Unwrap::Keep => return Err(limit("actual-text-span")),
+        }
+    }
+    Ok(ops)
+}
+
+/// Engine state saved before an edit: next object id, dirty objects, embedded faces.
+pub(crate) type Snapshot = (u32, BTreeSet<ObjectId>, Vec<Option<Embed>>);
+
+pub(crate) fn limit(reason: &'static str) -> Error {
     Error::Unsupported { reason: reason.to_string() }
 }
 
@@ -225,7 +317,7 @@ fn fmt_kern(v: f64) -> String {
     }
 }
 
-fn new_stream(data: Vec<u8>) -> Stream {
+pub(crate) fn new_stream(data: Vec<u8>) -> Stream {
     let mut s = Stream::new(Dictionary::new(), data);
     let _ = s.compress();
     s
@@ -259,18 +351,29 @@ impl Engine {
         self.pages.len()
     }
 
-    /// Registers an open-licensed TrueType font the engine may embed for missing characters.
-    /// Returns false when the file is not a usable TrueType (glyf) font.
+    /// Registers an open-licensed TrueType font (or WOFF 1.0) the engine may embed for missing
+    /// characters and added text. Several files of one family and style (web font slices) are
+    /// all kept. Returns false when the file is not a usable TrueType (glyf) font.
     pub fn add_font(&mut self, family: &str, bold: bool, italic: bool, data: Vec<u8>) -> bool {
+        // Web fonts as served: WOFF 1.0 is unpacked to the TrueType file inside.
+        let data = if data.starts_with(b"wOFF") {
+            match crate::woff::unpack(&data) {
+                Some(d) => d,
+                None => return false,
+            }
+        } else {
+            data
+        };
         let ok = ttf_parser::Face::parse(&data, 0).map(|f| f.tables().glyf.is_some()).unwrap_or(false);
-        if ok && !self.faces.iter().any(|f| f.family == family && f.bold == bold && f.italic == italic) {
+        // Web fonts come in slices (Latin, Devanagari…) under one family: every slice is kept.
+        if ok && !self.faces.iter().any(|f| f.family == family && f.bold == bold && f.italic == italic && *f.data == data) {
             self.faces.push(Face { family: family.to_string(), bold, italic, data: Rc::new(data) });
             self.embeds.push(None);
         }
         ok
     }
 
-    fn page_id(&self, page: usize) -> Result<ObjectId> {
+    pub(crate) fn page_id(&self, page: usize) -> Result<ObjectId> {
         self.pages.get(page).copied().ok_or(Error::BadPage)
     }
 
@@ -299,10 +402,11 @@ impl Engine {
             monospace: f.is_monospace(),
             object: f.object_id.map(|i| i.0),
             stand_ins: fallback::request_for(f).families,
+            complete: !f.subset,
         }
     }
 
-    fn describe(&self, page: usize, pc: &PageContent, lines: Vec<Line>, paragraphs: Vec<Paragraph>) -> PageText {
+    pub(crate) fn describe(&self, page: usize, pc: &PageContent, lines: Vec<Line>, paragraphs: Vec<Paragraph>) -> PageText {
         let page_id = self.pages[page];
         let read_box = |key: &[u8]| -> Option<[f64; 4]> {
             let a = self.inherited(page_id, key)?.as_array().ok()?;
@@ -350,6 +454,24 @@ impl Engine {
             }
         }
         Ok(out)
+    }
+
+    /// The embedded program of a document font with where it keeps each character of `chars`,
+    /// for matching the font against the library (the matching itself is not in the engine).
+    pub fn font_program(&mut self, font_object: u32, chars: &str) -> Result<FontProgram> {
+        let id = self.doc.objects.keys().find(|k| k.0 == font_object).copied().ok_or(Error::BadFont)?;
+        let is_font = self.doc.get_dictionary(id).is_ok_and(|d| d.has_type(b"Font"));
+        let font = is_font.then(|| self.cache.get(&self.doc, &Object::Reference(id))).flatten().ok_or(Error::BadFont)?;
+        let none = HashSet::new();
+        let (format, bytes) = font.program_bytes().map(|(f, b)| (f, b.to_vec())).unwrap_or(("none", Vec::new()));
+        let glyphs = chars
+            .chars()
+            .filter_map(|ch| {
+                let code = font.encode(ch, &none)?;
+                Some(ProgramGlyph { cp: ch as u32, gid: font.program_gid(code).unwrap_or(0), width: font.width(code) })
+            })
+            .collect();
+        Ok(FontProgram { format, complete: !font.subset, glyphs, bytes })
     }
 
     /// Text of a page: lines with runs, words, fonts and positions, and paragraphs.
@@ -499,6 +621,61 @@ impl Engine {
             let page_text = self.page_text(page)?;
             return Ok(EditResult { page: page_text, changed: Vec::new(), substitutions: Vec::new(), shift: 0.0 });
         }
+        if script::needs_shaping(&line.text, line.direction == "rtl") || script::needs_shaping(&inserted, false) {
+            #[cfg(feature = "shaping")]
+            return self.edit_complex(page, page_id, pc, lines, line_id, a, b, inserted);
+            #[cfg(not(feature = "shaping"))]
+            return Err(Error::ReadOnly { reason: "needs-shaping".into() });
+        }
+
+        // 1. ActualText spans (ligatures, replaced text): an edit that touches one rewrites the
+        // whole span with its real characters and removes the span, or its old text would keep
+        // replacing what is drawn.
+        let (a, b, inserted, drop_ops) = {
+            let span_of = |i: usize| line.chars[i].glyphs.iter().find_map(|&g| pc.glyphs[g].span);
+            let mut spans: BTreeSet<usize> = (a..b).filter_map(span_of).collect();
+            // New text is drawn next to the glyph it is anchored on (as in step 3): inside that
+            // glyph's span when it has one.
+            let anchor = if a < n && line.chars[a].glyph.is_some() && !(a == b && a > 0 && line.chars[a - 1].glyph.is_some()) {
+                line.chars[a].glyph
+            } else {
+                (0..a).rev().find_map(|k| line.chars[k].glyph)
+            };
+            if !inserted.is_empty() {
+                spans.extend(anchor.and_then(|g| pc.glyphs[g].span));
+            }
+            if spans.is_empty() {
+                (a, b, inserted, Vec::new())
+            } else {
+                let (mut a2, mut b2) = (a, b);
+                loop {
+                    let lo = (0..n).find(|&i| span_of(i).is_some_and(|s| spans.contains(&s))).unwrap_or(a2);
+                    let hi = (0..n).rev().find(|&i| span_of(i).is_some_and(|s| spans.contains(&s))).map_or(b2, |i| i + 1);
+                    let (na, nb) = (a2.min(lo), b2.max(hi));
+                    let before = spans.len();
+                    spans.extend((na..nb).filter_map(span_of));
+                    if (na, nb) == (a2, b2) && spans.len() == before {
+                        break;
+                    }
+                    (a2, b2) = (na, nb);
+                }
+                // Every glyph of the spans must be on this line.
+                let on_line: HashSet<usize> = line.chars[a2..b2].iter().flat_map(|c| c.glyphs.iter().copied()).collect();
+                if pc.glyphs.iter().enumerate().any(|(i, g)| g.span.is_some_and(|s| spans.contains(&s)) && !on_line.contains(&i))
+                {
+                    return Err(limit("actual-text-span"));
+                }
+                let text_of = |r: std::ops::Range<usize>| line.chars[r].iter().map(|c| c.text.as_str()).collect::<String>();
+                let widened = format!("{}{}{}", text_of(a2..a), inserted, text_of(b..b2));
+                (a2, b2, widened, unwrap_spans(&pc, spans)?)
+            }
+        };
+        if script::needs_shaping(&inserted, false) {
+            #[cfg(feature = "shaping")]
+            return self.edit_complex(page, page_id, pc, lines, line_id, a, b, inserted);
+            #[cfg(not(feature = "shaping"))]
+            return Err(Error::ReadOnly { reason: "needs-shaping".into() });
+        }
 
         // 2. Positions along the baseline.
         let ang = pc.glyphs[line.glyphs[0]].angle;
@@ -608,9 +785,10 @@ impl Engine {
             };
         }
         let shift = new_width - (pos(b) - pos(a));
-        let mut plan = Plan { removed: HashSet::new(), want: HashMap::new(), anchor, after: after_anchor, segs };
-        plan.removed.extend(line.chars[a..b].iter().filter_map(|c| c.glyph));
-        for g in line.chars[b..n].iter().filter_map(|c| c.glyph) {
+        let mut plan =
+            Plan { removed: HashSet::new(), want: HashMap::new(), anchor, after: after_anchor, segs, insert_at: 0.0, drop_ops };
+        plan.removed.extend(line.chars[a..b].iter().flat_map(|c| c.glyphs.iter().copied()));
+        for g in line.chars[b..n].iter().flat_map(|c| c.glyphs.iter().copied()) {
             plan.want.insert(g, shift);
         }
 
@@ -621,25 +799,38 @@ impl Engine {
         let outcome = self.apply(page_id, &pc, &plan, &state, &mut backup).and_then(|()| {
             let after = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
             let touched = check_edit(&pc, &after, &plan, ang)?;
+            // Where marked content changed, the glyphs alone do not prove how the line reads.
+            if !plan.drop_ops.is_empty() || line.glyphs.iter().any(|&g| pc.glyphs[g].span.is_some()) {
+                let text_of = |r: std::ops::Range<usize>| line.chars[r].iter().map(|c| c.text.as_str()).collect::<String>();
+                let expected = format!("{}{}{}", text_of(0..a), inserted, text_of(b..n));
+                let (new_lines, _) = layout::group(&after);
+                // The line holding a new or moved glyph; failing that (a deletion at the end), the
+                // line that overlaps the old one most.
+                let overlap = |r: &Rect| {
+                    let o = &line.bbox;
+                    (r.x1.min(o.x1) - r.x0.max(o.x0)).max(0.0) * (r.y1.min(o.y1) - r.y0.max(o.y0)).max(0.0)
+                };
+                let edited = match touched.first() {
+                    Some(&g) => new_lines.iter().find(|l| l.glyphs.contains(&g)),
+                    None => new_lines
+                        .iter()
+                        .filter(|l| overlap(&l.bbox) > 0.0)
+                        .max_by(|x, y| overlap(&x.bbox).total_cmp(&overlap(&y.bbox))),
+                };
+                let reads = edited.map(|l| l.text.clone());
+                let gone = edited.is_none() && expected.trim().is_empty();
+                if !gone && reads.as_deref() != Some(expected.as_str()) {
+                    return Err(Error::Verify {
+                        message: format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
+                    });
+                }
+            }
             Ok((after, touched))
         });
         let (after, touched) = match outcome {
             Ok(v) => v,
             Err(e) => {
-                for (id, old) in backup.into_iter().rev() {
-                    match old {
-                        Some(o) => {
-                            self.doc.objects.insert(id, o);
-                        }
-                        None => {
-                            self.doc.objects.remove(&id);
-                        }
-                    }
-                }
-                self.doc.max_id = snapshot.0;
-                self.dirty = snapshot.1;
-                self.embeds = snapshot.2;
-                self.cache.clear();
+                self.rollback(backup, snapshot);
                 return Err(e);
             }
         };
@@ -696,14 +887,32 @@ impl Engine {
         count
     }
 
-    fn touch(&mut self, id: ObjectId, backup: &mut Vec<(ObjectId, Option<Object>)>) {
+    /// Undoes a failed edit: restores every object it changed and the engine state before it.
+    pub(crate) fn rollback(&mut self, backup: Vec<(ObjectId, Option<Object>)>, snapshot: Snapshot) {
+        for (id, old) in backup.into_iter().rev() {
+            match old {
+                Some(o) => {
+                    self.doc.objects.insert(id, o);
+                }
+                None => {
+                    self.doc.objects.remove(&id);
+                }
+            }
+        }
+        self.doc.max_id = snapshot.0;
+        self.dirty = snapshot.1;
+        self.embeds = snapshot.2;
+        self.cache.clear();
+    }
+
+    pub(crate) fn touch(&mut self, id: ObjectId, backup: &mut Vec<(ObjectId, Option<Object>)>) {
         if !backup.iter().any(|(b, _)| *b == id) {
             backup.push((id, self.doc.objects.get(&id).cloned()));
         }
         self.dirty.insert(id);
     }
 
-    fn add_object(&mut self, o: Object, backup: &mut Vec<(ObjectId, Option<Object>)>) -> ObjectId {
+    pub(crate) fn add_object(&mut self, o: Object, backup: &mut Vec<(ObjectId, Option<Object>)>) -> ObjectId {
         let id = self.doc.add_object(o);
         backup.push((id, None));
         self.dirty.insert(id);
@@ -711,7 +920,7 @@ impl Engine {
     }
 
     /// Rewrites the affected show operators and commits the new streams to the document.
-    fn apply(
+    pub(crate) fn apply(
         &mut self,
         page_id: ObjectId,
         pc: &PageContent,
@@ -735,12 +944,13 @@ impl Engine {
                 }
                 Seg::Gap { width_em } => seg_items.push(Item::Kern(-width_em * 1000.0)),
                 Seg::Fallback { face, gids, text, .. } => {
-                    let font_id = self.embed(*face, gids, text, backup)?;
+                    let pairs: Vec<(u16, String)> = gids.iter().zip(text.chars()).map(|(g, c)| (*g, c.to_string())).collect();
+                    let font_id = self.embed(*face, &pairs, backup)?;
                     let res = self.font_resource(page_id, pc, anchor_source, font_id, backup)?;
                     let embed = self.embeds[*face].as_ref().unwrap();
                     let mut bytes = Vec::new();
-                    for g in gids {
-                        let n = embed.remap.get(*g).unwrap_or(0);
+                    for (g, c) in gids.iter().zip(text.chars()) {
+                        let n = embed.code_for(*g, c.encode_utf8(&mut [0; 4]));
                         bytes.extend_from_slice(&n.to_be_bytes());
                     }
                     seg_items.push(Item::Font(res, state.tfs));
@@ -767,7 +977,21 @@ impl Engine {
                 })
                 .sum()
         };
+        self.apply_items(page_id, pc, plan, &seg_items, inserted_width, backup)
+    }
 
+    /// Rewrites the streams that hold affected glyphs, with `items` as the new text at the
+    /// anchor, and commits them.
+    pub(crate) fn apply_items(
+        &mut self,
+        page_id: ObjectId,
+        pc: &PageContent,
+        plan: &Plan,
+        seg_items: &[Item],
+        inserted_width: f64,
+        backup: &mut Vec<(ObjectId, Option<Object>)>,
+    ) -> Result<()> {
+        let anchor_source = pc.glyphs[plan.anchor].source;
         // Rewrite each stream that holds affected glyphs.
         let mut touched: BTreeSet<usize> = BTreeSet::new();
         touched.insert(anchor_source);
@@ -780,6 +1004,12 @@ impl Engine {
             let reps = rewrite_source(pc, si, plan, if si == anchor_source { ins.take() } else { None }, inserted_width);
             if !reps.is_empty() {
                 splices.insert(si, reps);
+            }
+        }
+        for (si, oi, bytes) in &plan.drop_ops {
+            let reps = splices.entry(*si).or_default();
+            if !reps.iter().any(|(o, _)| o == oi) {
+                reps.push((*oi, bytes.clone()));
             }
         }
 
@@ -975,7 +1205,7 @@ impl Engine {
         Ok(name)
     }
 
-    fn font_resource(
+    pub(crate) fn font_resource(
         &mut self,
         page_id: ObjectId,
         pc: &PageContent,
@@ -1000,11 +1230,11 @@ impl Engine {
     }
 
     /// Embeds (or extends) the subset of a fallback face and returns its Type 0 font object.
-    fn embed(
+    /// `glyphs` are (glyph id in the face, text for ToUnicode); empty text adds no mapping.
+    pub(crate) fn embed(
         &mut self,
         face_index: usize,
-        gids: &[u16],
-        text: &str,
+        glyphs: &[(u16, String)],
         backup: &mut Vec<(ObjectId, Option<Object>)>,
     ) -> Result<ObjectId> {
         let err = |m: String| Error::Unsupported { reason: m };
@@ -1018,6 +1248,7 @@ impl Engine {
                 }
                 let mut remap = GlyphRemapper::new();
                 remap.remap(0);
+                let glyph_count = ttf_parser::Face::parse(&face.data, 0).map(|f| f.number_of_glyphs()).unwrap_or(u16::MAX);
                 Embed {
                     type0: ids[0],
                     cid: ids[1],
@@ -1026,17 +1257,50 @@ impl Engine {
                     to_unicode: ids[4],
                     remap,
                     chars: BTreeMap::new(),
+                    aliases: BTreeMap::new(),
+                    alias_base: glyph_count,
+                    cid_map: None,
                 }
             }
         };
-        for (g, ch) in gids.iter().zip(text.chars()) {
+        // The first text written for a glyph stays (earlier edits read through it); the same
+        // glyph with another text gets an alias code of its own.
+        for (g, text) in glyphs {
             let n = embed.remap.remap(*g);
-            embed.chars.entry(n).or_insert((ch, *g));
+            match embed.chars.get(&n) {
+                None => {
+                    embed.chars.insert(n, (text.clone(), *g));
+                }
+                Some((t, _)) if t != text => {
+                    if !embed.aliases.values().any(|(t, a)| a == g && t == text) {
+                        let code = embed.alias_base as u32 + embed.aliases.len() as u32;
+                        let code = u16::try_from(code).map_err(|_| err("too many glyph aliases".into()))?;
+                        embed.aliases.insert(code, (text.clone(), *g));
+                    }
+                }
+                Some(_) => {}
+            }
         }
         let parsed = ttf_parser::Face::parse(&face.data, 0).map_err(|e| err(e.to_string()))?;
         let upem = parsed.units_per_em() as f64;
         let k = 1000.0 / upem;
         let subset = subsetter::subset(&face.data, 0, &embed.remap).map_err(|e| err(e.to_string()))?;
+        // A cmap for the characters the glyphs draw, so readers can tell a mirrored bracket
+        // (right-to-left text, which only the shaping build writes).
+        #[cfg(feature = "shaping")]
+        let drawn: Vec<(char, u16)> = embed
+            .chars
+            .iter()
+            .filter_map(|(&n, (text, g))| {
+                let mut cs = text.chars();
+                match (cs.next(), cs.next()) {
+                    (Some(c), None) if face.glyph(c) == Some(*g) => Some((c, n)),
+                    _ => None,
+                }
+            })
+            .collect();
+        #[cfg(feature = "shaping")]
+        let subset = crate::sfnt::with_cmap(&subset, &drawn).unwrap_or(subset);
 
         let ps_base: String = format!(
             "{}{}{}",
@@ -1106,7 +1370,7 @@ impl Engine {
         self.doc.objects.insert(embed.desc, Object::Dictionary(desc));
 
         let mut w: Vec<Object> = Vec::new();
-        for (new, (_, old)) in &embed.chars {
+        for (new, (_, old)) in embed.chars.iter().chain(&embed.aliases) {
             // Whole numbers: several readers parse CID widths as integers, and the
             // line shift is computed from the same rounded value.
             let adv = (parsed.glyph_hor_advance(ttf_parser::GlyphId(*old)).unwrap_or(0) as f64 * k).round();
@@ -1125,18 +1389,47 @@ impl Engine {
         cid.set("FontDescriptor", Object::Reference(embed.desc));
         cid.set("DW", 1000);
         cid.set("W", Object::Array(w));
-        cid.set("CIDToGIDMap", Object::Name(b"Identity".to_vec()));
+        if embed.aliases.is_empty() {
+            cid.set("CIDToGIDMap", Object::Name(b"Identity".to_vec()));
+        } else {
+            // Identity up to the aliases, then each alias to its glyph in the subset.
+            let last = *embed.aliases.keys().next_back().unwrap() as usize;
+            let mut map: Vec<u8> = Vec::with_capacity(2 * (last + 1));
+            for c in 0..=last {
+                let gid = match embed.aliases.get(&(c as u16)) {
+                    Some((_, g)) => embed.remap.get(*g).unwrap_or(0),
+                    None if c < embed.alias_base as usize => c as u16,
+                    None => 0,
+                };
+                map.extend_from_slice(&gid.to_be_bytes());
+            }
+            let mut st = Stream::new(Dictionary::new(), map);
+            let _ = st.compress();
+            let map_id = match embed.cid_map {
+                Some(id) => {
+                    self.touch(id, backup);
+                    id
+                }
+                None => self.add_object(Object::Null, backup),
+            };
+            self.doc.objects.insert(map_id, Object::Stream(st));
+            embed.cid_map = Some(map_id);
+            cid.set("CIDToGIDMap", Object::Reference(map_id));
+        }
         self.doc.objects.insert(embed.cid, Object::Dictionary(cid));
 
         let mut cmap = String::from(
             "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n",
         );
-        let entries: Vec<(u16, char)> = embed.chars.iter().map(|(n, (c, _))| (*n, *c)).collect();
+        // A glyph with no text of its own (the second glyph of a cluster, a dot) maps to <0000>,
+        // as Chrome writes it, so readers do not show its code as a character.
+        let entries: Vec<(u16, &String)> =
+            embed.chars.iter().chain(&embed.aliases).filter(|(n, _)| **n != 0).map(|(n, (t, _))| (*n, t)).collect();
         for chunk in entries.chunks(100) {
             cmap.push_str(&format!("{} beginbfchar\n", chunk.len()));
-            for (n, c) in chunk {
-                let mut units = [0u16; 2];
-                let hex: String = c.encode_utf16(&mut units).iter().map(|u| format!("{u:04X}")).collect();
+            for (n, t) in chunk {
+                let hex: String =
+                    if t.is_empty() { "0000".into() } else { t.encode_utf16().map(|u| format!("{u:04X}")).collect() };
                 cmap.push_str(&format!("<{n:04X}> <{hex}>\n"));
             }
             cmap.push_str("endbfchar\n");
@@ -1247,7 +1540,7 @@ fn same_object(a: &Object, b: &Object) -> bool {
 }
 
 /// The text state of the show operator that draws a glyph.
-fn show_state(pc: &PageContent, glyph: usize) -> Option<&ShowState> {
+pub(crate) fn show_state(pc: &PageContent, glyph: usize) -> Option<&ShowState> {
     let g = &pc.glyphs[glyph];
     pc.sources[g.source].events.iter().find_map(|e| match e {
         TextEvent::Show { state, glyphs, .. } if glyphs.contains(&glyph) => Some(state),
@@ -1292,7 +1585,7 @@ fn splice_range(data: &[u8], ops: &[content::Op], reps: &[(usize, Vec<u8>)], seg
 #[allow(unused_assignments)] // `changed` is set inside the fix-up macros
 /// Walks one stream's text events and returns replacement bytes for the show operators that
 /// must change. `insert` carries the new text when this stream holds the anchor glyph.
-fn rewrite_source(
+pub(crate) fn rewrite_source(
     pc: &PageContent,
     si: usize,
     plan: &Plan,
@@ -1354,15 +1647,8 @@ fn rewrite_source(
         macro_rules! place_insert {
             () => {{
                 if let Some(it) = insert.take() {
-                    fix!(0.0);
-                    for item in it {
-                        items.push(match item {
-                            Item::Bytes(b) => Item::Bytes(b.clone()),
-                            Item::Kern(k) => Item::Kern(*k),
-                            Item::Font(n, s) => Item::Font(n.clone(), *s),
-                            Item::Td(t) => Item::Td(*t),
-                        });
-                    }
+                    fix!(plan.insert_at);
+                    items.extend(it.cloned());
                     cur += inserted_width;
                     fresh = false;
                     changed = true;
@@ -1423,6 +1709,16 @@ fn serialize(kind: ShowKind, op: &content::Op, items: Vec<Item>) -> Vec<u8> {
         }
         _ => {}
     }
+    let body = serialize_items(items);
+    if !body.is_empty() {
+        parts.push(body);
+    }
+    parts.join(&b' ')
+}
+
+/// Text-showing operators for these items (fonts, rises, spans, strings and kerns).
+pub(crate) fn serialize_items(items: Vec<Item>) -> Vec<u8> {
+    let mut parts: Vec<Vec<u8>> = Vec::new();
     let mut group: Vec<Item> = Vec::new();
     fn flush(group: &mut Vec<Item>, parts: &mut Vec<Vec<u8>>) {
         // Merge neighbours, drop empty strings and zero kerns.
@@ -1476,6 +1772,25 @@ fn serialize(kind: ShowKind, op: &content::Op, items: Vec<Item>) -> Vec<u8> {
                 fmt_name(&name, &mut out);
                 out.extend_from_slice(format!(" {} Tf", fmt_num(size)).as_bytes());
                 parts.push(out);
+            }
+            Item::Rise(r) => {
+                flush(&mut group, &mut parts);
+                parts.push(format!("{} Ts", fmt_kern(r)).into_bytes());
+            }
+            Item::BeginSpan(text) => {
+                flush(&mut group, &mut parts);
+                let mut out = b"/Span <</ActualText ".to_vec();
+                let mut utf16 = vec![0xFE, 0xFF];
+                for u in text.encode_utf16() {
+                    utf16.extend_from_slice(&u.to_be_bytes());
+                }
+                fmt_string(&utf16, &mut out);
+                out.extend_from_slice(b">> BDC");
+                parts.push(out);
+            }
+            Item::EndSpan => {
+                flush(&mut group, &mut parts);
+                parts.push(b"EMC".to_vec());
             }
             other => group.push(other),
         }

@@ -106,7 +106,7 @@ test("AC-1 AC-2 AC-4: no upload, the CSP blocks other origins, and five download
   expect(big).toEqual([]);
 });
 
-test("AC-5 AC-84: a 300-page PDF opens, edits on its last page and downloads every page", async ({ page }) => {
+test("AC-5 AC-84: a 300-page PDF opens, edits on its last page and downloads every page", { tag: "@serial" }, async ({ page }) => {
   test.setTimeout(120_000);
   await openFile(page, { name: "big-300p.pdf", mimeType: "application/pdf", buffer: await numbered(300) });
   await expect(page.getByTestId("page-300")).toHaveCount(1);
@@ -123,16 +123,32 @@ test("AC-5 AC-84: a 300-page PDF opens, edits on its last page and downloads eve
   expect(texts[299]).toContain("Last page note");
 });
 
-test("AC-6 AC-90: page 1 of a 10-page PDF is visible within a second of picking it", async ({ page }, info) => {
+test("AC-6 AC-90: page 1 of a 10-page PDF is visible within a second of picking it", { tag: "@serial" }, async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "Timing target is for the CI desktop profile");
   const buffer = await numbered(10);
   await page.goto("/edit-pdf");
   // Let the idle prefetch finish, as on a real visit (intent happens before the pick).
   await page.waitForLoadState("networkidle");
-  const t0 = Date.now();
+  // Timed inside the page, from the pick (the input's change event) to page 1 being drawn. Timing
+  // it from the test process added the harness's own polling steps (up to a second apart) and
+  // its round trips to the measurement, which is what failed on main at 1031 and 1066 ms.
+  await page.evaluate(() => {
+    const w = window as unknown as { __pick?: number; __drawn?: number };
+    document.addEventListener("change", (e) => ((e.target as HTMLElement).dataset.testid === "editor-input" ? (w.__pick ??= performance.now()) : 0), true);
+    new MutationObserver(() => {
+      if (w.__drawn === undefined && document.querySelector('[data-testid="page-1"][data-drawn="true"]')) w.__drawn = performance.now();
+    }).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-drawn"] });
+  });
   await page.getByTestId("editor-input").setInputFiles({ name: "ten-page.pdf", mimeType: "application/pdf", buffer });
   await expect(page.getByTestId("page-1")).toHaveAttribute("data-drawn", "true", { timeout: 5000 });
-  expect(Date.now() - t0).toBeLessThan(1000);
+  const took = await page.evaluate(() => {
+    const w = window as unknown as { __pick?: number; __drawn?: number };
+    return w.__pick !== undefined && w.__drawn !== undefined ? w.__drawn - w.__pick : null;
+  });
+  expect(took, "the pick and the first drawn page were both seen").not.toBeNull();
+  info.annotations.push({ type: "first-page", description: `${Math.round(took!)} ms after the pick` });
+  console.log(`[first-page] ${Math.round(took!)} ms after the pick`);
+  expect(took!).toBeLessThan(1000);
 });
 
 test("AC-7 AC-79: zoom by buttons and Ctrl+wheel keeps added objects on their spot", async ({ page }) => {

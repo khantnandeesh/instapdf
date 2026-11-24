@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { missingChars } from "@/lib/editor/coverage";
 import { faceOf, type EditorFontManifest, type FontFileEntry } from "@/lib/editor/fonts";
-import { loadFontManifest } from "@/lib/editor/fonts-browser";
+import { knownManifest, loadFontManifest } from "@/lib/editor/fonts-browser";
 import type { EditorObject, TextObj } from "@/lib/editor/model";
 
 let ready: Promise<{ m: EditorFontManifest; fallback: FontFileEntry[] }> | null = null;
@@ -26,7 +26,7 @@ export function loadCoverage() {
 /** Characters of a text object that won't print, or [] while the lists load. */
 export function missingIn(o: Pick<TextObj, "text" | "font" | "bold" | "italic">): string[] {
   if (!known) return [];
-  const face = faceOf(known.m, o.font, o.bold, o.italic);
+  const face = faceOf(knownManifest() ?? known.m, o.font, o.bold, o.italic);
   return missingChars(o.text, face?.files ?? [], known.fallback);
 }
 

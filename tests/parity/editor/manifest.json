@@ -1,5 +1,5 @@
 {
-  "note": "Synthetic files only. Each case is one find/replace on page 1 (1-based) run through the engine, then checked by the PDFium oracle. 'expect' must be in PDFium's extracted text afterwards, 'absent' must not.",
+  "note": "Synthetic files only. Each case is one find/replace (or, with 'add', one new line of text at x, y) on page 1 (1-based) run through the engine, then checked by the PDFium oracle. 'expect' must be in PDFium's extracted text afterwards, 'absent' must not.",
   "cases": [
     {"id": "std14-word", "file": "std14-reportlab.pdf", "find": "page of", "replace": "sheet of", "expect": ["Each sheet of the report"], "absent": ["Each page of"], "substituted": false},
     {"id": "std14-longer", "file": "std14-reportlab.pdf", "find": "45,000", "replace": "59,999 Ž", "expect": ["Amount due: 59,999 Ž"], "absent": ["45,000"], "substituted": false},
@@ -18,6 +18,22 @@
     {"id": "chrome-table-cell", "file": "chrome-justified-mixed.pdf", "find": "Item", "replace": "Items sold", "expect": ["Items sold", "Design"], "absent": [], "substituted": false},
     {"id": "shared-form", "file": "shared-xobject.pdf", "find": "Northwind", "replace": "Southwind", "expect": ["Southwind Traders"], "absent": ["Northwind"], "other_pages_keep": ["Northwind Traders"], "substituted": false},
     {"id": "rotated-page", "file": "rotated-90.pdf", "find": "notice", "replace": "bulletin", "expect": ["Landscape bulletin board"], "absent": ["notice"], "substituted": false},
-    {"id": "rotated-text", "file": "rotated-90.pdf", "find": "margin", "replace": "footer", "expect": ["Sideways footer note"], "absent": ["margin"], "substituted": false}
+    {"id": "rotated-text", "file": "rotated-90.pdf", "find": "margin", "replace": "footer", "expect": ["Sideways footer note"], "absent": ["margin"], "substituted": false},
+    {"id": "plain-hindi-word", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "कुल", "replace": "संपूर्ण", "expect": ["संपूर्ण"], "absent": ["कु ल"], "substituted": false},
+    {"id": "plain-hindi-append", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "गया।", "replace": "गया। धन्यवाद", "expect": ["गया। धन्यवाद"], "absent": [], "substituted": false},
+    {"id": "plain-hindi-inside-word", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "भुगतान", "replace": "भुगतानों", "expect": ["भुगतानों"], "absent": [], "substituted": false},
+    {"id": "plain-arabic-word", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "بالعالم،", "replace": "بالجميع،", "expect": ["مرحبا بالجميع، هذا"], "absent": ["بالعالم"], "substituted": true},
+    {"id": "plain-arabic-append", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "تجريبي.", "replace": "تجريبي. شكرا", "expect": ["تجريبي. شكرا"], "absent": [], "substituted": true},
+    {"id": "plain-arabic-number", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "2500", "replace": "3750", "expect": ["الإجمالي 3750 ريال"], "absent": ["2500"], "substituted": false},
+    {"id": "chrome-hindi-word", "file": "scripts-chrome.pdf", "fonts": "fonts", "find": "कुल", "replace": "संपूर्ण", "expect": ["संपूर्ण"], "absent": [], "substituted": true},
+    {"id": "chrome-arabic-word", "file": "scripts-chrome.pdf", "fonts": "fonts", "find": "بالعالم،", "replace": "بالجميع،", "expect": ["بالجميع،"], "absent": [], "substituted": true},
+    {"id": "lo-hindi-word", "file": "scripts-libreoffice.pdf", "fonts": "fonts", "find": "कुल", "replace": "संपूर्ण", "expect": ["संपूर्ण"], "absent": [], "substituted": true},
+    {"id": "lo-arabic-number", "file": "scripts-libreoffice.pdf", "fonts": "fonts", "find": "2500", "replace": "3750", "expect": ["3750"], "absent": ["2500"], "substituted": true},
+    {"id": "add-latin-chrome", "file": "chrome-justified-mixed.pdf", "fonts": "webfonts", "add": {"x": 72, "y": 40, "size": 12, "text": "Approved by the client, 24 Nov."}, "expect": ["Approved by the client, 24 Nov."], "absent": [], "substituted": false},
+    {"id": "add-hindi-libreoffice", "file": "scripts-libreoffice.pdf", "fonts": "webfonts", "add": {"x": 72, "y": 60, "size": 14, "text": "संपूर्ण राशि का भुगतान समय पर किया गया।"}, "expect": ["संपूर्ण राशि का भुगतान समय पर किया गया।"], "absent": [], "substituted": true},
+    {"id": "add-mixed-memo", "file": "libreoffice-memo.pdf", "fonts": "webfonts", "add": {"x": 72, "y": 40, "size": 11, "text": "Total: कुल राशि 500 (paid)"}, "expect": ["Total: कुल राशि 500 (paid)"], "absent": [], "substituted": true},
+    {"id": "add-arabic-chrome", "file": "scripts-chrome.pdf", "fonts": "webfonts", "add": {"x": 300, "y": 60, "size": 14, "text": "مرحبا بالعالم، هذا نص تجريبي.", "family": "Noto Naskh Arabic"}, "expect": ["مرحبا بالعالم، هذا نص تجريبي."], "absent": [], "substituted": true},
+    {"id": "add-vowelled-arabic-plain", "file": "scripts-plain.pdf", "fonts": "webfonts", "add": {"x": 72, "y": 60, "size": 16, "text": "قال مُحَمَّدٌ: السلام عليكم «تجربة» (نص)", "family": "Noto Naskh Arabic"}, "expect": ["قال مُحَمَّد", "السلام عليكم «تجربة» (نص)"], "absent": [], "substituted": true},
+    {"id": "add-arabic-number-in-latin", "file": "libreoffice-memo.pdf", "fonts": "webfonts", "add": {"x": 72, "y": 40, "size": 11, "text": "Invoice فاتورة 2024 paid, call هاتف 555-1234"}, "expect": ["Invoice فاتورة 2024 paid, call هاتف 555-1234"], "absent": [], "substituted": true}
   ]
 }

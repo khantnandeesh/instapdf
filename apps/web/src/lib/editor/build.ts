@@ -63,6 +63,8 @@ export type BuildInput = {
   assets: Record<string, Asset>;
   /** Form fields (lib/forms): the form now and as it was read from the file. Absent: left as is. */
   forms?: { state: FormState; original: FormState };
+  /** Library and user faces the objects use (fonts-browser fontsForBuild), and the user's own font bytes. */
+  fonts?: { faces: EditorFontManifest["faces"]; bytes: Record<string, Uint8Array> };
 };
 
 /** Font files on this device: the editor faces, and the Noto fallback for other scripts. */
