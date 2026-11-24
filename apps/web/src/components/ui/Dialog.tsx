@@ -76,9 +76,10 @@ export function Dialog({
   useLayoutEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    // What fades on close: the panel; for the full-screen variant only its content, so its opaque
-    // ground never shows the page through it (S7).
-    const parts = () => (variant === "fullscreen" ? (Array.from(dialog.children).filter((c) => c.tagName !== "H2") as HTMLElement[]) : [dialog]);
+    // What fades on close: the whole dialog, the full-screen variant too. Fading only its content left
+    // its opaque ground on screen, which flashed blank white before the page came back; the whole
+    // dialog crossfades to the page instead (visual gate, 24 Nov).
+    const parts = () => [dialog];
     if (open && !dialog.open) {
       dialog.removeAttribute("data-leaving");
       settle(dialog);
