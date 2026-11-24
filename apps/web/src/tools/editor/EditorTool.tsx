@@ -1,5 +1,6 @@
 "use client";
 import "./editor.css";
+import "@/components/berry/berry-loader.css";
 /**
  * Edit PDF (F16 E1): the route component. The landing is the shared F1 pieces only (title, drop
  * card, limits, privacy), so the route's first-load JS stays small (AC-86). The editor shell,
