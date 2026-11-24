@@ -46,9 +46,9 @@ async function expectInViewport(page: Page, el: Locator, what: string) {
   const onTop = await el.evaluate((node) => {
     const r = node.getBoundingClientRect();
     const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return !!hit && (node === hit || node.contains(hit));
+    return !!hit && (node === hit || node.contains(hit)) ? "" : (hit?.outerHTML.slice(0, 160) ?? "nothing");
   });
-  expect(onTop, `${what}: not covered by another element`).toBe(true);
+  expect(onTop, `${what}: not covered by another element`).toBe("");
 }
 
 async function open(page: Page, slug: string) {
@@ -103,7 +103,8 @@ for (const tool of usable) {
 
         await page.getByTestId("primary-action").click();
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "done", { timeout: 30_000 });
-        await expectInViewport(page, page.getByRole("link", { name: "Download" }), "Download (result)");
+        // The result scrolls the page back to the top (smoothly where motion is allowed): wait for it to settle.
+        await expect(async () => expectInViewport(page, page.getByRole("link", { name: "Download" }), "Download (result)")).toPass({ timeout: 5_000 });
       });
     }
 

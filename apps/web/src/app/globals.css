@@ -1758,3 +1758,45 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
     background: var(--brand);
   }
 }
+
+/* Fold fit, working state (>= 1024 px): once a file is in, the head shrinks to a compact title row so
+   the pages get more of the screen (Sejda scrolls its head away; ours stays, smaller). --ip-pages-h is
+   re-declared here because custom properties resolve where they are declared. */
+@media (min-width: 1024px) {
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) {
+    --ip-intro-h: 56px;
+    --ip-pages-h: max(320px, calc(100vh - var(--ip-header-h) - var(--ip-intro-h) - var(--ip-dock-actual, 80px) - var(--ip-fold-gap)));
+  }
+  @supports (height: 1dvh) {
+    .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) {
+      --ip-pages-h: max(320px, calc(100dvh - var(--ip-header-h) - var(--ip-intro-h) - var(--ip-dock-actual, 80px) - var(--ip-fold-gap)));
+    }
+  }
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) .mp-intro h1 {
+    font-size: 26px;
+    line-height: 32px;
+    transition: font-size var(--dur-move) var(--ease-standard);
+  }
+}
+
+/* Sticky search and filter bar on long lists (home catalogue). Pinned under the header; a frosted
+   grid-paper ground keeps the list from showing through, and a soft pink shadow appears only while it
+   is stuck. The shadow fades in (off under reduced motion via the global rule). */
+.ip-sticky-bar {
+  background: color-mix(in srgb, var(--ip-bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transition: box-shadow var(--dur-base) var(--ease-standard);
+}
+.ip-sticky-bar[data-stuck] {
+  /* A 1.5px sand line and a soft shadow, both as shadows so being stuck never changes the bar's height. */
+  box-shadow:
+    0 1.5px 0 var(--sand),
+    0 10px 18px -12px rgb(176 30 60 / 0.35);
+}
+@media (forced-colors: active) {
+  .ip-sticky-bar {
+    background: Canvas;
+    backdrop-filter: none;
+  }
+}

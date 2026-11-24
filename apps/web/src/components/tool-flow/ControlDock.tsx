@@ -64,7 +64,7 @@ export function ControlDock({
         "px-[15px] pt-3 pb-[calc(14px+env(safe-area-inset-bottom))]",
         side
           ? "lg:sticky lg:top-[calc(var(--ip-header-h)+16px)] lg:z-auto lg:flex lg:h-(--ip-work-h) lg:flex-col lg:rounded-panel lg:border-[1.5px] lg:border-panel-border lg:bg-surface-raised lg:p-6 lg:shadow-card"
-          : "mp-dock-bar lg:px-8 lg:pt-3.5 lg:pb-[calc(16px+env(safe-area-inset-bottom))]",
+          : "mp-dock-bar lg:px-8 lg:pt-3 lg:pb-[calc(12px+env(safe-area-inset-bottom))]",
       ].join(" ")}
     >
       <div
@@ -83,8 +83,9 @@ export function ControlDock({
           <h2 className="sr-only">Options</h2>
           {options}
         </fieldset>
-        <div className={["flex shrink-0 flex-col gap-2 sm:min-w-[200px]", side ? "lg:min-w-0" : "lg:w-[320px]"].join(" ")} data-testid="dock-footer">
-          <div className="max-lg:sr-only">{status}</div>
+        <div className={["flex shrink-0 flex-col gap-2 sm:min-w-[200px]", side ? "lg:min-w-0" : "lg:flex-row lg:items-center lg:gap-5 lg:[&>*:last-child]:w-[260px] lg:[&>*:last-child]:shrink-0"].join(" ")} data-testid="dock-footer">
+          {/* On the sand bar the status reads in ink (muted on sand is under 4.5:1), beside the primary. */}
+          <div className={["max-lg:sr-only", side ? "" : "min-w-0 text-end [&_p]:text-ink"].join(" ")}>{status}</div>
           {footer}
         </div>
       </div>

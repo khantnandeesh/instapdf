@@ -384,6 +384,8 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
   useEffect(() => {
     if (phase === "processing") progressBox.current?.focus();
     else if (phase === "error") retryButton.current?.focus();
+    // Fit the first screen: the result starts at the top, so Download is never under the header.
+    else if (phase === "done" && window.scrollY > 0) window.scrollTo({ top: 0, behavior: "instant" });
   }, [phase]);
   // Start over focuses the (re-mounted) picker after the empty state is committed.
   const [focusPickerTick, setFocusPickerTick] = useState(0);
@@ -540,7 +542,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
   );
 
   return (
-    <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" style={thumbSize === THUMB_DEFAULT ? undefined : { ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
+    <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" className="ip-flow" style={thumbSize === THUMB_DEFAULT ? undefined : { ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
       <DropOverlay active={dragging && acceptsDrop} mode={flow.multiFile || files.length === 0 ? "add" : "replace"} />
       <LiveRegion message={message} />
       <ToolIntro ref={heading} title={flow.title} />
