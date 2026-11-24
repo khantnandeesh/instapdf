@@ -11,6 +11,7 @@ cover one range each; this merges them. The output is committed. Run it again on
 The editor embeds a subset of it into the downloaded PDF, only for fields whose text Helvetica
 (WinAnsi) cannot show.
 """
+import json
 import os
 import shutil
 import tempfile
@@ -36,5 +37,15 @@ with tempfile.TemporaryDirectory() as tmp:
     merged.flavor = "woff"
     os.makedirs(out, exist_ok=True)
     merged.save(os.path.join(out, "noto-sans-forms.woff"))
+    # The characters it really has, as ranges, for the editor's "won't print" check (lib/forms/coverage).
+    cps = sorted(merged.getBestCmap())
+    ranges = []
+    for cp in cps:
+        if ranges and cp == ranges[-1][1] + 1:
+            ranges[-1][1] = cp
+        else:
+            ranges.append([cp, cp])
+    with open(os.path.join(out, "noto-sans-forms.json"), "w") as fh:
+        json.dump({"ranges": ranges}, fh, separators=(",", ":"))
 shutil.copyfile(os.path.join(src, "LICENSE"), os.path.join(out, "OFL-noto-sans-forms.txt"))
 print("wrote", os.path.join(out, "noto-sans-forms.woff"))

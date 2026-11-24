@@ -167,6 +167,11 @@ None recorded.
 - **Lighthouse TBT / G-9:** editor-wide chunk work, owned by the lead. For forms, the check is that the forms UI and Detect are not part of the editor's first load.
 - **Re-run fixtures:** `tests/parity/forms/form-extra.pdf` adds an editable dropdown, a push button and a crop box that starts at 50, 60 (G-17). "Repeat on all pages" is offered only on files with more than one page, so check G-5 on `detect-mix.pdf` or `report-form-3p.pdf`.
 
+## Decisions from the build (PR #40 review)
+
+- **Non-Latin values use an embedded font subset (G-1, G-19).** Values outside WinAnsi are drawn in the merged open-licence forms font (Noto Sans, Latin, Greek, Cyrillic and Vietnamese), embedded as a subset holding only the characters the file uses. This matches the reference's output (embedded subsets) and keeps files small. The trade-off: another viewer that rebuilds a field's appearance when someone types a new non-Latin character can lack that glyph. We accept it, because full fonts would add up to about 150 kB per file, and a viewer that rebuilds appearances normally falls back to its own font. Revisit if users report it.
+- **The pre-download "won't print" check uses the same font choice as the writer** (`lib/forms/coverage.ts`, with a parity unit test), so the warning lists exactly the characters that come out as "?". Characters outside every font, such as emoji, are kept in the field's value as typed. Only the drawn appearance shows "?".
+
 ## Re-run notes
 
 - Sejda outputs and screenshots are cached in `docs/evals/cache/f16-forms/` (`sejda-t1-fill.pdf`, `sejda-t2-create.pdf`, `sejda-t3-detect.pdf`, `sejda-runs.json`). Reuse them. A re-evaluation needs no new Sejda task unless the reference changes.

@@ -153,10 +153,10 @@ def form_basic():
         acro = pdf.Root.AcroForm
         da = pikepdf.String("/Helv 0 Tf 0 g")
         parent = pdf.make_indirect(pikepdf.Dictionary(T=pikepdf.String("address"), FT=pikepdf.Name.Tx, Kids=pikepdf.Array()))
-        for name, yy in (("street", street_y), ("town", town_y)):
+        for name, yy, bw in (("street", street_y, 2), ("town", town_y, 1)):
             kid = pdf.make_indirect(pikepdf.Dictionary(
                 Type=pikepdf.Name.Annot, Subtype=pikepdf.Name.Widget, T=pikepdf.String(name), Parent=parent,
-                Rect=[160, yy, 400, yy + 18], F=4, DA=da, P=page.obj, MK=pikepdf.Dictionary(BC=[0, 0, 0]), Border=[0, 0, 1]))
+                Rect=[160, yy, 400, yy + 18], F=4, DA=da, P=page.obj, MK=pikepdf.Dictionary(BC=[0, 0, 0]), Border=[0, 0, bw]))
             parent.Kids.append(kid)
             page.obj.Annots.append(kid)
         acro.Fields.append(parent)

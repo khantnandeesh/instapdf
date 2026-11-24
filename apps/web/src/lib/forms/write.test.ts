@@ -140,6 +140,19 @@ describe("applyForms: text outside WinAnsi (AC-232, G-1)", () => {
   });
 });
 
+describe("the download check and the writer agree (review)", () => {
+  it("reports the same missing characters before download as the writer writes as ?", async () => {
+    const { missingInText } = await import("./coverage");
+    const { fonts, fontkit } = await realFonts();
+    const slices = (await fonts.manifest()).fonts;
+    const formsRanges = JSON.parse(await readFile(new URL("../../../public/fonts/forms/noto-sans-forms.json", import.meta.url), "utf8")).ranges;
+    for (const value of ["Zoë Šťastná", "Šťastná\u2011Nováková", "Zoë 5\u202F000 ₹", "Ирина नम 😀", "नमस्ते 12", "5 ‰ €", "日本語 abc", "a\u{1F600}b"]) {
+      const { report } = await roundTrip(await fixture("form-basic.pdf"), (s) => setValue(s, s.fields.find((f) => f.name === "name")!.id, value).state, { fonts, fontkit });
+      expect([...report.missingGlyphs].sort(), value).toEqual([...missingInText(value, formsRanges, slices)].sort());
+    }
+  });
+});
+
 describe("applyForms: appearance details (G-3, G-6)", () => {
   it("keeps Auto as 0 Tf with the DA font in /DR, and drops the button placeholder DA", async () => {
     const doc = await blankDoc();
@@ -167,6 +180,22 @@ describe("applyForms: appearance details (G-3, G-6)", () => {
     expect(raw).not.toContain("dummy__noop");
   });
 
+  it("shrinks Auto text until a paragraph fits a multi-line box (review)", async () => {
+    const doc = await blankDoc();
+    const pages = pagesOf(doc);
+    const original = readForm(doc, pages);
+    const t = createField(original, { kind: "text", page: "p0", box: { x: 72, y: 72, w: 200, h: 40 }, name: "comments" });
+    let s = addField(original, t);
+    s = updateField(s, t.id, { multiline: true });
+    s = setValue(s, t.id, "The quick brown fox jumps over the lazy dog. ".repeat(4)).state;
+    await applyForms(doc, doc.getPages(), pages, s, original);
+    const out = await PDFDocument.load(await doc.save({ updateFieldAppearances: false }));
+    const w = out.getForm().getTextField("comments").acroField.getWidgets()[0];
+    const content = new TextDecoder().decode(decodePDFRawStream(out.context.lookup(w.getNormalAppearance() as PDFRef) as PDFRawStream).decode());
+    expect(Number(/([\d.]+) Tf/.exec(content)?.[1])).toBeLessThan(9);
+    expect(out.getForm().getTextField("comments").acroField.getDefaultAppearance()).toMatch(/ 0 Tf/);
+  });
+
   it("draws every option of a list that is too short for its size (G-18)", async () => {
     const { bytes } = await roundTrip(await fixture("form-basic.pdf"), (s) => setValue(s, s.fields.find((f) => f.name === "days")!.id, ["Mon", "Thu"]).state);
     const doc = await PDFDocument.load(bytes);
@@ -187,7 +216,7 @@ describe("applyForms: appearance details (G-3, G-6)", () => {
     const { bytes } = await roundTrip(src, (s) => setValue(s, s.fields.find((f) => f.name === "address.street")!.id, "1 Main St").state);
     const doc = await PDFDocument.load(bytes);
     const street = doc.getForm().getTextField("address.street");
-    expect(street.acroField.getWidgets()[0].getBorderStyle()?.getWidth()).toBe(1);
+    expect(street.acroField.getWidgets()[0].getBorderStyle()?.getWidth()).toBe(2);
     expect(street.acroField.getDefaultAppearance()).toMatch(/ 0 Tf/);
     const town = doc.getForm().getTextField("address.town").acroField.getWidgets()[0].dict.get(PDFName.of("AP"));
     expect(String(town)).toBe(String(townAp));

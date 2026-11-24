@@ -222,11 +222,16 @@ export const FieldPopover = memo(function FieldPopover({ entry, place, pageWidth
   return (
     <div ref={box} className="bf-popover" data-popover style={{ left: r.left, top: r.top + r.height + 8, visibility: "hidden" }} onPointerDown={(e) => e.stopPropagation()}>
       <FieldProps
+        key={f.id}
         form={form}
         fieldId={f.id}
         widgetId={w.id}
         pages={pages}
-        onChange={(next, label) => applyForm(ctl, next, label, label === "Rename field" ? undefined : `prop:${f.id}:${label}`, entry.id)}
+        onChange={(next, label) => {
+          // A commit on unmount can arrive after the field was deleted or undone away: drop it.
+          if (!formsOf(store.get())?.fields.some((x) => x.id === f.id)) return;
+          applyForm(ctl, next, label, label === "Rename field" ? undefined : `prop:${f.id}:${label}`, entry.id);
+        }}
         onClose={() => setUi(ctl, { selected: null })}
       />
     </div>
@@ -391,7 +396,7 @@ function FillPeek() {
   const f = at && form?.fields.find((x) => x.id === at.field);
   if (!at || !f) return null;
   return (
-    <div className="bf-peek" role="status" aria-live="polite">
+    <div className="bf-peek">
       <span className="bf-peek-name">{f.tooltip || f.name}</span>
       <span className="bf-peek-value">{String(f.value) || "\u00a0"}</span>
       <button

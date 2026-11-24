@@ -111,6 +111,13 @@ export function parseDA(da: string | undefined): { fontSize: number; color: stri
   return out;
 }
 
+/** Width from the old /Border [h v width] array, when the widget has no /BS. */
+function legacyBorderWidth(w: PDFWidgetAnnotation | undefined): number | undefined {
+  const b = w?.dict.lookup(N("Border"));
+  const width = b instanceof PDFArray ? b.lookup(2) : undefined;
+  return width instanceof PDFNumber ? width.asNumber() : undefined;
+}
+
 function styleOf(f: PDFField, w: PDFWidgetAnnotation | undefined): FieldStyle {
   const da = parseDA(f.acroField.getDefaultAppearance() ?? undefined);
   const mk = w?.getAppearanceCharacteristics();
@@ -123,7 +130,7 @@ function styleOf(f: PDFField, w: PDFWidgetAnnotation | undefined): FieldStyle {
     color: da.color,
     align,
     border: colorToHex(mk?.getBorderColor()),
-    borderWidth: bs?.getWidth() ?? 1,
+    borderWidth: bs?.getWidth() ?? legacyBorderWidth(w) ?? 1,
     background: colorToHex(mk?.getBackgroundColor()),
   };
 }

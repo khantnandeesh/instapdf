@@ -13,6 +13,7 @@ import type { FormState } from "@/lib/forms/types";
 
 let ready: Promise<{ m: EditorFontManifest; fallback: FontFileEntry[] }> | null = null;
 let known: { m: EditorFontManifest; fallback: FontFileEntry[] } | null = null;
+let formsRanges: Promise<[number, number][]> | null = null;
 
 export function loadCoverage() {
   ready ??= Promise.all([
@@ -44,8 +45,12 @@ export async function missingInObjects(objects: readonly EditorObject[]): Promis
 /** Every character of changed form values that won't print (AC-232). */
 export async function missingInFormValues(state: FormState | undefined, original: FormState | null | undefined): Promise<string[]> {
   if (!state || state === original) return [];
-  await loadCoverage().catch(() => null);
-  return known ? missingInForm(state, original, known.fallback) : [];
+  formsRanges ??= fetch("/fonts/forms/noto-sans-forms.json")
+    .then((r) => (r.ok ? (r.json() as Promise<{ ranges: [number, number][] }>) : { ranges: [] }))
+    .then((j) => j.ranges);
+  formsRanges.catch(() => (formsRanges = null));
+  const [ranges] = await Promise.all([formsRanges.catch(() => [] as [number, number][]), loadCoverage().catch(() => null)]);
+  return known ? missingInForm(state, original, ranges, known.fallback) : [];
 }
 
 export function useMissing(o: TextObj): string[] {

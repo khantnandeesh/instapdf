@@ -247,7 +247,7 @@ export function EditorShell(props: ShellProps) {
         </EditorContext.Provider>
       ) : (
         <div className="ed-opening">
-          <header className="ed-top ed-glass" role="group" aria-label="File">
+          <header className="ed-top ed-glass" role="group" aria-label="Document">
             <h2 className="ed-file truncate">{props.name}</h2>
           </header>
           <div className="grid flex-1 place-items-center">
@@ -625,8 +625,11 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   // ---- download (AC-44) ----
   const download = useCallback(
     async (name?: string, force = false) => {
+      if (store.get().busy === "save") return;
+      // A field property still being typed in the popover commits on blur: do that first.
+      const typing = document.activeElement;
+      if (typing instanceof HTMLElement && typing.closest(".bf-popover")) typing.blur();
       const s = store.get();
-      if (s.busy === "save") return;
       if (s.editing) store.set({ editing: null });
       if (s.lineEdit) await ctl.commitLine();
       // Added text with characters no font can print: say so before the file is made (AC-75).

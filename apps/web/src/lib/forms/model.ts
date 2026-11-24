@@ -169,7 +169,7 @@ export function duplicateField(state: FormState, id: string, toPage?: string): {
     name: uniqueName(f.name.replace(/(_\d+)$/, ""), state.fields.map((x) => x.name)),
     origin: "new",
     ref: undefined,
-    widgets: f.widgets.map((w) => ({ ...w, id: newId("w"), page: toPage ?? w.page, y: w.y + dy, ref: undefined })),
+    widgets: f.widgets.map((w) => ({ ...w, id: newId("w"), page: toPage ?? w.page, y: w.y + dy, ref: undefined, drawn: undefined })),
   };
   return { state: addField(state, copy), field: copy };
 }
@@ -183,7 +183,7 @@ export function repeatOnAllPages(state: FormState, fieldId: string, pages: FormP
   if (!f || f.kind === "radio") return state;
   const src = f.widgets[0];
   const have = new Set(f.widgets.map((w) => w.page));
-  const added: Widget[] = pages.filter((p) => !have.has(p.id)).map((p) => ({ ...src, id: newId("w"), page: p.id, ref: undefined }));
+  const added: Widget[] = pages.filter((p) => !have.has(p.id)).map((p) => ({ ...src, id: newId("w"), page: p.id, ref: undefined, drawn: undefined }));
   if (!added.length) return state;
   return { ...updateField(state, fieldId, { widgets: [...f.widgets, ...added] }), order: [...state.order, ...added.map((w) => w.id)] };
 }

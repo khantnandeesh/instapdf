@@ -180,4 +180,20 @@ describe("tab order (AC-239)", () => {
     expect(nextTabStop(s, ["p0"], r1.id)).toBe(widgetOf(s, "u"));
     expect(nextTabStop(s, ["p0"], r2.id, true)).toBe(widgetOf(s, "t"));
   });
+
+  it("nextTabStop never loops when a radio group's buttons sit around another field (review)", () => {
+    // "( ) Other: [____]" then "( ) None" below, sorted by rows: r1, other, r2, after.
+    let s = form({ kind: "radio", name: "r", x: 0, y: 0 }, { kind: "text", name: "other", x: 150, y: 0 }, { kind: "text", name: "after", x: 0, y: 200 });
+    s = addRadioButton(s, idOf(s, "r"), { x: 0, y: 50, w: 20, h: 20 });
+    s = sortByRows(s, [page("p0")]);
+    const [r1, r2] = s.fields.find((f) => f.name === "r")!.widgets;
+    const walk = (from: string, back: boolean) => {
+      const seen: string[] = [];
+      for (let w: string | null = from; w && seen.length < 10; w = nextTabStop(s, ["p0"], w, back)) seen.push(names(s, [w])[0]);
+      return seen;
+    };
+    expect(walk(r1.id, false)).toEqual(["r", "other", "after"]);
+    expect(walk(widgetOf(s, "after"), true)).toEqual(["after", "other", "r"]);
+    expect(nextTabStop(s, ["p0"], r2.id)).toBe(widgetOf(s, "other"));
+  });
 });

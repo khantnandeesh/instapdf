@@ -24,6 +24,7 @@ import {
   PDFRef,
   PDFTextField,
   PDFWidgetAnnotation,
+  layoutMultilineText,
   StandardFonts,
   TextAlignment,
   degrees,
@@ -34,6 +35,7 @@ import {
   type PDFPage,
 } from "@cantoo/pdf-lib";
 import { pageTurn, toPdfRect, type PdfRect } from "./frame";
+import { bestSlice, needsNoGlyph } from "./coverage";
 import { clipToMaxLen } from "./model";
 import { renamedTo } from "./names";
 import { kindOf, refKey, widgetRefs } from "./read";
@@ -100,7 +102,7 @@ class Fonts {
   private covers(font: PDFFont, text: string): boolean {
     let set = this.charsets.get(font);
     if (!set) this.charsets.set(font, (set = new Set(font.getCharacterSet())));
-    for (const ch of text) if (ch !== "\n" && ch !== "\r" && ch !== "\t" && !set.has(ch.codePointAt(0)!)) return false;
+    for (const ch of text) if (!needsNoGlyph(ch) && !set.has(ch.codePointAt(0)!)) return false;
     return true;
   }
 
@@ -128,19 +130,8 @@ class Fonts {
     }
     if (this.opts.fonts) {
       if (!this.manifest) this.manifest = (await this.opts.fonts.manifest()).fonts;
-      const cps = [...new Set([...text].map((c) => c.codePointAt(0)!))].filter((cp) => cp > 0x20);
-      const inRanges = (f: { ranges: [number, number][] }, cp: number) => f.ranges.some(([lo, hi]) => cp >= lo && cp <= hi);
       // The slice that covers the most of the text, for scripts the forms font lacks.
-      let best: { file: string; ranges: [number, number][] } | null = null;
-      let bestN = 0;
-      for (const f of this.manifest) {
-        const n = cps.filter((cp) => inRanges(f, cp)).length;
-        if (n > bestN) {
-          best = f;
-          bestN = n;
-        }
-        if (n === cps.length) break;
-      }
+      const best = bestSlice(text, this.manifest);
       if (best) candidates.push(await this.embed(best.file, () => this.opts.fonts!.load(best.file)));
     }
     // The font that draws the most characters; the rest are written as "?" and reported.
@@ -696,29 +687,38 @@ function listFit(f: FormField, font: PDFFont, widget: PDFWidgetAnnotation, bw: n
 }
 
 /**
- * The size an "Auto" (0 Tf) field is drawn at: 12 pt, smaller when the box is short or a single
- * line is too long. The DA keeps 0 so other viewers size it themselves (G-3).
+ * The size an "Auto" (0 Tf) field is drawn at: 12 pt, or smaller until the text fits the box
+ * (wrapped lines for multi-line fields, one cell for combs, every option for lists). The DA keeps
+ * 0 so other viewers size it themselves (G-3).
  */
 function autoSize(f: FormField, font: PDFFont, widget: PDFWidgetAnnotation, bw: number): number {
   const r = widget.getRectangle();
   const rot = ((widget.getAppearanceCharacteristics()?.getRotation() ?? 0) % 180 + 180) % 180;
   const [w, h] = rot === 90 ? [r.height, r.width] : [r.width, r.height];
-  const inner = Math.max(1, h - 2 * bw - 2);
-  let size = f.kind === "list" || f.multiline ? 12 : Math.min(12, inner / font.heightAtSize(1, { descender: true }));
-  if (f.kind === "list") size = Math.min(size, listFit(f, font, widget, bw));
-  if (f.kind === "text" && !f.multiline && !f.comb) {
-    const text = String(f.value);
-    const room = w - 2 * bw - 4;
-    if (text && room > 0) size = Math.min(size, room / Math.max(1e-6, font.widthOfTextAtSize(text, 1)));
-  }
-  return Math.max(4, Math.round(size * 10) / 10);
+  const pad = bw + 1;
+  const bounds = { x: pad, y: pad, width: Math.max(1, w - 2 * pad), height: Math.max(1, h - 2 * pad) };
+  const text = Array.isArray(f.value) ? "" : String(f.value);
+  const fits = (size: number): boolean => {
+    if (f.kind === "list") return f.options.length * 1.2 * font.heightAtSize(size) <= bounds.height;
+    if (f.kind === "text" && f.multiline) {
+      const { lines, lineHeight } = layoutMultilineText(text || " ", { alignment: TextAlignment.Left, fontSize: size, font, bounds });
+      return lines.length * lineHeight <= bounds.height + 0.01;
+    }
+    if (font.heightAtSize(size, { descender: true }) > bounds.height) return false;
+    if (f.kind === "text" && f.comb && f.maxLen) return font.widthOfTextAtSize("W", size) <= bounds.width / f.maxLen;
+    return !text || font.widthOfTextAtSize(text, size) <= bounds.width - 2;
+  };
+  for (let size = 12; size > 4; size -= 0.5) if (fits(size)) return size;
+  return 4;
 }
 
 async function refreshAppearance(doc: PDFDocument, field: PDFField, f: FormField, fonts: Fonts, pageOf: Map<string, { page: PDFPage; entry: FormPage }>) {
   const widgets = field.acroField.getWidgets();
   // Legacy /Border widths become /BS, which the appearance builder reads (G-6).
   for (const w of widgets) {
-    if (!w.getBorderStyle() && w.dict.lookup(N("Border")) instanceof PDFArray) w.getOrCreateBorderStyle().setWidth(borderWidthOf(w));
+    if (w.getBorderStyle() || !(w.dict.lookup(N("Border")) instanceof PDFArray)) continue;
+    const width = borderWidthOf(w); // before /BS exists: once it does, it is what borderWidthOf reads
+    w.getOrCreateBorderStyle().setWidth(width);
   }
   if (field instanceof PDFCheckBox || field instanceof PDFRadioGroup) {
     field.defaultUpdateAppearances();
@@ -760,6 +760,8 @@ async function refreshAppearance(doc: PDFDocument, field: PDFField, f: FormField
   const name = fonts.drName(font);
   const da = daString(name, f);
   const fit = field instanceof PDFOptionList ? Math.min(...widgets.map((w) => listFit(f, font, w, borderWidthOf(w)))) : Infinity;
+  // A widget's own DA wins over the field's when drawing: drop them so the field's style rules.
+  for (const w of widgets) if (w.dict !== field.acroField.dict) w.dict.delete(N("DA"));
   if (f.style.fontSize > 0 && f.style.fontSize <= fit) {
     field.acroField.setDefaultAppearance(da);
     field.updateAppearances(font);

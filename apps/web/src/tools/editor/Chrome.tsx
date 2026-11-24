@@ -326,7 +326,7 @@ export function TopBar({ wide, fileMenu, onClose }: { wide: boolean; fileMenu: M
   const ctl = useCtl();
   const selecting = useStore(ctl.store, (s) => s.selection.length > 0);
   return (
-    <header className="ed-top ed-glass" data-region="top" role="group" aria-label="File">
+    <header className="ed-top ed-glass" data-region="top" role="group" aria-label="Document">
       {wide ? (
         <Link href="/" className="ed-home" aria-label="BerryPDF home">
           <BerryMark size={28} />

@@ -4,7 +4,7 @@
  * proposals, or the Form tool is picked, so the editor's first load carries none of it.
  */
 import dynamic from "next/dynamic";
-import type { ComponentProps } from "react";
+import { Component, type ComponentProps, type ReactNode } from "react";
 import { useStore } from "@/tools/editor/store";
 import { useCtl } from "@/tools/editor/context";
 import { formsOf } from "./core";
@@ -18,6 +18,23 @@ const FormsToolOptionsUI = dynamic(() => load().then((m) => m.FormsToolOptions),
 const FieldsChipSlotUI = dynamic(() => load().then((m) => m.FieldsChipSlot), { ssr: false, loading: () => null });
 const TabOrderTabUI = dynamic(() => load().then((m) => m.TabOrderTab), { ssr: false, loading: () => null });
 
+/**
+ * If the forms chunk fails to load (offline, a deploy replaced it), the forms UI stays away and
+ * the rest of the editor keeps working, instead of the whole editor going to its error screen.
+ */
+class Guard extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(e: unknown) {
+    console.warn("Form fields could not load", e);
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
 /** True once there is anything for the forms UI to show. */
 function useFormsOn(): boolean {
   const { store } = useCtl();
@@ -25,20 +42,28 @@ function useFormsOn(): boolean {
 }
 
 export function PageFields(p: ComponentProps<typeof UI.PageFields>) {
-  return useFormsOn() ? <PageFieldsUI {...p} /> : null;
+  return useFormsOn() ? <Guard><PageFieldsUI {...p} /></Guard> : null;
 }
 export function FieldPopover(p: ComponentProps<typeof UI.FieldPopover>) {
-  return useFormsOn() ? <FieldPopoverUI {...p} /> : null;
+  return useFormsOn() ? <Guard><FieldPopoverUI {...p} /></Guard> : null;
 }
 export function FormsChrome(p: ComponentProps<typeof UI.FormsChrome>) {
-  return useFormsOn() ? <FormsChromeUI {...p} /> : null;
+  return useFormsOn() ? <Guard><FormsChromeUI {...p} /></Guard> : null;
 }
 export function FormsToolOptions() {
-  return <FormsToolOptionsUI />;
+  return (
+    <Guard>
+      <FormsToolOptionsUI />
+    </Guard>
+  );
 }
 export function FieldsChipSlot() {
-  return useFormsOn() ? <FieldsChipSlotUI /> : null;
+  return useFormsOn() ? <Guard><FieldsChipSlotUI /></Guard> : null;
 }
 export function TabOrderTab() {
-  return <TabOrderTabUI />;
+  return (
+    <Guard>
+      <TabOrderTabUI />
+    </Guard>
+  );
 }
