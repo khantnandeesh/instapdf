@@ -50,20 +50,26 @@ async function pdfjsText(bytes: Uint8Array): Promise<string> {
 
 const squash = (s: string) => s.replace(/\s+/g, "");
 /**
- * Edits refused here (crates/berry-engine/src/complex.rs): new words that need ActualText, which
- * pdf.js ignores; punctuation next to punctuation and a left-to-right run of two words, which
- * PDFium reorders ("تجريبي،. نعم", "defabc").
+ * Edits refused here (crates/berry-engine/src/complex.rs): punctuation next to punctuation and a
+ * left-to-right run of two words, which PDFium reorders ("تجريبي،. نعم", "defabc").
  */
-const MUST_REFUSE = new Set([" 2024", " abc 12", "!", "، نعم", ": نعم", ", نعم", " abc def"]);
+const MUST_REFUSE = new Set([" abc 12", "!", "، نعم", ": نعم", ", نعم", " abc def"]);
+/**
+ * Edits that must be kept and read as typed. " 2024": the subset draws "4" but neither its
+ * ToUnicode nor its widths name it, so the digits go through a sibling font with its own
+ * ToUnicode, drawn after the line's last glyph so pdf.js reads them in logical order.
+ */
+const MUST_KEEP = new Set([" 2024", " جديد"]);
 
 describe("mixed-direction edits in an Arabic line (scripts-plain.pdf)", () => {
   for (const [starts, tail] of [
     ["المبلغ", "x"],
     ["المبلغ", " more"],
     ["مرحبا", " 1–2"],
-    // Digits the Arabic font draws with glyphs whose ToUnicode maps them elsewhere: they read as
-    // typed only through ActualText, which pdf.js ignores ("202v", "abc s2"), so they are refused.
+    // Digits the Arabic subset draws but does not map ("202v" in pdf.js before): kept, and both
+    // readers must read them as typed.
     ["مرحبا", " 2024"],
+    // Two left-to-right words: PDFium reverses them.
     ["مرحبا", " abc 12"],
     // Punctuation next to the line's final "." (".!", ".،"), and two Latin words: PDFium reorders them.
     ["مرحبا", "!"],
@@ -89,7 +95,7 @@ describe("mixed-direction edits in an Arabic line (scripts-plain.pdf)", () => {
         try {
           result = doc.replaceLine(0, id, want);
         } catch (err) {
-          if (!MUST_REFUSE.has(tail) && !/[A-Za-z0-9\u2013]/.test(tail)) throw err;
+          if (MUST_KEEP.has(tail) || (!MUST_REFUSE.has(tail) && !/[A-Za-z0-9\u2013]/.test(tail))) throw err;
           expect((err as { kind: string; reason?: string }).reason).toBe("text-mismatch");
           expect(doc.pageText(0).lines.map((l) => l.text)).toEqual(page.lines.map((l) => l.text));
           return;

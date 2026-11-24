@@ -260,6 +260,10 @@ pub(crate) struct Plan {
     /// Operators to rewrite: (stream, operator, new bytes; empty deletes it), e.g. the BDC/EMC
     /// of removed ActualText spans.
     pub(crate) drop_ops: Vec<(usize, usize, Vec<u8>)>,
+    /// A second place for new text: after this kept glyph (in the anchor's stream), starting
+    /// this far along the baseline from the glyph's end. Its items take the same width as the
+    /// anchor's.
+    pub(crate) tail: Option<(usize, f64)>,
 }
 
 /// The operator rewrites that take whole ActualText spans out of the content, so the glyphs that
@@ -308,7 +312,7 @@ fn deref<'a>(doc: &'a Document, o: &'a Object) -> &'a Object {
     doc.dereference(o).map(|(_, o)| o).unwrap_or(o)
 }
 
-fn count_refs(doc: &Document, target: ObjectId) -> usize {
+pub(crate) fn count_refs(doc: &Document, target: ObjectId) -> usize {
     fn walk(o: &Object, target: ObjectId, n: &mut usize) {
         match o {
             Object::Reference(id) if *id == target => *n += 1,
@@ -883,8 +887,16 @@ impl Engine {
             };
         }
         let shift = new_width - (pos(b) - pos(a));
-        let mut plan =
-            Plan { removed: HashSet::new(), want: HashMap::new(), anchor, after: after_anchor, segs, insert_at: 0.0, drop_ops };
+        let mut plan = Plan {
+            removed: HashSet::new(),
+            want: HashMap::new(),
+            anchor,
+            after: after_anchor,
+            segs,
+            insert_at: 0.0,
+            drop_ops,
+            tail: None,
+        };
         plan.removed.extend(line.chars[a..b].iter().flat_map(|c| c.glyphs.iter().copied()));
         for g in line.chars[b..n].iter().flat_map(|c| c.glyphs.iter().copied()) {
             plan.want.insert(g, shift);
@@ -1093,7 +1105,7 @@ impl Engine {
                 })
                 .sum()
         };
-        self.apply_items(page_id, pc, plan, &seg_items, inserted_width, backup)
+        self.apply_items(page_id, pc, plan, (&seg_items, &[]), inserted_width, backup)
     }
 
     /// Rewrites the streams that hold affected glyphs, with `items` as the new text at the
@@ -1103,7 +1115,7 @@ impl Engine {
         page_id: ObjectId,
         pc: &PageContent,
         plan: &Plan,
-        seg_items: &[Item],
+        (seg_items, tail_items): (&[Item], &[Item]),
         inserted_width: f64,
         backup: &mut Vec<(ObjectId, Option<Object>)>,
     ) -> Result<()> {
@@ -1116,8 +1128,10 @@ impl Engine {
         }
         let mut splices: BTreeMap<usize, Vec<(usize, Vec<u8>)>> = BTreeMap::new();
         for &si in &touched {
-            let mut ins = Some(seg_items.iter());
-            let reps = rewrite_source(pc, si, plan, if si == anchor_source { ins.take() } else { None }, inserted_width);
+            let here = si == anchor_source;
+            let ins = here.then(|| seg_items.iter());
+            let tail = here.then(|| tail_items.iter()).filter(|_| plan.tail.is_some());
+            let reps = rewrite_source(pc, si, plan, ins, tail, inserted_width);
             if !reps.is_empty() {
                 splices.insert(si, reps);
             }
@@ -1343,6 +1357,121 @@ impl Engine {
             SourceKind::Page => None,
         };
         self.add_resource(page_id, form, b"Font", "BE", font_id, backup)
+    }
+
+    /// The ToUnicode stream of the font `font_id` when new entries can be added to it: a stream
+    /// of its own (no other object refers to it) that ends its CMap with `endcmap`.
+    #[cfg(feature = "shaping")]
+    pub(crate) fn own_to_unicode(&self, font_id: ObjectId) -> Option<ObjectId> {
+        let Ok(Object::Reference(id)) = self.doc.get_dictionary(font_id).ok()?.get(b"ToUnicode") else { return None };
+        let data = self
+            .doc
+            .get_object(*id)
+            .ok()?
+            .as_stream()
+            .ok()?
+            .get_plain_content_with_limit(crate::interp::MAX_STREAM_BYTES)
+            .ok()?;
+        (count_refs(&self.doc, *id) == 1 && data.windows(7).any(|w| w == b"endcmap")).then_some(*id)
+    }
+
+    /// Adds `map`'s codes (`width` bytes each; codes the map does not have yet) to the font's
+    /// own ToUnicode (see [`Self::own_to_unicode`]). Text already in the font reads as before:
+    /// its codes had no entry, so readers showed them as raw codes.
+    #[cfg(feature = "shaping")]
+    pub(crate) fn extend_to_unicode(
+        &mut self,
+        font_id: ObjectId,
+        width: usize,
+        map: &[(u32, String)],
+        backup: &mut Vec<(ObjectId, Option<Object>)>,
+    ) -> Result<()> {
+        let id = self.own_to_unicode(font_id).ok_or_else(|| limit("to-unicode"))?;
+        let mut data = self
+            .doc
+            .get_object(id)
+            .and_then(|o| o.as_stream())
+            .map_err(|_| limit("to-unicode"))?
+            .get_plain_content_with_limit(crate::interp::MAX_STREAM_BYTES)
+            .map_err(|_| limit("to-unicode"))?;
+        let at = data.windows(7).rposition(|w| w == b"endcmap").ok_or_else(|| limit("to-unicode"))?;
+        let mut block = String::from("\n");
+        for chunk in map.chunks(100) {
+            block.push_str(&format!("{} beginbfchar\n", chunk.len()));
+            for (code, text) in chunk {
+                let t: String = text.encode_utf16().map(|u| format!("{u:04X}")).collect();
+                block.push_str(&format!("<{code:0w$X}> <{t}>\n", w = 2 * width));
+            }
+            block.push_str("endbfchar\n");
+        }
+        data.splice(at..at, block.into_bytes());
+        self.touch(id, backup);
+        self.doc.objects.insert(id, Object::Stream(new_stream(data)));
+        self.cache.clear();
+        Ok(())
+    }
+
+    /// A sibling of the font `font_id`: a copy of its dictionary (same program, widths and
+    /// encoding, so it draws exactly the same glyphs) whose ToUnicode maps only `map`'s codes
+    /// (`width` bytes each) to their text. New text drawn through it reads right everywhere,
+    /// while the text already in the original font keeps its own mapping. `widths` (Type 0 only)
+    /// adds `/W` entries for codes the font leaves to `/DW`, in a copy of its CIDFont.
+    #[cfg(feature = "shaping")]
+    pub(crate) fn sibling_font(
+        &mut self,
+        font_id: ObjectId,
+        width: usize,
+        map: &[(u32, String)],
+        widths: &[(u32, f64)],
+        backup: &mut Vec<(ObjectId, Option<Object>)>,
+    ) -> Result<ObjectId> {
+        let mut dict = self.doc.get_dictionary(font_id).map_err(|_| limit("font-object"))?.clone();
+        if !widths.is_empty() {
+            let cid_ref = dict.get(b"DescendantFonts").ok().and_then(|o| match o {
+                Object::Array(a) => a.first().cloned(),
+                Object::Reference(id) => self.doc.get_object(*id).ok().and_then(|o| o.as_array().ok()?.first().cloned()),
+                _ => None,
+            });
+            let mut cid = match cid_ref {
+                Some(Object::Reference(id)) => self.doc.get_dictionary(id).map_err(|_| limit("font-object"))?.clone(),
+                Some(Object::Dictionary(d)) => d,
+                _ => return Err(limit("font-object")),
+            };
+            let mut w: Vec<Object> = match cid.get(b"W") {
+                Ok(Object::Array(a)) => a.clone(),
+                Ok(Object::Reference(id)) => {
+                    self.doc.get_object(*id).and_then(|o| o.as_array()).map_err(|_| limit("font-object"))?.clone()
+                }
+                _ => Vec::new(),
+            };
+            for (code, wd) in widths {
+                w.push(Object::Integer(*code as i64));
+                w.push(Object::Array(vec![Object::Real(*wd as f32)]));
+            }
+            cid.set("W", Object::Array(w));
+            let cid_id = self.add_object(Object::Dictionary(cid), backup);
+            dict.set("DescendantFonts", Object::Array(vec![Object::Reference(cid_id)]));
+        }
+        let hex = |n: u32| format!("{n:0w$X}", w = 2 * width);
+        let mut cmap = format!(
+            "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<{}> <{}>\nendcodespacerange\n",
+            hex(0),
+            hex(if width == 1 { 0xFF } else { 0xFFFF }),
+        );
+        let mut entries: Vec<&(u32, String)> = map.iter().collect();
+        entries.sort();
+        for chunk in entries.chunks(100) {
+            cmap.push_str(&format!("{} beginbfchar\n", chunk.len()));
+            for (code, text) in chunk {
+                let t: String = text.encode_utf16().map(|u| format!("{u:04X}")).collect();
+                cmap.push_str(&format!("<{}> <{t}>\n", hex(*code)));
+            }
+            cmap.push_str("endbfchar\n");
+        }
+        cmap.push_str("endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n");
+        let to_unicode = self.add_object(Object::Stream(new_stream(cmap.into_bytes())), backup);
+        dict.set("ToUnicode", Object::Reference(to_unicode));
+        Ok(self.add_object(Object::Dictionary(dict), backup))
     }
 
     /// Embeds (or extends) the subset of a fallback face and returns its Type 0 font object.
@@ -1707,6 +1836,7 @@ pub(crate) fn rewrite_source(
     si: usize,
     plan: &Plan,
     mut insert: Option<std::slice::Iter<'_, Item>>,
+    mut tail: Option<std::slice::Iter<'_, Item>>,
     inserted_width: f64,
 ) -> Vec<(usize, Vec<u8>)> {
     let src = &pc.sources[si];
@@ -1799,6 +1929,15 @@ pub(crate) fn rewrite_source(
                         }
                         if gi == plan.anchor && plan.after {
                             place_insert!();
+                        }
+                        if let Some(at) = plan.tail.filter(|t| t.0 == gi).map(|t| t.1) {
+                            if let Some(it) = tail.take() {
+                                fix!(at);
+                                items.extend(it.cloned());
+                                cur += inserted_width;
+                                fresh = false;
+                                changed = true;
+                            }
                         }
                         gi += 1;
                     }
