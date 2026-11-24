@@ -426,7 +426,8 @@ export function LineEditBox({
   const [r, g, b] = line.runs[0]?.color ?? [17, 17, 17];
   const info = text.fonts[first];
   // The ring and the paper are painted inside the box, over the line's own band only: where a
-  // neighbouring line's text reaches into the box they stop short of it and that side stays open.
+  // neighbouring line's text reaches into the box they stop short of it. The ring is always a
+  // closed rectangle around that band (all four edges show, however tight the lines are set).
   // The ring is thinner on small text.
   const w = fontSize < 11 ? 1 : 2;
   const band = Math.max(0, box.height - paperInset.top - paperInset.bottom);
@@ -435,8 +436,8 @@ export function LineEditBox({
   const layers: [image: string, position: string, size: string][] = [
     [brand, `0 ${paperInset.top}px`, `${w}px ${band}px`],
     [brand, `100% ${paperInset.top}px`, `${w}px ${band}px`],
-    ...(paperInset.top > 0 ? [] : ([[brand, "0 0", `100% ${w}px`]] as [string, string, string][])),
-    ...(paperInset.bottom > 0 ? [] : ([[brand, "0 100%", `100% ${w}px`]] as [string, string, string][])),
+    [brand, `0 ${paperInset.top}px`, `100% ${w}px`],
+    [brand, `0 ${paperInset.top + Math.max(0, band - w)}px`, `100% ${w}px`],
     [paperFill, `0 ${paperInset.top}px`, `100% ${band}px`],
   ];
   const type: CSSProperties = {
@@ -610,7 +611,7 @@ export function LineEditBox({
         data-face={firstFace ? firstFace.kind : first in faces ? "none" : "pending"}
         data-faces={fontIds.map((i) => faces[i]?.kind ?? (i in faces ? "none" : "pending")).join(" ")}
         data-missing={missing?.chars.join("") ?? ""}
-        data-open={[paperInset.top > 0 && "top", paperInset.bottom > 0 && "bottom"].filter(Boolean).join(" ")}
+        data-inset={[paperInset.top > 0 && "top", paperInset.bottom > 0 && "bottom"].filter(Boolean).join(" ")}
         className={cx("ed-input absolute left-0 top-0 rounded-[4px]", settling && "ed-input--settling")}
         style={type}
         // Back in the box (a file chooser closed without telling): leaving it ends the edit again.

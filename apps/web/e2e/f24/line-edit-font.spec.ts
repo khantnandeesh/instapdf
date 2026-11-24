@@ -138,8 +138,20 @@ test("nothing of the edit box (paper, ring) covers the line below it, at any siz
   await expect(input).not.toHaveClass(/ed-input--settling/);
   // Not one pixel of the line below changes while the line above it is open.
   expect((await page.screenshot({ clip })).equals(shot)).toBe(true);
-  // The ring is inside the box, and open on the side the next line's text reaches into.
-  await expect(input).toHaveAttribute("data-open", /bottom/);
+  // The ring is inside the box and stops short of the next line's text, and it is still a closed
+  // rectangle: two sides, top, bottom (and the paper under the text).
+  await expect(input).toHaveAttribute("data-inset", /bottom/);
+  expect(await input.evaluate((el) => getComputedStyle(el).backgroundImage.split("linear-gradient").length - 1)).toBe(5);
+  const ring = await input.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    const ys = cs.backgroundPositionY.split(", ").map(parseFloat);
+    const hs = cs.backgroundSize.split(", ").map((x) => parseFloat(x.split(" ")[1]));
+    // Layers: left, right, top, bottom, paper. The bottom edge ends where the sides end.
+    return { top: ys[2], sideTop: ys[0], bottomEnd: ys[3] + hs[3], sideEnd: ys[0] + hs[0], height: el.clientHeight };
+  });
+  expect(ring.top).toBe(ring.sideTop);
+  expect(Math.abs(ring.bottomEnd - ring.sideEnd)).toBeLessThanOrEqual(0.5);
+  expect(ring.bottomEnd).toBeLessThan(ring.height);
   expect(await input.evaluate((el) => [getComputedStyle(el).outlineStyle, getComputedStyle(el).boxShadow])).toEqual(["none", "none"]);
   // And the hint goes over the box here, because text lies right under it.
   await page.keyboard.press("End");
