@@ -1,0 +1,99 @@
+{
+ "pages": 3,
+ "fields": {},
+ "annots_p1": [],
+ "annots_p2": [
+  {
+   "name": "full_name",
+   "type": "Tx",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    128,
+    725,
+    324,
+    745
+   ],
+   "tu": ""
+  },
+  {
+   "name": "email_address",
+   "type": "Tx",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    149,
+    694,
+    345,
+    713
+   ],
+   "tu": ""
+  },
+  {
+   "name": "phone",
+   "type": "Tx",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    108,
+    661,
+    303,
+    681
+   ],
+   "tu": ""
+  },
+  {
+   "name": "date_of_birth",
+   "type": "Tx",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    143,
+    630,
+    338,
+    649
+   ],
+   "tu": ""
+  },
+  {
+   "name": "i_agree_to_the_terms",
+   "type": "Btn",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    69,
+    594,
+    81,
+    606
+   ],
+   "tu": ""
+  },
+  {
+   "name": "send_me_updates",
+   "type": "Btn",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    199,
+    594,
+    211,
+    606
+   ],
+   "tu": ""
+  },
+  {
+   "name": "signature",
+   "type": "Sig",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    126,
+    566,
+    321,
+    590
+   ],
+   "tu": ""
+  }
+ ],
+ "annots_p3": []
+}
