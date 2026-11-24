@@ -92,11 +92,18 @@ Delivered and tested:
 
 Not in this PR:
 
-- The fonts bucket (Terraform), the publish workflow and the full crawl. Until then the library is the in-app copy.
 - AC-280 for added text placed on an existing line, AC-283 (twin table beyond the engine's own stand-in list), AC-285 (timing on a phone), AC-287 (x-height scaling), AC-288 (script-aware matching: the index holds Latin letters and digits only), AC-297 (keeping an uploaded font for later sessions).
 - The engine takes TrueType outlines only for stand-ins: an OTF (CFF) font of your own works for added text but not yet for existing text.
-- The recognise-only tier and the GUST and Bitstream Vera families (CLAUDE.md rule 3 needs the owner's exception written in first).
+- The recognise-only tier, and a catalogue source for the GUST (TeX Gyre) and Bitstream Vera (DejaVu) families.
 
-Licences served today: OFL-1.1, Apache-2.0 and MIT only, which CLAUDE.md rule 3 already allows. UFL-1.0 (Ubuntu), CC0-1.0, the GUST Font License and Bitstream Vera are approved in principle by the owner (2026-11-24) but are not served until rule 3 is amended; the gate in `scripts/font-library/lib.mjs` refuses them until then.
+Licences served: OFL-1.1, Apache-2.0, MIT, UFL-1.0 (Ubuntu), CC0-1.0, and (once a catalogue source lists them) the GUST Font License and Bitstream Vera. The owner allowed the last four on 2026-11-24 and CLAUDE.md rule 3 names them. Unlicense is not on the list.
 
-Review follow-ups (not blocking): validate `FONTS_ORIGIN` and narrow its rewrite before the bucket ships; build the notices from the published catalogue when the bucket serves the library; arrow-key movement in the font list; parse large user fonts off the main thread; a timeout on the match worker.
+Review follow-ups (not blocking): arrow-key movement in the font list; parse large user fonts off the main thread; a timeout on the match worker.
+
+## Fonts bucket and the full library (second PR)
+
+- **Bucket.** `<project>-fonts` (Terraform, `infra/main.tf`): public, read by name only, one for staging and prod. The only writer is the `Publish font library` workflow's own identity. Details and cost in `infra/README.md` "Fonts bucket".
+- **Full build.** `build-library.mjs --source npm` builds every family of the gated catalogue (2,092 on 2026-11-24: every weight, style and script slice except numbered CJK slices) from its `@fontsource` package on the npm registry, checked against the registry's sha512, about two seconds a family. A family whose package is missing, fails its check or fails the gate again is skipped and reported.
+- **Serving.** The staging deploy builds with `FONTS_ORIGIN` when the bucket has a `manifest.json`; `/fonts/lib/*` is then passed through to the bucket and the image carries no fonts. `FONTS_ORIGIN` is checked (a Cloud Storage bucket address only) and only the library's own paths are passed through. Caching comes from the objects' own metadata, set at upload (a year for content-addressed files, five minutes for `manifest.json`).
+- **Notices.** With the bucket, the notices page lists every library family with its licence and links to its licence text at `/fonts/lib/licences/<id>.txt`.
+- Checked by hand against a six-family library with every weight and script slice (Roboto, Inter, Noto Sans, Noto Sans Devanagari, Noto Sans JP, ABeeZee) served through the passthrough: menu, matching, typing Devanagari with a library font and the download all work, and no request leaves our address.

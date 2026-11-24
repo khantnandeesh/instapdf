@@ -177,7 +177,7 @@ test("AC-39: while processing a progressbar shows and the primary and options ar
   await expect(flow(page)).toHaveAttribute("data-state", "done", { timeout: 30_000 });
 });
 
-test("AC-40: output size is at most input x 1.1 + 10 KB (3-page, 60-page and >= 40 MB inputs)", async ({ page }, info) => {
+test("AC-40: output size is at most input x 1.1 + 10 KB (3-page, 60-page and >= 40 MB inputs)", { tag: "@serial" }, async ({ page }, info) => {
   test.setTimeout(180_000);
   for (const name of ["three-pages.pdf", "sixty-pages.pdf"]) {
     const input = (await fixtureBytes(name)).length;

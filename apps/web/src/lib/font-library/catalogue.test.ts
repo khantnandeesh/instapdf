@@ -20,8 +20,14 @@ describe("licence gate (AC-270)", () => {
     expect(canonicalLicence(" mit ")).toBe("MIT");
   });
 
+  it("takes the licences the owner added for the library (rule 3, 2026-11-24)", () => {
+    expect(canonicalLicence("UFL-1.0")).toBe("UFL-1.0");
+    expect(canonicalLicence("cc0-1.0")).toBe("CC0-1.0");
+    expect(canonicalLicence("Bitstream-Vera")).toBe("Bitstream-Vera");
+  });
+
   it("refuses anything else, including a missing licence", () => {
-    for (const l of ["GPL-3.0", "AGPL-3.0", "UFL-1.0", "CC0-1.0", "proprietary", "free for personal use", "", undefined, null, 7]) {
+    for (const l of ["GPL-3.0", "AGPL-3.0", "Unlicense", "proprietary", "free for personal use", "", undefined, null, 7]) {
       expect(canonicalLicence(l as string)).toBeNull();
     }
     expect(gate({ ...roboto, license: "GPL-2.0" }, "x")).toEqual({ ok: false, reason: "licence:GPL-2.0" });

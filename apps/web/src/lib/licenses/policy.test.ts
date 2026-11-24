@@ -132,7 +132,11 @@ describe("findViolations", () => {
     expect([...ALLOWED_LIBRARY_FONT].sort()).toEqual([...FONT_LICENCES.values()].sort());
     const lib = (name: string, license: string | null) => ({ ...pkg(name, license, "font"), library: true });
     expect(findViolations([lib("Roboto Slab (font library)", "Apache-2.0"), lib("Lato (font library)", "OFL-1.1")])).toEqual([]);
-    expect(findViolations([lib("Ubuntu (font library)", "UFL-1.0")]).map((e) => e.name)).toEqual(["Ubuntu (font library)"]);
+    // The owner allowed these for the library on 2026-11-24 (CLAUDE.md rule 3); Unlicense is not on the list.
+    expect(findViolations([lib("Ubuntu (font library)", "UFL-1.0"), lib("Public (font library)", "CC0-1.0"), lib("DejaVu Sans (font library)", "Bitstream-Vera"), lib("TeX Gyre Heros (font library)", "LicenseRef-GUST-Font-License")])).toEqual([]);
+    expect(findViolations([lib("Free (font library)", "Unlicense")]).map((e) => e.name)).toEqual(["Free (font library)"]);
+    // Outside the library, a font is still OFL only.
+    expect(findViolations([pkg("Ubuntu (font)", "UFL-1.0", "font")]).map((e) => e.name)).toEqual(["Ubuntu (font)"]);
     expect(findViolations([lib("Paid (font library)", "LicenseRef-Commercial"), lib("Copyleft (font library)", "GPL-3.0-only"), lib("None (font library)", null)]).map((e) => e.name)).toEqual([
       "Paid (font library)",
       "Copyleft (font library)",
