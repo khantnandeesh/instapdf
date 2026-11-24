@@ -23,12 +23,13 @@ export const WINDOW_LOST_MS = 3000;
 export const FIRST_CONTACT_MS = 15000;
 /** The window treats this much silence from the tool tab as "lost its tool" (AC-168: within 5 s). */
 export const TOOL_LOST_MS = 3000;
-/** A full-page sign-in (OneDrive) may take this long before the window must be back. */
-export const SIGN_IN_AWAY_MS = 2 * 60 * 1000;
+/** A full-page sign-in (OneDrive) may take this long before the window must be back (MFA, a new account, an SMS code). */
+export const SIGN_IN_AWAY_MS = 10 * 60 * 1000;
 /**
- * While the window is away on a sign-in page, the tool tab stops waiting once it has been visible
- * and focused this long with nothing back: the person came back here, and the window was most
- * likely closed on the sign-in page (it can say nothing from there).
+ * While the window is away on a sign-in page, the tool tab says it stopped waiting once it has been
+ * visible and focused this long with nothing back: the person came back here, and the window was
+ * most likely closed on the sign-in page (it can say nothing from there). It still listens until
+ * SIGN_IN_AWAY_MS, so a sign-in that does come back carries on.
  */
 export const AWAY_FOCUSED_MS = 15000;
 

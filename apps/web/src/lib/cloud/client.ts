@@ -24,6 +24,13 @@ export type SessionEvents = {
   onDone?: () => void;
   /** The window was cancelled or closed (also: heartbeat lost). */
   onClosed?: (reason: "cancel" | "lost") => void;
+  /**
+   * The window is away on a sign-in page and this tab has been in front for AWAY_FOCUSED_MS: most
+   * likely it was closed there. Say so; the session still listens until the sign-in allowance ends.
+   */
+  onGaveUp?: () => void;
+  /** After onGaveUp, the window came back from its sign-in after all ("ready"): waiting again. */
+  onResumed?: () => void;
 };
 
 export type CloudSession = {
@@ -68,9 +75,11 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
   let ready = false;
   let contacted = false;
   let lastSeen = now();
-  // Away on a sign-in page: since when this tab has been in front and focused (null: not now).
+  // Away on a sign-in page: since when this tab has been in front and focused (null: not now), and
+  // whether the tool already said it stopped waiting (it keeps listening for a late "ready").
   let away = false;
   let focusedSince: number | null = null;
+  let gaveUp = false;
   // Save mode: kept until the session ends, and sent on every "ready": a window back from a
   // full-page sign-in (OneDrive) is a new page that has not seen it (it ignores a repeat).
   let saveFile: File | null = null;
@@ -102,6 +111,10 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
       case "ready":
         ready = true;
         away = false;
+        if (gaveUp) {
+          gaveUp = false;
+          events.onResumed?.();
+        }
         events.onReady?.();
         if (saveFile) post({ t: "save", file: saveFile });
         break;
@@ -153,14 +166,15 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
 
   const timer = setI(() => {
     if (ended) return;
-    if (away) {
-      // Back here for AWAY_FOCUSED_MS while the window says nothing: it was closed on the sign-in page.
+    if (away && !gaveUp) {
+      // Back here for AWAY_FOCUSED_MS while the window says nothing: most likely it was closed on the
+      // sign-in page. Say so, but keep listening: a slow sign-in (an MFA push, a new account, an SMS
+      // code) that comes back within the allowance still carries on.
       if (!focused()) focusedSince = null;
       else if (focusedSince === null) focusedSince = now();
       else if (now() - focusedSince >= AWAY_FOCUSED_MS) {
-        end();
-        events.onClosed?.("lost");
-        return;
+        gaveUp = true;
+        events.onGaveUp?.();
       }
     }
     if (hidden()) return;

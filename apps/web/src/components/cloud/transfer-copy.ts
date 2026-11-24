@@ -12,6 +12,8 @@ export const transferCopy = {
   saveFootnote: "Goes from this device to your cloud.",
   waiting: (p: CloudProvider) => `Waiting for ${providerName[p]}…`,
   cancel: "Cancel",
+  stoppedWaiting: (p: CloudProvider) => `Stopped waiting for ${providerName[p]}.`,
+  stoppedWaitingBody: "Still signing in? Finish there and we'll carry on.",
   tryAgain: "Try again",
   blocked: (p: CloudProvider) => `Your browser blocked the ${providerName[p]} window.`,
   blockedBody: "Allow pop-ups for this site.",

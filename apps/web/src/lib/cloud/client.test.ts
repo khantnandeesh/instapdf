@@ -136,40 +136,95 @@ describe("openCloudWindow (tool tab)", () => {
     win.close();
   });
 
-  it("a sign-in page gets at most SIGN_IN_AWAY_MS, whatever the window asks for", async () => {
+  it("a sign-in page gets at most SIGN_IN_AWAY_MS (10 minutes), whatever the window asks for", async () => {
+    expect(SIGN_IN_AWAY_MS).toBe(10 * 60_000);
     const onClosed = vi.fn();
     openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => false });
     const win = peer();
     win.postMessage(wrap("window", REQ, { t: "ready" }));
+    win.postMessage(wrap("window", REQ, { t: "away", ms: 60 * 60_000 })); // refused (over MAX_AWAY_MS): no hold-off at all
     win.postMessage(wrap("window", REQ, { t: "away", ms: 10 * 60_000 }));
     await tick();
-    vi.advanceTimersByTime(SIGN_IN_AWAY_MS + FIRST_CONTACT_MS + 1000);
+    vi.advanceTimersByTime(SIGN_IN_AWAY_MS - 1000);
+    expect(onClosed).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(FIRST_CONTACT_MS + 2000);
     expect(onClosed).toHaveBeenCalledWith("lost");
     win.close();
   });
 
-  it("while the window is away, this tab in front and focused for AWAY_FOCUSED_MS ends the wait (the window was closed on the sign-in page)", async () => {
+  it("while the window is away, this tab in front and focused for AWAY_FOCUSED_MS gives up waiting, but keeps listening (M-c)", async () => {
     let focused = true;
     const onClosed = vi.fn();
-    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => focused });
+    const onGaveUp = vi.fn();
+    openCloudWindow("mock", params, { onClosed, onGaveUp }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => focused });
     const win = peer();
     win.postMessage(wrap("window", REQ, { t: "ready" }));
-    win.postMessage(wrap("window", REQ, { t: "away", ms: 60_000 }));
+    win.postMessage(wrap("window", REQ, { t: "away", ms: SIGN_IN_AWAY_MS }));
     await tick();
     vi.advanceTimersByTime(AWAY_FOCUSED_MS - 2000);
     focused = false; // the person went back to the sign-in window: the count starts over
     vi.advanceTimersByTime(5000);
     focused = true;
     vi.advanceTimersByTime(AWAY_FOCUSED_MS - 2000);
-    expect(onClosed).not.toHaveBeenCalled();
+    expect(onGaveUp).not.toHaveBeenCalled();
     vi.advanceTimersByTime(3000);
+    expect(onGaveUp).toHaveBeenCalledTimes(1);
+    expect(onClosed).not.toHaveBeenCalled();
+    // Said once; the session lasts until the sign-in allowance runs out.
+    vi.advanceTimersByTime(SIGN_IN_AWAY_MS - 3 * AWAY_FOCUSED_MS);
+    expect(onGaveUp).toHaveBeenCalledTimes(1);
+    expect(onClosed).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(3 * AWAY_FOCUSED_MS + FIRST_CONTACT_MS);
     expect(onClosed).toHaveBeenCalledWith("lost");
+    win.close();
+  });
+
+  it("never gives up while this tab is in the background (the person is still signing in there)", async () => {
+    const onGaveUp = vi.fn();
+    openCloudWindow("mock", params, { onGaveUp }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => false });
+    const win = peer();
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    win.postMessage(wrap("window", REQ, { t: "away", ms: SIGN_IN_AWAY_MS }));
+    await tick();
+    vi.advanceTimersByTime(SIGN_IN_AWAY_MS - 1000);
+    expect(onGaveUp).not.toHaveBeenCalled();
+    win.close();
+  });
+
+  it("a sign-in that comes back after the tool gave up carries on: 'ready' resumes the session, and files arrive", async () => {
+    const onGaveUp = vi.fn();
+    const onResumed = vi.fn();
+    const onClosed = vi.fn();
+    const onProgress = vi.fn();
+    openCloudWindow("mock", params, { onGaveUp, onResumed, onClosed, onProgress }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => true });
+    const win = peer();
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    win.postMessage(wrap("window", REQ, { t: "away", ms: SIGN_IN_AWAY_MS }));
+    await tick();
+    vi.advanceTimersByTime(AWAY_FOCUSED_MS + 1000);
+    expect(onGaveUp).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(3 * 60_000); // an MFA push, an SMS code
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    await tick();
+    expect(onResumed).toHaveBeenCalledTimes(1);
+    win.postMessage(wrap("window", REQ, { t: "progress", id: "a", name: "a.pdf", loaded: 1, total: 2 }));
+    await tick();
+    expect(onProgress).toHaveBeenCalledWith("a", "a.pdf", 1, 2);
+    // Back to the normal heartbeat rules: no second "gave up", and the session is alive.
+    for (let i = 0; i < 40; i++) {
+      win.postMessage(wrap("window", REQ, { t: "hb" }));
+      await tick();
+      vi.advanceTimersByTime(1000);
+    }
+    expect(onGaveUp).toHaveBeenCalledTimes(1);
+    expect(onClosed).not.toHaveBeenCalled();
     win.close();
   });
 
   it("a window back from its sign-in ('ready') is no longer away: focus here does not end it", async () => {
     const onClosed = vi.fn();
-    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => true });
+    const onGaveUp = vi.fn();
+    openCloudWindow("mock", params, { onClosed, onGaveUp }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => true });
     const win = peer();
     win.postMessage(wrap("window", REQ, { t: "ready" }));
     win.postMessage(wrap("window", REQ, { t: "away", ms: 60_000 }));
@@ -183,6 +238,7 @@ describe("openCloudWindow (tool tab)", () => {
       vi.advanceTimersByTime(1000);
     }
     expect(onClosed).not.toHaveBeenCalled();
+    expect(onGaveUp).not.toHaveBeenCalled();
     win.close();
   });
 
