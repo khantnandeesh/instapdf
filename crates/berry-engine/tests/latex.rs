@@ -269,3 +269,58 @@ fn mixed_direction_text_in_an_arabic_line() {
         }
     }
 }
+
+/// Text pushed past the rectangle its page clips to (Chrome prints every page inside one) would
+/// be in the file but not drawn: refused with "overflow" like the page edge, and text that
+/// stays inside the clip is still accepted.
+#[test]
+fn running_past_the_clip_is_refused() {
+    let page = "q 40 40 400 720 re W n BT /F1 12 Tf 300 700 Td (Ends near the clip) Tj ET Q";
+    let mut e = Engine::open(helvetica_page(page), None).unwrap();
+    let p = e.page_text(0).unwrap();
+    let err = e.replace_line(0, 0, "Ends near the clip and keeps on going").unwrap_err();
+    assert!(matches!(err, Error::Verify { reason: "overflow", .. }), "{err:?}");
+    assert_eq!(texts(&e.page_text(0).unwrap()), texts(&p));
+    e.replace_line(0, 0, "Ends near the clips").unwrap();
+    // A clip that is not an upright rectangle is not followed: nothing is refused on a guess.
+    let page = "q 40 40 m 440 40 l 440 760 l h W n BT /F1 12 Tf 300 700 Td (Ends near the clip) Tj ET Q";
+    let mut e = Engine::open(helvetica_page(page), None).unwrap();
+    e.replace_line(0, 0, "Ends near the clip and on").unwrap();
+}
+
+/// The file the evaluator used: a full-width line of a Chrome print can't take a long word more.
+#[test]
+fn chrome_print_line_cannot_grow_past_its_clip() {
+    let mut e = Engine::open(read("chrome-justified-mixed.pdf"), None).unwrap();
+    let p = e.page_text(0).unwrap();
+    let id = line_id(&p, "This agreement is made");
+    let err = e.replace_line(0, id, &format!("{} and then the date and the date", p.lines[id].text)).unwrap_err();
+    assert!(matches!(err, Error::Verify { reason: "overflow", .. }), "{err:?}");
+}
+
+/// The line-edit box draws a document font from its embedded program: a CFF subset whose
+/// program keeps no advances of its own still says which glyph draws each letter it has.
+#[test]
+fn cff_subset_program_names_its_glyphs() {
+    let mut e = Engine::open(read("latex-type1c.pdf"), None).unwrap();
+    let p = e.page_text(0).unwrap();
+    let object = p.fonts[0].object.unwrap();
+    let program = e.font_program(object, "The").unwrap();
+    assert_eq!(program.format, "cff");
+    assert_eq!(program.glyphs.iter().map(|g| g.cp).collect::<Vec<_>>(), vec![84, 104, 101]);
+    assert!(program.glyphs.iter().all(|g| g.gid > 0 && g.width > 0.0));
+}
+
+/// reportlab writes a wrong advance table into a fixed-pitch TrueType subset; the PDF's widths
+/// are right. The program is still handed over with every letter it has and the PDF's widths
+/// (gen_mono_subset.py), so the font can be shown and matched.
+#[test]
+fn subset_with_a_wrong_advance_table_still_names_its_glyphs() {
+    let mut e = Engine::open(read("reportlab-mono-subset.pdf"), None).unwrap();
+    let p = e.page_text(0).unwrap();
+    let object = p.fonts.iter().find(|f| f.name == "FixtureMono").unwrap().object.unwrap();
+    let program = e.font_program(object, "Thequick").unwrap();
+    assert_eq!(program.format, "truetype");
+    assert_eq!(program.glyphs.len(), 8);
+    assert!(program.glyphs.iter().all(|g| g.gid > 0 && (g.width - 600.0).abs() < 1.0), "{:?}", program.glyphs);
+}

@@ -907,6 +907,18 @@
 .ed-narrow.ed-has-strip .ed-toasts {
   bottom: calc(190px + env(safe-area-inset-bottom));
 }
+/* A phone has no zoom pill over the dock: messages and the line-edit hint sit directly above the
+   dock, or above the options strip while it has something in it (`ed-strip-empty` is set by the
+   shell: `:has()` can't be nested to ask for it here). */
+@media (max-width: 639px) {
+  .ed-narrow .ed-toasts,
+  .ed-narrow.ed-has-strip.ed-strip-empty .ed-toasts {
+    bottom: max(calc(82px + env(safe-area-inset-bottom)), calc(var(--ed-keyboard, 0px) + 8px));
+  }
+  .ed-narrow.ed-has-strip:not(.ed-strip-empty) .ed-toasts {
+    bottom: max(calc(140px + env(safe-area-inset-bottom)), calc(var(--ed-keyboard, 0px) + 8px));
+  }
+}
 .ed-toast {
   display: flex;
   align-items: center;
@@ -940,22 +952,38 @@
 }
 /* Narrow screens: a long notice keeps the full width and its action goes under it (the font
    notice is one short row of its own, F24). */
-.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) {
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act, .ed-toast__picks) {
   flex-wrap: wrap;
   padding-bottom: 8px;
 }
-.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) > span {
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act, .ed-toast__picks) > span {
   flex: 1 1 calc(100% - 44px);
 }
-.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) > .ed-toast__act {
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act, .ed-toast__picks) > .ed-toast__act {
   order: 3;
   margin-left: -12px;
+}
+.ed-toast__slot {
+  display: contents;
+}
+.ed-toast__picks {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+.ed-narrow .ed-toast:has(.ed-toast__picks) > .ed-toast__slot > .ed-toast__picks {
+  order: 3;
+}
+.ed-toast__picks .ed-input__pick {
+  padding: 5px 12px;
+  font-size: 13px;
 }
 .ed-toast__act:hover,
 .ed-toast__x:hover {
   background: var(--color-hover);
 }
-/* The font notice: one row. On a phone its text is short and cut with an ellipsis. */
+/* The font notice: one compact row, its actions beside the sentence. */
 .ed-toast--font {
   max-width: min(640px, 100%);
 }
@@ -963,6 +991,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Both fonts are always named in full: on a phone the sentence takes a second line when it must. */
+.ed-narrow .ed-toast--font > span {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.25;
 }
 .ed-toast__act--pop {
   min-width: 0;
@@ -1294,7 +1330,7 @@
 }
 .ed-input__hint {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 5px);
   z-index: 2;
   display: flex;
   align-items: center;
@@ -1315,7 +1351,32 @@
 /* Text lies right under the box: the hint goes over it instead. */
 .ed-input__hint--over {
   top: auto;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 5px);
+}
+/* On a phone: one slim row above the tool dock, on the dock's own surface, never over the page's text. */
+.ed-hint-slot {
+  display: contents;
+}
+.ed-input__hint--docked {
+  position: static;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-height: 40px;
+  justify-content: space-between;
+  padding: 4px 6px 4px 14px;
+  font-size: 13px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  pointer-events: auto;
+  animation: none;
+}
+.ed-input__hint--docked > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ed-input__hint--docked .ed-input__pick {
+  padding: 5px 12px;
+  font-size: 13px;
 }
 .ed-input__chars {
   font-weight: 700;

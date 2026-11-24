@@ -507,8 +507,9 @@ impl Engine {
         }
     }
 
-    /// True when an edit moves a glyph of the line past the visible page edge, where none of
-    /// the line's glyphs were before.
+    /// True when an edit moves a glyph of the line past the visible page edge or past the
+    /// rectangle the page clips it to (it would be in the file but not drawn), where none of the
+    /// line's glyphs were before.
     pub(crate) fn overflows(
         &self,
         page: usize,
@@ -520,6 +521,7 @@ impl Engine {
         let [x0, y0, x1, y1] = self.page_box(page);
         let out = |g: &Glyph| {
             let end = (g.origin.0 + g.advance * g.angle.cos(), g.origin.1 + g.advance * g.angle.sin());
+            let [x0, y0, x1, y1] = crate::interp::meet(g.clip, [x0, y0, x1, y1]);
             [g.origin, end].iter().any(|p| p.0 < x0 - 0.5 || p.0 > x1 + 0.5 || p.1 < y0 - 0.5 || p.1 > y1 + 0.5)
         };
         !line.iter().any(|&g| out(&before.glyphs[g])) && touched.iter().any(|&g| out(&after.glyphs[g]))
@@ -621,12 +623,15 @@ impl Engine {
         let id = self.doc.objects.keys().find(|k| k.0 == font_object).copied().ok_or(Error::BadFont)?;
         let is_font = self.doc.get_dictionary(id).is_ok_and(|d| d.has_type(b"Font"));
         let font = is_font.then(|| self.cache.get(&self.doc, &Object::Reference(id))).flatten().ok_or(Error::BadFont)?;
-        let none = HashSet::new();
+        // To show or compare the font, a code whose glyph is in the program is enough, also where
+        // its declared width disagrees with the program's own (some subsetters write a wrong
+        // advance table; readers go by the PDF's widths): every one-byte code counts as shown.
+        let shown: HashSet<u32> = (0..256).collect();
         let (format, bytes) = font.program_bytes().map(|(f, b)| (f, b.to_vec())).unwrap_or(("none", Vec::new()));
         let glyphs = chars
             .chars()
             .filter_map(|ch| {
-                let code = font.encode(ch, &none)?;
+                let code = font.encode(ch, &shown).filter(|c| font.has_glyph(*c) == Some(true))?;
                 Some(ProgramGlyph { cp: ch as u32, gid: font.program_gid(code).unwrap_or(0), width: font.width(code) })
             })
             .collect();

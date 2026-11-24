@@ -4,14 +4,68 @@ on:
   pull_request:
   push:
     branches: [main]
+  # The nightly full suite on main: the safety net for PRs that ran only the specs they affect.
+  schedule:
+    - cron: "0 21 * * *" # 02:30 IST
+  workflow_dispatch:
 
+# A newer push to a PR cancels its older run. Runs on main are never cancelled: each commit's own
+# result is what the next merge's skip (plan.mjs) relies on.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  # plan: look up the PR behind a main commit and its CI runs.
+  actions: read
+  pull-requests: read
 
 jobs:
-  # Static checks, unit tests and the build (which is also the licence scan).
+  # Decides what runs (apps/web/scripts/ci/plan.mjs): on a PR, the browser specs its change can
+  # affect; on main, nothing again when a green PR run tested this exact tree on the previous main
+  # commit and that commit is green, else the full suite; nightly or Run workflow, the full suite.
+  # Writes the e2e matrix, packed by measured time.
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      scope: ${{ steps.plan.outputs.scope }}
+      checks: ${{ steps.plan.outputs.checks }}
+      e2e: ${{ steps.plan.outputs.e2e }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Fetch the previous main commit
+        if: github.event_name == 'push' && !startsWith(github.event.before, '0000000')
+        run: git fetch --no-tags --depth=1 origin "${{ github.event.before }}" || true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: plan
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: node apps/web/scripts/ci/plan.mjs
+      # Names the tree this PR run tests and the main commit it sits on. If the run passes and the PR
+      # merges with that same tree on that same commit, main's run finds this and skips the re-run.
+      - name: Record the tested tree
+        if: github.event_name == 'pull_request'
+        run: echo "${{ steps.plan.outputs.tested }}" > tested.txt
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request'
+        with:
+          name: ${{ steps.plan.outputs.tested }}
+          path: tested.txt
+          retention-days: 30
+
+  # Static checks, unit tests and the build (which is also the licence scan). Always on PRs.
   checks:
+    needs: plan
+    if: needs.plan.outputs.checks == 'run'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -22,6 +76,12 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Next.js keeps its compile cache here: a warm build takes a fraction of a cold one.
+      - uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: next-off-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: next-off-${{ hashFiles('pnpm-lock.yaml') }}-
       # qpdf's syntax check (via pikepdf, MPL-2.0) for the forms output tests (F16 AC-247).
       - uses: actions/setup-python@v5
         with:
@@ -34,14 +94,16 @@ jobs:
       - name: First-load JS budget
         run: node apps/web/scripts/first-load-budget.mjs apps/web
 
-  # The browser tests, in parallel jobs. Each builds the app itself (about a minute), which is
-  # quicker than waiting for another job's build and passing it along.
-  # "serial" holds the tests tagged @serial (wall-clock limits and heavy loads) on one worker.
+  # The browser tests, one machine per row of the plan's matrix. Each builds the app itself (warm
+  # cache, under a minute), which is quicker than waiting for another job's build.
+  # "serial" rows hold the tests tagged @serial (wall-clock limits and heavy loads) on one worker.
   # The "cloud" rows build the app with F23 cloud sources and the mock provider on
   # (docs/specs/f23-cloud-pickers.md §7) and run the cloud suite plus the specs that branch on the
   # flag (CSP, intake, Merge, layout, the phone JS budget). No provider keys are needed.
   e2e:
     name: e2e (${{ matrix.name }})
+    needs: plan
+    if: needs.plan.outputs.e2e == 'run'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -50,29 +112,7 @@ jobs:
       NEXT_PUBLIC_CLOUD_MOCK: ${{ matrix.cloud }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: desktop 1/2
-            args: --project desktop --grep-invert @serial --shard 1/2
-          - name: desktop 2/2
-            args: --project desktop --grep-invert @serial --shard 2/2
-          - name: mobile
-            args: --project mobile --grep-invert @serial
-          - name: serial
-            args: --grep @serial --workers 1
-          - name: cloud desktop 1/2
-            cloud: "1"
-            budget: true
-            args: --project desktop --grep-invert @serial --shard 1/2 e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/
-          - name: cloud desktop 2/2
-            cloud: "1"
-            args: --project desktop --grep-invert @serial --shard 2/2 e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/
-          - name: cloud mobile
-            cloud: "1"
-            args: --project mobile --grep-invert @serial e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/
-          - name: cloud serial
-            cloud: "1"
-            args: --grep @serial --workers 1 e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -81,7 +121,18 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - uses: actions/cache/restore@v4
+        with:
+          path: apps/web/.next/cache
+          key: next-${{ matrix.cloud && 'on' || 'off' }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: next-${{ matrix.cloud && 'on' || 'off' }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm build
+      # The checks job saves the cache of the plain build; this row saves the cloud build's.
+      - uses: actions/cache/save@v4
+        if: matrix.budget
+        with:
+          path: apps/web/.next/cache
+          key: next-on-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
       # The same first-load budgets on the cloud build (its own numbers, scripts/first-load-budget.mjs).
       - name: First-load JS budget (cloud sources on)
         if: matrix.budget
@@ -93,26 +144,48 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pikepdf==10.18.2 pypdfium2==5.14.0
-      - run: pnpm --filter web exec playwright test --trace off ${{ matrix.args }}
+      - name: Playwright
+        env:
+          FILES: ${{ matrix.files }}
+          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-report.json
+        run: pnpm --filter web exec playwright test --trace off --reporter=dot,json ${{ matrix.args }} $FILES
+      # Durations for e2e/timings.json (scripts/ci/timings.mjs); the nightly full run's are the ones to use.
+      - name: Name the row for the timings
+        if: always()
+        run: echo "${{ matrix.name }}" > apps/web/row.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-timings-${{ strategy.job-index }}
+          path: |
+            apps/web/e2e-report.json
+            apps/web/row.txt
+          retention-days: 5
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: playwright-report-${{ strategy.job-index }}
-          path: apps/web/playwright-report
+          path: apps/web/test-results
           retention-days: 7
 
-  # The one check other things wait for: passes only if every job above passed.
+  # The one check other things wait for: passes only if every job the plan asked for passed.
   web:
     if: always()
-    needs: [checks, e2e]
+    needs: [plan, checks, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: All web jobs passed
         env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
+          SCOPE: ${{ needs.plan.outputs.scope }}
+          PLAN: ${{ needs.plan.result }}
+          CHECKS: ${{ needs.checks.result }}
+          CHECKS_PLANNED: ${{ needs.plan.outputs.checks }}
+          E2E: ${{ needs.e2e.result }}
+          E2E_PLANNED: ${{ needs.plan.outputs.e2e }}
         run: |
-          echo "Results: $RESULTS"
-          for r in $RESULTS; do
-            [ "$r" = "success" ] || { echo "::error::A web job ended as $r"; exit 1; }
-          done
+          echo "Scope: $SCOPE. plan=$PLAN checks=$CHECKS (planned $CHECKS_PLANNED) e2e=$E2E (planned $E2E_PLANNED)"
+          [ "$PLAN" = "success" ] || { echo "::error::The plan job ended as $PLAN"; exit 1; }
+          ok() { [ "$1" = "success" ] || { [ "$1" = "skipped" ] && [ "$2" = "skip" ]; }; }
+          ok "$CHECKS" "$CHECKS_PLANNED" || { echo "::error::checks ended as $CHECKS"; exit 1; }
+          ok "$E2E" "$E2E_PLANNED" || { echo "::error::e2e ended as $E2E"; exit 1; }

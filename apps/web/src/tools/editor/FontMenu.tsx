@@ -264,7 +264,7 @@ export function FontNotice() {
   return (
     <div key={n.key} className="ed-toast ed-toast--font ed-glass" data-testid="font-notice">
       <span title={`${n.original} isn’t complete in this file. Using ${n.standIn}.`}>
-        {message || (wide ? `${n.original} isn’t complete in this file. Using ${n.standIn}.` : `Using ${n.standIn} for missing characters`)}
+        {message || (wide ? `${n.original} isn’t complete in this file. Using ${n.standIn}.` : `${n.original} isn’t complete. Using ${n.standIn}.`)}
       </span>
       <Pop label="Change font" title="Change font" className="ed-toast__act ed-toast__act--pop" testId="font-change" trigger="Change" panelClassName="ed-fonts-pop">
         {(close) => (

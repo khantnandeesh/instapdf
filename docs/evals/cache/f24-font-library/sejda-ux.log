@@ -1,0 +1,24 @@
+17:28:52.013 390 landing words before action null
+17:28:56.976 390 pick to text layer ms (throttled to 1 req/s) 4962
+17:29:11.513 390 scrollW/innerW [ 600, 390, 0 ]
+17:29:12.073 390 box {"x":85.15625,"y":474.609375,"width":175.65625,"height":11.671875}
+17:29:18.100 390 font toggle <button type="button" class="btn btn-default dropdown-toggle tooltip-single-line" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" title="" data-original-title="Font family">
+         
+17:29:46.495 390 menu {
+  n: 41,
+  rect: [ 105.140625, 459.609375, 250, 300 ],
+  search: false,
+  items: 'More fonts... | Amiri (Arabic) | Arial (Liberation Sans) | Arimo | Caladea (Cambria) | Carlito (Calibri) | Calibri (Carlito) | Courier | DejaVu Sans (Verdana) | DejaVu Serif (Georgia) | Droid Serif | EB Garamond | Fira Sans (Trebuchet MS) | Helvetica | Inter | Lato | Liberation Sans | Liberation Serif | Liberation Mono | Noto Sans | Noto Sans Chakma | Noto Serif | Noto Serif Tamil | Open Sans | Open Sans Condensed | Oranienbaum | Poppins | PT Sans | PT Sans Caption | PT Sans Narrow | PT Serif | PT Serif Caption | Scheherazade New (Arabic) | Selawik Segoe UI | Roboto | Times New Roman | Caladea-Bold | LiberationSerif | LiberationSerif-Bold | LiberationSerif-Italic | Inter-Regular'
+}
+17:29:56.083 1280 landing words before action null
+17:30:01.044 1280 pick to text layer ms (throttled to 1 req/s) 4961
+17:30:15.579 1280 scrollW/innerW [ 1280, 1280, 0 ]
+17:30:16.148 1280 box {"x":212.1875,"y":577.53125,"width":349.875,"height":23.265625}
+17:30:22.313 1280 font toggle <button type="button" class="btn btn-default dropdown-toggle tooltip-single-line" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" title="" data-original-title="Font family">
+         
+17:30:50.798 1280 menu {
+  n: 41,
+  rect: [ 349.625, 562.53125, 250, 300 ],
+  search: false,
+  items: 'More fonts... | Amiri (Arabic) | Arial (Liberation Sans) | Arimo | Caladea (Cambria) | Carlito (Calibri) | Calibri (Carlito) | Courier | DejaVu Sans (Verdana) | DejaVu Serif (Georgia) | Droid Serif | EB Garamond | Fira Sans (Trebuchet MS) | Helvetica | Inter | Lato | Liberation Sans | Liberation Serif | Liberation Mono | Noto Sans | Noto Sans Chakma | Noto Serif | Noto Serif Tamil | Open Sans | Open Sans Condensed | Oranienbaum | Poppins | PT Sans | PT Sans Caption | PT Sans Narrow | PT Serif | PT Serif Caption | Scheherazade New (Arabic) | Selawik Segoe UI | Roboto | Times New Roman | Caladea-Bold | LiberationSerif | LiberationSerif-Bold | LiberationSerif-Italic | Inter-Regular'
+}
