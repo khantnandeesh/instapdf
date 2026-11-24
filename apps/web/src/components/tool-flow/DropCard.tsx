@@ -7,12 +7,13 @@ import { Floaties, Sticker } from "../berry/Berry";
  * leaf-cornered card (white surfaces stay solid, so the grid never runs behind the words) that
  * holds only the large upload button and two or three short muted lines (drop hint, limits, privacy).
  * The card pops in, then its outline breathes gently (mp-dropcard) to invite a drop.
- * The whole page stays the drop target. The decoration is aria-hidden, ignores the pointer and
+ * From 1024 px the area is exactly as tall as the options panel (--ip-work-h), so the first
+ * screen holds both and ends inside the viewport. The whole page stays the drop target. The decoration is aria-hidden, ignores the pointer and
  * never takes focus.
  */
 export function DropCard({ children }: { children: ReactNode }) {
   return (
-    <div className="mp-empty grid min-h-[300px] place-items-center px-[15px] py-10 lg:min-h-[440px]" data-testid="drop-card">
+    <div className="mp-empty grid min-h-[300px] place-items-center px-[15px] py-10 lg:h-(--ip-work-h) lg:min-h-0 lg:py-6" data-testid="drop-card">
       <Floaties set="empty" />
       <div className="mp-empty__in mp-dropcard relative w-full max-w-[440px] rounded-[16px_16px_28px_16px] border-[1.5px] border-sand bg-surface-raised px-6 pt-9 pb-8 shadow-card">
         <Sticker kind="blossom" size={34} className="mp-sticker--tilt-r absolute -top-4 -right-3" />

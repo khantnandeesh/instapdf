@@ -1,6 +1,6 @@
-# Editor micro-checks (F16 annex to mission.md M1–M11)
+# Editor micro-checks (F16 annex to mission.md M1–M12)
 
-`docs/process/mission.md` is the source of truth for our goal, ways of work and the M1–M11 micro-comparison gate. This annex lists only what the **editor** adds to that gate: the test corpus, the edit scripts and the extra measurements under each M-check. Each check is still scored **win / tie / lose** against the reference, and the mission's pass rule applies: no lost check without the owner's written waiver.
+`docs/process/mission.md` is the source of truth for our goal, ways of work and the M1–M12 micro-comparison gate. This annex lists only what the **editor** adds to that gate: the test corpus, the edit scripts and the extra measurements under each M-check. Each check is still scored **win / tie / lose** against the reference, and the mission's pass rule applies: no lost check without the owner's written waiver.
 
 ## 1. Corpus
 
