@@ -1,6 +1,6 @@
 import type { Permission } from "@/tools/registry";
 import type { PageSize } from "@/lib/pdf/pdfjs";
-import type { CloudProvider } from "@/lib/cloud/providers";
+import type { ReactNode } from "react";
 
 export type FileStatus = "loading" | "locked" | "ready";
 
@@ -78,10 +78,6 @@ export type FlowApi = {
   openPicker: () => void;
   /** Focus target when nothing better exists (the toolbar picker, else the heading). */
   fallbackFocus: () => HTMLElement | null;
-  /** F23: cloud providers configured in this build (empty when the feature is off). */
-  cloudProviders: readonly CloudProvider[];
-  /** F23: opens a provider's window; call it synchronously in the click handler. Files come back through `intake` with `tag`. */
-  openCloud: (provider: CloudProvider, trigger: HTMLElement | null, opts?: { tag?: unknown; multiple?: boolean }) => void;
 };
 
 export type FlowNoticeInput = {
@@ -90,12 +86,8 @@ export type FlowNoticeInput = {
   title: string;
   body?: string;
   items?: string[];
-  /** `href`: the action is a link (opens in a new tab). `autoFocus`: it takes focus when shown (a direct result of the user's click). */
-  action?: { label: string; onClick?: () => void; href?: string; autoFocus?: boolean };
-  /** The action sits on the alert's row, before the close button (short alerts: waiting, blocked, saved). */
-  inlineAction?: boolean;
-  /** Shows a small busy ring instead of the icon (waiting for a cloud window). */
-  busy?: boolean;
+  /** F23 adds `node` and `icon` (see Notice; cloud/NoticeAction.tsx makes them). */
+  action?: { label: string; onClick: () => void; node?: ReactNode; icon?: ReactNode };
   /** Kept when new files are added (other info and warning notices are cleared then). */
   sticky?: boolean;
   /** Auto-dismiss after this long (paused while hovered or focused). */

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Button, buttonClasses } from "./Button";
+import { Button } from "./Button";
 import { cx } from "./cx";
 import { AlertIcon, CheckCircleIcon, CloseIcon, ErrorIcon, InfoIcon, LeafIcon } from "./icons";
 
@@ -22,20 +22,15 @@ export function Notice({
   action,
   look,
   className,
-  inlineAction,
-  busy,
 }: {
   tone: NoticeTone;
   title?: string;
   children?: ReactNode;
   onDismiss?: () => void;
-  action?: { label: string; onClick?: () => void; href?: string; autoFocus?: boolean };
+  /** F23 adds `node` (a rendered action for the alert's row, before the close button) and `icon` (in place of the notice's own). */
+  action?: { label: string; onClick: () => void; node?: ReactNode; icon?: ReactNode };
   look?: "alert" | "callout";
   className?: string;
-  /** The action sits on the alert's row, before the close (F23 short alerts). */
-  inlineAction?: boolean;
-  /** A small busy ring replaces the icon (waiting). */
-  busy?: boolean;
 }) {
   const kind = look ?? (tone === "danger" ? "alert" : "callout");
   const Icon =
@@ -52,6 +47,19 @@ export function Notice({
         : tone === "warning"
           ? AlertIcon
           : LeafIcon;
+  // F23 reads `node` and `icon` only behind the build flag, written out each time, and the close
+  // button is a thunk (inlined back): builds without cloud sources compile to main's exact code.
+  const close = () =>
+    onDismiss && (
+      <button
+        type="button"
+        aria-label={title ? `Dismiss: ${title}` : "Dismiss"}
+        className={kind === "alert" ? "mp-alert__close" : "mp-iconbtn mp-iconbtn--plain -my-1 -me-1 size-[30px]"}
+        onClick={onDismiss}
+      >
+        <CloseIcon size={18} />
+      </button>
+    );
   return (
     <div
       role={tone === "danger" || tone === "warning" ? "alert" : "status"}
@@ -61,8 +69,8 @@ export function Notice({
         className,
       )}
     >
-      {busy ? (
-        <span className="ip-busy-ring" aria-hidden="true" />
+      {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && action?.icon ? (
+        action.icon
       ) : (
         <Icon
           size={22}
@@ -72,33 +80,20 @@ export function Notice({
       <div className="min-w-0 flex-1 break-words">
         {title && <p className="font-semibold">{title}</p>}
         {children && <div className={cx(kind === "alert" && title && "font-normal")}>{children}</div>}
-        {action && !inlineAction && <NoticeAction action={action} className="mt-2" />}
+        {action && !(process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && action.node) && (
+          <Button size="sm" variant="outline" className="mt-2" onClick={action.onClick}>
+            {action.label}
+          </Button>
+        )}
       </div>
-      {action && inlineAction && <NoticeAction action={action} className="-my-1 shrink-0 self-center" />}
-      {onDismiss && (
-        <button
-          type="button"
-          aria-label={title ? `Dismiss: ${title}` : "Dismiss"}
-          className={kind === "alert" ? "mp-alert__close" : "mp-iconbtn mp-iconbtn--plain -my-1 -me-1 size-[30px]"}
-          onClick={onDismiss}
-        >
-          <CloseIcon size={18} />
-        </button>
+      {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && action?.node ? (
+        <>
+          {action.node}
+          {close()}
+        </>
+      ) : (
+        close()
       )}
     </div>
-  );
-}
-
-function NoticeAction({ action, className }: { action: { label: string; onClick?: () => void; href?: string; autoFocus?: boolean }; className?: string }) {
-  if (action.href)
-    return (
-      <a href={action.href} target="_blank" rel="noopener noreferrer" className={buttonClasses("outline", "sm", className)} onClick={action.onClick} autoFocus={action.autoFocus}>
-        {action.label}
-      </a>
-    );
-  return (
-    <Button size="sm" variant="outline" className={className} onClick={action.onClick} autoFocus={action.autoFocus}>
-      {action.label}
-    </Button>
   );
 }

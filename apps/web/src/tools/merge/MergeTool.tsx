@@ -7,8 +7,6 @@ import type { FlowApi, LoadedFile, ProcessFn, WorkspaceContext } from "@/compone
 import { cx } from "@/components/ui/cx";
 import { ChevronDownIcon, PlusIcon } from "@/components/ui/icons";
 import type { MenuEntry } from "@/components/ui/Menu";
-import { cloudMenus } from "@/components/cloud/tool-cloud";
-import type { CloudProvider } from "@/lib/cloud/providers";
 import {
   A4,
   blankSizeAt,
@@ -41,7 +39,6 @@ import { flowTool } from "@/tools/registry";
 import { mergeCopy as c } from "./copy";
 import { MergeOptions } from "./MergeOptions";
 
-
 const tool = flowTool("merge-pdf");
 
 // The workspace (both views, menus) and the dialogs are separate chunks: nothing of
@@ -52,6 +49,12 @@ const SegmentGrid = dynamic(() => loadSegmentGrid().then((m) => m.SegmentGrid), 
 const ShortcutsHelp = dynamic(() => loadSegmentGrid().then((m) => m.ShortcutsHelp), { ssr: false });
 const loadMenu = () => import("@/components/ui/Menu");
 const MenuButton = dynamic(() => loadMenu().then((m) => m.MenuButton), { ssr: false, loading: () => <span className="inline-block h-9 w-11" aria-hidden="true" /> });
+const CloudAddMenu =
+  process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
+    ? dynamic(() => import("@/components/cloud/ui").then((m) => m.CloudAddMenu), { ssr: false, loading: () => <span className="inline-block h-9 w-11" aria-hidden="true" /> })
+    : null;
+/** F23: with cloud sources, the Add menus regrouped with the providers (cloud/merge-menus.tsx; unchanged without any). */
+const AddMenu = (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && CloudAddMenu) || MenuButton;
 const loadPageGrid = () => import("@/components/page-edit/EditablePageGrid");
 const EditablePageGrid = dynamic(loadPageGrid, { ssr: false, loading: () => <div className="h-40" aria-hidden="true" /> });
 const loadDialogs = () => import("@/components/page-edit/dialogs");
@@ -477,11 +480,6 @@ export function MergeTool() {
     pendingAt.current = at;
     pagesInput.current?.click();
   };
-  /** F23: "Pages from a file" from a cloud: one file, then the page picker, as for a local file. */
-  const cloudPages = (p: CloudProvider, trigger: string) => {
-    pendingAt.current = null;
-    api.current?.openCloud(p, document.querySelector<HTMLElement>(`[data-testid=${trigger}]`), { tag: { picker: true } satisfies IntakeTag, multiple: false });
-  };
   const toolbarBlank = () => {
     const list = pagesRef.current;
     const last = list.reduce((acc, p, i) => (selection.has(p.uid) ? i : acc), -1);
@@ -791,57 +789,38 @@ export function MergeTool() {
           <>
             {/* ≥ 640 px: "Add pages" beside the flow's "Add files" (spec F3 M-3). */}
             <span className="contents max-sm:hidden">
-              <MenuButton
+              <AddMenu
                 label={c.addPages}
                 placement="bottom-end"
                 disabled={w.dimmed}
                 className={cx(toolbarButton, "-ms-1")}
-                items={
-                  cloudMenus
-                    ? cloudMenus.addPagesEntries(w.api.cloudProviders, { fromFile: { label: c.fromFile, onSelect: () => openPagesPicker(null) }, blank: { label: c.blankPage, onSelect: toolbarBlank } }, (p) =>
-                        cloudPages(p, "add-pages-menu"),
-                      )
-                    : [
-                        { id: "from-file", label: c.fromFile, onSelect: () => openPagesPicker(null) },
-                        { id: "blank", label: c.blankPage, onSelect: toolbarBlank },
-                      ]
-                }
-                footnote={cloudMenus && w.api.cloudProviders.length ? cloudMenus.cloudFootnote() : undefined}
-                popupClassName={cloudMenus && w.api.cloudProviders.length ? "ip-menu-wide" : undefined}
+                items={[
+                  { id: "from-file", label: c.fromFile, onSelect: () => openPagesPicker(null) },
+                  { id: "blank", label: c.blankPage, onSelect: toolbarBlank },
+                ]}
                 data-testid="add-pages-menu"
               >
                 <span>{c.addPages}</span>
                 <ChevronDownIcon size={16} />
-              </MenuButton>
+              </AddMenu>
             </span>
             {/* < 640 px: one "Add" menu replaces both (spec F3 M-3, eval G-2). */}
             <span className="contents sm:hidden">
-              <MenuButton
+              <AddMenu
                 label={c.add}
                 placement="bottom-end"
                 disabled={w.dimmed}
                 className={phoneAddButton}
-                items={
-                  cloudMenus
-                    ? cloudMenus.phoneAddEntries(
-                        w.api.cloudProviders,
-                        { files: { label: c.addFilesItem, onSelect: () => w.api.openPicker() }, fromFile: { label: c.fromFile, onSelect: () => openPagesPicker(null) }, blank: { label: c.blankPage, onSelect: toolbarBlank } },
-                        (p) => w.api.openCloud(p, document.querySelector<HTMLElement>("[data-testid=add-menu]")),
-                        (p) => cloudPages(p, "add-menu"),
-                      )
-                    : [
-                        { id: "files", label: c.addFilesItem, onSelect: () => w.api.openPicker() },
-                        { id: "from-file", label: c.fromFile, onSelect: () => openPagesPicker(null) },
-                        { id: "blank", label: c.blankPage, onSelect: toolbarBlank },
-                      ]
-                }
-                footnote={cloudMenus && w.api.cloudProviders.length ? cloudMenus.cloudFootnote() : undefined}
-                presentation={w.api.cloudProviders.length ? "auto" : "popover"}
+                items={[
+                  { id: "files", label: c.addFilesItem, onSelect: () => w.api.openPicker() },
+                  { id: "from-file", label: c.fromFile, onSelect: () => openPagesPicker(null) },
+                  { id: "blank", label: c.blankPage, onSelect: toolbarBlank },
+                ]}
                 data-testid="add-menu"
               >
                 <PlusIcon size={18} />
                 <span>{c.add}</span>
-              </MenuButton>
+              </AddMenu>
             </span>
           </>
         )}

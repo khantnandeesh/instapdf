@@ -2,9 +2,12 @@
 import "./cloud.css";
 import { useEffect, useState } from "react";
 import { readLast } from "@/lib/cloud/last-used";
-import { providerName, type CloudProvider } from "@/lib/cloud/providers";
+import { configuredProviders, providerName, type CloudProvider } from "@/lib/cloud/providers";
 import { cloudCopy } from "./copy";
+import { openCloud } from "./intake-engine";
 import { ProviderMark } from "./ProviderMark";
+
+const providers = configuredProviders();
 
 /**
  * One-tap provider buttons under the upload button (spec U-2 E1, AC-165). Server-rendered at its
@@ -12,11 +15,9 @@ import { ProviderMark } from "./ProviderMark";
  * last used provider first and shows its name (cloud.css), so nothing shifts after hydration.
  * The `title` (a tooltip, no layout) is set after mount.
  */
-export type CloudRowProps = { providers: readonly CloudProvider[]; onOpen: (p: CloudProvider, trigger: HTMLElement) => void };
-
-export function CloudRow({ providers, onOpen }: CloudRowProps) {
+export function CloudRow() {
   const [last, setLast] = useState<CloudProvider | null>(null);
-  useEffect(() => setLast(readLast(providers)), [providers]);
+  useEffect(() => setLast(readLast(providers)), []);
   if (!providers.length) return null;
   return (
     <div role="group" aria-label={cloudCopy.rowLabel} className="ip-cloud-row" data-testid="cloud-row">
@@ -27,7 +28,7 @@ export function CloudRow({ providers, onOpen }: CloudRowProps) {
           className="ip-cloud-glyph"
           data-p={p}
           title={last === p ? cloudCopy.lastUsedTitle : providerName[p]}
-          onClick={(e) => onOpen(p, e.currentTarget)}
+          onClick={(e) => openCloud(p, e.currentTarget)}
         >
           <ProviderMark provider={p} size={22} />
           <span className="ip-cloud-name">

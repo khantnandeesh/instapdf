@@ -1,20 +1,21 @@
 "use client";
 import "./cloud.css";
 import { useRef } from "react";
-import type { CloudProvider } from "@/lib/cloud/providers";
-import { MenuButton, type MenuButtonHandle } from "../ui/Menu";
+import { configuredProviders } from "@/lib/cloud/providers";
+import { MenuButton, type MenuButtonHandle } from "./CloudMenu";
 import { ChevronDownIcon } from "../ui/icons";
 import { cx } from "../ui/cx";
 import { cloudCopy } from "./copy";
+import { openCloud } from "./intake-engine";
 import { cloudFootnote, providerItems } from "./items";
 
+const providers = configuredProviders();
+
 export type SourceCaretProps = {
-  providers: readonly CloudProvider[];
   look: "primary" | "tool";
   /** Toolbar of a single-file tool: the clouds replace the file. */
   replace?: boolean;
   className?: string;
-  onOpen: (p: CloudProvider, trigger: HTMLElement | null) => void;
   disabled?: boolean;
 };
 
@@ -23,8 +24,9 @@ export type SourceCaretProps = {
  * Menu-button pattern (U-7); a popover from 640 px, a sheet above the dock below it.
  * The provider window opens inside the item's click handler (user activation).
  */
-export function SourceCaret({ providers, look, replace, onOpen, disabled, className }: SourceCaretProps) {
+export function SourceCaret({ look, replace, disabled, className }: SourceCaretProps) {
   const ref = useRef<MenuButtonHandle>(null);
+  if (!providers.length) return null;
   const label = look === "primary" ? cloudCopy.caret(providers) : cloudCopy.caretToolbar(providers, !!replace);
   return (
     <MenuButton
@@ -36,7 +38,7 @@ export function SourceCaret({ providers, look, replace, onOpen, disabled, classN
       popupClassName="ip-menu-wide"
       disabled={disabled}
       className={cx("mp-btn ip-split__caret", look === "primary" ? "mp-btn--lg" : "mp-btn--tool", className)}
-      items={providerItems(providers, (p) => onOpen(p, ref.current?.element ?? null))}
+      items={providerItems(providers, (p) => openCloud(p, ref.current?.element ?? null, { replace }))}
       footnote={cloudFootnote()}
       data-testid={look === "primary" ? "cloud-caret" : "cloud-caret-toolbar"}
     >

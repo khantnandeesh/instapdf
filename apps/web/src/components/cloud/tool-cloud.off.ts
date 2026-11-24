@@ -1,6 +1,5 @@
-/** F23 off: what tool-cloud.ts becomes in builds without NEXT_PUBLIC_CLOUD_SOURCES=1 (next.config.ts). */
+// F23 off (next.config.ts swaps this in for tool-cloud.ts): nothing ships, and nothing calls it.
 import type * as On from "./tool-cloud";
-import { useNoCloud } from "./off";
 
-export const useCloud: typeof On.useCloud = useNoCloud;
-export const cloudMenus: typeof On.cloudMenus = null;
+export const useCloud = null as unknown as typeof On.useCloud;
+export const cloudReady = false;

@@ -37,7 +37,7 @@ export const FilePicker = forwardRef<
   }));
   return (
     // With a `sources` slot (F23 caret) the two halves form one split button (components/cloud/cloud.css).
-    <span className={sources ? `ip-split inline-flex ${variant === "tool" ? "ip-split--tool" : "ip-split--lg"}` : "inline-flex"}>
+    <span className={process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && sources ? `ip-split inline-flex ${variant === "tool" ? "ip-split--tool" : "ip-split--lg"}` : "inline-flex"}>
       <Button
         ref={button}
         variant={variant}

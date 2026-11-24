@@ -43,8 +43,12 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   webpack(config, { webpack }) {
     // F23 off (the default): tool pages get the no-op cloud module, so none of the cloud code ships.
+    // The /cloud window page gets a stub too, so its adapters (and MSAL) are not even async chunks.
     if (process.env.NEXT_PUBLIC_CLOUD_SOURCES !== "1")
-      config.plugins.push(new webpack.NormalModuleReplacementPlugin(/[\\/]cloud[\\/]tool-cloud$/, join(__dirname, "src/components/cloud/tool-cloud.off.ts")));
+      config.plugins.push(
+        new webpack.NormalModuleReplacementPlugin(/[\\/]cloud[\\/]tool-cloud$/, join(__dirname, "src/components/cloud/tool-cloud.off.ts")),
+        new webpack.NormalModuleReplacementPlugin(/[\\/]cloud[\\/]window[\\/]CloudWindow$/, join(__dirname, "src/components/cloud/window/CloudWindow.off.tsx")),
+      );
     return config;
   },
   async rewrites() {

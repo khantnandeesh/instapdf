@@ -3,7 +3,7 @@
  * these, and the bundler can drop them from builds without NEXT_PUBLIC_CLOUD_SOURCES.
  */
 import { providerName, type CloudProvider } from "@/lib/cloud/providers";
-import type { MenuEntry } from "../ui/Menu";
+import type { MenuEntry } from "./CloudMenu";
 import { ShieldIcon } from "../ui/icons";
 import { cloudCopy } from "./copy";
 import { OutIcon, ProviderMark } from "./ProviderMark";

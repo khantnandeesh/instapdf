@@ -179,6 +179,13 @@
   .mp-menu.ip-menu-wide {
     min-width: 248px;
   }
+  /* Plain CSS, not utilities: a utility only cloud code uses would land in the site-wide sheet. */
+  .mp-menu.ip-cmenu {
+    inset: auto;
+  }
+  .ip-menu-group {
+    line-height: 18px;
+  }
   /* < 640 px: a sheet that rises from the top edge of the dock and never covers it (U-3). */
   /* !important: the popup's own Tailwind utilities (inset-auto, max-w-…) sit in a later layer. */
   .mp-menu.ip-menu-sheet {
@@ -355,6 +362,16 @@
   .ip-cw__close {
     margin-inline-start: auto;
   }
+  /* The tool tab stopped answering mid-pick: a strip under the header, over whatever is shown. */
+  .ip-cw__banner {
+    margin: 0 12px 8px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    background: var(--band);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 20px;
+  }
   .ip-cw__main {
     flex: 1;
     display: grid;
@@ -457,6 +474,12 @@
     background: var(--mp-alert-ok-bg);
     color: var(--leaf);
     animation: mp-pop-in 400ms var(--ease-pop) 160ms both;
+  }
+  .ip-cw__ring {
+    color: var(--brand);
+  }
+  .ip-cw__retry {
+    justify-self: start;
   }
   .ip-cw__mock {
     width: 100%;

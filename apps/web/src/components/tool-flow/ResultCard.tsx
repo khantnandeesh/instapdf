@@ -8,20 +8,19 @@ import { renderPage } from "@/lib/pdf/thumbnails";
 import type { FlowTool } from "@/tools/registry";
 import { Button, buttonClasses } from "../ui/Button";
 import { BerryLoader } from "../berry/Berry";
-import { CheckIcon, DownloadIcon, FilesIcon, ShareIcon } from "../ui/icons";
+import { CheckIcon, DownloadIcon, FilesIcon, ShareIcon, ShieldIcon } from "../ui/icons";
 import { Notice } from "../ui/Notice";
 import { copy } from "./copy";
 import { PrivacyNote } from "./notes";
 import type { FlowNoticeInput, ToolOutput } from "./types";
-import { configuredProviders, SAVE_PROVIDERS, type CloudProvider } from "@/lib/cloud/providers";
-import { cloudCopy } from "../cloud/copy";
 import type { SaveToCloudProps } from "../cloud/SaveToCloud";
+import type { CloudState } from "../cloud/tool-cloud";
 
 /** F23: a build-time constant (DefinePlugin), so builds without cloud sources drop that code. */
 const CLOUD_ON = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1";
 // Its own chunk (ToolFlow preloads it once files are in), so the idle-prefetched result chunk stays small.
 const SaveToCloud: ComponentType<SaveToCloudProps> | null =
-  process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? dynamic(() => import("../cloud/SaveToCloud").then((m) => m.SaveToCloud), { ssr: false }) : null;
+  process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? dynamic(() => import("../cloud/ui").then((m) => m.SaveToCloud), { ssr: false }) : null;
 
 export function ResultCard({
   output,
@@ -40,11 +39,12 @@ export function ResultCard({
   onStartOver: () => void;
   onBack: () => void;
   announce: (message: string) => void;
-  /** F23: save to a cloud, and the provider any input came from (for the privacy line, AC-131). */
-  cloud?: { pushNotice: (n: Omit<FlowNoticeInput, "id">) => string; from: CloudProvider | null };
+  /** F23: save to a cloud, and the inputs (the privacy line names a cloud any came from, AC-131). */
+  cloud?: { pushNotice: (n: Omit<FlowNoticeInput, "id">) => string; sources: Blob[]; state: CloudState };
 }) {
-  const [savedTo, setSavedTo] = useState<CloudProvider | null>(null);
-  const savable = CLOUD_ON && cloud ? SAVE_PROVIDERS.filter((p) => configuredProviders().includes(p)) : [];
+  // F23: the privacy line once a copy went to a cloud (SaveToCloud words it).
+  const [savedLine, setSavedLine] = useState<string | null>(null);
+  const from = (CLOUD_ON && cloud?.sources.map((b) => cloud.state.origin?.(b)).find(Boolean)) || null;
   const download = useRef<HTMLAnchorElement>(null);
   const isZip = output.type === "application/zip";
   // Created in an effect and revoked in its cleanup, so StrictMode's double
@@ -127,15 +127,14 @@ export function ResultCard({
                 Download
               </span>
             </a>
-            {SaveToCloud && cloud && savable.length > 0 && (
+            {CLOUD_ON && SaveToCloud && cloud && (
               <SaveToCloud
                 file={file}
-                providers={savable}
-                preferred={cloud.from}
+                preferred={from}
                 toolName={tool.flow.title}
                 pushNotice={cloud.pushNotice}
                 announce={announce}
-                onSaved={setSavedTo}
+                onSaved={setSavedLine}
               />
             )}
             {canShare && (
@@ -152,13 +151,15 @@ export function ResultCard({
             )}
           </div>
           <div className="flex flex-col gap-2">
-            <PrivacyNote
-              runtime={tool.runtime}
-              context="result"
-              text={
-                !CLOUD_ON ? undefined : savedTo ? cloudCopy.resultPrivacySaved(savedTo) : cloud?.from ? cloudCopy.resultPrivacy(cloud.from) : undefined
-              }
-            />
+            {CLOUD_ON && tool.runtime === "client" && (savedLine ?? (from && cloud?.state.privacy?.(from))) ? (
+              // F23: the privacy line names the cloud the files came from or went to (PrivacyNote's look).
+              <p className="flex items-center gap-2 text-sm text-ink" data-testid="privacy-result">
+                <ShieldIcon size={18} className="shrink-0 text-brand-strong" />
+                {savedLine ?? (from && cloud?.state.privacy?.(from))}
+              </p>
+            ) : (
+              <PrivacyNote runtime={tool.runtime} context="result" />
+            )}
             {output.wasEncrypted && <Notice tone="warning">{copy.resultUnencrypted}</Notice>}
           </div>
           {!isZip && continueTargets.length > 0 && (

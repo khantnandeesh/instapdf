@@ -3,15 +3,16 @@ import "./cloud.css";
 import { useEffect, useRef, useState } from "react";
 import { openCloudWindow, type CloudSession } from "@/lib/cloud/client";
 import { newRequestId } from "@/lib/cloud/protocol";
-import { routeFor, type CloudProvider } from "@/lib/cloud/providers";
+import { configuredProviders, routeFor, SAVE_PROVIDERS, type CloudProvider } from "@/lib/cloud/providers";
 import type { FlowNoticeInput } from "../tool-flow/types";
 import { buttonClasses } from "../ui/Button";
-import { MenuButton, type MenuButtonHandle } from "../ui/Menu";
+import { MenuButton, type MenuButtonHandle } from "./CloudMenu";
 import { CheckIcon, ChevronDownIcon } from "../ui/icons";
 import { cloudCopy } from "./copy";
 import { transferCopy } from "./transfer-copy";
 import { ProviderMark } from "./ProviderMark";
 import { cloudFootnote, providerItems } from "./items";
+import { cloudAction } from "./NoticeAction";
 
 /**
  * Result screen "Save to Drive" (spec U-2 E5, AC-160 to AC-164, AC-169): a `line` split next to
@@ -21,15 +22,18 @@ import { cloudFootnote, providerItems } from "./items";
  */
 export type SaveToCloudProps = {
   file: File;
-  providers: readonly CloudProvider[];
   preferred: CloudProvider | null;
   toolName: string;
   pushNotice: (n: Omit<FlowNoticeInput, "id">) => string;
   announce: (m: string) => void;
-  onSaved: (p: CloudProvider) => void;
+  /** After a save: the result's new privacy line. */
+  onSaved: (privacyLine: string) => void;
 };
 
-export function SaveToCloud({ file, providers, preferred, toolName, pushNotice, announce, onSaved }: SaveToCloudProps) {
+/** Providers the result can save to in this build. */
+const providers = SAVE_PROVIDERS.filter((p) => configuredProviders().includes(p));
+
+export function SaveToCloud({ file, preferred, toolName, pushNotice, announce, onSaved }: SaveToCloudProps) {
   const [busy, setBusy] = useState<{ p: CloudProvider; pct: number } | null>(null);
   const [saved, setSaved] = useState(false);
   const session = useRef<CloudSession | null>(null);
@@ -46,7 +50,7 @@ export function SaveToCloud({ file, providers, preferred, toolName, pushNotice, 
   function save(p: CloudProvider) {
     if (busy) return;
     const fail = () =>
-      pushNotice({ tone: "danger", title: transferCopy.saveFailed(p), body: transferCopy.saveFailedBody, action: { label: transferCopy.tryAgain, onClick: () => save(p) }, inlineAction: true });
+      pushNotice({ tone: "danger", title: transferCopy.saveFailed(p), body: transferCopy.saveFailedBody, action: cloudAction({ label: transferCopy.tryAgain, onClick: () => save(p) }) });
     if (navigator.onLine === false) {
       pushNotice({ tone: "info", title: cloudCopy.offline, body: cloudCopy.offlineBody(p) });
       return;
@@ -61,9 +65,9 @@ export function SaveToCloud({ file, providers, preferred, toolName, pushNotice, 
           done = true;
           setBusy(null);
           setSaved(true);
-          onSaved(p);
+          onSaved(transferCopy.resultPrivacySaved(p));
           announce(transferCopy.savedAlert(p, name));
-          pushNotice({ tone: "success", title: transferCopy.savedAlert(p, name), action: link ? { label: transferCopy.openIn(p), href: link } : undefined, inlineAction: true, timeoutMs: 8000 });
+          pushNotice({ tone: "success", title: transferCopy.savedAlert(p, name), action: link ? cloudAction({ label: transferCopy.openIn(p), href: link }) : undefined, timeoutMs: 8000 });
         },
         onError: () => {
           done = true;
@@ -78,7 +82,7 @@ export function SaveToCloud({ file, providers, preferred, toolName, pushNotice, 
       },
     );
     if (!s) {
-      pushNotice({ tone: "warning", title: transferCopy.blocked(p), body: transferCopy.blockedBody, action: { label: transferCopy.tryAgain, onClick: () => save(p), autoFocus: true }, inlineAction: true });
+      pushNotice({ tone: "warning", title: transferCopy.blocked(p), body: transferCopy.blockedBody, action: cloudAction({ label: transferCopy.tryAgain, onClick: () => save(p), autoFocus: true }) });
       return;
     }
     session.current = s;

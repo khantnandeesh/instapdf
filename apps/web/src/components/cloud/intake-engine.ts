@@ -1,16 +1,21 @@
 /**
- * F23: the part of the cloud intake that runs once a window is open (loaded on first use, so
- * tool pages do not ship it up front). Mirrors the window's downloads as cards, and hands every
- * file that passes the protocol and screening checks to `intake` in the order a local batch would
- * have. Waiting, blocked, unreachable, denied and offline states float as notices (no alert()).
+ * F23: the cloud intake behind tool-cloud.ts, in the cloud controls' chunk (ui.ts, never in a tool
+ * page's first-load JS). Opens the `/cloud/<route>` window in the click, mirrors the window's
+ * downloads as cards, and hands every file that passes the protocol and screening checks to `intake`
+ * in the order a local batch would have. Waiting, blocked, unreachable, denied and offline states
+ * float as notices (no alert()).
  */
 import { openCloudWindow, type CloudSession } from "@/lib/cloud/client";
 import { writeLast } from "@/lib/cloud/last-used";
-import type { OpenedWindow, WindowParams } from "@/lib/cloud/opener";
-import { screenIncoming, type ErrorCode, type SkipReason } from "@/lib/cloud/protocol";
+import { MAX_FILES_PER_MESSAGE, newRequestId, screenIncoming, type ErrorCode, type SkipReason } from "@/lib/cloud/protocol";
 import { routeFor, type CloudProvider } from "@/lib/cloud/providers";
+import { copy } from "../tool-flow/copy";
+import { cloudCopy } from "./copy";
+import { busyIcon, cloudAction } from "./NoticeAction";
+import type { CloudCtrl, CloudDeps, CloudDownload, CloudOpenOptions } from "./tool-cloud";
 import { transferCopy } from "./transfer-copy";
-import { showOffline, type CloudOpenOptions, type Entry, type IntakeDeps } from "./useCloudIntake";
+
+type Entry = CloudDownload & { file?: File; resolved: boolean };
 
 type SessionState = {
   session: CloudSession;
@@ -23,39 +28,68 @@ type SessionState = {
   problems: string[];
   waitNotice: string | null;
   gotFiles: boolean;
-};
-
-export type IntakeHost = {
-  deps: () => IntakeDeps;
-  setEntries: (e: Entry[]) => void;
-  /** Remembers where an accepted file came from (AC-131). */
-  markOrigin: (file: File, provider: CloudProvider) => void;
+  /** Files the user stopped: whatever the window still sends for them is dropped. */
+  stopped: Set<string>;
+  /** At most this many distinct files per request (1 for a single-file tool). */
+  cap: number;
 };
 
 export type Begin = {
   provider: CloudProvider;
   trigger: HTMLElement | null;
   opts: CloudOpenOptions;
-  params: WindowParams;
-  /** The window opened in the click handler; null: the browser blocked it. */
-  opened: OpenedWindow | null;
   /** Opens again (runs synchronously in the notice button's click). */
   again: () => void;
 };
 
-export function createIntake(host: IntakeHost) {
-  const d = host.deps;
+/** The tool page's CloudCtrl (one ToolFlow per page; tool-cloud.ts hands it over once this chunk loads). */
+let page: CloudCtrl | undefined;
+export function attach(ctrl: CloudCtrl) {
+  page = ctrl;
+  ctrl.local = () => writeLast("device");
+}
+
+/** Opens a provider's window: call it synchronously in the click (the browser allows a window only then). */
+export function openCloud(provider: CloudProvider, trigger: HTMLElement | null, opts: CloudOpenOptions = {}) {
+  if (page) (page.intake ??= createIntake(page)).begin({ provider, trigger, opts, again: () => openCloud(provider, trigger, opts) });
+}
+
+/** The download cards' Stop and Retry. */
+export const stopDownload = (key: string) => page?.intake?.stop(key);
+export const retryDownload = (key: string) => page?.intake?.retry(key);
+
+const privacy = (p: CloudProvider) => transferCopy.resultPrivacy(p);
+/** Where each cloud file came from (the result's privacy line, AC-131). */
+const origins = new WeakMap<Blob, CloudProvider>();
+const origin = (file: Blob) => origins.get(file);
+
+export function createIntake(host: CloudCtrl) {
+  const d = () => host.deps as CloudDeps;
+  // The F1 intake's words for a skipped file, and for several problems at once.
+  const describeSkip = (name: string, reason: "type" | "size") =>
+    reason === "type" ? (d().errorType ?? copy.errorType)(name) : copy.errorSize(name, Math.round(d().tool.flow.maxFileBytes / 1024 / 1024));
   let entries: Entry[] = [];
+  const publish = () => {
+    const pending = entries.filter((e) => e.status !== "failed").length;
+    host.set({
+      downloads: entries.map(({ key, id, req, name, provider, status, loaded, total }) => ({ key, id, req, name, provider, status, loaded, total })),
+      pending,
+      statusText: pending && entries[0] ? transferCopy.status(pending, entries[0].provider) : null,
+      privacy,
+      origin,
+    });
+  };
   const update = (fn: (prev: Entry[]) => Entry[]) => {
     entries = fn(entries);
-    host.setEntries(entries);
+    publish();
   };
+  publish();
   const sessions = new Map<string, SessionState>();
 
   const flush = (s: SessionState) => {
     if (!s.problems.length) return;
     const p = s.problems.splice(0);
-    d().pushNotice(p.length === 1 ? { tone: "danger", title: p[0] } : { tone: "danger", title: d().problemsTitle(p.length), items: p });
+    d().pushNotice(p.length === 1 ? { tone: "danger", title: p[0] } : { tone: "danger", title: copy.problemsTitle(p.length), items: p });
   };
 
   /** Hands over the longest run of finished files at the front of the request's order. */
@@ -98,15 +132,19 @@ export function createIntake(host: IntakeHost) {
 
   const showError = (p: CloudProvider, code: ErrorCode | "blocked", retry: () => void) => {
     const n = d();
-    if (code === "blocked") n.pushNotice({ tone: "warning", title: transferCopy.blocked(p), body: transferCopy.blockedBody, action: { label: transferCopy.tryAgain, onClick: retry, autoFocus: true }, inlineAction: true, sticky: true });
-    else if (code === "offline") showOffline(n, p);
-    else if (code === "denied") n.pushNotice({ tone: "warning", title: transferCopy.denied(p), body: transferCopy.deniedBody, action: { label: transferCopy.tryAgain, onClick: retry }, inlineAction: true, sticky: true });
-    else n.pushNotice({ tone: "danger", title: transferCopy.unreachable(p), body: transferCopy.unreachableBody, action: { label: transferCopy.tryAgain, onClick: retry }, inlineAction: true });
+    if (code === "blocked") n.pushNotice({ tone: "warning", title: transferCopy.blocked(p), body: transferCopy.blockedBody, action: cloudAction({ label: transferCopy.tryAgain, onClick: retry, autoFocus: true }), sticky: true });
+    else if (code === "offline") n.pushNotice({ tone: "info", title: cloudCopy.offline, body: cloudCopy.offlineBody(p), sticky: true });
+    else if (code === "denied") n.pushNotice({ tone: "warning", title: transferCopy.denied(p), body: transferCopy.deniedBody, action: cloudAction({ label: transferCopy.tryAgain, onClick: retry }), sticky: true });
+    else n.pushNotice({ tone: "danger", title: transferCopy.unreachable(p), body: transferCopy.unreachableBody, action: cloudAction({ label: transferCopy.tryAgain, onClick: retry }) });
   };
 
-  function begin({ provider, trigger, opts, params, opened, again }: Begin) {
+  const skipText = (name: string, reason: SkipReason, p: CloudProvider) =>
+    reason === "access" ? transferCopy.notAccessible(name, p) : reason === "export" ? transferCopy.exportTooBig(name, p) : describeSkip(name, reason);
+
+  function begin({ provider, trigger, opts, again }: Begin) {
     const { tool, announce, pushNotice, dismissNotice } = d();
-    if (opened === null) return showError(provider, "blocked", again);
+    if (navigator.onLine === false) return showError(provider, "offline", again);
+    const req = newRequestId();
     // One cloud window at a time: a window still waiting for a pick is replaced.
     for (const [r, s] of sessions) {
       if (!entries.some((e) => e.req === r) && !s.gotFiles) {
@@ -115,16 +153,19 @@ export function createIntake(host: IntakeHost) {
         sessions.delete(r);
       }
     }
-    const req = params.req;
-    const limits = { accept: tool.flow.accept, maxFileBytes: tool.flow.maxFileBytes, multiple: params.multiple };
+    const multiple = opts.multiple ?? tool.flow.multiFile;
+    const params = { req, accept: tool.flow.accept.extensions.map((e) => e.toLowerCase()), multiple, max: tool.flow.maxFileBytes, tool: tool.flow.title, provider };
+    const limits = { accept: tool.flow.accept, maxFileBytes: tool.flow.maxFileBytes, multiple };
     const box: { s?: SessionState } = {};
+    /** A file this session still takes: not stopped, and within the request's file cap. */
+    const takes = (s: SessionState, id: string) => !s.stopped.has(id) && (s.order.includes(id) || s.order.length < s.cap);
     const session = openCloudWindow(
       routeFor(provider),
       params,
       {
         onProgress: (id, name, loaded, total) => {
           const s = box.s;
-          if (!s) return;
+          if (!s || !takes(s, id)) return;
           if (s.waitNotice) {
             dismissNotice(s.waitNotice);
             s.waitNotice = null;
@@ -147,16 +188,18 @@ export function createIntake(host: IntakeHost) {
             update((prev) => prev.map((e) => (e.key === key ? { ...e, loaded, total, status: "downloading" } : e)));
           }
         },
-        onFiles: (files) => {
+        onFiles: (all) => {
           const s = box.s;
           if (!s) return;
+          const files = all.filter((f) => takes(s, f.id));
+          if (!files.length) return;
           const screened = screenIncoming(
             files.map((f) => f.file),
             limits,
             s.received,
           );
           s.received += screened.accepted.length;
-          for (const sk of screened.skipped) s.problems.push(d().describeSkip(sk.name, sk.reason === "access" ? "type" : sk.reason));
+          for (const sk of screened.skipped) s.problems.push(describeSkip(sk.name, sk.reason === "size" ? "size" : "type"));
           const ok = new Set(screened.accepted);
           for (const { id, file } of files) {
             const key = `${req}:${id}`;
@@ -164,7 +207,7 @@ export function createIntake(host: IntakeHost) {
               s.order.push(id);
               update((prev) => [...prev, { key, id, req, name: file.name, provider, loaded: file.size, total: file.size, status: "arrived", resolved: false }]);
             }
-            if (ok.has(file)) host.markOrigin(file, provider);
+            if (ok.has(file)) origins.set(file, provider);
             update((prev) => prev.map((e) => (e.key === key ? { ...e, status: "arrived", loaded: e.total || file.size, file: ok.has(file) ? file : undefined, resolved: true } : e)));
           }
           deliver(s);
@@ -173,13 +216,15 @@ export function createIntake(host: IntakeHost) {
           const s = box.s;
           if (!s) return;
           for (const it of items) {
-            s.problems.push(it.reason === "access" ? transferCopy.notAccessible(it.name, provider) : d().describeSkip(it.name, it.reason as Exclude<SkipReason, "access">));
+            if (it.id && s.stopped.has(it.id)) continue;
+            s.problems.push(skipText(it.name, it.reason, provider));
             const e = it.id ? entries.find((x) => x.key === `${req}:${it.id}`) : undefined;
             if (e) e.resolved = true;
           }
           deliver(s);
         },
         onFailed: (id, name) => {
+          if (box.s?.stopped.has(id)) return;
           update((prev) => prev.map((e) => (e.key === `${req}:${id}` ? { ...e, status: "failed" } : e)));
           announce(transferCopy.liveStopped(name));
         },
@@ -194,24 +239,37 @@ export function createIntake(host: IntakeHost) {
         onDone: () => endSession(req, "done"),
         onClosed: (reason) => endSession(req, reason),
       },
-      { opened },
     );
     if (!session) return showError(provider, "blocked", again);
-    const state: SessionState = { session, provider, trigger, opts, order: [], delivered: 0, received: 0, problems: [], waitNotice: null, gotFiles: false };
+    const state: SessionState = {
+      session,
+      provider,
+      trigger,
+      opts,
+      order: [],
+      delivered: 0,
+      received: 0,
+      problems: [],
+      waitNotice: null,
+      gotFiles: false,
+      stopped: new Set(),
+      cap: multiple ? MAX_FILES_PER_MESSAGE : 1,
+    };
     box.s = state;
     state.waitNotice = pushNotice({
       tone: "info",
       title: transferCopy.waiting(provider),
-      busy: true,
       sticky: true,
-      inlineAction: true,
-      action: {
-        label: transferCopy.cancel,
-        onClick: () => {
-          session.cancel();
-          endSession(req, "cancel");
+      action: cloudAction(
+        {
+          label: transferCopy.cancel,
+          onClick: () => {
+            session.cancel();
+            endSession(req, "cancel");
+          },
         },
-      },
+        busyIcon,
+      ),
     });
     sessions.set(req, state);
     announce(transferCopy.liveOpening(provider));
@@ -223,6 +281,7 @@ export function createIntake(host: IntakeHost) {
       const e = entries.find((x) => x.key === key);
       if (!e) return;
       const s = sessions.get(e.req);
+      s?.stopped.add(e.id);
       s?.session.stop(e.id);
       e.resolved = true;
       update((prev) => prev.filter((x) => x.key !== key));

@@ -2,7 +2,13 @@
 import { formatBytes } from "@/lib/pdf/naming";
 import { providerName, providerShort, type CloudProvider } from "@/lib/cloud/providers";
 
+const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+
 export const transferCopy = {
+  status: (n: number, p: CloudProvider) => `Getting ${plural(n, "file")} from ${providerName[p]}…`,
+  resultPrivacy: (p: CloudProvider) => `Done on this device, straight from ${providerName[p]}. Never uploaded.`,
+  /** The result privacy line once a copy went to the cloud: still true (spec D-5). */
+  resultPrivacySaved: (p: CloudProvider) => `Done on this device. A copy was sent from this browser to your ${providerName[p]}; we never saw it.`,
   saveFootnote: "Goes from this device to your cloud.",
   waiting: (p: CloudProvider) => `Waiting for ${providerName[p]}…`,
   cancel: "Cancel",
@@ -13,6 +19,7 @@ export const transferCopy = {
   unreachableBody: "Files on this device still work.",
   denied: (p: CloudProvider) => `${providerName[p]} access wasn't given.`,
   deniedBody: "We can only open files you allow.",
+  exportTooBig: (name: string, p: CloudProvider) => `${name} is too large for ${providerName[p]} to turn into a PDF. Download it there as a PDF and add that file.`,
   notAccessible: (name: string, p: CloudProvider) => `${name} can't be opened from ${providerName[p]}. Check that you can open it there.`,
   cardBytes: (loaded: number, total: number) => (total > 0 ? `${formatBytes(loaded)} of ${formatBytes(total)}` : formatBytes(loaded)),
   cardPercent: (pct: number) => `${pct}%`,
