@@ -1,6 +1,26 @@
 @import "tailwindcss";
 @import "../styles/tokens.css";
 
+/* Tool options layout (docs/design/berrypdf.md "Fit the first screen", rule 6). The ControlDock says
+   which layout it is in with data-ip-dock: "side" (the tall options panel, empty state from 1024 px)
+   or "bar" (one compact row docked at the bottom: phones and tablets always, desktop once a file is
+   loaded so the pages get the screen). Options use these instead of lg:/max-lg: for their layout. */
+@custom-variant dock-side {
+  @media (width >= 64rem) {
+    &:where([data-ip-dock="side"] *) {
+      @slot;
+    }
+  }
+}
+@custom-variant dock-bar {
+  @media (width < 64rem) {
+    @slot;
+  }
+  &:where([data-ip-dock="bar"] *) {
+    @slot;
+  }
+}
+
 /*
  * BerryPDF components and motifs (docs/design/berrypdf.md). Class names follow BerryPDF's `mp-`
  * bundle and its values are the bundle's. Where we deviate for WCAG AA the rule says so and the
@@ -1491,10 +1511,20 @@
   }
 }
 
-/* Tool pages: below 1024 px the F1 dock is fixed at the bottom; keep the footer's end clear of it. */
+/* Tool pages: below 1024 px (and on desktop once a file is loaded) the F1 dock is fixed at the bottom;
+   keep the footer's end clear of it. */
 @media (max-width: 1023px) {
   body:has([data-ip-dock]) .ip-site-footer {
     padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);
+  }
+}
+body:has([data-ip-dock="bar"]) .ip-site-footer {
+  padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);
+}
+/* The desktop bottom bar rises in once a file is loaded (reduced motion: the global rule drops it). */
+@media (min-width: 1024px) {
+  .mp-dock-bar {
+    animation: mp-fade-up 320ms var(--ease-enter) both;
   }
 }
 
@@ -1594,12 +1624,46 @@
    it and soft shadows at the cut edges say so. Pure CSS (background-attachment: local covers the
    shadow while the content is at that end), so the strict CSP and reduced motion need nothing. */
 @media (min-width: 1024px) {
-  .ip-dock-scroll {
+  [data-ip-dock="side"] .ip-dock-scroll {
     overscroll-behavior: contain;
     background:
       linear-gradient(var(--ip-surface-raised) 30%, transparent) top / 100% 24px no-repeat local,
       linear-gradient(transparent, var(--ip-surface-raised) 70%) bottom / 100% 24px no-repeat local,
       radial-gradient(farthest-side at 50% 0, rgb(0 0 0 / 0.1), transparent) top / 100% 10px no-repeat scroll,
       radial-gradient(farthest-side at 50% 100%, rgb(0 0 0 / 0.1), transparent) bottom / 100% 10px no-repeat scroll;
+  }
+}
+
+/* The pages' own scroll area (>= 1024 px): a slim, squarish BerryPDF scroll bar, shown only when the
+   pages overflow (overflow-y: auto). Chrome/Safari/Edge get the shaped bar; Firefox gets the thin
+   coloured one (it has no shape control). */
+@media (min-width: 1024px) {
+  .ip-scroll {
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    .ip-scroll {
+      scrollbar-width: thin;
+      scrollbar-color: var(--subtle) transparent;
+    }
+  }
+  .ip-scroll::-webkit-scrollbar {
+    width: 10px;
+  }
+  .ip-scroll::-webkit-scrollbar-track {
+    margin-block: 6px;
+    background: transparent;
+  }
+  .ip-scroll::-webkit-scrollbar-thumb {
+    border: 2px solid var(--cream);
+    border-radius: 4px;
+    background: var(--subtle);
+  }
+  .ip-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--brand-bright);
+  }
+  .ip-scroll::-webkit-scrollbar-thumb:active {
+    background: var(--brand);
   }
 }

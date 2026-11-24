@@ -101,11 +101,23 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
   const renderer = useMemo(() => (typeof window === "undefined" ? null : new ThumbnailRenderer()), []);
   const [watcher, setWatcher] = useState<ReturnType<typeof createVisibilityWatcher> | null>(null);
   // Set once listeners (drop, paste, hand-off) are live: tests wait for data-hydrated.
+  // From 1024 px the pages scroll inside their own area (fold fit), so thumbnails are watched
+  // against that area; below, the page itself scrolls and the viewport is the root.
+  const [scrollArea, setScrollArea] = useState<HTMLDivElement | null>(null);
+  const [wide, setWide] = useState(false);
   useEffect(() => {
-    const w = createVisibilityWatcher();
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setWide(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  const watchRoot = wide ? scrollArea : null;
+  useEffect(() => {
+    const w = createVisibilityWatcher(watchRoot);
     setWatcher(w);
     return () => w.disconnect();
-  }, []);
+  }, [watchRoot]);
 
   const heading = useRef<HTMLHeadingElement>(null);
   const picker = useRef<FilePickerHandle>(null);
@@ -544,7 +556,9 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
           announce={announce}
         />
       ) : (
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]">
+        // Empty: the drop area and the tall options panel side by side (both --ip-work-h, fit the
+        // first screen). Loaded: the pages take the full width down to the compact bottom bar.
+        <div className={state === "empty" ? "lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]" : undefined}>
           <section aria-label="Your files" className="min-w-0">
             {state === "empty" ? (
               <DropCard>
@@ -564,8 +578,11 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
             ) : (
               // BerryPDF working mode: plain seed-cream, no decoration. A sticky row of editing tools
               // (blueberry EditorToolbar look, Tabs for the view) above the pink page trays.
-              <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 sm:px-5">
-                <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] items-center gap-4 rounded-t-panel bg-cream px-3 sm:-mx-5 sm:px-5">
+              // From 1024 px the area fills the screen down to the bottom bar (--ip-pages-h)
+              // and the pages scroll inside it with a slim BerryPDF scroll bar (shown only on overflow);
+              // below 1024 px the page scrolls and the tools row sticks under the header.
+              <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 sm:px-5 lg:flex lg:h-(--ip-pages-h) lg:flex-col">
+                <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] shrink-0 items-center gap-4 rounded-t-panel bg-cream px-3 sm:-mx-5 sm:px-5 lg:static">
                   {files.length > 1 && (
                     <SegmentedControl
                       look="tabs"
@@ -606,7 +623,13 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
                     />
                   </span>
                 </div>
-                <div className="flex flex-col gap-4 pt-3 pb-6" style={{ minHeight: "calc(var(--ip-thumb-size) + 76px)" }} inert={state === "processing" ? true : undefined}>
+                <div
+                  ref={setScrollArea}
+                  data-testid="pages-scroll"
+                  className="ip-scroll flex flex-col gap-4 pt-3 pb-6 lg:-mx-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5"
+                  style={{ minHeight: "calc(var(--ip-thumb-size) + 76px)" }}
+                  inert={state === "processing" ? true : undefined}
+                >
                   {ownerBlocked.map((f) => (
                     <OwnerPermissionNotice
                       key={f.id}
@@ -657,6 +680,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
 
           <ControlDock
             label={`${tool.name} options`}
+            layout={state === "empty" ? "side" : "bar"}
             optionsDisabled={optionsDisabled}
             options={renderOptions(ctx)}
             status={<DockStatus id={statusId} text={statusText} extra={state === "ready" && runCheck === true ? readyNote : undefined} />}

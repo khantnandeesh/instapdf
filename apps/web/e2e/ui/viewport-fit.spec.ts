@@ -1,7 +1,8 @@
 /**
- * Fold fit (docs/design/berrypdf.md "Fit the first screen"): on every usable tool page the whole
- * working UI, and above all the primary action, is visible on load without scrolling, and stays
- * visible after a file is loaded and the page is scrolled.
+ * Fold fit (docs/design/berrypdf.md "Fit the first screen"): on every usable tool page the title,
+ * drop area, options panel and primary action are visible on load without scrolling; after a file
+ * loads the pages scroll in their own area (desktop) or the page scrolls (phones) and the primary
+ * action stays in view; Download is in view on the result.
  *
  * Desktop sizes include real browser viewports (screen minus browser chrome), which are shorter
  * than the screen resolution: a 1366x768 laptop shows about 1366x657 of page.
@@ -63,21 +64,42 @@ async function noHorizontalScroll(page: Page) {
 for (const tool of usable) {
   test.describe(`fold fit: ${tool.slug}`, () => {
     for (const [width, height] of DESKTOP) {
-      test(`desktop ${width}x${height}: picker and primary action visible on load, primary stays in view when loaded, Download in view on the result`, async ({ page }, info) => {
+      test(`desktop ${width}x${height}: picker and primary action visible on load, options fold to a bottom bar and pages fill the screen, page preview and Download fit`, async ({ page }, info) => {
         test.skip(info.project.name !== "desktop", "desktop sizes run in the desktop project");
         await page.setViewportSize({ width, height });
         await open(page, tool.slug);
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (empty state)");
         await expectInViewport(page, page.getByTestId("drop-card").getByRole("button").first(), "file picker");
         await expectInViewport(page, page.getByTestId("dock-status"), "status line");
+        await expectInViewport(page, page.locator("[data-ip-dock]"), "options panel");
+        await expectInViewport(page, page.getByTestId("drop-card"), "drop area");
+        const title = await page.getByRole("heading", { level: 1 }).boundingBox();
+        expect(title!.height, "tool title fits on one line (the head has a fixed height)").toBeLessThanOrEqual(44);
         await noHorizontalScroll(page);
 
         await page.getByTestId("file-input").setInputFiles(fx("sixty-pages.pdf"));
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded)");
+        // Loaded: the options fold into the compact bottom bar and the pages get most of the screen.
+        await expect(page.locator("[data-ip-dock]")).toHaveAttribute("data-ip-dock", "bar");
+        await expectInViewport(page, page.getByTestId("dock-options"), "options in the bottom bar");
+        const pages = page.getByTestId("pages-scroll");
+        await expectInViewport(page, pages, "pages area");
+        const box = (await pages.boundingBox())!;
+        expect(box.width, "pages use the full content width").toBeGreaterThanOrEqual(Math.min(width, 1280) - 120);
+        expect(box.height, "pages get at least half of the screen height").toBeGreaterThanOrEqual(height * 0.5 - 40);
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
         await page.mouse.wheel(0, 3000);
-        await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-        await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded, scrolled)");
+        await expect.poll(() => pages.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+        await expect.poll(() => page.evaluate(() => window.scrollY), { message: "the page itself does not scroll" }).toBe(0);
+        await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded, pages scrolled)");
+        await expectInViewport(page, page.getByRole("button", { name: /Add files|Replace file/ }), "add files (loaded, pages scrolled)");
+
+        // The bigger page view fits too: its buttons are on screen.
+        await page.getByRole("button", { name: /^Page 1 of/ }).click();
+        await expectInViewport(page, page.getByRole("dialog").getByRole("button", { name: "Close" }), "Close in the page preview");
+        await expectInViewport(page, page.getByRole("dialog").getByRole("button", { name: "Next" }), "Next in the page preview");
+        await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
 
         await page.getByTestId("primary-action").click();
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "done", { timeout: 30_000 });
@@ -92,11 +114,18 @@ for (const tool of usable) {
         await open(page, tool.slug);
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (empty state)");
         await expectInViewport(page, page.getByTestId("drop-card").getByRole("button").first(), "file picker");
+        await expectInViewport(page, page.getByTestId("privacy-intro"), "privacy line");
         await noHorizontalScroll(page);
 
         await page.getByTestId("file-input").setInputFiles(fx("sixty-pages.pdf"));
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded)");
+        await page.getByRole("button", { name: /^Page 1 of/ }).click();
+        await expectInViewport(page, page.getByRole("dialog").getByRole("button", { name: "Close" }), "Close in the page preview");
+        await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+        await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded, scrolled)");
       });
     }
   });

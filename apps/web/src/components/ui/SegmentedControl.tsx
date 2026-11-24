@@ -70,7 +70,7 @@ export function SegmentedControl<T extends string>({
             disabled={disabled}
             onClick={() => onChange(o.value)}
             className={cx(
-              tiles ? "mp-choice min-w-0 px-2 py-4 max-lg:flex-row max-lg:gap-1.5 max-lg:py-2.5" : tabs ? "mp-tab" : "mp-btn mp-btn--tool flex-1",
+              tiles ? "mp-choice min-w-0 px-2 py-4 dock-bar:flex-row dock-bar:gap-1.5 dock-bar:py-2.5" : tabs ? "mp-tab" : "mp-btn mp-btn--tool flex-1",
               checked && "ip-seg-checked",
             )}
             // The toolbar look shows the pressed state through aria-checked styling below.
