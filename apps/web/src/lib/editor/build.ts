@@ -15,6 +15,7 @@
  */
 import {
   LineCapStyle,
+  PDFDict,
   PDFDocument,
   PDFHexString,
   PDFName,
@@ -42,6 +43,7 @@ import {
   type PDFRef,
   LineJoinStyle,
 } from "@cantoo/pdf-lib";
+import type { FormState } from "@/lib/forms/types";
 import { covers, faceOf, type EditorFontManifest, type FaceEntry } from "./fonts";
 import { norm360, pageSize, totalRotation, type EditorObject, type InkObj, type MarkupObj, type PageEntry, type Pt } from "./model";
 import { alignOffset, baselineOffset } from "./text-layout";
@@ -59,6 +61,8 @@ export type BuildInput = {
   pages: PageEntry[];
   objects: EditorObject[];
   assets: Record<string, Asset>;
+  /** Form fields (lib/forms): the form now and as it was read from the file. Absent: left as is. */
+  forms?: { state: FormState; original: FormState };
   /** Library and user faces the objects use (fonts-browser fontsForBuild), and the user's own font bytes. */
   fonts?: { faces: EditorFontManifest["faces"]; bytes: Record<string, Uint8Array> };
 };
@@ -175,7 +179,12 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
 
   // ---- pages: order, copies, blanks, rotation ----
   const source = doc.getPages();
-  const used = new Set<number>();
+  // Each source page object goes to one entry: the original (id p<src>) when it is still there,
+  // else the first copy. The others are copies. So a copy moved before its original never takes
+  // the original's widgets (their /P and the form model both point at the original).
+  const ids = new Set(input.pages.map((p) => p.id));
+  const owner = new Map<number, string>();
+  for (const e of input.pages) if (e.src != null && !owner.has(e.src)) owner.set(e.src, ids.has(`p${e.src}`) ? `p${e.src}` : e.id);
   const out: PDFPage[] = [];
   for (const entry of input.pages) {
     let page: PDFPage;
@@ -183,11 +192,12 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
       page = PDFPage.create(doc);
       const { w, h } = pageSize(entry);
       page.setSize(w, h);
-    } else if (!used.has(entry.src)) {
-      used.add(entry.src);
+    } else if (owner.get(entry.src) === entry.id) {
       page = source[entry.src];
     } else {
       [page] = await doc.copyPages(doc, [entry.src]);
+      // The copy's widgets would be fields outside the form; the form model adds this page's own.
+      if (input.forms) dropWidgets(page);
     }
     out.push(page);
   }
@@ -309,9 +319,25 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
     }
   }
 
+  // ---- form fields (F16 E3): only when the form changed, so an untouched form stays as it was ----
+  if (input.forms && input.forms.state !== input.forms.original) {
+    const { applyForms } = await import("@/lib/forms/write");
+    await applyForms(doc, out, input.pages, input.forms.state, input.forms.original, { fonts: fonts.fallback, fontkit });
+  }
+
   doc.setProducer(PRODUCER);
   doc.setModificationDate(new Date());
   return doc.save();
+}
+
+/** Removes widget annotations from a copied page (see the page copy above). */
+function dropWidgets(page: PDFPage) {
+  const annots = page.node.Annots();
+  if (!annots) return;
+  for (let i = annots.size() - 1; i >= 0; i--) {
+    const a = annots.lookup(i);
+    if (a instanceof PDFDict && a.get(PDFName.of("Subtype")) === PDFName.of("Widget")) annots.remove(i);
+  }
 }
 
 /**

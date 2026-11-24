@@ -7,6 +7,7 @@
  * A property change on a selection applies live, is one undo step, and becomes that tool's
  * default for the next object (AC-96).
  */
+import { FormsToolOptions } from "@/tools/forms/EditorForms";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MenuButton, type MenuEntry } from "@/components/ui/Menu";
 import { cx } from "@/components/ui/cx";
@@ -567,6 +568,12 @@ export function ToolOptions({ compact }: { compact?: boolean }) {
   const tool = useStore(ctl.store, (s) => s.tool);
   const d = useStore(ctl.store, (s) => s.defaults);
   const set = (patch: Partial<ToolDefaults>) => ctl.store.set((s) => ({ defaults: { ...s.defaults, ...patch } }));
+  if (tool === "form")
+    return (
+      <div key="form" className="ed-options">
+        <FormsToolOptions />
+      </div>
+    );
   let controls: Control[] = [];
   switch (tool) {
     case "text":
