@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { IconButton } from "../ui/IconButton";
-import { AlertIcon, EyeIcon, LockIcon } from "../ui/icons";
+import { AlertIcon, EyeIcon } from "../ui/icons";
 import { copy } from "./copy";
 
 /** Middle-truncates long names so the start and the extension stay visible. */
@@ -66,7 +66,6 @@ export function PasswordDialog({
       open={open}
       onClose={() => onSkip()}
       title={copy.pwTitle(middleTruncate(fileName))}
-      icon={<LockIcon />}
       initialFocusRef={input}
       fallbackFocus={fallbackFocus}
       description={

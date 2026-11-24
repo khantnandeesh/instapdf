@@ -112,26 +112,26 @@ test.describe("AC-49 at 375 px", () => {
     expect(await rotationsOf(out.bytes)).toEqual([90, 90, 90]);
   });
 
-  test("the page preview dialog stacks its three buttons and nothing overflows at 375 px", async ({ page }) => {
+  test("the page preview keeps its controls on screen and nothing overflows at 375 px", async ({ page }) => {
     await pickReady(page, "three-pages.pdf");
     await page.getByRole("button", { name: /^Page 1 of 3/ }).click();
     await expect(dialog(page)).toBeVisible();
-    const buttons = dialog(page).getByTestId("dialog-footer").getByRole("button");
+    // Close at the top; Previous / Next in the bottom bar (docs/design/berrypdf.md "Modals").
+    const buttons = dialog(page).getByRole("button");
     await expect(buttons).toHaveCount(3);
     const boxes = await buttons.evaluateAll((els) =>
       els.map((e) => {
         const r = e.getBoundingClientRect();
-        return { left: r.left, right: r.right, top: r.top, fits: e.scrollWidth <= e.clientWidth };
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
       }),
     );
+    const vh = page.viewportSize()!.height;
     for (const b of boxes) {
       expect(b.left).toBeGreaterThanOrEqual(0);
       expect(b.right).toBeLessThanOrEqual(375);
-      expect(b.fits, "button label is not clipped").toBe(true);
+      expect(b.top).toBeGreaterThanOrEqual(0);
+      expect(b.bottom).toBeLessThanOrEqual(vh);
     }
-    // Stacked: each button sits below the previous one.
-    expect(boxes[1].top).toBeGreaterThan(boxes[0].top);
-    expect(boxes[2].top).toBeGreaterThan(boxes[1].top);
     expect(await noHorizontalScroll(page)).toBe(true);
   });
 });

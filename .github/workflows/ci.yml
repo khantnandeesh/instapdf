@@ -12,8 +12,8 @@ concurrency:
 jobs:
   web:
     runs-on: ubuntu-latest
-    # Main takes about 17 min (15 of them e2e): 20 left no room (cancelled on PR #32).
-    timeout-minutes: 30
+    # The e2e suite alone now takes about 20 minutes on a runner (desktop and mobile), so 20 cancelled the job mid-run.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

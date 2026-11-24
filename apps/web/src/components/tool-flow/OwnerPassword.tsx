@@ -4,7 +4,7 @@ import type { Permission } from "@/tools/registry";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { IconButton } from "../ui/IconButton";
-import { AlertIcon, CloseIcon, EyeIcon, LockIcon } from "../ui/icons";
+import { AlertIcon, EyeIcon } from "../ui/icons";
 import { permissionLabels } from "./copy";
 
 // The notice is its own module: ToolFlow shows it from first load, while this dialog loads on demand.
@@ -36,10 +36,10 @@ export function OwnerPasswordDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      icon={<LockIcon />}
       title={`Owner password for ${fileName}`}
       description="The file's owner restricted what can be done with it. Enter the owner password to allow:"
       initialFocusRef={input}
+      onCloseButton={onClose}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -51,8 +51,7 @@ export function OwnerPasswordDialog({
         </>
       }
     >
-      <IconButton label="Close" size="sm" className="absolute top-3 right-3" tooltip={false} icon={<CloseIcon size={18} />} onClick={onClose} />
-      <ul className="mp-seedlist mx-auto text-start text-[15px]">
+      <ul className="list-disc ps-5 text-[15px]">
         {denied.map((p) => (
           <li key={p}>{permissionLabels[p]}</li>
         ))}

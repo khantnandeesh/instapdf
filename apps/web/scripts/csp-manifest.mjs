@@ -68,7 +68,8 @@ console.log(`csp-manifest: ${Object.keys(routes).length} pages, ${count} inline-
 
 function findServerJs(dir, depth = 0) {
   if (existsSync(join(dir, "server.js")) && existsSync(join(dir, ".next"))) return join(dir, "server.js");
-  if (depth > 3) return null;
+  // Standalone output mirrors the path from the tracing root, which can be several folders deep (a git worktree).
+  if (depth > 8) return null;
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (e.isDirectory() && e.name !== "node_modules" && e.name !== ".next") {
       const found = findServerJs(join(dir, e.name), depth + 1);
