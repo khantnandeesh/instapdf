@@ -396,7 +396,8 @@ function FillPeek() {
   const f = at && form?.fields.find((x) => x.id === at.field);
   const bar = useRef<HTMLDivElement>(null);
   // The bar must never cover the field being typed into (G-25): the field is scrolled below it,
-  // and a field that can't go lower (near the top of the file) gets the bar at the bottom instead.
+  // and a field that can't go lower (near the top of the file), or a screen too short for both
+  // (keyboard open), gets the bar at the bottom of the visible screen instead.
   useLayoutEffect(() => {
     const el = at && controlOf(at.widget);
     const b = bar.current;
@@ -411,15 +412,24 @@ function FillPeek() {
       const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
       b.style.top = `${Math.max(0, bottom - h - 8)}px`;
     };
-    revealField(el);
+    // From the bar's own place, whatever the last field did with it.
+    b.style.top = "";
+    if (!revealField(el)) revealField(el, { skip: b });
     place();
-    document.addEventListener("scroll", place, true);
-    vv?.addEventListener("resize", place);
-    vv?.addEventListener("scroll", place);
+    let frame = 0;
+    const later = () => {
+      if (!frame) frame = requestAnimationFrame(() => ((frame = 0), place()));
+    };
+    const scrollers = [...new Set([el.closest<HTMLElement>(".ed-canvas"), document])].filter(Boolean) as (HTMLElement | Document)[];
+    for (const t of scrollers) t.addEventListener("scroll", later, { passive: true });
+    vv?.addEventListener("resize", later);
+    vv?.addEventListener("scroll", later);
     return () => {
-      document.removeEventListener("scroll", place, true);
-      vv?.removeEventListener("resize", place);
-      vv?.removeEventListener("scroll", place);
+      cancelAnimationFrame(frame);
+      for (const t of scrollers) t.removeEventListener("scroll", later);
+      vv?.removeEventListener("resize", later);
+      vv?.removeEventListener("scroll", later);
+      b.style.top = "";
     };
   }, [at, f?.id]);
   if (!at || !f) return null;

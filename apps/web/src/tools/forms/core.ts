@@ -87,34 +87,52 @@ export function fieldTab(ctl: Controller, e: Pick<KeyboardEvent, "key" | "shiftK
   return true;
 }
 
-/** The nearest ancestor that scrolls vertically, else the page. */
-function scrollerOf(el: HTMLElement): HTMLElement {
+/** The nearest ancestor that scrolls along an axis, else the page. */
+function scrollerOf(el: HTMLElement, axis: "x" | "y"): HTMLElement {
   for (let p = el.parentElement; p; p = p.parentElement) {
-    const oy = getComputedStyle(p).overflowY;
-    if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
+    const o = axis === "y" ? getComputedStyle(p).overflowY : getComputedStyle(p).overflowX;
+    const more = axis === "y" ? p.scrollHeight > p.clientHeight : p.scrollWidth > p.clientWidth;
+    if ((o === "auto" || o === "scroll") && more) return p;
   }
   return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
 }
 
+/** The floating chrome a field must stay clear of (top bar, view pill, tool rail, phone fill bar). */
+const CHROME = '[data-region="top"], [data-region="view"], [data-region="tools"], .bf-peek';
+
 /**
- * Scrolls a field into the part of the screen the floating bars leave free: below the top bar (and
- * the phone fill bar), above the view pill (G-21, G-25). A field already clear of them stays put.
+ * Scrolls a field into the part of the visible screen the floating bars leave free: below the
+ * top bar and the phone fill bar, above the view pill, beside the tool rail (G-21, G-25), on both
+ * axes. A field already clear of them stays put. `skip` leaves one bar out of the sums. Returns
+ * false when the free area is too small for the field (a phone keyboard taking most of the screen).
  */
-export function revealField(el: HTMLElement, smooth = true) {
+export function revealField(el: HTMLElement, opts: { smooth?: boolean; skip?: Element | null } = {}): boolean {
   const gap = 12;
-  let top = 0;
-  let bottom = window.innerHeight;
-  for (const c of document.querySelectorAll<HTMLElement>('[data-region="top"], [data-region="view"], .bf-peek')) {
+  const vv = window.visualViewport;
+  let [left, top] = [vv?.offsetLeft ?? 0, vv?.offsetTop ?? 0];
+  let [right, bottom] = [left + (vv?.width ?? window.innerWidth), top + (vv?.height ?? window.innerHeight)];
+  const [cx, cy] = [(left + right) / 2, (top + bottom) / 2];
+  for (const c of document.querySelectorAll<HTMLElement>(CHROME)) {
+    if (c === opts.skip || getComputedStyle(c).visibility === "hidden") continue;
     const r = c.getBoundingClientRect();
-    if (!r.height || getComputedStyle(c).visibility === "hidden") continue;
-    if (r.top + r.height / 2 < window.innerHeight / 2) top = Math.max(top, r.bottom);
-    else bottom = Math.min(bottom, r.top);
+    if (!r.width || !r.height || r.bottom <= top || r.top >= bottom || r.right <= left || r.left >= right) continue;
+    if (r.width >= r.height) {
+      if (r.top + r.height / 2 < cy) top = Math.max(top, r.bottom);
+      else bottom = Math.min(bottom, r.top);
+    } else if (r.left + r.width / 2 < cx) left = Math.max(left, r.right);
+    else right = Math.min(right, r.left);
   }
   const r = el.getBoundingClientRect();
-  if (r.top >= top + gap && r.bottom <= bottom - gap) return;
-  // Centre it in the free band; a field taller than the band lines up its top.
-  const want = r.height > bottom - top - 2 * gap ? r.top - (top + gap) : (r.top + r.bottom) / 2 - (top + bottom) / 2;
-  scrollerOf(el).scrollBy({ top: want, behavior: smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto" });
+  const fits = r.height <= bottom - top - 2 * gap;
+  // Centre it in the free area; along an axis where it is larger than the area, line up its start.
+  const delta = (lo: number, hi: number, a: number, b: number) =>
+    a >= lo + gap && b <= hi - gap ? 0 : b - a > hi - lo - 2 * gap ? a - (lo + gap) : (a + b) / 2 - (lo + hi) / 2;
+  const dy = delta(top, bottom, r.top, r.bottom);
+  const dx = delta(left, right, r.left, r.right);
+  const behavior = opts.smooth !== false && !matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto";
+  if (dy) scrollerOf(el, "y").scrollBy({ top: dy, behavior });
+  if (dx) scrollerOf(el, "x").scrollBy({ left: dx, behavior });
+  return fits;
 }
 
 /**
