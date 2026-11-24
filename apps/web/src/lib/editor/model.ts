@@ -170,6 +170,115 @@ export function clampDelta(b: Box, dx: number, dy: number, page: { w: number; h:
   return [cx, cy];
 }
 
+type Size = { w: number; h: number };
+
+/** True when a box lies inside the page (with `eps` points of slack for rounding). */
+export const insidePage = (b: Box, page: Size, eps = 0.01) => b.x >= -eps && b.y >= -eps && b.x + b.w <= page.w + eps && b.y + b.h <= page.h + eps;
+
+/** Scales an object by `k` about the point `c` (page frame). Text scales its size and wrap with it. */
+export function scaleObject<T extends EditorObject>(o: T, k: number, c: Pt): T {
+  const sp = ([x, y]: Pt): Pt => [c[0] + (x - c[0]) * k, c[1] + (y - c[1]) * k];
+  switch (o.kind) {
+    case "line":
+      return { ...o, a: sp(o.a), b: sp(o.b) };
+    case "ink":
+      return { ...o, points: o.points.map(sp) };
+    case "markup":
+      return { ...o, rects: o.rects.map((r) => ({ ...r, x: c[0] + (r.x - c[0]) * k, y: c[1] + (r.y - c[1]) * k, w: r.w * k, h: r.h * k })) };
+    default: {
+      const b = o as BoxObject;
+      // Scale about the box centre's image so a rotated box keeps its angle.
+      const [ncx, ncy] = sp([b.x + b.w / 2, b.y + b.h / 2]);
+      const w = b.w * k;
+      const h = b.h * k;
+      const out = { ...o, x: ncx - w / 2, y: ncy - h / 2, w, h } as T;
+      if (o.kind === "text") Object.assign(out, { size: o.size * k, wrap: o.wrap === null ? null : o.wrap * k });
+      return out;
+    }
+  }
+}
+
+/**
+ * Fits objects into the page: a group larger than the page (minus `margin` on each side) is scaled
+ * down proportionally about its centre, then the group is shifted inside. Rotation is included
+ * through the rotated bounds. Returns the objects unchanged when they already fit.
+ */
+export function fitToPage<T extends EditorObject>(objs: T[], page: Size, margin = 0): T[] {
+  if (!objs.length) return objs;
+  let u = unionOf(objs.map(objectBounds));
+  if (insidePage(u, page)) return objs;
+  let out = objs;
+  const m = Math.min(margin, page.w / 4, page.h / 4);
+  let scaled = false;
+  // Strokes keep their width when scaled, so a second pass absorbs what they add.
+  for (let pass = 0; pass < 3; pass++) {
+    const k = Math.min(1, (page.w - 2 * m) / Math.max(u.w, 1e-6), (page.h - 2 * m) / Math.max(u.h, 1e-6));
+    if (k >= 1) break;
+    const c: Pt = [u.x + u.w / 2, u.y + u.h / 2];
+    out = out.map((o) => scaleObject(o, k * (pass ? 0.9999 : 1), c));
+    u = unionOf(out.map(objectBounds));
+    scaled = true;
+  }
+  // A scaled-down group keeps the margin on every side; one that only hung off an edge goes flush.
+  const inset = scaled ? m : 0;
+  const [ix, iy] = clampDelta({ ...u, x: u.x - inset, y: u.y - inset }, 0, 0, { w: page.w - 2 * inset, h: page.h - 2 * inset });
+  const [dx, dy] = [ix, iy];
+  return dx || dy ? out.map((o) => moveObject(o, dx, dy)) : out;
+}
+
+/**
+ * Keeps one object on its page (move, resize, rotate, nudge, paste, drop and typing all end here).
+ * Unrotated text that runs past the right edge wraps at the edge (via `reflow`, which lays the text
+ * out at a new wrap width) instead of shrinking; anything else larger than the page scales down
+ * with `margin`, and anything hanging off an edge is shifted back on.
+ */
+export function keepOnPage(o: EditorObject, page: Size, reflow?: (t: TextObj, wrap: number) => TextObj, margin = 12): EditorObject {
+  if (insidePage(objectBounds(o), page)) return o;
+  let t = o;
+  if (t.kind === "text" && !t.rot && reflow && t.x + t.w > page.w) {
+    // Keep at least a few words of room: a box that starts near the right edge moves left first.
+    const least = Math.min(t.w, t.size * 8, page.w);
+    const x = Math.min(Math.max(0, t.x), page.w - least);
+    const room = page.w - x;
+    t = t.w > room ? reflow({ ...t, x }, room) : { ...t, x };
+  }
+  return fitToPage([t], page, margin)[0];
+}
+
+function unionOf(bs: Box[]): Box {
+  const x0 = Math.min(...bs.map((b) => b.x));
+  const y0 = Math.min(...bs.map((b) => b.y));
+  const x1 = Math.max(...bs.map((b) => b.x + b.w));
+  const y1 = Math.max(...bs.map((b) => b.y + b.h));
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+/** A point kept on the page. */
+export const clampPoint = (p: Pt, page: Size): Pt => [Math.min(Math.max(p[0], 0), page.w), Math.min(Math.max(p[1], 0), page.h)];
+
+/**
+ * Resizes like `resizeBox`, but never past the page edge: an unrotated box stops at the edge per
+ * axis; a rotated or aspect-locked box stops growing where its rotated bounds first touch the edge
+ * (the anchored corner or side stays put). A box that was already off the page may still shrink.
+ */
+export function clampedResize(b: Box & { rot: number }, handle: Handle, p: Pt, keepAspect: boolean, page: Size): Box {
+  const q = b.rot ? p : clampPoint(p, page);
+  const next = resizeBox(b, handle, q, keepAspect);
+  const fits = (x: Box) => insidePage(b.rot ? bounds(rotatedCorners(x, b.rot)) : x, page);
+  if (fits(next) || !fits(b)) return next;
+  // Between the start box and the wanted one, the anchor stays fixed and the aspect is kept, so
+  // the largest box that fits lies on the straight path between them.
+  let lo = 0;
+  let hi = 1;
+  const at = (t: number): Box => ({ x: b.x + (next.x - b.x) * t, y: b.y + (next.y - b.y) * t, w: b.w + (next.w - b.w) * t, h: b.h + (next.h - b.h) * t });
+  for (let i = 0; i < 30; i++) {
+    const t = (lo + hi) / 2;
+    if (fits(at(t))) lo = t;
+    else hi = t;
+  }
+  return at(lo);
+}
+
 export type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
 /** Which handles an object gets (U-E4 table). */

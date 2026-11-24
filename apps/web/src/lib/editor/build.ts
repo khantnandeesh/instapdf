@@ -45,7 +45,7 @@ import {
 import { covers, faceOf, type EditorFontManifest, type FaceEntry } from "./fonts";
 import { norm360, pageSize, totalRotation, type EditorObject, type InkObj, type MarkupObj, type PageEntry, type Pt } from "./model";
 import { alignOffset, baselineOffset } from "./text-layout";
-import { arrowHead, boxPoint, hexToRgb, quadPoints, svgPolyline, toPdf, typedSignatureSize } from "./draw-math";
+import { arrowHead, boxPoint, fitTypedSize, hexToRgb, quadPoints, svgPolyline, toPdf, typedSignatureSize } from "./draw-math";
 
 export { arrowHead, boxPoint, hexToRgb, quadPoints, svgPolyline, toPdf, typedSignatureSize };
 
@@ -284,7 +284,8 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
           page.drawImage(img, { x, y, width: o.w, height: o.h, rotate: degrees(-o.rot) });
         } else if (sig.type === "typed") {
           const face = text!.face(sig.face, false, false);
-          const size = typedSignatureSize(o.h, face);
+          const full = typedSignatureSize(o.h, face);
+          const size = fitTypedSize(full, await text!.width(face, sig.text, full), o.w);
           const tw = await text!.width(face, sig.text, size);
           const base = (o.h - (face.ascent + face.descent) * size) / 2 + face.ascent * size;
           await text!.draw(page, entry, face, sig.text, boxPoint(o, o.rot, (o.w - tw) / 2, base), size, o.color, o.rot);

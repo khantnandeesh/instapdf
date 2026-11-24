@@ -19,16 +19,43 @@ import {
   duplicatePage,
   insertBlankAfter,
   isPristine,
+  keepOnPage,
   kindName,
   movePage,
   objectsOn,
+  pageSize,
   reorderObjects,
   removeObjects,
   rotatePage,
   updateObjects,
   type DocState,
   type EditorObject,
+  type TextObj,
 } from "@/lib/editor/model";
+import { layoutText, textBoxSize } from "@/lib/editor/text-layout";
+
+/** Lays a text box out again at a new wrap width (used to wrap text at the page edge). */
+export function reflowText(t: TextObj, wrap: number): TextObj {
+  const m = measurer(t.font, t.size, t.bold, t.italic);
+  const lines = layoutText(t.text, wrap, m);
+  const box = textBoxSize(lines, wrap, t.size, m);
+  return { ...t, wrap, lines, w: box.w, h: box.h };
+}
+
+/** Keeps the objects `ids` of a state inside their pages (no object ends past a page edge). */
+export function onPage(s: DocState, ids: readonly string[]): DocState {
+  const want = new Set(ids);
+  let changed = false;
+  const objects = s.objects.map((o) => {
+    if (!want.has(o.id)) return o;
+    const entry = s.pages.find((p) => p.id === o.page);
+    if (!entry) return o;
+    const k = keepOnPage(o, pageSize(entry), reflowText);
+    if (k !== o) changed = true;
+    return k;
+  });
+  return changed ? { ...s, objects } : s;
+}
 import { referencedAssets } from "@/lib/editor/asset-refs";
 import { textAt, type TextItemLike } from "@/lib/editor/line-hit";
 import { releaseUnused } from "./assets";
@@ -147,14 +174,14 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     },
 
     add(objs: EditorObject[], label: string, select = true) {
-      apply(addObjects(state(), objs), label, { page: objs[0]?.page, targets: objs.map((o) => o.id), select: select ? objs.map((o) => o.id) : undefined });
+      apply(onPage(addObjects(state(), objs), objs.map((o) => o.id)), label, { page: objs[0]?.page, targets: objs.map((o) => o.id), select: select ? objs.map((o) => o.id) : undefined });
       store.set({ flash: { ids: objs.map((o) => o.id), key: Date.now() } });
     },
 
     update(ids: readonly string[], fn: (o: EditorObject) => EditorObject, label: string, key?: string) {
       if (!ids.length) return;
       const objs = objectsById(ids);
-      apply(updateObjects(state(), ids, fn), label, { page: objs[0]?.page, targets: [...ids], key });
+      apply(onPage(updateObjects(state(), ids, fn), ids), label, { page: objs[0]?.page, targets: [...ids], key });
     },
 
     remove(ids: readonly string[]) {
@@ -169,7 +196,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       if (!ids.length) return;
       const r = duplicateObjects(state(), ids, nextPage);
       if (!r.ids.length) return;
-      apply(r.state, `Duplicate ${nameOf(ids)}`, { page: objectsById(r.ids)[0]?.page ?? r.state.objects.find((o) => o.id === r.ids[0])?.page, targets: r.ids, select: r.ids });
+      apply(onPage(r.state, r.ids), `Duplicate ${nameOf(ids)}`, { page: objectsById(r.ids)[0]?.page ?? r.state.objects.find((o) => o.id === r.ids[0])?.page, targets: r.ids, select: r.ids });
       ui.announce(`Duplicated ${r.ids.length === 1 ? "it" : `${r.ids.length} objects`}`);
     },
 

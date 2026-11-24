@@ -10,7 +10,7 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { cx } from "@/components/ui/cx";
-import { constrain45, dragBox, handlesOf, canRotate, aspectLocked, hasBox, moveObject, newId, objectBounds, pageSize, resizeBox, rotationFor, totalRotation, clampDelta, rotatedCorners, LINE_HEIGHT, type Box, type EditorObject, type Handle, type PageEntry, type Pt, type TextObj } from "@/lib/editor/model";
+import { constrain45, dragBox, handlesOf, canRotate, aspectLocked, hasBox, moveObject, newId, objectBounds, pageSize, rotationFor, totalRotation, clampDelta, clampedResize, clampPoint, keepOnPage, rotatedCorners, LINE_HEIGHT, type Box, type EditorObject, type Handle, type PageEntry, type Pt, type TextObj } from "@/lib/editor/model";
 import { displaySize, rectToScreen, screenToFrame, toScreen, userRectToFrame } from "@/lib/editor/geometry";
 import { selectWords, dominantHex, type FrameWord } from "@/lib/editor/markup";
 import { snapMove, snapPoint } from "@/lib/editor/snap";
@@ -24,7 +24,7 @@ import { PropertiesPopover } from "./Properties";
 import { lineAt } from "@/lib/editor/line-hit";
 import { release, renderPage, swapCanvas } from "./render";
 import { shallowArray, useStore, type EditorState } from "./store";
-import { TOOL_NAMES } from "./controller";
+import { TOOL_NAMES, onPage, reflowText } from "./controller";
 
 type Gesture =
   | { type: "move"; ids: string[]; start: Pt; origin: EditorObject[]; moved: boolean; pointer: number }
@@ -406,23 +406,26 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
           gs = sp.guides;
         }
         const keep = aspectLocked(g.origin) ? !shift : shift;
-        const b = resizeBox({ ...g.origin, rot: orot }, g.handle, q, keep);
+        // Never past the page edge (rotated boxes by their rotated bounds).
+        const b = clampedResize({ ...g.origin, rot: orot }, g.handle, q, keep, page);
         let next = { ...g.origin, ...b } as EditorObject;
         if (next.kind === "text") {
           const m = measurer(next.font, next.size, next.bold, next.italic);
           const lines = layoutText(next.text, b.w, m);
           next = { ...next, wrap: b.w, lines, h: textBoxSize(lines, b.w, next.size, m).h, y: g.origin.y };
+          next = keepOnPage(next, page, reflowText);
         }
         setDraft([next]);
         store.set({ guides: { page: entry.id, guides: gs }, readout: pointsLabel(b) });
       } else if (g.type === "rotate" && hasBox(g.origin)) {
         const rot = rotationFor(g.origin, p, shift);
-        setDraft([{ ...g.origin, rot } as EditorObject]);
+        setDraft([keepOnPage({ ...g.origin, rot } as EditorObject, page)]);
         store.set({ readout: `${Math.round(rot)}°` });
       } else if (g.type === "end" && g.origin.kind === "line") {
         const other = g.which === "a" ? g.origin.b : g.origin.a;
         let q = shift ? constrain45(other, p) : p;
         if (!alt && !shift) q = snapPoint(q, page, others([g.id]), threshold).p;
+        q = clampPoint(q, page);
         setDraft([{ ...g.origin, [g.which]: q }]);
       } else if (g.type === "create") {
         g.cur = p;
@@ -530,7 +533,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
       const next: TextObj = { ...cur, text: value, lines, w: box.w, h: box.h };
       if (isNew) {
         const s = store.get();
-        store.set({ history: H.replaceCurrent(s.history, { ...H.current(s.history), objects: H.current(s.history).objects.map((x) => (x.id === o.id ? next : x)) }) });
+        store.set({ history: H.replaceCurrent(s.history, onPage({ ...H.current(s.history), objects: H.current(s.history).objects.map((x) => (x.id === o.id ? next : x)) }, [o.id])) });
       } else if (cur.text !== value) ctl.update([o.id], () => next, "Edit text");
       ctl.announce(`Text on page ${index + 1}: ${value}`);
       requestAnimationFrame(() => (document.querySelector(`[data-obj-id="${o.id}"]`) as HTMLElement | null)?.focus({ preventScroll: true }));

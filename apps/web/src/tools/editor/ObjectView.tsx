@@ -8,7 +8,7 @@
 import { listChars } from "@/lib/editor/coverage";
 import { useMissing } from "./coverage-browser";
 import { memo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { arrowHead, svgPolyline, typedSignatureSize } from "@/lib/editor/draw-math";
+import { arrowHead, fitTypedSize, svgPolyline, typedSignatureSize } from "@/lib/editor/draw-math";
 import { cssFamily, faceOf } from "@/lib/editor/fonts";
 import { cssFont, ensureFace, knownManifest } from "@/lib/editor/fonts-browser";
 import { objectBounds, objectLabel, type EditorObject, type Pt, type SignatureObj, type TextObj } from "@/lib/editor/model";
@@ -309,7 +309,8 @@ function SignatureArt({ o, scale, assets }: { o: SignatureObj; scale: number; as
 function TypedSignature({ o, text, face, scale }: { o: SignatureObj; text: string; face: string; scale: number }) {
   useFace(face, false, false, text);
   const m = metricsOf(face, false, false);
-  const size = typedSignatureSize(o.h, m);
+  const full = typedSignatureSize(o.h, m);
+  const size = fitTypedSize(full, measurer(face, full)(text), o.w);
   const tw = measurer(face, size)(text);
   const base = (o.h - (m.ascent + m.descent) * size) / 2 + m.ascent * size;
   return (
