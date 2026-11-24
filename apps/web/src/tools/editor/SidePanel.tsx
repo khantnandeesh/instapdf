@@ -12,7 +12,7 @@ import { cx } from "@/components/ui/cx";
 import * as H from "@/lib/editor/history";
 import { objectLabel, totalRotation, type PageEntry } from "@/lib/editor/model";
 import { displaySize } from "@/lib/editor/geometry";
-import { TabOrderTab } from "@/tools/forms/EditorForms";
+import { TabOrderTab } from "@/tools/forms/lazy";
 import { TabOrderIcon } from "@/tools/forms/icons";
 import { pageActions } from "./Chrome";
 import { useCtl } from "./context";

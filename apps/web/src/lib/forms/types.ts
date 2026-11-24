@@ -37,6 +37,8 @@ export type Widget = {
   ref?: string;
   /** The file hides this widget (annotation flag Hidden or NoView): not shown, kept as it is. */
   hidden?: boolean;
+  /** A signature widget from the file that draws its own look (an /AP /N stream), which the page image shows. */
+  drawn?: boolean;
 };
 
 export type FieldStyle = {

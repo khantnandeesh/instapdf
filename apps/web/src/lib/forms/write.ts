@@ -22,7 +22,10 @@ import {
   PDFOptionList,
   PDFRadioGroup,
   PDFRef,
+  PDFString,
   PDFTextField,
+  PDFWidgetAnnotation,
+  layoutMultilineText,
   StandardFonts,
   TextAlignment,
   degrees,
@@ -30,9 +33,11 @@ import {
   type PDFDocument,
   type PDFField,
   type PDFFont,
+  type PDFObject,
   type PDFPage,
 } from "@cantoo/pdf-lib";
 import { pageTurn, toPdfRect, type PdfRect } from "./frame";
+import { bestSlice, needsNoGlyph } from "./coverage";
 import { clipToMaxLen } from "./model";
 import { renamedTo } from "./names";
 import { kindOf, refKey, widgetRefs } from "./read";
@@ -40,10 +45,15 @@ import type { FormField, FormPage, FormState, Widget } from "./types";
 
 const N = (s: string) => PDFName.of(s);
 
-/** Font files for text that Helvetica (WinAnsi) cannot show: the Noto slices Merge uses. */
+/**
+ * Font files for text that Helvetica (WinAnsi) cannot show. `forms` is Noto Sans with Latin,
+ * Latin Extended, Greek, Cyrillic and Vietnamese in one font (public/fonts/forms), since a field
+ * has one font; the Noto slices Merge uses cover other scripts.
+ */
 export type FormFonts = {
   manifest: () => Promise<{ fonts: { file: string; ranges: [number, number][] }[] }>;
   load: (file: string) => Promise<Uint8Array>;
+  forms?: () => Promise<Uint8Array>;
 };
 
 type FontKit = Parameters<PDFDocument["registerFontkit"]>[0];
@@ -88,61 +98,60 @@ class Fonts {
     return this.helv;
   }
 
-  private static encodable(font: PDFFont, text: string) {
-    try {
-      font.encodeText(text);
-      return true;
-    } catch {
-      return false;
-    }
+  private charsets = new Map<PDFFont, Set<number>>();
+  /** True when the font has a glyph for every character. pdf-lib's encodeText writes "?" for a
+   * character Helvetica lacks instead of throwing, so the character set is checked. */
+  private covers(font: PDFFont, text: string): boolean {
+    let set = this.charsets.get(font);
+    if (!set) this.charsets.set(font, (set = new Set(font.getCharacterSet())));
+    for (const ch of text) if (!needsNoGlyph(ch) && !set.has(ch.codePointAt(0)!)) return false;
+    return true;
+  }
+
+  /** The text with characters the font lacks replaced by "?", each noted in `missing`. */
+  private cleaner(font: PDFFont): (s: string) => string {
+    return (s) =>
+      [...s]
+        .map((ch) => {
+          if (this.covers(font, ch)) return ch;
+          this.missing.add(ch);
+          return "?";
+        })
+        .join("");
   }
 
   /** The font for a field's text, and the text with characters no font covers replaced by "?". */
   async pick(text: string): Promise<{ font: PDFFont; clean: (s: string) => string }> {
     const helv = this.helvetica();
-    if (Fonts.encodable(helv, text)) return { font: helv, clean: (s) => s };
+    if (this.covers(helv, text)) return { font: helv, clean: (s) => s };
+    const candidates: PDFFont[] = [];
+    if (this.opts.fonts?.forms) {
+      const forms = await this.embed("forms", () => this.opts.fonts!.forms!());
+      if (this.covers(forms, text)) return { font: forms, clean: (s) => s };
+      candidates.push(forms);
+    }
     if (this.opts.fonts) {
       if (!this.manifest) this.manifest = (await this.opts.fonts.manifest()).fonts;
-      const cps = [...new Set([...text].map((c) => c.codePointAt(0)!))].filter((cp) => cp > 0x20);
-      const covers = (f: { ranges: [number, number][] }, cp: number) => f.ranges.some(([lo, hi]) => cp >= lo && cp <= hi);
-      // The slice that covers the most of the text (all of it, ideally).
-      let best: { file: string; ranges: [number, number][] } | null = null;
-      let bestN = 0;
-      for (const f of this.manifest) {
-        const n = cps.filter((cp) => covers(f, cp)).length;
-        if (n > bestN) {
-          best = f;
-          bestN = n;
-        }
-        if (n === cps.length) break;
-      }
-      if (best) {
-        const font = await this.embed(best.file);
-        const set = new Set(font.getCharacterSet());
-        const clean = (s: string) =>
-          [...s]
-            .map((ch) => {
-              if (ch === "\n" || ch === "\r" || set.has(ch.codePointAt(0)!)) return ch;
-              this.missing.add(ch);
-              return "?";
-            })
-            .join("");
-        return { font, clean };
+      // The slice that covers the most of the text, for scripts the forms font lacks.
+      const best = bestSlice(text, this.manifest);
+      if (best) candidates.push(await this.embed(best.file, () => this.opts.fonts!.load(best.file)));
+    }
+    // The font that draws the most characters; the rest are written as "?" and reported.
+    const chars = [...text];
+    let font = helv;
+    let most = chars.filter((ch) => this.covers(helv, ch)).length;
+    for (const c of candidates) {
+      const n = chars.filter((ch) => this.covers(c, ch)).length;
+      if (n > most) {
+        font = c;
+        most = n;
       }
     }
-    const clean = (s: string) =>
-      [...s]
-        .map((ch) => {
-          if (ch === "\n" || Fonts.encodable(helv, ch)) return ch;
-          this.missing.add(ch);
-          return "?";
-        })
-        .join("");
-    return { font: helv, clean };
+    return { font, clean: this.cleaner(font) };
   }
 
-  private async embed(file: string): Promise<PDFFont> {
-    let p = this.embedded.get(file);
+  private async embed(key: string, load: () => Promise<Uint8Array>): Promise<PDFFont> {
+    let p = this.embedded.get(key);
     if (!p) {
       p = (async () => {
         if (!this.kitReady) {
@@ -151,13 +160,20 @@ class Fonts {
           this.doc.registerFontkit(kit);
           this.kitReady = true;
         }
-        // The whole slice (10 to 60 kB), not a subset: the font sits in /DR, so characters typed
-        // later in another viewer can be drawn with it too.
-        return this.doc.embedFont(await this.opts.fonts!.load(file), { subset: false });
+        // A subset: only the glyphs the appearances use, so the file stays small.
+        return this.doc.embedFont(await load(), { subset: true });
       })();
-      this.embedded.set(file, p);
+      this.embedded.set(key, p);
     }
     return p;
+  }
+
+  /** The appearance streams name the font by its own name; /DR lists that name too. */
+  ensureDr(font: PDFFont) {
+    this.drName(font);
+    const dr = this.doc.getForm().acroForm.dict.lookup(N("DR"), PDFDict);
+    const fontsDict = dr.lookup(N("Font"), PDFDict);
+    if (!fontsDict.get(N(font.name))) fontsDict.set(N(font.name), font.ref);
   }
 
   /** The font's resource name in the AcroForm /DR, adding it there if needed. */
@@ -550,7 +566,8 @@ function setFieldValue(field: PDFField, f: FormField) {
     if (f.value) field.select(String(f.value));
     else field.clear();
   } else if (field instanceof PDFDropdown) {
-    if (f.value) field.select(String(f.value), f.editable);
+    // select(value, merge): never merge, a dropdown holds one value (own text on editable ones).
+    if (f.value) field.select(String(f.value));
     else field.clear();
   } else if (field instanceof PDFOptionList) {
     const v = Array.isArray(f.value) ? f.value : f.value ? [f.value] : [];
@@ -652,14 +669,78 @@ function setDefault(doc: PDFDocument, field: PDFField, f: FormField) {
 
 const textForFont = (f: FormField) => [...(Array.isArray(f.value) ? f.value : [f.value]), ...(f.kind === "dropdown" || f.kind === "list" ? f.options : [])].join("");
 
+/** A widget's border width: /BS /W, else the legacy /Border array's third number, else 1. */
+function borderWidthOf(widget: PDFWidgetAnnotation): number {
+  const bs = widget.getBorderStyle();
+  if (bs) return bs.getWidth() ?? 1;
+  const legacy = widget.dict.lookup(N("Border"));
+  if (legacy instanceof PDFArray && legacy.size() >= 3) {
+    const w = legacy.lookup(2);
+    if (w instanceof PDFNumber) return w.asNumber();
+  }
+  return 1;
+}
+
+/** The largest size at which every option of a list fits its box (pdf-lib's 1.2 line spacing). */
+function listFit(f: FormField, font: PDFFont, widget: PDFWidgetAnnotation, bw: number): number {
+  const r = widget.getRectangle();
+  const inner = Math.max(1, r.height - 2 * (bw + 1));
+  return inner / Math.max(1, f.options.length) / (1.2 * font.heightAtSize(1));
+}
+
+/**
+ * The size an "Auto" (0 Tf) field is drawn at: 12 pt, or smaller until the text fits the box
+ * (wrapped lines for multi-line fields, one cell for combs, every option for lists). The DA keeps
+ * 0 so other viewers size it themselves (G-3).
+ */
+function autoSize(f: FormField, font: PDFFont, widget: PDFWidgetAnnotation, bw: number): number {
+  const r = widget.getRectangle();
+  const rot = ((widget.getAppearanceCharacteristics()?.getRotation() ?? 0) % 180 + 180) % 180;
+  const [w, h] = rot === 90 ? [r.height, r.width] : [r.width, r.height];
+  const pad = bw + 1;
+  const bounds = { x: pad, y: pad, width: Math.max(1, w - 2 * pad), height: Math.max(1, h - 2 * pad) };
+  const text = Array.isArray(f.value) ? "" : String(f.value);
+  const fits = (size: number): boolean => {
+    if (f.kind === "list") return f.options.length * 1.2 * font.heightAtSize(size) <= bounds.height;
+    if (f.kind === "text" && f.multiline) {
+      const { lines, lineHeight } = layoutMultilineText(text || " ", { alignment: TextAlignment.Left, fontSize: size, font, bounds });
+      return lines.length * lineHeight <= bounds.height + 0.01;
+    }
+    if (font.heightAtSize(size, { descender: true }) > bounds.height) return false;
+    if (f.kind === "text" && f.comb && f.maxLen) return font.widthOfTextAtSize("W", size) <= bounds.width / f.maxLen;
+    return !text || font.widthOfTextAtSize(text, size) <= bounds.width - 2;
+  };
+  // Fitting only gets easier as the size drops: binary-search the half-point steps from 4 to 12,
+  // so a long multi-line value is laid out about 4 times, not 16.
+  let lo = 8; // 4 pt, in half points: always used when nothing larger fits
+  let hi = 24;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (fits(mid / 2)) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo / 2;
+}
+
 async function refreshAppearance(doc: PDFDocument, field: PDFField, f: FormField, fonts: Fonts, pageOf: Map<string, { page: PDFPage; entry: FormPage }>) {
+  const widgets = field.acroField.getWidgets();
+  // Legacy /Border widths become /BS, which the appearance builder reads (G-6).
+  for (const w of widgets) {
+    if (w.getBorderStyle() || !(w.dict.lookup(N("Border")) instanceof PDFArray)) continue;
+    const width = borderWidthOf(w); // before /BS exists: once it does, it is what borderWidthOf reads
+    w.getOrCreateBorderStyle().setWidth(width);
+  }
   if (field instanceof PDFCheckBox || field instanceof PDFRadioGroup) {
     field.defaultUpdateAppearances();
+    // Buttons have no variable text: drop the placeholder DA pdf-lib writes (G-3).
+    for (const d of new Set([field.acroField.dict, ...widgets.map((w) => w.dict)])) {
+      const da = d.lookup(N("DA"));
+      if (da && String(da).includes("dummy__noop")) d.delete(N("DA"));
+    }
     return;
   }
   if (f.kind === "signature") {
     // Hand-made appearance (AC-237).
-    const widgets = field.acroField.getWidgets();
     f.widgets.forEach((w, i) => {
       const target = pageOf.get(w.page);
       if (widgets[i] && target) widgets[i].setNormalAppearance(signatureAppearance(doc, toPdfRect(target.entry, w), pageTurn(target.entry), fonts.helvetica(), f));
@@ -669,21 +750,94 @@ async function refreshAppearance(doc: PDFDocument, field: PDFField, f: FormField
   if (!(field instanceof PDFTextField || field instanceof PDFDropdown || field instanceof PDFOptionList)) return;
   const { font, clean } = await fonts.pick(textForFont(f));
   // Characters no font can draw are written as "?" (and reported), never as a blank box.
+  // The value itself (V) stays as typed; only the appearance shows "?".
+  let keepV: ReturnType<PDFDict["get"]> | undefined;
+  let keepOpts: { opt: ReturnType<PDFDict["get"]>; v: ReturnType<PDFDict["get"]>; i: ReturnType<PDFDict["get"]> } | undefined;
   if (field instanceof PDFTextField) {
     const v = field.getText();
-    if (v && clean(v) !== v) field.setText(clean(v));
-  } else if (font === fonts.helvetica()) {
-    const opts = field.getOptions();
-    const cleaned = opts.map(clean);
-    if (!same(opts, cleaned)) {
-      const sel = field.getSelected().map(clean);
-      field.setOptions(cleaned);
-      if (sel.length) field.select(field instanceof PDFOptionList ? sel : sel[0]);
+    if (v && clean(v) !== v) {
+      keepV = field.acroField.dict.get(N("V"));
+      field.setText(clean(v));
+    }
+  } else {
+    // Options and the value are drawn cleaned too, then the field's own Opt, V and I are put back.
+    // Written straight into the dictionary: pdf-lib's select() would refuse a stored export code
+    // or turn on editing or multi-select to fit the value.
+    const d = field.acroField.dict;
+    const ctx = doc.context;
+    const textOf = (o: PDFObject | undefined) => (o instanceof PDFString || o instanceof PDFHexString ? o.decodeText() : null);
+    let changed = false;
+    const cleanObj = (o: PDFObject | undefined): PDFObject => {
+      const t = textOf(o);
+      if (t === null) return o ?? PDFHexString.fromText("");
+      const c = clean(t);
+      if (c === t) return o!;
+      changed = true;
+      return PDFHexString.fromText(c);
+    };
+    const opt = d.lookup(N("Opt"));
+    const exportCodes = new Set<string>();
+    const cleanedOpt =
+      opt instanceof PDFArray
+        ? opt.asArray().map((o) => {
+            const e = o instanceof PDFRef ? ctx.lookup(o) : o;
+            if (e instanceof PDFArray && e.size() >= 2) {
+              const code = e.lookup(0);
+              const t = textOf(code);
+              if (t !== null) exportCodes.add(t);
+              return ctx.obj([code ?? PDFHexString.fromText(""), cleanObj(e.lookup(1))]);
+            }
+            return cleanObj(e);
+          })
+        : null;
+    // The value: a stored export code stays; text (an option's own text, or an editable
+    // dropdown's typed text) is drawn cleaned.
+    const cleanValue = (o: PDFObject | undefined) => {
+      const t = textOf(o);
+      return t !== null && exportCodes.has(t) ? o! : cleanObj(o);
+    };
+    const v = d.lookup(N("V"));
+    const cleanedV = v instanceof PDFArray ? ctx.obj(v.asArray().map((x) => cleanValue(x instanceof PDFRef ? ctx.lookup(x) : x))) : v ? cleanValue(v) : undefined;
+    if (changed) {
+      keepOpts = { opt: d.get(N("Opt")), v: d.get(N("V")), i: d.get(N("I")) };
+      if (cleanedOpt) d.set(N("Opt"), ctx.obj(cleanedOpt));
+      if (cleanedV) d.set(N("V"), cleanedV);
     }
   }
-  const da = field.acroField.getDefaultAppearance() ?? "";
-  if (!da.includes(`/${fonts.drName(font)} `)) field.acroField.setDefaultAppearance(daString(fonts.drName(font), f));
-  field.updateAppearances(font);
+  const name = fonts.drName(font);
+  const da = daString(name, f);
+  const fit = field instanceof PDFOptionList ? Math.min(...widgets.map((w) => listFit(f, font, w, borderWidthOf(w)))) : Infinity;
+  // A widget's own DA wins over the field's when drawing: drop them so the field's style rules.
+  for (const w of widgets) if (w.dict !== field.acroField.dict) w.dict.delete(N("DA"));
+  if (f.style.fontSize > 0 && f.style.fontSize <= fit) {
+    field.acroField.setDefaultAppearance(da);
+    field.updateAppearances(font);
+  } else if (f.style.fontSize > 0) {
+    // A list whose options don't all fit at its size is drawn smaller, so none is cut off (G-18).
+    for (const w of widgets) if (w.dict !== field.acroField.dict) w.dict.delete(N("DA"));
+    field.acroField.setDefaultAppearance(daString(name, { ...f, style: { ...f.style, fontSize: Math.max(4, Math.floor(fit * 10) / 10) } }));
+    field.updateAppearances(font);
+    field.acroField.setDefaultAppearance(da);
+  } else {
+    // Auto: drawn at a size that fits the smallest widget, the DA left at 0 Tf.
+    for (const w of widgets) if (w.dict !== field.acroField.dict) w.dict.delete(N("DA"));
+    const size = Math.min(12, ...widgets.map((w) => autoSize(f, font, w, borderWidthOf(w))));
+    field.acroField.setDefaultAppearance(daString(name, { ...f, style: { ...f.style, fontSize: size } }));
+    field.updateAppearances(font);
+    field.acroField.setDefaultAppearance(da);
+  }
+  // pdf-lib writes a widget DA naming the font by its own name; the field's DA (in /DR) rules.
+  for (const w of widgets) if (w.dict !== field.acroField.dict) w.dict.delete(N("DA"));
+  field.acroField.setDefaultAppearance(da);
+  fonts.ensureDr(font);
+  if (keepV) field.acroField.dict.set(N("V"), keepV);
+  if (keepOpts) {
+    const d = field.acroField.dict;
+    for (const [k, v] of [["Opt", keepOpts.opt], ["V", keepOpts.v], ["I", keepOpts.i]] as const) {
+      if (v) d.set(N(k), v);
+      else d.delete(N(k));
+    }
+  }
 }
 
 /** Signature field built by hand: pdf-lib has no signature creation. */

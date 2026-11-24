@@ -24,6 +24,8 @@ describe("readForm (AC-230)", () => {
     expect(by.email).toMatchObject({ required: true });
     expect(by.signature).toMatchObject({ kind: "signature" });
     expect(by["address.street"].widgets[0]).toMatchObject({ page: "p0", w: 240, h: 18 });
+    expect(by["address.street"].style.borderWidth).toBe(2); // the legacy /Border [0 0 2], no /BS
+    expect(by["address.town"].style.borderWidth).toBe(1);
     // Boxes are in the frame: top-left origin, y down.
     const name = by.name.widgets[0];
     expect(name.x).toBeCloseTo(160);
