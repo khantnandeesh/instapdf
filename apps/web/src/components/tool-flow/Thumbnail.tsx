@@ -8,9 +8,10 @@ type Watch = (el: Element, onChange: (near: boolean, far: boolean, top: number) 
 /**
  * One pair of IntersectionObservers for a whole grid: "near" (the viewport
  * plus 200 px, about one row of overscan) asks for renders; leaving "far"
- * (three screens away) releases the bitmap.
+ * (three screens away) releases the bitmap. `root` is the pages' own scroll
+ * area when it scrolls (>= 1024 px), so the overscan applies inside it.
  */
-export function createVisibilityWatcher(): { watch: Watch; disconnect: () => void } {
+export function createVisibilityWatcher(root: Element | null = null): { watch: Watch; disconnect: () => void } {
   const callbacks = new Map<Element, { cb: (near: boolean, far: boolean, top: number) => void; near: boolean; far: boolean }>();
   const near = new IntersectionObserver(
     (entries) => {
@@ -22,7 +23,7 @@ export function createVisibilityWatcher(): { watch: Watch; disconnect: () => voi
         c.cb(c.near, c.far, e.boundingClientRect.top);
       }
     },
-    { rootMargin: "200px 0px" },
+    { root, rootMargin: "200px 0px" },
   );
   const far = new IntersectionObserver(
     (entries) => {
@@ -33,7 +34,7 @@ export function createVisibilityWatcher(): { watch: Watch; disconnect: () => voi
         c.cb(c.near, c.far, e.boundingClientRect.top);
       }
     },
-    { rootMargin: "300% 0px" },
+    { root, rootMargin: "300% 0px" },
   );
   return {
     watch(el, cb) {
