@@ -639,14 +639,13 @@ export function ToolFlow({
     setFocusPickerTick((n) => n + 1);
   }, [announce, onReset, releaseDoc, updateFiles]);
 
-  // Back to options reverses T12: the card fades out (120ms, inert at once), then the work area fades in
-  // (200ms; opacity only, so the sticky dock inside it never gets a transformed containing block). Focus
-  // waits on the tool heading meanwhile, as it does on the way in.
+  // Back to options (T12 reversed): the work area is back at once and fades in (200ms; opacity only, so the
+  // sticky dock inside it never gets a transformed containing block). Focus moves to the tool heading, not
+  // <body>, as the card goes. The card's own 120ms fade-out first is deferred (docs/design/motion.md T12).
   const resultCard = useRef<HTMLElement>(null);
   const [workBack, setWorkBack] = useState(0);
-  const backToOptions = useCallback(async () => {
+  const backToOptions = useCallback(() => {
     if (resultCard.current?.contains(document.activeElement)) heading.current?.focus({ preventScroll: true });
-    await exit(resultCard.current, "result");
     setOutput(null);
     setPhase("idle");
     setWorkBack((n) => n + 1);
@@ -866,7 +865,7 @@ export function ToolFlow({
           continueTargets={continueTargets(output.type)}
           onContinue={continueWith}
           onStartOver={startOver}
-          onBack={() => void backToOptions()}
+          onBack={backToOptions}
           announce={announce}
         />
       ) : (
