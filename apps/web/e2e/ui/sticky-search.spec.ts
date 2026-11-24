@@ -1,7 +1,8 @@
 /**
- * Sticky search and filter bar (docs/design/berrypdf.md "Sticky search and filter bars"): on the home
- * catalogue the search, the ready-only filter and the jump chips scroll with the page until they reach
- * the header, stay pinned under it while the list scrolls, and return to their place on the way up.
+ * Sticky search bar (docs/design/berrypdf.md "Sticky search and filter bars"): on the home catalogue the
+ * search scrolls with the page until it reaches the header, stays pinned under it while the list scrolls,
+ * and returns to its place on the way up. Only the search pins (owner, 2026-11-24): the ready-only filter
+ * and the jump chips scroll away; pinned, the search grows a little and stays centred.
  */
 import { expect, test, type Page } from "@playwright/test";
 
@@ -88,4 +89,39 @@ test("the ready-only switch's visible text is part of its accessible name on eve
   const visible = (await sw.locator("xpath=..").innerText()).trim();
   expect(visible.length).toBeGreaterThan(0);
   expect("Only ready tools".toLowerCase()).toContain(visible.toLowerCase());
+});
+
+test("only the search pins: the filter and the jump chips scroll away, and the pinned search is centred and a bit wider", async ({ page }) => {
+  await page.goto("/");
+  const search = page.getByRole("searchbox");
+  const vw = page.viewportSize()!.width;
+  const rest = (await search.boundingBox())!;
+  expect(Math.abs(rest.x + rest.width / 2 - vw / 2), "the search is centred at rest").toBeLessThanOrEqual(1);
+
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight * 0.5));
+  await expect(bar(page)).toHaveAttribute("data-stuck", "");
+  const hb = await headerBottom(page);
+  // The filter and the chips are above the header now (scrolled away), not pinned below it.
+  for (const el of [page.getByRole("switch", { name: "Only ready tools" }), page.getByRole("navigation", { name: "Jump to a category" })]) {
+    const box = (await el.boundingBox())!;
+    expect(box.y + box.height, "scrolled away under the header").toBeLessThanOrEqual(hb);
+  }
+  // Pinned: centred, and slightly wider where there is room (it is already full width on phones).
+  await expect
+    .poll(async () => {
+      const b = (await search.boundingBox())!;
+      return Math.abs(b.x + b.width / 2 - vw / 2) <= 1 && (vw < 768 || (b.width > rest.width && b.width <= rest.width * 1.2));
+    })
+    .toBe(true);
+});
+
+test("the strip beside the pinned search lets clicks through to the cards", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "needs room beside the field");
+  await page.goto("/");
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight * 0.5));
+  await expect(bar(page)).toHaveAttribute("data-stuck", "");
+  const b = (await bar(page).boundingBox())!;
+  const s = (await page.getByRole("searchbox").boundingBox())!;
+  const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest("[data-testid=catalogue-bar]") === null, [Math.max(b.x + 4, s.x - 60), b.y + b.height / 2]);
+  expect(hit, "a point beside the field is not taken by the bar").toBe(true);
 });
