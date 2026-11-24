@@ -135,7 +135,7 @@ for (const tool of usable) {
         await page.waitForTimeout(300);
         expect(await page.evaluate(() => window.scrollY), "the page itself does not scroll").toBe(0);
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded, pages scrolled)");
-        await expectInViewport(page, page.getByRole("button", { name: /Add files|Replace file/ }), "add files (loaded, pages scrolled)");
+        await expectInViewport(page, page.getByRole("button", { name: /^(Add files|Replace file)$/ }), "add files (loaded, pages scrolled)");
 
         // The bigger page view fits too: its buttons are on screen.
         await openFirstPagePreview(page);

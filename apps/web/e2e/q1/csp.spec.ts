@@ -6,8 +6,9 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { inlineScriptHashes, scriptHash } from "../../scripts/csp-lib.mjs";
+import { cloudPrepaintScript } from "../../src/lib/cloud/last-used";
 import { recentPrepaintScript } from "../../src/lib/recent-tools";
-import { downloadResult, fx, openRotate, pickReady, rotateRight, run, tiles } from "../support/flow";
+import { cloudOn, downloadResult, fx, openRotate, pickReady, rotateRight, run, tiles } from "../support/flow";
 import { isDesktop, menuSearch, openHydrated, openMenu, plannedTools, RECENT_KEY, usableTools } from "../f2/support";
 
 const PAGES = ["/", ...usableTools.map((t) => `/${t.slug}`), ...plannedTools.map((t) => `/${t.slug}`), "/privacy", "/terms", "/cookies", "/licenses", "/about", "/help", "/security"];
@@ -260,5 +261,70 @@ test.describe("everything still works under the CSP, with no violations", () => 
     }, b64);
     await expect(tiles(page)).toHaveCount(3);
     expect(await violations()).toEqual([]);
+  });
+});
+
+/**
+ * F23 cloud sources (docs/specs/f23-cloud-pickers.md AC-120, AC-127): tool pages keep the policy and
+ * COOP above unchanged with the flag on or off; only /cloud/<provider> windows get their own
+ * policy (src/lib/security/csp.ts cloudPolicy, unit-tested host by host) and COOP
+ * same-origin-allow-popups. The mock build prerenders /cloud/mock only.
+ */
+test.describe("F23 cloud windows", () => {
+  test.beforeEach(({}, info) => test.skip(!isDesktop(info.project.name), "HTTP-level checks; once on desktop"));
+
+  test("without the flag there are no cloud routes; with it, only the built ones", async ({ request }) => {
+    for (const p of ["google", "dropbox", "onedrive"]) expect((await request.get(`/cloud/${p}`)).status(), p).toBe(404);
+    expect((await request.get("/cloud/mock")).status()).toBe(cloudOn ? 200 : 404);
+    expect((await request.get("/cloud-mock/alpha.pdf")).status()).toBe(cloudOn ? 200 : 404);
+    expect((await request.get("/cloud-mock/..%2Fpackage.json")).status()).toBe(404);
+  });
+
+  test("tool pages: same policy and COOP; the cloud pre-paint script is hashed only when the flag is on", async ({ request }) => {
+    const pre = cloudPrepaintScript(["google", "dropbox", "onedrive"]);
+    for (const path of ["/rotate-pdf", "/merge-pdf"]) {
+      const res = await request.get(path);
+      const csp = res.headers()["content-security-policy"];
+      expect(res.headers()["cross-origin-opener-policy"], path).toBe("same-origin");
+      const d = directives(csp);
+      for (const k of ["connect-src", "frame-src", "form-action"]) expect(d.get(k) ?? ["'self'"], `${path} ${k}`).not.toContain("https:");
+      expect(d.get("connect-src")).toEqual(["'self'"]);
+      expect(csp).not.toMatch(/dropbox|google|microsoft|1drv/);
+      expect(csp.includes(`'${scriptHash(pre)}'`), path).toBe(cloudOn);
+    }
+  });
+
+  test("/cloud/mock: its own strict policy, COOP same-origin-allow-popups, every inline script hashed", async ({ request }) => {
+    test.skip(!cloudOn, "needs the cloud mock build");
+    const res = await request.get("/cloud/mock?req=x");
+    const h = res.headers();
+    expect(h["cross-origin-opener-policy"]).toBe("same-origin-allow-popups");
+    const csp = h["content-security-policy"];
+    const d = directives(csp);
+    expect(d.get("connect-src")).toEqual(["'self'"]);
+    expect(d.get("frame-src")).toEqual(["'none'"]);
+    expect(d.get("frame-ancestors")).toEqual(["'none'"]);
+    expect(d.get("form-action")).toEqual(["'self'"]);
+    expect(csp).not.toContain("'unsafe-inline'");
+    expect(csp).not.toContain("'unsafe-eval'");
+    expect(res.headersArray().filter((x) => x.name.toLowerCase() === "content-security-policy")).toHaveLength(1);
+    const allowed = new Set(d.get("script-src")!.filter((s) => s.startsWith("'sha256-")));
+    for (const hash of inlineScriptHashes(await res.text())) expect(allowed.has(`'${hash}'`), hash).toBe(true);
+    expect(h["x-robots-tag"] ?? (await res.text())).toMatch(/noindex/);
+  });
+
+  test("a full mock pick runs with no CSP violation in the tool tab or the window", async ({ page }) => {
+    test.skip(!cloudOn, "needs the cloud mock build");
+    const toolViolations = await watchCsp(page);
+    await openRotate(page);
+    const [win] = await Promise.all([page.context().waitForEvent("page"), page.getByTestId("cloud-row").getByRole("button", { name: /^Choose from Dropbox/ }).click()]);
+    const winViolations: string[] = [];
+    win.on("console", (m) => /Content Security Policy/i.test(m.text()) && winViolations.push(m.text()));
+    await win.getByTestId("cloud-open").click();
+    await win.getByTestId("mock-picker").getByRole("group").getByLabel("alpha.pdf", { exact: true }).check();
+    await win.getByRole("button", { name: "Pick", exact: true }).click();
+    await expect(tiles(page)).toHaveCount(3);
+    expect(winViolations).toEqual([]);
+    expect(await toolViolations()).toEqual([]);
   });
 });

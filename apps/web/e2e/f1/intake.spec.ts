@@ -2,6 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import {
+  cloudOn,
   dropFixtures,
   fileInput,
   flow,
@@ -115,7 +116,7 @@ test("AC-7: two files load; the files view shows 2 cards with thumbnail, name an
 
 test("AC-8: add more files by picker and by drop without removing the first", async ({ page }) => {
   await pickReady(page, "three-pages.pdf");
-  await expect(page.getByRole("button", { name: "Add files" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add files", exact: true })).toBeVisible();
   await pick(page, "pre-rotated.pdf");
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
   await dropFixtures(page, ["sixty-pages.pdf"]);
@@ -148,6 +149,7 @@ test("AC-10: the thumbnail-size slider changes the tile width", async ({ page })
 });
 
 test("AC-11: the sources slot shows no cloud or URL entries", async ({ page }) => {
+  test.skip(cloudOn, "F23 fills the sources slot on purpose (checked by e2e/f23); still checked on the flag-off build");
   const cloud = /dropbox|google drive|onedrive|\bbox\b|url|web address|link/i;
   for (const role of ["button", "menuitem", "option", "link"] as const) {
     const items = page.locator("[data-testid=tool-flow]").getByRole(role, { name: cloud });

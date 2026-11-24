@@ -11,6 +11,12 @@ import { PDFDocument } from "pdf-lib";
 
 export const fx = (name: string) => `tests/fixtures/${name}`;
 
+/**
+ * F23: true when the server under test was built with cloud sources on (NEXT_PUBLIC_CLOUD_SOURCES=1,
+ * the CI "cloud" job). A few F1/F3 checks of the original menus branch on it.
+ */
+export const cloudOn = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1";
+
 export const flow = (page: Page) => page.getByTestId("tool-flow");
 export const primary = (page: Page) => page.getByTestId("primary-action");
 export const tiles = (page: Page) => page.getByTestId("page-tile");
