@@ -1,0 +1,29 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { CloudWindow } from "@/components/cloud/window/CloudWindow";
+import { cloudRoutes, isProvider, isRoute, providerName } from "@/lib/cloud/providers";
+
+/**
+ * F23: the /cloud/<provider> window (spec D-3). Prerendered for the providers this build has
+ * (so the CSP manifest hashes its inline scripts); everything else is a 404. Its own CSP and COOP
+ * come from src/middleware.ts and next.config.ts. Never indexed.
+ */
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return cloudRoutes().map((provider) => ({ provider }));
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ provider: string }> }): Promise<Metadata> {
+  const { provider } = await params;
+  return {
+    title: { absolute: isProvider(provider) ? `${providerName[provider]} · BerryPDF` : "BerryPDF" },
+    robots: { index: false, follow: false },
+  };
+}
+
+export default async function CloudPage({ params }: { params: Promise<{ provider: string }> }) {
+  const { provider } = await params;
+  if (!isRoute(provider) || !cloudRoutes().includes(provider)) notFound();
+  return <CloudWindow route={provider} />;
+}

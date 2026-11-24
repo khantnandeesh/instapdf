@@ -10,6 +10,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@azure/msal-browser':
+        specifier: 5.28.0
+        version: 5.28.0
       '@cantoo/fontkit':
         specifier: 2.0.12
         version: 2.0.12
@@ -110,6 +113,14 @@ packages:
     engines: {node: '>=22.12.0'}
     peerDependencies:
       playwright-core: '>= 1.0.0'
+
+  '@azure/msal-browser@5.28.0':
+    resolution: {integrity: sha512-f3yY518Z++x3ZogCbcLK6vnABgpxc8rAKGKtQibcUJKAVU9gamgh5mNAPJIRwduzXQvO2xtHx/gtmPz8iuZ8+w==}
+    engines: {node: '>=0.8.0'}
+
+  '@azure/msal-common@16.16.0':
+    resolution: {integrity: sha512-EZgd8h5nczsdRAQAgXA0A0pC5L/zj43n1jePXvUMgdwXMbH2zhb7b7Hp+Oe7ZOODK/sch2x+soD6FOrtgUbx/w==}
+    engines: {node: '>=0.8.0'}
 
   '@cantoo/fontkit@2.0.12':
     resolution: {integrity: sha512-B9ZE4pA3cUf3pzn7UaPCtjyejd1ie16SLquCqdlGQiDncFgn8iD29dU9vD3dSgKkxAUx2ttvjg/li9JVkj5+fQ==}
@@ -2160,6 +2171,12 @@ snapshots:
     dependencies:
       axe-core: 4.14.1
       playwright-core: 1.63.0
+
+  '@azure/msal-browser@5.28.0':
+    dependencies:
+      '@azure/msal-common': 16.16.0
+
+  '@azure/msal-common@16.16.0': {}
 
   '@cantoo/fontkit@2.0.12':
     dependencies:

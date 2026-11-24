@@ -1,0 +1,73 @@
+/** A provider adapter, run only inside its own /cloud/<provider> window (research §3.1). */
+import type { DownloadRequest } from "@/lib/cloud/download";
+import type { WindowParams } from "@/lib/cloud/protocol";
+import type { CloudProvider } from "@/lib/cloud/providers";
+
+export type Picked = { id: string; name: string; size: number; request: () => Promise<DownloadRequest> };
+
+export type Phase = "signing" | "picking" | "connecting";
+
+export type FrameSpec = { url: string } | { post: { action: string; fields: Record<string, string> } };
+
+export type AdapterCtx = {
+  params: WindowParams & { provider: CloudProvider };
+  setPhase: (p: Phase) => void;
+  /** Shows the provider's own picker in our iframe under the window header; null removes it. */
+  frame: (spec: FrameSpec | null, title?: string) => Promise<HTMLIFrameElement | null>;
+  /** Before a full-page sign-in redirect (OneDrive). */
+  leaving: () => void;
+  /** Mock only: shows the test picker and resolves with what was chosen. */
+  mockPick?: () => Promise<Picked[] | "cancel">;
+};
+
+export type Adapter = {
+  /** Google and Dropbox SDKs must be called from a tap in this window. */
+  needsTap: boolean;
+  /** Loads the provider's script (after the disclosure is on screen). */
+  prepare: () => Promise<void>;
+  /** Starts synchronously (inside the tap); resolves with the picked files or "cancel". */
+  pick: () => Promise<Picked[] | "cancel">;
+  /** Uploads the result into the provider (save mode). */
+  save?: (file: File, onProgress: (loaded: number, total: number) => void) => Promise<{ name: string; link?: string }>;
+};
+
+export class CloudError extends Error {
+  constructor(readonly code: "denied" | "unreachable") {
+    super(code);
+  }
+}
+
+/** Adds a provider script once (its host is in this window's CSP only). */
+export function loadScript(src: string, attrs: Record<string, string> = {}): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const s = document.createElement("script");
+    s.src = src;
+    s.async = true;
+    for (const [k, v] of Object.entries(attrs)) s.setAttribute(k, v);
+    s.onload = () => resolve();
+    s.onerror = () => reject(new CloudError("unreachable"));
+    document.head.append(s);
+  });
+}
+
+/** XHR upload with progress (fetch has no upload progress); the URL's host must be in connect-src. */
+export function xhrUpload(method: string, url: string, body: Blob | FormData, headers: Record<string, string>, onProgress: (l: number, t: number) => void): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open(method, url);
+    for (const [k, v] of Object.entries(headers)) x.setRequestHeader(k, v);
+    x.upload.onprogress = (e) => onProgress(e.loaded, e.total || (body instanceof Blob ? body.size : 0));
+    x.onload = () => {
+      if (x.status === 401 || x.status === 403) return reject(new CloudError("denied"));
+      if (x.status < 200 || x.status >= 300) return reject(new CloudError("unreachable"));
+      try {
+        resolve(JSON.parse(x.responseText));
+      } catch {
+        resolve({});
+      }
+    };
+    x.onerror = () => reject(new CloudError("unreachable"));
+    x.send(body);
+  });
+}
