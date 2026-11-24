@@ -199,6 +199,29 @@ export interface FontProgram {
   glyphs: { cp: number; gid: number; width: number }[];
 }
 
+/**
+ * A complex-script line as an edit would draw it (previewLine), for the edit box: browsers can't
+ * apply a PDF subset's joining rules, so the box draws these outlines instead of setting text.
+ */
+export interface LinePreview {
+  /** Glyph outlines as SVG path data, in 1/1000 em with y up; each one once. */
+  paths: string[];
+  glyphs: {
+    /** Index into paths. */
+    path: number;
+    /** Baseline origin, PDF user space. */
+    x: number;
+    y: number;
+    /** Em size across the baseline, and along it (with horizontal scaling), in points. */
+    size: number;
+    width: number;
+    /** Baseline direction in degrees, counter-clockwise. */
+    angle: number;
+    /** sRGB 0–255. */
+    color: [number, number, number];
+  }[];
+}
+
 /** What every method throws. Nothing is changed when an edit throws. */
 export type BerryError =
   | { kind: "parse"; message: string }
@@ -246,6 +269,15 @@ export class BerryDocument {
   find(page: number, needle: string, matchCase: boolean): Match[];
   /** Sets a line's text. Only the characters that differ are rewritten. */
   replaceLine(page: number, line: number, text: string): EditResult;
+  /**
+   * How a line with Hindi, Arabic or other complex-script text would look with `text`: the
+   * edit is made, read back and rolled back, so nothing changes and the glyphs are exactly those
+   * replaceLine would draw (the whole line, with the rest of it moved as the edit moves it).
+   * Throws as replaceLine does (missing-glyphs, verify…); unsupported "preview-simple-script"
+   * for a line without such text and "preview-no-outline" when a font's program can't be read
+   * (Type 1, Type 3, not embedded). The default build throws read-only "needs-shaping".
+   */
+  previewLine(page: number, line: number, text: string): LinePreview;
   /** Replaces characters [start, end) of a line. */
   replaceRange(page: number, line: number, start: number, end: number, text: string): EditResult;
   /**

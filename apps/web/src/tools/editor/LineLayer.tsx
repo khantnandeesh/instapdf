@@ -154,7 +154,13 @@ export function LineLayer({
         } else if (o.cy < mid) paperTop = Math.max(paperTop, Math.min(bottom - box.top, box.height / 2 - 1));
       });
     }
-    return { box, start, length: b.length, maxWidth: displaySize(view, rotation, scale).width - box.left - 2, paperInset: { top: Math.max(0, paperTop), bottom: Math.max(0, paperBottom) }, hintBelow: below };
+    // The page's user-space origin on an upright page: the edit box draws engine glyphs from it.
+    let pageOrigin: { x: number; y: number } | null = null;
+    if (quarterTurns(rotation) === 0) {
+      const [x, y] = toScreen(0, 0, view, rotation, scale);
+      pageOrigin = { x, y };
+    }
+    return { box, start, pageOrigin, length: b.length, maxWidth: displaySize(view, rotation, scale).width - box.left - 2, paperInset: { top: Math.max(0, paperTop), bottom: Math.max(0, paperBottom) }, hintBelow: below };
   };
 
   return (

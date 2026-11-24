@@ -594,8 +594,19 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
      * font and style gets its own closest font.
      */
     async replaceWithStandIn(e: { src: number; line: number; text: string }, page: PageText | undefined) {
-      const call = { op: "replace", page: e.src, line: e.line, text: e.text } as const;
-      const runs = page?.lines[e.line]?.runs ?? [];
+      return ctl.withStandIn({ op: "replace", page: e.src, line: e.line, text: e.text } as const, page);
+    },
+    /**
+     * How a Hindi, Arabic or other complex-script line would look with `text` (nothing changes):
+     * the edit box draws these glyphs, since a browser can't join letters with a PDF's subset. A
+     * font the line lacks is registered as for the edit itself, so the preview is what Enter writes.
+     */
+    async previewLine(src: number, line: number, text: string) {
+      return (await ctl.withStandIn({ op: "preview", page: src, line, text } as const, store.get().texts[src])).preview;
+    },
+    /** Runs an edit (or its preview), registering the closest font for characters the line's fonts lack. */
+    async withStandIn<C extends { op: "replace" | "preview"; page: number; line: number; text: string }>(call: C, page: PageText | undefined) {
+      const runs = page?.lines[call.line]?.runs ?? [];
       const fonts = [...new Set(runs.map((r) => r.font))].map((i) => page!.fonts[i]).filter(Boolean);
       const key = fonts.map((f) => `${f.name}|${f.bold}|${f.italic}`).sort().join(",");
       if (ctl.standIns.size && key !== ctl.standInKey) {
