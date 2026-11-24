@@ -22,7 +22,10 @@ function item(id: string, fixture: string, opts: { as?: string; slow?: boolean; 
       if (opts.slow) q.set("slow", "1");
       if (opts.fail) q.set("fail", "1");
       if (opts.status) q.set("status", String(opts.status));
-      return { url: `/cloud-mock/${encodeURIComponent(fixture)}${q.size ? `?${q}` : ""}`, name, type: fixture.endsWith(".pdf") ? "application/pdf" : "" };
+      const url = `/cloud-mock/${encodeURIComponent(fixture)}`;
+      // Real pickers report each file's size up front; streamed bodies carry no Content-Length.
+      const total = opts.status ? undefined : Number(await (await fetch(`${url}?size=1`)).text()) || undefined;
+      return { url: `${url}${q.size ? `?${q}` : ""}`, name, type: fixture.endsWith(".pdf") ? "application/pdf" : "", total };
     },
   };
 }

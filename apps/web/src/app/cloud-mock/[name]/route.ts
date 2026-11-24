@@ -2,7 +2,7 @@
  * F23 mock provider files (CI/e2e only): serves a few tests/fixtures files same-origin to the
  * /cloud/mock window. 404 unless the mock is active (never in a production build without
  * NEXT_PUBLIC_CLOUD_MOCK=1). `slow=1` streams in small timed chunks, `fail=1` breaks off half way,
- * `status=403` refuses.
+ * `status=403` refuses, `size=1` answers the byte size (what a real picker reports up front).
  */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -16,6 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ name
   const q = new URL(request.url).searchParams;
   if (q.get("status") === "403") return new Response("Forbidden", { status: 403 });
   const bytes = new Uint8Array(await readFile(join(process.cwd(), "tests", "fixtures", name)));
+  if (q.get("size") === "1") return new Response(String(bytes.length), { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
   const type = name.endsWith(".pdf") ? "application/pdf" : name.endsWith(".png") ? "image/png" : "text/plain";
   const slow = q.get("slow") === "1";
   const fail = q.get("fail") === "1";
