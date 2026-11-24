@@ -1,4 +1,6 @@
 "use client";
+import "@/components/berry/floaties-empty.css";
+import "@/components/berry/berry-loader.css";
 import "./editor.css";
 /**
  * Edit PDF (beta): change existing text, line by line (F16, a small subset of phase E1/E2).
