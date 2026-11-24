@@ -178,9 +178,9 @@ for (const how of ["Esc", "a newer edit of the line"] as const) {
       await page.keyboard.press("Escape");
     } else {
       await line().click();
-      await page.getByTestId("line-input").fill("Left column, again");
+      await page.getByTestId("line-input").fill("Left column column");
       await page.getByTestId("line-input").press("Enter");
-      await expect(page.locator('[data-testid="line"][data-text^="Left column, again"]')).toHaveCount(1, { timeout: 30_000 });
+      await expect(page.locator('[data-testid="line"][data-text^="Left column column"]')).toHaveCount(1, { timeout: 30_000 });
     }
     fail = false;
     await pill.getByRole("button", { name: "Retry" }).click();
@@ -188,7 +188,7 @@ for (const how of ["Esc", "a newer edit of the line"] as const) {
     // The dropped edit never reaches the shaping build (it would name "न" as missing).
     await page.waitForTimeout(1500);
     await expect(page.getByTestId("editor-notice")).toHaveCount(0);
-    if (how !== "Esc") await expect(page.locator('[data-testid="line"][data-text^="Left column, again"]')).toHaveCount(1);
+    if (how !== "Esc") await expect(page.locator('[data-testid="line"][data-text^="Left column column"]')).toHaveCount(1);
   });
 }
 

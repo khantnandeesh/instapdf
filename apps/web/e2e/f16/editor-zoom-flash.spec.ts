@@ -101,7 +101,7 @@ async function recordFrames(page: Page, name: string, run: () => Promise<void>) 
   }
 }
 
-test("zooming in and out never shows a blank or white page where it had content", async ({ page }, info) => {
+test("zooming in and out never shows a blank or white page where it had content", { tag: "@serial" }, async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "Zoom buttons and Ctrl+wheel are desktop input; pinch shares the same path");
   await open(page, "report-form-3p.pdf");
   // The first appearance fades in (once); sampling starts after it.
@@ -144,7 +144,7 @@ test("zooming in and out never shows a blank or white page where it had content"
   expect(ratio).toBeLessThan(1.03);
 });
 
-test("objects and the text layer stay on their spot while a Ctrl+wheel zoom is in progress", async ({ page }, info) => {
+test("objects and the text layer stay on their spot while a Ctrl+wheel zoom is in progress", { tag: "@serial" }, async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "Ctrl+wheel is desktop input");
   await open(page, "report-form-3p.pdf");
   const line = page.getByTestId("page-1").locator('[data-testid="line"]').first();
