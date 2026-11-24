@@ -699,6 +699,15 @@ impl PdfFont {
         None
     }
 
+    /// The text other readers get for a code: the ToUnicode entry when the font has a ToUnicode
+    /// map (codes missing from it read as their raw values elsewhere), else [`Self::unicode`].
+    pub fn reader_unicode(&self, code: u32) -> Option<String> {
+        if self.to_unicode.is_empty() {
+            return self.unicode(code);
+        }
+        self.to_unicode.get(&code).filter(|t| !t.is_empty() && !t.contains('\u{0}')).cloned()
+    }
+
     /// For a Type 0 font without ToUnicode: reverse the embedded cmap (GID → Unicode).
     fn type0_unicode_from_program(&self, code: u32) -> Option<String> {
         let gid = self.gid_for(code)?;
@@ -775,6 +784,28 @@ impl PdfFont {
             }
         }
         None
+    }
+
+    /// The CID that draws a glyph of the embedded program, for Type 0 fonts.
+    pub fn cid_for_gid(&self, gid: u16) -> Option<u32> {
+        if !self.two_byte || !self.cmap_supported {
+            return None;
+        }
+        if let Some(m) = &self.cff_cid_to_gid {
+            return m.iter().find(|(_, g)| **g == gid).map(|(c, _)| *c as u32);
+        }
+        match &self.cid_to_gid {
+            Some(m) => m.iter().position(|&g| g == gid).map(|p| p as u32),
+            None => Some(gid as u32),
+        }
+    }
+
+    /// The embedded TrueType program, when the font has one.
+    pub fn truetype_program(&self) -> Option<&[u8]> {
+        match &self.program {
+            Program::TrueType(d) => Some(d),
+            _ => None,
+        }
     }
 
     /// Glyph index in the embedded program for a code (TrueType and CID fonts).
@@ -870,6 +901,45 @@ impl PdfFont {
             Program::None if !self.two_byte => {
                 let std = std14(strip_subset_prefix(&self.base_font).0)?;
                 std14_width(std, self.names.get(code as usize)?.as_deref()?)
+            }
+            _ => None,
+        }
+    }
+
+    /// Whether the embedded program's Unicode cmap maps `ch` to the glyph a code draws. Tells a
+    /// mirrored bracket glyph from the bracket its ToUnicode names.
+    pub fn program_maps(&self, code: u32, ch: char) -> bool {
+        let Program::TrueType(data) = &self.program else { return false };
+        let Ok(face) = ttf_parser::Face::parse(data, 0) else { return false };
+        let gid = if self.two_byte { self.gid_for(code) } else { self.simple_truetype_gid(&face, code) };
+        let (Some(gid), Some(cmap)) = (gid, face.tables().cmap) else { return false };
+        // A direct lookup per subtable: walking every codepoint of a hostile cmap could take
+        // millions of steps per glyph.
+        cmap.subtables.into_iter().any(|st| st.is_unicode() && st.glyph_index(ch as u32).map(|g| g.0) == Some(gid))
+    }
+
+    /// Horizontal extent of the glyph's ink in 1/1000 em, relative to its origin, when the
+    /// embedded program can tell. Marks often have no advance and draw left of their origin.
+    pub fn ink_x(&self, code: u32) -> Option<(f64, f64)> {
+        match &self.program {
+            Program::TrueType(data) => {
+                let face = ttf_parser::Face::parse(data, 0).ok()?;
+                let gid = if self.two_byte { self.gid_for(code)? } else { self.simple_truetype_gid(&face, code)? };
+                let b = face.glyph_bounding_box(ttf_parser::GlyphId(gid))?;
+                let k = 1000.0 / face.units_per_em() as f64;
+                Some((b.x_min as f64 * k, b.x_max as f64 * k))
+            }
+            Program::Cff(data) => {
+                let cff = ttf_parser::cff::Table::parse(data)?;
+                let gid = if self.two_byte {
+                    self.gid_for(code)?
+                } else {
+                    cff.glyph_index_by_name(self.names.get(code as usize)?.as_deref()?)?.0
+                };
+                let mut sink = NullOutline(false);
+                let b = cff.outline(ttf_parser::GlyphId(gid), &mut sink).ok()?;
+                let k = cff.matrix().sx as f64 * 1000.0;
+                Some((b.x_min as f64 * k, b.x_max as f64 * k))
             }
             _ => None,
         }

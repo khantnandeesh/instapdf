@@ -10,7 +10,16 @@ import { baseSecurityHeaders, CLOUD_COOP, contentSecurityPolicy, TOOL_PAGE_COOP 
  * by scripts/engine-precompress.mjs when the request accepts it. Route handlers can't send
  * Content-Encoding, so this is a rewrite to the static copy plus headers.
  */
-const ENGINE_TYPES = { "berry_engine_bg.wasm": "application/wasm", "berry_engine.js": "text/javascript; charset=utf-8" } as const;
+const WASM = "application/wasm";
+const JS = "text/javascript; charset=utf-8";
+// The shaping module is served the same way but loaded only on demand (never prefetched).
+const ENGINE_TYPES = {
+  "berry_engine_bg.wasm": WASM,
+  "berry_engine.js": JS,
+  "berry_engine_shaping_bg.wasm": WASM,
+  "berry_engine_shaping.js": JS,
+} as const;
+const PREFETCH_ENV = { "berry_engine.js": "ENGINE_JS_PATH", "berry_engine_bg.wasm": "ENGINE_WASM_PATH" } as const;
 // "br;q=0" refuses brotli: the patterns take a coding only when it is listed without q=0.
 const BR = { type: "header" as const, key: "accept-encoding", value: ACCEPTS_BR };
 const GZIP = { type: "header" as const, key: "accept-encoding", value: ACCEPTS_GZIP };
@@ -22,7 +31,9 @@ const nextConfig: NextConfig = {
   // F23: the cloud flags are always defined (empty when unset), so `process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"`
   // folds to a constant at build time and builds without cloud sources ship none of its code (AC-120).
   env: {
-    ...Object.fromEntries(engineFiles.map(({ file, source }) => [file === "berry_engine.js" ? "ENGINE_JS_PATH" : "ENGINE_WASM_PATH", source])),
+    ...Object.fromEntries(
+      engineFiles.flatMap(({ file, source }) => (file in PREFETCH_ENV ? [[PREFETCH_ENV[file as keyof typeof PREFETCH_ENV], source]] : [])),
+    ),
     NEXT_PUBLIC_CLOUD_SOURCES: process.env.NEXT_PUBLIC_CLOUD_SOURCES ?? "",
     NEXT_PUBLIC_CLOUD_MOCK: process.env.NEXT_PUBLIC_CLOUD_MOCK ?? "",
   },

@@ -11,7 +11,9 @@ pub enum Operand {
     Str(Vec<u8>),
     Name(Vec<u8>),
     Array(Vec<Operand>),
-    /// Dictionaries, booleans and null: kept only so parsing stays in sync.
+    /// An inline dictionary (marked-content properties), keys without the slash.
+    Dict(Vec<(Vec<u8>, Operand)>),
+    /// Booleans, null and anything past the nesting limit: kept only so parsing stays in sync.
     Other,
 }
 
@@ -22,6 +24,14 @@ impl Operand {
             _ => None,
         }
     }
+    /// Value of a key in an inline dictionary.
+    pub fn get(&self, key: &[u8]) -> Option<&Operand> {
+        match self {
+            Operand::Dict(entries) => entries.iter().find(|(k, _)| k == key).map(|(_, v)| v),
+            _ => None,
+        }
+    }
+
     pub fn name(&self) -> Option<&[u8]> {
         match self {
             Operand::Name(n) => Some(n),
@@ -217,14 +227,23 @@ impl<'a> Lexer<'a> {
                     return Tok::Operand(Operand::Other);
                 }
                 self.depth += 1;
+                let mut entries = Vec::new();
+                let mut key: Option<Vec<u8>> = None;
                 loop {
                     match self.next() {
                         Tok::DictEnd | Tok::Eof => break,
-                        _ => {}
+                        Tok::Operand(o) => match (key.take(), o) {
+                            (None, Operand::Name(k)) => key = Some(k),
+                            (Some(k), v) => entries.push((k, v)),
+                            (None, _) => {}
+                        },
+                        // true, false, null: kept as values the writer refuses to drop.
+                        Tok::Keyword(_) if key.is_some() => entries.push((key.take().unwrap(), Operand::Other)),
+                        _ => key = None,
                     }
                 }
                 self.depth -= 1;
-                Tok::Operand(Operand::Other)
+                Tok::Operand(Operand::Dict(entries))
             }
             b'<' => {
                 self.p += 1;
@@ -249,8 +268,9 @@ impl<'a> Lexer<'a> {
                     match self.next() {
                         Tok::Operand(o) => items.push(o),
                         Tok::ArrayEnd | Tok::Eof => break,
-                        // Keywords inside arrays (true/false/null or junk) are ignored.
-                        Tok::Keyword(_) | Tok::DictEnd => {}
+                        // Keywords inside arrays (true/false/null or junk) hold their place.
+                        Tok::Keyword(_) => items.push(Operand::Other),
+                        Tok::DictEnd => {}
                     }
                 }
                 self.depth -= 1;
@@ -429,6 +449,37 @@ pub fn fmt_name(name: &[u8], out: &mut Vec<u8>) {
             out.push(b);
         }
     }
+}
+
+/// Writes an operand back out. `None` when it holds a value the parser did not keep
+/// (booleans, null, past the nesting limit), so a rewrite would lose it.
+pub fn fmt_operand(op: &Operand, out: &mut Vec<u8>) -> Option<()> {
+    match op {
+        Operand::Num(n) => out.extend_from_slice(fmt_num(*n).as_bytes()),
+        Operand::Str(b) => fmt_string(b, out),
+        Operand::Name(n) => fmt_name(n, out),
+        Operand::Array(items) => {
+            out.push(b'[');
+            for (i, it) in items.iter().enumerate() {
+                if i > 0 {
+                    out.push(b' ');
+                }
+                fmt_operand(it, out)?;
+            }
+            out.push(b']');
+        }
+        Operand::Dict(entries) => {
+            out.extend_from_slice(b"<<");
+            for (k, v) in entries {
+                fmt_name(k, out);
+                out.push(b' ');
+                fmt_operand(v, out)?;
+            }
+            out.extend_from_slice(b">>");
+        }
+        Operand::Other => return None,
+    }
+    Some(())
 }
 
 #[cfg(test)]

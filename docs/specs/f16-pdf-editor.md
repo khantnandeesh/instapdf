@@ -260,6 +260,7 @@ Priority: P0 = parity must-have; P1 = parity nice-to-have or key differentiator;
 - **AC-19 (P2)** `type3.pdf` text is shown as not editable with the same fallback.
 
 ### Complex scripts (phase E4)
+Engine support for reading and editing existing Hindi and Arabic lines is specified in `f16-complex-scripts.md` (AC-200 to AC-215).
 - **AC-20 (P1)** (improvement) Adding new Hindi text "नमस्ते दुनिया" renders correctly shaped (render diff vs a HarfBuzz reference) and copy-paste from the output returns the same string.
 - **AC-21 (P1)** (improvement) Adding new Arabic text renders right-to-left with joined letters; extraction returns the logical string.
 - **AC-22 (P2)** (improvement) Replacing an existing Devanagari line in `scripts-hi-ar.pdf` replaces the whole run with correctly shaped text.
