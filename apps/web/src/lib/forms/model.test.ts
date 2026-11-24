@@ -114,6 +114,25 @@ describe("tab order (AC-239)", () => {
     expect(names(back, back.order)).toEqual(["b", "a", "c"]);
   });
 
+  it("moveInOrder counts positions among listed widgets; hidden ones keep their places", () => {
+    const st = (ids: string[], hiddenIds: string[]): FormState => ({
+      fields: ids.map((id) => ({ ...createField(emptyForm(), { kind: "text", page: "p0", box: { x: 0, y: 0, w: 10, h: 10 }, name: id }), id: `f${id}`, widgets: [{ id, page: "p0", x: 0, y: 0, w: 10, h: 10, hidden: hiddenIds.includes(id) || undefined }] })),
+      order: ids,
+      orderMode: "original",
+      originalOrder: ids,
+    });
+    const pages = [{ id: "p0", view: [0, 0, 600, 800] as [number, number, number, number], rotate: 0, baseRotate: 0, src: 0 }];
+    const s0 = st(["H", "A", "B", "C"], ["H"]);
+    expect(pageOrder(s0, "p0")).toEqual(["A", "B", "C"]);
+    expect(moveInOrder(s0, "A", 1, pages).order).toEqual(["H", "B", "A", "C"]);
+    expect(moveInOrder(s0, "C", 1, pages).order).toEqual(["H", "A", "C", "B"]);
+    expect(moveInOrder(s0, "C", 0, pages).order).toEqual(["H", "C", "A", "B"]);
+    expect(moveInOrder(s0, "A", 2, pages).order).toEqual(["H", "B", "C", "A"]);
+    const s1 = st(["A", "H", "B"], ["H"]);
+    expect(moveInOrder(s1, "B", 0, pages).order).toEqual(["B", "A", "H"]);
+    expect(moveInOrder(s1, "A", 1, pages).order).toEqual(["H", "B", "A"]);
+  });
+
   it("moveInOrder moves a widget within its page and keeps pages in page order", () => {
     let s = form({ kind: "text", name: "a", x: 0, y: 0 }, { kind: "text", name: "b", x: 0, y: 50 }, { kind: "text", name: "c", x: 0, y: 100 }, { kind: "text", name: "z", x: 0, y: 0, page: "p1" });
     const pages = [page("p0"), page("p1")];

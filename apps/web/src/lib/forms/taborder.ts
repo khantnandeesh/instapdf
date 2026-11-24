@@ -67,14 +67,21 @@ export function restoreOriginal(state: FormState): FormState {
   return { ...state, orderMode: "original", order: [...original, ...rest] };
 }
 
-/** Custom order: moves a widget to position `to` among the widgets of its page. */
+/**
+ * Custom order: moves a widget to position `to` among the widgets of its page that are listed
+ * (`pageOrder`: the file's hidden widgets left out). Hidden widgets keep their places.
+ */
 export function moveInOrder(state: FormState, widgetId: string, to: number, pages: FormPage[]): FormState {
   const pageOf = new Map(state.fields.flatMap((f) => f.widgets.map((w) => [w.id, w.page] as const)));
+  const hidden = new Set(state.fields.flatMap((f) => f.widgets.filter((w) => w.hidden).map((w) => w.id)));
   const page = pageOf.get(widgetId);
   if (page == null) return state;
   const onPage = state.order.filter((id) => pageOf.get(id) === page && id !== widgetId);
-  const clamped = Math.max(0, Math.min(to, onPage.length));
-  onPage.splice(clamped, 0, widgetId);
+  const shown = onPage.filter((id) => !hidden.has(id));
+  const clamped = Math.max(0, Math.min(to, shown.length));
+  // Before the listed widget now at `to`, or right after the last listed one.
+  const at = clamped < shown.length ? onPage.indexOf(shown[clamped]) : shown.length ? onPage.indexOf(shown[shown.length - 1]) + 1 : onPage.length;
+  onPage.splice(at, 0, widgetId);
   const pageIndex = new Map(pages.map((p, i) => [p.id, i]));
   const others = state.order.filter((id) => pageOf.get(id) !== page);
   // Rebuild: pages in page order, each page's ids in their (new) order.
