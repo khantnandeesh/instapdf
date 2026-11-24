@@ -1,0 +1,10 @@
+[package]
+name = "berry-fontmatch"
+description = "BerryPDF font matching: a fingerprint of a font's look from its outlines, and ranking against the font library index"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ttf-parser = "0.25"

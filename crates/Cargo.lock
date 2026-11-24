@@ -69,6 +69,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "berry-fontmatch"
+version = "0.1.0"
+dependencies = [
+ "ttf-parser",
+]
+
+[[package]]
 name = "berry-wasm"
 version = "0.1.0"
 dependencies = [
