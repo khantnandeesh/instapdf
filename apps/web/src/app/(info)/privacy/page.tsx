@@ -10,7 +10,7 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo/metadata";
 import { Code, Contact, Fill, LegalPage, List, Section, Sub, Summary, TextLink } from "@/components/legal/Legal";
 import { legalFacts as f } from "@/components/legal/facts";
-import { cloudEnabled } from "@/lib/cloud/providers";
+import { configuredProviders } from "@/lib/cloud/providers";
 
 export const metadata: Metadata = pageMetadata({
   path: "/privacy",
@@ -19,7 +19,9 @@ export const metadata: Metadata = pageMetadata({
 });
 
 export default function PrivacyPage() {
-  const cloud = cloudEnabled();
+  // F23: the clouds this build offers (none without cloud sources: the page stays as it was).
+  const providers = configuredProviders();
+  const cloud = providers.length > 0;
   return (
     <LegalPage
       title="Privacy"
@@ -119,7 +121,7 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      {/* F23: only in builds with cloud sources (otherwise there are none, and the page stays as it was). */}
+      {/* F23: only in builds that offer a cloud. */}
       {cloud && (
         <Section id="third-party" title="Third-party services (cloud storage)">
           <p>
@@ -129,17 +131,23 @@ export default function PrivacyPage() {
             device like any other file. Nothing passes through our servers.
           </p>
           <List>
-            <li>
-              <strong className="font-bold text-ink">Dropbox Chooser</strong> (Dropbox, Inc.) for choosing files from Dropbox.
-            </li>
-            <li>
-              <strong className="font-bold text-ink">Google Picker and Google Identity Services</strong> (Google LLC) for signing in to Google Drive, choosing files
-              and saving results. We ask only for access to the files you pick or that BerryPDF creates (the <Code>drive.file</Code> permission).
-            </li>
-            <li>
-              <strong className="font-bold text-ink">Microsoft sign-in and the OneDrive file picker</strong> (Microsoft Corporation) for OneDrive, including saving
-              results.
-            </li>
+            {providers.includes("dropbox") && (
+              <li>
+                <strong className="font-bold text-ink">Dropbox Chooser</strong> (Dropbox, Inc.) for choosing files from Dropbox.
+              </li>
+            )}
+            {providers.includes("google") && (
+              <li>
+                <strong className="font-bold text-ink">Google Picker and Google Identity Services</strong> (Google LLC) for signing in to Google Drive, choosing
+                files and saving results. We ask only for access to the files you pick or that BerryPDF creates (the <Code>drive.file</Code> permission).
+              </li>
+            )}
+            {providers.includes("onedrive") && (
+              <li>
+                <strong className="font-bold text-ink">Microsoft sign-in and the OneDrive file picker</strong> (Microsoft Corporation) for OneDrive, including
+                saving results.
+              </li>
+            )}
           </List>
           <p>
             The access the provider gives us is kept in that window&apos;s memory only. It is never stored and never sent to us, and it is gone when the window
