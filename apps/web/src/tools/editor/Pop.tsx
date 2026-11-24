@@ -57,11 +57,21 @@ export function Pop({
       if (isOpen) {
         place();
         onOpen?.();
-        requestAnimationFrame(() => (p.querySelector<HTMLElement>("[data-autofocus], [aria-checked=true], button, input, [tabindex='0']"))?.focus());
+        // On a touch screen a focused text field would raise the keyboard over the panel: the
+        // first control takes the focus instead.
+        const touch = matchMedia("(pointer: coarse)").matches;
+        requestAnimationFrame(() => p.querySelector<HTMLElement>(touch ? "[aria-checked=true], [aria-selected=true], button, [tabindex='0']" : "[data-autofocus], [aria-checked=true], button, input, [tabindex='0']")?.focus({ preventScroll: true }));
       }
     };
     p.addEventListener("toggle", onToggle);
-    return () => p.removeEventListener("toggle", onToggle);
+    // The content is drawn after the panel opens and can grow (a list that loads): place it
+    // again whenever its size changes, so a panel opened near the bottom edge stays on screen.
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => p.matches(":popover-open") && place());
+    ro?.observe(p);
+    return () => {
+      p.removeEventListener("toggle", onToggle);
+      ro?.disconnect();
+    };
   }, [place, onOpen]);
 
   const close = useCallback(() => {

@@ -73,6 +73,11 @@ export type EditorState = {
   pendingLine: { src: number; at: [number, number] } | null;
   /** Line being edited (Edit text). */
   lineEdit: { src: number; line: number; text: string } | null;
+  /**
+   * A line was edited with characters its font lacks, so another font draws them (F24). Shown
+   * as an inline notice that offers another font; never blocks typing.
+   */
+  fontNotice: { original: string; standIn: string; standInId: string; fontName: string; src: number; line: number; text: string; key: number } | null;
   busy: "edit" | "save" | null;
   panel: boolean;
   panelTab: "pages" | "objects" | "history";

@@ -174,6 +174,31 @@ function fontEntries() {
       texts: [{ file: label, text }],
     });
   }
+  // The font library's in-app copy (F24): one entry a family, with the licence text published
+  // beside its files (public/fonts/lib/licences/<id>.txt, written by scripts/font-library).
+  const lib = join(fontsDir, "lib");
+  if (existsSync(join(lib, "manifest.json"))) {
+    const manifest = JSON.parse(readFileSync(join(lib, "manifest.json"), "utf8"));
+    for (const row of JSON.parse(readFileSync(join(lib, manifest.families), "utf8"))) {
+      const file = join(lib, "licences", `${row.i}.txt`);
+      const text = existsSync(file) ? readFileSync(file, "utf8").trim() : "";
+      if (!text) {
+        console.error(`licenses: font library family ${row.i} has no licence text`);
+        process.exit(1);
+      }
+      entries.push({
+        kind: "font",
+        library: true,
+        name: `${row.n} (font library)`,
+        version: "self-hosted",
+        license: row.l,
+        copyright: copyrightLines(text),
+        author: null,
+        homepage: null,
+        texts: [{ file: `fonts/lib/licences/${row.i}.txt`, text }],
+      });
+    }
+  }
   return entries;
 }
 
