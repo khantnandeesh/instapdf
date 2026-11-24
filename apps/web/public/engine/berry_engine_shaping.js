@@ -162,6 +162,14 @@ export class BerryDocument {
         }
     }
     /**
+     * Objects numbered above this were made by this engine's own edits (a trust boundary).
+     * @returns {number}
+     */
+    madeAfter() {
+        const ret = wasm.berrydocument_madeAfter(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * Opens a PDF from its bytes.
      * @param {Uint8Array | number[]} bytes
      * @param {string | null} [password]
@@ -209,6 +217,32 @@ export class BerryDocument {
         try {
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16) >>> 0;
             wasm.berrydocument_pageText(retptr, this.__wbg_ptr, page);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeFromExternrefTable0(r1);
+            }
+            return takeFromExternrefTable0(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * How a complex-script line would look with `text` (nothing is changed): `{ paths, glyphs }`.
+     * @param {number} page
+     * @param {number} line
+     * @param {string} text
+     * @returns {any}
+     */
+    previewLine(page, line, text) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16) >>> 0;
+            const val2 = +page;
+            const val3 = +line;
+            const ptr0 = passStringToWasm0(text, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.berrydocument_previewLine(retptr, this.__wbg_ptr, val2, val3, ptr0, len0);
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
             var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
@@ -292,6 +326,13 @@ export class BerryDocument {
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
         }
+    }
+    /**
+     * Restores `madeAfter` after reopening the editor's own output; clamped to the document.
+     * @param {number} n
+     */
+    setMadeAfter(n) {
+        wasm.berrydocument_setMadeAfter(this.__wbg_ptr, n);
     }
     /**
      * Lays out one line of new text with the registered fonts.

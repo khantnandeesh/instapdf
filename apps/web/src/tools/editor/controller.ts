@@ -639,8 +639,31 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
      * font and style gets its own closest font.
      */
     async replaceWithStandIn(e: { src: number; line: number; text: string }, page: PageText | undefined) {
-      const call = { op: "replace", page: e.src, line: e.line, text: e.text } as const;
-      const runs = page?.lines[e.line]?.runs ?? [];
+      return ctl.withStandIn({ op: "replace", page: e.src, line: e.line, text: e.text } as const, page, () => true);
+    },
+    /**
+     * How a Hindi, Arabic or other complex-script line would look with `text` (nothing changes):
+     * the edit box draws these glyphs, since a browser can't join letters with a PDF's subset. A
+     * font the line lacks is registered as for the edit itself, so the preview is what Enter writes.
+     */
+    async previewLine(src: number, line: number, text: string, wanted: () => boolean) {
+      return (await ctl.withStandIn({ op: "preview", page: src, line, text } as const, store.get().texts[src], wanted)).preview;
+    },
+    /** The edit or preview whose fonts are being registered: one at a time, so they never interleave. */
+    standInTurn: Promise.resolve() as Promise<unknown>,
+    /**
+     * Runs an edit (or its preview), registering the closest font for characters the line's fonts
+     * lack. One at a time; a preview no longer `wanted` (the box moved on) stops before registering.
+     */
+    withStandIn<C extends { op: "replace" | "preview"; page: number; line: number; text: string }>(call: C, page: PageText | undefined, wanted: () => boolean) {
+      const run = ctl.standInTurn.then(() => ctl.standInRun(call, page, wanted));
+      ctl.standInTurn = run.catch(() => undefined);
+      return run;
+    },
+    async standInRun<C extends { op: "replace" | "preview"; page: number; line: number; text: string }>(call: C, page: PageText | undefined, wanted: () => boolean) {
+      const stale = () => ({ kind: "unsupported", reason: "preview-stale" });
+      if (!wanted()) throw stale();
+      const runs = page?.lines[call.line]?.runs ?? [];
       const fonts = [...new Set(runs.map((r) => r.font))].map((i) => page!.fonts[i]).filter(Boolean);
       const key = fonts.map((f) => `${f.name}|${f.bold}|${f.italic}`).sort().join(",");
       if (ctl.standIns.size && key !== ctl.standInKey) {
@@ -654,9 +677,12 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         // The font the engine asks about: the run whose family it names, else the line's first.
         const asked = foldName(err.request.families[0] ?? "");
         const info = fonts.find((f) => asked && foldName(f.family || f.name) === asked && f.bold === err.request.bold && f.italic === err.request.italic) ?? fonts.find((f) => asked && foldName(f.family || f.name) === asked) ?? fonts[0];
+        if (!wanted()) throw stale();
         ctl.standInKey = key;
-        ctl.standInFor = asked;
+        // The person's choice is kept under the font an edit asked about (a preview writes nothing).
+        if (call.op === "replace") ctl.standInFor = asked;
         for (const id of await standInCandidates(info, err.request, err.chars)) {
+          if (!wanted()) throw stale();
           if (!(await registerWithEngine(id, err.request.bold, err.request.italic, err.chars))) continue;
           ctl.standIns.set(fontLabel(id), id);
           try {

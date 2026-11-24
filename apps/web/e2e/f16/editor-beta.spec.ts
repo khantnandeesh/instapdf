@@ -188,7 +188,7 @@ test("a save that fails after an edit drops only that edit; Download keeps the e
   await page.getByTestId("line-input").fill("Items");
   await page.getByTestId("line-input").press("Enter");
   await expect(page.getByTestId("editor-notice")).toContainText("Saving this edit failed, so the line is unchanged.");
-  // What was typed is kept in the box (F24 AC-305); the file is as it was before this edit.
+  // What was typed is kept in the box (F24 AC-310); the file is as it was before this edit.
   await expect(page.getByTestId("line-input")).toHaveText("Items");
   await page.getByTestId("line-input").press("Escape");
   await expect(cell).toHaveCount(1);
@@ -212,7 +212,7 @@ test("if reopening after a save fails, the edit is dropped and earlier edits sti
   await page.getByTestId("line-input").fill("Items");
   await page.getByTestId("line-input").press("Enter");
   await expect(page.getByTestId("editor-notice")).toContainText("restarted");
-  // What was typed is kept in the box (F24 AC-305); the file is as it was before this edit.
+  // What was typed is kept in the box (F24 AC-310); the file is as it was before this edit.
   await expect(page.getByTestId("line-input")).toHaveText("Items");
   await page.getByTestId("line-input").press("Escape");
   await expect(cell).toHaveCount(1);

@@ -202,6 +202,14 @@ enum ColorSpace {
     Other,
 }
 
+/// The part of `r` inside `clip` (all of it when there is no clip).
+pub(crate) fn meet(clip: Option<[f64; 4]>, r: [f64; 4]) -> [f64; 4] {
+    match clip {
+        Some(c) => [c[0].max(r[0]), c[1].max(r[1]), c[2].min(r[2]), c[3].min(r[3])],
+        None => r,
+    }
+}
+
 #[derive(Clone, Copy)]
 enum PathSoFar {
     Empty,
@@ -458,10 +466,8 @@ impl<'a> Interp<'a> {
             font_res: Vec::new(),
         };
         let mut stack: Vec<GState> = Vec::new();
-        // The path being built: its box while it is one upright rectangle, and whether `W` asked
-        // for it to become the clip when it is painted.
+        // The path being built: its box while it is one upright rectangle.
         let mut path: PathSoFar = PathSoFar::Empty;
-        let mut clip_next = false;
         let mut tm = Matrix::IDENTITY;
         let mut tlm = Matrix::IDENTITY;
         let mut events: Vec<TextEvent> = Vec::new();
@@ -489,30 +495,23 @@ impl<'a> Interp<'a> {
                 }
                 b"cm" => gs.ctm = Matrix([n(0), n(1), n(2), n(3), n(4), n(5)]).then(&gs.ctm),
                 b"re" => {
-                    let [a, b, c, d, ..] = gs.ctm.0;
-                    let upright = (b.abs() < 1e-9 && c.abs() < 1e-9) || (a.abs() < 1e-9 && d.abs() < 1e-9);
-                    path = match (&path, upright) {
-                        (PathSoFar::Empty, true) => {
-                            let (p, q) = (gs.ctm.apply(n(0), n(1)), gs.ctm.apply(n(0) + n(2), n(1) + n(3)));
-                            PathSoFar::Rect([p.0.min(q.0), p.1.min(q.1), p.0.max(q.0), p.1.max(q.1)])
-                        }
-                        _ => PathSoFar::Other,
+                    let [_, b, c, ..] = gs.ctm.0;
+                    path = if matches!(path, PathSoFar::Empty) && b == 0.0 && c == 0.0 {
+                        let (p, q) = (gs.ctm.apply(n(0), n(1)), gs.ctm.apply(n(0) + n(2), n(1) + n(3)));
+                        PathSoFar::Rect([p.0.min(q.0), p.1.min(q.1), p.0.max(q.0), p.1.max(q.1)])
+                    } else {
+                        PathSoFar::Other
                     };
                 }
                 b"m" | b"l" | b"c" | b"v" | b"y" | b"h" => path = PathSoFar::Other,
-                b"W" | b"W*" => clip_next = true,
-                b"n" | b"S" | b"s" | b"f" | b"F" | b"f*" | b"B" | b"B*" | b"b" | b"b*" => {
-                    if clip_next {
-                        if let PathSoFar::Rect(r) = path {
-                            gs.clip = Some(match gs.clip {
-                                Some(c) => [c[0].max(r[0]), c[1].max(r[1]), c[2].min(r[2]), c[3].min(r[3])],
-                                None => r,
-                            });
-                        }
+                // `W` makes the path built so far the clip (from the paint that follows, which is
+                // the next operator in practice).
+                b"W" | b"W*" => {
+                    if let PathSoFar::Rect(r) = path {
+                        gs.clip = Some(meet(gs.clip, r));
                     }
-                    path = PathSoFar::Empty;
-                    clip_next = false;
                 }
+                b"n" | b"S" | b"s" | b"f" | b"F" | b"f*" | b"B" | b"B*" | b"b" | b"b*" => path = PathSoFar::Empty,
                 b"BT" => {
                     tm = Matrix::IDENTITY;
                     tlm = Matrix::IDENTITY;

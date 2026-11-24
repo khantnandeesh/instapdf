@@ -8,12 +8,19 @@
  * A typed character the font lacks is underlined where it stands and named under the box, with
  * the closest fonts that have it; the one picked draws it at once, here and in the file. Typing
  * is never blocked.
+ *
+ * Hindi, Arabic and other joined scripts: a browser can't join their letters with a PDF's subset
+ * (it has the glyphs, not the joining rules), so the engine lays the line out as the edit would
+ * draw it (previewLine) and the box draws those outlines over its own text, which stays for the
+ * caret and typing but is not seen. Opening the box changes nothing on screen, and what is shown
+ * while typing is what Enter writes. Where the engine can't preview, a font that joins letters
+ * stands in, as before.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import type { FontInfo, PageText } from "@/lib/editor/berry-engine";
+import type { FontInfo, LinePreview, PageText } from "@/lib/editor/berry-engine";
 import { cssFamily, faceOf, fileFor } from "@/lib/editor/fonts";
-import { isComplex } from "@/lib/editor/shaping";
+import { isComplex, needsShaping } from "@/lib/editor/shaping";
 import { ensureFace, knownManifest, resolveFonts } from "@/lib/editor/fonts-browser";
 import { foldName } from "@/lib/font-library/client";
 import { cx } from "@/components/ui/cx";
@@ -110,6 +117,7 @@ export function LineEditBox({
   maxWidth,
   paperInset,
   around,
+  pageOrigin,
   point,
   paper,
   onChange,
@@ -131,6 +139,8 @@ export function LineEditBox({
   paperInset: { top: number; bottom: number };
   /** Where the text of the lines around this one is drawn (layer pixels): the hint keeps off it where it can. */
   around: { left: number; right: number; top: number; bottom: number }[];
+  /** Where the page's user-space origin is, in the layer's pixels, on an upright page (null when turned): engine glyphs are drawn from it. */
+  pageOrigin: { x: number; y: number } | null;
   /** Where the line was clicked (viewport pixels): the caret goes there. */
   point: { x: number; y: number } | null;
   /** The page's colour under the line. */
@@ -199,9 +209,66 @@ export function LineEditBox({
   const [nudge, setNudge] = useState<{ key: string; px: number } | null>(null);
   const turned = !!box.transform;
   const boxTop = box.top;
+  /** The line as the engine draws it (joined scripts), and whether it is the text in the box now. */
+  const [drawn, setDrawn] = useState<{ preview: LinePreview; current: boolean } | null>(null);
   const settled = fontIds.every((i) => i in faces);
   // Shown in the document's fonts only; a font that never arrives gives way after a long wait.
-  const ready = settled || waited;
+  const ready = settled || waited || !!drawn;
+  /** Joined-script lines on an upright page are drawn from the engine's glyphs. */
+  const engineDrawn = !!pageOrigin && !turned && (needsShaping(line.text) || needsShaping(value));
+  const glyphsRef = useRef<SVGGElement>(null);
+  /** Where the drawn glyphs' ink starts and ends, from the box's left edge (CSS px). */
+  const [ink, setInk] = useState<{ left: number; right: number } | null>(null);
+  const previewWanted = useRef<string | null>(null);
+  const previewBusy = useRef(false);
+  /** Counts requests (and cancels): a result is used only if nothing was asked since. */
+  const previewSeq = useRef(0);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  /** Asks the engine for the line with `t`; one request at a time, always for the latest text. */
+  const requestPreview = (t: string) => {
+    previewSeq.current++;
+    previewWanted.current = t;
+    setDrawn((d) => (d && d.current ? { ...d, current: false } : d));
+    if (previewBusy.current) return;
+    previewBusy.current = true;
+    void (async () => {
+      while (alive.current && previewWanted.current !== null) {
+        const asked = previewWanted.current;
+        const seq = previewSeq.current;
+        previewWanted.current = null;
+        let got: LinePreview | null = null;
+        try {
+          got = await ctl.previewLine(text.page, line.id, asked, () => alive.current && previewSeq.current === seq);
+        } catch {
+          // Refused or not drawable: the stand-in text shows what is typed.
+        }
+        if (!alive.current || previewSeq.current !== seq) continue;
+        if (got) setDrawn({ preview: got, current: true });
+        else {
+          // The stand-in font shows the text, at its own spacing, and the caret goes where the click landed.
+          setDrawn(null);
+          setFit(null);
+          if (caretTodo.current) {
+            caretTodo.current = false;
+            placeCaret();
+          }
+        }
+      }
+      previewBusy.current = false;
+    })();
+  };
+  /** The text no longer needs the engine's glyphs (the joined letters were deleted): the box's own text shows. */
+  const stopPreview = () => {
+    previewSeq.current++;
+    previewWanted.current = null;
+    setDrawn(null);
+  };
   const standInRef = useRef(standIn);
   standInRef.current = standIn;
   const facesRef = useRef(faces);
@@ -226,10 +293,15 @@ export function LineEditBox({
     return () => input?.removeEventListener("cancel", back);
   }, []);
   const caretTodo = useRef(false);
+  /** Where the caret was put on opening: placed again at the click only while it is still there. */
+  const opened = useRef<{ node: Node | null; offset: number } | null>(null);
   const placeCaret = () => {
     const caret = point && !touched.current && el.current ? caretAt(el.current, point.x, point.y) : null;
     if (!caret) return;
     const sel = getSelection();
+    // The person already moved the caret or selected text (a key, a click, select-all): theirs stands.
+    const at = opened.current;
+    if (sel && at && (!sel.isCollapsed || sel.anchorNode !== at.node || sel.anchorOffset !== at.offset)) return;
     sel?.removeAllRanges();
     sel?.addRange(caret);
   };
@@ -290,6 +362,7 @@ export function LineEditBox({
     const sel = getSelection();
     sel?.removeAllRanges();
     sel?.addRange(end);
+    opened.current = { node: end.startContainer, offset: end.startOffset };
     return () => {
       box.removeEventListener("beforeinput", guard);
       mark([]);
@@ -299,6 +372,7 @@ export function LineEditBox({
   }, []);
 
   useEffect(() => {
+    if (engineDrawn) requestPreview(value);
     let alive = true;
     for (const i of fontIds) {
       const info = text.fonts[i];
@@ -350,7 +424,8 @@ export function LineEditBox({
       placed.current = true;
       let fitted = false;
       // Fitted to the line's length on the page (justified text, tracking), measured once.
-      if (!turned && value === line.text && length > 0) {
+      // (Lines drawn from the engine's glyphs are fitted to those glyphs instead, below.)
+      if (!turned && value === line.text && length > 0 && !engineDrawn) {
         const all = document.createRange();
         all.selectNodeContents(box);
         const diff = length - all.getBoundingClientRect().width;
@@ -360,11 +435,40 @@ export function LineEditBox({
         if (fitted) setFit(spaces ? { word: diff / spaces / scale } : { letter: diff / letters / scale });
       }
       // The caret goes where the click landed, once the text is at its final length.
-      if (fitted) caretTodo.current = true;
+      if (fitted || engineDrawn) caretTodo.current = true;
       else placeCaret();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [faces, standIn, scale, ready, settled]);
+
+  // The box covers the drawn glyphs, and its unseen text is spread to their length so the caret
+  // stands where they end.
+  useLayoutEffect(() => {
+    const g = glyphsRef.current;
+    const input = el.current;
+    // Only glyphs of the text in the box now: a stale drawing would fit the text to the old length.
+    if (!drawn?.current || !g || !input?.parentElement) return;
+    const frame = input.parentElement.getBoundingClientRect();
+    const r = g.getBoundingClientRect();
+    if (!r.width) return;
+    const left = r.left - frame.left;
+    const right = r.right - frame.left;
+    setInk((s) => (s && Math.abs(s.left - left) < 0.5 && Math.abs(s.right - right) < 0.5 ? s : { left, right }));
+    const all = document.createRange();
+    all.selectNodeContents(input);
+    const diff = r.width - all.getBoundingClientRect().width;
+    const t = input.textContent ?? "";
+    const spaces = (t.trim().match(/ /g) ?? []).length;
+    if (Math.abs(diff) > 0.5 && Math.abs(diff) < r.width * 0.5)
+      setFit((f) => (spaces ? { word: (f?.word ?? 0) + diff / spaces / scale } : { letter: (f?.letter ?? 0) + diff / Math.max(1, [...t].length) / scale }));
+    else if (caretTodo.current) {
+      // The caret goes where the click landed once the text lies under the glyphs.
+      caretTodo.current = false;
+      placeCaret();
+    }
+    // Again when a font arrives or the page is zoomed: the unseen text's length changes with them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawn, faces, scale]);
 
   useLayoutEffect(() => {
     if (!fit || !caretTodo.current) return;
@@ -467,6 +571,13 @@ export function LineEditBox({
     ...(fit?.letter !== undefined ? { letterSpacing: fit.letter * scale } : null),
   };
   const settling = !ready || paperColor === null;
+  // A right-to-left line keeps its right end as it grows, as the engine draws it, and the box
+  // reaches past the drawn glyphs' ends.
+  if ((drawn || engineDrawn) && line.direction === "rtl") Object.assign(type, { left: "auto", right: 0 });
+  if (drawn && ink && !box.transform) {
+    const need = line.direction === "rtl" ? box.width - ink.left + 4 : ink.right + 4;
+    type.minWidth = Math.max(box.width, need);
+  }
   const hintId = `ed-miss-${line.id}`;
   // The hint goes where it hides no text: under the box, starting at the missing character,
   // when nothing is drawn there; else beside the box on the line's own row (a short line has
@@ -612,14 +723,18 @@ export function LineEditBox({
         data-faces={fontIds.map((i) => faces[i]?.kind ?? (i in faces ? "none" : "pending")).join(" ")}
         data-missing={missing?.chars.join("") ?? ""}
         data-inset={[paperInset.top > 0 && "top", paperInset.bottom > 0 && "bottom"].filter(Boolean).join(" ")}
-        className={cx("ed-input absolute left-0 top-0 rounded-[4px]", settling && "ed-input--settling")}
+        data-drawn={drawn ? (drawn.current ? "engine" : "engine-pending") : engineDrawn ? "stand-in" : undefined}
+        className={cx("ed-input absolute left-0 top-0 rounded-[4px]", settling && "ed-input--settling", drawn && "ed-input--drawn")}
         style={type}
         // Back in the box (a file chooser closed without telling): leaving it ends the edit again.
         onFocus={() => (choosing.current = false)}
         onInput={(e) => {
           choosing.current = false;
           touched.current = true;
-          onChange(cleaned(e.currentTarget.textContent));
+          const now = cleaned(e.currentTarget.textContent);
+          onChange(now);
+          if (pageOrigin && !turned && (needsShaping(line.text) || needsShaping(now))) requestPreview(now);
+          else stopPreview();
           rescan();
         }}
         onCompositionStart={() => (composing.current = true)}
@@ -629,9 +744,14 @@ export function LineEditBox({
           document.execCommand("insertText", false, cleaned(e.clipboardData.getData("text/plain")));
         }}
         onDrop={(e) => e.preventDefault()}
-        onPointerDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          touched.current = true;
+        }}
         onKeyDown={(e) => {
           e.stopPropagation();
+          // A key before the caret was placed at the click (End, an arrow): the person's caret stands.
+          touched.current = true;
           // Enter that finishes a composition (an input method) is not the end of the edit.
           if (e.nativeEvent.isComposing || e.keyCode === 229) return;
           // The docked hint is elsewhere in the page: Tab goes to its fonts all the same.
@@ -650,6 +770,21 @@ export function LineEditBox({
           }
         }}
       />
+      {drawn && pageOrigin && (
+        // The line's glyphs as the engine draws them, over the box's own (unseen) text.
+        <svg className="ed-input__glyphs" aria-hidden="true" data-testid="line-glyphs" width="1" height="1">
+          <g ref={glyphsRef} transform={`translate(${pageOrigin.x - box.left} ${pageOrigin.y - box.top}) scale(${scale} ${-scale})`}>
+            {drawn.preview.glyphs.map((g, i) => (
+              <path
+                key={i}
+                d={drawn.preview.paths[g.path]}
+                fill={`rgb(${g.color.join(" ")})`}
+                transform={`translate(${g.x} ${g.y}) rotate(${g.angle}) scale(${g.width / 1000} ${g.size / 1000})`}
+              />
+            ))}
+          </g>
+        </svg>
+      )}
       {missing && (docked ? createPortal(hint, slot!) : hint)}
       <input
         ref={ownFile}

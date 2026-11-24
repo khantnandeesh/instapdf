@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { InsertKind, PageAction } from "@/components/page-edit/EditablePageGrid";
 import { loadCloud } from "@/components/cloud/tool-cloud";
+import { onIntent } from "@/components/tool-flow/intent";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
 import type { FlowApi, LoadedFile, ProcessFn, WorkspaceContext } from "@/components/tool-flow/types";
 import { cx } from "@/components/ui/cx";
@@ -629,23 +630,7 @@ export function MergeTool() {
   // Prefetch the workspace chunks at the first sign of intent (a pointer, key, focus or drag: the
   // file chooser then hides the load) or after 4 s, so the first pick never waits for them and the
   // first load stays within the phone JS budget (SEO checklist).
-  useEffect(() => {
-    const events = ["pointerdown", "keydown", "focusin", "dragenter"] as const;
-    let done = false;
-    const go = () => {
-      if (done) return;
-      done = true;
-      stop();
-      void Promise.all([loadSegmentGrid(), prefetchMenu()]).catch(() => {});
-    };
-    const t = setTimeout(go, 4000);
-    const stop = () => {
-      clearTimeout(t);
-      for (const e of events) window.removeEventListener(e, go, true);
-    };
-    for (const e of events) window.addEventListener(e, go, true);
-    return stop;
-  }, []);
+  useEffect(() => onIntent(() => void Promise.all([loadSegmentGrid(), prefetchMenu()]).catch(() => {})), []);
 
   // Load the pages view chunk on idle once there is something to show.
   useEffect(() => {

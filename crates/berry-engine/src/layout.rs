@@ -417,12 +417,21 @@ fn bidi_logical(pc: &PageContent, units: &mut Vec<Unit>, reversed_hint: bool) ->
     }
     let n_l = cls.iter().filter(|c| **c == Class::L).count();
     let rtl = reversed_hint || n_r >= n_l;
-    // Separators between digits are part of the number (1,000 and 2.5).
+    // Separators between digits are part of the number (1,000 and 2.5), and so is a plus or
+    // minus between European digits (050-1234567, 2024-2025: UAX #9, W4).
+    let european = |u: &Unit, last: bool| {
+        let c = if last { u.text.chars().next_back() } else { u.text.chars().next() };
+        c.is_some_and(|c| c.is_ascii_digit())
+    };
     for i in 1..cls.len().saturating_sub(1) {
         if cls[i] == Class::N
             && cls[i - 1] == Class::D
             && cls[i + 1] == Class::D
-            && units[i].text.chars().all(|c| matches!(c, ',' | '.' | '\u{66B}' | '\u{66C}' | '/' | ':'))
+            && (units[i].text.chars().all(|c| matches!(c, ',' | '.' | '\u{66B}' | '\u{66C}' | '/' | ':'))
+                || (units[i].text.chars().all(|c| matches!(c, '-' | '+' | '\u{2212}'))
+                    && units[i].text.chars().count() == 1
+                    && european(&units[i - 1], true)
+                    && european(&units[i + 1], false)))
         {
             cls[i] = Class::D;
         }
@@ -482,7 +491,18 @@ fn bidi_logical(pc: &PageContent, units: &mut Vec<Unit>, reversed_hint: bool) ->
         let right = (j..n).find(|&k| level[k] != 255).map(|k| dir(level[k]));
         let base = if rtl { 'R' } else { 'L' };
         let (left, right) = (left.unwrap_or(base), right.unwrap_or(base));
+        // A space between two numbers in a right-to-left line: numbers act as right-to-left
+        // there (UAX #9, N1), so "2024 7" reads as two numbers, not one run read backwards.
+        // Unless left-to-right letters lead into them ("abc 12 34" is one left-to-right run).
+        let digits = |k: Option<usize>| k.is_some_and(|k| cls[k] == Class::D);
+        let letter = |ks: &mut dyn Iterator<Item = usize>| ks.map(|k| cls[k]).find(|c| matches!(c, Class::L | Class::R));
+        let between_numbers = rtl
+            && digits((0..i).rev().find(|&k| cls[k] != Class::N))
+            && digits((j..n).find(|&k| cls[k] != Class::N))
+            && letter(&mut (0..i).rev()) != Some(Class::L)
+            && letter(&mut (j..n)) != Some(Class::L);
         let lv = match (left, right) {
+            _ if between_numbers => 1,
             ('R', 'R') => 1,
             ('L', 'L') => {
                 if rtl {

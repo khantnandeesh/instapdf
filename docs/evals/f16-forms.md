@@ -1,10 +1,165 @@
 # F16 E3 forms: parity evaluation (step 8)
 
-- **Verdict: FAIL.**
-- **Date:** 2026-11-24, 16:01 to 16:40 UTC.
-- **Build:** BerryPDF staging `https://web-staging-qzq5fa2g7q-uc.a.run.app/edit-pdf` (main at 341fa82, includes the forms merge 05dd84c, deployed 15:59 UTC).
+- **Verdict (updated 2026-11-24 20:25 UTC, staging bc02fa1): FAIL on M2 only.** No forms blocker remains: every AC passes (24 / 24, all P0) and every forms gap that blocked the first run is fixed. **M12 is now a win** (re-measured on bc02fa1, see "M12 re-measure" below). The gate still fails on one micro-check lose that this feature does not own: **M2** (no cloud or URL source, owned by the cloud pickers work, behind a flag until the owner creates the OAuth apps). The owner has not waived it. Once M2 lands, the verdict becomes PASS without a forms re-run (lead, 2026-11-24: no waiver).
+- Re-evaluation verdict (18:14–18:40 UTC, staging 3fc9e65): FAIL on M2 and M12 (cross-cutting only). Details are in the re-evaluation section below.
+- First run verdict (16:01–16:40 UTC, staging 341fa82): FAIL.
+- **First run date:** 2026-11-24, 16:01 to 16:40 UTC.
+- **First run build:** BerryPDF staging `https://web-staging-qzq5fa2g7q-uc.a.run.app/edit-pdf` (main at 341fa82, includes the forms merge 05dd84c, deployed 15:59 UTC).
 - **Reference:** Sejda online PDF editor, `https://www.sejda.com/pdf-editor`, Forms menu.
 - **Evaluator:** independent. I read only the spec (`docs/specs/f16-pdf-editor.md` §AC-230 to AC-253 and U-F1 to U-F8), `docs/process/mission.md`, `docs/process/editor-micro-checks.md`, the earlier evals and the fixtures. I did not read `apps/`, `services/`, `infra/` or any PR description.
+
+## Re-evaluation (2026-11-24, staging 3fc9e65)
+
+- **Build:** `https://web-staging-qzq5fa2g7q-uc.a.run.app/edit-pdf`, main at 3fc9e65, deployed 18:14 UTC. Runs took place from 18:14 to 18:40 UTC.
+- **Evaluator:** independent. I read only this file, the spec ACs (AC-230 to AC-253, U-F1 to U-F8) and the fixtures in `tests/parity/forms/`. I did not read `apps/`, `services/`, `infra/` or any PR description or builder note.
+- **Reference tasks run: 0.** Every reference comparison reuses the cached outputs and screenshots from the first run (`sejda-t1-fill.pdf`, `sejda-t2-create.pdf`, `sejda-t3-detect.pdf`, `sejda-runs.json`, `vp/sejda-*`). This run made no requests to the reference site.
+- **Method:**
+  - Browser: headless Playwright Chromium (`chromium.launch()`) only. Desktop runs used 1280×800 and 1280×1100. Phone runs used 390×844 and 375×812 with touch on. M12 used the five real viewports plus 375×812 and 1280×800.
+  - Outputs: each one was checked with pikepdf 10.18.2 `check_pdf_syntax()`, its raw structure read with pikepdf, its annotations read with pdf.js 6.5.438, and it was rendered at 2× in pdf.js (`AnnotationMode.ENABLE`) and in PDFium (pypdfium2 5.14, forms on).
+  - Glyph check: annotations flattened with qpdf (via pikepdf), then text extracted with PDFium. This proves that the drawn glyphs map back to the typed text.
+  - Untouched areas: pixel diff against the source render, with widget boxes masked.
+- **Evidence:** `docs/evals/cache/f16-forms/rerun/`. It holds `outputs/` (11 BerryPDF PDFs), `analysis/` (renders, screenshots, pdf.js JSON), `micro/` (side-by-side captures, reference on the left), `vp/` (viewport captures and `vp.json`), `lighthouse-mobile-{1..4}.json`, `axe-results.json` and `net-first-load.txt`. The key UI captures are also in `/mnt/project-files/designs/editor-forms/rerun-2026-11-24/`, and the side-by-sides are in `/mnt/project-files/comparisons/f16-forms/rerun-2026-11-24/`.
+
+### Gate
+
+| Gate | Bar | Result | Met? |
+|---|---|---|---|
+| Micro-checks M1–M12 | no *lose* unless the owner waived it | 9 win, 2 tie, **1 lose (M2)** after the M12 re-measure on bc02fa1 (it was 8 / 2 / 2 on 3fc9e65). M2 is not a forms loss: it belongs to the cloud pickers work (ownership section). Not waived by the owner | **no** (M2 only, cross-cutting) |
+| P0 ACs | all pass | AC-230, AC-231, AC-247, AC-248 and AC-253 pass | yes |
+| All ACs | ≥ 90% | **24 / 24 = 100%** | yes |
+| Lighthouse mobile performance | ≥ 90 | **91** (median of the first 3 valid runs: 87 / 91 / 93; a 4th run gave 96) | yes |
+| axe | no critical | 0 violations of any impact in 7 states | yes |
+
+### AC results (re-run)
+
+| AC | P | Result on 3fc9e65 | Pass? |
+|---|---|---|---|
+| AC-230 | P0 | All 13 terminal fields of `form-basic.pdf` are read as before. **form-extra.pdf (new, G-17):** the editable dropdown `city` (Ff 393216 = combo + edit) is read and its flags are kept in the output. The push button `reset` is shown and does nothing when clicked. **Note:** the editable dropdown is shown as a plain select, so the user can pick an option but can't type a new one ("Mumbai" was refused). See G-23 | pass (G-23) |
+| AC-231 | P0 | `V` is written with a fresh AP for each changed field, with no `NeedAppearances`. The `code` and `signature` APs are byte-identical to the source (MD5). Each `DA` font is now in `/DR` (`/Helv`, `/BerryF1`). `street` keeps `/Border [0 0 2]` and `town` keeps `[0 0 1]`, both with `0 Tf` | pass |
+| AC-232 | P1 | "Zoë Šťastná", "₹ 5,000 paid" and "Ирина 12" are drawn exactly in pdf.js and PDFium (capture `micro/04`, `05`). Flattened text extraction returns the exact strings. The font is an embedded Type0 subset `NotoSans-Regular-7098` (2,203 B). The mixed-script value "Ирина Smith" is also correct. 😀 and 東京 bring up a dialog before download: "Some characters won't print … They come out as "?"", with **Keep editing** and **Download anyway** (`micro/29`). Downloading anyway gives "?" only for those characters | pass |
+| AC-233 | P1 | Typing 7 digits into `pin` keeps 6. The read-only field and the required-field nudge were not re-run; both passed in the first run, and the build changes don't touch them | pass |
+| AC-234 | P1 | Structure is right for all 7 kinds. Radio `/Opt` is [student, staff, guest] with 3 widgets. **Auto size is now `0 Tf` in `DA`** for every new text, dropdown and list field. APs draw at 12 pt (multi-line comments 12 pt, list 12 pt). Checkbox and radio `DA` are empty (no `/dummy__noop`). **Border width 1 / 2 / 3 pt** appears after a border colour is picked, and 2 pt is written as `/BS /W 2` | pass |
+| AC-235 | P1 | **"Repeat on all pages"** is in the Text ⋯ menu on `detect-mix.pdf`. The output has one field `ref_no` with 3 widgets on pages 1, 2 and 3 (`outputs/berry-repeat.pdf`). Name checks were not re-run (they passed in the first run) | pass |
+| AC-236 | P1 | Renaming `notes` → `comments` keeps the value "Keep me". Delete was not re-run (it passed in the first run) | pass |
+| AC-237 | P1 | New `Sig` draws a dashed box and "Sign here" in pdf.js and PDFium. No dialog appears | pass |
+| AC-238 | P1 | 90°: the field lands where drawn and reads upright, with `MK /R 90`. **Crop box at 50, 60 (new fixture):** a box dragged at a predicted [129.5, 692.0, 258.7, 707.5] was written at exactly [129.5, 692.0, 258.7, 707.5]. 180° and 270° were not re-run (they passed in the first run). Turning the page again after placing a field still sets `/R` to the new turn, which makes the text tiny (G-24) | pass (G-24) |
+| AC-239 | P1 | After a custom keyboard reorder, `/Annots` on p1 and p3 and `/Fields` follow the panel order exactly | pass |
+| AC-240 | P1 | 0 non-GET requests. Detect lazy-loads `5165.*.js` and `berry-detect.*.js`. Timings including chunk load: report-form-3p 1.19 s for 3 pages (0.40 s/page), detect-mix 0.88 s | pass |
+| AC-241 | P1 | Exactly 7 fields, all on page 2, with the right names and kinds. `signature` is a `Sig`. Each TU is its label | pass |
+| AC-242 / 243 / 244 | P1 | detect-mix: "12 fields on 2 pages", page 2 has none, and page 3 adds only `mobile` next to the existing `phone`. The kinds are the same as in the first run (comb `pin_code`, radio `member_type`, date tooltips) | pass |
+| AC-245 | P2 | Not re-run (passed in the first run) | pass |
+| AC-246 / 250 | P1 | The pill reads "7 fields on 1 page". **The first "Next field" now goes to `full_name`** (G-16). Add all → Ctrl+Z → Ctrl+Shift+Z gives 7 → 0 → 7 | pass |
+| AC-247 | P0 | All 11 BerryPDF outputs pass pikepdf `check_pdf_syntax()` with 0 issues: fill, glyph, tab order, create, created+filled, repeat, form-extra, detect, rot90, rot180 and edit. Every changed widget has an AP | pass |
+| AC-248 | P0 | **Tab follows the custom order across pages.** With the Text tool active, the order was date_of_birth → city → full_name → address → PIN → comments → member_type (**one stop for the radio group**; arrow keys move inside it) → … → date (p1) → mobile → phone (p3), with no page buttons in between. Shift+Tab gives the exact reverse. On form-basic the radio `size` is also one stop. The download carries the values. Note: the field Tab lands on can sit under the floating view pill or top bar (G-21) | pass (G-21) |
+| AC-249 | P1 | A click creates a 310×39 px field (default size) with the popover open. Shift+→ moves 20 px (10 pt at 145%). Ctrl+D → 13 fields, Delete → 12, Ctrl+Z → 13 | pass |
+| AC-251 | P1 | Badges are on the canvas, and Space ↑↑ Space renumbers them at once | pass |
+| AC-252 | P1 | **0 changed px outside widgets** on fill, create, detect (3 pages) and form-extra (PDFium 2×) | pass |
+| AC-253 | P0 | At 1366×657: 11 rail buttons, the last one's bottom at 615 px, Form 5th. At 390×844 the dock is Text / Sign / Mark / Whiteout / Draw / More, and Form is in More. The Form strip fits (scrollWidth 390) | pass |
+
+**Summary: 24 / 24 pass, all P0 pass.** Untested items from the first run (editable combo, push button, crop box) are now tested.
+
+### Micro-comparison (re-run)
+
+Reference figures are from the cached first-run evidence. The side-by-side captures are in `cache/f16-forms/rerun/micro/`, with the reference on the left.
+
+| # | Check | BerryPDF on 3fc9e65 | Numbers | Score | Captures |
+|---|---|---|---|---|---|
+| M1 | Landing | Unchanged: 12 words above Open PDF | LH perf 91 median vs the reference's 66 | **win** | 01 |
+| M2 | Upload start | Open PDF, drop, Ctrl+V, Blank page. **No cloud or URL source** on `/edit-pdf`. `/merge-pdf` and `/rotate-pdf` on this build have none either, so #32 is not visible on staging 3fc9e65 | n/a | **LOSE**, owned by the cloud pickers work, not forms. No owner waiver | 02 |
+| M3 | Loading | First page and "11 fields" chip at once, 0 B uploaded | n/a | tie | 03 |
+| M4 | Display | The page now opens at fit width (145%). The `days` list shows all 4 options (G-18). A reopened `Sig` shows one label only (G-14). The reference still draws overlapping text in read-only `code` | n/a | **win** | 03 |
+| M5 | Interaction | Tab order works across pages (G-2). Radio clicks add to the group and keep values (G-10). Escape commits the name (G-11). The phone fill bar has a 48×44 Next. Open: G-21 (Tab target under the chrome), G-25 (phone bar covers the field being typed into), G-13 partly | n/a | **win** | 09, 12, 18 |
+| M6 | Options | Border width and Repeat on all pages are added (G-4, G-5). Gap: an editable dropdown can't take typed values (G-23) | n/a | **win** | 06, 07, 09 |
+| M7 | Processing | Download click → file: fill 1.11 s, create 1.48 s, detect 1.16 s. Detect run: 1.19 s for 3 pages | Reference: Apply → download 5.3 s (create) and 3.5 s (detect); detect 5.1 s for 1 page | **win** | 12 |
+| M8 | Output fidelity | All text correct in pdf.js and PDFium, borders kept, auto size kept, 0 px changed outside widgets, check clean. The reference merges street/town, writes `V` past MaxLen and leaves `Sig` invisible. **Still worse:** file size (G-19) and small auto size for embedded-font values (G-22) | fill **28,606 vs 20,881 B (1.37×)**; create 41,861 vs 28,717 (1.46×); detect 43,446 vs 32,994 (1.32×) | **win** (on correctness; size is a sub-loss) | 04, 05, 10, 13 |
+| M9 | Errors | Same as the first run, plus a pre-download missing-glyph dialog | n/a | **win** | 29 |
+| M10 | Privacy and cost | 0 non-GET requests on every flow. The only extra GETs are lazy chunks and `/fonts/forms/noto-sans-forms.woff` from the same origin | n/a | **win** | — |
+| M11 | Look and motion | Calm. The popover is a single row until More is opened (G-12 mostly fixed) | n/a | tie | 07 |
+| M12 | First screen fit | Download visible at every viewport. **Pages area after scroll: 1280×632 90%, 1366×657 87%, 1536×730 78%, 1920×969 62%**; 390×664 93%, 375×812 91%; no sideways scroll. At 1920 the thumbnails panel is open and zoom is capped at 150%, so the page is 62% of the width | Reference after scroll: 90–92% (1280–1536), 83% (1920). Phone 46–69% with sideways overflow | ~~LOSE at 1536 and 1920~~ → **win on bc02fa1** (see "M12 re-measure"): 90 / 91 / 92 / 84% vs 90–92 / 83%, phones 93 / 91% | M12-* |
+
+Totals on 3fc9e65: 8 win, 2 tie, 2 lose (M2, M12). **Totals after the M12 re-measure on bc02fa1: 9 win (M1, M4, M5, M6, M7, M8, M9, M10, M12), 2 tie (M3, M11), 1 lose (M2).** M2 is not a forms loss.
+
+### M12 re-measure (2026-11-24 20:24 UTC, staging bc02fa1)
+
+- **Build:** main at bc02fa1 (PR #46, opening zoom cap derived from the canvas limit), Deploy staging run 53 finished 20:22 UTC; build id changed from `MQTVCpHVJcSkxugHeHm_g` to `J2nAKKeDy_fB7fwgueNPb`.
+- **Method:** unchanged from the re-evaluation: headless Playwright Chromium, `report-form-3p.pdf` opened on `/edit-pdf`, measured 3 s after load and after a wheel scroll of 60% of the viewport height. Pages area = visible area of page canvases over the viewport. **Reference tasks run: 0** (reference values are the cached first-run captures).
+- **Evidence:** `docs/evals/cache/f16-forms/rerun/vp-m12/` (`vp.json`, loaded and scrolled captures per viewport).
+
+  | Viewport | Opening zoom | Pages area after scroll (was on 3fc9e65) | Page width | Reference after scroll | Result |
+  |---|---|---|---|---|---|
+  | 1280×632 | 145% | **90%** (90%) | 90% | 90–92% | tie |
+  | 1280×800 | 145% | **90%** | 90% | 90–92% | tie |
+  | 1366×657 | 156% | **91%** (87%) | 91% | 90–92% | tie |
+  | 1536×730 | 177% | **92%** (78%) | 92% | 90–92% | tie (was lose) |
+  | 1920×969 | 202% | **84%** (62%) | 84% | 83% | tie (was lose) |
+  | 390×664 | 47% | **93%** (93%) | 96% | 46–69%, sideways overflow | win |
+  | 375×812 | 45% | **91%** (91%) | 96% | 46–69%, sideways overflow | win |
+
+- Download visible at every viewport (top 15–16 px), no sideways scroll anywhere. At 1920 the thumbnails panel stays open and the page still gets 84%.
+- **M12: win** (ties on every desktop size, win on phones). G-7 is fixed.
+
+### Lighthouse and axe (re-run)
+
+- **Lighthouse 12.8.2, mobile, empty `/edit-pdf`,** Playwright Chromium 1243. A 3rd run failed with NO_NAVSTART and was repeated.
+
+  | Run | Perf | A11y | BP | SEO | FCP | LCP | TBT | CLS | benchmarkIndex |
+  |---|---|---|---|---|---|---|---|---|---|
+  | 1 | 87 | 100 | 100 | 66 | 1.3 s | 2.4 s | 440 ms | 0 | 1,618 |
+  | 2 | 91 | 100 | 100 | 66 | 1.3 s | 1.6 s | 370 ms | 0 | 1,592 |
+  | 3 | 93 | 100 | 100 | 66 | 1.3 s | 2.2 s | 260 ms | 0 | 1,374 |
+  | 4 | 96 | 100 | 100 | 66 | 1.3 s | 1.4 s | 230 ms | 0 | 1,501 |
+
+  - **Median 91** (first 3 valid runs) and 92 across all 4. The first run's median was 84.
+  - TBT is 230–440 ms, down from 520–1,340. The biggest scripting cost is `6495-*.js` at 390–519 ms. TBT belongs to the lead's editor-wide work.
+  - SEO 66 comes only from `is-crawlable`, because staging is noindex.
+- **Forms code on first load:** an empty editor makes 33 GET requests and 0 others (`rerun/net-first-load.txt`).
+  - The forms UI chunk `3823.*.js` (37 KB) is **not** requested on first load. It holds the popover, Detect review, Repeat on all pages, Tab order chips and radio controls.
+  - `3823.*.js` loads only when the Form tool is picked or a file with fields is opened. A PDF without fields loaded only the pdf.js worker and renderer.
+  - Detect (`5165.*.js` and `berry-detect.*.js`) loads only on Detect.
+  - Small leftovers do ship on first load in `2622.*.js` (232 KB): a ~3 KB Tab order panel module, and the missing-glyph dialog strings inside the 120 KB editor shell module. Small, but they could move into `3823`.
+- **axe-core 4.14.1** (CSP bypassed only so axe could be injected). States: 1280 empty, 1280 form-basic loaded, 1280 Form tool with the popover More open, 1280 Tab order panel, 1280 Detect review, 1280 missing-glyph dialog, 390 loaded. **0 violations of any impact.** The `landmark-banner-is-top-level` issue is gone (G-20).
+
+### Gap status (G-1 to G-20, plus new ones)
+
+| Gap | Status | Evidence |
+|---|---|---|
+| G-1 non-Latin "?" | **fixed** | Exact text in both renderers and in extraction. Embedded Noto subset. The dialog lists 😀 東 京 before download (`analysis/glyph-2-download-click.png`, `micro/04`, `05`) |
+| G-2 Tab order | **fixed** | Custom order across pages, radio group one stop, Shift+Tab reverse (AC-248 row). New follow-up G-21 |
+| G-3 auto size | **fixed** | `DA` `0 Tf` on every new field. APs 12 pt, with no 51 pt. No `/dummy__noop` (`outputs/berry-t2-create.pdf`, `berry-t2-filled.pdf`) |
+| G-4 border width | **fixed** | 1 / 2 / 3 pt buttons after a border colour is picked → `/BS /W 2` (`analysis/c-1b-border.png`) |
+| G-5 Repeat on all pages | **fixed** | One field, 3 widgets on 3 pages (`outputs/berry-repeat.pdf`) |
+| G-6 street/town border | **fixed** | `/Border [0 0 2]` and `[0 0 1]`, `/BS /W` matching, `MK /BC` black, `0 Tf` kept. Drawn in both renderers |
+| G-7 pages' share of screen | **fixed (lead, PR #46, bc02fa1)** | 1280: 90%, 1366: 91%, 1536: 92%, 1920: 84% (reference 90–92 / 83%); phones 91–93% (`rerun/vp-m12/`) |
+| G-8 cloud / URL | **open (cloud pickers)** | Not on `/edit-pdf`, `/merge-pdf` or `/rotate-pdf` on 3fc9e65 (`analysis/m2-*.png`) |
+| G-9 Lighthouse / TBT | **fixed for the gate (lead)** | Median 91, TBT 230–440 ms. The forms UI chunk is lazy |
+| G-10 radio creation | **fixed** | 3 clicks → one group `member_type`, `/Opt` [student, staff, guest] (`analysis/c-5-radio-3.png`) |
+| G-11 Escape drops name | **fixed** | "typed_then_escape" kept after Escape |
+| G-12 popover covers targets | **mostly fixed** | Single row, placed above the field. Opening More expands it over neighbouring rows (`analysis/create-text-more.png`) |
+| G-13 name tags | **partly fixed** | With Form active, every field has an outline. Names show only as placeholders in empty text fields; checkbox, radio, dropdown, list and filled fields show none (`analysis/form-tool-nametags.png`) |
+| G-14 double sig label | **fixed** | A reopened `Sig` shows only "Sign here" (`analysis/g14-reopened-sig.png`) |
+| G-15 phone fill targets | **partly fixed** | A fill bar with a field label and a 48×44 Next appears. Targets are still 11 css px tall with no zoom, and the bar covers the field being typed into (G-25) |
+| G-16 Detect polish | **fixed** | The first Next goes to `full_name`. The `signature` top is 589.9 < 593.9 checkbox bottom |
+| G-17 fixtures | **fixed** | form-extra tested (AC-230, AC-238) |
+| G-18 list clips "Thu" | **fixed** | The list AP is 11.7 pt and all 4 options show |
+| G-19 output size | **open** | 1.32–1.46× the reference. No object streams or xref stream (0 `/ObjStm`) |
+| G-20 axe banner | **fixed** | 0 violations |
+| **G-21 (new, P1)** | open | When Tab moves to a field off-screen, the field is scrolled only to the viewport edge and stays under the floating chrome. From `date` (p1) to `phone` (p3) at 1280×800 it lands at top 769 / bottom 800, under the view pill. Shift+Tab back lands at top 0, under the top bar (`analysis/tab-crosspage-landed.png`). Fix: `scroll-margin` / `scroll-padding` equal to the top-bar and pill heights, or `scrollIntoView({block:'center'})` |
+| **G-22 (new, P2)** | open | Auto size with the embedded Noto font gives **8.5 pt** in an 18 pt box (`street`, and a new `full_name` with "Zoë Šťastná"). In the same box with Helvetica it gives 12 pt, and the reference draws it larger (`micro/04`). Use the same auto-size rule (cap height / line gap) for both fonts |
+| **G-23 (new, P1)** | open | The editable dropdown (`form-extra.pdf` `city`, Ff combo + edit) is a plain select, so typing a new value isn't possible. Use a combobox input with the options list when the Edit flag is set |
+| **G-24 (P2, carried from the first-run AC-238 note)** | open | Turning a page again after placing a field resets `/R` to the new turn, so the text turns sideways into a narrow strip (`analysis/rot-side.png`, `berry-rot180.pdf`) |
+| **G-25 (new, P2)** | open | On a 390 px phone, the fill bar at the top covers the field being typed into (Name row hidden, `analysis/phone-390-tap-name.png`). Either put the input itself in the bar at ≥ 16 px, or scroll the field below the bar |
+
+### What has to happen for PASS
+
+1. **M2:** cloud and URL sources reach the editor's upload on staging (G-8), or the owner records a written waiver here.
+2. ~~**M12:** the pages' share at 1536×730 and 1920×969 reaches the reference (≥ ~90% / 83%) (G-7, lead), or the owner records a written waiver here.~~ **Done on bc02fa1** (92% / 84%, see "M12 re-measure").
+3. No forms re-run is needed for either one. Re-measure M12 with `rerun/vp/` and the viewport script method above, and check M2 on `/edit-pdf`.
+4. The forms gaps G-19, G-21, G-22, G-23, G-24, G-25 and the partial G-12, G-13 and G-15 don't block, but they should be scheduled. G-21 and G-23 should come first.
+
+
+---
+
+# First run (2026-11-24 16:01–16:40 UTC, staging 341fa82)
 
 ## Why it fails
 

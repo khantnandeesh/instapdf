@@ -537,7 +537,7 @@ test("Download pressed while a save that fails is under way makes no file; anoth
   expect(files).toBe(0);
 });
 
-test("AC-308: on a phone a message takes the hint's action in; the two are never stacked", async ({ page }, info) => {
+test("AC-313: on a phone a message takes the hint's action in; the two are never stacked", async ({ page }, info) => {
   test.skip(info.project.name !== "mobile", "the docked hint is the phone layout");
   await open(page, "chrome-justified-mixed.pdf");
   const line = lineWith(page, "in full.");

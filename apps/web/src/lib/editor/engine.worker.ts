@@ -8,10 +8,11 @@
  * shaping build in a fresh worker (engine-client openInShapingEngine), so in practice a worker
  * holds one build; a worker asked for both keeps their separate memories side by side.
  */
-import type { BerryDocument as BerryDocumentType, BerryError, EditResult, FontInfo, FontProgram, PageText } from "./berry-engine";
+import type { BerryDocument as BerryDocumentType, BerryError, EditResult, FontInfo, FontProgram, LinePreview, PageText } from "./berry-engine";
 
 import { ENGINE_JS, ENGINE_SHAPING_JS, ENGINE_SHAPING_WASM, ENGINE_SHAPING_WASM_BYTES, ENGINE_WASM, ENGINE_WASM_BYTES } from "./engine-assets";
 import { countBody, type Progress } from "./engine-load";
+import { MadeAfterTrust, fingerprint } from "./engine-trust";
 
 type EngineModule = { default: (opts: { module_or_path: Response | Promise<Response> }) => Promise<unknown>; BerryDocument: typeof BerryDocumentType };
 
@@ -22,6 +23,8 @@ export type EngineRequest =
   | { id: number; op: "open"; bytes: Uint8Array; shaping?: boolean }
   | { id: number; op: "text"; page: number }
   | { id: number; op: "replace"; page: number; line: number; text: string }
+  /** How a complex-script line would look with `text`; nothing is changed. */
+  | { id: number; op: "preview"; page: number; line: number; text: string }
   | { id: number; op: "save" }
   /** Every font of the open document (F24). */
   | { id: number; op: "fonts" }
@@ -39,6 +42,7 @@ export type EngineReply =
   /** `appended`: the output starts with the bytes before the edit (undo can keep just a length). */
   | { op: "replace"; result: EditResult; bytes: Uint8Array; appended: boolean }
   | { op: "save"; bytes: Uint8Array }
+  | { op: "preview"; preview: LinePreview }
   | { op: "fonts"; fonts: FontInfo[] }
   | { op: "program"; program: FontProgram }
   /** `ok` false: the engine can't use this file (not TrueType outlines). */
@@ -67,8 +71,11 @@ let doc: BerryDocumentType | null = null;
 let current: Uint8Array | null = null;
 /** Fonts registered so far. A document is reopened after every edit, so they are added again each time. */
 let added: { family: string; bold: boolean; italic: boolean; bytes: Uint8Array }[] = [];
-function open(BerryDocument: EngineModule["BerryDocument"], bytes: Uint8Array): BerryDocumentType {
+/** Restores BerryDocument.madeAfter when the worker reopens bytes it saved (engine-trust.ts). */
+const trust = new MadeAfterTrust();
+function open(BerryDocument: EngineModule["BerryDocument"], bytes: Uint8Array, print = fingerprint(bytes)): BerryDocumentType {
   const d = new BerryDocument(bytes);
+  trust.restore(print, d);
   for (const f of added) d.addFont(f.family, f.bold, f.italic, f.bytes);
   return d;
 }
@@ -134,7 +141,10 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
     dropDoc();
     current = null;
     active = variant;
-    doc = open(BerryDocument, req.bytes);
+    const print = fingerprint(req.bytes);
+    doc = open(BerryDocument, req.bytes, print);
+    // Bytes this worker did not save (the person's file) start the trust; its own keep it.
+    trust.opened(print, doc);
     current = req.bytes;
     return { op: "open", pageCount: doc.pageCount };
   }
@@ -156,6 +166,7 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
     return { op: "addFont", ok };
   }
   if (req.op === "text") return { op: "text", page: doc.pageText(req.page) };
+  if (req.op === "preview") return { op: "preview", preview: doc.previewLine(req.page, req.line, req.text) };
   if (req.op === "replace") {
     const result = doc.replaceLine(req.page, req.line, req.text); // rolls back on its own errors
     const before = current!;
@@ -170,8 +181,11 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
     }
     try {
       // Reopen from the output so the next save appends to it, and undo states stay prefixes.
+      // The output is this worker's own, made from bytes of the current trust epoch.
+      const print = fingerprint(saved.bytes);
+      trust.saved(print);
       dropDoc();
-      doc = open(BerryDocument, saved.bytes);
+      doc = open(BerryDocument, saved.bytes, print);
       current = saved.bytes.slice();
     } catch (error) {
       return rollback(BerryDocument, error);

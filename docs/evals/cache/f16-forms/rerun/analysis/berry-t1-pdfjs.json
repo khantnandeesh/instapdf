@@ -1,0 +1,210 @@
+{
+ "pages": 1,
+ "fields": {},
+ "annots_p1": [
+  {
+   "name": "name",
+   "type": "Tx",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    160,
+    748,
+    400,
+    766
+   ],
+   "tu": "Your name",
+   "fs": [
+    "Zoë Šťastná"
+   ]
+  },
+  {
+   "name": "notes",
+   "type": "Tx",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    160,
+    676,
+    400,
+    730
+   ],
+   "tu": "",
+   "fs": [
+    "₹ 5,000 paid",
+    "Second line"
+   ]
+  },
+  {
+   "name": "pin",
+   "type": "Tx",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    160,
+    640,
+    280,
+    658
+   ],
+   "tu": "",
+   "fs": [
+    "1 2 3 4 5 6"
+   ]
+  },
+  {
+   "name": "agree",
+   "type": "Btn",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    160,
+    604,
+    174,
+    618
+   ],
+   "tu": ""
+  },
+  {
+   "name": "size",
+   "type": "Btn",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    160,
+    568,
+    174,
+    582
+   ],
+   "tu": ""
+  },
+  {
+   "name": "size",
+   "type": "Btn",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    220,
+    568,
+    234,
+    582
+   ],
+   "tu": ""
+  },
+  {
+   "name": "size",
+   "type": "Btn",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    280,
+    568,
+    294,
+    582
+   ],
+   "tu": ""
+  },
+  {
+   "name": "colour",
+   "type": "Ch",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    160,
+    532,
+    280,
+    550
+   ],
+   "tu": ""
+  },
+  {
+   "name": "days",
+   "type": "Ch",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    160,
+    450,
+    280,
+    506
+   ],
+   "tu": ""
+  },
+  {
+   "name": "code",
+   "type": "Tx",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    160,
+    416,
+    280,
+    434
+   ],
+   "tu": "",
+   "fs": [
+    "A-17"
+   ]
+  },
+  {
+   "name": "email",
+   "type": "Tx",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    160,
+    380,
+    400,
+    398
+   ],
+   "tu": "",
+   "fs": [
+    "zoe@example.com"
+   ]
+  },
+  {
+   "name": "address.street",
+   "type": "Tx",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    160,
+    344,
+    400,
+    362
+   ],
+   "tu": "",
+   "fs": [
+    "Ирина 12"
+   ]
+  },
+  {
+   "name": "address.town",
+   "type": "Tx",
+   "hasAP": true,
+   "rot": 0,
+   "rect": [
+    160,
+    308,
+    400,
+    326
+   ],
+   "tu": "",
+   "fs": [
+    "Praha"
+   ]
+  },
+  {
+   "name": "signature",
+   "type": "Sig",
+   "hasAP": false,
+   "rot": 0,
+   "rect": [
+    160,
+    272,
+    400,
+    308
+   ],
+   "tu": ""
+  }
+ ]
+}
