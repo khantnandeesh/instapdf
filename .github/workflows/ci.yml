@@ -12,7 +12,8 @@ concurrency:
 jobs:
   web:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Main takes about 17 min (15 of them e2e): 20 left no room (cancelled on PR #32).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -25,6 +26,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: First-load JS budget
+        run: node apps/web/scripts/first-load-budget.mjs apps/web
       - name: Install Playwright Chromium
         run: pnpm --filter web exec playwright install --with-deps chromium
       # AC-46 checks every editor output with qpdf (pikepdf, MPL-2.0) and renders it with pdfium (pypdfium2, Apache-2.0/BSD).
@@ -58,6 +61,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # The same budgets with cloud sources on: production builds have them.
+      - name: First-load JS budget
+        run: node apps/web/scripts/first-load-budget.mjs apps/web
       - name: Install Playwright Chromium
         run: pnpm --filter web exec playwright install --with-deps chromium
       - run: pnpm --filter web exec playwright test e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/ --trace off
