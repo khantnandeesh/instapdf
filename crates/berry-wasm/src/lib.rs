@@ -16,8 +16,9 @@ fn fail(e: berry_engine::Error) -> JsValue {
     to_js(&e).unwrap_or_else(|e| e)
 }
 
+/// A bad argument throws like the engine does: `{ kind: "unsupported", reason }`.
 fn bad(what: &str) -> JsValue {
-    JsValue::from_str(&format!("invalid {what}"))
+    fail(berry_engine::Error::Unsupported { reason: format!("invalid {what}") })
 }
 
 /// `{ families: string[], bold?: boolean, italic?: boolean }`, read field by field (a serde

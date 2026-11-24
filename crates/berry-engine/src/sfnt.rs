@@ -19,20 +19,30 @@ fn checksum(data: &[u8]) -> u32 {
     })
 }
 
-/// A format 4 cmap (Windows Unicode BMP) mapping each character to its glyph.
-fn cmap_table(map: &[(u16, u16)]) -> Vec<u8> {
+/// A format 4 cmap (Windows Unicode BMP) mapping each character to its glyph, or `None` when it
+/// would not fit the format.
+fn cmap_table(map: &[(u16, u16)]) -> Option<Vec<u8>> {
     let mut pairs: Vec<(u16, u16)> = map.iter().copied().filter(|&(c, _)| c != 0xFFFF).collect();
     pairs.sort_unstable();
     pairs.dedup_by_key(|p| p.0);
-    // One segment per character keeps it simple: the map holds a few hundred at most.
-    let seg_count = pairs.len() + 1;
-    let mut ends = Vec::new();
-    let mut starts = Vec::new();
-    let mut deltas = Vec::new();
+    // Consecutive characters with consecutive glyphs share a segment.
+    let mut ends: Vec<u16> = Vec::new();
+    let mut starts: Vec<u16> = Vec::new();
+    let mut deltas: Vec<u16> = Vec::new();
     for &(c, g) in &pairs {
-        ends.push(c);
-        starts.push(c);
-        deltas.push(g.wrapping_sub(c));
+        let delta = g.wrapping_sub(c);
+        match (ends.last_mut(), deltas.last()) {
+            (Some(e), Some(&d)) if *e + 1 == c && d == delta => *e = c,
+            _ => {
+                ends.push(c);
+                starts.push(c);
+                deltas.push(delta);
+            }
+        }
+    }
+    let seg_count = ends.len() + 1;
+    if 16 + 8 * seg_count > 0xFFFF {
+        return None;
     }
     ends.push(0xFFFF);
     starts.push(0xFFFF);
@@ -56,7 +66,7 @@ fn cmap_table(map: &[(u16, u16)]) -> Vec<u8> {
     }
     out.extend_from_slice(&12u32.to_be_bytes());
     out.extend(sub);
-    out
+    Some(out)
 }
 
 /// The font with its `cmap` table replaced by one for `map` (character, glyph id), or `None`
@@ -77,7 +87,7 @@ pub fn with_cmap(font: &[u8], map: &[(char, u16)]) -> Option<Vec<u8>> {
             tables.push((tag, font.get(off..off.checked_add(len)?)?.to_vec()));
         }
     }
-    tables.push((*b"cmap", cmap_table(&bmp)));
+    tables.push((*b"cmap", cmap_table(&bmp)?));
     tables.sort_by_key(|t| t.0);
     let n = tables.len() as u32;
     let pow = if n.is_power_of_two() { n } else { n.next_power_of_two() / 2 };
@@ -134,5 +144,12 @@ mod tests {
         assert_eq!(f.glyph_index('b'), None);
         assert_eq!(f.number_of_glyphs(), ttf_parser::Face::parse(&data, 0).unwrap().number_of_glyphs());
         assert_eq!(checksum(&out), 0xB1B0_AFBA);
+        // A large map: runs share segments and every character still maps.
+        let many: Vec<(char, u16)> = (0x0600u32..0x2600).map(|c| (char::from_u32(c).unwrap(), (c - 0x0500) as u16)).collect();
+        let out = with_cmap(&data, &many).unwrap();
+        let f = ttf_parser::Face::parse(&out, 0).unwrap();
+        assert_eq!(f.glyph_index('\u{1234}').map(|g| g.0), Some(0x0D34));
+        let scattered: Vec<(char, u16)> = (0..9000u32).map(|i| (char::from_u32(0x4E00 + 2 * i).unwrap(), 1)).collect();
+        assert!(with_cmap(&data, &scattered).is_none());
     }
 }

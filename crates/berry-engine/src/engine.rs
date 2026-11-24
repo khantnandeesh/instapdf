@@ -329,8 +329,9 @@ impl Engine {
         self.pages.len()
     }
 
-    /// Registers an open-licensed TrueType font the engine may embed for missing characters.
-    /// Returns false when the file is not a usable TrueType (glyf) font.
+    /// Registers an open-licensed TrueType font (or WOFF 1.0) the engine may embed for missing
+    /// characters and added text. Several files of one family and style (web font slices) are
+    /// all kept. Returns false when the file is not a usable TrueType (glyf) font.
     pub fn add_font(&mut self, family: &str, bold: bool, italic: bool, data: Vec<u8>) -> bool {
         // Web fonts as served: WOFF 1.0 is unpacked to the TrueType file inside.
         let data = if data.starts_with(b"wOFF") {
@@ -342,7 +343,8 @@ impl Engine {
             data
         };
         let ok = ttf_parser::Face::parse(&data, 0).map(|f| f.tables().glyf.is_some()).unwrap_or(false);
-        if ok && !self.faces.iter().any(|f| f.family == family && f.bold == bold && f.italic == italic) {
+        // Web fonts come in slices (Latin, Devanagari…) under one family: every slice is kept.
+        if ok && !self.faces.iter().any(|f| f.family == family && f.bold == bold && f.italic == italic && *f.data == data) {
             self.faces.push(Face { family: family.to_string(), bold, italic, data: Rc::new(data) });
             self.embeds.push(None);
         }
@@ -1242,7 +1244,9 @@ impl Engine {
         let upem = parsed.units_per_em() as f64;
         let k = 1000.0 / upem;
         let subset = subsetter::subset(&face.data, 0, &embed.remap).map_err(|e| err(e.to_string()))?;
-        // A cmap for the characters the glyphs draw, so readers can tell a mirrored bracket.
+        // A cmap for the characters the glyphs draw, so readers can tell a mirrored bracket
+        // (right-to-left text, which only the shaping build writes).
+        #[cfg(feature = "shaping")]
         let drawn: Vec<(char, u16)> = embed
             .chars
             .iter()
@@ -1254,6 +1258,7 @@ impl Engine {
                 }
             })
             .collect();
+        #[cfg(feature = "shaping")]
         let subset = crate::sfnt::with_cmap(&subset, &drawn).unwrap_or(subset);
 
         let ps_base: String = format!(

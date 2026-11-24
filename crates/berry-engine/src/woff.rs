@@ -26,12 +26,16 @@ pub fn unpack(woff: &[u8]) -> Option<Vec<u8>> {
         return None;
     }
     let mut tables: Vec<([u8; 4], Vec<u8>, u32)> = Vec::with_capacity(num);
+    // Unpacked bytes so far: checked before each table is inflated, so a small file whose
+    // entries all point at one compressed blob cannot make it allocate gigabytes.
+    let mut unpacked = 12 + 16 * num;
     for i in 0..num {
         let e = 44 + 20 * i;
         let tag: [u8; 4] = woff.get(e..e + 4)?.try_into().ok()?;
         let (off, comp, orig, sum) =
             (be32(woff, e + 4)? as usize, be32(woff, e + 8)? as usize, be32(woff, e + 12)? as usize, be32(woff, e + 16)?);
-        if orig > MAX_SFNT || comp > orig {
+        unpacked = unpacked.checked_add(orig.div_ceil(4) * 4)?;
+        if unpacked > MAX_SFNT || unpacked > total || comp > orig || tables.iter().any(|t| t.0 == tag) {
             return None;
         }
         let raw = woff.get(off..off.checked_add(comp)?)?;
@@ -85,5 +89,33 @@ mod tests {
         head.resize(44, 0);
         head[13] = 1; // one table, no directory
         assert!(unpack(&head).is_none());
+    }
+
+    /// A small file whose entries all point at one compressed run of zeros.
+    #[test]
+    fn rejects_a_decompression_bomb() {
+        use std::io::Write;
+        let mut z = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::best());
+        z.write_all(&vec![0u8; 16 << 20]).unwrap();
+        let blob = z.finish().unwrap();
+        let num = 40usize;
+        let off = 44 + 20 * num;
+        let mut w = b"wOFF".to_vec();
+        w.extend_from_slice(&0x0001_0000u32.to_be_bytes());
+        w.extend_from_slice(&((off + blob.len()) as u32).to_be_bytes());
+        w.extend_from_slice(&(num as u16).to_be_bytes());
+        w.extend_from_slice(&0u16.to_be_bytes());
+        w.extend_from_slice(&(60u32 << 20).to_be_bytes()); // claimed sfnt size, under the cap
+        w.resize(44, 0);
+        for i in 0..num {
+            w.extend_from_slice(&[b'a', b'a' + (i / 26) as u8, b'a' + (i % 26) as u8, b' ']);
+            for v in [off as u32, blob.len() as u32, 16 << 20, 0] {
+                w.extend_from_slice(&v.to_be_bytes());
+            }
+        }
+        w.extend_from_slice(&blob);
+        let t = std::time::Instant::now();
+        assert!(unpack(&w).is_none());
+        assert!(t.elapsed().as_secs_f64() < 2.0);
     }
 }

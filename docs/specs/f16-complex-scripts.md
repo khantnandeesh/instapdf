@@ -148,12 +148,15 @@ that needs the shaper, so the editor loads the shaping module only for such boxe
   covers the space after the word, because PDFium drops a space after a word that ends in a
   zero-advance glyph (a reph). Right to left, the glyph mappings are written so that no ActualText is
   needed where possible, as for edits (PDFium reverses right-to-left ActualText).
+- Right-to-left words with numbers or Latin inside a left-to-right line ("Invoice فاتورة 2024")
+  look the same drawn as several logical orders, so that whole stretch gets one ActualText span.
 - A bracket right to left maps to the shape it shows ("«" drawn for "»"): PDFium always mirrors when
   it reorders, and our reader mirrors when the embedded cmap confirms the shape.
 - The new content stream is appended after the page's own content, which is wrapped in `q … Q`.
   The page is read back: the old glyphs must be unchanged, every new glyph where it was laid out,
   and the new line must read as typed, or the edit is rolled back.
-- `addFont` also takes WOFF 1.0 (the Fontsource files the web app ships).
+- `addFont` also takes WOFF 1.0 (the Fontsource files the web app ships), with the unpacked size
+  checked before each table is inflated. Several slices of one family are all kept.
 
 ### Acceptance criteria
 
@@ -178,10 +181,13 @@ that needs the shaper, so the editor loads the shaping module only for such boxe
 | AC | Result | Evidence |
 |---|---|---|
 | 216, 219, 221, 222 | Pass | `crates/berry-engine/tests/add_text.rs` (both builds) and `smoke.mjs` (both modules) |
-| 217, 218 | Pass | oracle cases `add-*` in `manifest.json`: 5 of 5, including pixels outside `changed`. One PDFium quirk stays: in `مُحَمَّدٌ:` it reads the final tanween after the colon (`مُحَمَّد:ٌ`); the engine reads it right and the rendering is right. |
+| 217, 218 | Pass | oracle cases `add-*` in `manifest.json`: 6 of 6, including pixels outside `changed` and Arabic words with numbers in a Latin line. One PDFium quirk stays: in `مُحَمَّدٌ:` it reads the final tanween after the colon (`مُحَمَّد:ٌ`); the engine reads it right and the rendering is right. |
 | 220 | Pass | `missing_script_fonts_are_named`, `bad_input_changes_nothing` |
-| 223 | Pass | default `berry_engine` 763,446 → 792,277 bytes gzip; `berry_engine_shaping` 977,933 → 957,442 bytes gzip (972,124 with Node's zlib, which the web test uses), now built with `opt-level = "z"` for the engine, rustybuzz and ttf-parser (profile `wasm-shaping`). That module reads pages about 15% slower than the default one, which stays at `"s"`. |
+| 223 | Pass | default `berry_engine` 763,446 → 786,575 bytes gzip, now capped by a test and in CI so it cannot grow past 792 KB; `berry_engine_shaping` 977,933 → 958,683 bytes gzip (973,218 with Node's zlib, which the web test uses), now built with `opt-level = "z"` for the engine, rustybuzz and ttf-parser (profile `wasm-shaping`). That module reads pages about 15% slower than the default one, which stays at `"s"`. |
 | 224 | Pending | needs a browser session and a reference task slot |
+
+Known limit: a very short line with as many Latin as Arabic letters (for example "x ب 2") can read
+back in the other direction, so `addText` refuses it with `verify` and nothing changes.
 
 Also fixed on the way: replacing a Hindi word that ends in a reph (संपूर्ण) kept the following space in
 place instead of moving it with the rest of the line, so the line read "रा शि". Glyphs that start

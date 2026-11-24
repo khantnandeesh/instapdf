@@ -454,9 +454,11 @@ impl Engine {
             }
             // A zero-advance glyph can end the word (a Devanagari reph after its consonant), so
             // a glyph that starts where the word ends is after it.
-            if !rtl && (u_of(g) > hi + 1e-6 || u_of(g) >= end - 1e-6) {
+            // Only glyphs that advance: a remaining zero-advance mark there belongs to its base.
+            let advances = pc.glyphs[g].advance.abs() > 1e-6;
+            if !rtl && (u_of(g) > hi + 1e-6 || (advances && u_of(g) >= end - 1e-6)) {
                 want.insert(g, delta);
-            } else if rtl && (u_of(g) < lo - 1e-6 || u_of(g) + pc.glyphs[g].advance <= lo + 1e-6) {
+            } else if rtl && (u_of(g) < lo - 1e-6 || (advances && u_of(g) + pc.glyphs[g].advance <= lo + 1e-6)) {
                 want.insert(g, -delta);
             }
         }

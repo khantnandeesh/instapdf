@@ -33,6 +33,7 @@
     {"id": "add-hindi-libreoffice", "file": "scripts-libreoffice.pdf", "fonts": "webfonts", "add": {"x": 72, "y": 60, "size": 14, "text": "संपूर्ण राशि का भुगतान समय पर किया गया।"}, "expect": ["संपूर्ण राशि का भुगतान समय पर किया गया।"], "absent": [], "substituted": true},
     {"id": "add-mixed-memo", "file": "libreoffice-memo.pdf", "fonts": "webfonts", "add": {"x": 72, "y": 40, "size": 11, "text": "Total: कुल राशि 500 (paid)"}, "expect": ["Total: कुल राशि 500 (paid)"], "absent": [], "substituted": true},
     {"id": "add-arabic-chrome", "file": "scripts-chrome.pdf", "fonts": "webfonts", "add": {"x": 300, "y": 60, "size": 14, "text": "مرحبا بالعالم، هذا نص تجريبي.", "family": "Noto Naskh Arabic"}, "expect": ["مرحبا بالعالم، هذا نص تجريبي."], "absent": [], "substituted": true},
-    {"id": "add-vowelled-arabic-plain", "file": "scripts-plain.pdf", "fonts": "webfonts", "add": {"x": 72, "y": 60, "size": 16, "text": "قال مُحَمَّدٌ: السلام عليكم «تجربة» (نص)", "family": "Noto Naskh Arabic"}, "expect": ["قال مُحَمَّد", "السلام عليكم «تجربة» (نص)"], "absent": [], "substituted": true}
+    {"id": "add-vowelled-arabic-plain", "file": "scripts-plain.pdf", "fonts": "webfonts", "add": {"x": 72, "y": 60, "size": 16, "text": "قال مُحَمَّدٌ: السلام عليكم «تجربة» (نص)", "family": "Noto Naskh Arabic"}, "expect": ["قال مُحَمَّد", "السلام عليكم «تجربة» (نص)"], "absent": [], "substituted": true},
+    {"id": "add-arabic-number-in-latin", "file": "libreoffice-memo.pdf", "fonts": "webfonts", "add": {"x": 72, "y": 40, "size": 11, "text": "Invoice فاتورة 2024 paid, call هاتف 555-1234"}, "expect": ["Invoice فاتورة 2024 paid, call هاتف 555-1234"], "absent": [], "substituted": true}
   ]
 }

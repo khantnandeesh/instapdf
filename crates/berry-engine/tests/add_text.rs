@@ -76,6 +76,12 @@ fn woff_fonts_register_and_bad_ones_are_refused() {
     bad[48..52].copy_from_slice(&u32::MAX.to_be_bytes()); // first table's offset
     assert!(!e.add_font("Broken", false, false, bad));
     assert!(e.add_font("Noto Sans", false, false, woff));
+    // Web font slices of one family are all kept.
+    assert!(e.add_font("Noto Sans", false, false, read("webfonts/NotoSansDevanagari-Regular.woff")));
+    assert_eq!(
+        e.shape_text("नमस्ते", &sans(), 10.0).map(|s| s.runs[0].family.clone()).ok().as_deref(),
+        cfg!(feature = "shaping").then_some("Noto Sans")
+    );
     let s = e.shape_text("Hello", &sans(), 10.0).unwrap();
     assert_eq!(s.runs.len(), 1);
     assert_eq!(s.runs[0].family, "Noto Sans");
@@ -134,7 +140,10 @@ fn bad_input_changes_nothing() {
     let mut e = engine(page(""), false);
     assert!(matches!(e.add_text(3, "x", &sans(), 10.0, 0.0, 0.0, 0.0, BLACK), Err(Error::BadPage)));
     assert!(matches!(e.add_text(0, "x", &sans(), f64::NAN, 0.0, 0.0, 0.0, BLACK), Err(Error::Unsupported { .. })));
-    assert!(matches!(e.add_text(0, "two\nlines", &sans(), 10.0, 0.0, 0.0, 0.0, BLACK), Err(Error::Unsupported { .. })));
+    for text in ["two\nlines", "a\u{1C}b", "a\u{85}b", "a\u{2029}b"] {
+        assert!(matches!(e.add_text(0, text, &sans(), 10.0, 0.0, 0.0, 0.0, BLACK), Err(Error::Unsupported { .. })), "{text:?}");
+    }
+    assert!(e.add_text(0, "\u{200B}\u{FEFF}", &sans(), 10.0, 0.0, 0.0, 0.0, BLACK).unwrap().changed.is_empty());
     assert!(e.add_text(0, "   ", &sans(), 10.0, 0.0, 0.0, 0.0, BLACK).unwrap().changed.is_empty());
     match e.add_text(0, "Price ₹ 5", &sans(), 10.0, 0.0, 0.0, 0.0, BLACK) {
         Err(Error::MissingGlyphs { chars, request }) => {
@@ -247,6 +256,23 @@ mod shaping {
         for text in lines {
             line(&after, text);
         }
+        // Right-to-left words with numbers in a left-to-right line (invoices, phone numbers).
+        let embedded = ["Price سعر 100", "Invoice فاتورة 2024 paid", "Call هاتف 555-1234 now", "Room غرفة 2"];
+        for (i, text) in embedded.iter().enumerate() {
+            e.add_text(0, text, &sans(), 12.0, 300.0, 600.0 - 30.0 * i as f64, 0.0, BLACK)
+                .unwrap_or_else(|err| panic!("{text}: {err:?}"));
+        }
+        let after = reopen(&mut e);
+        for text in embedded {
+            line(&after, text);
+        }
+        // Runs cover disjoint ranges of the text.
+        let s = e.shape_text("Price سعر 100", &sans(), 12.0).unwrap();
+        let mut ranges: Vec<(usize, usize)> = s.runs.iter().map(|r| (r.start, r.end)).collect();
+        ranges.sort_unstable();
+        assert!(ranges.windows(2).all(|w| w[0].1 <= w[1].0), "{ranges:?}");
+        assert_eq!(ranges.first().map(|r| r.0), Some(0));
+        assert_eq!(ranges.last().map(|r| r.1), Some("Price سعر 100".encode_utf16().count()));
         let mixed = e.shape_text("Total: कुल राशि 500 (paid)", &sans(), 12.0).unwrap();
         let families: Vec<&str> = mixed.runs.iter().map(|r| r.family.as_str()).collect();
         assert_eq!(families, ["Noto Sans", "Noto Sans Devanagari", "Noto Sans"], "{:?}", mixed.runs);

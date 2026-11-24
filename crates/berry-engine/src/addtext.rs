@@ -72,6 +72,9 @@ struct Piece {
     gap: f64,
     /// Wrap in ActualText with the piece's text.
     actual: bool,
+    /// Right-to-left text with numbers or Latin inside, in a left-to-right line: its glyphs read
+    /// the same as other logical orders, so the whole stretch (this byte range) gets ActualText.
+    group: Option<Range<usize>>,
 }
 
 struct PieceGlyph {
@@ -159,7 +162,11 @@ impl Engine {
     /// Splits `text` into pieces in visual order and lays each out. Returns the paragraph
     /// direction. Errors: missing glyphs, or (default build) text that needs shaping.
     fn lay_out(&self, text: &str, req: &FontRequest) -> Result<(bool, Vec<Piece>)> {
-        if text.chars().any(|c| matches!(c, '\n' | '\r' | '\u{2028}' | '\u{2029}')) {
+        // Line and paragraph separators (bidi class B and the vertical whitespace around it).
+        if text
+            .chars()
+            .any(|c| matches!(c, '\n' | '\r' | '\u{0B}' | '\u{0C}' | '\u{1C}'..='\u{1E}' | '\u{85}' | '\u{2028}' | '\u{2029}'))
+        {
             return Err(limit("one-line-only"));
         }
         if text.len() > 10_000 {
@@ -175,24 +182,42 @@ impl Engine {
         #[cfg(feature = "shaping")]
         let (para_rtl, runs) = {
             let info = unicode_bidi::BidiInfo::new(text, None);
-            let mut runs: Vec<(Range<usize>, bool)> = Vec::new();
+            let mut runs: Vec<(Range<usize>, bool, Option<Range<usize>>)> = Vec::new();
             let para_rtl = info.paragraphs.first().is_some_and(|p| p.level.is_rtl());
             for para in &info.paragraphs {
                 let (levels, vruns) = info.visual_runs(para, para.range.clone());
-                for r in vruns {
-                    let odd = levels[r.start].is_rtl();
-                    runs.push((r, odd));
+                let base = para.level.number();
+                let mut i = 0;
+                while i < vruns.len() {
+                    // A stretch of runs above a left-to-right base level: one embedded
+                    // right-to-left segment, contiguous in the text.
+                    let mut j = i;
+                    while j < vruns.len() && !para.level.is_rtl() && levels[vruns[j].start].number() > base {
+                        j += 1;
+                    }
+                    if j > i + 1 {
+                        let start = vruns[i..j].iter().map(|r| r.start).min().unwrap_or(0);
+                        let end = vruns[i..j].iter().map(|r| r.end).max().unwrap_or(0);
+                        for r in &vruns[i..j] {
+                            runs.push((r.clone(), levels[r.start].is_rtl(), Some(start..end)));
+                        }
+                        i = j;
+                    } else {
+                        let r = vruns[i].clone();
+                        runs.push((r.clone(), levels[r.start].is_rtl(), None));
+                        i += 1;
+                    }
                 }
             }
             (para_rtl, runs)
         };
         #[cfg(not(feature = "shaping"))]
-        let (para_rtl, runs) = (false, vec![(0..text.len(), false)]);
+        let (para_rtl, runs) = (false, vec![(0..text.len(), false, None::<Range<usize>>)]);
 
         let mut missing = String::new();
         let mut pieces: Vec<Piece> = Vec::new();
         let mut cur: Option<usize> = None;
-        for (range, rtl) in runs {
+        for (range, rtl, group) in runs {
             // Words and blanks of the run, logical order, each with its face.
             let run = &text[range.clone()];
             let mut parts: Vec<(Range<usize>, Option<usize>)> = Vec::new();
@@ -239,7 +264,9 @@ impl Engine {
             }
             if missing.is_empty() {
                 for (r, face) in parts {
-                    pieces.push(self.lay_out_piece(text, r, face, rtl)?);
+                    let mut piece = self.lay_out_piece(text, r, face, rtl)?;
+                    piece.group = group.clone();
+                    pieces.push(piece);
                 }
             }
         }
@@ -254,7 +281,7 @@ impl Engine {
         let Some(f) = face else {
             // Blanks no face draws: a typical space width each.
             let gap = part.chars().filter(|c| c.is_whitespace()).count() as f64 * 0.25;
-            return Ok(Piece { range, rtl, face: None, glyphs: Vec::new(), gap, actual: false });
+            return Ok(Piece { range, rtl, face: None, glyphs: Vec::new(), gap, actual: false, group: None });
         };
         let data = &self.faces[f].data;
         #[cfg(feature = "shaping")]
@@ -314,7 +341,7 @@ impl Engine {
                 dy: g.y_offset,
             })
             .collect();
-        Ok(Piece { range, rtl, face: Some(f), glyphs, gap: 0.0, actual })
+        Ok(Piece { range, rtl, face: Some(f), glyphs, gap: 0.0, actual, group: None })
     }
 
     /// Lays out one line of new text with the registered faces, for measuring and placing it.
@@ -353,8 +380,12 @@ impl Engine {
             width += w;
             let (start, end) = (utf16_at(text, p.range.start), utf16_at(text, p.range.end));
             let direction = if p.rtl { "rtl" } else { "ltr" };
+            // Neighbours merge only when they are also neighbours in the text.
+            let touches = |r: &ShapedRun| if p.rtl { end == r.start } else { r.end == start };
             match runs.last_mut() {
-                Some(r) if r.family == family && r.bold == bold && r.italic == italic && r.direction == direction => {
+                Some(r)
+                    if r.family == family && r.bold == bold && r.italic == italic && r.direction == direction && touches(r) =>
+                {
                     r.start = r.start.min(start);
                     r.end = r.end.max(end);
                     r.width += w;
@@ -388,7 +419,7 @@ impl Engine {
         if !(x.is_finite() && y.is_finite() && angle.is_finite()) || x.abs() > 1e6 || y.abs() > 1e6 {
             return Err(limit("bad-position"));
         }
-        if text.trim().is_empty() {
+        if text.chars().all(|c| c.is_whitespace() || shape::is_ignorable(c)) {
             let page_text = self.page_text(page)?;
             return Ok(EditResult { page: page_text, changed: Vec::new(), substitutions: Vec::new(), shift: 0.0 });
         }
@@ -487,12 +518,21 @@ impl Engine {
         // Piece index after which the open ActualText span ends.
         let mut span_end: Option<usize> = None;
         for (i, p) in pieces.iter().enumerate() {
+            // An embedded right-to-left stretch is one span; its pieces get none of their own.
+            let group_opens = p.group.is_some() && (i == 0 || pieces[i - 1].group != p.group);
+            let group_closes = p.group.is_some() && pieces.get(i + 1).is_none_or(|n| n.group != p.group);
+            if let (true, Some(g)) = (group_opens, &p.group) {
+                items.push(Item::BeginSpan(text[g.clone()].to_string()));
+            }
             let Some(f) = p.face else {
                 items.push(Item::Kern(kern(p.gap)));
                 pen += p.gap;
+                if group_closes {
+                    items.push(Item::EndSpan);
+                }
                 continue;
             };
-            if p.actual {
+            if p.actual && p.group.is_none() {
                 // PDFium drops a space glyph after a word ending in a zero-advance glyph (a
                 // Devanagari reph), so a left-to-right span also covers the blank after it.
                 let blank_next = pieces
@@ -524,7 +564,7 @@ impl Engine {
                 expect.push((pen + g.dx, g.dy));
                 pen += g.advance;
             }
-            if span_end == Some(i) {
+            if span_end == Some(i) || group_closes {
                 items.push(Item::EndSpan);
                 span_end = None;
             }
