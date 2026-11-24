@@ -4,6 +4,8 @@
  * Playwright config does): metadata, robots and the sitemap are only final in a production build. Every indexable page is checked, so a new tool
  * page is covered as soon as it is usable.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { indexableRoutes } from "../../src/lib/seo/routes";
 import { absoluteUrl, SITE_ORIGIN } from "../../src/lib/seo/site";
@@ -16,7 +18,12 @@ const PLANNED = tools.filter((t) => t.status === "planned").map((t) => `/${t.slu
 const STAGING_HOST = "web-staging-qzq5fa2g7q-uc.a.run.app";
 
 /** Performance budgets (docs/seo/strategy.md, "Performance budgets"), checked on the mobile project. */
-const BUDGET = { jsKB: 170, lcpMs: 2500, cls: 0.1 };
+// Phone JS, KiB: the measure now counts link-preloaded scripts; base is main 200ed84 (170.64 KiB) + ~1.4 KiB
+// headroom; cloud-on +2 KiB per F23; lead 24 Nov. Follow-up: cut Merge's idle chunks back to 170.
+// Cloud-on is what the served build applied (next.config.ts CLOUD_ON), read from its own config the way
+// scripts/first-load-budget.mjs does, so the two always agree.
+const cloudOn = JSON.parse(readFileSync(join(__dirname, "../../.next/required-server-files.json"), "utf8")).config.env?.NEXT_PUBLIC_CLOUD_SOURCES === "1";
+const BUDGET = { jsKB: cloudOn ? 174 : 172, lcpMs: 2500, cls: 0.1 };
 
 type Ld = { "@graph": { "@type": string; [k: string]: unknown }[] };
 
@@ -98,7 +105,7 @@ test.describe("indexable pages", () => {
     });
   }
 
-  test("pages stay within the performance budgets on a phone", async ({ page }, info) => {
+  test("pages stay within the performance budgets on a phone", { tag: "@serial" }, async ({ page }, info) => {
     test.skip(info.project.name !== "mobile", "budgets are measured on the mobile project");
     for (const path of ROUTES) {
       await page.addInitScript(() => {
@@ -117,10 +124,10 @@ test.describe("indexable pages", () => {
       await page.waitForTimeout(1000);
       const m = await page.evaluate(() => {
         const w = window as Window & { __lcp?: number; __cls?: number };
-        const js = performance
-          .getEntriesByType("resource")
-          .filter((r) => (r as PerformanceResourceTiming).initiatorType === "script")
-          .reduce((a, r) => a + (r as PerformanceResourceTiming).encodedBodySize, 0);
+        // Scripts, and scripts fetched by a <link rel="preload"> (a server-rendered lazy part), which run all the same.
+        const js = (performance.getEntriesByType("resource") as PerformanceResourceTiming[])
+          .filter((r) => r.initiatorType === "script" || (r.initiatorType === "link" && new URL(r.name).pathname.endsWith(".js")))
+          .reduce((a, r) => a + r.encodedBodySize, 0);
         return { jsKB: js / 1024, lcp: w.__lcp ?? 0, cls: w.__cls ?? 0 };
       });
       expect(m.jsKB, `${path} JS`).toBeLessThanOrEqual(BUDGET.jsKB);

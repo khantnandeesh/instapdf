@@ -4,7 +4,7 @@ import "../ui/dialog.css";
 import "./tool-flow.css";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { cloneElement, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { setHandoff, takeHandoff } from "@/lib/pdf/handoff";
 import { openPdf, readPageSizes, type OpenedPdf } from "@/lib/pdf/pdfjs";
 import { ThumbnailRenderer } from "@/lib/pdf/thumbnails";
@@ -34,6 +34,9 @@ import { createVisibilityWatcher, ThumbContext } from "./Thumbnail";
 import { ToolIntro } from "./ToolIntro";
 import type { FlowApi, FlowContext, FlowState, LoadedFile, PageDecoration, PreviewItem, ProcessFn, ReadyFile, ToolOutput, WorkspaceContext } from "./types";
 import { LeaveGuard } from "./LeaveGuard";
+// F23 cloud sources: the caret, the row and the hub on tool pages (everything else is the cloud chunk,
+// ui.ts, fetched on intent), compiled out entirely without them (every use sits behind the flag).
+import { CloudCaret, CloudRow, useCloud } from "../cloud/tool-cloud";
 
 // Never needed before a file is picked: separate chunks, prefetched once the page is idle.
 const lazyParts = {
@@ -52,6 +55,12 @@ const PasswordDialog = dynamic(() => lazyParts.password().then((m) => m.Password
 const OwnerPasswordDialog = dynamic(() => lazyParts.owner().then((m) => m.OwnerPasswordDialog), { ssr: false });
 const ReplaceFileDialog = dynamic(() => lazyParts.replace().then((m) => m.ReplaceFileDialog), { ssr: false });
 const PagePreviewDialog = dynamic(() => lazyParts.preview().then((m) => m.PagePreviewDialog), { ssr: false });
+
+/*
+ * F23 cloud sources: every check is `process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"` written out, a
+ * build-time constant the bundler folds before minifying, so builds without them compile to main's
+ * exact code (each branch is shaped so that its off side is main's expression).
+ */
 
 type Phase = "idle" | "processing" | "done" | "error";
 
@@ -135,7 +144,7 @@ export function ToolFlow({
   onPageKey,
   readyNote,
   canRun,
-  process,
+  process: processFiles, // renamed: `process.env` checks below must reach the real global
   onReset,
   renderWorkspace,
   toolbarStart,
@@ -237,6 +246,12 @@ export function ToolFlow({
     return toolbarAdd() ?? heading.current;
   }, [toolbarAdd]);
 
+  // ---- F23 cloud sources: same intake as a local pick (its inputs are set further down) ----
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- the flag is a build-time constant: the same call on every render
+  const cloud = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? useCloud() : null;
+  // The download cards come with the cloud chunk (here before any download starts).
+  const CloudCards = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? cloud!.ui?.CloudDownloads : undefined;
+
   // ---- derived -------------------------------------------------------------
   const readyFiles = files.filter(isReady);
   const lockedFiles = files.filter((f) => f.status === "locked");
@@ -247,11 +262,11 @@ export function ToolFlow({
         ? "done"
         : phase === "error"
           ? "error"
-          : files.length === 0 || (workspaceEmpty && !files.some((f) => f.status !== "ready"))
+          : (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && cloud!.s.downloads.length ? false : files.length === 0 || (workspaceEmpty && !files.some((f) => f.status !== "ready")))
             ? "empty"
             : lockedFiles.length
               ? "password"
-              : files.some((f) => f.status === "loading")
+              : (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? files.some((f) => f.status === "loading") || !!cloud!.s.busy : files.some((f) => f.status === "loading"))
                 ? "loading"
                 : "ready";
   const totalPages = readyFiles.reduce((s, f) => s + f.pageCount, 0);
@@ -265,7 +280,7 @@ export function ToolFlow({
     state === "empty"
       ? (copyOverrides?.statusEmpty ?? copy.statusEmpty)
       : state === "loading"
-        ? copy.statusLoading
+        ? process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? cloud!.s.busy || copy.statusLoading : copy.statusLoading
         : state === "password"
           ? copy.statusPassword
           : ownerBlocked.length
@@ -478,6 +493,8 @@ export function ToolFlow({
     [announce, beforeIntake, copyOverrides?.errorType, flow, flushProblems, loadFile, onFilesAdded, pushNotice, removeFile, sortIntake, updateFiles],
   );
 
+  if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1") cloud!.deps = { tool, announce, intake, pushNotice, dismissNotice, sortIntake, errorType: copyOverrides?.errorType, files };
+
   // ---- password queue ------------------------------------------------------
   const currentLocked = lockedFiles[0];
   // Files resolved (unlocked or skipped) in the current run of prompts, for "Locked file 2 of 3".
@@ -535,7 +552,7 @@ export function ToolFlow({
     announce(tool.flow.progressLabel);
     const started = performance.now();
     try {
-      const out = await process(ready, controller.signal, (v, ph) => {
+      const out = await processFiles(ready, controller.signal, (v, ph) => {
         setProgress(v);
         setProgressPhase(ph);
       });
@@ -554,7 +571,7 @@ export function ToolFlow({
       setProcessMessage(message.startsWith(USER_ERROR) ? message.slice(USER_ERROR.length) : null);
       setPhase("error");
     }
-  }, [announce, process, pushNotice, tool.flow.progressLabel, tool.slug]);
+  }, [announce, processFiles, pushNotice, tool.flow.progressLabel, tool.slug]);
 
   // Move focus once the processing bar or the error panel has been committed
   // (a requestAnimationFrame can run before React commits under load).
@@ -768,6 +785,44 @@ export function ToolFlow({
     </Button>
   );
 
+  // Elements the F23 branches below extend (cloneElement adds the caret) and the plain branch
+  // renders as is. Thunks, which the minifier inlines back: flag-off builds compile to main's code.
+  const introPicker = () => (
+    <FilePicker
+      ref={picker}
+      accept={accept}
+      multiple={flow.multiFile}
+      label={copyOverrides?.pickerButton ?? copy.pickerButton(flow.multiFile)}
+      icon={<UploadIcon size={24} />}
+      onFiles={(f, t) => void intake(f, t)}
+      inputTestId="file-input"
+    />
+  );
+  const toolbarPicker = () => (
+    <FilePicker
+      ref={picker}
+      accept={accept}
+      multiple={flow.multiFile}
+      label={flow.multiFile ? "Add files" : "Replace file"}
+      variant="tool"
+      size="sm"
+      className={phoneAddMenu ? "shadow-glow max-sm:hidden" : "shadow-glow"}
+      icon={<PlusIcon size={16} />}
+      disabled={state === "processing"}
+      onFiles={(f, t) => void intake(f, t, { replace: !flow.multiFile })}
+      inputTestId="file-input"
+    />
+  );
+  const pickerHint = () => <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copyOverrides?.pickerHint ?? copy.pickerHint}</p>;
+  const previewDialog = () => (
+    <PagePreviewDialog
+      target={previewTarget}
+      renderer={renderer}
+      onNavigate={(at) => setPreview((p) => (p ? { ...p, at } : p))}
+      onClose={() => setPreview(null)}
+      fallbackFocus={() => heading.current}
+    />
+  );
   return (
     <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" className="ip-flow" style={thumbSize === THUMB_DEFAULT ? undefined : { ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
       <DropOverlay active={dragging && acceptsDrop} mode={flow.multiFile || files.length === 0 ? "add" : "replace"} />
@@ -793,16 +848,17 @@ export function ToolFlow({
           <section aria-label="Your files" className={state === "empty" ? "min-w-0 lg:sticky lg:top-[calc(var(--ip-header-h)+16px)]" : "min-w-0"}>
             {state === "empty" ? (
               <DropCard>
-                <FilePicker
-                  ref={picker}
-                  accept={accept}
-                  multiple={flow.multiFile}
-                  label={copyOverrides?.pickerButton ?? copy.pickerButton(flow.multiFile)}
-                  icon={<UploadIcon size={24} />}
-                  onFiles={(f, t) => void intake(f, t)}
-                  inputTestId="file-input"
-                />
-                <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copyOverrides?.pickerHint ?? copy.pickerHint}</p>
+                {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
+                  ? cloneElement(introPicker(), { sources: <CloudCaret hub={cloud!} look="primary" /> })
+                  : introPicker()}
+                {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
+                  <>
+                    <CloudRow hub={cloud!} />
+                    {pickerHint()}
+                  </>
+                ) : (
+                  pickerHint()
+                )}
                 <LimitsNote text={copyOverrides?.limits ?? copy.limits(flow)} full={copyOverrides?.limitsFull ?? copy.limitsFull(flow)} />
                 <PrivacyNote runtime={tool.runtime} context="intro" />
               </DropCard>
@@ -848,19 +904,13 @@ export function ToolFlow({
                     />
                   )}
                   <span className="ms-auto">
-                    <FilePicker
-                      ref={picker}
-                      accept={accept}
-                      multiple={flow.multiFile}
-                      label={flow.multiFile ? "Add files" : "Replace file"}
-                      variant="tool"
-                      size="sm"
-                      className={phoneAddMenu ? "shadow-glow max-sm:hidden" : "shadow-glow"}
-                      icon={<PlusIcon size={16} />}
-                      disabled={state === "processing"}
-                      onFiles={(f, t) => void intake(f, t, { replace: !flow.multiFile })}
-                      inputTestId="file-input"
-                    />
+                    {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
+                      ? cloneElement(toolbarPicker(), {
+                          sources: (
+                            <CloudCaret hub={cloud!} look="tool" className={phoneAddMenu ? "max-sm:hidden" : undefined} disabled={state === "processing"} />
+                          ),
+                        })
+                      : toolbarPicker()}
                   </span>
                   {toolbarEnd?.(wctx)}
                 </div>
@@ -897,13 +947,14 @@ export function ToolFlow({
                     ) : (
                       <FileGrid files={files} onRemove={(f) => removeFile(f.id)} />
                     )}
-                    <PagePreviewDialog
-                      target={previewTarget}
-                      renderer={renderer}
-                      onNavigate={(at) => setPreview((p) => (p ? { ...p, at } : p))}
-                      onClose={() => setPreview(null)}
-                      fallbackFocus={() => heading.current}
-                    />
+                    {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
+                      <>
+                        {CloudCards && <CloudCards downloads={cloud!.s.downloads} />}
+                        {previewDialog()}
+                      </>
+                    ) : (
+                      previewDialog()
+                    )}
                   </ThumbContext.Provider>
                 </div>
                 {state === "processing" && (

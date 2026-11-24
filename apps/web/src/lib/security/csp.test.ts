@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { cspViolationsInHtml, inlineScriptHashes, routeForHtmlFile, scriptHash } from "../../../scripts/csp-lib.mjs";
 import { recentPrepaintScript } from "../recent-tools";
-import { contentSecurityPolicy, hashesFor, routeKey, securityHeaders } from "./csp";
+import { CLOUD_ALLOW, CLOUD_COOP, cloudPolicy, cloudRouteOf, contentSecurityPolicy, hashesFor, routeKey, securityHeaders } from "./csp";
 
 const directives = (policy: string) => new Map(policy.split("; ").map((d) => [d.split(" ")[0], d.split(" ").slice(1)] as const));
 
@@ -112,5 +112,73 @@ describe("csp-lib (build-time manifest)", () => {
     expect(routeForHtmlFile("(info)/privacy.html")).toBe("/privacy");
     expect(routeForHtmlFile("a/(group)/b.html")).toBe("/a/b");
     expect(routeForHtmlFile("docs/index.html")).toBe("/docs");
+  });
+});
+
+describe("F23: tool pages keep the pre-F23 policy byte for byte (spec D-3, AC-120/AC-127)", () => {
+  it("the tool-page policy string is exactly what it was before cloud sources", () => {
+    expect(contentSecurityPolicy({ scriptHashes: ["sha256-AAA="] })).toBe(
+      "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-AAA='; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+    );
+  });
+  it("tool pages still get exactly the pre-F23 security headers, COOP same-origin included", () => {
+    expect(securityHeaders).toEqual([
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" },
+      { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+      { key: "X-Frame-Options", value: "DENY" },
+    ]);
+  });
+  it("only /cloud/<provider> itself is a cloud route", () => {
+    expect(cloudRouteOf("/cloud/google")).toBe("google");
+    expect(cloudRouteOf("/cloud/onedrive/")).toBe("onedrive");
+    expect(cloudRouteOf("/cloud/mock")).toBe("mock");
+    expect(cloudRouteOf("/cloud/google/x")).toBeNull();
+    expect(cloudRouteOf("/cloud/box")).toBeNull();
+    expect(cloudRouteOf("/merge-pdf")).toBeNull();
+    expect(cloudRouteOf("/x/cloud/google")).toBeNull();
+  });
+});
+
+describe("F23: cloudPolicy (research §2.1)", () => {
+  const routes = Object.keys(CLOUD_ALLOW) as (keyof typeof CLOUD_ALLOW)[];
+
+  it("each window allows exactly its provider's hosts and nothing else", () => {
+    const d = directives(cloudPolicy("google", { scriptHashes: ["sha256-AAA="] }));
+    expect(d.get("script-src")).toEqual(["'self'", "'sha256-AAA='", "https://apis.google.com/js/api.js", "https://apis.google.com/_/scs/", "https://accounts.google.com/gsi/client"]);
+    expect(d.get("connect-src")).toEqual(["'self'", "https://www.googleapis.com/drive/v3/files", "https://www.googleapis.com/drive/v3/files/", "https://www.googleapis.com/upload/drive/v3/files", "https://accounts.google.com/gsi/"]);
+    expect(d.get("frame-src")).toEqual(["https://docs.google.com/picker", "https://accounts.google.com/gsi/"]);
+    expect(d.get("form-action")).toEqual(["'self'"]);
+    const dbx = directives(cloudPolicy("dropbox"));
+    expect(dbx.get("script-src")).toEqual(["'self'", "https://www.dropbox.com/static/api/2/dropins.js"]);
+    expect(dbx.get("connect-src")).toEqual(["'self'", "https://dl.dropboxusercontent.com"]);
+    expect(dbx.get("frame-src")).toEqual(["'none'"]);
+    const od = directives(cloudPolicy("onedrive"));
+    expect(od.get("script-src")).toEqual(["'self'"]); // MSAL is bundled: no third-party script
+    expect(od.get("frame-src")).toEqual(["https://onedrive.live.com/picker/"]);
+    expect(od.get("form-action")).toEqual(["'self'", "https://onedrive.live.com/picker/"]);
+    const mock = directives(cloudPolicy("mock"));
+    expect(mock.get("connect-src")).toEqual(["'self'"]);
+    expect(mock.get("script-src")).toEqual(["'self'"]);
+  });
+
+  it("keeps the strict base everywhere: no inline/eval, no wildcard or scheme-only sources, never framed", () => {
+    for (const r of routes) {
+      const policy = cloudPolicy(r, { scriptHashes: ["sha256-AAA="] });
+      const d = directives(policy);
+      expect(policy, r).not.toContain("'unsafe-inline'");
+      expect(policy, r).not.toContain("'unsafe-eval'");
+      expect(d.get("frame-ancestors"), r).toEqual(["'none'"]);
+      expect(d.get("style-src"), r).toEqual(["'self'"]);
+      expect(d.get("object-src"), r).toEqual(["'none'"]);
+      for (const k of ["script-src", "connect-src", "frame-src", "form-action"]) {
+        for (const src of d.get(k) ?? []) expect(["*", "https:", "http:", "data:", "blob:"], `${r} ${k} ${src}`).not.toContain(src);
+      }
+    }
+  });
+
+  it("COOP: allow-popups for the windows whose SDK opens a nested popup, same-origin for OneDrive", () => {
+    expect(CLOUD_COOP).toEqual({ dropbox: "same-origin-allow-popups", google: "same-origin-allow-popups", onedrive: "same-origin", mock: "same-origin-allow-popups" });
   });
 });

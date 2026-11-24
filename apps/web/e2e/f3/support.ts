@@ -2,7 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { expect, type Page } from "@playwright/test";
 import { PDFDocument } from "pdf-lib";
-import { downloadResult, flow, fx, primary } from "../support/flow";
+import { cloudOn, downloadResult, flow, fx, primary } from "../support/flow";
 
 export * from "../support/flow";
 
@@ -41,8 +41,16 @@ export const isPhoneToolbar = (page: Page) => (page.viewportSize()?.width ?? 128
  * ≥ 640 px, the one "Add" menu below (spec M-3, eval G-2). Same item names in both.
  */
 export async function chooseAddPages(page: Page, item: "Pages from a file…" | "Blank page") {
-  await chooseMenu(page, isPhoneToolbar(page) ? "Add" : "Add pages", item);
+  if (!cloudOn || item === "Blank page") return chooseMenu(page, isPhoneToolbar(page) ? "Add" : "Add pages", item);
+  // F23 (spec U-2 E3/E4): "From a file" lists This device and the clouds; on phones it is a step in the Add sheet.
+  if (isPhoneToolbar(page)) {
+    await chooseMenu(page, "Add", "Pages from a file");
+    await page.getByRole("menuitem", { name: "This device", exact: true }).click();
+  } else await chooseMenu(page, "Add pages", "This device");
 }
+
+/** The Add pages menu's "pages from this device" item: its F3 name, or "This device" with F23 on. */
+export const fromFileItem = cloudOn ? "This device" : "Pages from a file…";
 
 /** Opens a menu by its trigger name and chooses an item. */
 export async function chooseMenu(page: Page, trigger: string | RegExp, item: string) {

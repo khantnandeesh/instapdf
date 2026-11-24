@@ -31,14 +31,23 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: First-load JS budget
+        run: node apps/web/scripts/first-load-budget.mjs apps/web
 
   # The browser tests, in parallel jobs. Each builds the app itself (about a minute), which is
   # quicker than waiting for another job's build and passing it along.
   # "serial" holds the tests tagged @serial (wall-clock limits and heavy loads) on one worker.
+  # The "cloud" rows build the app with F23 cloud sources and the mock provider on
+  # (docs/specs/f23-cloud-pickers.md §7) and run the cloud suite plus the specs that branch on the
+  # flag (CSP, intake, Merge, layout, the phone JS budget). No provider keys are needed.
   e2e:
     name: e2e (${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Empty outside the cloud rows: the build is then main's, without cloud sources.
+      NEXT_PUBLIC_CLOUD_SOURCES: ${{ matrix.cloud }}
+      NEXT_PUBLIC_CLOUD_MOCK: ${{ matrix.cloud }}
     strategy:
       fail-fast: false
       matrix:
@@ -51,6 +60,19 @@ jobs:
             args: --project mobile --grep-invert @serial
           - name: serial
             args: --grep @serial --workers 1
+          - name: cloud desktop 1/2
+            cloud: "1"
+            budget: true
+            args: --project desktop --grep-invert @serial --shard 1/2 e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/
+          - name: cloud desktop 2/2
+            cloud: "1"
+            args: --project desktop --grep-invert @serial --shard 2/2 e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/
+          - name: cloud mobile
+            cloud: "1"
+            args: --project mobile --grep-invert @serial e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/
+          - name: cloud serial
+            cloud: "1"
+            args: --grep @serial --workers 1 e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -60,6 +82,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # The same first-load budgets on the cloud build (its own numbers, scripts/first-load-budget.mjs).
+      - name: First-load JS budget (cloud sources on)
+        if: matrix.budget
+        run: node apps/web/scripts/first-load-budget.mjs apps/web
       - name: Install Playwright Chromium
         run: pnpm --filter web exec playwright install --with-deps chromium
       # AC-46 checks every editor output with qpdf (pikepdf, MPL-2.0) and renders it with pdfium (pypdfium2, Apache-2.0/BSD).

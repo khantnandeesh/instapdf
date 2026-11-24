@@ -1,6 +1,7 @@
 node_modules/
 .next/
 .env*
+!.env.example
 *.key.json
 __pycache__/
 apps/web/playwright-report/

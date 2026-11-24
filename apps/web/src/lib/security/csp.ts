@@ -53,15 +53,93 @@ export function contentSecurityPolicy({ scriptHashes = [], dev = false }: CspOpt
   return directives.map((d) => d.join(" ")).join("; ");
 }
 
-/** Headers sent on every response (next.config.ts `headers()`), besides the CSP. */
-export const securityHeaders: { key: string; value: string }[] = [
+/**
+ * F23 cloud sources: the policy of one `/cloud/<provider>` window (spec D-3, research §2.1).
+ * Tool pages never get these hosts: provider code runs only in its own window, which never
+ * holds the visitor's local files (except the result they chose to save there).
+ * Each entry is exactly what the provider's flow needs (host-source paths match as prefixes
+ * when they end in "/", exactly otherwise):
+ * - Dropbox Chooser: its one script; downloads from the direct-link host.
+ * - Google: GIS token client + gapi (and the picker module from /_/scs/); the Picker and GIS
+ *   frames; Drive v3 file downloads and the Drive upload endpoint (save).
+ * - OneDrive: MSAL is bundled (no third-party script); token endpoint, Graph, the download-URL
+ *   hosts, and the File Picker v8 frame, started with a form POST. Personal accounts first.
+ * - mock (CI/e2e only): nothing beyond our own origin.
+ */
+export const CLOUD_ALLOW: Record<"google" | "dropbox" | "onedrive" | "mock", { script: string[]; connect: string[]; frame: string[]; form: string[] }> = {
+  dropbox: { script: ["https://www.dropbox.com/static/api/2/dropins.js"], connect: ["https://dl.dropboxusercontent.com"], frame: [], form: [] },
+  google: {
+    script: ["https://apis.google.com/js/api.js", "https://apis.google.com/_/scs/", "https://accounts.google.com/gsi/client"],
+    connect: ["https://www.googleapis.com/drive/v3/files", "https://www.googleapis.com/drive/v3/files/", "https://www.googleapis.com/upload/drive/v3/files", "https://accounts.google.com/gsi/"],
+    frame: ["https://docs.google.com/picker", "https://accounts.google.com/gsi/"],
+    form: [],
+  },
+  onedrive: {
+    script: [],
+    connect: ["https://login.microsoftonline.com", "https://graph.microsoft.com", "https://*.files.1drv.com", "https://my.microsoftpersonalcontent.com"],
+    frame: ["https://onedrive.live.com/picker/"],
+    form: ["https://onedrive.live.com/picker/"],
+  },
+  mock: { script: [], connect: [], frame: [], form: [] },
+};
+
+export type CloudRouteName = keyof typeof CLOUD_ALLOW;
+
+/** The policy for `/cloud/<route>`: the strict base plus only that provider's hosts. */
+export function cloudPolicy(route: CloudRouteName, { scriptHashes = [], dev = false }: CspOptions = {}): string {
+  const allow = CLOUD_ALLOW[route];
+  const hashes = scriptHashes.map((h) => `'${h}'`);
+  const directives: [string, ...string[]][] = [
+    ["default-src", "'self'"],
+    dev ? ["script-src", "'self'", "'unsafe-inline'", "'unsafe-eval'", ...allow.script] : ["script-src", "'self'", ...hashes, ...allow.script],
+    dev ? ["style-src", "'self'", "'unsafe-inline'"] : ["style-src", "'self'"],
+    ["img-src", "'self'", "blob:", "data:"],
+    ["font-src", "'self'"],
+    dev ? ["connect-src", "'self'", "ws:", "wss:", ...allow.connect] : ["connect-src", "'self'", ...allow.connect],
+    ["frame-src", ...(allow.frame.length ? allow.frame : ["'none'"])],
+    ["worker-src", "'self'"],
+    ["manifest-src", "'self'"],
+    ["object-src", "'none'"],
+    ["base-uri", "'self'"],
+    ["frame-ancestors", "'none'"],
+    ["form-action", "'self'", ...allow.form],
+  ];
+  return directives.map((d) => d.join(" ")).join("; ");
+}
+
+/**
+ * COOP of each cloud window. Dropbox and Google return results from a nested popup to this
+ * window, which needs `same-origin-allow-popups` (research §2.1). OneDrive signs in by a full-page
+ * redirect (MSAL `loginRedirect`, no popup, no redirect bridge page) and hosts the picker in an
+ * iframe, so it keeps `same-origin`. The mock mirrors Google.
+ */
+export const CLOUD_COOP: Record<CloudRouteName, string> = {
+  dropbox: "same-origin-allow-popups",
+  google: "same-origin-allow-popups",
+  onedrive: "same-origin",
+  mock: "same-origin-allow-popups",
+};
+
+/** `/cloud/<route>` (and nothing deeper) → the route, else null. */
+export function cloudRouteOf(pathname: string): CloudRouteName | null {
+  const m = /^\/cloud\/(google|dropbox|onedrive|mock)\/?$/.exec(pathname);
+  return m ? (m[1] as CloudRouteName) : null;
+}
+
+/** COOP for every page that is not a cloud window (tool pages: unchanged, spec D-3). */
+export const TOOL_PAGE_COOP = "same-origin";
+
+/** Headers sent on every response (next.config.ts `headers()`), besides the CSP and COOP. */
+export const baseSecurityHeaders: { key: string; value: string }[] = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   // web-share and clipboard stay allowed (Share and paste are features).
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" },
-  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   { key: "X-Frame-Options", value: "DENY" },
 ];
+
+/** Everything a non-cloud page gets: the base headers plus COOP `same-origin` (same set and values as before F23). */
+export const securityHeaders: { key: string; value: string }[] = [...baseSecurityHeaders.slice(0, 3), { key: "Cross-Origin-Opener-Policy", value: TOOL_PAGE_COOP }, baseSecurityHeaders[3]];
 
 /** Shape of `.next/csp-manifest.json`, written by scripts/csp-manifest.mjs after `next build`. */
 export type CspManifest = {

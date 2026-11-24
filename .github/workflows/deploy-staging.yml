@@ -74,6 +74,13 @@ jobs:
         if: steps.fresh.outputs.deploy == 'true'
         env:
           PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          # F23 cloud sources: public IDs from repository variables (not secrets). Prod promotes this same image.
+          NEXT_PUBLIC_CLOUD_SOURCES: ${{ vars.NEXT_PUBLIC_CLOUD_SOURCES }}
+          NEXT_PUBLIC_DROPBOX_APP_KEY: ${{ vars.NEXT_PUBLIC_DROPBOX_APP_KEY }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+          NEXT_PUBLIC_GOOGLE_API_KEY: ${{ vars.NEXT_PUBLIC_GOOGLE_API_KEY }}
+          NEXT_PUBLIC_GOOGLE_APP_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_APP_ID }}
+          NEXT_PUBLIC_ONEDRIVE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_ONEDRIVE_CLIENT_ID }}
           FONTS_BUCKET: ${{ vars.FONTS_BUCKET }}
         run: |
           image="${REGION}-docker.pkg.dev/${PROJECT_ID}/instapdf/web:${SHA}"
@@ -94,7 +101,10 @@ jobs:
             esac
           fi
           echo "::notice::Font library: ${fonts:-in-app copy}"
-          docker build -f apps/web/Dockerfile --build-arg "FONTS_ORIGIN=${fonts}" -t "$image" .
+          docker build -f apps/web/Dockerfile --build-arg "FONTS_ORIGIN=${fonts}" -t "$image" \
+            --build-arg NEXT_PUBLIC_CLOUD_SOURCES --build-arg NEXT_PUBLIC_DROPBOX_APP_KEY \
+            --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID --build-arg NEXT_PUBLIC_GOOGLE_API_KEY \
+            --build-arg NEXT_PUBLIC_GOOGLE_APP_ID --build-arg NEXT_PUBLIC_ONEDRIVE_CLIENT_ID .
           docker push "$image"
 
       - name: Deploy to Cloud Run

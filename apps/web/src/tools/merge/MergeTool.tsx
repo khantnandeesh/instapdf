@@ -2,6 +2,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { InsertKind, PageAction } from "@/components/page-edit/EditablePageGrid";
+import { loadCloud } from "@/components/cloud/tool-cloud";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
 import type { FlowApi, LoadedFile, ProcessFn, WorkspaceContext } from "@/components/tool-flow/types";
 import { cx } from "@/components/ui/cx";
@@ -47,8 +48,18 @@ const tool = flowTool("merge-pdf");
 const loadSegmentGrid = () => import("@/components/page-edit/SegmentGrid");
 const SegmentGrid = dynamic(() => loadSegmentGrid().then((m) => m.SegmentGrid), { ssr: false, loading: () => <div className="h-40" aria-hidden="true" /> });
 const ShortcutsHelp = dynamic(() => loadSegmentGrid().then((m) => m.ShortcutsHelp), { ssr: false });
+// F23: cloud builds take Merge's menus from the cloud chunk (through tool-cloud.tsx loadCloud, so the
+// page's cloud controls use it too), whose MenuButton adds the providers to the Add menus
+// (cloud/merge-menus.tsx) and passes every other menu through. They are drawn once files are in, which
+// fetches it then: the idle prefetch below never fetches the cloud chunk. Builds without cloud sources
+// fold this to the plain menu.
 const loadMenu = () => import("@/components/ui/Menu");
-const MenuButton = dynamic(() => loadMenu().then((m) => m.MenuButton), { ssr: false, loading: () => <span className="inline-block h-9 w-11" aria-hidden="true" /> });
+const MenuButton = dynamic(
+  () => (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (loadCloud() as unknown as ReturnType<typeof loadMenu>) : loadMenu()).then((m) => m.MenuButton),
+  { ssr: false, loading: () => <span className="inline-block h-9 w-11" aria-hidden="true" /> },
+);
+/** The idle prefetch's part of the menus: none in cloud builds (the cloud chunk is fetched on intent only). */
+const prefetchMenu = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? () => {} : loadMenu;
 const loadPageGrid = () => import("@/components/page-edit/EditablePageGrid");
 const EditablePageGrid = dynamic(loadPageGrid, { ssr: false, loading: () => <div className="h-40" aria-hidden="true" /> });
 const loadDialogs = () => import("@/components/page-edit/dialogs");
@@ -625,7 +636,7 @@ export function MergeTool() {
       if (done) return;
       done = true;
       stop();
-      void Promise.all([loadSegmentGrid(), loadMenu()]).catch(() => {});
+      void Promise.all([loadSegmentGrid(), prefetchMenu()]).catch(() => {});
     };
     const t = setTimeout(go, 4000);
     const stop = () => {

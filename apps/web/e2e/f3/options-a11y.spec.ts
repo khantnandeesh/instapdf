@@ -223,6 +223,8 @@ test("AC-74: no serious axe violations in the Merge states", async ({ page }) =>
   await tile(page, "B2").getByTestId("tile-more").click();
   await expectNoSeriousAxeViolations(page, "page More menu");
   await page.getByRole("menuitem", { name: /Move to position/ }).click();
+  // The dialog is a lazy chunk: wait for it, so settled() sees its fade-in instead of running before it starts.
+  await expect(page.getByRole("dialog")).toBeVisible();
   await expectNoSeriousAxeViolations(page, "move dialog");
   await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
   await chooseAddPages(page, "Pages from a file…");

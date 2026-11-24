@@ -11,7 +11,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { isUsable, tools } from "../../src/tools/registry";
-import { fx } from "../support/flow";
+import { cloudOn, fx } from "../support/flow";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
 const comingSoon = tools.find((t) => !isUsable(t));
@@ -169,7 +169,7 @@ for (const [project, sizes] of [
           const addPages = page.getByTestId("add-pages-menu");
           if (await addPages.isVisible()) {
             await addPages.click();
-            const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("menuitem", { name: "Pages from a file…" }).click()]);
+            const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("menuitem", { name: cloudOn ? "This device" : "Pages from a file…", exact: true }).click()]);
             await chooser.setFiles(fx("sixty-pages.pdf"));
             await expect(page.getByTestId("picker-grid")).toBeVisible();
             await expectClean(page, "page picker open");

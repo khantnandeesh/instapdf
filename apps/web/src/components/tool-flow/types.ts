@@ -1,5 +1,6 @@
 import type { Permission } from "@/tools/registry";
 import type { PageSize } from "@/lib/pdf/pdfjs";
+import type { ReactNode } from "react";
 
 export type FileStatus = "loading" | "locked" | "ready";
 
@@ -85,7 +86,8 @@ export type FlowNoticeInput = {
   title: string;
   body?: string;
   items?: string[];
-  action?: { label: string; onClick: () => void };
+  /** F23 adds `node` and `icon` (see Notice; cloud/NoticeAction.tsx makes them). */
+  action?: { label: string; onClick: () => void; node?: ReactNode; icon?: ReactNode };
   /** Kept when new files are added (other info and warning notices are cleared then). */
   sticky?: boolean;
   /** Auto-dismiss after this long (paused while hovered or focused). */
