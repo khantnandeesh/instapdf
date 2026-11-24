@@ -28,7 +28,7 @@
  */
 
 @layer base {
-  /* Grid paper: the default background behind everything (Backgrounds, mp-bg-grid). */
+  /* Grid paper: the default background behind everything (Backgrounds). */
   html,
   body {
     background-color: var(--mp-grid-ground);
@@ -765,8 +765,7 @@
     color: var(--mp-alert-info-ink);
     border-color: var(--mp-alert-info-border);
   }
-  .mp-alert a,
-  .mp-alert button.mp-alert__link {
+  .mp-alert a {
     color: inherit;
     text-decoration: underline;
   }
@@ -1487,8 +1486,11 @@
 
 /* ---- F2: site chrome and home catalogue (docs/specs/f2-home.md) ---------------- */
 
+/* Smooth jumps only where the page has in-page anchors (the home catalogue: hero CTA, category chips).
+   Not site-wide: a smooth scroll still in flight is not cancelled by an instant scrollTo, so on tool
+   pages it could carry the result screen away after the flow reset it to the top. */
 @media (prefers-reduced-motion: no-preference) {
-  html {
+  :root:has([data-ip-smooth-anchors]) {
     scroll-behavior: smooth;
   }
 }
@@ -1668,13 +1670,10 @@
 
 /* Sticky search and filter bar on long lists (home catalogue). Pinned under the header and fully
    transparent (owner, 2026-11-24): no ground, blur, border or shadow, so it never reads as a box on
-   the grid paper. data-stuck stays for tests and future use; it changes nothing visible. */
-.ip-sticky-bar {
-  background: transparent;
-}
+   the grid paper (no rule needed: transparent is the default). data-stuck stays for tests and future use;
+   it changes nothing visible. */
 @media (forced-colors: active) {
   .ip-sticky-bar {
     background: Canvas;
-    backdrop-filter: none;
   }
 }

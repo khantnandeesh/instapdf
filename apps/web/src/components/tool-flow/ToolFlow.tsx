@@ -560,7 +560,19 @@ export function ToolFlow({
     if (phase === "processing") progressBox.current?.focus();
     else if (phase === "error") retryButton.current?.focus();
     // Fit the first screen: the result starts at the top, so Download is never under the header.
-    else if (phase === "done" && window.scrollY > 0) window.scrollTo({ top: 0, behavior: "instant" });
+    // Unconditional and repeated after two frames: a smooth scroll already in flight (scrollY may still
+    // read 0) is not cancelled by an instant scrollTo and would otherwise carry the result away.
+    else if (phase === "done") {
+      const root = document.documentElement;
+      root.style.scrollBehavior = "auto";
+      window.scrollTo(0, 0);
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          window.scrollTo(0, 0);
+          root.style.scrollBehavior = "";
+        }),
+      );
+    }
   }, [phase]);
   // Start over focuses the (re-mounted) picker after the empty state is committed.
   const [focusPickerTick, setFocusPickerTick] = useState(0);
