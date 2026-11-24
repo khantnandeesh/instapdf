@@ -1,0 +1,20 @@
+{
+  "subsets": ["latin", "latin-ext"],
+  "text": [
+    { "id": "arimo", "label": "Arimo", "standsFor": "Arial", "class": "sans" },
+    { "id": "tinos", "label": "Tinos", "standsFor": "Times", "class": "serif" },
+    { "id": "cousine", "label": "Cousine", "standsFor": "Courier", "class": "mono" },
+    { "id": "carlito", "label": "Carlito", "standsFor": "Calibri", "class": "sans" },
+    { "id": "caladea", "label": "Caladea", "standsFor": "Cambria", "class": "serif" }
+  ],
+  "sign": [
+    { "id": "caveat", "label": "Caveat" },
+    { "id": "dancing-script", "label": "Dancing Script" },
+    { "id": "great-vibes", "label": "Great Vibes" },
+    { "id": "kalam", "label": "Kalam" },
+    { "id": "sacramento", "label": "Sacramento" },
+    { "id": "allura", "label": "Allura" },
+    { "id": "alex-brush", "label": "Alex Brush" },
+    { "id": "parisienne", "label": "Parisienne" }
+  ]
+}

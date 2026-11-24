@@ -40,6 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 /public/fonts/noto/
+/public/fonts/editor/
 
 # generated at build by scripts/licenses.mjs
 /.generated/
