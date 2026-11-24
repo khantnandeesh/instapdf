@@ -667,12 +667,14 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       if (typing instanceof HTMLElement && typing.closest(".bf-popover")) typing.blur();
       const s = store.get();
       if (s.editing) store.set({ editing: null });
+      const kept = !!s.lineEdit?.failed;
       if (s.lineEdit) await ctl.commitLine();
       // Clicking Download left the box, which started the save: its outcome decides.
       await ctl.committing;
       // A line whose text couldn't be saved is still open: the file would be made without it.
+      // (A save that failed just now has said why itself, with its own way out.)
       if (store.get().lineEdit?.failed) {
-        ctl.toast({ text: "The line you’re editing couldn’t be saved, so it isn’t in the file yet. Change it, or press Escape to leave it as it was.", tone: "danger" });
+        if (kept) ctl.toast({ text: "The line you’re editing couldn’t be saved, so it isn’t in the file yet. Change it, or press Escape to leave it as it was.", tone: "danger" });
         return;
       }
       // Added text with characters no font can print: say so before the file is made (AC-75).
@@ -1092,7 +1094,14 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   const strip = !wide && (selectionObjs.length > 0 || tool !== "select" || !!placement);
   // The strip hides itself when a tool has no options: what sits above it then sits on the dock.
   useLayoutEffect(() => {
-    document.querySelector(".ed-frame-root")?.classList.toggle("ed-strip-empty", strip && !document.querySelector(".ed-strip :is(button, input)"));
+    const mark = () => document.querySelector(".ed-frame-root")?.classList.toggle("ed-strip-empty", strip && !document.querySelector(".ed-strip :is(button, input)"));
+    mark();
+    // Its options can arrive later (the form tools load on demand).
+    const bar = document.querySelector(".ed-strip");
+    if (!bar) return;
+    const seen = new MutationObserver(mark);
+    seen.observe(bar, { childList: true, subtree: true });
+    return () => seen.disconnect();
   });
 
   return (

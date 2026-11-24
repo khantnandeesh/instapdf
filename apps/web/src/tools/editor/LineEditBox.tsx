@@ -143,6 +143,7 @@ export function LineEditBox({
   // On a phone the page's text is smaller than the hint: it is docked above the tools instead of floating over the page.
   const wide = useStore(ctl.store, (s) => s.wide);
   const [slot, setSlot] = useState<Element | null>(null);
+  const hintFocused = useRef(false);
   useLayoutEffect(() => {
     if (wide) return setSlot(null);
     const area = document.querySelector<HTMLElement>(".ed-toasts");
@@ -151,7 +152,11 @@ export function LineEditBox({
       const next = area?.querySelector('[data-line-hint-slot="toast"]') ?? area?.querySelector('[data-line-hint-slot="dock"]') ?? null;
       setSlot((was) => {
         // A font button that had the focus went with the old place: the box takes it back.
-        if (was && was !== next && was.contains(document.activeElement)) queueMicrotask(() => el.current?.focus({ preventScroll: true }));
+        // (It is gone from the page by now, so the focus it had is remembered, not looked up.)
+        if (was !== next && hintFocused.current) {
+          hintFocused.current = false;
+          queueMicrotask(() => el.current?.focus({ preventScroll: true }));
+        }
         return next;
       });
     };
@@ -161,7 +166,7 @@ export function LineEditBox({
     seen.observe(area, { childList: true, subtree: true });
     // An on-screen keyboard covers the bottom of the page without resizing it: the row stays above it.
     const vv = window.visualViewport;
-    const lift = () => area.style.setProperty("--ed-keyboard", `${Math.max(0, Math.round(window.innerHeight - (vv?.height ?? window.innerHeight) - (vv?.offsetTop ?? 0)))}px`);
+    const lift = () => area.style.setProperty("--ed-keyboard", `${!vv || vv.scale > 1.01 ? 0 : Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop))}px`);
     lift();
     vv?.addEventListener("resize", lift);
     vv?.addEventListener("scroll", lift);
@@ -493,6 +498,8 @@ export function LineEditBox({
           }}
           style={docked ? undefined : side === "beside" ? { left: hintLeft, top: besideTop - box.top } : { left: hintLeft }}
           data-testid="line-missing"
+          onFocus={() => (hintFocused.current = true)}
+          onBlur={() => (hintFocused.current = false)}
           data-side={inMessage ? "message" : docked ? "docked" : side}
         >
           <span className={inMessage ? "sr-only" : undefined}>

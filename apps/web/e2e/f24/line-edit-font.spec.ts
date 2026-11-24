@@ -507,8 +507,12 @@ test("Download pressed while a save that fails is under way makes no file; anoth
   // Download is pressed with the box still open: leaving it starts the save, which is refused.
   await page.getByRole("button", { name: "Download PDF" }).click();
   const notice = page.getByTestId("editor-notice");
-  await expect(notice).toContainText("couldn’t be saved, so it isn’t in the file yet", { timeout: 30_000 });
+  // The refusal says why itself and keeps its own way out; Download adds nothing over it.
+  await expect(notice).toContainText("would run past the page edge. Your text is still in the box.", { timeout: 30_000 });
+  await expect(notice.getByRole("button", { name: "Replace with new text" })).toBeVisible();
   await expect(input).toHaveText(`${text} and then the date`);
+  await page.waitForTimeout(500);
+  await expect(notice).toContainText("would run past the page edge");
   // Another line is not opened over the kept text.
   await lineWith(page, "Total amount due").click({ force: true });
   await expect(input).toHaveText(`${text} and then the date`);
