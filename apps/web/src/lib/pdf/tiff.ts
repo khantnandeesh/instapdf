@@ -175,7 +175,11 @@ function check(ifd: TiffIfd, width: number, height: number, len: number) {
     if (tw <= 0 || th <= 0 || Math.ceil(width / tw) * Math.ceil(height / th) > offsets.length) throw new Bad("unreadable");
     // UTIF allocates (and zeroes) one tile buffer of tw x th: a 1x1 image may not claim 30000x30000 tiles.
     if (tw > maxTileSide(width) || th > maxTileSide(height)) throw new Bad("unreadable");
-    if (tw * th * (bitsPerPixel / 8) > MAX_TIFF_DECODE_BYTES) throw new Bad("tooLarge");
+    // The whole tile grid, overhang included, must fit the budget: each kept tile is tw x th.
+    if (Math.ceil(width / tw) * Math.ceil(height / th) * tw * th * (bitsPerPixel / 8) > MAX_TIFF_DECODE_BYTES) throw new Bad("tooLarge");
+  } else {
+    const rps = Math.min(num0(ifd, "t278") || height, height);
+    if (Math.ceil(height / rps) * rps * Math.ceil((width * bitsPerPixel) / 8) > MAX_TIFF_DECODE_BYTES) throw new Bad("tooLarge");
   }
 }
 

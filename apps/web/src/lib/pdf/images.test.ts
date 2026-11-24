@@ -167,6 +167,19 @@ describe("TIFF structure walker (review fix)", () => {
       ifdTiff([[256, 3, 1, 1], [257, 3, 1, 1], [258, 3, 1, 8], [262, 3, 1, 2], [277, 3, 1, 3], [322, 4, 1, side], [323, 4, 1, side], [324, 4, 1, 8], [325, 4, 1, 4]], 0, 4);
     expect(readTiff(tiles(30000))).toEqual({ problem: "unreadable" });
     expect(tiffFrameSizes(tiles(256))).toEqual([{ width: 1, height: 1 }]); // an honest small tiled file still opens
+    // A 4,000,000 x 1 strip of 1024x1024 tiles: 3,907 overhanging tiles would be 4 GB.
+    const n = 3907;
+    const e: [number, number, number, number][] = [[256, 4, 1, 4_000_000], [257, 3, 1, 1], [258, 3, 1, 8], [262, 3, 1, 1], [322, 4, 1, 1024], [323, 4, 1, 1024], [324, 4, n, 0], [325, 4, n, 0]];
+    const at = ifdTiff(e, 0).length;
+    e[6][3] = at;
+    e[7][3] = at + n * 4;
+    const wide = ifdTiff(e, 0, n * 8 + 4);
+    const v = new DataView(wide.buffer);
+    for (let i = 0; i < n; i++) {
+      v.setUint32(at + i * 4, at + n * 8, true);
+      v.setUint32(at + n * 4 + i * 4, 4, true);
+    }
+    expect(readTiff(wide)).toEqual({ problem: "tooLarge" });
     expect(Date.now() - started).toBeLessThan(200);
   });
   it("inflates a deflate strip only up to its own size (deflate bomb)", async () => {
