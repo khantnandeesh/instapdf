@@ -5,7 +5,7 @@ import { PlaceholderPage } from "@/components/site/pages";
 /** Footer placeholder page (About, Help, Security until F21 writes them): 200, noindex. */
 export function infoPage(slug: InfoSlug) {
   const title = infoPages[slug];
-  const metadata: Metadata = { title: `${title} · BerryPDF`, robots: { index: false } };
+  const metadata: Metadata = { title: { absolute: `${title} | BerryPDF` }, robots: { index: false } };
   function Page() {
     return <PlaceholderPage title={title} />;
   }

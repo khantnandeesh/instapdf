@@ -6,11 +6,14 @@
  * time). Middleware does not make pages dynamic: the prerendered HTML is still
  * served as is, this only adds a header. `/_next/static` is excluded; its files
  * get the hash-free policy from next.config.ts.
+ *
+ * Also sends `X-Robots-Tag: noindex` on every host but the canonical one (docs/seo/strategy.md).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
 import { contentSecurityPolicy, hashesFor, type CspManifest } from "@/lib/security/csp";
+import { isIndexable } from "@/lib/seo/site";
 
 export const config = {
   runtime: "nodejs",
@@ -36,5 +39,9 @@ export function middleware(request: NextRequest) {
   const policy = dev ? contentSecurityPolicy({ dev }) : contentSecurityPolicy({ scriptHashes: hashesFor(loadManifest(), request.nextUrl.pathname) });
   const response = NextResponse.next();
   response.headers.set("Content-Security-Policy", policy);
+  // Only prod on the canonical host may be indexed (src/lib/seo/site.ts): staging and raw Cloud Run URLs never are.
+  if (!isIndexable(request.headers.get("host"))) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
   return response;
 }

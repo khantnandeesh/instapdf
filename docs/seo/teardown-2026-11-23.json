@@ -1,0 +1,1251 @@
+{
+ "fetched": "2026-11-23",
+ "method": "see docs/seo/strategy.md section 1",
+ "pages": {
+  "ilovepdf-compress": {
+   "title": "Compress PDF online. Same PDF quality less file size",
+   "tlen": 52,
+   "desc": "Compress PDF file to get the same PDF quality but less filesize. Compress or optimize PDF files online, easily and free.",
+   "dlen": 120,
+   "canonical": [
+    "https://www.ilovepdf.com/compress_pdf"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:app_id",
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://www.ilovepdf.com/img/ilovepdf/social/en-US/compress.png",
+   "twitter": "summary_large_image",
+   "ld": [],
+   "h1": [
+    "Compress PDF files"
+   ],
+   "h2": [
+    "Reduce file size while optimizing for maximal PDF quality."
+   ],
+   "nh2": 1,
+   "nh3": 0,
+   "words": 342,
+   "links": 96,
+   "scripts": 11,
+   "ext_scripts": 2,
+   "details": 0,
+   "lang": "en"
+  },
+  "ilovepdf-edit": {
+   "title": "Edit PDF | Online PDF Editor and Form Filler",
+   "tlen": 44,
+   "desc": "Free online PDF Editor. Easily edit documents and add text, shapes, comments and highlights to a PDF file. Fill out PDF forms and modify your PDF by adding annotations.",
+   "dlen": 168,
+   "canonical": [
+    "https://www.ilovepdf.com/edit-pdf"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:app_id",
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://www.ilovepdf.com/img/ilovepdf/social/en-US/editpdf.png",
+   "twitter": "summary_large_image",
+   "ld": [],
+   "h1": [
+    "PDF Editor"
+   ],
+   "h2": [
+    "Edit PDF by adding text, shapes, comments and highlights. Your secure and simple tool to edit PDF."
+   ],
+   "nh2": 1,
+   "nh3": 0,
+   "words": 364,
+   "links": 96,
+   "scripts": 11,
+   "ext_scripts": 3,
+   "details": 0,
+   "lang": "en"
+  },
+  "ilovepdf-home": {
+   "title": "iLovePDF | Online PDF tools for PDF lovers",
+   "tlen": 42,
+   "desc": "iLovePDF is an online service to work with PDF files completely free and easy to use. Merge PDF, split PDF, compress PDF, office to PDF, PDF to JPG and more!",
+   "dlen": 157,
+   "canonical": [
+    "https://www.ilovepdf.com/"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:app_id",
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://www.ilovepdf.com/img/ilovepdf/social/en-US/ilovepdf.png",
+   "twitter": "summary_large_image",
+   "ld": [],
+   "h1": [
+    "Every tool you need to work with PDFs in one place"
+   ],
+   "h2": [
+    "Every tool you need to use PDFs, at your fingertips. All are 100% FREE and easy to use! Merge, split, compress, convert,",
+    "Get more with Premium",
+    "Image editing made simple with iLoveIMG"
+   ],
+   "nh2": 3,
+   "nh3": 33,
+   "words": 1127,
+   "links": 186,
+   "scripts": 7,
+   "ext_scripts": 2,
+   "details": 0,
+   "lang": "en"
+  },
+  "ilovepdf-jpg2pdf": {
+   "title": "Convert JPG to PDF. Images JPG to PDF online",
+   "tlen": 44,
+   "desc": "Convert JPG images to PDF, rotate them or set a page margin. Convert JPG to PDF online, easily and free.",
+   "dlen": 104,
+   "canonical": [
+    "https://www.ilovepdf.com/jpg_to_pdf"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:app_id",
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://www.ilovepdf.com/img/ilovepdf/social/en-US/imagepdf.png",
+   "twitter": "summary_large_image",
+   "ld": [],
+   "h1": [
+    "JPG to PDF"
+   ],
+   "h2": [
+    "Convert JPG images to PDF in seconds. Easily adjust orientation and margins."
+   ],
+   "nh2": 1,
+   "nh3": 0,
+   "words": 359,
+   "links": 96,
+   "scripts": 11,
+   "ext_scripts": 2,
+   "details": 0,
+   "lang": "en"
+  },
+  "ilovepdf-merge": {
+   "title": "Merge PDF files online. Free service to merge PDF",
+   "tlen": 49,
+   "desc": "Select multiple PDF files and merge them in seconds. Merge & combine PDF files online, easily and free.",
+   "dlen": 103,
+   "canonical": [
+    "https://www.ilovepdf.com/merge_pdf"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:app_id",
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://www.ilovepdf.com/img/ilovepdf/social/en-US/merge.png",
+   "twitter": "summary_large_image",
+   "ld": [],
+   "h1": [
+    "Merge PDF files"
+   ],
+   "h2": [
+    "Combine PDFs in the order you want with the easiest PDF merger available."
+   ],
+   "nh2": 1,
+   "nh3": 0,
+   "words": 362,
+   "links": 96,
+   "scripts": 11,
+   "ext_scripts": 2,
+   "details": 0,
+   "lang": "en"
+  },
+  "ilovepdf-pdf2word": {
+   "title": "PDF to WORD | Convert PDF to Word online for free",
+   "tlen": 49,
+   "desc": "Convert PDF to editable Word documents for free. PDF to Word conversion is fast, secure and almost 100% accurate. Convert scanned PDF to DOC keeping the layout.",
+   "dlen": 160,
+   "canonical": [
+    "https://www.ilovepdf.com/pdf_to_word"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:app_id",
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://www.ilovepdf.com/img/ilovepdf/social/en-US/pdfword.png",
+   "twitter": "summary_large_image",
+   "ld": [],
+   "h1": [
+    "PDF to WORD Converter"
+   ],
+   "h2": [
+    "Convert your PDF to WORD documents with incredible accuracy. Powered by Solid Documents."
+   ],
+   "nh2": 1,
+   "nh3": 0,
+   "words": 441,
+   "links": 97,
+   "scripts": 11,
+   "ext_scripts": 2,
+   "details": 0,
+   "lang": "en"
+  },
+  "pdf24-compress": {
+   "title": "Compress PDF - 100% free & online - PDF24",
+   "tlen": 41,
+   "desc": "Make PDF files smaller for free. Reduce PDF size while maintaining maximum quality. ✓ No limits and no watermarks. ✓ No installation or registration required.",
+   "dlen": 158,
+   "canonical": [
+    "https://tools.pdf24.org/en/compress-pdf"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://tools.pdf24.org/static/img/share/v3/en/compressPdf.png?v=62c35636",
+   "twitter": "summary_large_image",
+   "ld": [
+    "AggregateRating",
+    "Offer",
+    "Organization",
+    "Person",
+    "WebApplication"
+   ],
+   "h1": [
+    "Compress PDF"
+   ],
+   "h2": [
+    "Shrink PDF files by reducing image resolution and quality and removing unneeded data, all adjustable",
+    "Information",
+    "What others are saying",
+    "Questions and Answers",
+    "Please rate this app",
+    "Please share PDF24 with friends",
+    "Alternative: PDF24 Creator",
+    "More great tools"
+   ],
+   "nh2": 8,
+   "nh3": 13,
+   "words": 1261,
+   "links": 91,
+   "scripts": 22,
+   "ext_scripts": 7,
+   "details": 0,
+   "lang": "en"
+  },
+  "pdf24-edit": {
+   "title": "Edit PDF - 100% free & online - PDF24",
+   "tlen": 37,
+   "desc": "Free online PDF editor to edit PDF files. ✓ No limits and no watermarks. ✓ No installation or registration required.",
+   "dlen": 116,
+   "canonical": [
+    "https://tools.pdf24.org/en/edit-pdf"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://tools.pdf24.org/static/img/share/v3/en/editPdf.png?v=62c3568b",
+   "twitter": "summary_large_image",
+   "ld": [
+    "AggregateRating",
+    "Offer",
+    "Organization",
+    "Person",
+    "WebApplication"
+   ],
+   "h1": [
+    "Edit PDF"
+   ],
+   "h2": [
+    "Write on PDF pages, insert images, shapes and signatures, add comments, black out content, rearrange pages and fill in f",
+    "Information",
+    "What others are saying",
+    "Questions and Answers",
+    "Please rate this app",
+    "Please share PDF24 with friends",
+    "Alternative: PDF24 Creator",
+    "More great tools"
+   ],
+   "nh2": 8,
+   "nh3": 8,
+   "words": 951,
+   "links": 93,
+   "scripts": 21,
+   "ext_scripts": 7,
+   "details": 0,
+   "lang": "en"
+  },
+  "pdf24-home": {
+   "title": "PDF24 Tools: Free PDF solutions for all PDF problems",
+   "tlen": 52,
+   "desc": "Free online PDF tools to merge, compress, create, edit and convert PDFs. ✓ No limits and no watermarks. ✓ No installation or registration required.",
+   "dlen": 147,
+   "canonical": [
+    "https://tools.pdf24.org/en/"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://tools.pdf24.org/static/img/share/v3/home.png?v=62bef007",
+   "twitter": "summary_large_image",
+   "ld": [
+    "Organization",
+    "WebSite"
+   ],
+   "h1": [
+    "PDF24 Tools"
+   ],
+   "h2": [
+    "Free and easy to use PDF tools that make you more productive – online and offline",
+    "Information",
+    "Please share PDF24 with friends",
+    "Alternative: PDF24 Creator"
+   ],
+   "nh2": 4,
+   "nh3": 9,
+   "words": 554,
+   "links": 89,
+   "scripts": 17,
+   "ext_scripts": 6,
+   "details": 0,
+   "lang": "en"
+  },
+  "pdf24-jpg2pdf": {
+   "title": "JPG to PDF converter - 100% free & online - PDF24",
+   "tlen": 49,
+   "desc": "Free online converter to convert JPG files to PDF. ✓ No limits and no watermarks. ✓ No installation or registration required.",
+   "dlen": 125,
+   "canonical": [
+    "https://tools.pdf24.org/en/jpg-to-pdf"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://tools.pdf24.org/static/img/share/v3/en/jpgToPdf.png?v=62c356cc",
+   "twitter": "summary_large_image",
+   "ld": [
+    "AggregateRating",
+    "Offer",
+    "Organization",
+    "Person",
+    "WebApplication"
+   ],
+   "h1": [
+    "JPG to PDF"
+   ],
+   "h2": [
+    "Combine multiple JPG images into a single PDF – in a fixed order and uniform page size, ready to send, print or archive",
+    "Information",
+    "Questions and Answers",
+    "Please rate this app",
+    "Please share PDF24 with friends",
+    "Alternative: PDF24 Creator",
+    "Related Tools",
+    "More great tools"
+   ],
+   "nh2": 8,
+   "nh3": 7,
+   "words": 838,
+   "links": 92,
+   "scripts": 21,
+   "ext_scripts": 6,
+   "details": 0,
+   "lang": "en"
+  },
+  "pdf24-merge": {
+   "title": "Merge PDF - 100% free & online - PDF24",
+   "tlen": 38,
+   "desc": "Quickly and easily combine multiple files into one PDF for free. ✓ No limits and no watermarks. ✓ No installation or registration required.",
+   "dlen": 139,
+   "canonical": [
+    "https://tools.pdf24.org/en/merge-pdf"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://tools.pdf24.org/static/img/share/v3/en/mergePdf.png?v=62c356d7",
+   "twitter": "summary_large_image",
+   "ld": [
+    "AggregateRating",
+    "Offer",
+    "Organization",
+    "Person",
+    "WebApplication"
+   ],
+   "h1": [
+    "Merge PDF"
+   ],
+   "h2": [
+    "Combine multiple PDFs into a single PDF without losing quality – also works with images, Word documents and other files",
+    "Information",
+    "What others are saying",
+    "Questions and Answers",
+    "Please rate this app",
+    "Please share PDF24 with friends",
+    "Alternative: PDF24 Creator",
+    "More great tools"
+   ],
+   "nh2": 8,
+   "nh3": 9,
+   "words": 1027,
+   "links": 91,
+   "scripts": 21,
+   "ext_scripts": 6,
+   "details": 0,
+   "lang": "en"
+  },
+  "pdf24-pdf2word": {
+   "title": "PDF to Word converter - 100% free & online - PDF24",
+   "tlen": 50,
+   "desc": "Free online converter to convert PDF files to Word. ✓ No limits and no watermarks. ✓ No installation or registration required.",
+   "dlen": 126,
+   "canonical": [
+    "https://tools.pdf24.org/en/pdf-to-word"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://tools.pdf24.org/static/img/share/v3/en/pdfToWord.png?v=62c35802",
+   "twitter": "summary_large_image",
+   "ld": [
+    "AggregateRating",
+    "Offer",
+    "Organization",
+    "Person",
+    "WebApplication"
+   ],
+   "h1": [
+    "PDF to Word"
+   ],
+   "h2": [
+    "Turn PDFs into editable Microsoft Word documents with text, images and fonts – keep the original layout or reflow into p",
+    "Information",
+    "Questions and Answers",
+    "Please rate this app",
+    "Please share PDF24 with friends",
+    "Alternative: PDF24 Creator",
+    "Related Tools",
+    "More great tools"
+   ],
+   "nh2": 8,
+   "nh3": 7,
+   "words": 934,
+   "links": 95,
+   "scripts": 21,
+   "ext_scripts": 6,
+   "details": 0,
+   "lang": "en"
+  },
+  "sejda-compress": {
+   "title": "Compress PDF online",
+   "tlen": 19,
+   "desc": "Compress PDF. Reduce the size of your PDF. Online, no installation or registration required. It's free, quick and easy to use.",
+   "dlen": 126,
+   "canonical": [
+    "https://www.sejda.com/compress-pdf"
+   ],
+   "hreflang": 30,
+   "hreflang_sample": [
+    "en",
+    "de",
+    "fr",
+    "ro",
+    "nl",
+    "no",
+    "x-default"
+   ],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": null,
+   "twitter": "summary_large_image",
+   "ld": [],
+   "h1": [
+    "Compress PDF",
+    "How To Compress PDF Files or Reduce the Size of Your PDF Files"
+   ],
+   "h2": [
+    "Reduce the size of your PDF",
+    "Too many attempts. Please try again later. Sorry, your file is too large.",
+    "You reached your free limit of 30 files per hour. Please upgrade to continue processing this task. You reached your free",
+    "Below we show how to shrink one or multiple PDF files to reduce their file size."
+   ],
+   "nh2": 4,
+   "nh3": 4,
+   "words": 2174,
+   "links": 203,
+   "scripts": 1,
+   "ext_scripts": 1,
+   "details": 0,
+   "lang": "en"
+  },
+  "sejda-edit": {
+   "title": "Easy to use Online PDF editor",
+   "tlen": 29,
+   "desc": "Free, no watermarks or registration. Edit PDF files for free. Fill & sign PDFs. Change existing text and links. Find & replace text. Whiteout. Add text, images, links and annotations.",
+   "dlen": 183,
+   "canonical": [
+    "https://www.sejda.com/pdf-editor"
+   ],
+   "hreflang": 30,
+   "hreflang_sample": [
+    "en",
+    "de",
+    "fr",
+    "ro",
+    "nl",
+    "no",
+    "x-default"
+   ],
+   "robots": null,
+   "og": [
+    "og:site_name",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": null,
+   "twitter": "summary_large_image",
+   "ld": [],
+   "h1": [
+    "Online PDF editorBETA",
+    "Edit PDF files for free. Fill & sign PDF",
+    "How To Edit PDF Files Online For Free",
+    "How To Sign PDF",
+    "How to type on a PDF",
+    "How to edit PDF on Mac"
+   ],
+   "h2": [
+    "Too many attempts. Please try again later. Sorry, your file is too large.",
+    "You reached your free limit of 30 files per hour. Please upgrade to continue processing this task. You reached your free",
+    "Edit & Sign PDF files online for free. Fill out PDF forms online. Change PDF text Add text to PDF. Edit existing PDF tex",
+    "Below we show how to add your signature to a PDF document"
+   ],
+   "nh2": 4,
+   "nh3": 23,
+   "words": 3851,
+   "links": 941,
+   "scripts": 3,
+   "ext_scripts": 1,
+   "details": 0,
+   "lang": "en"
+  },
+  "sejda-home": {
+   "title": "Sejda helps with your PDF tasks",
+   "tlen": 31,
+   "desc": "Sejda helps with your PDF tasks. Quick and simple online service, no installation required! Split, merge or convert PDF to images, alternate mix or split scans and many other.",
+   "dlen": 175,
+   "canonical": [
+    "https://www.sejda.com/"
+   ],
+   "hreflang": 30,
+   "hreflang_sample": [
+    "en",
+    "fr",
+    "de",
+    "ro",
+    "nl",
+    "no",
+    "x-default"
+   ],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": null,
+   "twitter": "summary_large_image",
+   "ld": [],
+   "h1": [
+    "We help with your PDF tasks",
+    "How-to PDF Guides"
+   ],
+   "h2": [
+    "Easy, pleasant and productive PDF editor",
+    "Online or offline — in the cloud or as a desktop application"
+   ],
+   "nh2": 2,
+   "nh3": 14,
+   "words": 2545,
+   "links": 257,
+   "scripts": 1,
+   "ext_scripts": 1,
+   "details": 0,
+   "lang": "en"
+  },
+  "sejda-jpg2pdf": {
+   "title": "JPG to PDF Online",
+   "tlen": 17,
+   "desc": "JPG to PDF. Convert Images to PDF. Online, no installation or registration required. It's free, quick and easy to use.",
+   "dlen": 118,
+   "canonical": [
+    "https://www.sejda.com/jpg-to-pdf"
+   ],
+   "hreflang": 30,
+   "hreflang_sample": [
+    "en",
+    "de",
+    "fr",
+    "ro",
+    "nl",
+    "no",
+    "x-default"
+   ],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": null,
+   "twitter": "summary_large_image",
+   "ld": [],
+   "h1": [
+    "JPG to PDF Online",
+    "How to Convert JPG to PDF"
+   ],
+   "h2": [
+    "Convert Images to PDF",
+    "Too many attempts. Please try again later. Sorry, your file is too large.",
+    "You reached your free limit of 30 files per hour. Please upgrade to continue processing this task. You reached your free",
+    "Below we show how to convert images to PDF."
+   ],
+   "nh2": 4,
+   "nh3": 4,
+   "words": 2208,
+   "links": 206,
+   "scripts": 2,
+   "ext_scripts": 1,
+   "details": 0,
+   "lang": "en"
+  },
+  "sejda-merge": {
+   "title": "Merge PDF Files Online",
+   "tlen": 22,
+   "desc": "Merge PDF Files Online. Combine multiple PDFs and images into one. Online, no installation or registration required. It's free, quick and easy to use.",
+   "dlen": 150,
+   "canonical": [
+    "https://www.sejda.com/merge-pdf"
+   ],
+   "hreflang": 30,
+   "hreflang_sample": [
+    "en",
+    "de",
+    "fr",
+    "ro",
+    "nl",
+    "no",
+    "x-default"
+   ],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": null,
+   "twitter": "summary_large_image",
+   "ld": [],
+   "h1": [
+    "Merge PDF Files Online",
+    "How to Merge PDF Files",
+    "How to combine PDF files"
+   ],
+   "h2": [
+    "Combine multiple PDFs and images into one",
+    "Too many attempts. Please try again later. Sorry, your file is too large.",
+    "You reached your free limit of 30 files per hour. Please upgrade to continue processing this task. You reached your free",
+    "Below we show how to combine multiple PDF files into a single document."
+   ],
+   "nh2": 4,
+   "nh3": 5,
+   "words": 2597,
+   "links": 217,
+   "scripts": 2,
+   "ext_scripts": 1,
+   "details": 0,
+   "lang": "en"
+  },
+  "sejda-pdf2word": {
+   "title": "Convert PDF to Word DOC online",
+   "tlen": 30,
+   "desc": "Free conversion from PDF to DOC online.",
+   "dlen": 39,
+   "canonical": [
+    "https://www.sejda.com/pdf-to-word"
+   ],
+   "hreflang": 30,
+   "hreflang_sample": [
+    "en",
+    "de",
+    "fr",
+    "ro",
+    "nl",
+    "no",
+    "x-default"
+   ],
+   "robots": null,
+   "og": [
+    "og:site_name",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": null,
+   "twitter": "summary_large_image",
+   "ld": [],
+   "h1": [
+    "PDF to Word",
+    "How to convert a PDF to Word"
+   ],
+   "h2": [
+    "Convert from PDF to DOC online",
+    "Too many attempts. Please try again later. Sorry, your file is too large.",
+    "You reached your free limit of 30 files per hour. Please upgrade to continue processing this task. You reached your free",
+    "Below we show how to convert one or multiple PDF files to Word format"
+   ],
+   "nh2": 4,
+   "nh3": 4,
+   "words": 1956,
+   "links": 202,
+   "scripts": 2,
+   "ext_scripts": 1,
+   "details": 0,
+   "lang": "en"
+  },
+  "smallpdf-compress": {
+   "title": "Compress PDF: Reduce PDF File Size with Free Compressor",
+   "tlen": 55,
+   "desc": "Compress your PDF to the smallest possible size without sacrificing quality. No installation or account creation required.",
+   "dlen": 122,
+   "canonical": [
+    "https://smallpdf.com/compress-pdf"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://smallpdf.com/assets/img/fb/compress.png",
+   "twitter": "summary_large_image",
+   "ld": [
+    "AggregateRating",
+    "Answer",
+    "BreadcrumbList",
+    "ContactPoint",
+    "FAQPage",
+    "HowTo",
+    "HowToStep",
+    "ImageObject",
+    "ListItem",
+    "Offer",
+    "Organization",
+    "PostalAddress",
+    "Question",
+    "SoftwareApplication/WebApplication"
+   ],
+   "h1": [
+    "Compress PDF for Free"
+   ],
+   "h2": [
+    "Shrink PDF Size, Preserve Quality",
+    "How To Compress a PDF Online for Free",
+    "Everything You Need in a PDF Compressor",
+    "PDF Compressing FAQs",
+    "Tutorials on PDF Compression",
+    "Document Work Made Easy",
+    "Solutions",
+    "Company",
+    "Product",
+    "Apps"
+   ],
+   "nh2": 10,
+   "nh3": 22,
+   "words": 1361,
+   "links": 119,
+   "scripts": 40,
+   "ext_scripts": 0,
+   "details": 10,
+   "lang": "en"
+  },
+  "smallpdf-edit": {
+   "title": "Free PDF Editor: Change & Edit PDF Content Online",
+   "tlen": 49,
+   "desc": "Edit PDFs for free – add text, images, highlights, e-signatures, and more with an online PDF editor trusted by over 1 billion people.",
+   "dlen": 133,
+   "canonical": [
+    "https://smallpdf.com/edit-pdf"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://smallpdf.com/assets/img/fb/edit.png",
+   "twitter": "summary_large_image",
+   "ld": [
+    "AggregateRating",
+    "Answer",
+    "BreadcrumbList",
+    "ContactPoint",
+    "FAQPage",
+    "HowTo",
+    "HowToStep",
+    "ImageObject",
+    "ListItem",
+    "Offer",
+    "Organization",
+    "PostalAddress",
+    "Question",
+    "SoftwareApplication/WebApplication"
+   ],
+   "h1": [
+    "Free Online PDF Editor"
+   ],
+   "h2": [
+    "Edit Your PDFs The Easy Way",
+    "How To Edit a PDF for Free",
+    "Free PDF editing—Quick & Easy",
+    "PDF Editing FAQs",
+    "Tips & Tricks for Editing PDF",
+    "Document Work—Your Way",
+    "Solutions",
+    "Company",
+    "Product",
+    "Apps"
+   ],
+   "nh2": 10,
+   "nh3": 21,
+   "words": 1239,
+   "links": 118,
+   "scripts": 40,
+   "ext_scripts": 0,
+   "details": 9,
+   "lang": "en"
+  },
+  "smallpdf-home": {
+   "title": "Smallpdf - A Free Solution to all your PDF Problems",
+   "tlen": 51,
+   "desc": "Smallpdf - the platform that makes it super easy to convert and edit all your PDF files. Solving all your PDF problems in one place - and yes, free.",
+   "dlen": 148,
+   "canonical": [
+    "https://smallpdf.com/"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://smallpdf.com/assets/img/fb/smallpdf.png",
+   "twitter": "summary_large_image",
+   "ld": [
+    "ContactPoint",
+    "ImageObject",
+    "Organization",
+    "PostalAddress",
+    "WebSite"
+   ],
+   "h1": [
+    "We make PDF easy."
+   ],
+   "h2": [
+    "Most Popular PDF Tools",
+    "Keep Your Simple Tasks Simple",
+    "Get It on Mobile",
+    "Plans & Pricing",
+    "Pro",
+    "Team",
+    "Why Choose Smallpdf?",
+    "Try Smallpdf for Free",
+    "Solutions",
+    "Company",
+    "Product",
+    "Apps"
+   ],
+   "nh2": 12,
+   "nh3": 10,
+   "words": 781,
+   "links": 126,
+   "scripts": 36,
+   "ext_scripts": 0,
+   "details": 0,
+   "lang": "en"
+  },
+  "smallpdf-jpg2pdf": {
+   "title": "JPG to PDF Converter: Convert Image & Photo to PDF for Free",
+   "tlen": 59,
+   "desc": "Convert JPG to PDF for free with a converter trusted by over 1 billion users. No installation or account creation required.",
+   "dlen": 123,
+   "canonical": [
+    "https://smallpdf.com/jpg-to-pdf"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://smallpdf.com/assets/img/fb/jpg.png",
+   "twitter": "summary_large_image",
+   "ld": [
+    "AggregateRating",
+    "Answer",
+    "BreadcrumbList",
+    "ContactPoint",
+    "FAQPage",
+    "HowTo",
+    "HowToStep",
+    "ImageObject",
+    "ListItem",
+    "Offer",
+    "Organization",
+    "PostalAddress",
+    "Question",
+    "SoftwareApplication/WebApplication"
+   ],
+   "h1": [
+    "Convert JPG to PDF for Free"
+   ],
+   "h2": [
+    "How To Convert JPG to PDF Online for Free",
+    "Convert JPG to PDF FAQs",
+    "Solutions",
+    "Company",
+    "Product",
+    "Apps"
+   ],
+   "nh2": 6,
+   "nh3": 12,
+   "words": 944,
+   "links": 113,
+   "scripts": 40,
+   "ext_scripts": 0,
+   "details": 6,
+   "lang": "en"
+  },
+  "smallpdf-merge": {
+   "title": "Merge PDF: Combine PDF Files with Free PDF Combiner",
+   "tlen": 51,
+   "desc": "Merge PDFs online for free. Combine files quickly and securely on Mac, Windows, iOS, Android, and other platforms.",
+   "dlen": 114,
+   "canonical": [
+    "https://smallpdf.com/merge-pdf"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://smallpdf.com/assets/img/fb/merge.png",
+   "twitter": "summary_large_image",
+   "ld": [
+    "AggregateRating",
+    "Answer",
+    "BreadcrumbList",
+    "ContactPoint",
+    "FAQPage",
+    "HowTo",
+    "HowToStep",
+    "ImageObject",
+    "ListItem",
+    "Offer",
+    "Organization",
+    "PostalAddress",
+    "Question",
+    "SoftwareApplication/WebApplication"
+   ],
+   "h1": [
+    "Merge PDF"
+   ],
+   "h2": [
+    "How to Merge PDF Files Online for Free:",
+    "Merge PDF FAQs",
+    "Merge PDF Blog Articles",
+    "Solutions",
+    "Company",
+    "Product",
+    "Apps"
+   ],
+   "nh2": 7,
+   "nh3": 13,
+   "words": 1176,
+   "links": 132,
+   "scripts": 40,
+   "ext_scripts": 0,
+   "details": 7,
+   "lang": "en"
+  },
+  "smallpdf-pdf2word": {
+   "title": "PDF to Word Converter: Convert PDF to DOCX for Free",
+   "tlen": 51,
+   "desc": "Convert PDFs to fully editable Word documents online for free. Keep fonts, formatting, and layouts intact. No sign-ups or installation required.",
+   "dlen": 144,
+   "canonical": [
+    "https://smallpdf.com/pdf-to-word"
+   ],
+   "hreflang": 0,
+   "hreflang_sample": [],
+   "robots": null,
+   "og": [
+    "og:description",
+    "og:image",
+    "og:site_name",
+    "og:title",
+    "og:type",
+    "og:url"
+   ],
+   "og_image": "https://smallpdf.com/assets/img/fb/pdf-to-word.png",
+   "twitter": "summary_large_image",
+   "ld": [
+    "AggregateRating",
+    "Answer",
+    "BreadcrumbList",
+    "ContactPoint",
+    "FAQPage",
+    "HowTo",
+    "HowToStep",
+    "ImageObject",
+    "ListItem",
+    "Offer",
+    "Organization",
+    "PostalAddress",
+    "Question",
+    "SoftwareApplication/WebApplication"
+   ],
+   "h1": [
+    "Free PDF to Word Converter"
+   ],
+   "h2": [
+    "How to Convert PDF to Word Online for Free",
+    "FAQs About Smallpdf’s PDF to Word Converter",
+    "PDF to Word Blog Articles",
+    "Solutions",
+    "Company",
+    "Product",
+    "Apps"
+   ],
+   "nh2": 7,
+   "nh3": 12,
+   "words": 1142,
+   "links": 132,
+   "scripts": 40,
+   "ext_scripts": 0,
+   "details": 7,
+   "lang": "en"
+  }
+ },
+ "mobile_lab": [
+  {
+   "u": "https://www.sejda.com/merge-pdf",
+   "ttfb": 763,
+   "fcp": 1496,
+   "lcp": 1496,
+   "cls": 0,
+   "load": 1613,
+   "jsKB": 2,
+   "reqs": 9,
+   "totalKB": 348,
+   "thirdParty": 0
+  },
+  {
+   "u": "https://www.ilovepdf.com/merge_pdf",
+   "ttfb": 240,
+   "fcp": 664,
+   "lcp": 664,
+   "cls": 0,
+   "load": 1423,
+   "jsKB": 573,
+   "reqs": 44,
+   "totalKB": 979,
+   "thirdParty": 16
+  },
+  {
+   "u": "https://smallpdf.com/merge-pdf",
+   "ttfb": 192,
+   "fcp": 280,
+   "lcp": 384,
+   "cls": 0,
+   "load": 975,
+   "jsKB": 0,
+   "reqs": 42,
+   "totalKB": 1150,
+   "thirdParty": 11
+  },
+  {
+   "u": "https://tools.pdf24.org/en/merge-pdf",
+   "ttfb": 186,
+   "fcp": 508,
+   "lcp": 508,
+   "cls": 0,
+   "load": 812,
+   "jsKB": 352,
+   "reqs": 37,
+   "totalKB": 674,
+   "thirdParty": 9
+  },
+  {
+   "u": "https://web-staging-qzq5fa2g7q-uc.a.run.app/rotate-pdf",
+   "ttfb": 3493,
+   "fcp": 3700,
+   "lcp": 3700,
+   "cls": 0,
+   "load": 4142,
+   "jsKB": 139,
+   "reqs": 14,
+   "totalKB": 212,
+   "thirdParty": 0
+  },
+  {
+   "u": "https://web-staging-qzq5fa2g7q-uc.a.run.app/rotate-pdf",
+   "ttfb": 159,
+   "fcp": 440,
+   "lcp": 440,
+   "cls": 0,
+   "load": 857,
+   "jsKB": 139,
+   "reqs": 14,
+   "totalKB": 212,
+   "thirdParty": 0
+  },
+  {
+   "u": "https://web-staging-qzq5fa2g7q-uc.a.run.app/",
+   "ttfb": 127,
+   "fcp": 412,
+   "lcp": 412,
+   "cls": 0,
+   "load": 681,
+   "jsKB": 115,
+   "reqs": 12,
+   "totalKB": 184,
+   "thirdParty": 0
+  }
+ ]
+}

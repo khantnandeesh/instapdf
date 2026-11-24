@@ -6,13 +6,15 @@
  * must be checked by a lawyer for the owner's jurisdiction and consumer law.
  */
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/metadata";
 import { Contact, Fill, LegalPage, List, Section, Summary, TextLink } from "@/components/legal/Legal";
 import { legalFacts as f } from "@/components/legal/facts";
 
-export const metadata: Metadata = {
-  title: "Terms of use · BerryPDF",
+export const metadata: Metadata = pageMetadata({
+  path: "/terms",
+  title: "Terms of Use | BerryPDF",
   description: "The terms for using BerryPDF's free PDF tools, in plain language.",
-};
+});
 
 export default function TermsPage() {
   return (
