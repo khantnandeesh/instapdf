@@ -581,7 +581,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     },
 
     /** The person picks, while typing, the font that draws what a document font lacks. */
-    async pickStandIn(key: string, id: string) {
+    async pickStandIn(key: string, id: string | undefined) {
       chooseStandIn(key, id);
       ctl.standIns.clear();
       await callEngine({ op: "clearFonts" }).catch(() => {});

@@ -21,7 +21,7 @@ import { createPortal } from "react-dom";
 import type { FontInfo, LinePreview, PageText } from "@/lib/editor/berry-engine";
 import { cssFamily, faceOf, fileFor } from "@/lib/editor/fonts";
 import { isComplex, needsShaping } from "@/lib/editor/shaping";
-import { ensureFace, knownManifest, resolveFonts } from "@/lib/editor/fonts-browser";
+import { ensureFace, knownManifest, resolveFonts, widenFor } from "@/lib/editor/fonts-browser";
 import { foldName } from "@/lib/font-library/client";
 import { cx } from "@/components/ui/cx";
 import { useCtl } from "./context";
@@ -154,6 +154,14 @@ export function LineEditBox({
   const wide = useStore(ctl.store, (s) => s.wide);
   const [slot, setSlot] = useState<Element | null>(null);
   const hintFocused = useRef(false);
+  /** A stand-in font this edit took on its own, and what was remembered before it. */
+  const taken = useRef<{ key: string; before: string | undefined } | null>(null);
+  const cancel = () => {
+    const t = taken.current;
+    taken.current = null;
+    if (t) void ctl.pickStandIn(t.key, t.before);
+    onCancel();
+  };
   useLayoutEffect(() => {
     if (wide) return setSlot(null);
     const area = document.querySelector<HTMLElement>(".ed-toasts");
@@ -488,6 +496,8 @@ export function LineEditBox({
     void (async () => {
       const ids = await standInCandidates(info, { families: [info.family || info.name], bold: info.bold, italic: info.italic }, chars);
       await resolveFonts([...ids, ...getFontState().user.map((u) => u.id)]).catch(() => undefined);
+      // A built-in family may have these characters in the library's copy of it.
+      await widenFor(ids, chars).catch(() => undefined);
       const m = knownManifest();
       // Those that have the most of the missing characters first; closeness decides between equals.
       const has = (id: string) => {
@@ -505,7 +515,11 @@ export function LineEditBox({
       if (kept && kept.font === missing.font && kept.ids.length === able.length && able.every((id) => kept.ids.includes(id))) able.splice(0, able.length, ...kept.ids);
       const picked = kept && kept.font === missing.font && able.includes(kept.picked) ? kept.picked : (able[0] ?? "");
       // What the box shows is what the file gets: the font in use is recorded as the choice.
-      if (picked && chosenStandIn(familyKey(info)) !== picked) await ctl.pickStandIn(familyKey(info), picked);
+      if (picked && chosenStandIn(familyKey(info)) !== picked) {
+        // Taken without being asked: an edit given up with Escape leaves no trace of it.
+        taken.current ??= { key: familyKey(info), before: chosenStandIn(familyKey(info)) };
+        await ctl.pickStandIn(familyKey(info), picked);
+      }
       if (alive) setStandIn({ font: missing.font, chars, ids: able, picked });
     })().catch(() => undefined);
     return () => {
@@ -637,6 +651,7 @@ export function LineEditBox({
                     if (!font || shown.picked === id) return el.current?.focus({ preventScroll: true });
                     // Another font may be able to save what the last one couldn't.
                     ctl.retryable();
+                    taken.current = null;
                     void ctl.pickStandIn(familyKey(font), id);
                     setStandIn({ ...shown, picked: id });
                     el.current?.focus({ preventScroll: true });
@@ -697,7 +712,7 @@ export function LineEditBox({
           return;
         }
         if (e.key !== "Escape") return;
-        onCancel();
+        cancel();
         (e.target as HTMLElement).blur();
       }}
     >
@@ -765,7 +780,7 @@ export function LineEditBox({
             e.currentTarget.blur();
           } else if (e.key === "Escape") {
             e.preventDefault();
-            onCancel();
+            cancel();
             e.currentTarget.blur();
           }
         }}

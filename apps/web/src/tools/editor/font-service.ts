@@ -7,9 +7,10 @@
 import type { FontInfo, FontRequest } from "@/lib/editor/berry-engine";
 import { callEngine } from "@/lib/editor/engine-client";
 import { TEXT_FONTS, USER_FILE, USER_FONT, faceOf, filesFor, fontUrl } from "@/lib/editor/fonts";
-import { ensureFace, knownManifest, registerUserFont, resolveFonts, userFontBytes } from "@/lib/editor/fonts-browser";
+import { ensureFace, knownManifest, registerUserFont, resolveFonts, userFontBytes, widenFor } from "@/lib/editor/fonts-browser";
 import { familyByName, foldName, loadLibrary, type Library } from "@/lib/font-library/client";
-import { MATCH_CHARS, isClose, type FontMatch } from "@/lib/font-library/match";
+import { orderCandidates } from "@/lib/font-library/candidates";
+import { MATCH_CHARS, type FontMatch } from "@/lib/font-library/match";
 import { matchFont } from "@/lib/font-library/match-client";
 import { USER_FONT_ERROR, readLocalFamily, readUserFont, type AddedFont, type LocalFontData, type UserFontError } from "@/lib/font-library/user-fonts";
 
@@ -132,43 +133,27 @@ export function chooseStandIn(key: string, id: string | undefined): void {
 }
 export const chosenStandIn = (key: string) => choices.get(key);
 
-/** The library's name for the character set a character belongs to, where a font must have that set to draw it. */
-function setOf(cp: number): string | null {
-  if (cp >= 0x370 && cp <= 0x3ff) return "greek";
-  if (cp >= 0x400 && cp <= 0x4ff) return "cyrillic";
-  if (cp >= 0x590 && cp <= 0x5ff) return "hebrew";
-  if (cp >= 0x600 && cp <= 0x6ff) return "arabic";
-  if (cp >= 0x900 && cp <= 0x97f) return "devanagari";
-  if (cp >= 0xe00 && cp <= 0xe7f) return "thai";
-  return null;
-}
-/** How many library families are added for a character set the closer fonts may not have. */
-const SET_FONTS = 4;
-
 /**
  * Font ids to try for the characters a document font lacks, best first: the person's choice,
- * the closest library font by shape, the families the engine names, our default, then (for
- * `chars` of another alphabet) library families of the same kind that have that alphabet.
+ * the closest library font by shape, the families the engine names (when the shapes don't say
+ * otherwise), the next closest by shape, our default, then (for `chars` of another alphabet)
+ * library families of the same kind that have that alphabet.
  */
 export async function standInCandidates(info: FontInfo | undefined, request: FontRequest, chars = ""): Promise<string[]> {
-  const out: string[] = [];
-  const add = (id?: string) => id && !out.includes(id) && out.push(id);
-  add(choices.get(foldName(request.families[0] ?? "")));
   const known = info && state.doc.find((d) => d.key === info.name)?.matches;
   const matches = known ?? (info ? await matchOf(info).catch(() => []) : []);
-  if (isClose(matches[0])) add(matches[0].family);
   const lib = state.library ?? (await loadLibrary().catch(() => null));
   if (lib && !state.library) set({ library: lib });
-  for (const name of request.families) add(lib ? familyByName(lib, name)?.i : TEXT_FONTS.find((f) => foldName(f.label) === foldName(name))?.id);
-  add(TEXT_FONTS.find((f) => f.class === (info?.monospace ? "mono" : info?.serif ? "serif" : "sans"))?.id);
-  add("arimo");
-  const sets = [...new Set([...chars].map((c) => setOf(c.codePointAt(0)!)).filter((x): x is string => !!x))];
-  if (lib && sets.length) {
-    const kind = info?.monospace ? "monospace" : info?.serif ? "serif" : "sans-serif";
-    const having = lib.families.filter((f) => sets.every((x) => f.s.includes(x)));
-    for (const f of [...having.filter((f) => f.c === kind), ...having.filter((f) => f.c !== kind && f.c !== "display" && f.c !== "handwriting")].slice(0, SET_FONTS)) add(f.i);
-  }
-  return out;
+  const kind = info?.monospace ? "mono" : info?.serif ? "serif" : "sans";
+  return orderCandidates({
+    choice: choices.get(foldName(request.families[0] ?? "")),
+    matches,
+    named: request.families.map((name) => (lib ? familyByName(lib, name)?.i : TEXT_FONTS.find((f) => foldName(f.label) === foldName(name))?.id)),
+    fallbacks: [TEXT_FONTS.find((f) => f.class === kind)?.id, "arimo"],
+    families: lib?.families ?? [],
+    kind: kind === "mono" ? "monospace" : kind === "sans" ? "sans-serif" : "serif",
+    chars,
+  });
 }
 
 /**
@@ -178,6 +163,7 @@ export async function standInCandidates(info: FontInfo | undefined, request: Fon
 export async function registerWithEngine(id: string, bold: boolean, italic: boolean, chars: string): Promise<boolean> {
   try {
     await resolveFonts([id]);
+    await widenFor([id], chars);
     const m = knownManifest();
     if (!m?.faces[id]) return false;
     const face = faceOf(m, id, bold, italic);
