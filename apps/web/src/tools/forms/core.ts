@@ -103,10 +103,11 @@ const CHROME = '[data-region="top"], [data-region="view"], [data-region="tools"]
 /**
  * Scrolls a field into the part of the visible screen the floating bars leave free: below the
  * top bar and the phone fill bar, above the view pill, beside the tool rail (G-21, G-25), on both
- * axes. A field already clear of them stays put. `skip` leaves one bar out of the sums. Returns
- * false when the free area is too small for the field (a phone keyboard taking most of the screen).
+ * axes. A field already clear of them stays put. `skip` leaves one bar out of the sums. `fits` is
+ * false when the free area is too short for the field (a phone keyboard taking most of the
+ * screen); `moving` is true while a smooth scroll is still taking it there.
  */
-export function revealField(el: HTMLElement, opts: { smooth?: boolean; skip?: Element | null } = {}): boolean {
+export function revealField(el: HTMLElement, opts: { smooth?: boolean; skip?: Element | null } = {}): { fits: boolean; moving: boolean } {
   const gap = 12;
   const vv = window.visualViewport;
   let [left, top] = [vv?.offsetLeft ?? 0, vv?.offsetTop ?? 0];
@@ -130,9 +131,16 @@ export function revealField(el: HTMLElement, opts: { smooth?: boolean; skip?: El
   const dy = delta(top, bottom, r.top, r.bottom);
   const dx = delta(left, right, r.left, r.right);
   const behavior = opts.smooth !== false && !matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto";
-  if (dy) scrollerOf(el, "y").scrollBy({ top: dy, behavior });
-  if (dx) scrollerOf(el, "x").scrollBy({ left: dx, behavior });
-  return fits;
+  // How far each scroller can really go: none at the very top of the file, for instance.
+  const room = (sc: HTMLElement, d: number, axis: "x" | "y") => {
+    const [pos, max] = axis === "y" ? [sc.scrollTop, sc.scrollHeight - sc.clientHeight] : [sc.scrollLeft, sc.scrollWidth - sc.clientWidth];
+    return Math.max(0, Math.min(max, pos + d)) - pos;
+  };
+  const [sy, sx] = [scrollerOf(el, "y"), scrollerOf(el, "x")];
+  const [my, mx] = [room(sy, dy, "y"), room(sx, dx, "x")];
+  if (Math.abs(my) >= 1) sy.scrollBy({ top: my, behavior });
+  if (Math.abs(mx) >= 1) sx.scrollBy({ left: mx, behavior });
+  return { fits, moving: behavior === "smooth" && (Math.abs(my) >= 1 || Math.abs(mx) >= 1) };
 }
 
 /**

@@ -414,8 +414,11 @@ function FillPeek() {
     };
     // From the bar's own place, whatever the last field did with it.
     b.style.top = "";
-    if (!revealField(el)) revealField(el, { skip: b });
-    place();
+    let shown = revealField(el);
+    if (!shown.fits) shown = revealField(el, { skip: b });
+    // While a smooth scroll is still bringing the field clear, the scroll listener places the bar;
+    // placing it now would see the old position and send the bar to the bottom and back.
+    if (!shown.moving) place();
     let frame = 0;
     const later = () => {
       if (!frame) frame = requestAnimationFrame(() => ((frame = 0), place()));

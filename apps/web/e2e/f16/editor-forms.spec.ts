@@ -176,6 +176,7 @@ test("G-25: on a phone, the fill bar never covers the field being typed into", a
   // The next field starts from the bar's own place again.
   await text("email").focus();
   await clear("email");
+  expect((await peek.boundingBox())!.y, "the bar is back in its own place").toBeLessThan(page.viewportSize()!.height / 2);
   // Further down, under where the bar sits: the field is scrolled below the bar, which stays on top.
   await text("email").blur();
   await text("city").evaluate((el) => el.scrollIntoView({ block: "start" }));
