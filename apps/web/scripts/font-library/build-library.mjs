@@ -5,10 +5,13 @@
  *
  *   node scripts/font-library/build-library.mjs --out <dir>
  *        [--source packages | catalogue] [--catalogue <catalogue.json>] [--families id,id] [--limit n]
+ *        [--subsets latin,latin-ext] [--weights 400,700] [--clean]
  *
  * --source packages (default) reads the @fontsource packages installed in this app: the small
  * library that development, tests and CI use. --source catalogue downloads every family of a
- * catalogue written by crawl.mjs, one request a second per host.
+ * catalogue written by crawl.mjs, one request a second per host. --subsets and --weights keep
+ * only those slices and weights (the copy shipped inside the app stays small); --clean empties
+ * <out> first.
  *
  * Layout written under <out> (everything but manifest.json is content-addressed and can be
  * cached forever):
@@ -23,7 +26,7 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { faceId, faceKey, familyRow, fontFileName, gate, parseUnicodeRange, printSubset } from "./lib.mjs";
@@ -35,7 +38,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function args() {
   const a = process.argv.slice(2);
   const get = (k) => (a.includes(k) ? a[a.indexOf(k) + 1] : undefined);
-  return { out: get("--out"), source: get("--source") ?? "packages", catalogue: get("--catalogue"), families: get("--families")?.split(","), limit: Number(get("--limit") ?? 0) };
+  return { out: get("--out"), source: get("--source") ?? "packages", catalogue: get("--catalogue"), families: get("--families")?.split(","), limit: Number(get("--limit") ?? 0), subsets: get("--subsets")?.split(","), weights: get("--weights")?.split(",").map(Number), clean: a.includes("--clean") };
 }
 
 /** Installed @fontsource packages as a source: { entry, unicode, defSubset, read(subset, weight, style), licence() }. */
@@ -117,11 +120,12 @@ async function loadMatcher() {
 async function main() {
   const opt = args();
   if (!opt.out) {
-    console.error("usage: build-library.mjs --out <dir> [--source packages|catalogue] [--catalogue file] [--families a,b] [--limit n]");
+    console.error("usage: build-library.mjs --out <dir> [--source packages|catalogue] [--catalogue file] [--families a,b] [--limit n] [--subsets a,b] [--weights 400,700] [--clean]");
     process.exit(2);
   }
   const sources = opt.source === "catalogue" ? await catalogueSource(opt.catalogue, opt.families, opt.limit) : await packageSource(opt.families);
   const matcher = await loadMatcher();
+  if (opt.clean) await rm(opt.out, { recursive: true, force: true });
   const put = async (rel, bytes) => {
     await mkdir(dirname(join(opt.out, rel)), { recursive: true });
     await writeFile(join(opt.out, rel), bytes);
@@ -136,10 +140,12 @@ async function main() {
     const faces = {};
     const forPrint = printSubset(entry, src.defSubset);
     for (const weight of entry.weights) {
+      if (opt.weights && !opt.weights.includes(weight)) continue;
       for (const style of entry.styles) {
         const list = [];
         let metrics = null;
         for (const subset of entry.subsets) {
+          if (opt.subsets && !opt.subsets.includes(subset)) continue;
           const ranges = parseUnicodeRange(src.unicode[subset]);
           // Numbered slices (CJK) carry their ranges under "[n]" keys: not handled yet, skipped.
           if (!ranges.length) continue;

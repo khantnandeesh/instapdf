@@ -61,7 +61,14 @@ export function Pop({
       }
     };
     p.addEventListener("toggle", onToggle);
-    return () => p.removeEventListener("toggle", onToggle);
+    // The content is drawn after the panel opens and can grow (a list that loads): place it
+    // again whenever its size changes, so a panel opened near the bottom edge stays on screen.
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => p.matches(":popover-open") && place());
+    ro?.observe(p);
+    return () => {
+      p.removeEventListener("toggle", onToggle);
+      ro?.disconnect();
+    };
   }, [place, onOpen]);
 
   const close = useCallback(() => {

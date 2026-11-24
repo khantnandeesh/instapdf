@@ -76,3 +76,23 @@ AC-270 to AC-309 are reserved for this feature.
 1. Owner: open licences only (recommended), the bucket cost, and the two extra licence families.
 2. Real-world rate at which embedded subsets cover an edit: to be measured on the Q2 corpus (our own fixtures are too few).
 3. Whether the library and the editor work ship as one PR or two (lead).
+
+## Build status (first PR)
+
+Delivered and tested:
+
+- AC-270, AC-272 to AC-274: catalogue crawler and licence gate (`apps/web/scripts/font-library/`).
+- AC-271: every family of the in-app library is on the third-party notices page, with its licence text published at `/fonts/lib/licences/<id>.txt`.
+- AC-275: `/fonts/lib/*` on our own address; content-hashed files are immutable for a year, `manifest.json` for five minutes. With `FONTS_ORIGIN` set at build the same paths pass through to the fonts bucket; without it the in-app copy (54 families, Latin, regular and bold, about 11 MB) is served.
+- AC-281, AC-282, AC-284: matcher (`crates/berry-fontmatch`, 99.6% first on the 484-face sample) and its use in the browser (`src/lib/font-library/match.ts`).
+- AC-286: the stand-in notice with "Change" and "Use your own font"; "Change" undoes the edit and makes it again with the chosen font.
+- AC-290 to AC-293: the font menu. It has one more section than planned, "Standard" (the five built-in faces with the names they stand for).
+- AC-294, AC-295: your own font file (TTF, OTF, WOFF, WOFF2), kept in the page's memory only.
+- AC-296 (part): installed fonts can be listed and picked where the browser allows it. Looking the PDF's font up on the device automatically is not built.
+
+Not in this PR:
+
+- The fonts bucket (Terraform), the publish workflow and the full crawl. Until then the library is the in-app copy.
+- AC-280 for added text placed on an existing line, AC-283 (twin table beyond the engine's own stand-in list), AC-285 (timing on a phone), AC-287 (x-height scaling), AC-288 (script-aware matching: the index holds Latin letters and digits only), AC-297 (keeping an uploaded font for later sessions).
+- The engine takes TrueType outlines only for stand-ins: an OTF (CFF) font of your own works for added text but not yet for existing text.
+- The recognise-only tier and the GUST and Bitstream Vera families (CLAUDE.md rule 3 needs the owner's exception written in first).

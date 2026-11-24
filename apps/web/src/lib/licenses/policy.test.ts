@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { FONT_LICENCES } from "../../../scripts/font-library/lib.mjs";
 import {
   ALLOWED_CODE,
+  ALLOWED_LIBRARY_FONT,
   copyrightLines,
   EXCEPTIONS,
   findViolations,
@@ -124,6 +126,17 @@ describe("findViolations", () => {
     expect(findViolations([pkg("Geist (font)", "OFL-1.1", "font")])).toEqual([]);
     expect(findViolations([pkg("some-package", "OFL-1.1")]).map((e) => e.name)).toEqual(["some-package"]);
     expect(findViolations([pkg("font", "MIT", "font")]).map((e) => e.name)).toEqual(["font"]);
+  });
+
+  it("font library entries follow the library's own serving list (F24, AC-270)", () => {
+    expect([...ALLOWED_LIBRARY_FONT].sort()).toEqual([...FONT_LICENCES.values()].sort());
+    const lib = (name: string, license: string | null) => ({ ...pkg(name, license, "font"), library: true });
+    expect(findViolations([lib("Roboto (font library)", "Apache-2.0"), lib("Ubuntu (font library)", "UFL-1.0"), lib("Lato (font library)", "OFL-1.1")])).toEqual([]);
+    expect(findViolations([lib("Paid (font library)", "LicenseRef-Commercial"), lib("Copyleft (font library)", "GPL-3.0-only"), lib("None (font library)", null)]).map((e) => e.name)).toEqual([
+      "Paid (font library)",
+      "Copyleft (font library)",
+      "None (font library)",
+    ]);
   });
 
   it("accepts a reviewed exception only for that package and that exact license", () => {

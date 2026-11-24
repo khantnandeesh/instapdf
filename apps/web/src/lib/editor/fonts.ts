@@ -18,16 +18,28 @@ export const TEXT_FONTS: TextFamily[] = config.text;
 export const SIGN_FACES: SignFace[] = config.sign;
 export const DEFAULT_FONT = "arimo";
 export const FONT_BASE = "/fonts/editor/";
+/** File names with this prefix are font library files ("lib:roboto/latin-400-normal.<sha>.woff"). */
+export const LIB_FILE = "lib:";
+/** File names with this prefix are fonts the user added: bytes kept on this device, never fetched. */
+export const USER_FILE = "user:";
+/** Font ids with this prefix are the user's own fonts (uploaded, or from this device). */
+export const USER_FONT = "user:";
+
+/** Where a font file is fetched from (always our own address). */
+export const fontUrl = (file: string) => (file.startsWith(LIB_FILE) ? `/fonts/lib/fonts/${file.slice(LIB_FILE.length)}` : `${FONT_BASE}${encodeURIComponent(file)}`);
 
 export const styleKey = (bold: boolean, italic: boolean) => `${bold ? 700 : 400}-${italic ? "italic" : "normal"}`;
 
 /** CSS family name the editor registers for a font id (one family; weight and style are descriptors). */
 export const cssFamily = (id: string) => `bp-${id}`;
 
-/** The face for a font and style; falls back to regular, then to the default font. */
+/**
+ * The face for a font and style; falls back to the upright face of that weight, then regular,
+ * then whatever the family has (a display family may only have one weight), then the default font.
+ */
 export function faceOf(m: EditorFontManifest, id: string, bold = false, italic = false): FaceEntry | undefined {
   const fam = m.faces[id] ?? m.faces[DEFAULT_FONT];
-  return fam?.[styleKey(bold, italic)] ?? fam?.["400-normal"];
+  return fam?.[styleKey(bold, italic)] ?? fam?.[styleKey(bold, false)] ?? fam?.["400-normal"] ?? (fam && Object.values(fam)[0]);
 }
 
 export const covers = (ranges: [number, number][], cp: number) => ranges.some(([lo, hi]) => cp >= lo && cp <= hi);

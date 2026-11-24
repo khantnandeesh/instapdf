@@ -27,6 +27,14 @@ const BR = { type: "header" as const, key: "accept-encoding", value: ACCEPTS_BR 
 const GZIP = { type: "header" as const, key: "accept-encoding", value: ACCEPTS_GZIP };
 const engineFiles = (Object.keys(ENGINE_TYPES) as (keyof typeof ENGINE_TYPES)[]).map((file) => ({ file, source: `/engine/${engine.files[file].slice(0, 16)}/${file}` }));
 
+/**
+ * The font library (F24) is always fetched from our own address, /fonts/lib/*, so the page's
+ * policy stays 'self'. Without FONTS_ORIGIN (development, tests, a build without the bucket) the
+ * files are the in-app copy in public/fonts/lib; with it (set at build, e.g.
+ * https://storage.googleapis.com/<bucket>) the same paths are passed through to the bucket.
+ */
+const FONTS_ORIGIN = (process.env.FONTS_ORIGIN ?? "").replace(/\/+$/, "");
+
 const nextConfig: NextConfig = {
   output: "standalone",
   // Inlined at build: the site-wide prefetch (EnginePrefetch) needs only these two strings.
@@ -44,7 +52,7 @@ const nextConfig: NextConfig = {
         { source, has: [GZIP], destination: `/engine/${file}.gz` },
         { source, destination: `/engine/${file}` },
       ]),
-      afterFiles: [],
+      afterFiles: FONTS_ORIGIN ? [{ source: "/fonts/lib/:path*", destination: `${FONTS_ORIGIN}/:path*` }] : [],
       fallback: [],
     };
   },
@@ -57,6 +65,9 @@ const nextConfig: NextConfig = {
         { source, has: [GZIP], missing: [BR], headers: [{ key: "Content-Encoding", value: "gzip" }] },
       ]),
       { source: "/:path*", headers: securityHeaders },
+      // Content-addressed library files never change; manifest.json names the current ones.
+      { source: "/fonts/lib/:dir(index|families|fonts)/:path*", headers: [immutable] },
+      { source: "/fonts/lib/manifest.json", headers: [{ key: "Cache-Control", value: "public, max-age=300" }] },
       // Pages get a per-page CSP (with their inline-script hashes) from src/middleware.ts.
       // Static files skip the middleware; workers loaded from here run under this hash-free policy.
       {

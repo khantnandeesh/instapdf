@@ -33,6 +33,8 @@ import { releaseUnused } from "./assets";
 import { pushVersion, releaseBelow, versionBytes, type VersionEntry } from "@/lib/editor/versions";
 import { pdfOutputName, baseName } from "@/lib/pdf/naming";
 import { openPdf } from "@/lib/pdf/pdfjs";
+import type { PageText } from "@/lib/editor/berry-engine";
+import { chooseStandIn, fontLabel, registerWithEngine, standInCandidates } from "./font-service";
 import type { Store, ToolId } from "./store";
 
 export type RuntimeAsset = Asset & { url: string; w: number; h: number };
@@ -63,6 +65,12 @@ export type Toast = { text: string; tone: "info" | "success" | "danger"; action?
 
 export type Controller = ReturnType<typeof createController>;
 
+/** "ABCDEF+TimesNewRomanPS-BoldMT" → "TimesNewRomanPS": the name a person recognises. */
+export function familyOfFont(name: string): string {
+  const bare = name.replace(/^[A-Z]{6}\+/, "").split(/[-,]/)[0] || name;
+  return bare.replace(/([a-z])(Sans|Serif|Mono|Slab|Display|Text|Condensed|Narrow|New|Roman|Gothic|Script|Pro)(?![a-z])/g, "$1 $2");
+}
+
 const isEngineError = (e: unknown): e is EngineError => !!e && typeof e === "object" && "kind" in e;
 
 export function createController(store: Store, rt: Runtime, ui: { announce: Announce; toast: (t: Omit<Toast, "key">) => void }) {
@@ -79,6 +87,8 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     store.set((s) => ({
       history: H.commit(s.history, next, { label, page: opts.page, targets: opts.targets, key: opts.key, at: Date.now() }),
       selection: opts.select ?? s.selection.filter((id) => next.objects.some((o) => o.id === id)),
+      // The font notice is about the last change only ("Change" undoes and redoes it).
+      fontNotice: null,
     }));
   }
 
@@ -243,7 +253,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         store.set({ busy: null });
       }
       const live = (entry.targets ?? []).filter((id) => target.objects.some((o) => o.id === id));
-      store.set({ history, selection: live, editing: null, lineEdit: null, flash: { ids: live, key: Date.now() } });
+      store.set({ history, selection: live, editing: null, lineEdit: null, fontNotice: null, flash: { ids: live, key: Date.now() } });
       ui.announce(`${verb}: ${entry.label.toLowerCase()}`);
       if (entry.page) ctl.revealPage?.(entry.page, live[0]);
     },
@@ -370,7 +380,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       if (!line || line.text === e.text) return;
       store.set({ busy: "edit" });
       try {
-        const { result, bytes, appended } = await callEngine({ op: "replace", page: e.src, line: e.line, text: e.text });
+        const { result, bytes, appended } = await ctl.replaceWithStandIn(e, s.texts[e.src]);
         const opened = await openPdf(bytes.slice(), rt.password);
         if (!opened.ok) {
           const back = ctl.bytesOf(rt.shown).slice();
@@ -396,7 +406,14 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
           lineFlash: { src: e.src, rects: result.changed, key: Date.now() },
         }));
         apply({ ...state(), engine: rt.shown }, "Edit text", { page: pageId });
-        if (result.substitutions.some((x) => !x.same_family)) ui.toast({ text: "Some characters use a similar font.", tone: "info" });
+        // Another font drew some characters: say which, and offer a different one (F24).
+        const sub = result.substitutions.find((x) => !x.same_family);
+        if (sub) {
+          const standInId = ctl.standIns.get(sub.substitute_font) ?? "";
+          const original = familyOfFont(sub.original_font);
+          store.set({ fontNotice: { original, standIn: sub.substitute_font, standInId, fontName: sub.original_font, src: e.src, line: e.line, text: e.text, key: Date.now() } });
+          ui.announce(`${original} isn’t complete in this file. Using ${sub.substitute_font}.`);
+        } else store.set({ fontNotice: null });
       } catch (err) {
         if (isEngineError(err)) {
           ui.toast({ text: describeEngineError(err), tone: "danger" });
@@ -404,6 +421,54 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         } else ui.toast({ text: "That change couldn’t be made.", tone: "danger" });
       } finally {
         store.set({ busy: null });
+      }
+    },
+
+    /** Engine family name → the font id it was registered from. */
+    standIns: new Map<string, string>(),
+    /**
+     * Replaces a line; when its font lacks a typed character, registers the closest font we have
+     * (the person's choice, the best shape match, then the engine's own list) and tries again.
+     */
+    async replaceWithStandIn(e: { src: number; line: number; text: string }, page: PageText | undefined) {
+      const call = { op: "replace", page: e.src, line: e.line, text: e.text } as const;
+      try {
+        return await callEngine(call);
+      } catch (err) {
+        if (!isEngineError(err) || err.kind !== "missing-glyphs") throw err;
+        const run = page?.lines[e.line]?.runs[0];
+        const info = run ? page?.fonts[run.font] : undefined;
+        for (const id of await standInCandidates(info, err.request)) {
+          if (!(await registerWithEngine(id, err.request.bold, err.request.italic, err.chars))) continue;
+          ctl.standIns.set(fontLabel(id), id);
+          try {
+            return await callEngine(call);
+          } catch (again) {
+            // This font lacks them too (or the edit failed for another reason): try the next.
+            if (!isEngineError(again) || again.kind !== "missing-glyphs") throw again;
+          }
+        }
+        throw err;
+      }
+    },
+
+    /**
+     * The notice's "Change": the person picks the font that stands in. The edit is undone and
+     * made again with it, and later edits of that document font use it too.
+     */
+    async changeStandIn(id: string) {
+      const n = store.get().fontNotice;
+      if (!n || store.get().busy) return;
+      chooseStandIn(n.original, id);
+      try {
+        await callEngine({ op: "clearFonts" });
+        ctl.standIns.clear();
+        await ctl.undo();
+        const { page } = await callEngine({ op: "text", page: n.src });
+        store.set((st) => ({ texts: { ...st.texts, [n.src]: page }, fresh: { ...st.fresh, [n.src]: true }, lineEdit: { src: n.src, line: n.line, text: n.text } }));
+        await ctl.commitLine();
+      } catch (err) {
+        ui.toast({ text: isEngineError(err) ? describeEngineError(err) : "That font couldn’t be used.", tone: "danger" });
       }
     },
 
