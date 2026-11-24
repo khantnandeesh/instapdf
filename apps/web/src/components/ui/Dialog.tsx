@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
 import { cx } from "./cx";
-import "./dialog.css";
+// Styles: ./dialog.css (modal and sheet) is imported by the screens that open them (ToolFlow, ControlDock, the
+// editor), so it stays off pages whose only dialog is the full-screen menu.
 import { IconButton } from "./IconButton";
 import { CloseIcon } from "./icons";
 

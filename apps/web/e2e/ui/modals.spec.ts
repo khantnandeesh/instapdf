@@ -5,12 +5,17 @@
  * missed, so it is checked here at a phone (390x844) and a laptop (1280x720) size:
  *
  * 1. The page preview fills the space: page height ≥ 85% of the dialog (desktop), width ≥ 90% (phone).
- * 2. Buttons are normal-sized: none is taller than 48px.
+ * 2. Buttons are normal-sized: none is taller than 48px, and on desktop a dialog's footer buttons are as wide as
+ *    their label (the old ones were 41-44px tall but stretched to equal full-width columns, which made them chunky).
  * 3. Nothing sits above the content (the description under the title counts as content) except the title, the
  *    page counter and the close button (no bands, badges,
  *    handles or file names up there), and the modal surface carries no background image (the wave).
  * 4. A pointer click shows no focus ring; keyboard focus shows one, on-theme (not the blueberry link ring).
  * 5. Escape closes it.
+ *
+ * The preview also: closes on a backdrop tap without the tap's click reaching the page underneath (a ghost click
+ * once fired Merge's primary action and the header logo); never closes on a drag; and centres a page turned 90°
+ * inside its stage, whole.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { fx } from "../support/flow";
@@ -33,13 +38,50 @@ async function openTool(page: Page, slug: string, files: string[]) {
 const ready = (page: Page) => expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
 
 /** Rule 2. */
-async function expectNormalButtons(dialog: Locator, where: string) {
+async function expectNormalButtons(dialog: Locator, where: string, desktop: boolean) {
   // Action buttons: choice tiles (role=radio) and page tiles in the picker are content, not controls.
   const heights = await dialog.locator("button:visible:not([role=radio], [data-pick])").evaluateAll((els) =>
     els.map((e) => ({ name: e.getAttribute("aria-label") ?? e.textContent?.trim() ?? "", h: e.getBoundingClientRect().height })),
   );
   expect(heights.length, `${where}: has buttons`).toBeGreaterThan(0);
   for (const b of heights) expect(b.h, `${where}: button "${b.name}" height`).toBeLessThanOrEqual(48);
+  if (!desktop) return;
+  // Width: a footer button is its label plus padding (≤ 40px of padding in all), never a stretched column.
+  const widths = await dialog.locator("[data-testid=dialog-footer] .mp-btn:visible").evaluateAll((els) =>
+    els.map((e) => {
+      const label = e.firstElementChild!.getBoundingClientRect().width;
+      const w = e.getBoundingClientRect().width;
+      return { name: e.textContent?.trim() ?? "", extra: Math.round(w - label), share: w / e.closest("[data-testid=dialog-footer]")!.getBoundingClientRect().width };
+    }),
+  );
+  for (const b of widths) {
+    expect(b.extra, `${where}: footer button "${b.name}" is label-width (padding)`).toBeLessThanOrEqual(40);
+    expect(b.share, `${where}: footer button "${b.name}" is not a full-width column`).toBeLessThan(0.5);
+  }
+}
+
+/** Opens Merge's preview of sixty-pages.pdf and waits for the page to be drawn. */
+async function openMergePreview(page: Page, desktop: boolean) {
+  if (desktop) await page.getByTestId("file-card").first().hover();
+  await page.getByRole("button", { name: "Enlarge sixty-pages.pdf" }).click({ force: !desktop });
+  await expect(openDialog(page).getByTestId("page-preview-page").locator("canvas")).toBeVisible();
+}
+
+/** Records every click whose target is outside the open dialog (what a ghost click would hit). */
+async function watchClicksBehind(page: Page) {
+  await page.evaluate(() => {
+    const w = window as unknown as { behind: string[] };
+    w.behind = [];
+    document.addEventListener(
+      "click",
+      (e) => {
+        const t = e.target as Element;
+        if (!t.closest("dialog[open]")) w.behind.push(t.closest("a,button,[role]")?.outerHTML.slice(0, 120) ?? t.tagName);
+      },
+      true,
+    );
+  });
+  return () => page.evaluate(() => (window as unknown as { behind: string[] }).behind);
 }
 
 /**
@@ -127,7 +169,7 @@ for (const size of SIZES) {
       expect(await paper.evaluate((e) => getComputedStyle(e).boxShadow)).not.toBe("none");
 
       // 2-3. Chrome.
-      await expectNormalButtons(dialog, "preview");
+      await expectNormalButtons(dialog, "preview", size.project === "desktop");
       await expectQuietTop(dialog, paper, "preview");
       await expect(dialog.getByTestId("page-preview-counter")).toHaveText(/^\s*1 \/ 60/);
       // Phones: the arrows are in the thumb zone (bottom quarter).
@@ -154,20 +196,87 @@ for (const size of SIZES) {
       // 4. Focus.
       await expectFocusRules(page, dialog.getByRole("button", { name: "Next page" }), "preview");
 
-      // 5. Escape closes; reopen, and a tap on the backdrop closes too.
+      // 5. Escape closes; reopen, and a click on the backdrop beside the page closes too.
       await expectEscapeCloses(page, "preview");
-      if (size.project === "desktop") await page.getByTestId("file-card").first().hover();
-      await page.getByRole("button", { name: "Enlarge sixty-pages.pdf" }).click({ force: size.project === "mobile" });
-      await expect(openDialog(page).getByTestId("page-preview-page")).toBeVisible();
-      await page.mouse.click(size.width / 2, size.project === "desktop" ? 20 : 24);
-      await expect(page.locator("dialog[open]"), "a click on the backdrop closes it").toHaveCount(0);
+      if (size.project === "desktop") {
+        await openMergePreview(page, true);
+        await page.mouse.click(200, 300);
+        await expect(page.locator("dialog[open]"), "a click on the backdrop closes it").toHaveCount(0);
+      }
+    });
+
+    test("page preview: a backdrop tap closes it and its click never reaches the page underneath", async ({ page }) => {
+      test.skip(size.project !== "mobile", "touch");
+      await openTool(page, "merge-pdf", ["sixty-pages.pdf", "alpha.pdf"]);
+      await ready(page);
+      await openMergePreview(page, false);
+      const behind = await watchClicksBehind(page);
+      // The chrome rows are not backdrop: a tap beside the close button or on the counter keeps the viewer open.
+      await page.touchscreen.tap(30, 24);
+      const counter = (await openDialog(page).getByTestId("page-preview-counter").boundingBox())!;
+      await page.touchscreen.tap(counter.x + counter.width / 2, counter.y + counter.height / 2);
+      await page.waitForTimeout(500);
+      await expect(page.locator("dialog[open]"), "a tap on the chrome rows keeps it open").toHaveCount(1);
+      // A tap on the dark area above the page closes it.
+      const paper = (await openDialog(page).getByTestId("page-preview-page").boundingBox())!;
+      expect(paper.y, "there is backdrop above the page").toBeGreaterThan(70);
+      await page.touchscreen.tap(size.width / 2, 60);
+      await expect(page.locator("dialog[open]"), "a backdrop tap closes it").toHaveCount(0);
+      await page.waitForTimeout(800);
+      expect(await behind(), "no click lands on the page underneath").toEqual([]);
+    });
+
+    test("page preview: a drag never closes it", async ({ page }) => {
+      test.skip(size.project !== "desktop", "mouse");
+      await openTool(page, "merge-pdf", ["sixty-pages.pdf", "alpha.pdf"]);
+      await ready(page);
+      await openMergePreview(page, true);
+      const p = (await openDialog(page).getByTestId("page-preview-page").boundingBox())!;
+      const onPage = { x: p.x + p.width / 2, y: p.y + p.height / 2 };
+      const backdrop = { x: 200, y: 300 };
+      const drags: [string, { x: number; y: number }, { x: number; y: number }][] = [
+        ["page to backdrop", onPage, backdrop],
+        ["on the backdrop", backdrop, { x: backdrop.x + 60, y: backdrop.y + 120 }],
+        ["backdrop to page", backdrop, onPage],
+      ];
+      for (const [what, from, to] of drags) {
+        await page.mouse.move(from.x, from.y);
+        await page.mouse.down();
+        await page.mouse.move(to.x, to.y, { steps: 6 });
+        await page.mouse.up();
+        await page.waitForTimeout(200);
+        await expect(page.locator("dialog[open]"), `a drag ${what} keeps it open`).toHaveCount(1);
+      }
+    });
+
+    test("page preview: a page turned 90° is whole and centred in the stage", async ({ page }) => {
+      test.skip(size.project !== "desktop", "one desktop run is enough; the geometry is unit-tested too");
+      await openTool(page, "rotate-pdf", ["three-pages.pdf"]);
+      await ready(page);
+      await page.getByRole("button", { name: "Rotate right", exact: true }).click();
+      await page.getByRole("button", { name: /^Page 1 of/ }).first().click();
+      const dialog = openDialog(page);
+      await expect(dialog.getByTestId("page-preview-page").locator("canvas")).toBeVisible();
+      await page.waitForTimeout(400);
+      const stage = (await dialog.getByTestId("page-preview-stage").boundingBox())!;
+      const p = (await dialog.getByTestId("page-preview-page").boundingBox())!;
+      expect(p.width, "turned sideways: wider than tall").toBeGreaterThan(p.height);
+      expect(p.x, "left edge inside the stage").toBeGreaterThanOrEqual(stage.x - 1);
+      expect(p.y, "top edge inside the stage").toBeGreaterThanOrEqual(stage.y - 1);
+      expect(p.x + p.width, "right edge inside the stage").toBeLessThanOrEqual(stage.x + stage.width + 1);
+      expect(p.y + p.height, "bottom edge inside the stage").toBeLessThanOrEqual(stage.y + stage.height + 1);
+      expect(Math.abs(p.x + p.width / 2 - (stage.x + stage.width / 2)), "centred across").toBeLessThanOrEqual(2);
+      // Centred in the stage's content box (its padding is the gutter: 0 at the top, 16px at the bottom).
+      expect(Math.abs(p.y + p.height / 2 - (stage.y + (stage.height - 16) / 2)), "centred down").toBeLessThanOrEqual(2);
+      // And it fills the space it is given.
+      expect(Math.max(p.width / (stage.width - 144), p.height / (stage.height - 16)), "fills the stage").toBeGreaterThan(0.98);
     });
 
     test("password dialog", async ({ page }) => {
       await openTool(page, "rotate-pdf", ["user-pw.pdf"]);
       const dialog = openDialog(page);
       await expect(dialog.getByLabel("Password", { exact: true })).toBeVisible();
-      await expectNormalButtons(dialog, "password");
+      await expectNormalButtons(dialog, "password", size.project === "desktop");
       await expectQuietTop(dialog, dialog.locator("[data-ip-scroll] > :nth-child(2)"), "password");
       await expectFocusRules(page, dialog.getByRole("button", { name: "Show password" }), "password");
       await expectEscapeCloses(page, "password");
@@ -179,7 +288,7 @@ for (const size of SIZES) {
       await page.locator('header a[href="/"]').first().click();
       const dialog = openDialog(page);
       await expect(dialog).toBeVisible();
-      await expectNormalButtons(dialog, "leave guard");
+      await expectNormalButtons(dialog, "leave guard", size.project === "desktop");
       await expectQuietTop(dialog, dialog.getByTestId("dialog-footer"), "leave guard");
       await expectEscapeCloses(page, "leave guard");
     });
@@ -192,7 +301,7 @@ for (const size of SIZES) {
       await page.getByTestId("pages-file-input").setInputFiles(fx("three-pages.pdf"));
       const dialog = openDialog(page);
       await expect(dialog.getByTestId("picker-grid")).toBeVisible();
-      await expectNormalButtons(dialog, "page picker");
+      await expectNormalButtons(dialog, "page picker", size.project === "desktop");
       await expectQuietTop(dialog, dialog.locator("[data-ip-scroll] > :nth-child(2)"), "page picker");
       await expectFocusRules(page, dialog.getByRole("button", { name: "Select all" }), "page picker");
       await expectEscapeCloses(page, "page picker");
@@ -208,7 +317,7 @@ for (const size of SIZES) {
       await page.getByRole("menuitem", { name: /Move to position/ }).click();
       const dialog = openDialog(page);
       await expect(dialog).toBeVisible();
-      await expectNormalButtons(dialog, "move to position");
+      await expectNormalButtons(dialog, "move to position", size.project === "desktop");
       await expectQuietTop(dialog, dialog.locator("[data-ip-scroll] > :nth-child(2)"), "move to position");
       await expectEscapeCloses(page, "move to position");
     });
@@ -222,7 +331,7 @@ for (const size of SIZES) {
       const content = page.getByTestId("sign-dialog");
       await expect(content).toBeVisible();
       const dialog = openDialog(page);
-      await expectNormalButtons(dialog, "sign");
+      await expectNormalButtons(dialog, "sign", size.project === "desktop");
       await expectQuietTop(dialog, content, "sign");
       await expectFocusRules(page, dialog.getByRole("radio", { name: "Draw" }), "sign");
       await expectEscapeCloses(page, "sign");

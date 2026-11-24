@@ -46,6 +46,8 @@
    pinch-zoom stays the browser's. */
 .ip-pv__stage {
   display: grid;
+  /* One fixed track: the stage never grows with its content. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
   min-height: 0;
   padding: 0 8px;
@@ -54,9 +56,16 @@
 }
 
 /* The page: white paper with a hairline edge and a soft drop, so a white page reads on the scrim. */
-.ip-pv__paper {
+/* The space the page takes on screen (after a quarter turn too); the page is centred in it, then turned. */
+.ip-pv__frame {
+  position: relative;
   display: block;
-  flex: none;
+}
+.ip-pv__paper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
   background: var(--color-paper);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--ink-black) 35%, transparent),
