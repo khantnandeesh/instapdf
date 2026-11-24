@@ -17,9 +17,18 @@ export const AXE_WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag2
  * `withTags()` on its own would be narrower than (1): it runs only the tagged rules.
  * Note: bumping axe-core can surface new (experimental-rule) violations; fix them, don't filter them out.
  */
-/** Waits until entry animations (menu drop-in, scrim fade, dialogs) finish, so contrast is measured on final colors. */
+/**
+ * Waits until entry and exit animations (menu drop-in, scrim fade, dialogs) finish, so contrast is measured on
+ * final colors: the CSS ones (document.getAnimations()) and lib/motion's GSAP tweens, which the Web Animations
+ * API doesn't see (the engine's count of running tweens, window.__motionLive; absent until it has loaded).
+ * It can't wait for something that hasn't started: after an action that opens something, wait for it first.
+ */
 export const settled = (page: Page) =>
-  page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || (a.effect?.getComputedTiming().iterations ?? 1) === Infinity));
+  page.waitForFunction(
+    () =>
+      ((window as unknown as { __motionLive?: number }).__motionLive ?? 0) === 0 &&
+      document.getAnimations().every((a) => a.playState !== "running" || (a.effect?.getComputedTiming().iterations ?? 1) === Infinity),
+  );
 
 export async function expectNoSeriousAxeViolations(page: Page, state: string) {
   await settled(page);

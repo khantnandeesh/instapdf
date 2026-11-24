@@ -22,6 +22,9 @@ async function drained(ms = 1500) {
   return m.liveCount();
 }
 
+/** What e2e/support/axe.ts settled() reads. */
+const liveOnWindow = () => (window as unknown as { __motionLive: number }).__motionLive;
+
 function els(n: number) {
   return Array.from({ length: n }, () => {
     const el = document.createElement("div");
@@ -43,8 +46,10 @@ describe("lib/motion engine: retained animations", () => {
     m.swap(d, e, "tick");
     const gone = m.exit(a, "card");
     expect(m.liveCount()).toBeGreaterThan(0);
+    expect(liveOnWindow()).toBe(m.liveCount());
     await gone;
     expect(await drained()).toBe(0);
+    expect(liveOnWindow()).toBe(0);
   });
 
   it("drops an exit that is interrupted (killed or overwritten) and still resolves it", async () => {

@@ -7,7 +7,8 @@
  * - one gsap.matchMedia() query: under prefers-reduced-motion every preset is a 120ms fade or instant,
  *   and flipping the OS setting mid-session reverts running tweens (pending exits then resolve);
  * - only running animations are referenced: each is in `live` until it completes or is interrupted, so
- *   a finished tween never keeps its targets (detached DOM, Flip states of removed tiles) alive;
+ *   a finished tween never keeps its targets (detached DOM, Flip states of removed tiles) alive. The size
+ *   of that set is what e2e/support/axe.ts settled() waits on (window.__motionLive);
  * - overwrite: "auto", so a new call on an element retargets from where it is; nothing queues.
  */
 import { gsap } from "gsap";
@@ -38,6 +39,11 @@ const live = new Set<gsap.core.Animation>();
 
 /** How many animations are running: 0 once everything has settled. */
 export const liveCount = () => live.size;
+
+// The same count for the e2e suites: settled() (e2e/support/axe.ts) waits for 0 as it does for CSS
+// animations, since GSAP tweens are not in document.getAnimations(). A getter on window, not a DOM
+// attribute: nothing is written per tween, and reading it costs nothing.
+if (typeof window !== "undefined") Object.defineProperty(window, "__motionLive", { configurable: true, get: liveCount });
 
 /**
  * Registers a running animation and drops it when it completes or is interrupted, keeping any callback it
