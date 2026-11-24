@@ -1560,11 +1560,12 @@ impl Engine {
             .all(|(id, o)| *id == font || !o.as_dict().ok().and_then(|d| d.get(b"DescendantFonts").ok()).is_some_and(names))
     }
 
-    /// True when the font is a sibling this engine can extend: the font, its ToUnicode and
-    /// (when it has one of its own) its CIDFont copy were made in this session, and the
-    /// ToUnicode is exactly what the engine writes for its entries. So even with
+    /// True when the font is a sibling this engine can extend: the font and its ToUnicode were
+    /// made in this session, it is not an embedded fallback face, and the ToUnicode is exactly
+    /// what the engine writes for its entries, none of them empty. So even with
     /// [`Engine::made_after`] set too low, a font the engine did not write (whose CMap would
-    /// use ranges, or another layout) is never rewritten.
+    /// use ranges, or another layout) is never rewritten. (Its CIDFont is changed in place only
+    /// when no other font uses it: see `sibling_font`.)
     #[cfg(feature = "shaping")]
     pub(crate) fn extendable_sibling(&self, font: ObjectId, width: usize) -> bool {
         let Ok(dict) = self.doc.get_dictionary(font) else { return false };
@@ -1572,7 +1573,12 @@ impl Engine {
         let Some(bytes) = self.doc.get_object(tu).ok().and_then(|o| o.as_stream().ok()?.get_plain_content().ok()) else {
             return false;
         };
-        self.made_here(font) && self.made_here(tu) && to_unicode_cmap(width, &bfchar_entries(&bytes)).as_bytes() == bytes
+        let entries = bfchar_entries(&bytes);
+        self.made_here(font)
+            && self.made_here(tu)
+            && !self.embeds.iter().flatten().any(|e| e.type0 == font)
+            && entries.values().all(|t| !t.is_empty() && !t.contains('\0'))
+            && to_unicode_cmap(width, &entries).as_bytes() == bytes
     }
 
     /// True when `b` is a sibling of `a` (or `a` of `b`): the same font dictionary but for its
