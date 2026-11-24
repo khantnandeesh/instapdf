@@ -1,6 +1,6 @@
 "use client";
 import "./page-edit.css";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { flip } from "@/lib/motion/flow";
 import { pageBoxStyle } from "@/components/tool-flow/PageTile";
@@ -77,6 +77,7 @@ export function SegmentGrid({
   onPreview,
   onAddFiles,
   onDragState,
+  listRef,
 }: {
   model: ListModel;
   labels?: SegmentGridLabels;
@@ -91,10 +92,13 @@ export function SegmentGrid({
   onPreview: (key: string) => void;
   onAddFiles: (trigger: HTMLElement) => void;
   onDragState: (s: { phase: "start" | "cancel"; name: string }) => void;
+  /** The list element (the [data-flip-root] the owner FLIPs, e.g. on Sort). */
+  listRef?: RefObject<HTMLDivElement | null>;
 }) {
   const labels = labelsIn ?? segmentLabels(sourceCount);
   const cards = useMemo(() => buildCards(model), [model.pages, model.sources, model.files]); // eslint-disable-line react-hooks/exhaustive-deps
-  const list = useRef<HTMLDivElement>(null);
+  const ownList = useRef<HTMLDivElement>(null);
+  const list = listRef ?? ownList;
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [dragKey, setDragKey] = useState<string | null>(null);
   const settled = useSettled();

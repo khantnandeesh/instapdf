@@ -1,6 +1,6 @@
 "use client";
 import "./page-edit.css";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { flip } from "@/lib/motion/flow";
 import { pageBoxStyle } from "@/components/tool-flow/PageTile";
@@ -137,6 +137,7 @@ export default function EditablePageGrid({
   onRotateSelection,
   onRemoveSelection,
   onDragState,
+  listRef,
 }: {
   model: ListModel;
   selection: ReadonlySet<string>;
@@ -155,9 +156,12 @@ export default function EditablePageGrid({
   onRotateSelection: (step: number) => void;
   onRemoveSelection: () => void;
   onDragState: (s: { phase: "start" | "cancel"; label: string; count: number }) => void;
+  /** The list element (the [data-flip-root] the owner FLIPs, e.g. on Sort). */
+  listRef?: RefObject<HTMLDivElement | null>;
 }) {
   const tiles = useMemo(() => buildTiles(model, selection, inserted), [model.pages, model.sources, model.files, selection, inserted]); // eslint-disable-line react-hooks/exhaustive-deps
-  const list = useRef<HTMLDivElement>(null);
+  const ownList = useRef<HTMLDivElement>(null);
+  const list = listRef ?? ownList;
   const [activeUid, setActiveUid] = useState<string | null>(null);
   const [dragging, setDragging] = useState<Set<string>>(new Set());
   const settled = useSettled();
