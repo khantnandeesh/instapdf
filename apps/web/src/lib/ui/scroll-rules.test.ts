@@ -62,8 +62,24 @@ export function openingTag(text: string, index: number): string | null {
   return null;
 }
 
-/** Tailwind classes that make an element a scroll container (any variant prefix). */
-const TW_SCROLL = /(?<![\w-])(?:[\w-]+:|\[[^\]]*\]:)*overflow(?:-[xy])?-(?:auto|scroll)(?![\w-])/g;
+/**
+ * What makes an element a scroll container in our sources: a Tailwind class (any variant prefix),
+ * a Tailwind arbitrary property ([overflow-y:auto]) or an inline style ({ overflowY: "auto" }).
+ */
+const TW_SCROLL =
+  /(?<![\w-])(?:[\w-]+:|\[[^\]]*\]:)*(?:overflow(?:-[xy])?-(?:auto|scroll)(?![\w-])|\[overflow(?:-[xy])?:[^\]]*\b(?:auto|scroll)\b[^\]]*\])|overflow[XY]?\s*:\s*["'`][^"'`]*\b(?:auto|scroll)\b/g;
+
+/** .ts files have no JSX tag to carry the attribute: a "ip-scroll: <kind>" comment on that line or the one above. */
+export function tsViolations(path: string, text: string): string[] {
+  const out: string[] = [];
+  for (const m of text.matchAll(TW_SCROLL)) {
+    const line = lineOf(text, m.index!);
+    const lines = text.split("\n").slice(Math.max(0, line - 2), line).join("\n");
+    const marker = lines.match(/ip-scroll:\s*([a-z]+)/);
+    if (!marker || !(KINDS as readonly string[]).includes(marker[1])) out.push(`${path}:${line} "${m[0]}" needs an "ip-scroll: <${KINDS.join(" | ")}>" comment on its line or the line above`);
+  }
+  return out;
+}
 
 export function tsxViolations(path: string, text: string): string[] {
   const out: string[] = [];
@@ -80,7 +96,9 @@ export function tsxViolations(path: string, text: string): string[] {
 export function cssViolations(path: string, text: string): string[] {
   const out: string[] = [];
   // Strip comments except the ip-scroll markers, then look at each declaration block.
-  const re = /overflow(?:-[xy])?\s*:\s*(?:auto|scroll|overlay)\b/g;
+  // overflow / overflow-x / overflow-y set to auto|scroll|overlay (also as the second value of the
+  // two-value overflow shorthand), or a Tailwind scroll class pulled in with @apply.
+  const re = new RegExp(`overflow(?:-[xy])?\\s*:\\s*(?:[a-z]+\\s+)?(?:auto|scroll|overlay)\\b|@apply[^;]*?${TW_SCROLL.source}`, "g");
   for (const m of text.matchAll(re)) {
     const before = text.slice(0, m.index!);
     // Inside a comment? (an unclosed /* before it)
@@ -100,6 +118,11 @@ describe("scroll rules (source)", () => {
     expect(bad, "see docs/design/berrypdf.md \"Scrolling\"").toEqual([]);
   });
 
+  it("every scroll class or style in plain .ts files is marked with its kind", () => {
+    const bad = files(SRC, /\.ts$/).flatMap((f) => tsViolations(relative(SRC, f), readFileSync(f, "utf8")));
+    expect(bad, "see docs/design/berrypdf.md \"Scrolling\"").toEqual([]);
+  });
+
   it("every scrolling CSS rule says which allowed kind it is", () => {
     const bad = files(SRC, /\.css$/).flatMap((f) => cssViolations(relative(SRC, f), readFileSync(f, "utf8")));
     expect(bad, "see docs/design/berrypdf.md \"Scrolling\"").toEqual([]);
@@ -112,6 +135,13 @@ describe("scroll rules (source)", () => {
     expect(tsxViolations("a.tsx", '<dialog data-ip-scroll={v ? "overlay" : undefined} className="overflow-y-auto" />')).toHaveLength(0);
     expect(tsxViolations("a.tsx", '<div className="overflow-hidden overflow-x-clip">x</div>')).toHaveLength(0);
     expect(tsxViolations("a.tsx", '<div\n  // a comment with a <tag> in it\n  className="overflow-y-auto"\n  data-ip-scroll="rail"\n/>')).toHaveLength(0);
+    expect(tsxViolations("a.tsx", '<div style={{ overflowY: "auto" }}>x</div>')).toHaveLength(1);
+    expect(tsxViolations("a.tsx", '<div className="lg:[overflow-y:auto]">x</div>')).toHaveLength(1);
+    expect(tsxViolations("a.tsx", '<div style={{ overflowY: "auto" }} data-ip-scroll="overlay">x</div>')).toHaveLength(0);
+    expect(tsViolations("a.ts", 'const bar = "flex overflow-x-auto";')).toHaveLength(1);
+    expect(tsViolations("a.ts", '// ip-scroll: chips\nconst bar = "flex overflow-x-auto";')).toHaveLength(0);
+    expect(cssViolations("a.css", ".a { overflow: hidden auto; }")).toHaveLength(1);
+    expect(cssViolations("a.css", ".a { @apply flex lg:overflow-y-auto; }")).toHaveLength(1);
     expect(cssViolations("a.css", ".a { overflow-y: auto; }")).toHaveLength(1);
     expect(cssViolations("a.css", ".a { /* ip-scroll: pages */ overflow-y: auto; }")).toHaveLength(0);
     expect(cssViolations("a.css", "/* overflow: auto */ .a { overflow: hidden; }")).toHaveLength(0);

@@ -95,7 +95,7 @@ export function ControlDock({
       role="region"
       aria-label={label}
       // Bar: BerryPDF's strawberry-cream action tab fixed to the bottom (EditorToolbar).
-      // Side (>= 1024 px): an app Panel (white, sand outline, 20px radius, soft pink shadow) in a sticky column.
+      // Side (>= 1024 px): an app Panel (white, sand outline, 20px radius, soft pink shadow) that grows with its options.
       className={[
         "fixed inset-x-0 bottom-0 z-20 rounded-t-[18px] bg-sand shadow-menu",
         "px-[15px] pt-3 pb-[calc(14px+env(safe-area-inset-bottom))]",

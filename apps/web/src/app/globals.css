@@ -1612,8 +1612,8 @@
    A vertical region never scrolls sideways: clip x (clip, not hidden, so a region that is visible on
    the other axis does not become a scroller). A region is also the containing block of what it
    holds, so an absolutely placed child (an sr-only note, a popover) can't spill out and make the
-   region's parent scroll too. Chip rows swipe with no bar. In the base layer, so a utility such as
-   `fixed` on a menu still wins. */
+   region's parent scroll too (not on top-layer elements, which the browser positions). Chip rows
+   swipe with no bar. In the base layer, so a utility such as `fixed` on a menu still wins. */
 @layer base {
   [data-ip-scroll]:not([data-ip-scroll="chips"], [data-ip-scroll="pages"]) {
     overflow-x: clip;
@@ -1625,7 +1625,7 @@
       overflow-x: clip;
     }
   }
-  [data-ip-scroll]:not(dialog, .fixed, .absolute, .sticky) {
+  [data-ip-scroll]:not(dialog, [popover]) {
     position: relative;
   }
   [data-ip-scroll="chips"] {

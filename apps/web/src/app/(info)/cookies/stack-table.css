@@ -28,7 +28,9 @@
     padding-block: 4px;
   }
   .ip-stack-table td[data-label]::before {
+    /* Screen readers already hear the column header; the alt text "" keeps them from hearing it twice. */
     content: attr(data-label);
+    content: attr(data-label) / "";
     display: block;
     font-weight: 700;
     color: var(--ink);

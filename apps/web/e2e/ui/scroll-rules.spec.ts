@@ -84,7 +84,7 @@ async function openTool(page: Page, slug: string) {
   await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
 }
 
-const pages = ["/", "/cookies", "/privacy", "/terms", "/edit-pdf", ...(comingSoon ? [`/${comingSoon.slug}`] : [])];
+const pages = ["/", "/about", "/help", "/licenses", "/security", "/cookies", "/privacy", "/terms", "/edit-pdf", "/no-such-page", ...(comingSoon ? [`/${comingSoon.slug}`] : [])];
 
 for (const [project, sizes] of [
   ["desktop", DESKTOP],
@@ -108,6 +108,14 @@ for (const [project, sizes] of [
         });
       }
 
+      test("the All tools menu (an overlay) scrolls alone", async ({ page }) => {
+        await page.goto("/");
+        await page.waitForLoadState("networkidle");
+        await page.getByRole("button", { name: /All tools/ }).first().click();
+        await expect(page.getByRole("searchbox").last()).toBeVisible();
+        await expectClean(page, "tools menu open");
+      });
+
       for (const tool of usable) {
         test(`${tool.slug}: empty, loaded and options are free of nested or sideways scrollers`, async ({ page }) => {
           await openTool(page, tool.slug);
@@ -124,6 +132,34 @@ for (const [project, sizes] of [
             await pagesView.click();
             await expectClean(page, "loaded, pages view");
           }
+          // The bigger page view (a dialog).
+          const pageButton = page.getByRole("button", { name: /^Page 1 of/ });
+          const card = page.getByTestId("card-main").first();
+          if (await pageButton.count()) await pageButton.first().click();
+          else if (await card.isVisible()) await card.click();
+          else {
+            const tile = page.getByTestId("page-tile").first();
+            await tile.hover();
+            await tile.getByTestId("tile-more").click();
+            await page.getByRole("menuitem", { name: "Enlarge" }).click();
+          }
+          await expect(page.getByRole("dialog")).toBeVisible();
+          await expectClean(page, "page preview open");
+          await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+          await expect(page.getByRole("dialog")).toBeHidden();
+
+          // Merge's page picker: a long list inside a modal; only the list may scroll.
+          const addPages = page.getByTestId("add-pages-menu");
+          if (await addPages.isVisible()) {
+            await addPages.click();
+            const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("menuitem", { name: "Pages from a file…" }).click()]);
+            await chooser.setFiles(fx("sixty-pages.pdf"));
+            await expect(page.getByTestId("picker-grid")).toBeVisible();
+            await expectClean(page, "page picker open");
+            await page.keyboard.press("Escape");
+            await expect(page.getByRole("dialog")).toBeHidden();
+          }
+
           const optionsButton = page.getByTestId("options-button");
           if (await optionsButton.isVisible()) {
             await optionsButton.click();
