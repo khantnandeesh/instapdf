@@ -26,6 +26,17 @@ describe("markup selection (AC-27, AC-71)", () => {
     expect(selectWords(words, [90, 120], [120, 104])!.text).toBe("total due next week");
     expect(selectWords(words, [900, 900], [950, 950])).toBeNull();
   });
+
+  it("a drag that starts in the gap between words doesn't take in the word past the gap", () => {
+    // Gap between "Quarterly" (ends 110) and "total" (starts 115); 113 is nearer "total".
+    expect(selectWords(words, [113, 106], [55, 106])!.text).toBe("Quarterly");
+    expect(selectWords(words, [112, 106], [165, 106])!.text).toBe("total due");
+    // Ending in a gap stops at the last word crossed.
+    expect(selectWords(words, [55, 106], [113, 106])!.text).toBe("Quarterly");
+    expect(selectWords(words, [160, 106], [113, 106])!.text).toBe("total due");
+    // A drag inside one gap marks no word.
+    expect(selectWords(words, [111, 106], [113, 106])).toBeNull();
+  });
 });
 
 describe("page frame mapping", () => {

@@ -65,6 +65,8 @@ const writeLocal = (k: string, v: string) => {
   }
 };
 
+/** Largest zoom the document opens at on desktop (fit width up to this). */
+const OPEN_ZOOM_CAP = 1.5;
 const reducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function initialState(pages: PageEntry[], wide: boolean): EditorState {
@@ -102,7 +104,7 @@ function initialState(pages: PageEntry[], wide: boolean): EditorState {
     pendingLine: null,
     lineEdit: null,
     busy: null,
-    panel: wide && (readLocal(PANEL_KEY) ?? (typeof innerWidth !== "undefined" && innerWidth >= 1280 ? "1" : "0")) === "1",
+    panel: wide && (readLocal(PANEL_KEY) ?? (typeof innerWidth !== "undefined" && innerWidth >= 1600 ? "1" : "0")) === "1",
     panelTab: "pages",
     wide,
     readOnly: false,
@@ -381,16 +383,17 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     },
     [store, fitZoom, scroller],
   );
-  // First fit: 100% when the widest page fits, else fit width (always fit width on phones).
+  // First fit: fit width, so the page fills the view (M12). On very wide screens the zoom is
+  // capped, so a line of text stays a readable length.
   const fitted = useRef(false);
   useLayoutEffect(() => {
     if (!scroller || fitted.current) return;
     fitted.current = true;
     const inner = innerSize();
     if (inner) setAvail(inner.w);
-    const fits = fitZoom("width") >= 1;
-    if (wide && fits) store.set({ zoom: 1, fit: null });
-    else store.set({ zoom: fitZoom("width"), fit: "width" });
+    const z = fitZoom("width");
+    if (wide && z > OPEN_ZOOM_CAP) store.set({ zoom: OPEN_ZOOM_CAP, fit: null });
+    else store.set({ zoom: z, fit: "width" });
   }, [scroller, wide, fitZoom, store, innerSize]);
   useEffect(() => {
     if (!scroller) return;
@@ -848,10 +851,19 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         return;
       }
       if (k === "Escape") {
-        if (s.placement || (s.tool !== "select" && s.tool !== "edit")) {
+        // Spec order: a placement is cancelled; else the selection goes first, then the tool
+        // (unlock / back to Select). A sticky tool stays armed while only a selection is dropped.
+        if (s.placement) {
           ctl.setTool("select");
           ctl.announce("Select tool");
-        } else if (sel.length) ctl.select([]);
+        } else if (sel.length) {
+          ctl.select([]);
+          ctl.announce("Deselected");
+          if (t?.closest("[data-obj-id]")) document.querySelector<HTMLElement>("[data-testid=canvas]")?.focus({ preventScroll: true });
+        } else if (s.tool !== "select" && s.tool !== "edit") {
+          ctl.setTool("select");
+          ctl.announce("Select tool");
+        }
         return;
       }
       if ((k === "Delete" || k === "Backspace") && sel.length) {
@@ -1023,7 +1035,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
           {readOnly && <OwnerLock name={rt.name} denied={pdf.denied} onUnlock={() => setOwnerOpen(true)} />}
           {recovery && <RecoveryNotice s={recovery} onRestore={() => void restore(recovery)} onDiscard={() => (setRecovery(null), rt.hash && void deleteSession(rt.hash))} />}
           {placement && <ModeHint text={`Click to place ${placement.label.toLowerCase()} · Esc cancels`} />}
-          {!placement && (tool === "draw" || tool === "mark" || tool === "shapes" || tool === "whiteout") && <ModeHint text={`${TOOL_HINTS[tool]} · Esc to stop`} />}
+          {!placement && (tool === "text" || tool === "draw" || tool === "mark" || tool === "shapes" || tool === "whiteout") && <ModeHint text={`${TOOL_HINTS[tool]} · Esc to stop`} />}
           {!wide && <PageChip onOpen={() => setSheet("pages")} />}
           <EnginePill wide={wide} />
           <div className="ed-floor">
@@ -1209,6 +1221,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
 }
 
 const TOOL_HINTS: Partial<Record<ToolId, string>> = {
+  text: "Click to type, drag for a box",
   draw: "Drag to draw",
   mark: "Drag across text",
   shapes: "Click or drag",

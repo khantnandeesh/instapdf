@@ -990,8 +990,14 @@
     width: 12px;
     height: 12px;
   }
+  /* A 48 px target centred on the handle, whatever its border (AC-48: at least 44 px). */
   .ed-handle::before {
-    inset: -16px;
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    width: 48px;
+    height: 48px;
+    transform: translate(-50%, -50%);
   }
 }
 .ed-handle--nw,
@@ -1036,7 +1042,24 @@
 }
 .ed-rotate > span {
   position: absolute;
-  inset: -12px;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -50%);
+}
+@media (pointer: coarse) {
+  /* Further up on touch so its 48 px target clears the top resize handle's. */
+  .ed-rotate {
+    top: -56px;
+  }
+  .ed-rotate::after {
+    height: 42px;
+  }
+  .ed-rotate > span {
+    width: 48px;
+    height: 48px;
+  }
 }
 .ed-guide {
   position: absolute;

@@ -43,6 +43,7 @@ async function placeSignature(page: Page, text: string) {
   await tool(page, "s");
   await page.getByTestId("sign-text").fill(text);
   await page.getByTestId("sign-place").click();
+  await expect(page.getByTestId("sign-dialog")).toBeHidden();
   const p = await box(page.getByTestId("page-1"));
   await page.mouse.click(p.x + p.width / 2, p.y + Math.min(p.height, page.viewportSize()!.height - p.y) / 2);
   const sig = page.locator('[data-kind="signature"]');

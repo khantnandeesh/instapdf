@@ -234,24 +234,31 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     }
     if (t === "shapes") {
       const kind = d.shapes.shape;
+      const id = newId();
       if (kind === "line" || kind === "arrow") {
         const end: Pt = clicked ? [a[0] + 120, a[1]] : shift ? constrain45(a, b) : b;
-        ctl.add([{ kind: "line", id: newId(), page: entry.id, arrow: kind === "arrow", a, b: end, stroke: d.shapes.stroke, width: d.shapes.width }], `Add ${kind}`);
+        ctl.add([{ kind: "line", id, page: entry.id, arrow: kind === "arrow", a, b: end, stroke: d.shapes.stroke, width: d.shapes.width }], `Add ${kind}`);
       } else {
         const box = clicked ? { x: a[0] - 60, y: a[1] - 40, w: 120, h: 80 } : dragBox(a, b, shift);
-        ctl.add([{ kind: "shape", id: newId(), page: entry.id, shape: kind, ...box, rot: 0, stroke: d.shapes.stroke, fill: d.shapes.fill, width: d.shapes.width }], kind === "rect" ? "Add rectangle" : "Add ellipse");
+        ctl.add([{ kind: "shape", id, page: entry.id, shape: kind, ...box, rot: 0, stroke: d.shapes.stroke, fill: d.shapes.fill, width: d.shapes.width }], kind === "rect" ? "Add rectangle" : "Add ellipse");
       }
       ctl.announce(`${kind === "rect" ? "Rectangle" : kind === "ellipse" ? "Ellipse" : kind === "line" ? "Line" : "Arrow"} added on page ${index + 1}`);
+      focusObject(id);
       return;
     }
     if (t === "whiteout") {
       const box = clicked ? { x: a[0] - 60, y: a[1] - 12, w: 120, h: 24 } : dragBox(a, b);
       const fill = d.whiteout.fill === "page" ? sampleColor(box) : d.whiteout.fill;
-      ctl.add([{ kind: "whiteout", id: newId(), page: entry.id, ...box, fill, border: null, borderWidth: 0 }], "Add whiteout");
+      const id = newId();
+      ctl.add([{ kind: "whiteout", id, page: entry.id, ...box, fill, border: null, borderWidth: 0 }], "Add whiteout");
       ctl.announce(`Whiteout added on page ${index + 1}. It hides content but doesn't delete it.`);
       finishTool();
+      focusObject(id);
     }
   };
+
+  /** Keyboard focus on a new object, so arrows nudge it straight away (AC-82). */
+  const focusObject = (id: string) => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-obj-id="${id}"]`)?.focus({ preventScroll: true }));
 
   const placeAt = (p: Pt) => {
     const pl = store.get().placement;
