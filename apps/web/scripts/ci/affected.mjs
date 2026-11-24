@@ -206,7 +206,10 @@ export function selectSpecs({ repoRoot, changed }) {
       // A removed module: whatever imported it changed too (or the build fails). A removed asset
       // can be fetched by URL from anywhere, so it runs everything.
       if (!/^apps\/web\/src\/.*\.(tsx?|mjs|js|css)$/.test(f)) return full(`${f} was removed and may be fetched by URL`);
-      reasons.push(`${f}: removed`);
+      // A removed route or module inside a spec's routes (folders match by prefix) runs that spec.
+      const hits = all.filter((s) => inReach(reach.get(s), abs));
+      hits.forEach((s) => picked.add(s));
+      reasons.push(`${f}: removed${hits.length ? `, ${hits.length} spec(s)` : ""}`);
       continue;
     }
     const hits = all.filter((s) => inReach(reach.get(s), abs));
@@ -214,7 +217,7 @@ export function selectSpecs({ repoRoot, changed }) {
     hits.forEach((s) => picked.add(s));
     reasons.push(`${f}: ${hits.length} spec(s)`);
   }
-  if (picked.size === 0 && reasons.every((r) => r.endsWith(": removed"))) return full("only removals, nothing to place them by");
+  if (picked.size === 0 && reasons.every((r) => r.includes(": removed"))) return full("only removals, nothing to place them by");
   for (const s of all) if (ALWAYS.includes(specGroup(s))) picked.add(s);
   if (picked.size === all.length) return { mode: "full", specs: all, reasons };
   return { mode: "some", specs: all.filter((s) => picked.has(s)), reasons };

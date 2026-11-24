@@ -56,6 +56,9 @@ describe("affected specs", () => {
   it("a removed asset runs the full suite; a removed module relies on its importers", () => {
     expect(pick("apps/web/public/fonts/forms/gone.woff").mode).toBe("full");
     expect(pick("apps/web/src/tools/editor/gone.ts", "apps/web/src/tools/editor/EditorShell.tsx").mode).toBe("some");
+    // A removed route has no importers: the specs whose routes held it run.
+    const r = pick("apps/web/src/app/edit-pdf/page.tsx", "apps/web/src/app/merge-pdf/page.tsx");
+    expect(groups(r)).toEqual(expect.arrayContaining(["f16", "f3"]));
   });
 
   it("a changed spec runs itself", () => {

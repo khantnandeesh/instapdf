@@ -30,12 +30,12 @@ export const ROW_KINDS = [
   { key: "serial", bucket: "serial", args: ["--grep", "@serial"], workers: 1, maxShards: 4 },
   { key: "cloud desktop", bucket: "desktop", cloud: true, args: ["--project", "desktop", "--grep-invert", "@serial"], workers: 3, maxShards: 4 },
   { key: "cloud mobile", bucket: "mobile", cloud: true, args: ["--project", "mobile", "--grep-invert", "@serial"], workers: 3, maxShards: 4 },
-  { key: "cloud serial", bucket: "serial", cloud: true, args: ["--grep", "@serial"], workers: 1, maxShards: 3 },
+  { key: "cloud serial", bucket: "serial", cloud: true, args: ["--grep", "@serial"], workers: 1, maxShards: 4 },
 ];
 
 /** Tests declared in a spec file, by whether their declaration (title and options) has the @serial tag. */
 export const testCount = (src, serial) =>
-  [...src.matchAll(/^\s*test(?:\.(?:only|fixme))?\(([\s\S]*?)\basync\b/gm)].filter((m) => m[1].includes("@serial") === serial).length +
+  [...src.matchAll(/^\s*test(?:\.(?:only|fixme))?\(([\s\S]*?)(?:\basync\b|=>|\bfunction\b)/gm)].filter((m) => m[1].includes("@serial") === serial).length +
   (serial ? 0 : [...src.matchAll(/^\s*for \(/gm)].length * 2); // a loop of tests: guess a few
 
 /**
@@ -43,12 +43,15 @@ export const testCount = (src, serial) =>
  * Whether a file belongs in a bucket comes from its source, never from old timings, so a test
  * added to a file always runs; 0 means the file has no tests for that bucket.
  */
-export function estimate(timings, bucket, spec) {
+export function estimate(timings, bucket, spec, kindKey = bucket) {
   const src = readFileSync(join(webRoot, spec), "utf8");
   const serial = bucket === "serial";
-  const count = testCount(src, serial);
+  // A tag on a group (test.describe) isn't on its tests' lines: a file that mentions @serial at all
+  // goes to the serial rows too, where --grep picks whatever is really tagged.
+  const count = serial && src.includes("@serial") ? Math.max(1, testCount(src, true)) : testCount(src, serial);
   if (count === 0) return 0;
-  const known = timings[bucket]?.[spec];
+  // The row kind's own measurement first (cloud builds run some specs slower), then the bucket's.
+  const known = timings[kindKey]?.[spec] ?? timings[bucket]?.[spec];
   // Measured in CI on 24 Nov: about 3 s of worker time per test, 15 s per @serial test and project.
   const guess = serial ? 30 * count : 3 * count;
   return Math.max(1, typeof known === "number" ? known : guess);
@@ -71,7 +74,7 @@ export function buildMatrix(specs, timings) {
   const rows = [];
   for (const kind of ROW_KINDS) {
     const files = specs.filter((s) => !kind.cloud || CLOUD_SPECS.some((c) => s === c || s.startsWith(c)));
-    const items = files.map((spec) => ({ spec, weight: estimate(timings, kind.bucket, spec) })).filter((i) => i.weight > 0);
+    const items = files.map((spec) => ({ spec, weight: estimate(timings, kind.bucket, spec, kind.key) })).filter((i) => i.weight > 0);
     if (items.length === 0) continue;
     const total = items.reduce((s, i) => s + i.weight, 0);
     // Per machine its workers share the files (a file's tests stay on one worker).

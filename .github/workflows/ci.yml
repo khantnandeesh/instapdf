@@ -150,11 +150,16 @@ jobs:
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-report.json
         run: pnpm --filter web exec playwright test --trace off --reporter=dot,json ${{ matrix.args }} $FILES
       # Durations for e2e/timings.json (scripts/ci/timings.mjs); the nightly full run's are the ones to use.
+      - name: Name the row for the timings
+        if: always()
+        run: echo "${{ matrix.name }}" > apps/web/row.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: e2e-timings-${{ strategy.job-index }}
-          path: apps/web/e2e-report.json
+          path: |
+            apps/web/e2e-report.json
+            apps/web/row.txt
           retention-days: 5
       - uses: actions/upload-artifact@v4
         if: failure()
