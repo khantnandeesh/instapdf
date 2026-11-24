@@ -109,8 +109,11 @@ test.describe("desktop", () => {
   test("M12: very wide screens are capped, so the page stays crisp and a line a readable length", async ({ page }) => {
     await page.setViewportSize({ width: 2560, height: 1300 });
     await open(page);
-    // report-form-3p.pdf is A4: capped at about 217% (lib/editor/open-zoom), about 1,720 px wide.
-    expect((await page.getByTestId("page-1").boundingBox())!.width).toBeLessThanOrEqual(1760);
+    // report-form-3p.pdf is A4; fit width here would be about 300%. Capped (lib/editor/open-zoom) at
+    // 220% at this project's DPR 1 (about 1,746 px), about 217% at DPR 2 (about 1,720 px).
+    const w = (await page.getByTestId("page-1").boundingBox())!.width;
+    expect(w).toBeLessThanOrEqual(1760);
+    expect(w).toBeGreaterThanOrEqual(1700);
   });
 });
 

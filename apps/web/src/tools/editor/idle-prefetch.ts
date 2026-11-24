@@ -10,6 +10,9 @@ declare const require: { ensure(deps: string[], ready: () => void, failed: (e: u
 
 export function prefetchEditorChunks(): void {
   require.ensure(
+    // Literals (webpack resolves them at build time), so not a shared constant: "pdfjs-dist" must be
+    // the specifier lib/pdf/pdfjs.ts imports (loadPdfjs), or this loads a chunk the pick never uses.
+    // idle-prefetch.test.ts checks both.
     ["./EditorShell", "pdfjs-dist"],
     () => {},
     () => {},

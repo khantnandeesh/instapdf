@@ -4,7 +4,7 @@
  * renders at a time, canvases capped at 16.7 megapixels (iOS limit) (U-E5).
  */
 import type { PDFDocumentProxy, PDFPageProxy, PageViewport, RenderTask } from "pdfjs-dist";
-import { MAX_CANVAS_PIXELS as MAX_PIXELS } from "@/lib/editor/open-zoom";
+import { MAX_CANVAS_PIXELS as MAX_PIXELS, renderDpr } from "@/lib/editor/open-zoom";
 
 type Job = { run: () => Promise<void>; priority: number; cancelled: boolean };
 const queue: Job[] = [];
@@ -41,7 +41,7 @@ export function renderPage(pdf: PDFDocumentProxy, src: number, scale: number, ro
       try {
         page = await pdf.getPage(src + 1);
         if (job.cancelled) return resolve(null);
-        let dpr = Math.min(2, window.devicePixelRatio || 1);
+        let dpr = renderDpr(window.devicePixelRatio);
         let viewport = page.getViewport({ scale: scale * dpr, rotation });
         if (viewport.width * viewport.height > MAX_PIXELS) {
           dpr *= Math.sqrt(MAX_PIXELS / (viewport.width * viewport.height));

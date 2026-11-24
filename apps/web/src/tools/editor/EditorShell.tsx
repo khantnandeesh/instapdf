@@ -20,7 +20,7 @@ import type { Permission } from "@/tools/registry";
 import { disposeEngine, getEngineStatus, getShapingStatus, subscribeEngine } from "@/lib/editor/engine-client";
 import { fontsForBuild, resolveFonts } from "@/lib/editor/fonts-browser";
 import { screenDeltaToFrame, screenToFrame, displaySize } from "@/lib/editor/geometry";
-import { openZoom } from "@/lib/editor/open-zoom";
+import { openZoom, renderDpr } from "@/lib/editor/open-zoom";
 import * as H from "@/lib/editor/history";
 import { clampDelta, initialPages, isPristine, kindName, moveObject, newId, objectBounds, pageSize, totalRotation, type EditorObject, type PageEntry, type Pt } from "@/lib/editor/model";
 import { clearDevice, deleteSession, loadSession, sha256, storageAvailable, writeSession, type LoadedSession } from "@/lib/editor/persist";
@@ -423,7 +423,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     const ps = H.current(store.get().history).pages;
     const ref = ps[store.get().current] ?? ps[0];
     const d = ref ? displaySize(ref.view, totalRotation(ref), 1) : { width: 612, height: 792 };
-    const first = openZoom(fitZoom("width"), d.width * BASE_SCALE, d.height * BASE_SCALE, wide);
+    const first = openZoom(fitZoom("width"), d.width * BASE_SCALE, d.height * BASE_SCALE, wide, renderDpr(window.devicePixelRatio));
     store.set(first.capped ? { zoom: first.zoom, fit: null } : { zoom: first.zoom, fit: "width" });
   }, [scroller, wide, fitZoom, store, innerSize]);
   useEffect(() => {
