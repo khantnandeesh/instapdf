@@ -76,7 +76,8 @@ function makeSlotBar(): HTMLElement {
   const bar = document.createElement("div");
   bar.setAttribute("aria-hidden", "true");
   bar.dataset.testid = "slot-bar";
-  bar.className = "rounded-full bg-primary";
+  // forced-colors:bg-[Highlight]: a background alone vanishes in High Contrast.
+  bar.className = "rounded-full bg-primary forced-colors:bg-[Highlight] forced-colors:forced-color-adjust-none";
   Object.assign(bar.style, {
     position: "fixed",
     width: cssVar("--ip-slot-bar") || "3px",

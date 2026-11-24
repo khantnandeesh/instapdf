@@ -10,6 +10,7 @@
  * UTIF.decodeImage (UTIF.js, MIT), which is imported lazily. Decoding runs
  * in workers (thumbnails: tiff.worker.ts; merge: processing.worker.ts).
  */
+import { Inflate, Unzlib } from "fflate";
 import { exceedsPixelCap } from "./images";
 
 /** IFD in UTIF's shape: "t<tag>" -> values. */
@@ -172,8 +173,14 @@ function check(ifd: TiffIfd, width: number, height: number, len: number) {
     const tw = num0(ifd, "t322");
     const th = num0(ifd, "t323");
     if (tw <= 0 || th <= 0 || Math.ceil(width / tw) * Math.ceil(height / th) > offsets.length) throw new Bad("unreadable");
+    // UTIF allocates (and zeroes) one tile buffer of tw x th: a 1x1 image may not claim 30000x30000 tiles.
+    if (tw > maxTileSide(width) || th > maxTileSide(height)) throw new Bad("unreadable");
+    if (tw * th * (bitsPerPixel / 8) > MAX_TIFF_DECODE_BYTES) throw new Bad("tooLarge");
   }
 }
+
+/** Tile sides are multiples of 16 and may overhang the image; writers often use 256 or 512 for small images. */
+const maxTileSide = (side: number) => Math.max(1024, Math.ceil(side / 16) * 16);
 
 /** Frame sizes, or null when the file is refused (any reason). */
 export function tiffFrameSizes(bytes: Uint8Array): { width: number; height: number }[] | null {
@@ -192,9 +199,70 @@ export async function decodeTiffFrame(bytes: Uint8Array, file: TiffFile, index: 
   const UTIF = await loadUtif();
   // A fresh copy of the tag values: decodeImage writes into the IFD object.
   const ifd = { ...frame.ifd } as Parameters<Utif["decodeImage"]>[1];
-  UTIF.decodeImage(bytes, ifd);
+  const data = num0(ifd, "t259") === 8 ? inflateSegments(bytes, ifd, frame) : bytes;
+  UTIF.decodeImage(data, ifd);
   const rgba = UTIF.toRGBA8(ifd);
   const n = frame.width * frame.height * 4;
   if (rgba.length < n) throw new Error("TIFF frame could not be decoded");
   return { rgba: new Uint8Array(rgba.buffer, rgba.byteOffset, n), width: frame.width, height: frame.height };
+}
+
+/** Input is fed in slices this small, so one push can't inflate past ~16 MB (deflate tops out near 1032:1). */
+const INFLATE_SLICE = 16 * 1024;
+
+/**
+ * Deflate (compression 8): UTIF inflates each strip or tile with no output cap, so a 1 MB strip of
+ * zeros could expand to 1 GB. We inflate every segment here instead, stopping at the bytes that
+ * segment can hold, and hand UTIF an uncompressed copy (same predictor and byte order).
+ */
+export function inflateSegments(bytes: Uint8Array, ifd: TiffIfd, frame: TiffFrame): Uint8Array {
+  const bps = isList(ifd.t258) ? Array.from(ifd.t258 as NumList) : null;
+  // UTIF's own bits-per-pixel rule (decodeImage), so the segment sizes match what it copies.
+  const bipp = bps ? Math.min(32, bps[0]) * bps.length : num0(ifd, "t277") || 1;
+  const tiled = ifd.t322 !== undefined;
+  const offKey = ifd.t273 !== undefined ? "t273" : "t324";
+  const cntKey = ifd.t279 !== undefined ? "t279" : "t325";
+  const offsets = Array.from(ifd[offKey] as NumList);
+  const counts = Array.from(ifd[cntKey] as NumList);
+  const rps = Math.min(num0(ifd, "t278") || frame.height, frame.height);
+  const cap = tiled
+    ? Math.ceil((num0(ifd, "t322") * num0(ifd, "t323") * bipp) / 8)
+    : Math.ceil((frame.width * bipp) / 8) * rps;
+  const parts = offsets.map((off, i) => inflateCapped(bytes.subarray(off, off + counts[i]), cap));
+  const header = bytes.subarray(0, 8); // UTIF reads the byte order from the first two bytes.
+  const out = new Uint8Array(header.length + parts.reduce((n, p) => n + p.length, 0));
+  out.set(header);
+  const newOffsets: number[] = [];
+  let at = header.length;
+  for (const p of parts) {
+    newOffsets.push(at);
+    out.set(p, at);
+    at += p.length;
+  }
+  ifd[offKey] = newOffsets;
+  ifd[cntKey] = parts.map((p) => p.length);
+  ifd.t259 = [1];
+  return out;
+}
+
+/** Inflates zlib or raw deflate data, keeping at most `cap` bytes and stopping as soon as it has them. */
+export function inflateCapped(src: Uint8Array, cap: number): Uint8Array {
+  const out = new Uint8Array(cap);
+  let got = 0;
+  const zlib = src.length > 2 && (src[0] & 0x0f) === 8 && ((src[0] << 8) | src[1]) % 31 === 0;
+  const sink = (chunk: Uint8Array) => {
+    const take = Math.min(chunk.length, cap - got);
+    out.set(chunk.subarray(0, take), got);
+    got += take;
+  };
+  const stream = zlib ? new Unzlib(sink) : new Inflate(sink);
+  try {
+    for (let i = 0; i < src.length && got < cap; i += INFLATE_SLICE) {
+      const end = Math.min(i + INFLATE_SLICE, src.length);
+      stream.push(src.subarray(i, end), end === src.length);
+    }
+  } catch {
+    // Damaged data: keep what was inflated, like UTIF's pako path would before throwing.
+  }
+  return out.subarray(0, got);
 }

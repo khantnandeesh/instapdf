@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { exceedsPixelCap, imageFormatOfName, imagePageSize, imagePlacement, probeImage, sniffFormat } from "./images";
 import { decodeTiffFrame, readTiff, TIFF_DECODER_TAGS, tiffFrameSizes, type TiffFile } from "./tiff";
@@ -159,5 +160,42 @@ describe("TIFF structure walker (review fix)", () => {
   });
   it("accepts a plain frame", () => {
     expect(tiffFrameSizes(ifdTiff(image(2, 2), 0, 16))).toEqual([{ width: 2, height: 2 }]);
+  });
+  it("refuses a 1x1 image with 30000x30000 tiles (tile bomb), fast", () => {
+    const started = Date.now();
+    const tiles = (side: number) =>
+      ifdTiff([[256, 3, 1, 1], [257, 3, 1, 1], [258, 3, 1, 8], [262, 3, 1, 2], [277, 3, 1, 3], [322, 4, 1, side], [323, 4, 1, side], [324, 4, 1, 8], [325, 4, 1, 4]], 0, 4);
+    expect(readTiff(tiles(30000))).toEqual({ problem: "unreadable" });
+    expect(tiffFrameSizes(tiles(256))).toEqual([{ width: 1, height: 1 }]); // an honest small tiled file still opens
+    expect(Date.now() - started).toBeLessThan(200);
+  });
+  it("inflates a deflate strip only up to its own size (deflate bomb)", async () => {
+    const zeros = deflateSync(Buffer.alloc(256 * 1024 * 1024), { level: 9 }); // 256 MB of zeros in ~250 KB
+    const entries: [number, number, number, number][] = [[256, 3, 1, 100], [257, 3, 1, 100], [258, 3, 1, 8], [259, 3, 1, 8], [262, 3, 1, 1], [273, 4, 1, 0], [277, 3, 1, 1], [278, 3, 1, 100], [279, 4, 1, zeros.length]];
+    const head = ifdTiff(entries, 0).length;
+    entries[5][3] = head;
+    const b = ifdTiff(entries, 0, zeros.length);
+    b.set(zeros, head);
+    const file = readTiff(b) as TiffFile;
+    expect(file.frames).toHaveLength(1);
+    const before = process.memoryUsage().rss;
+    const started = Date.now();
+    const { rgba } = await decodeTiffFrame(b, file, 0);
+    expect(rgba.length).toBe(100 * 100 * 4);
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(process.memoryUsage().rss - before).toBeLessThan(100 * 1024 * 1024);
+  });
+  it("still decodes an honest deflate TIFF, predictor included", async () => {
+    // 4x2 gray, horizontal predictor: rows store differences.
+    const rows = [10, 20, 30, 40, 5, 5, 5, 5];
+    const diff = [10, 10, 10, 10, 5, 0, 0, 0];
+    const z = deflateSync(Buffer.from(diff));
+    const entries: [number, number, number, number][] = [[256, 3, 1, 4], [257, 3, 1, 2], [258, 3, 1, 8], [259, 3, 1, 8], [262, 3, 1, 1], [273, 4, 1, 0], [277, 3, 1, 1], [278, 3, 1, 2], [279, 4, 1, z.length], [317, 3, 1, 2]];
+    const head = ifdTiff(entries, 0).length;
+    entries[5][3] = head;
+    const b = ifdTiff(entries, 0, z.length);
+    b.set(z, head);
+    const { rgba } = await decodeTiffFrame(b, readTiff(b) as TiffFile, 0);
+    expect(Array.from({ length: 8 }, (_, i) => rgba[i * 4])).toEqual(rows);
   });
 });
