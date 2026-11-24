@@ -112,7 +112,14 @@ Review follow-ups (not blocking): arrow-key movement in the font list; parse lar
 
 Owner, 2026-11-24: on a click the line's font changed to another one while typing and changed back on Enter ("why show font B at all?"); a letter the font lacks should be told while typing, with fonts to choose from; the flow must be well structured.
 
-**Reference.** Our research (`f16-pdf-editor-research.md`) records that Sejda opens the clicked text in its own stand-in font and replaces a missing font without saying so. We keep what is useful (the edit happens in place) and go further: the box is drawn in the document's own font, so nothing changes on screen; a missing character is told as it is typed; and the font chosen for it applies at once.
+**Reference.** Checked live on 2026-11-24 (17:01 UTC, headless Chromium, `tests/parity/editor/chrome-justified-mixed.pdf`, nothing applied or downloaded; images `designs/fonts/sejda/line-edit-1-opened.png` to `line-edit-5-after.png` in the project files):
+
+- Sejda edits one font run at a time, not a line: hovering the first line outlines only "This agreement is made between the", and the bold word after it is a separate piece.
+- A click opens that piece in place under a floating toolbar. On this file (embedded Liberation Serif subset) the text looked the same after the click, so the font swap our research records (`f16-pdf-editor-research.md`) did not show here; it is recorded there for files whose font Sejda can't use.
+- Typing " for Dvořák" at the end of the piece ran over the bold word that follows: the two overlap and can't be read, and they stay that way after clicking away. The text after the piece does not move.
+- Nothing was said about ř, which the subset doesn't have: no mark, no message, no fonts offered while typing.
+
+We keep what is useful (the edit happens in place) and go further: the whole line is one box drawn in the document's own fonts, so nothing changes on screen and what follows moves along as you type; a missing character is told as it is typed; and the font chosen for it applies at once.
 
 **How.** The engine hands over a document font's embedded program and where it keeps each character (`fontProgram`). `lib/font-library/embedded-face.ts` adds what a browser needs and a PDF leaves out (character map, name and metrics tables; an OpenType file around a bare CFF program), and the result is loaded as a font of the page only (`tools/editor/doc-face.ts`): nothing is fetched or sent, and it goes when another file is opened. Where a program can't be used (not embedded, Type 1, Type 3), the closest library font stands in, as before.
 
