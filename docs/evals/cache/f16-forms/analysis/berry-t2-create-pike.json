@@ -1,0 +1,354 @@
+{
+ "check": [],
+ "pages": 1,
+ "NeedAppearances": "None",
+ "fields_order": [
+  "member_type",
+  "accept_rules",
+  "full_name",
+  "city",
+  "pin",
+  "interests",
+  "signature",
+  "date",
+  "comments"
+ ],
+ "DR_fonts": {
+  "/Helv": {
+   "BaseFont": "/Helvetica",
+   "Subtype": "/Type1",
+   "embedded": false
+  }
+ },
+ "pages_info": [
+  {
+   "MediaBox": [
+    0.0,
+    0.0,
+    595.2756,
+    841.8898
+   ],
+   "CropBox": [
+    0.0,
+    0.0,
+    595.2756,
+    841.8898
+   ],
+   "Rotate": 0,
+   "Tabs": "/C",
+   "annots": [
+    {
+     "name": "member_type",
+     "FT": "/Btn",
+     "Ff": 32768,
+     "V": "/Off",
+     "DV": null,
+     "TU": null,
+     "MaxLen": null,
+     "Opt": [
+      "student",
+      "staff",
+      "guest"
+     ],
+     "AS": "/Off",
+     "Rect": [
+      70.9,
+      398.4,
+      84.9,
+      412.4
+     ],
+     "AP_N": "dict:/0,/Off",
+     "ap_fonts": [],
+     "DA": "0 0 0 rg\n/dummy__noop 0 Tf",
+     "Q": null,
+     "MK": {
+      "/R": "0"
+     },
+     "F": 4
+    },
+    {
+     "name": "accept_rules",
+     "FT": "/Btn",
+     "Ff": 2,
+     "V": "/Off",
+     "DV": null,
+     "TU": null,
+     "MaxLen": null,
+     "Opt": null,
+     "AS": "/Off",
+     "Rect": [
+      70.9,
+      364.6,
+      84.9,
+      378.6
+     ],
+     "AP_N": "dict:/Yes,/Off",
+     "ap_fonts": [],
+     "DA": "0 0 0 rg\n/dummy__noop 0 Tf",
+     "Q": null,
+     "MK": {
+      "/R": "0"
+     },
+     "F": 4
+    },
+    {
+     "name": "full_name",
+     "FT": "/Tx",
+     "Ff": 2,
+     "V": null,
+     "DV": null,
+     "TU": "Full name",
+     "MaxLen": null,
+     "Opt": null,
+     "AS": null,
+     "Rect": [
+      134.9,
+      721.9,
+      433.4,
+      739.9
+     ],
+     "AP_N": "stream",
+     "ap_fonts": [
+      "/Helvetica=/Helvetica"
+     ],
+     "DA": "0 0 0 rg\n/Helvetica 14 Tf",
+     "Q": 0,
+     "MK": {
+      "/R": "0"
+     },
+     "F": 4
+    },
+    {
+     "name": "city",
+     "FT": "/Ch",
+     "Ff": 131072,
+     "V": null,
+     "DV": null,
+     "TU": null,
+     "MaxLen": null,
+     "Opt": [
+      "Praha",
+      "Brno",
+      "Ostrava"
+     ],
+     "AS": null,
+     "Rect": [
+      100.4,
+      652.9,
+      395.1,
+      669.4
+     ],
+     "AP_N": "stream",
+     "ap_fonts": [
+      "/Helvetica=/Helvetica"
+     ],
+     "DA": "0 0 0 rg\n/Helvetica 13 Tf",
+     "Q": null,
+     "MK": {
+      "/R": "0"
+     },
+     "F": 4
+    },
+    {
+     "name": "pin",
+     "FT": "/Tx",
+     "Ff": 16777216,
+     "V": null,
+     "DV": null,
+     "TU": null,
+     "MaxLen": 6,
+     "Opt": null,
+     "AS": null,
+     "Rect": [
+      140.1,
+      574.9,
+      248.1,
+      593.6
+     ],
+     "AP_N": "stream",
+     "ap_fonts": [
+      "/Helvetica=/Helvetica"
+     ],
+     "DA": "0 0 0 rg\n/Helvetica 26 Tf",
+     "Q": 0,
+     "MK": {
+      "/R": "0"
+     },
+     "F": 4
+    },
+    {
+     "name": "interests",
+     "FT": "/Ch",
+     "Ff": 2097152,
+     "V": null,
+     "DV": null,
+     "TU": null,
+     "MaxLen": null,
+     "Opt": [
+      "Music",
+      "Sport",
+      "Books"
+     ],
+     "AS": null,
+     "Rect": [
+      383.9,
+      388.9,
+      481.4,
+      445.1
+     ],
+     "AP_N": "stream",
+     "ap_fonts": [
+      "/Helvetica=/Helvetica"
+     ],
+     "DA": "0 0 0 rg\n/Helvetica 16 Tf",
+     "Q": null,
+     "MK": {
+      "/R": "0"
+     },
+     "F": 4
+    },
+    {
+     "name": "member_type",
+     "FT": "/Btn",
+     "Ff": 32768,
+     "V": "/Off",
+     "DV": null,
+     "TU": null,
+     "MaxLen": null,
+     "Opt": [
+      "student",
+      "staff",
+      "guest"
+     ],
+     "AS": "/Off",
+     "Rect": [
+      181.1,
+      398.1,
+      195.1,
+      412.1
+     ],
+     "AP_N": "dict:/1,/Off",
+     "ap_fonts": [],
+     "DA": "0 0 0 rg\n/dummy__noop 0 Tf",
+     "Q": null,
+     "MK": {
+      "/R": "0"
+     },
+     "F": 4
+    },
+    {
+     "name": "member_type",
+     "FT": "/Btn",
+     "Ff": 32768,
+     "V": "/Off",
+     "DV": null,
+     "TU": null,
+     "MaxLen": null,
+     "Opt": [
+      "student",
+      "staff",
+      "guest"
+     ],
+     "AS": "/Off",
+     "Rect": [
+      291.4,
+      397.9,
+      305.4,
+      411.9
+     ],
+     "AP_N": "dict:/2,/Off",
+     "ap_fonts": [],
+     "DA": "0 0 0 rg\n/dummy__noop 0 Tf",
+     "Q": null,
+     "MK": {
+      "/R": "0"
+     },
+     "F": 4
+    },
+    {
+     "name": "signature",
+     "FT": "/Sig",
+     "Ff": 0,
+     "V": null,
+     "DV": null,
+     "TU": null,
+     "MaxLen": null,
+     "Opt": null,
+     "AS": null,
+     "Rect": [
+      73.4,
+      279.4,
+      270.6,
+      317.6
+     ],
+     "AP_N": "stream",
+     "ap_fonts": [
+      "/Helv=/Helvetica"
+     ],
+     "DA": null,
+     "Q": null,
+     "MK": {
+      "/BC": "pikepdf.Array([ Decimal('0.35294117647058826'), Decimal('0.35294117647058826'), Decimal('0.35294117647058826') ])",
+      "/R": "0"
+     },
+     "F": 4
+    },
+    {
+     "name": "date",
+     "FT": "/Tx",
+     "Ff": 0,
+     "V": null,
+     "DV": null,
+     "TU": null,
+     "MaxLen": null,
+     "Opt": null,
+     "AS": null,
+     "Rect": [
+      341.9,
+      279.4,
+      478.4,
+      295.1
+     ],
+     "AP_N": "stream",
+     "ap_fonts": [
+      "/Helvetica=/Helvetica"
+     ],
+     "DA": "0 0 0 rg\n/Helvetica 12 Tf",
+     "Q": 0,
+     "MK": {
+      "/R": "0"
+     },
+     "F": 4
+    },
+    {
+     "name": "comments",
+     "FT": "/Tx",
+     "Ff": 4096,
+     "V": null,
+     "DV": null,
+     "TU": null,
+     "MaxLen": null,
+     "Opt": null,
+     "AS": null,
+     "Rect": [
+      74.1,
+      460.1,
+      470.1,
+      520.9
+     ],
+     "AP_N": "stream",
+     "ap_fonts": [
+      "/Helvetica=/Helvetica"
+     ],
+     "DA": "0 0 0 rg\n/Helvetica 51 Tf",
+     "Q": 0,
+     "MK": {
+      "/BC": "pikepdf.Array([ Decimal('0.08235294117647059'), Decimal('0.396078431372549'), Decimal('0.7529411764705882') ])",
+      "/R": "0"
+     },
+     "F": 4
+    }
+   ]
+  }
+ ]
+}

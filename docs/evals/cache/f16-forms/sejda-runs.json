@@ -1,0 +1,8 @@
+{
+  "tasks": [
+    {"n":1,"what":"fill form-basic.pdf","apply_utc":"2026-11-24T16:03:27Z","output":"sejda-t1-fill.pdf","apply_to_ready_ms":null,"note":"ready time not captured (wrong locator); POST /api/tasks 1471 B"},
+    {"n":2,"what":"create fields on scan-form.pdf + tab order by columns","apply_utc":"2026-11-24T16:12:02Z","output":"sejda-t2-create.pdf","apply_to_ready_ms":4333,"apply_to_download_ms":5260},
+    {"n":3,"what":"detect on report-form-3p.pdf page 2","apply_utc":"2026-11-24T16:12:40Z","output":"sejda-t3-detect.pdf","apply_to_ready_ms":2300,"apply_to_download_ms":3459,"detect_ms":5090,"detect_msg":"Detected 7 form fields on page 2"}
+  ],
+  "load": {"landing_load_ms":1797,"upload_on_pick":"POST /api/files/upload immediately on pick"}
+}
