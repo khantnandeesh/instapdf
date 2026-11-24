@@ -1,0 +1,563 @@
+{
+ "pages": 1,
+ "fields": {
+  "member_type": [
+   {
+    "type": "",
+    "page": -1,
+    "name": "member_type"
+   },
+   {
+    "type": "radiobutton",
+    "value": "Off",
+    "defaultValue": "Off",
+    "page": 0,
+    "rect": [
+     71,
+     398,
+     85,
+     412
+    ],
+    "editable": true,
+    "exportValues": "student",
+    "hidden": false,
+    "name": "member_type"
+   },
+   {
+    "type": "radiobutton",
+    "value": "Off",
+    "defaultValue": "Off",
+    "page": 0,
+    "rect": [
+     181,
+     398,
+     195,
+     412
+    ],
+    "editable": true,
+    "exportValues": "staff",
+    "hidden": false,
+    "name": "member_type"
+   },
+   {
+    "type": "radiobutton",
+    "value": "Off",
+    "defaultValue": "Off",
+    "page": 0,
+    "rect": [
+     291,
+     398,
+     305,
+     412
+    ],
+    "editable": true,
+    "exportValues": "guest",
+    "hidden": false,
+    "name": "member_type"
+   }
+  ],
+  "accept_rules": [
+   {
+    "type": "",
+    "page": -1,
+    "name": "accept_rules"
+   },
+   {
+    "type": "checkbox",
+    "value": "Off",
+    "defaultValue": "Off",
+    "page": 0,
+    "rect": [
+     71,
+     365,
+     85,
+     379
+    ],
+    "editable": true,
+    "exportValues": "Yes",
+    "hidden": false,
+    "name": "accept_rules"
+   }
+  ],
+  "full_name": [
+   {
+    "type": "",
+    "page": -1,
+    "name": "full_name"
+   },
+   {
+    "type": "text",
+    "value": "",
+    "defaultValue": "",
+    "page": 0,
+    "rect": [
+     135,
+     722,
+     433,
+     740
+    ],
+    "editable": true,
+    "multiline": false,
+    "comb": false,
+    "charLimit": 0,
+    "hidden": false,
+    "name": "full_name"
+   }
+  ],
+  "city": [
+   {
+    "type": "",
+    "page": -1,
+    "name": "city"
+   },
+   {
+    "type": "combobox",
+    "value": null,
+    "defaultValue": null,
+    "page": 0,
+    "rect": [
+     100,
+     653,
+     395,
+     669
+    ],
+    "editable": true,
+    "items": [
+     {
+      "exportValue": "Praha",
+      "displayValue": "Praha"
+     },
+     {
+      "exportValue": "Brno",
+      "displayValue": "Brno"
+     },
+     {
+      "exportValue": "Ostrava",
+      "displayValue": "Ostrava"
+     }
+    ],
+    "multipleSelection": false,
+    "hidden": false,
+    "name": "city"
+   }
+  ],
+  "pin": [
+   {
+    "type": "",
+    "page": -1,
+    "name": "pin"
+   },
+   {
+    "type": "text",
+    "value": "",
+    "defaultValue": "",
+    "page": 0,
+    "rect": [
+     140,
+     575,
+     248,
+     594
+    ],
+    "editable": true,
+    "multiline": false,
+    "comb": true,
+    "charLimit": 6,
+    "hidden": false,
+    "name": "pin"
+   }
+  ],
+  "interests": [
+   {
+    "type": "",
+    "page": -1,
+    "name": "interests"
+   },
+   {
+    "type": "listbox",
+    "value": null,
+    "defaultValue": null,
+    "page": 0,
+    "rect": [
+     384,
+     389,
+     481,
+     445
+    ],
+    "editable": true,
+    "items": [
+     {
+      "exportValue": "Music",
+      "displayValue": "Music"
+     },
+     {
+      "exportValue": "Sport",
+      "displayValue": "Sport"
+     },
+     {
+      "exportValue": "Books",
+      "displayValue": "Books"
+     }
+    ],
+    "multipleSelection": true,
+    "hidden": false,
+    "name": "interests"
+   }
+  ],
+  "signature": [
+   {
+    "type": "",
+    "page": -1,
+    "name": "signature"
+   },
+   {
+    "type": "signature",
+    "value": null,
+    "page": 0
+   }
+  ],
+  "date": [
+   {
+    "type": "",
+    "page": -1,
+    "name": "date"
+   },
+   {
+    "type": "text",
+    "value": "",
+    "defaultValue": "",
+    "page": 0,
+    "rect": [
+     342,
+     279,
+     478,
+     295
+    ],
+    "editable": true,
+    "multiline": false,
+    "comb": false,
+    "charLimit": 0,
+    "hidden": false,
+    "name": "date"
+   }
+  ],
+  "comments": [
+   {
+    "type": "",
+    "page": -1,
+    "name": "comments"
+   },
+   {
+    "type": "text",
+    "value": "",
+    "defaultValue": "",
+    "page": 0,
+    "rect": [
+     74,
+     460,
+     470,
+     521
+    ],
+    "editable": true,
+    "multiline": true,
+    "comb": false,
+    "charLimit": 0,
+    "hidden": false,
+    "name": "comments"
+   }
+  ]
+ },
+ "annots": [
+  {
+   "page": 1,
+   "subtype": "Widget",
+   "fieldType": "Btn",
+   "fieldName": "member_type",
+   "fieldValue": "Off",
+   "alt": "",
+   "rect": [
+    71,
+    398,
+    85,
+    412
+   ],
+   "hasAppearance": true,
+   "hasOwnCanvas": true,
+   "readOnly": false,
+   "required": false,
+   "checkBox": false,
+   "radioButton": true,
+   "buttonValue": "student",
+   "rotation": 0,
+   "borderColor": null,
+   "backgroundColor": null,
+   "fontSize": 0
+  },
+  {
+   "page": 1,
+   "subtype": "Widget",
+   "fieldType": "Btn",
+   "fieldName": "accept_rules",
+   "fieldValue": "Off",
+   "alt": "",
+   "rect": [
+    71,
+    365,
+    85,
+    379
+   ],
+   "hasAppearance": true,
+   "hasOwnCanvas": true,
+   "readOnly": false,
+   "required": true,
+   "checkBox": true,
+   "radioButton": false,
+   "exportValue": "Yes",
+   "rotation": 0,
+   "borderColor": null,
+   "backgroundColor": null,
+   "fontSize": 0
+  },
+  {
+   "page": 1,
+   "subtype": "Widget",
+   "fieldType": "Tx",
+   "fieldName": "full_name",
+   "fieldValue": "",
+   "alt": "",
+   "rect": [
+    135,
+    722,
+    433,
+    740
+   ],
+   "hasAppearance": true,
+   "hasOwnCanvas": false,
+   "readOnly": false,
+   "required": true,
+   "comb": false,
+   "maxLen": 0,
+   "multiLine": false,
+   "rotation": 0,
+   "textAlignment": 0,
+   "borderColor": null,
+   "backgroundColor": null,
+   "fontSize": 14
+  },
+  {
+   "page": 1,
+   "subtype": "Widget",
+   "fieldType": "Ch",
+   "fieldName": "city",
+   "fieldValue": [],
+   "alt": "",
+   "rect": [
+    100,
+    653,
+    395,
+    669
+   ],
+   "hasAppearance": true,
+   "hasOwnCanvas": false,
+   "readOnly": false,
+   "required": false,
+   "combo": true,
+   "multiSelect": false,
+   "options": [
+    "Praha",
+    "Brno",
+    "Ostrava"
+   ],
+   "rotation": 0,
+   "borderColor": null,
+   "backgroundColor": null,
+   "fontSize": 13
+  },
+  {
+   "page": 1,
+   "subtype": "Widget",
+   "fieldType": "Tx",
+   "fieldName": "pin",
+   "fieldValue": "",
+   "alt": "",
+   "rect": [
+    140,
+    575,
+    248,
+    594
+   ],
+   "hasAppearance": true,
+   "hasOwnCanvas": false,
+   "readOnly": false,
+   "required": false,
+   "comb": true,
+   "maxLen": 6,
+   "multiLine": false,
+   "rotation": 0,
+   "textAlignment": 0,
+   "borderColor": null,
+   "backgroundColor": null,
+   "fontSize": 26
+  },
+  {
+   "page": 1,
+   "subtype": "Widget",
+   "fieldType": "Ch",
+   "fieldName": "interests",
+   "fieldValue": [],
+   "alt": "",
+   "rect": [
+    384,
+    389,
+    481,
+    445
+   ],
+   "hasAppearance": true,
+   "hasOwnCanvas": false,
+   "readOnly": false,
+   "required": false,
+   "combo": false,
+   "multiSelect": true,
+   "options": [
+    "Music",
+    "Sport",
+    "Books"
+   ],
+   "rotation": 0,
+   "borderColor": null,
+   "backgroundColor": null,
+   "fontSize": 16
+  },
+  {
+   "page": 1,
+   "subtype": "Widget",
+   "fieldType": "Btn",
+   "fieldName": "member_type",
+   "fieldValue": "Off",
+   "alt": "",
+   "rect": [
+    181,
+    398,
+    195,
+    412
+   ],
+   "hasAppearance": true,
+   "hasOwnCanvas": true,
+   "readOnly": false,
+   "required": false,
+   "checkBox": false,
+   "radioButton": true,
+   "buttonValue": "staff",
+   "rotation": 0,
+   "borderColor": null,
+   "backgroundColor": null,
+   "fontSize": 0
+  },
+  {
+   "page": 1,
+   "subtype": "Widget",
+   "fieldType": "Btn",
+   "fieldName": "member_type",
+   "fieldValue": "Off",
+   "alt": "",
+   "rect": [
+    291,
+    398,
+    305,
+    412
+   ],
+   "hasAppearance": true,
+   "hasOwnCanvas": true,
+   "readOnly": false,
+   "required": false,
+   "checkBox": false,
+   "radioButton": true,
+   "buttonValue": "guest",
+   "rotation": 0,
+   "borderColor": null,
+   "backgroundColor": null,
+   "fontSize": 0
+  },
+  {
+   "page": 1,
+   "subtype": "Widget",
+   "fieldType": "Sig",
+   "fieldName": "signature",
+   "fieldValue": null,
+   "alt": "",
+   "rect": [
+    73,
+    279,
+    271,
+    318
+   ],
+   "hasAppearance": true,
+   "hasOwnCanvas": false,
+   "readOnly": false,
+   "required": false,
+   "rotation": 0,
+   "borderColor": {
+    "0": 90,
+    "1": 90,
+    "2": 90
+   },
+   "backgroundColor": null,
+   "fontSize": 0
+  },
+  {
+   "page": 1,
+   "subtype": "Widget",
+   "fieldType": "Tx",
+   "fieldName": "date",
+   "fieldValue": "",
+   "alt": "",
+   "rect": [
+    342,
+    279,
+    478,
+    295
+   ],
+   "hasAppearance": true,
+   "hasOwnCanvas": false,
+   "readOnly": false,
+   "required": false,
+   "comb": false,
+   "maxLen": 0,
+   "multiLine": false,
+   "rotation": 0,
+   "textAlignment": 0,
+   "borderColor": null,
+   "backgroundColor": null,
+   "fontSize": 12
+  },
+  {
+   "page": 1,
+   "subtype": "Widget",
+   "fieldType": "Tx",
+   "fieldName": "comments",
+   "fieldValue": "",
+   "alt": "",
+   "rect": [
+    74,
+    460,
+    470,
+    521
+   ],
+   "hasAppearance": true,
+   "hasOwnCanvas": false,
+   "readOnly": false,
+   "required": false,
+   "comb": false,
+   "maxLen": 0,
+   "multiLine": true,
+   "rotation": 0,
+   "textAlignment": 0,
+   "borderColor": {
+    "0": 21,
+    "1": 101,
+    "2": 192
+   },
+   "backgroundColor": null,
+   "fontSize": 51
+  }
+ ]
+}

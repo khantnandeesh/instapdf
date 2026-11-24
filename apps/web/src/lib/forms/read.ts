@@ -13,6 +13,7 @@ import {
   PDFName,
   PDFNumber,
   PDFOptionList,
+  PDFStream,
   PDFRadioGroup,
   PDFRef,
   PDFSignature,
@@ -110,6 +111,13 @@ export function parseDA(da: string | undefined): { fontSize: number; color: stri
   return out;
 }
 
+/** Width from the old /Border [h v width] array, when the widget has no /BS. */
+function legacyBorderWidth(w: PDFWidgetAnnotation | undefined): number | undefined {
+  const b = w?.dict.lookup(N("Border"));
+  const width = b instanceof PDFArray ? b.lookup(2) : undefined;
+  return width instanceof PDFNumber ? width.asNumber() : undefined;
+}
+
 function styleOf(f: PDFField, w: PDFWidgetAnnotation | undefined): FieldStyle {
   const da = parseDA(f.acroField.getDefaultAppearance() ?? undefined);
   const mk = w?.getAppearanceCharacteristics();
@@ -122,7 +130,7 @@ function styleOf(f: PDFField, w: PDFWidgetAnnotation | undefined): FieldStyle {
     color: da.color,
     align,
     border: colorToHex(mk?.getBorderColor()),
-    borderWidth: bs?.getWidth() ?? 1,
+    borderWidth: bs?.getWidth() ?? legacyBorderWidth(w) ?? 1,
     background: colorToHex(mk?.getBackgroundColor()),
   };
 }
@@ -183,6 +191,8 @@ export function readForm(doc: PDFDocument, pages: FormPage[] = pagesOf(doc)): Fo
       // Annotation flags: Hidden (2) or NoView (32) widgets stay hidden in the editor, as viewers do.
       const flags = w.dict.lookup(N("F"));
       if (flags instanceof PDFNumber && flags.asNumber() & (2 | 32)) widget.hidden = true;
+      const ap = w.dict.lookup(N("AP"));
+      if (kind === "signature" && ap instanceof PDFDict && ap.lookup(N("N")) instanceof PDFStream) widget.drawn = true;
       widgets.push(widget);
       pageIndexOrder.push({ id, page: pi, annotIndex: ref ? (annotIndex.get(refKey(ref)) ?? 1e6) : 1e6 });
     });

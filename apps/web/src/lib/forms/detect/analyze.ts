@@ -430,7 +430,9 @@ export function analyzePage(input: AnalyzeInput): Found[] {
     const refH = left ? left.h : 12;
     let hPt = isSig ? 36 : Math.min(24, Math.max(14, refH * 1.35));
     const ceiling = freeAbove(g, ln, hPt * s, where === "above" ? null : left?.r ?? null, textPx);
-    hPt = Math.max(isSig ? 18 : 10, Math.min(hPt, pt(ceiling)));
+    // Stopped by ink above (a checkbox row, say): keep a small gap under it.
+    const room = pt(ceiling) < hPt ? pt(ceiling) - 4 : hPt;
+    hPt = Math.max(isSig ? 18 : 10, Math.min(hPt, room));
     const box = { x: pt(ln.x0), y: pt(ln.y) - hPt, w: pt(r.w), h: hPt };
     found.push({
       kind: isSig ? "signature" : "text",

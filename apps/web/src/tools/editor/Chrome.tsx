@@ -4,7 +4,7 @@
  * (< 1024), the view pill, the save and privacy chips, and each page's header row.
  * Icons only (Phosphor Bold, no boxes); names and shortcuts are in tooltips and accessible names.
  */
-import { FieldsChipSlot } from "@/tools/forms/EditorForms";
+import { FieldsChipSlot } from "@/tools/forms/lazy";
 import { useEffect, useLayoutEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { BerryMark } from "@/components/berry/Berry";
@@ -325,7 +325,7 @@ export function DownloadButton({ compact }: { compact?: boolean }) {
 export function TopBar({ wide, fileMenu, onClose }: { wide: boolean; fileMenu: MenuEntry[]; onClose: () => void }) {
   const ctl = useCtl();
   return (
-    <header className="ed-top ed-glass" data-region="top">
+    <header className="ed-top ed-glass" data-region="top" role="group" aria-label="Document">
       {wide ? (
         <Link href="/" className="ed-home" aria-label="BerryPDF home">
           <BerryMark size={28} />

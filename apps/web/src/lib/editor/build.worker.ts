@@ -43,6 +43,8 @@ const fonts = {
       return noto;
     },
     load: (file: string) => bytes(`/fonts/noto/${encodeURIComponent(file)}`),
+    // One font for form field text beyond WinAnsi (scripts/forms-font/merge.py).
+    forms: () => bytes("/fonts/forms/noto-sans-forms.woff"),
   },
 };
 
