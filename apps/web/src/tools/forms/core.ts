@@ -62,7 +62,7 @@ export function nudgeAfterDownload(ctl: Controller): number {
 }
 
 /** The control a field's element focuses, or null when it has none (read-only, inert). */
-const controlOf = (widgetId: string) => {
+export const controlOf = (widgetId: string) => {
   const el = document.querySelector<HTMLElement>(`.bf-field[data-w="${widgetId}"]`);
   if (!el || el.querySelector("[inert]")) return null;
   return el.querySelector<HTMLElement>("input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]):not(.bf-badge)");
@@ -83,8 +83,38 @@ export function fieldTab(ctl: Controller, e: Pick<KeyboardEvent, "key" | "shiftK
   const el = next ? controlOf(next) : null;
   if (!el) return false;
   el.focus({ preventScroll: true });
-  el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  revealField(el);
   return true;
+}
+
+/** The nearest ancestor that scrolls vertically, else the page. */
+function scrollerOf(el: HTMLElement): HTMLElement {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const oy = getComputedStyle(p).overflowY;
+    if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
+  }
+  return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+}
+
+/**
+ * Scrolls a field into the part of the screen the floating bars leave free: below the top bar (and
+ * the phone fill bar), above the view pill (G-21, G-25). A field already clear of them stays put.
+ */
+export function revealField(el: HTMLElement, smooth = true) {
+  const gap = 12;
+  let top = 0;
+  let bottom = window.innerHeight;
+  for (const c of document.querySelectorAll<HTMLElement>('[data-region="top"], [data-region="view"], .bf-peek')) {
+    const r = c.getBoundingClientRect();
+    if (!r.height || getComputedStyle(c).visibility === "hidden") continue;
+    if (r.top + r.height / 2 < window.innerHeight / 2) top = Math.max(top, r.bottom);
+    else bottom = Math.min(bottom, r.top);
+  }
+  const r = el.getBoundingClientRect();
+  if (r.top >= top + gap && r.bottom <= bottom - gap) return;
+  // Centre it in the free band; a field taller than the band lines up its top.
+  const want = r.height > bottom - top - 2 * gap ? r.top - (top + gap) : (r.top + r.bottom) / 2 - (top + bottom) / 2;
+  scrollerOf(el).scrollBy({ top: want, behavior: smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto" });
 }
 
 /**

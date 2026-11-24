@@ -137,9 +137,43 @@ test("AC-248: Tab follows a custom tab order and crosses pages without stopping 
   await expect(page.getByRole("radio", { name: "contact: Email" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(text("notes")).toBeFocused();
+  // The field Tab lands on is clear of the floating top bar and view pill (G-21).
+  await expect(async () => {
+    const box = (await text("notes").boundingBox())!;
+    const top = (await page.locator('[data-region="top"]').first().boundingBox())!;
+    const pill = await page.locator('[data-region="view"]').first().boundingBox();
+    expect(box.y).toBeGreaterThanOrEqual(top.y + top.height);
+    if (pill) expect(box.y + box.height).toBeLessThanOrEqual(pill.y);
+  }).toPass();
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Shift+Tab");
   await expect(page.getByRole("checkbox", { name: "agree" })).toBeFocused();
+});
+
+test("G-25: on a phone, the fill bar never covers the field being typed into", async ({ page }) => {
+  test.skip(page.viewportSize()!.width >= 1024, "the fill bar is for phones");
+  await open(page, await fillable());
+  const name = page.locator('.bf-field[data-kind="text"] input').first();
+  await name.focus();
+  const peek = page.locator(".bf-peek");
+  await expect(peek).toBeVisible();
+  await expect(async () => {
+    const bar = (await peek.boundingBox())!;
+    const box = (await name.boundingBox())!;
+    expect(box.y >= bar.y + bar.height || box.y + box.height <= bar.y, "the bar is clear of the field").toBe(true);
+  }).toPass();
+});
+
+test("G-23: an editable dropdown takes typed text as well as its options", async ({ page }) => {
+  const buffer = await readFile("tests/fixtures/forms/form-extra.pdf");
+  await open(page, { name: "form-extra.pdf", mimeType: "application/pdf", buffer });
+  const city = page.getByRole("combobox", { name: "city" });
+  await expect(city).toHaveValue("Pune");
+  await city.fill("Nagpur");
+  const out = await PDFDocument.load(await download(page));
+  const dd = out.getForm().getDropdown("city");
+  expect(dd.getSelected()).toEqual(["Nagpur"]);
+  expect(dd.isEditable()).toBe(true);
 });
 
 test("AC-233: required fields left empty become a nudge after Download, never a block", async ({ page }) => {

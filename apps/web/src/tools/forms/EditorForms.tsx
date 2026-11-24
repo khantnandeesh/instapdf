@@ -25,7 +25,7 @@ import { FieldsChip, FormToolOptions } from "./FormToolOptions";
 import { ReviewPill } from "./ReviewPill";
 import { TabOrderPanel } from "./TabOrderPanel";
 import "./forms.css";
-import { applyForm, fieldTab, formReady, formsOf, setUi } from "./core";
+import { applyForm, controlOf, fieldTab, formReady, formsOf, revealField, setUi } from "./core";
 
 const NO_FIELDS: FormField[] = [];
 
@@ -394,9 +394,37 @@ function FillPeek() {
     };
   }, [store]);
   const f = at && form?.fields.find((x) => x.id === at.field);
+  const bar = useRef<HTMLDivElement>(null);
+  // The bar must never cover the field being typed into (G-25): the field is scrolled below it,
+  // and a field that can't go lower (near the top of the file) gets the bar at the bottom instead.
+  useLayoutEffect(() => {
+    const el = at && controlOf(at.widget);
+    const b = bar.current;
+    if (!el || !b) return;
+    const vv = window.visualViewport;
+    const place = () => {
+      b.style.top = "";
+      const r = el.getBoundingClientRect();
+      // Layout box, not the bounding box: the bar slides in, so its transform is still moving.
+      const [top, h] = [b.offsetTop, b.offsetHeight];
+      if (r.top >= top + h + 4 || r.bottom <= top - 4) return;
+      const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+      b.style.top = `${Math.max(0, bottom - h - 8)}px`;
+    };
+    revealField(el);
+    place();
+    document.addEventListener("scroll", place, true);
+    vv?.addEventListener("resize", place);
+    vv?.addEventListener("scroll", place);
+    return () => {
+      document.removeEventListener("scroll", place, true);
+      vv?.removeEventListener("resize", place);
+      vv?.removeEventListener("scroll", place);
+    };
+  }, [at, f?.id]);
   if (!at || !f) return null;
   return (
-    <div className="bf-peek">
+    <div className="bf-peek" ref={bar}>
       <span className="bf-peek-name">{f.tooltip || f.name}</span>
       <span className="bf-peek-value">{String(f.value) || "\u00a0"}</span>
       <button
@@ -483,7 +511,10 @@ export function TabOrderTab() {
       onColumns={() => applyForm(ctl, sortByColumns(form, pages), "Sort tab order by columns")}
       onOriginal={() => applyForm(ctl, restoreOriginal(form), "Restore tab order")}
       onMove={(id, to) => applyForm(ctl, moveInOrder(form, id, to, pages), "Change tab order", `tab:${id}`)}
-      onFocusWidget={(id) => document.querySelector<HTMLElement>(`.bf-field[data-w="${id}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" })}
+      onFocusWidget={(id) => {
+        const el = document.querySelector<HTMLElement>(`.bf-field[data-w="${id}"]`);
+        if (el) revealField(el);
+      }}
     />
   );
 }
