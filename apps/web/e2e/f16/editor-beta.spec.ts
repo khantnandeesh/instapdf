@@ -98,14 +98,17 @@ test("edits a line, undoes it, edits it again, and downloads a PDF with the new 
   expect(sent, "nothing is uploaded").toEqual([]);
 });
 
-test("explains a character the font lacks", async ({ page }) => {
+test("a character the font lacks comes from the same open family, with nothing to explain (F24, AC-281)", async ({ page }) => {
   await open(page, "chrome-justified-mixed.pdf");
   const line = page.locator('[data-testid="line"][data-text="Service Agreement"]');
   await line.click();
   await page.getByTestId("line-input").fill("Supply Quote");
   await page.getByTestId("line-input").press("Enter");
-  await expect(page.getByTestId("editor-notice")).toContainText("This font has no");
-  await expect(line).toHaveCount(1);
+  await expect(page.locator('[data-testid="line"][data-text="Supply Quote"]')).toHaveCount(1, { timeout: 30_000 });
+  await expect(line).toHaveCount(0);
+  // The file's font is a library family: its own glyphs are used, so no notice and no error.
+  await expect(page.getByTestId("font-notice")).toHaveCount(0);
+  await expect(page.getByTestId("editor-notice")).toHaveCount(0);
 });
 
 test("edits text on a rotated page", async ({ page }) => {

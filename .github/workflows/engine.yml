@@ -65,6 +65,9 @@ jobs:
           # Built for size (profile wasm-shaping in crates/Cargo.toml) to stay inside the budget.
           cargo build -p berry-wasm --features shaping --target wasm32-unknown-unknown --profile wasm-shaping --locked
           wasm-bindgen target/wasm32-unknown-unknown/wasm-shaping/berry_wasm.wasm --out-dir berry-wasm/pkg --target web --out-name berry_engine_shaping
+          # The font matcher (F24): a third, small module loaded only when a match is needed.
+          cargo build -p berry-fontmatch-wasm --target wasm32-unknown-unknown --release --locked
+          wasm-bindgen target/wasm32-unknown-unknown/release/berry_fontmatch_wasm.wasm --out-dir berry-fontmatch-wasm/pkg --target web --out-name berry_fontmatch
       - name: WebAssembly smoke test and size budget
         run: |
           node berry-wasm/smoke.mjs
@@ -77,6 +80,8 @@ jobs:
           # The default module loads on every editor visit: it must not grow (see engine-manifest.test.ts).
           # 792,277 bytes locally; builds on other machines differ by a few dozen bytes.
           test "$(gzip -9 -c berry-wasm/pkg/berry_engine_bg.wasm | wc -c)" -le 793000
+          node berry-fontmatch-wasm/smoke.mjs
+          test "$(gzip -9 -c berry-fontmatch-wasm/pkg/berry_fontmatch_bg.wasm | wc -c)" -le 150000
       - name: PDFium oracle over the editor corpus
         run: |
           pip install --quiet pypdfium2==5.14.0 pikepdf==10.18.2 pillow==13.0.0 uharfbuzz==0.57.0

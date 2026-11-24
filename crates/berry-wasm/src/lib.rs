@@ -119,6 +119,15 @@ impl BerryDocument {
         self.engine.add_font(family, bold, italic, bytes.to_vec())
     }
 
+    /// Returns `{ bytes: Uint8Array, format, complete, glyphs }`.
+    #[wasm_bindgen(js_name = fontProgram)]
+    pub fn font_program(&mut self, font_object: u32, chars: &str) -> Result<JsValue, JsValue> {
+        let program = self.engine.font_program(font_object, chars).map_err(fail)?;
+        let out = to_js(&program)?;
+        js_sys::Reflect::set(&out, &"bytes".into(), &js_sys::Uint8Array::from(program.bytes.as_slice()))?;
+        Ok(out)
+    }
+
     /// Returns `{ bytes: Uint8Array, report }`.
     pub fn save(&mut self) -> Result<JsValue, JsValue> {
         let (bytes, report) = self.engine.save().map_err(fail)?;
