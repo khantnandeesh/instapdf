@@ -12,6 +12,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { FontInfo, PageText } from "@/lib/editor/berry-engine";
 import { cssFamily, faceOf, fileFor } from "@/lib/editor/fonts";
+import { isComplex } from "@/lib/editor/shaping";
 import { ensureFace, knownManifest, resolveFonts } from "@/lib/editor/fonts-browser";
 import { foldName } from "@/lib/font-library/client";
 import { cx } from "@/components/ui/cx";
@@ -48,7 +49,8 @@ function scan(el: HTMLElement, faces: Record<number, DocFace | null>, first: num
     for (let i = 0; i < s.length; ) {
       const cp = s.codePointAt(i)!;
       const ch = String.fromCodePoint(cp);
-      if (ch.trim()) {
+      // Letters of joined scripts are the engine's to judge on save: never asked about or marked here.
+      if (ch.trim() && !isComplex(cp)) {
         if (!face.asked.has(cp)) out.unasked.set(font, (out.unasked.get(font) ?? "") + ch);
         else if (!face.covered.has(cp)) {
           const r = document.createRange();
@@ -141,7 +143,8 @@ export function LineEditBox({
   const [paperColor, setPaperColor] = useState<string | null>(null);
   const [missing, setMissing] = useState<Scan["missing"]>(null);
   const [standIn, setStandIn] = useState<{ font: number; chars: string; ids: string[]; picked: string } | null>(null);
-  const [fit, setFit] = useState<CSSProperties | null>(null);
+  /** Spacing that fits the text to the line's length, per unit of zoom (so it holds when the page is zoomed). */
+  const [fit, setFit] = useState<{ word?: number; letter?: number } | null>(null);
   /** Where the first missing character stands in the box: the hint starts there. */
   const [missAt, setMissAt] = useState(0);
   /** What the browser's own rounding puts between the baseline asked for and the one drawn, at this size. */
@@ -281,7 +284,7 @@ export function LineEditBox({
         const spaces = (line.text.trim().match(/ /g) ?? []).length;
         const letters = [...line.text].length;
         fitted = Math.abs(diff) > 0.5 && Math.abs(diff) < length * 0.2 && (spaces > 0 || letters > 1);
-        if (fitted) setFit(spaces ? { wordSpacing: diff / spaces } : letters > 1 ? { letterSpacing: diff / letters } : null);
+        if (fitted) setFit(spaces ? { word: diff / spaces / scale } : { letter: diff / letters / scale });
       }
       // The caret goes where the click landed, once the text is at its final length.
       if (fitted) caretTodo.current = true;
@@ -386,7 +389,8 @@ export function LineEditBox({
           backgroundSize: layers.map((l) => l[2]).join(", "),
         }
       : null),
-    ...fit,
+    ...(fit?.word !== undefined ? { wordSpacing: fit.word * scale } : null),
+    ...(fit?.letter !== undefined ? { letterSpacing: fit.letter * scale } : null),
   };
   const settling = !ready || paperColor === null;
   const hintId = `ed-miss-${line.id}`;

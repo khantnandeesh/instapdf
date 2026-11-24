@@ -1252,9 +1252,8 @@
 .ed-input {
   box-sizing: border-box;
   width: max-content;
-  /* Clipped at the sides only: a descender may reach past a box drawn close to the next line. */
-  overflow-x: clip;
-  overflow-y: visible;
+  /* Text longer than the page scrolls inside the box as it is typed (the caret stays in view). */
+  overflow: hidden;
   white-space: pre;
   border: 0;
   /* Drawn as a PDF draws text: glyph after glyph, no kerning or ligatures of the browser's own. */

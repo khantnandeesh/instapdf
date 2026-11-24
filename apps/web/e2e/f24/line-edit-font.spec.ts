@@ -280,6 +280,34 @@ test("a typed letter the font lacks is marked as typed, with fonts to draw it; p
   expect(firstLabel).not.toBe(label);
 });
 
+test("text typed past the page's edge scrolls inside the box: the caret stays in view", async ({ page }) => {
+  await open(page, "report-form-3p.pdf");
+  const input = await edit(page, lineWith(page, "This report was made"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" and then a good many more words than the width of this page can hold on one line, typed to the very end");
+  const seen = await input.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    const caret = getSelection()!.getRangeAt(0).getBoundingClientRect();
+    return { inside: caret.right <= box.right + 1 && caret.left >= box.left - 1, scrolled: el.scrollLeft > 0, within: box.right <= window.innerWidth };
+  });
+  expect(seen).toEqual({ inside: true, scrolled: true, within: true });
+  await input.press("Escape");
+});
+
+test("a letter of a joined script typed into a Latin line doesn't turn the marks off", async ({ page }) => {
+  await open(page, "chrome-justified-mixed.pdf");
+  const input = await edit(page, lineWith(page, "and it stays in force"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ř");
+  await expect(input).toHaveAttribute("data-missing", /ř/);
+  await page.keyboard.type(" ש");
+  await page.waitForTimeout(600);
+  await expect(input).toHaveAttribute("data-missing", /ř/);
+  await expect(input).toHaveAttribute("data-face", "own");
+  await expect(page.getByTestId("line-missing")).toBeVisible();
+  await input.press("Escape");
+});
+
 test("a PDF's bare CFF font program becomes a font the browser loads, with the PDF's widths", async ({ page }) => {
   const cff = new Uint8Array(readFileSync("src/lib/font-library/__fixtures__/berry-test.cff"));
   const file = webFontFromProgram({

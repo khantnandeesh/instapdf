@@ -110,13 +110,16 @@ async function build(info: FontInfo, text: string, gen: number, prev: DocFace | 
  */
 export function docFace(info: FontInfo, text: string, known?: DocFace | null): Promise<DocFace | null> {
   if (info.object == null) return Promise.resolve(null);
-  const key = String(info.object);
+  // Joined scripts get a face of their own (a stand-in that can join letters): a font's Latin
+  // text keeps the document's own font and its record of what is missing.
+  const key = `${info.object}${needsShaping(text) ? "|joined" : ""}`;
   if (known && [...codePoints(text)].every((cp) => known.asked.has(cp))) return Promise.resolve(known);
   const gen = generation;
   const have = faces.get(key);
-  // A font that couldn't be made (null) is not tried again for this file.
+  // A font that couldn't be made (null) is not tried again for this file; a remake that fails
+  // keeps the font there was.
   const fresh = have
-    ? have.then((f) => (!f || [...codePoints(text)].every((cp) => f.asked.has(cp)) ? f : build(info, text, gen, f)))
+    ? have.then((f) => (!f || [...codePoints(text)].every((cp) => f.asked.has(cp)) ? f : build(info, text, gen, f).catch(() => f)))
     : build(info, text, gen, null);
   faces.set(key, fresh.catch(() => null));
   return faces.get(key)!;
