@@ -190,10 +190,15 @@ export function EditorShell(props: ShellProps) {
       const wide = matchMedia("(min-width: 1024px)").matches;
       const rt: Runtime = { name: props.name, password: props.password, hash: null, versions: initialVersions(props.bytes), pdf: props.pdf.doc, shown: 0, src, assets: {}, held: new Set(), clip: null, wasEncrypted: props.pdf.wasEncrypted };
       // Owner-restricted (no modify): read-only until the owner password is entered (U-E9). A file
-      // opened with its owner password is unlocked already.
-      const restricted = props.pdf.denied.includes("modify") && !(props.password && (await checkOwnerPassword(props.bytes.slice(), props.password).catch(() => false)));
-      if (!alive) return;
+      // opened with a password opens at once, read-only, and unlocks if that was the owner password
+      // (checked in the background: the check loads the download worker).
+      const restricted = props.pdf.denied.includes("modify");
       const store = createStore({ ...initialState(initialPages(src), wide), readOnly: restricted });
+      if (restricted && props.password)
+        void checkOwnerPassword(props.bytes.slice(), props.password).then(
+          (owner) => alive && owner && store.set({ readOnly: false }),
+          () => undefined,
+        );
       made = createController(store, rt, { announce: say, toast: showToast });
       setCtl(made);
       say(`${props.name} opened, ${src.length} ${src.length === 1 ? "page" : "pages"}`);
@@ -706,8 +711,14 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       const plan = planSession({ hash: rt.hash!, name: rt.name, history: h, versions: rt.versions, assets: plainAssets(rt.assets), written, keyOf, sweep: p.fresh });
       // Too big to keep even the last step: the last good record stays.
       if (!plan) return fail();
-      const ok = await writeSession(plan);
-      if (!ok) return fail();
+      const result = await writeSession(plan);
+      if (result === "stale" && !p.fresh) {
+        // Another tab swept blobs this page had written: write everything again, sweeping too.
+        written.clear();
+        p.fresh = true;
+        return save();
+      }
+      if (result !== "ok") return fail();
       p.fresh = false;
       plan.put.forEach(([k]) => written.add(k));
       plan.drop.forEach((k) => written.delete(k));

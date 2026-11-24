@@ -123,13 +123,14 @@ for (const [project, sizes] of [
         await expectClean(page, "editor open");
         await page.getByTestId("canvas").evaluate((el) => el.scrollTo(0, el.scrollHeight / 2));
         await expectClean(page, "editor scrolled");
-        // Phones: the pages sheet (the side panel in a sheet).
+        // Below 1024 px the pages panel is a sheet behind the page chip; from 1024 px there is no chip.
         const chip = page.getByTestId("page-chip");
-        if (await chip.isVisible()) {
+        if (width < 1024) {
+          await expect(chip).toBeVisible();
           await chip.click();
           await expect(page.getByRole("tab", { name: "Pages" })).toBeVisible();
           await expectClean(page, "pages sheet open");
-        }
+        } else await expect(chip).toHaveCount(0);
       });
 
       for (const tool of usable) {
