@@ -907,7 +907,7 @@ Numbered after the recording ACs (53–73) and the live-check ACs (74–84). The
 Designed 2026-11-24 in the forms thread. It builds on the E1 contract above: same rail, popover, context strip, snapping, undo and motion rules. Logic lives in `apps/web/src/lib/forms/`; the components go in `apps/web/src/tools/forms/` and plug into the editor shell after #25.
 
 ### U-F1. Entry points
-- **Form tool** (Phosphor `textbox`, key **F**): its own rail slot between Sign and Mark (pending the lead's confirmation; otherwise under More). On phones it joins the dock priority list after Sign.
+- **Form tool** (Phosphor `textbox`, key **F**): its own rail slot between Sign and Mark (lead's decision, 2026-11-24), which makes the rail 11 slots. On phones it lives in the **More** sheet, not the priority dock, since creating fields on a phone is rare and filling needs no tool.
 - **Filling never needs the Form tool.** With any tool, clicking a field of the file types into it (text, dropdown, list), toggles it (checkbox, radio) or opens the Sign dialog (signature field, which places the signature inside the field box). **Tab** and Shift+Tab move between fields in tab order, across pages.
 - When the file has fields, a one-line chip in the top bar reads "12 fields" and opens a "Next empty field" jump. When required fields are empty at Download, the chip turns to "2 required empty". Download still goes ahead; the chip is a nudge, not a block (AC-233).
 
@@ -946,11 +946,12 @@ Designed 2026-11-24 in the forms thread. It builds on the E1 contract above: sam
 - **While the panel is open, every field on the canvas shows its number in a badge.** Clicking fields in sequence renumbers them from the one clicked ("click to set order"). This beats a list-only dialog: the order is visible where the fields are.
 
 ### U-F7. Phone (390 × 844)
-The Form tool's options become the context strip: kinds as a scrollable-free 4 + ⋯ group, with Detect and Tab order in ⋯. The review pill is full width above the dock. Properties use the existing bottom sheet. No control is wider than the viewport (AC-98).
+The Form tool is reached from More. Its options become the context strip: 4 kinds plus ⋯, with Detect and Tab order inside ⋯. The review pill is full width above the dock. Properties use the existing bottom sheet. No control is wider than the viewport (AC-98).
 
 ### U-F8. UI acceptance criteria
 - **AC-248 (P0)** Fields of an opened file can be filled with any tool active: typing into text fields, picking in dropdowns and lists, and toggling checkboxes and radios. Tab and Shift+Tab follow the tab order across pages. The download carries the values (AC-231).
 - **AC-249 (P1)** With the Form tool, a drag creates the chosen kind at the dragged box, and a click creates the default size. The field is selected with its properties popover open, and Delete, nudge keys, duplicate, snapping and undo work as for other objects.
 - **AC-250 (P1)** The Detect review pill shows the count, steps through proposals, and accepts or discards one or all. Accept all is one undo step. Cancel during the run stops it and leaves no proposals.
 - **AC-251 (P1)** With the Tab order panel open, every field shows its number on the canvas, and dragging a chip in the list renumbers the badges at once.
+- **AC-253 (P0)** The 11-slot rail fits the first screen at 1366×657 with no scroll (spacing tightens on short screens; Form keeps its place), asserted in the viewport-fit e2e with a screenshot. At 390×844 the dock keeps its E1 count and Form is in More.
 - **AC-252 (P1)** Field shading, outlines, name tags, badges and proposal outlines never appear in the downloaded file (render diff of an untouched page area against the source).
