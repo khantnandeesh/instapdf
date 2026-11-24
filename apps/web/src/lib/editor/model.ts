@@ -241,8 +241,35 @@ export function keepOnPage(o: EditorObject, page: Size, reflow?: (t: TextObj, wr
     const x = Math.min(Math.max(0, t.x), page.w - least);
     const room = page.w - x;
     t = t.w > room ? reflow({ ...t, x }, room) : { ...t, x };
-  }
+  } else if (t.kind === "text" && t.rot && reflow) t = wrapRotated(t, page, reflow, margin);
   return fitToPage([t], page, margin)[0];
+}
+
+/**
+ * A rotated text box past the page edge wraps too, rather than shrinking: its first corner (where
+ * the text starts) stays put, and the widest wrap, down to a few words, that keeps the box on the
+ * page wins. If none does from there, the widest wrap whose size fits the page is kept and
+ * fitToPage slides it in; if none fits at all, the box is left as it was (fitToPage shrinks it).
+ */
+function wrapRotated(t: TextObj, page: Size, reflow: (t: TextObj, wrap: number) => TextObj, margin: number): TextObj {
+  // fitToPage slides a box on without shrinking it only when it fits inside its margins.
+  const m = 2 * Math.min(margin, page.w / 4, page.h / 4);
+  const [ax, ay] = rotatedCorners(t, t.rot)[0];
+  const at = (w: number): TextObj => {
+    const r = reflow(t, w);
+    const [cx, cy] = rotatedCorners(r, t.rot)[0];
+    return { ...r, x: r.x + ax - cx, y: r.y + ay - cy };
+  };
+  const least = Math.min(t.w, t.size * 8);
+  const steps = 24;
+  let sized: TextObj | null = null;
+  for (let i = 1; i <= steps && t.w > least; i++) {
+    const r = at(t.w - ((t.w - least) * i) / steps);
+    const b = objectBounds(r);
+    if (insidePage(b, page)) return r;
+    if (!sized && b.w <= page.w - m && b.h <= page.h - m) sized = r;
+  }
+  return sized ?? t;
 }
 
 function unionOf(bs: Box[]): Box {

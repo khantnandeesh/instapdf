@@ -120,6 +120,25 @@ describe("keepOnPage", () => {
     expect(r.x).toBeCloseTo(612 - 96);
     expect(insidePage(objectBounds(r), page)).toBe(true);
   });
+  it("wraps a rotated box past the edge instead of shrinking it, its first corner kept", async () => {
+    const { rotatedCorners } = await import("./model");
+    const t = text({ x: 380, y: 300, rot: 30 });
+    expect(inside(t)).toBe(false);
+    const r = keepOnPage(t, page, reflow) as TextObj;
+    expect(r.size).toBe(12);
+    expect(r.lines.length).toBeGreaterThan(1);
+    expect(inside(r)).toBe(true);
+    const [a, b] = [rotatedCorners(t, 30)[0], rotatedCorners(r, 30)[0]];
+    expect(b[0]).toBeCloseTo(a[0]);
+    expect(b[1]).toBeCloseTo(a[1]);
+  });
+  it("wraps rotated text longer than the page, then slides it on", () => {
+    const long = "x".repeat(200);
+    const r = keepOnPage(text({ x: 100, y: 300, rot: 90, text: long, lines: [long], w: 1200 }), page, reflow) as TextObj;
+    expect(r.size).toBe(12);
+    expect(r.lines.length).toBeGreaterThan(1);
+    expect(inside(r)).toBe(true);
+  });
   it("shrinks a signature dragged or resized past the page", () => {
     const r = keepOnPage(sig({ x: -100, w: 1000, h: 80 }), page);
     expect(insidePage(objectBounds(r), page)).toBe(true);
