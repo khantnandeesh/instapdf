@@ -338,16 +338,6 @@ impl Engine {
         };
 
         // 4. Lay the new text out with the bidi algorithm, then draw each word.
-        // Page fonts whose own ToUnicode can take entries for codes it lacks (see
-        // `extend_to_unicode`).
-        let ext: HashSet<usize> = (0..pc.fonts.len())
-            .filter(|&fi| {
-                let f = &pc.fonts[fi];
-                f.kind != crate::font::FontKind::Type3
-                    && f.has_to_unicode()
-                    && f.object_id.and_then(|id| self.own_to_unicode(id)).is_some()
-            })
-            .collect();
         let spans_on_line = line.glyphs.iter().any(|&g| pc.glyphs[g].span.is_some());
         let mut pieces: Vec<Piece> = Vec::new();
         let mut missing = String::new();
@@ -435,20 +425,13 @@ impl Engine {
                 // Whether readers get the word from the glyphs' own Unicode mappings. Right-to-left
                 // words skip ActualText when they can: PDFium reverses right-to-left ActualText.
                 let folded = script::canonical_marks(&script::fold_presentation(part));
-                let plain_ok = |glyphs: &[NewGlyph]| plain_reading(&pc, &ext, glyphs, run_rtl) == folded;
+                let plain_ok = |glyphs: &[NewGlyph]| plain_reading(&pc, glyphs, run_rtl) == folded;
                 // Left-to-right page glyphs (digits, Latin) whose ToUnicode reads wrong move to the
                 // font's sibling, when the text of every glyph is known. A right-to-left word keeps
                 // preferring a registered face (below).
-                // (Their page glyphs carry no text, so no ToUnicode entry is added for them.)
-                let readable_glyphs = |mut glyphs: Vec<NewGlyph>| {
-                    if run_rtl {
-                        glyphs.iter_mut().for_each(|g| g.text.clear());
-                        return glyphs;
-                    }
-                    match sibling(&pc, &glyphs) {
-                        Some(s) if !plain_ok(&glyphs) && plain_ok(&s) => s,
-                        _ => glyphs,
-                    }
+                let readable_glyphs = |glyphs: Vec<NewGlyph>| match sibling(&pc, &glyphs) {
+                    Some(s) if !run_rtl && !plain_ok(&glyphs) && plain_ok(&s) => s,
+                    _ => glyphs,
                 };
                 let word = |glyphs: Vec<NewGlyph>, face| {
                     let actual = !plain_ok(&glyphs) || (spans_on_line && !run_rtl);
@@ -536,7 +519,7 @@ impl Engine {
         // pdf.js ignores ActualText and pdfium reorders it, so in a line with right-to-left text a
         // word that reads as typed only through ActualText is refused; "Replace with new text"
         // covers it. (Digits an Arabic subset draws but does not map read by their glyphs through
-        // a ToUnicode entry added to the font or a sibling font, above.) A word drawn in another font is kept: pdfium reads it in place, while pdf.js, which
+        // a sibling font, above.) A word drawn in another font is kept: pdfium reads it in place, while pdf.js, which
         // puts a line's text items in content order, can read it out of order (crates/README.md).
         // A line already drawn with ActualText spans (Chrome's output) is left out: neither reader
         // reads it by its glyphs before the edit either.
@@ -657,7 +640,7 @@ impl Engine {
         // (pdfium, pdf.js). The editor then offers "Replace with new text".
         let snapshot = (self.doc.max_id, self.dirty.clone(), self.embeds.clone());
         let mut backup: Vec<(ObjectId, Option<Object>)> = Vec::new();
-        let outcome = self.emit(page_id, &ctx, &pieces, &ext, &lists, &mut backup).and_then(|drawn| {
+        let outcome = self.emit(page_id, &ctx, &pieces, &lists, &mut backup).and_then(|drawn| {
             let none = (Vec::new(), Vec::new());
             let ((items, expect), (tail_items, tail_expect)) = (&drawn[0], drawn.get(1).unwrap_or(&none));
             self.apply_items(page_id, &pc, &plan, (items, tail_items), new_width, &mut backup)?;
@@ -732,7 +715,6 @@ impl Engine {
         page_id: ObjectId,
         ctx: &Ctx,
         pieces: &[Piece],
-        ext: &HashSet<usize>,
         lists: &[Vec<usize>],
         backup: &mut Vec<(ObjectId, Option<Object>)>,
     ) -> Result<Vec<(Vec<Item>, Vec<Expect>)>> {
@@ -771,30 +753,6 @@ impl Engine {
                     per_sibling[i].1.push((g.code, g.text.clone()));
                 }
             }
-        }
-        // Entries for codes the page fonts' ToUnicode maps lack.
-        let mut per_font: Vec<(usize, Vec<(u32, String)>)> = Vec::new();
-        for g in pieces.iter().flat_map(piece_glyphs) {
-            let Some(fi) = extends(pc, ext, g) else { continue };
-            let i = match per_font.iter().position(|(x, _)| *x == fi) {
-                Some(i) => i,
-                None => {
-                    per_font.push((fi, Vec::new()));
-                    per_font.len() - 1
-                }
-            };
-            match per_font[i].1.iter().find(|(c, _)| *c == g.code) {
-                Some((_, t)) if *t != g.text => {
-                    return Err(verify("text-mismatch", format!("one glyph would stand for both {t:?} and {:?}", g.text)));
-                }
-                Some(_) => {}
-                None => per_font[i].1.push((g.code, g.text.clone())),
-            }
-        }
-        for (fi, map) in &per_font {
-            let f = &pc.fonts[*fi];
-            let id = f.object_id.ok_or_else(|| limit("inline-font"))?;
-            self.extend_to_unicode(id, if f.two_byte { 2 } else { 1 }, map, backup)?;
         }
         // A sibling of a Type 0 font also declares the widths of its codes the font leaves to
         // `/DW` (glyphs the subset never drew), from the program, so readers advance by the real
@@ -958,11 +916,10 @@ fn runs_of(pieces: &[Piece]) -> (Vec<Run>, f64) {
 
 /// The text a reader gets from the glyphs' own Unicode mappings, in logical order: left to
 /// right, or right to left for a right-to-left run (as readers reorder Word-style files).
-fn plain_reading(pc: &PageContent, ext: &HashSet<usize>, glyphs: &[NewGlyph], rtl: bool) -> String {
+fn plain_reading(pc: &PageContent, glyphs: &[NewGlyph], rtl: bool) -> String {
     let mut parts: Vec<String> = glyphs
         .iter()
         .map(|g| match g.font {
-            GlyphFont::Page(_) if extends(pc, ext, g).is_some() => g.text.clone(),
             GlyphFont::Page(fi) => pc.fonts[fi].reader_unicode(g.code).unwrap_or_else(|| "\u{FFFD}".into()),
             // PDFium reads a right-to-left glyph mapped to nothing as U+FFFE: such a word
             // needs ActualText.
@@ -974,23 +931,6 @@ fn plain_reading(pc: &PageContent, ext: &HashSet<usize>, glyphs: &[NewGlyph], rt
         parts.reverse();
     }
     script::canonical_marks(&script::fold_presentation(&parts.concat()))
-}
-
-/// For a page glyph its font's ToUnicode has no entry for, when that ToUnicode can take one
-/// (`ext`) and the glyph's text is known: the font, which gets the entry when the edit is drawn.
-/// Readers showed such a code as its raw value, so the entry changes no text already there.
-fn extends(pc: &PageContent, ext: &HashSet<usize>, g: &NewGlyph) -> Option<usize> {
-    let GlyphFont::Page(fi) = g.font else { return None };
-    let f = &pc.fonts[fi];
-    let width = if f.two_byte { 2 } else { 1 };
-    // A code without a declared width as well is left to the sibling: a width added here would
-    // move any other text drawn with it.
-    (ext.contains(&fi)
-        && !g.text.is_empty()
-        && !f.maps_code(g.code)
-        && f.declares_width(g.code)
-        && f.code_bytes(g.code).len() == width)
-        .then_some(fi)
 }
 
 /// The glyphs a piece draws.

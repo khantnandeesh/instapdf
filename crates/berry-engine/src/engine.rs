@@ -312,7 +312,7 @@ fn deref<'a>(doc: &'a Document, o: &'a Object) -> &'a Object {
     doc.dereference(o).map(|(_, o)| o).unwrap_or(o)
 }
 
-pub(crate) fn count_refs(doc: &Document, target: ObjectId) -> usize {
+fn count_refs(doc: &Document, target: ObjectId) -> usize {
     fn walk(o: &Object, target: ObjectId, n: &mut usize) {
         match o {
             Object::Reference(id) if *id == target => *n += 1,
@@ -1357,58 +1357,6 @@ impl Engine {
             SourceKind::Page => None,
         };
         self.add_resource(page_id, form, b"Font", "BE", font_id, backup)
-    }
-
-    /// The ToUnicode stream of the font `font_id` when new entries can be added to it: a stream
-    /// of its own (no other object refers to it) that ends its CMap with `endcmap`.
-    #[cfg(feature = "shaping")]
-    pub(crate) fn own_to_unicode(&self, font_id: ObjectId) -> Option<ObjectId> {
-        let Ok(Object::Reference(id)) = self.doc.get_dictionary(font_id).ok()?.get(b"ToUnicode") else { return None };
-        let data = self
-            .doc
-            .get_object(*id)
-            .ok()?
-            .as_stream()
-            .ok()?
-            .get_plain_content_with_limit(crate::interp::MAX_STREAM_BYTES)
-            .ok()?;
-        (count_refs(&self.doc, *id) == 1 && data.windows(7).any(|w| w == b"endcmap")).then_some(*id)
-    }
-
-    /// Adds `map`'s codes (`width` bytes each; codes the map does not have yet) to the font's
-    /// own ToUnicode (see [`Self::own_to_unicode`]). Text already in the font reads as before:
-    /// its codes had no entry, so readers showed them as raw codes.
-    #[cfg(feature = "shaping")]
-    pub(crate) fn extend_to_unicode(
-        &mut self,
-        font_id: ObjectId,
-        width: usize,
-        map: &[(u32, String)],
-        backup: &mut Vec<(ObjectId, Option<Object>)>,
-    ) -> Result<()> {
-        let id = self.own_to_unicode(font_id).ok_or_else(|| limit("to-unicode"))?;
-        let mut data = self
-            .doc
-            .get_object(id)
-            .and_then(|o| o.as_stream())
-            .map_err(|_| limit("to-unicode"))?
-            .get_plain_content_with_limit(crate::interp::MAX_STREAM_BYTES)
-            .map_err(|_| limit("to-unicode"))?;
-        let at = data.windows(7).rposition(|w| w == b"endcmap").ok_or_else(|| limit("to-unicode"))?;
-        let mut block = String::from("\n");
-        for chunk in map.chunks(100) {
-            block.push_str(&format!("{} beginbfchar\n", chunk.len()));
-            for (code, text) in chunk {
-                let t: String = text.encode_utf16().map(|u| format!("{u:04X}")).collect();
-                block.push_str(&format!("<{code:0w$X}> <{t}>\n", w = 2 * width));
-            }
-            block.push_str("endbfchar\n");
-        }
-        data.splice(at..at, block.into_bytes());
-        self.touch(id, backup);
-        self.doc.objects.insert(id, Object::Stream(new_stream(data)));
-        self.cache.clear();
-        Ok(())
     }
 
     /// A sibling of the font `font_id`: a copy of its dictionary (same program, widths and

@@ -57,8 +57,8 @@ codebase that runs as WebAssembly in the browser and natively for the consented 
    Arabic, which readers reorder with their own bidi rules), the edit is refused
    (`text-mismatch`), not wrapped in ActualText. In a line with right-to-left text that reads by
    its glyphs, a new word that would need ActualText is refused the same way, since pdf.js
-   ignores ActualText; digits an Arabic subset draws but does not map get a ToUnicode entry or a
-   sibling font instead (see Known limits). Two more cases PDFium orders differently from
+   ignores ActualText; digits an Arabic subset draws but does not map go through a sibling font
+   instead (see Known limits). Two more cases PDFium orders differently from
    UAX #9 (the engine's read-back) are refused the same way in a right-to-left line:
    punctuation typed next to punctuation
    ("تجريبي." + "، نعم" reads "تجريبي،. نعم"; also ".!", ": ", ", "), and a left-to-right run
@@ -110,22 +110,23 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
   order (checked for AC-205 and an appended Arabic word); refusing them would refuse most
   Arabic word edits on such files, so they are kept. This is a pdf.js-only limit: every kept edit
   must read correctly in PDFium, and the cases where PDFium reorders are refused (above).
-- A digit (or other left-to-right text) typed into an Arabic line reads by its glyphs, with no
-  ActualText, in three ways:
+- A digit (or - A digit (or other left-to-right text) typed into an Arabic line reads by its glyphs, with no
+  ActualText, in two ways:
   - the line's font maps the digit in its ToUnicode: drawn in place;
-  - the font draws it but its ToUnicode has no entry for the code, while its widths declare it:
-    the entry is added to the font's own ToUnicode (readers showed that code as a raw value, so
-    no text already there reads differently) and the digit is drawn in place;
-  - otherwise (the code maps to other text, has no declared width, or the ToUnicode is shared):
-    the digits are drawn through a *sibling* font, a copy of the font's dictionary with the same
-    program and its own ToUnicode for just the codes it draws (a Type 0 sibling also declares
-    their widths, from the program, in a copy of its CIDFont). The sibling is a text item of its
-    own, so in a right-to-left line it is drawn after the line's last glyph, where pdf.js reads it
-    in logical order; that works when the new text ends the line (oracle case
-    `plain-arabic-digits-unmapped-at-end`). Inside the line no content order reads right in
-    pdf.js, so the edit is refused (`text-mismatch`; oracle case `plain-arabic-number-unmapped`,
-    "2500" → "3750" on scripts-plain.pdf, whose subset has no width for "3").
-  Tests: crates/berry-engine/tests/font_mapping.rs, and pdfium and pdf.js read-back in
+  - otherwise (no entry for the code, or an entry for other text): the digits are drawn through a
+    *sibling* font, a copy of the font's dictionary with the same program and its own ToUnicode
+    for just the codes it draws (a Type 0 sibling also declares their widths, from the program,
+    in a copy of its CIDFont). The font's own ToUnicode is never changed: other pages, forms and
+    text may share it, and a new entry would change how they read. The sibling is a text item of
+    its own, so in a right-to-left line it is drawn after the line's last glyph, where pdf.js
+    reads it in logical order; that works when the new text ends the line (oracle case
+    `plain-arabic-digits-unmapped-at-end`). Anywhere else in the line (inside it, or at its
+    start) no content order reads right in pdf.js, so the edit is refused (`text-mismatch`;
+    oracle case `plain-arabic-number-unmapped`, "2500" → "3750" on scripts-plain.pdf, whose
+    subset has no width for "3"). pdf.js drops the space between the line and the sibling's
+    digits ("تجريبي.2024"), as it does at any change of font and direction there; PDFium and
+    copy and paste keep it. Each such edit makes a new sibling (reusing one is a follow-up).
+s/berry-engine/tests/font_mapping.rs, and pdfium and pdf.js read-back in
   apps/web/src/lib/editor/mixed-direction.test.ts.
 - Lines already drawn with ActualText spans (Chrome and LibreOffice Arabic) are not covered by
   the ActualText refusal: neither reader reads them by their glyphs before an edit either.

@@ -1,10 +1,9 @@
 //! New glyphs a page font draws but its ToUnicode maps wrong or not at all (digits typed into an
 //! Arabic line whose subset never used them). Readers that go by the glyphs (PDFium, pdf.js,
-//! copy and paste) must read the edit as typed with no ActualText: the engine adds the missing
-//! entries to the font's own ToUnicode when that changes no other text, and otherwise draws the
-//! glyphs through a sibling font (same program, its own ToUnicode for just those glyphs) at the
-//! line's logical end. pdfium and pdf.js read-back of the saved files is checked in apps/web
-//! (mixed-direction.test.ts).
+//! copy and paste) must read the edit as typed with no ActualText: the engine draws such glyphs
+//! through a sibling font (same program, its own ToUnicode for just those glyphs) at the line's
+//! logical end, and never changes the font's own ToUnicode, which other text may share. pdfium
+//! and pdf.js read-back of the saved files is checked in apps/web (mixed-direction.test.ts).
 #![cfg(feature = "shaping")]
 
 use berry_engine::{Engine, Error, PageText};
@@ -129,15 +128,17 @@ fn unmapped_digit_at_line_end_uses_a_sibling() {
     assert_eq!(w[w.len() - 2].as_i64().unwrap(), 0x76);
 }
 
-/// A code the ToUnicode lacks but `/W` declares gets its entry in the font's own ToUnicode: no
-/// new font. Other readers showed the text already drawn with it ("2500") as raw codes, so the
-/// entry only adds a reading.
+/// A code the ToUnicode lacks but `/W` declares also goes through a sibling: the font's own
+/// ToUnicode is left byte for byte as it was, since another page or form may draw with it.
 #[test]
-fn unmapped_code_with_a_width_is_added_to_the_fonts_own_map() {
-    let doc = append(plain_with_to_unicode("<0072> <0030>\n", ""), "مرحبا", " 20");
-    let (font, tu) = arabic_font(&doc);
-    assert_eq!(stream_text(&doc, tu).lines().filter(|l| *l == "<0072> <0030>").count(), 1);
-    assert!(other_to_unicode(&doc, font).iter().all(|(_, t)| !t.contains("<0072>")), "a sibling was made");
+fn unmapped_code_with_a_width_uses_a_sibling() {
+    let bytes = plain_with_to_unicode("<0072> <0030>\n", "");
+    let before = Document::load_mem(&bytes).unwrap();
+    let (font, tu) = arabic_font(&before);
+    let doc = append(bytes, "مرحبا", " 20");
+    assert_eq!(stream_text(&doc, tu), stream_text(&before, tu), "the font's own ToUnicode changed");
+    let siblings = other_to_unicode(&doc, font);
+    assert!(siblings.iter().any(|(_, t)| t.contains("<0072> <0030>")), "{siblings:?}");
 }
 
 /// A code the ToUnicode maps to other text (an Arabic-Indic zero for the Latin zero glyph) keeps
