@@ -157,46 +157,55 @@ export function Catalogue() {
           </h2>
         </div>
 
-        {/* Sticky search bar (design rule "Sticky search and filter bars"): the search and
-            the jump chips scroll with the page until they reach the header, then stay pinned under it
-            while the list scrolls, and drop back into place on the way up. A sentinel just above it
-            tells when it is stuck (data-stuck). The bar itself is fully transparent (owner, 2026-11-24). */}
+        {/* Sticky search bar (design rule "Sticky search and filter bars"): only the search pins under the header
+            while the list scrolls (owner, 2026-11-24); the ready-only filter and the jump chips scroll away with
+            the content. Pinned, the field grows a little and stays centred. A sentinel just above it tells when it
+            is stuck (data-stuck). The strip is fully transparent and lets clicks through beside the field. */}
         <div ref={stickSentinel} aria-hidden="true" className="mt-6 h-px" />
-        <div ref={stickBar} data-stuck={stuck ? "" : undefined} className="ip-sticky-bar sticky top-(--ip-header-h) z-10 -mx-[15px] px-[15px] pb-2" data-testid="catalogue-bar">
-          {/* Phones: search and the filter share one row (short label) so the pinned bar stays compact. */}
-          <div className="mx-auto flex max-w-[957px] items-center justify-center gap-x-3 gap-y-2 pt-2 max-sm:flex-nowrap sm:flex-wrap sm:gap-x-5">
-            <SearchField
-              ref={searchRef}
-              id={CATALOGUE_SEARCH_ID}
-              label={copy.searchLabel}
-              hideLabel
-              size="lg"
-              value={query}
-              onChange={updateQuery}
-              onEscape={() => updateQuery("")}
-              placeholder={copy.searchPlaceholder}
-              shortcutHint
-              className="min-w-0 max-sm:flex-1 sm:w-full md:max-w-[480px] md:flex-1"
-            />
-            <Switch
-              id="ready-only"
-              label={copy.readyOnly}
-              shortLabel={copy.readyOnlyShort}
-              // The bar is transparent (owner), so the label carries its own pill like the search field and
-              // chips do: cards scrolling under it never sit behind its text.
-              className="shrink-0 rounded-pill border-[1.5px] border-sand bg-surface-raised ps-4 pe-1.5"
-              checked={readyOnly}
-              onChange={(v) => {
-                userChanged.current = true;
-                setReadyOnly(v);
-              }}
-            />
-          </div>
-          <LiveRegion message={live} />
+        <div
+          ref={stickBar}
+          data-stuck={stuck ? "" : undefined}
+          className="ip-sticky-bar group pointer-events-none sticky top-(--ip-header-h) z-10 flex justify-center py-2"
+          data-testid="catalogue-bar"
+        >
+          <SearchField
+            ref={searchRef}
+            id={CATALOGUE_SEARCH_ID}
+            label={copy.searchLabel}
+            hideLabel
+            size="lg"
+            value={query}
+            onChange={updateQuery}
+            onEscape={() => updateQuery("")}
+            placeholder={copy.searchPlaceholder}
+            shortcutHint
+            className="pointer-events-auto w-full md:max-w-[480px] md:transition-[max-width] md:duration-200 md:ease-out motion-reduce:transition-none md:group-data-stuck:max-w-[540px]"
+          />
+        </div>
+        <LiveRegion message={live} />
 
+        {/* Filter and jump chips: not pinned. Below 1024 px the filter leads the chip row (the chips scroll
+            sideways beside it); from 1024 px the filter sits in the search row, right of the centred field, and
+            the chips wrap centred below. */}
+        <div className="relative mt-1 flex items-center gap-3 lg:block" data-testid="catalogue-filters">
+          <Switch
+            id="ready-only"
+            label={copy.readyOnly}
+            shortLabel={copy.readyOnlyShort}
+            // The ground is transparent (owner), so the label carries its own pill like the search field and
+            // chips do. From 1024 px it sits in the search row, above the z-10 strip (which gets a Canvas ground
+            // in forced colours) and below the header (z 20); nowrap keeps the pill one line at 1024 px with a
+            // classic scroll bar.
+            className="shrink-0 rounded-pill border-[1.5px] border-sand bg-surface-raised ps-4 pe-1.5 lg:absolute lg:z-[11] lg:start-[calc(50%+290px)] lg:whitespace-nowrap lg:bottom-[calc(100%+14px)]"
+            checked={readyOnly}
+            onChange={(v) => {
+              userChanged.current = true;
+              setReadyOnly(v);
+            }}
+          />
           {!searching && (
             // Inline padding offset by negative margins keeps edge chips' focus outlines inside the scroller.
-            <nav aria-label={copy.jumpLabel} className="ip-scroll-x -mx-1.5 mt-4 px-1.5" data-ip-scroll="chips">
+            <nav aria-label={copy.jumpLabel} className="ip-scroll-x -mx-1.5 min-w-0 flex-1 px-1.5" data-ip-scroll="chips">
               <ul className="flex gap-2 py-1.5 max-lg:flex-nowrap lg:flex-wrap lg:justify-center">
                 {groups.map((g) => (
                   <li key={g.id} className="shrink-0">
