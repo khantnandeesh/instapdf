@@ -1,7 +1,7 @@
 /** F23 /cloud/<provider> window (mock): first view, progress, lost tool, Escape, axe. Spec: AC-157, AC-168 */
 import { expect, test } from "@playwright/test";
 import { expectNoSeriousAxeViolations } from "../support/axe";
-import { caret, cards, isDesktop, mockPick, needsCloud, openRotate, openWindow, reachPicker, rowButton } from "./support";
+import { caret, cards, closed, isDesktop, mockPick, needsCloud, openRotate, openWindow, reachPicker, rowButton } from "./support";
 
 needsCloud();
 
@@ -24,7 +24,7 @@ test("AC-168: the window's button and privacy line fit at 480x640 and 390x664; f
   await expectNoSeriousAxeViolations(win, "cloud window: downloading");
   await expect(win.getByTestId("cloud-window")).toHaveAttribute("data-view", "done", { timeout: 15_000 });
   await expect(win.getByRole("heading", { level: 1 })).toHaveText("Added to Rotate PDF");
-  await win.waitForEvent("close", { timeout: 5000 });
+  await closed(win, 5000);
 });
 
 test("AC-168: when the tool tab goes away, the window says it lost its tool within 5 s", async ({ page }) => {

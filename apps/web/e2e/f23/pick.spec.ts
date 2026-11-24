@@ -4,6 +4,7 @@ import { settled } from "../support/axe";
 import {
   cards,
   caret,
+  closed,
   cloudRow,
   downloadResult,
   fileInput,
@@ -14,8 +15,10 @@ import {
   needsCloud,
   openRotate,
   openWindow,
+  passwordField,
   pick,
   pickFromRow,
+  dropFixtures,
   pickReady,
   reachPicker,
   rotateRight,
@@ -43,6 +46,29 @@ test.beforeEach(async ({ page }) => {
 });
 test.afterEach(() => expect(dialogs).toEqual([]));
 
+/** What has focus, described the same way for a local and a cloud pick (AC-158). */
+const focused = (page: import("@playwright/test").Page) =>
+  page.evaluate(() => {
+    const a = document.activeElement as HTMLElement | null;
+    if (!a || a === document.body) return "body";
+    return `${a.tagName} ${a.dataset.testid ?? ""} ${a.getAttribute("aria-label") ?? a.textContent?.trim().slice(0, 40) ?? ""}`;
+  });
+
+/** Records every text that appears in an aria-live region from now on (AC-154). */
+async function recordLive(page: import("@playwright/test").Page) {
+  await page.evaluate(() => {
+    const w = window as unknown as { __live: string[] };
+    w.__live = [];
+    new MutationObserver(() => {
+      for (const el of document.querySelectorAll("[aria-live]")) {
+        const t = el.textContent?.trim();
+        if (t && w.__live.at(-1) !== t) w.__live.push(t);
+      }
+    }).observe(document.body, { subtree: true, childList: true, characterData: true });
+  });
+  return () => page.evaluate(() => (window as unknown as { __live: string[] }).__live);
+}
+
 test("AC-121, AC-130, AC-153: the caret is a menu button listing the three providers, with the one-line note", async ({ page }) => {
   await expect(caret(page)).toHaveAttribute("aria-haspopup", "menu");
   await expect(caret(page)).toHaveAttribute("aria-expanded", "false");
@@ -54,7 +80,12 @@ test("AC-121, AC-130, AC-153: the caret is a menu button listing the three provi
   await expect(items.nth(0)).toBeFocused();
   for (const [i, n] of ["Google Drive", "Dropbox", "OneDrive"].entries()) {
     await expect(items.nth(i)).toContainText(n);
-    await expect(items.nth(i).locator("svg").first()).toBeVisible();
+    // The marks are inline SVG (no image request): drawn means a visible, non-empty box on first open.
+    const icon = items.nth(i).locator("svg").first();
+    await expect(icon).toBeVisible();
+    const box = (await icon.boundingBox())!;
+    expect(box.width * box.height, `${n} icon`).toBeGreaterThan(0);
+    expect(await icon.locator("path, rect, circle, polygon, use").count(), `${n} icon has shapes`).toBeGreaterThan(0);
   }
   await expect(page.getByRole("menu")).toHaveAccessibleDescription("Files come straight to this device.");
   await page.keyboard.press("ArrowDown");
@@ -69,6 +100,26 @@ test("AC-121, AC-130, AC-153: the caret is a menu button listing the three provi
   const win = await openWindow(page, () => page.keyboard.press("Enter"));
   await expect(win.getByRole("heading", { level: 1 })).toHaveText("Dropbox");
   await win.close();
+});
+
+test("AC-121: /merge-pdf's empty state has the same caret and providers", async ({ page }) => {
+  await page.goto("/merge-pdf");
+  await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
+  await caret(page).click();
+  const items = page.getByRole("menuitem");
+  await expect(items).toHaveCount(3);
+  for (const [i, n] of ["Google Drive", "Dropbox", "OneDrive"].entries()) await expect(items.nth(i)).toContainText(n);
+  await page.keyboard.press("Escape");
+});
+
+test("AC-165: the cloud row is in the server HTML, before any script runs", async ({ request }) => {
+  for (const path of ["/rotate-pdf", "/merge-pdf"]) {
+    const html = await (await request.get(path)).text();
+    const at = html.indexOf('data-testid="cloud-row"');
+    expect(at, `${path}: the row is server-rendered`).toBeGreaterThan(0);
+    const row = html.slice(at, at + 4000);
+    for (const n of ["Google Drive", "Dropbox", "OneDrive"]) expect(row, `${path}: ${n}`).toMatch(new RegExp(`title="${n}"`));
+  }
 });
 
 test("AC-165: the cloud row has one 44 px button per provider, named like its title", async ({ page }) => {
@@ -90,15 +141,27 @@ test("AC-132, AC-134, AC-135, AC-158, AC-168: a pick from Google Drive lands in 
   await expect(win.getByTestId("cloud-privacy")).toContainText("straight to this browser. We never see them or your sign");
   await expect(win.getByTestId("cloud-open")).toBeEnabled();
   await expect(win.getByTestId("cloud-open")).toBeFocused();
-  await mockPick(win, ["three-pages.pdf"]);
+  await mockPick(win, ["alpha.pdf"]);
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  // The window closes itself 600 ms after the tool's ack, often before the thumbnails below are drawn.
+  await closed(win);
   await expect(tiles(page)).toHaveCount(3);
-  await win.waitForEvent("close", { timeout: 10_000 });
+  await expect(page.getByRole("button", { name: /^Page 1 of 3/ })).toHaveCount(1);
+  await expect(tiles(page).first().locator("[data-rendered] canvas")).toHaveCount(1);
+  // Rotate shows a single file as its pages (no file card, as for a local pick); the name is announced.
+  await expect(page.locator("[aria-live]").filter({ hasText: "alpha.pdf ready, 3 pages" })).toHaveCount(1);
   const log = (await mockLog(page))!;
   expect(log.requests.at(-1)).toMatchObject({ provider: "google", multiple: true, accept: [".pdf"], mode: "pick" });
   await expect(page.getByTestId("tool-flow").getByText("straight from Google Drive")).toHaveCount(0); // said on the result screen (AC-131)
-  // Focus is on the tool's first target in the ready state, not on the row.
+  // AC-158: focus lands where a local pick puts it (the tool's first target in the ready state), not on the row.
   await expect(rowButton(page, "Google Drive")).toHaveCount(0);
+  await expect.poll(() => focused(page)).not.toBe("body");
+  const cloudFocus = await focused(page);
+  await openRotate(page);
+  await rowButton(page, "Google Drive").focus(); // the same starting point
+  await fileInput(page).setInputFiles("tests/fixtures/alpha.pdf");
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await expect.poll(() => focused(page)).toBe(cloudFocus);
 });
 
 test("AC-140, AC-131: rotating a cloud file gives the same output as the same file picked locally", async ({ page }) => {
@@ -120,6 +183,7 @@ test("AC-140, AC-131: rotating a cloud file gives the same output as the same fi
 });
 
 test("AC-136, AC-154: a slow download shows a card whose progress rises, then the file arrives", async ({ page }) => {
+  const live = await recordLive(page);
   const win = await pickFromRow(page, "OneDrive", ["three-pages.pdf"], { slow: "three-pages.pdf" });
   const card = cards(page).first();
   await expect(card).toContainText("three-pages.pdf");
@@ -136,13 +200,22 @@ test("AC-136, AC-154: a slow download shows a card whose progress rises, then th
   await expect(flow(page)).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
   await expect(cards(page)).toHaveCount(0);
   await expect(tiles(page)).toHaveCount(3);
-  await win.waitForEvent("close");
+  await closed(win);
+  // Starting named the file and provider; finishing says the file was added.
+  const said = await live();
+  const start = said.findIndex((t) => t.includes("Downloading three-pages.pdf from OneDrive"));
+  expect(start, said.join(" | ")).toBeGreaterThanOrEqual(0);
+  expect(said.slice(start + 1).some((t) => t.includes("three-pages.pdf ready, 3 pages")), said.join(" | ")).toBe(true);
 });
 
 test("AC-146, AC-152: wrong type and corrupt files get the local messages; the good file stays", async ({ page }) => {
+  await pick(page, "notes.txt", "alpha.pdf");
+  const localType = await page.getByRole("alert").filter({ hasText: "notes.txt" }).innerText();
+  await openRotate(page);
   await pickFromRow(page, "Google Drive", ["notes.txt", "alpha.pdf"]);
-  await expect(page.getByRole("alert").filter({ hasText: "notes.txt" })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "notes.txt" })).toHaveText(localType);
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await expect(tiles(page)).toHaveCount(3);
   await openRotate(page);
   await pick(page, "corrupt.pdf");
   const local = await page.getByRole("alert").filter({ hasText: "corrupt.pdf" }).innerText();
@@ -173,6 +246,12 @@ test("AC-151: a file the provider refuses (403) is named; the other file stays",
 test("AC-149: a password-protected cloud file opens the same password dialog", async ({ page }) => {
   await pickFromRow(page, "Dropbox", ["user-pw.pdf"]);
   await expect(page.getByRole("dialog")).toContainText("user-pw.pdf");
+  await expect(passwordField(page)).toBeFocused();
+  await passwordField(page).fill("test");
+  await page.getByRole("dialog").getByRole("button", { name: "Unlock" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await expect(tiles(page).first()).toBeVisible();
 });
 
 test("AC-150: a mid-download failure marks that file, and Retry fetches it without the picker", async ({ page }) => {
@@ -183,7 +262,7 @@ test("AC-150: a mid-download failure marks that file, and Retry fetches it witho
   await failed.getByRole("button", { name: "Retry" }).click();
   await expect(cards(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByTestId("file-card").or(page.getByTestId("page-tile")).first()).toBeVisible();
-  await win.waitForEvent("close");
+  await closed(win);
   const log = (await mockLog(page))!;
   expect(log.requests.length).toBe(1); // the picker opened once
 });
@@ -240,7 +319,13 @@ test("AC-144, AC-145: unreachable and denied are named inline; local files still
   await win.getByRole("button", { name: "Deny access" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Google Drive access wasn't given." }).getByRole("button", { name: "Try again" })).toBeVisible();
   await win.close();
-  await pickReady(page, "alpha.pdf");
+  // Choose files still opens the file chooser, and a drop still adds a file.
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("drop-card").getByRole("button", { name: "Choose PDF files", exact: true }).click()]);
+  await chooser.setFiles("tests/fixtures/alpha.pdf");
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await expect(tiles(page)).toHaveCount(3);
+  await dropFixtures(page, ["bravo.pdf"]);
+  await expect(tiles(page)).toHaveCount(5);
 });
 
 test("offline: choosing a provider while offline says so inline and opens nothing", async ({ page, context }) => {
@@ -267,6 +352,11 @@ test("AC-166: last used provider leads the row after a reload; a local pick clea
   expect((await rowButton(page, "Dropbox").locator(".ip-cloud-name").boundingBox())!.width).toBeGreaterThan(30);
   expect((await rowButton(page, "OneDrive").locator(".ip-cloud-name").boundingBox())!.width).toBeLessThan(2);
   await expect(first).toHaveAttribute("title", "Google Drive"); // DOM order is unchanged
+  // One click on the leading button opens the Dropbox window.
+  const lead = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  await expect(lead.getByRole("heading", { level: 1 })).toHaveText("Dropbox");
+  await lead.close();
+  await expect(page.getByText("Waiting for Dropbox…")).toBeHidden({ timeout: 8_000 });
   // A cancelled pick does not change it; a local pick sets "device".
   const win = await openWindow(page, () => rowButton(page, "Google Drive").click());
   await expect(win.getByTestId("cloud-open")).toBeEnabled();
@@ -297,25 +387,54 @@ test("AC-165: the row causes no layout shift, with and without a stored last-use
   }
 });
 
-test("AC-155, AC-156, AC-167: on a phone the caret is visible, 44 px, and opens a sheet above the dock", async ({ page }, info) => {
-  test.skip(isDesktop(info.project.name), "phone layout");
-  await page.setViewportSize({ width: 390, height: 664 });
-  await expect(caret(page)).toBeInViewport({ ratio: 1 });
-  expect((await caret(page).boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  await caret(page).tap();
+/** AC-167: an open source menu is a sheet sitting on the dock, rows of 48 px, primary uncovered, no sideways scroll. */
+async function expectSheet(page: import("@playwright/test").Page, width: number) {
   const menu = page.getByRole("menu");
   await expect(menu).toBeVisible();
   await page.waitForTimeout(400); // the sheet's entrance (a short scale-in) has settled
   for (const item of await page.getByRole("menuitem").all()) expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(48);
   const sheet = (await page.locator(".ip-menu-sheet").boundingBox())!;
   const dock = (await page.locator("[data-ip-dock]").boundingBox())!;
+  expect(sheet.y).toBeGreaterThanOrEqual(0);
   expect(sheet.y + sheet.height).toBeLessThanOrEqual(dock.y + 1);
   expect(dock.y - (sheet.y + sheet.height)).toBeLessThan(32); // it sits on the dock, not at the top
   expect(sheet.x).toBeLessThanOrEqual(12);
-  expect(sheet.width).toBeGreaterThanOrEqual(390 - 24);
+  expect(sheet.width).toBeGreaterThanOrEqual(width - 24);
   expect(await uncovered(primary(page))).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.keyboard.press("Escape");
-  await expect(menu).toBeHidden();
-  await expect(caret(page)).toBeFocused();
-});
+}
+
+for (const [w, h] of [
+  [390, 664],
+  [360, 640],
+] as const) {
+  test(`AC-155, AC-156, AC-167: at ${w}x${h} the caret is visible, 44 px, and opens a sheet above the dock; Escape and a tap outside close it`, async ({ page }, info) => {
+    test.skip(isDesktop(info.project.name), "phone layout");
+    await page.setViewportSize({ width: w, height: h });
+    // AC-156 is about 390x664: there the caret is on the first screen without scrolling.
+    if (h >= 664) await expect(caret(page)).toBeInViewport({ ratio: 1 });
+    expect((await caret(page).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await caret(page).tap();
+    await expectSheet(page, w);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toBeHidden();
+    await expect(caret(page)).toBeFocused();
+    // The working state's source menu (the toolbar caret) is a sheet as well.
+    await pickReady(page, "alpha.pdf");
+    const toolbar = page.getByTestId("cloud-caret-toolbar");
+    await expect(toolbar).toBeVisible();
+    expect((await toolbar.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await toolbar.tap();
+    await expectSheet(page, w);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toBeHidden();
+    await expect(toolbar).toBeFocused();
+    // A tap outside the sheet closes it too, and focus goes back to its trigger.
+    await toolbar.tap();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await page.waitForTimeout(400);
+    await page.getByRole("heading", { level: 1 }).tap(); // plain text, nothing focusable under the tap
+    await expect(page.getByRole("menu")).toBeHidden();
+    await expect(toolbar).toBeFocused();
+  });
+}

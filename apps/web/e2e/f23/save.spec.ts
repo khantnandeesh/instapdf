@@ -1,7 +1,7 @@
 /** F23 Save to cloud on the result screen (mock provider). Spec: docs/specs/f23-cloud-pickers.md AC-160 to AC-164, AC-169 */
 import { expect, test } from "@playwright/test";
 import { settled } from "../support/axe";
-import { downloadLink, downloadResult, flow, needsCloud, openRotate, openWindow, pickFromRow, pickReady, mockLog, recordRequests, rotateRight, run, sha256, uncovered } from "./support";
+import { closed, downloadLink, isDesktop, downloadResult, flow, needsCloud, openRotate, openWindow, pickFromRow, pickReady, mockLog, recordRequests, rotateRight, run, sha256, uncovered } from "./support";
 
 needsCloud();
 
@@ -15,10 +15,10 @@ async function saveVia(page: import("@playwright/test").Page, click: () => Promi
   const win = await openWindow(page, click);
   await expect(win.getByTestId("cloud-open")).toBeEnabled();
   await expect(win.getByTestId("cloud-privacy")).toContainText("We never see it.");
-  const closed = win.waitForEvent("close", { timeout: 15_000 });
+  const gone = win.waitForEvent("close", { timeout: 15_000 });
   await win.getByTestId("cloud-open").click();
   await during?.();
-  await closed;
+  await gone;
 }
 
 test("AC-160, AC-161, AC-162, AC-164, AC-169, AC-131: Save to Drive after a Drive pick uploads the exact download, never overwriting", async ({ page, context }) => {
@@ -77,9 +77,52 @@ test("AC-160: after a local pick, Save to… lists only Google Drive and OneDriv
   await expect(page.getByRole("menuitem", { name: /Dropbox/ })).toHaveCount(0);
   // OneDrive's mock window saves without a tap (it goes straight on, like the real redirect sign-in).
   const win = await openWindow(page, () => page.getByRole("menuitem", { name: /^OneDrive/ }).click());
-  await win.waitForEvent("close", { timeout: 15_000 });
+  await closed(win, 15_000);
   await expect(page.getByTestId("notice").filter({ hasText: /Saved to OneDrive as alpha/ })).toBeVisible();
   await expect(page.getByRole("link", { name: "Open in OneDrive" })).toBeVisible();
+});
+
+test("AC-169: Download is the only berry fill, keeps the focus, and both controls fit at 1366x657 and 390x664", async ({ page }, info) => {
+  await pickFromRow(page, "OneDrive", ["alpha.pdf"]);
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await run(page);
+  const save = page.getByTestId("save-main");
+  await expect(save).toHaveAccessibleName("Save to OneDrive");
+  await expect(downloadLink(page)).toBeFocused();
+  // One filled action: no other control on the result has Download's background.
+  const fills = await page.getByTestId("result").evaluate((root) => {
+    const bg = (el: Element) => getComputedStyle(el).backgroundColor;
+    const dl = [...root.querySelectorAll("a")].find((a) => a.textContent?.trim() === "Download")!;
+    return [...root.querySelectorAll("a, button")].filter((el) => (el as HTMLElement).offsetParent && bg(el) === bg(dl)).map((el) => el.textContent?.trim());
+  });
+  expect(fills).toEqual(["Download"]);
+  for (const [w, h] of isDesktop(info.project.name) ? [[1366, 657]] : [[390, 664]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await settled(page);
+    for (const el of [downloadLink(page), save]) {
+      await expect(el).toBeInViewport({ ratio: 1 });
+      expect(await uncovered(el)).toBe(true);
+    }
+  }
+});
+
+test("AC-163: a save that fails in its window says so inline; Download still works", async ({ page }) => {
+  await pickReady(page, "alpha.pdf");
+  await run(page);
+  await page.getByTestId("save-main").click();
+  const win = await openWindow(page, () => page.getByRole("menuitem", { name: /^Google Drive/ }).click());
+  await expect(win.getByTestId("cloud-open")).toBeEnabled();
+  // Make the upload itself fail inside the window (the mock hashes the file before it "uploads").
+  await win.evaluate(() => {
+    crypto.subtle.digest = () => Promise.reject(new Error("upload failed"));
+  });
+  await win.getByTestId("cloud-open").click();
+  await expect(page.getByRole("alert").filter({ hasText: "Couldn't save to Google Drive." })).toBeVisible({ timeout: 8000 });
+  await expect(page.getByRole("alert").filter({ hasText: "Download still works." })).toBeVisible();
+  expect((await mockLog(page))!.saved).toEqual([]);
+  const { bytes } = await downloadResult(page);
+  expect(bytes.length).toBeGreaterThan(0);
+  if (!win.isClosed()) await win.close();
 });
 
 test("AC-163: a save cancelled in its window says so inline; Download still works", async ({ page }) => {

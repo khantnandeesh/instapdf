@@ -280,7 +280,7 @@ test.describe("F23 cloud windows", () => {
     expect((await request.get("/cloud-mock/..%2Fpackage.json")).status()).toBe(404);
   });
 
-  test("tool pages: same policy and COOP; the cloud pre-paint script is hashed only when the flag is on", async ({ request }) => {
+  test("AC-120, AC-127: tool pages: same policy and COOP; the cloud pre-paint script is hashed only when the flag is on", async ({ request }) => {
     const pre = cloudPrepaintScript(["google", "dropbox", "onedrive"]);
     for (const path of ["/rotate-pdf", "/merge-pdf"]) {
       const res = await request.get(path);
@@ -288,6 +288,12 @@ test.describe("F23 cloud windows", () => {
       expect(res.headers()["cross-origin-opener-policy"], path).toBe("same-origin");
       const d = directives(csp);
       for (const k of ["connect-src", "frame-src", "form-action"]) expect(d.get(k) ?? ["'self'"], `${path} ${k}`).not.toContain("https:");
+      // AC-127: no wildcard or scheme-only source where code, connections or frames come from.
+      for (const k of ["script-src", "connect-src", "frame-src"])
+        for (const bad of ["*", "https:", "http:"]) expect(d.get(k) ?? [], `${path} ${k}`).not.toContain(bad);
+      expect(d.get("frame-ancestors"), path).toEqual(["'none'"]);
+      expect(d.get("script-src"), path).not.toContain("'unsafe-inline'");
+      expect(d.get("script-src"), path).not.toContain("'unsafe-eval'");
       expect(d.get("connect-src")).toEqual(["'self'"]);
       expect(csp).not.toMatch(/dropbox|google|microsoft|1drv/);
       expect(csp.includes(`'${scriptHash(pre)}'`), path).toBe(cloudOn);

@@ -37,7 +37,25 @@ test("AC-125, AC-126, AC-128, AC-129: a full mock merge sends nothing but GETs t
   // AC-129: nothing stored holds the token, after a reload too.
   await page.reload();
   const stored = await page.evaluate(async () => {
-    const dbs = (await indexedDB.databases?.()) ?? [];
+    // Every IndexedDB database, every store, every record (not just the names).
+    const dbs: unknown[] = [];
+    for (const info of (await indexedDB.databases?.()) ?? []) {
+      if (!info.name) continue;
+      const db = await new Promise<IDBDatabase>((ok, no) => {
+        const r = indexedDB.open(info.name!);
+        r.onsuccess = () => ok(r.result);
+        r.onerror = () => no(r.error);
+      });
+      for (const store of db.objectStoreNames) {
+        const rows = await new Promise<unknown[]>((ok) => {
+          const r = db.transaction(store, "readonly").objectStore(store).getAll();
+          r.onsuccess = () => ok(r.result);
+          r.onerror = () => ok([]);
+        });
+        dbs.push({ db: info.name, store, rows: rows.map((x) => (x instanceof Blob ? `blob:${x.size}` : x)) });
+      }
+      db.close();
+    }
     return JSON.stringify({ l: { ...localStorage }, s: { ...sessionStorage }, c: document.cookie, dbs });
   });
   expect(stored).not.toContain("MOCK-TOKEN-F23");

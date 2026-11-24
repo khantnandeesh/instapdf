@@ -25,6 +25,15 @@ export async function openWindow(page: Page, click: () => Promise<unknown>) {
   return win;
 }
 
+/**
+ * Resolves once the provider window has closed itself. Use this, never a late `win.waitForEvent("close")`:
+ * that event is not replayed, so if the window closed before the call (it closes 600 ms after the tool's
+ * ack, often while the test still waits for thumbnails) the wait hangs until its timeout.
+ */
+export async function closed(win: Page, timeout = 10_000) {
+  await expect.poll(() => win.isClosed(), { timeout, message: "the provider window closes itself" }).toBe(true);
+}
+
 /** In the mock window: taps the berry button when the provider needs a tap, then waits for the mock picker. */
 export async function reachPicker(win: Page) {
   const open = win.getByTestId("cloud-open");
