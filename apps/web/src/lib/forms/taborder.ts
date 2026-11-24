@@ -101,3 +101,28 @@ export function pageOrder(state: FormState, pageId: string): string[] {
   const listed = state.order.filter((id) => onPage.has(id));
   return [...listed, ...[...onPage].filter((id) => !listed.includes(id))];
 }
+
+/**
+ * Where Tab goes from widget `from` (AC-248): the next (or previous, `back`) stop in tab order
+ * across the pages in their current order. A radio group is one stop. Returns null past either
+ * end, so Tab then leaves the fields as usual.
+ */
+export function nextTabStop(state: FormState, pageIds: readonly string[], from: string, back = false, canFocus: (widgetId: string) => boolean = () => true): string | null {
+  const fieldOf = new Map(state.fields.flatMap((f) => f.widgets.map((w) => [w.id, f] as const)));
+  const seq = pageIds.flatMap((p) => pageOrder(state, p));
+  const at = seq.indexOf(from);
+  if (at < 0) return null;
+  const own = fieldOf.get(from);
+  const step = back ? -1 : 1;
+  for (let i = at + step; i >= 0 && i < seq.length; i += step) {
+    const f = fieldOf.get(seq[i]);
+    if (!f || (own?.kind === "radio" && f === own) || !canFocus(seq[i])) continue;
+    if (f.kind === "radio") {
+      // A group is entered at its checked button, else its first one in tab order.
+      const mine = seq.filter((id) => fieldOf.get(id) === f && canFocus(id));
+      return f.widgets.find((w) => mine.includes(w.id) && w.on != null && w.on === f.value)?.id ?? (back ? mine[mine.length - 1] : mine[0]) ?? seq[i];
+    }
+    return seq[i];
+  }
+  return null;
+}

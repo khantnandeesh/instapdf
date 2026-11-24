@@ -13,7 +13,7 @@ import {
   updateField,
 } from "./model";
 import { checkName, renamedTo } from "./names";
-import { moveInOrder, pageOrder, restoreOriginal, sortByColumns, sortByRows } from "./taborder";
+import { moveInOrder, nextTabStop, pageOrder, restoreOriginal, sortByColumns, sortByRows } from "./taborder";
 import type { FormPage, FormState } from "./types";
 
 const page = (id: string, turn = 0): FormPage => ({ id, view: [0, 0, 595, 842], baseRotate: 0, rotate: turn });
@@ -151,5 +151,33 @@ describe("tab order (AC-239)", () => {
     expect(names(s, s.order)).toEqual(["topLeft", "topRight", "below"]);
     s = sortByColumns(s, turned);
     expect(names(s, s.order)).toEqual(["topLeft", "below", "topRight"]);
+  });
+
+  it("nextTabStop follows the custom order across pages in their current order (AC-248)", () => {
+    let s = form({ kind: "text", name: "a", x: 0, y: 0 }, { kind: "text", name: "b", x: 0, y: 50 }, { kind: "text", name: "c", x: 0, y: 100 }, { kind: "text", name: "z", x: 0, y: 0, page: "p1" });
+    s = moveInOrder(s, widgetOf(s, "c"), 0, [page("p0"), page("p1")]);
+    const go = (from: string, pages: string[], back = false, can?: (w: string) => boolean) => {
+      const w = nextTabStop(s, pages, widgetOf(s, from), back, can);
+      return w ? names(s, [w])[0] : null;
+    };
+    expect(go("c", ["p0", "p1"])).toBe("a");
+    expect(go("b", ["p0", "p1"])).toBe("z");
+    expect(go("z", ["p0", "p1"])).toBeNull();
+    expect(go("z", ["p0", "p1"], true)).toBe("b");
+    // Pages moved: p1 now comes first.
+    expect(go("z", ["p1", "p0"])).toBe("c");
+    // Fields that can't take focus are passed over.
+    expect(go("c", ["p0", "p1"], false, (w) => w !== widgetOf(s, "a"))).toBe("b");
+  });
+
+  it("nextTabStop treats a radio group as one stop, entered at its checked button", () => {
+    let s = form({ kind: "text", name: "t", x: 0, y: 0 }, { kind: "radio", name: "r", x: 0, y: 50 }, { kind: "text", name: "u", x: 0, y: 200 });
+    s = addRadioButton(s, idOf(s, "r"), { x: 150, y: 50, w: 20, h: 20 });
+    const r = s.fields.find((f) => f.name === "r")!;
+    s = setValue(s, r.id, r.widgets[1].on!).state;
+    const [r1, r2] = s.fields.find((f) => f.name === "r")!.widgets;
+    expect(nextTabStop(s, ["p0"], widgetOf(s, "t"))).toBe(r2.id);
+    expect(nextTabStop(s, ["p0"], r1.id)).toBe(widgetOf(s, "u"));
+    expect(nextTabStop(s, ["p0"], r2.id, true)).toBe(widgetOf(s, "t"));
   });
 });

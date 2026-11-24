@@ -15,7 +15,7 @@ import { readFormsInWorker } from "@/lib/editor/build-client";
 import { addObjects, clampDelta, newId, pageSize, totalRotation, type EditorObject, type PageEntry } from "@/lib/editor/model";
 import { nextEmptyWidget } from "@/lib/forms/edit";
 import { addField, addFields, addRadioButton, createField, defaultSize, deleteField, deleteWidget, duplicateField, emptyForm, fieldOfWidget, missingRequired, setValue, setWidgetBox } from "@/lib/forms/model";
-import { moveInOrder, pageOrder, restoreOriginal, sortByColumns, sortByRows } from "@/lib/forms/taborder";
+import { moveInOrder, nextTabStop, pageOrder, restoreOriginal, sortByColumns, sortByRows } from "@/lib/forms/taborder";
 import type { FormField, FormState, Proposal } from "@/lib/forms/types";
 import type { Controller } from "@/tools/editor/controller";
 import { useCtl } from "@/tools/editor/context";
@@ -83,7 +83,7 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
   const edit = tool === "form" && !readOnly;
   const turn = totalRotation(entry);
   const { w: pw, h: ph } = pageSize(entry);
-  const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number; sel: FormsUi["selected"] } | null>(null);
 
   const shown = useMemo(() => (readOnly ? fields.map((f) => (f.readOnly ? f : { ...f, readOnly: true })) : fields), [fields, readOnly]);
 
@@ -100,7 +100,7 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
 
   if (!fields.length && !proposals.length && !edit) return null;
 
-  const create = (x0: number, y0: number, x1: number, y1: number, shift: boolean) => {
+  const create = (x0: number, y0: number, x1: number, y1: number, shift: boolean, sel: FormsUi["selected"]) => {
     if (!formReady(ctl)) return;
     const state = formsOf(store.get()) ?? emptyForm();
     const kind = draw === "multiline" ? "text" : draw;
@@ -113,7 +113,6 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
     box.x += dx;
     box.y += dy;
     // Radio: clicks while a radio group is selected add buttons to it; Shift starts a new group.
-    const sel = store.get().forms.selected;
     const group = sel && !shift ? state.fields.find((f) => f.id === sel.field && f.kind === "radio") : undefined;
     if (kind === "radio" && group) {
       const next = addRadioButton(state, group.id, { ...box, page: entry.id });
@@ -141,7 +140,9 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
             e.stopPropagation();
             e.currentTarget.setPointerCapture(e.pointerId);
             const [x, y] = local(e);
-            setDrag({ x0: x, y0: y, x1: x, y1: y });
+            // The selection as it was at the press: a click next to a selected radio group adds a
+            // button to it (U-F2). Closing the popover commits what was typed there first.
+            setDrag({ x0: x, y0: y, x1: x, y1: y, sel: store.get().forms.selected });
             setUi(ctl, { selected: null });
           }}
           onPointerMove={(e) => {
@@ -152,7 +153,7 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
           onPointerUp={(e) => {
             if (!drag) return;
             setDrag(null);
-            create(drag.x0, drag.y0, drag.x1, drag.y1, e.shiftKey);
+            create(drag.x0, drag.y0, drag.x1, drag.y1, e.shiftKey, drag.sel);
           }}
           onPointerCancel={() => setDrag(null)}
         />
@@ -463,6 +464,32 @@ export function nudgeAfterDownload(ctl: Controller): number {
  * Keys for the selected field (Form tool): Delete removes it, Escape lets go, arrows nudge it by
  * 1 pt (10 with Shift), Ctrl/Cmd+D duplicates it. Returns true when handled.
  */
+/** The control a field's element focuses, or null when it has none (read-only, inert). */
+const controlOf = (widgetId: string) => {
+  const el = document.querySelector<HTMLElement>(`.bf-field[data-w="${widgetId}"]`);
+  if (!el || el.querySelector("[inert]")) return null;
+  return el.querySelector<HTMLElement>("input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]):not(.bf-badge)");
+};
+
+/**
+ * Tab and Shift+Tab inside the fields follow the tab order across pages (AC-248), not the page's
+ * DOM, so page buttons in between are skipped. Past the last (or first) field, Tab goes on as usual.
+ */
+export function fieldTab(ctl: Controller, e: Pick<KeyboardEvent, "key" | "shiftKey" | "ctrlKey" | "metaKey" | "altKey" | "target" | "defaultPrevented">): boolean {
+  if (e.key !== "Tab" || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return false;
+  const t = e.target instanceof Element ? e.target : null;
+  const from = t?.closest<HTMLElement>(".bf-field[data-w]")?.dataset.w;
+  const form = ctl.state().forms;
+  if (!from || !form) return false;
+  const pages = H.current(ctl.store.get().history).pages.map((p) => p.id);
+  const next = nextTabStop(form, pages, from, e.shiftKey, (id) => !!controlOf(id));
+  const el = next ? controlOf(next) : null;
+  if (!el) return false;
+  el.focus({ preventScroll: true });
+  el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  return true;
+}
+
 export function fieldKey(ctl: Controller, e: Pick<KeyboardEvent, "key" | "shiftKey" | "ctrlKey" | "metaKey" | "target" | "defaultPrevented">): boolean {
   const { key } = e;
   const sel = ctl.store.get().forms.selected;

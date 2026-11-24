@@ -5,7 +5,7 @@
  * separate chunk once the user shows intent (AC-86).
  */
 import { emptyForm } from "@/lib/forms/model";
-import { FormsChrome, fieldKey, loadForms, nudgeAfterDownload } from "@/tools/forms/EditorForms";
+import { FormsChrome, fieldKey, fieldTab, loadForms, nudgeAfterDownload } from "@/tools/forms/EditorForms";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
@@ -845,6 +845,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         void download();
         return;
       }
+      if (fieldTab(ctl, e)) return e.preventDefault();
       if (typing(t)) return;
       if (fieldKey(ctl, e)) return e.preventDefault();
       if (mod && !e.altKey && (k === "z" || k === "Z")) {

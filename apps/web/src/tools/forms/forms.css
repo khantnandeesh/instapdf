@@ -92,6 +92,7 @@ textarea.bf-options { height: auto; padding: 6px 8px; line-height: 1.4; resize: 
 @media (pointer: coarse) { .bf-act, .bf-text, .bf-step, .bf-seg, .bf-color { min-height: 40px; } }
 @media (prefers-reduced-motion: reduce) { .bf-props { animation: none; } }
 .bf-prop--tight { gap: 4px; }
+.bf-propgroup { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 /* Form tool options (U-F2) and the fields chip (U-F1) */
 .bf-formopts { display: flex; align-items: center; gap: 8px; font: 500 13px/1 Fredoka, sans-serif; color: var(--ink); }
 .bf-kinds { display: flex; gap: 2px; padding: 2px; border-radius: 12px; background: var(--surface-soft); }
