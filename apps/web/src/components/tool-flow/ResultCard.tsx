@@ -1,6 +1,6 @@
 "use client";
 import "@/components/berry/berry-loader.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { swap } from "@/lib/motion/flow";
 import { formatBytes } from "@/lib/pdf/naming";
 import { openPdf } from "@/lib/pdf/pdfjs";
@@ -83,12 +83,15 @@ export function ResultCard({
   const arrow = useRef<HTMLSpanElement>(null);
   const tick = useRef<HTMLSpanElement>(null);
   const shownTick = useRef(false);
+  // A layout effect: the crossfade starts from the commit that swaps the icons' CSS, so the tick never
+  // shows at full opacity for a frame before its fade.
+  useLayoutEffect(() => {
+    if (downloaded === shownTick.current) return;
+    shownTick.current = downloaded;
+    if (downloaded) swap(arrow.current, tick.current, "tick");
+    else swap(tick.current, arrow.current, "swap");
+  }, [downloaded]);
   useEffect(() => {
-    if (downloaded !== shownTick.current) {
-      shownTick.current = downloaded;
-      if (downloaded) swap(arrow.current, tick.current, "tick");
-      else swap(tick.current, arrow.current, "swap");
-    }
     if (!downloaded) return;
     const t = setTimeout(() => setDownloaded(false), 2400);
     return () => clearTimeout(t);
