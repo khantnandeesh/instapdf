@@ -3,6 +3,11 @@
  * engine worker, only when a line that needs it is picked, with the same counted progress and
  * Retry as the default build. It is never requested for a Latin-only file.
  */
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 const corpus = (name: string) => `../../tests/parity/editor/${name}`;
@@ -11,7 +16,7 @@ const SHAPING = /berry_engine_shaping/;
 function watch(page: Page) {
   const urls: string[] = [];
   page.on("request", (r) => urls.push(r.url()));
-  return { shaping: () => urls.filter((u) => SHAPING.test(u)), engine: () => urls.filter((u) => /\/engine\//.test(u)) };
+  return { shaping: () => urls.filter((u) => SHAPING.test(u) || /\/fonts\/shaping\//.test(u)), engine: () => urls.filter((u) => /\/engine\//.test(u)) };
 }
 
 async function open(page: Page, file: string) {
@@ -42,6 +47,10 @@ test("a Latin-only file never requests the shaping build, from the landing to a 
   await page.getByTestId("line-input").press("Enter");
   await expect(page.locator('[data-testid="line"][data-text="Left column changed"]')).toHaveCount(1);
   await expect(page.locator("[data-needs-shaping]")).toHaveCount(0);
+  // Added Latin text downloads without the shaping build or its fonts (AC-224).
+  await addTextAt(page, "Approved", 0.3, 0.12);
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download PDF" }).click()]);
+  expect(await dl.path()).toBeTruthy();
   expect(seen.shaping()).toEqual([]);
 });
 
@@ -104,4 +113,55 @@ test("typing Hindi into a Latin line loads the shaping build and retries the edi
   expect(seen.shaping().length).toBeGreaterThan(0);
   // Retried in the shaping build: this file's TeX font has no Devanagari, which is now the reason given.
   await expect(page.getByTestId("editor-notice")).toContainText("This font in the file has no");
+});
+
+// ---- added text (AC-224) ------------------------------------------------------------------------
+
+async function addTextAt(page: Page, text: string, fx: number, fy: number) {
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("t");
+  const b = (await page.getByTestId("page-1").boundingBox())!;
+  await page.mouse.click(b.x + b.width * fx, b.y + b.height * fy);
+  await expect(page.getByTestId("text-input")).toBeFocused();
+  await page.keyboard.insertText(text);
+  await page.getByTestId("text-input").press("Escape");
+  await expect(page.getByTestId("text-input")).toHaveCount(0);
+}
+
+/** Page 1's text as pdfium (pypdfium2, Apache-2.0/BSD) extracts it. */
+function pdfiumText(bytes: Uint8Array): string {
+  const dir = mkdtempSync(join(tmpdir(), "berry-shaped-"));
+  const path = join(dir, "out.pdf");
+  writeFileSync(path, bytes);
+  const script = ["import sys, pypdfium2", "doc = pypdfium2.PdfDocument(sys.argv[1])", "sys.stdout.buffer.write(doc[0].get_textpage().get_text_range().encode('utf-8'))"].join("\n");
+  return execFileSync("python3", ["-I", "-c", script, path], { encoding: "utf8" });
+}
+
+test("AC-224: added Arabic and Hindi lines print shaped, as real text pdfium reads back", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "Output checks run once, on the desktop project");
+  try {
+    execFileSync("python3", ["-I", "-c", "import pypdfium2"], { stdio: "ignore" });
+  } catch {
+    if (process.env.CI) throw new Error("AC-224 needs pypdfium2 in CI: pip install pypdfium2==5.14.0");
+    test.skip(true, "pypdfium2 is not installed here");
+  }
+  const seen = watch(page);
+  await open(page, "latex-type1c.pdf");
+  const arabic = "مرحبا بالعالم";
+  const hindi = "नमस्ते दुनिया, धर्म और कार्य";
+  await addTextAt(page, arabic, 0.3, 0.12);
+  await addTextAt(page, hindi, 0.3, 0.2);
+  // Both scripts print now: no "Won't print" marker on either box.
+  await expect(page.getByRole("group", { name: new RegExp(arabic) })).toHaveCount(1);
+  await expect(page.getByTestId("text-missing")).toHaveCount(0);
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download PDF" }).click()]);
+  const bytes = new Uint8Array(await readFile((await dl.path())!));
+  const text = pdfiumText(bytes).replace(/\s+/g, "");
+  expect(text).toContain(arabic.replace(/\s+/g, ""));
+  expect(text).toContain(hindi.replace(/\s+/g, ""));
+  // The file's own text is still there.
+  expect(text).toContain("Leftcolumn");
+  // The download worker fetched the shaping build and the Arabic font for it, from our origin.
+  expect(seen.shaping().some((u) => /berry_engine_shaping_bg\.wasm/.test(u))).toBe(true);
+  expect(seen.shaping().some((u) => /noto-naskh-arabic/.test(u))).toBe(true);
 });

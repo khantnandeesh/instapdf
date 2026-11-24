@@ -5,6 +5,7 @@
  */
 import { buildPdf, type BuildInput } from "./build";
 import { FONT_BASE, type EditorFontManifest } from "./fonts";
+import { needsShaping, SHAPING_MANIFEST, type ShapingManifest } from "./shaping";
 
 export type BuildRequest = { id: number; input: BuildInput } | { id: number; owner: { bytes: Uint8Array; password: string } };
 export type BuildResponse = { id: number; ok: true; bytes: Uint8Array } | { id: number; ok: true; owner: boolean } | { id: number; ok: false; message: string };
@@ -37,6 +38,22 @@ const fonts = {
   },
 };
 
+/** Hindi, Arabic and similar added text: drawn by the shaping engine (loaded only for it, AC-224). */
+const wantsShaping = (input: BuildInput) => input.objects.some((o) => o.kind === "text" && o.lines.some(needsShaping));
+
+async function shapingEngine() {
+  const { ENGINE_SHAPING_JS, ENGINE_SHAPING_WASM } = await import("./engine-assets");
+  const origin = scope.location.origin;
+  const mod = (await import(/* webpackIgnore: true */ new URL(ENGINE_SHAPING_JS, origin).href)) as {
+    default: (opts: { module_or_path: string }) => Promise<unknown>;
+    BerryDocument: import("./shaped-text").ShapingEngine["BerryDocument"];
+  };
+  await mod.default({ module_or_path: new URL(ENGINE_SHAPING_WASM, origin).href });
+  return mod;
+}
+let engine: ReturnType<typeof shapingEngine> | null = null;
+let shapingFonts: Promise<ShapingManifest> | null = null;
+
 scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: true }>) => {
   const msg = event.data;
   if ("warm" in msg) return;
@@ -48,7 +65,30 @@ scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: 
   }
   try {
     const fontkit = (await import("@cantoo/fontkit")).default;
-    const out = await buildPdf(msg.input, fonts, fontkit);
+    const input = msg.input;
+    let out: Uint8Array;
+    if (wantsShaping(input)) {
+      const { buildShaped } = await import("./shaped-text");
+      out = await buildShaped(
+        {
+          engine: () => {
+            engine ??= shapingEngine();
+            engine.catch(() => (engine = null));
+            return engine;
+          },
+          editorManifest: fonts.manifest,
+          shapingManifest: () => {
+            shapingFonts ??= json<ShapingManifest>(SHAPING_MANIFEST);
+            shapingFonts.catch(() => (shapingFonts = null));
+            return shapingFonts;
+          },
+          loadFace: fonts.load,
+          loadUrl: bytes,
+        },
+        (defer) => buildPdf(input, fonts, fontkit, defer),
+        input.password,
+      );
+    } else out = await buildPdf(input, fonts, fontkit);
     scope.postMessage({ id: msg.id, ok: true, bytes: out } satisfies BuildResponse, [out.buffer as ArrayBuffer]);
   } catch (error) {
     // Logged locally only, without file content.

@@ -41,6 +41,7 @@ yarn-error.log*
 next-env.d.ts
 /public/fonts/noto/
 /public/fonts/editor/
+/public/fonts/shaping/
 
 # generated at build by scripts/licenses.mjs
 /.generated/

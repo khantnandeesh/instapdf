@@ -45,6 +45,7 @@ import {
 import { covers, faceOf, type EditorFontManifest, type FaceEntry } from "./fonts";
 import { norm360, pageSize, totalRotation, type EditorObject, type InkObj, type MarkupObj, type PageEntry, type Pt } from "./model";
 import { alignOffset, baselineOffset } from "./text-layout";
+import { color255, needsShaping, type ShapedLine } from "./shaping";
 import { arrowHead, boxPoint, fitTypedSize, hexToRgb, quadPoints, svgPolyline, toPdf, typedSignatureSize } from "./draw-math";
 
 export { arrowHead, boxPoint, hexToRgb, quadPoints, svgPolyline, toPdf, typedSignatureSize };
@@ -70,6 +71,18 @@ export type BuildFonts = {
 };
 
 const color = (hex: string) => rgb(...hexToRgb(hex));
+
+/**
+ * Added text that needs shaping (Hindi, Arabic and similar, AC-224) is left for the shaping
+ * engine: buildPdf measures each line with `measure` (the engine's shape() width), draws only its
+ * underline, and pushes where the line goes to `lines`. The caller then draws them with addText.
+ */
+export type DeferShaped = {
+  measure: (text: string, o: { font: string; bold: boolean; italic: boolean; size: number }) => Promise<number> | number;
+  /** The family name the engine knows the box's face by. */
+  family: (font: string) => string;
+  lines: ShapedLine[];
+};
 
 type FontKit = Parameters<PDFDocument["registerFontkit"]>[0];
 
@@ -166,7 +179,7 @@ class TextFonts {
 }
 
 /** Builds the edited PDF. */
-export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: FontKit): Promise<Uint8Array> {
+export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: FontKit, shaped?: DeferShaped): Promise<Uint8Array> {
   const probe = await PDFDocument.load(input.bytes, { ignoreEncryption: true, updateMetadata: false });
   const doc = probe.isEncrypted ? await PDFDocument.load(input.bytes, { password: input.password ?? "", updateMetadata: false }) : probe;
   if (fontkit) doc.registerFontkit(fontkit);
@@ -257,10 +270,15 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
         for (let li = 0; li < o.lines.length; li++) {
           const line = o.lines[li];
           if (!line) continue;
-          const lw = await text!.width(face, line, o.size);
+          const defer = !!shaped && needsShaping(line);
+          const lw = defer ? await shaped.measure(line, o) : await text!.width(face, line, o.size);
           const lx = alignOffset(o.align, o.w, lw);
           const base = baselineOffset(face, o.size, li);
-          await text!.draw(page, entry, face, line, boxPoint(o, o.rot, lx, base), o.size, o.color, o.rot);
+          if (defer) {
+            // Right alignment is x = right − width, so the line ends at the box's right edge.
+            const [x, y] = toPdf(entry, boxPoint(o, o.rot, lx, base));
+            shaped.lines.push({ page: i, text: line, font: o.font, families: [shaped.family(o.font), "Noto Sans"], bold: o.bold, italic: o.italic, size: o.size, x, y, angle: -o.rot, color: color255(hexToRgb(o.color)) });
+          } else await text!.draw(page, entry, face, line, boxPoint(o, o.rot, lx, base), o.size, o.color, o.rot);
           if (o.underline) {
             const t = Math.max(0.5, o.size * 0.06);
             const a = toPdf(entry, boxPoint(o, o.rot, lx, base + o.size * 0.12));

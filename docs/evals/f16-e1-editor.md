@@ -151,6 +151,21 @@ Upload-only visits (no apply) were used to read Sejda's controls, its upload sou
 12. **Strike-out drag snapping takes in a neighbouring word** when the drag starts in a space between words.
 13. **axe:** fix the serious `label-content-name-mismatch` on the active tool button while the sign dialog is open, and the moderate nested-banner landmark issue.
 
+## AC-224: added Arabic and Hindi text, side by side
+
+Same two lines added with the Text tool on both sites: a Hindi sentence ("the full amount was paid on time") and an Arabic one ("hello world, this is a test text"). The reference run and both renders are in `/mnt/project-files/designs/complex-scripts/` (`side-by-side-add-text.png`, `sejda-add-text-editor.jpg`, `sejda-add-text-output.png`, `sejda/01-05`). No new Sejda task was spent for this entry.
+
+| Check | Sejda | InstaPDF |
+|---|---|---|
+| Warning | Shows a banner while you type that complex scripts (Arabic, Devanagari) are not supported. | None needed. Scripts we ship fonts for (Devanagari, Arabic, Hebrew, Thai) no longer show "Won't print". |
+| Devanagari output | Broken: the reph of "संपूर्ण" ends up as a separate letter with a halant (र्ण → रण), and the i-matra of "किया" sits after its consonant (कयि). | Correct: conjuncts, reph and matra order as typed, drawn by the shaping engine with Noto Sans Devanagari. |
+| Arabic output | Joined and right-to-left: parity. | Joined and right-to-left, in the requested face (Noto Naskh Arabic, the engine's pick for the box; the punctuation comes from Noto Sans). |
+| Copy and paste | Not checked on Sejda (no new task). | pdfium extracts both lines exactly, in reading order (e2e `AC-224` in `e2e/f16/editor-shaping.spec.ts`). |
+
+**Result: PASS.** Hindi is better than the reference, Arabic is at parity. How it works: `buildPdf` leaves out lines that need shaping and returns where each one goes; the download worker then loads the shaping engine (only for such text), opens the built file, calls `addText` once per line (`x = right - shape().width` for right alignment) and saves. Latin-only downloads never request the shaping engine or its fonts (tested).
+
+Known limit: shaped lines are drawn after the other added objects, so an object added later that overlaps such a line sits under it instead of on top.
+
 ## Where InstaPDF is better than Sejda
 
 - Nothing is uploaded: 0 B, checkable through the CSP. Sejda uploads on pick and allows 3 tasks per hour.
@@ -171,6 +186,7 @@ Upload-only visits (no apply) were used to read Sejda's controls, its upload sou
   - a whiteout that matches tinted pages;
   - marker and initials;
   - a colour picker with recent colours and an eyedropper.
+- Added Hindi text prints correctly (reph and matra order), where Sejda's output breaks it and warns that these scripts are not supported (AC-224).
 - Phone layout: no sideways scroll, a bottom dock, and the page fits the width. Sejda's toolbar is 600 px wide on a 390 px phone.
 - Large files: 500 pages and 197 MB work without a limit.
 

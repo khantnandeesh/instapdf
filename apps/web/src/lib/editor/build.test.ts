@@ -4,7 +4,10 @@ import { dirname, join } from "node:path";
 import fontkit from "@cantoo/fontkit";
 import { PDFArray, PDFDict, PDFDocument, PDFName, StandardFonts, degrees } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
-import { arrowHead, boxPoint, buildPdf, hexToRgb, quadPoints, toPdf, type BuildFonts } from "./build";
+import { arrowHead, boxPoint, buildPdf, hexToRgb, quadPoints, toPdf, type BuildFonts, type DeferShaped } from "./build";
+import type { BerryDocument } from "./berry-engine";
+import { buildShaped, familyOf, type ShapingEngine } from "./shaped-text";
+import type { ShapingManifest } from "./shaping";
 import config from "./fonts.json";
 import type { EditorFontManifest } from "./fonts";
 import { initialPages, type EditorObject, type PageEntry } from "./model";
@@ -235,5 +238,88 @@ describe("buildPdf", () => {
     const { texts } = await pdfText(out);
     expect(texts[0]).not.toContain("only on the copy");
     expect(texts[1]).toContain("only on the copy");
+  });
+});
+
+// ---- complex scripts (AC-224) -------------------------------------------------------------------
+
+/** The shaping build of the engine, straight from public/engine (copied there by the engine build). */
+async function shapingEngine(): Promise<ShapingEngine> {
+  const dir = new URL("../../../public/engine/", import.meta.url);
+  const mod = (await import(/* @vite-ignore */ new URL("berry_engine_shaping.js", dir).href)) as ShapingEngine & { initSync: (o: { module: BufferSource }) => unknown };
+  mod.initSync({ module: await readFile(new URL("berry_engine_shaping_bg.wasm", dir)) });
+  return mod;
+}
+
+/** The shaping fonts the way scripts/copy-fonts.mjs lists them, read from node_modules. */
+async function nodeShapingFonts(): Promise<{ manifest: ShapingManifest; load: (url: string) => Promise<Uint8Array> }> {
+  const list = [
+    { family: "Noto Naskh Arabic", pkg: "noto-naskh-arabic", key: "arabic" },
+    { family: "Noto Sans Devanagari", pkg: "noto-sans", key: "devanagari" },
+    { family: "Noto Sans", pkg: "noto-sans", key: "latin" },
+  ];
+  const where = new Map<string, string>();
+  const fonts = [];
+  for (const { family, pkg, key } of list) {
+    const root = dirname(require.resolve(`@fontsource/${pkg}/package.json`));
+    const unicode = JSON.parse(await readFile(join(root, "unicode.json"), "utf8"));
+    const url = `/fonts/x/${pkg}-${key}-400-normal.woff`;
+    where.set(url, join(root, "files", `${pkg}-${key}-400-normal.woff`));
+    fonts.push({ family, url, ranges: parse(unicode[key]) });
+  }
+  return { manifest: { fonts }, load: async (u) => new Uint8Array(await readFile(where.get(u)!)) };
+}
+
+describe("complex-script text (AC-224)", () => {
+  const pages = initialPages([{ view: [0, 0, 600, 800], rotate: 0 }]);
+  const box = { kind: "text", id: "t", page: "p0", x: 100, y: 200, wrap: null, w: 200, h: 40, rot: 0, font: "arimo", size: 14, bold: false, italic: false, underline: false, color: "#c80000" } as const;
+
+  it("leaves lines that need shaping to the engine, placed by their shaped width", async () => {
+    const fonts = await nodeFonts();
+    const objects: EditorObject[] = [{ ...box, lines: ["Total: 5", "مرحبا بالعالم"], text: "Total: 5\nمرحبا بالعالم", align: "right" }];
+    const defer: DeferShaped = { measure: () => 50, family: familyOf, lines: [] };
+    const out = await buildPdf({ bytes: await source(), pages, objects, assets: {} }, fonts, fontkit, defer);
+    const { texts } = await pdfText(out);
+    expect(texts[0]).toContain("Total: 5");
+    expect(texts[0]).not.toMatch(/[\u0600-\u06ff]/);
+    expect(defer.lines).toHaveLength(1);
+    const face = fonts.manifestValue.faces.arimo["400-normal"];
+    const [line] = defer.lines;
+    expect(line).toMatchObject({ page: 0, text: "مرحبا بالعالم", font: "arimo", families: ["Arimo", "Noto Sans"], size: 14, angle: -0, color: [200, 0, 0] });
+    // Right aligned: x = right − width.
+    expect(line.x).toBeCloseTo(100 + 200 - 50, 5);
+    expect(line.y).toBeCloseTo(800 - 200 - baselineOffset(face, 14, 1), 5);
+  });
+
+  it("draws Arabic and Hindi with the shaping engine, as real text in reading order", async () => {
+    const fonts = await nodeFonts();
+    const shaping = await nodeShapingFonts();
+    const engine = await shapingEngine();
+    const objects: EditorObject[] = [
+      { ...box, lines: ["Invoice 42", "مرحبا بالعالم", "नमस्ते दुनिया, धर्म और कार्य"], text: "", align: "right" },
+    ];
+    const out = await buildShaped(
+      { engine: async () => engine, editorManifest: fonts.manifest, shapingManifest: async () => shaping.manifest, loadFace: fonts.load, loadUrl: shaping.load },
+      async (defer) => buildPdf({ bytes: await source(), pages, objects, assets: {} }, fonts, fontkit, defer),
+    );
+    const doc: BerryDocument = new engine.BerryDocument(out);
+    try {
+      const lines = doc.pageText(0).lines;
+      const arabic = lines.find((l) => l.text.includes("مرحبا"));
+      const hindi = lines.find((l) => l.text.includes("नमस्ते"));
+      expect(arabic?.text).toBe("مرحبا بالعالم");
+      expect(arabic?.direction).toBe("rtl");
+      expect(hindi?.text).toBe("नमस्ते दुनिया, धर्म और कार्य");
+      // Both end at the box's right edge (x = right − shaped width).
+      expect(arabic!.bbox.x1).toBeCloseTo(300, 0);
+      expect(hindi!.bbox.x1).toBeCloseTo(300, 0);
+      expect(arabic!.runs[0].color).toEqual([200, 0, 0]);
+      const families = doc.pageText(0).fonts.map((f) => f.name).join(" ");
+      expect(families).toMatch(/Naskh/);
+      expect(families).toMatch(/Devanagari/);
+    } finally {
+      doc.free();
+    }
+    expect((await pdfText(out)).texts[0]).toContain("Invoice 42");
   });
 });
