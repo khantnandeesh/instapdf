@@ -442,49 +442,7 @@
   /* "Most popular" uses cat-edit (BerryPDF token usage). */
   .ip-cat-popular { --c: var(--cat-edit); --c-text: var(--ip-cat-edit-text); }
 
-  /* Sand wash: the strawberry-cream section ground, fading out. */
-  .mp-sand {
-    background: linear-gradient(var(--sand), rgba(255, 255, 255, 0));
-  }
-
-  /* ---- Header: a floating glass pill (owner 2026-11-24: no white bar, glass instead) ---------- */
-  .mp-header {
-    padding: 10px 10px 0;
-    background: transparent;
-  }
-  /* The glass sits on ::before, not on the div: backdrop-filter (like filter, transform, contain)
-     would make the div the containing block of position:fixed descendants (the All tools menu
-     panel and its scrim), pinning them to the pill instead of the viewport. */
-  .mp-header > div {
-    position: relative;
-    isolation: isolate;
-    height: calc(100% - 10px);
-    padding-inline: 22px;
-    border-radius: 999px;
-  }
-  .mp-header > div::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    border-radius: inherit;
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    background: color-mix(in srgb, var(--surface) 55%, transparent);
-    -webkit-backdrop-filter: blur(18px) saturate(1.7);
-    backdrop-filter: blur(18px) saturate(1.7);
-    box-shadow: 0 10px 30px -16px rgba(140, 30, 60, 0.35);
-  }
-  @media (prefers-reduced-transparency: reduce) {
-    .mp-header > div::before {
-      background: var(--surface);
-    }
-  }
-  @media (forced-colors: active) {
-    .mp-header > div::before {
-      border-color: CanvasText;
-    }
-  }
+  /* ---- Header: the bar and the All tools panel live in components/site/site-header.css ---- */
   .mp-brand {
     display: inline-flex;
     align-items: center;
@@ -728,11 +686,6 @@
     color: var(--brand-strong);
     font-size: 16px;
   }
-  .mp-hint {
-    color: var(--muted);
-    font-size: 14px;
-    line-height: 20px;
-  }
 
   /* ---- Switch: 50x28 pill, 22px thumb with a tiny bounce ----------------------------------- */
   .mp-switch-track {
@@ -777,9 +730,6 @@
     border-radius: 999px;
     vertical-align: middle;
     white-space: nowrap;
-  }
-  .mp-pill--leaf {
-    background: var(--leaf);
   }
   .mp-tag {
     display: inline-block;
@@ -1187,24 +1137,7 @@
   /* ---- Berry kit: the one background ------------------------------------------------------------
      Grid paper only (24px squares, 7% berry red, on #fffdfb), carried by html/body above. No waves,
      glows, patterns or coloured bands behind sections; white surfaces stay solid white. */
-  .mp-bg-grid {
-    background-color: var(--mp-grid-ground);
-    background-image:
-      linear-gradient(var(--mp-grid-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--mp-grid-line) 1px, transparent 1px);
-    background-size: 24px 24px;
-  }
-  /* ---- Berry kit: dividers -------------------------------------------------------------------- */
-  .mp-drip {
-    height: 46px;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='46'%3E%3Cpath fill='%23d92b4b' d='M0 0h260v10c-8 0-10 6-10 14s-4 12-9 12-9-4-9-12 0-12-9-13-12 2-13 6-4 6-8 6-7-2-8-6-4-7-12-7-10 5-10 16-4 20-10 20-10-9-10-20-2-15-10-16-12 3-13 8-4 8-9 8-8-3-9-8-5-8-13-8-10 4-10 10-4 9-9 9-9-3-9-9-2-10-10-10-12 4-12 12-5 12-10 12-9-4-10-12S8 10 0 10z'/%3E%3Cpath fill='%23fff' opacity='.35' d='M6 4h248v2H6z'/%3E%3C/svg%3E")
-      repeat-x top left;
-  }
-  .mp-scallop {
-    height: 18px;
-    background: radial-gradient(circle at 14px 0, var(--cream) 13px, transparent 14px) repeat-x;
-    background-size: 28px 18px;
-  }
+  /* ---- Berry kit: jam (the drip and scallop dividers were never placed; removed for the home CSS budget) -------------------------------------------------------------------- */
   /* Indeterminate jam: a short segment glides across the track. */
   .mp-jam--indeterminate > i {
     width: 34%;
@@ -1327,9 +1260,6 @@
   /* Forced colors (Windows High Contrast) drop box-shadows and backgrounds, so controls whose edge
      is a shadow get a real system-coloured border, and the selected choice an outline-free border. */
   @media (forced-colors: active) {
-    .ip-edge {
-      border: 1px solid ButtonText;
-    }
     /* A border, not an outline: the checked choice is the one that takes focus, and its focus
        outline must stay free to show. */
     .ip-seg-checked {
@@ -1415,9 +1345,6 @@
 
 /* Small utilities still used by the shared flow (transform/opacity only). */
 @layer utilities {
-  .ip-spin {
-    animation: ip-spin 800ms linear infinite;
-  }
   .ip-pulse {
     animation: ip-pulse 1.4s ease-in-out infinite;
   }
@@ -1433,11 +1360,6 @@
 }
 
 
-@keyframes ip-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 @keyframes ip-pulse {
   50% {
     opacity: 0.55;
@@ -1560,9 +1482,6 @@
   *::after {
     animation: none !important;
     transition: none !important;
-  }
-  .ip-spin {
-    animation: ip-pulse 1.2s linear infinite !important;
   }
 }
 

@@ -211,7 +211,7 @@
   --ip-cat-automate-text: var(--cat-other);
 
   /* Layout metrics (shared tool flow, header, menu) */
-  --ip-header-h: 64px; /* sticky header: 62.5px row incl. the 1.5px sand line, rounded */
+  --ip-header-h: 64px; /* sticky header below 768px; 72px from 768px (below) */
   --ip-dock-w: 360px; /* options panel column at >= 1024px */
   /* Fold fit (docs/design/berrypdf.md "Fit the first screen"): the tool head is a fixed height so the
      workspace row (drop area and options panel) can be sized in pure CSS to end inside the viewport,
@@ -229,6 +229,12 @@
   --ip-z-header: 20;
   --ip-z-header-open: 50;
   --ip-recent-h: 96px;
+}
+/* The site header is 72px from 768px (owner 2026-11-24: a bigger full-width bar), 64px on phones. */
+@media (min-width: 768px) {
+  :root {
+    --ip-header-h: 72px;
+  }
 }
 
 @media (min-width: 640px) {
