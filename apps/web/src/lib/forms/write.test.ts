@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
-import { PDFDocument, degrees } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFRef, degrees } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
 import { toPdfRect } from "./frame";
-import { addField, addRadioButton, createField, deleteField, emptyForm, repeatOnAllPages, setValue, updateField } from "./model";
-import { pagesOf, readForm } from "./read";
+import { addField, addRadioButton, createField, deleteField, deleteWidget, emptyForm, repeatOnAllPages, setMaxLen, setRadioValue, setValue, setWidgetBox, updateField } from "./model";
+import { hasXfa, pagesOf, readForm } from "./read";
 import { sortByColumns, sortByRows } from "./taborder";
 import { annotationsOf, inkIn, qpdfCheck, renderPage } from "./test-helpers";
 import type { FormState } from "./types";
@@ -247,5 +247,191 @@ describe("applyForms: tab order (AC-239)", () => {
     };
     expect(await names(sortByRows(s, pages))).toEqual({ annots: ["a", "b", "c", "d"], fields: ["a", "b", "c", "d"], tabs: "/R" });
     expect(await names(sortByColumns(s, pages))).toEqual({ annots: ["a", "c", "b", "d"], fields: ["a", "c", "b", "d"], tabs: "/C" });
+  });
+});
+
+/** A one-widget field stored as one dictionary (field and widget merged), as many real files do. */
+async function mergedDoc(ft: "Tx" | "Sig") {
+  return blankDoc(2, (d) => {
+    const ctx = d.context;
+    const ref = ctx.register(
+      ctx.obj({ Type: "Annot", Subtype: "Widget", FT: ft, T: PDFHexString.fromText("m"), Rect: [50, 700, 150, 720], F: 4, P: d.getPage(0).ref, DA: PDFHexString.fromText("/Helv 0 Tf 0 g") }),
+    );
+    d.getPage(0).node.addAnnot(ref);
+    d.catalog.set(PDFName.of("AcroForm"), ctx.obj({ Fields: [ref] }));
+  });
+}
+
+describe("applyForms: fields from the file, harder cases (code review)", () => {
+  for (const ft of ["Tx", "Sig"] as const) {
+    it(`repeats a merged ${ft === "Tx" ? "text" : "signature"} field on every page (AC-235)`, async () => {
+      const doc = await mergedDoc(ft);
+      const pages = pagesOf(doc);
+      const original = readForm(doc, pages);
+      const f = original.fields[0];
+      let s = repeatOnAllPages(original, f.id, pages);
+      if (ft === "Tx") s = setValue(s, f.id, "hello").state;
+      s = setWidgetBox(s, f.widgets[0].id, { x: 60, y: 100, w: 100, h: 20 });
+      await applyForms(doc, doc.getPages(), pages, s, original);
+      const bytes = await doc.save();
+      expect(qpdfCheck(bytes)).toEqual([]);
+      const back = readForm(await PDFDocument.load(bytes));
+      expect(back.fields).toHaveLength(1);
+      expect(back.fields[0].name).toBe("m");
+      expect(back.fields[0].widgets.map((w) => w.page)).toEqual(["p0", "p1"]);
+      expect(back.fields[0].widgets[0]).toMatchObject({ x: 60, y: 100 });
+      for (const n of [1, 2]) expect((await annotationsOf(bytes, n)).filter((a) => a.fieldName === "m")).toHaveLength(1);
+      if (ft === "Tx") expect((await annotationsOf(bytes, 2)).find((a) => a.fieldName === "m")?.fieldValue).toBe("hello");
+    });
+  }
+
+  it("never fails on max length: lowered under a value, shortened with it, or counted in UTF-16", async () => {
+    // New field whose limit was lowered after it was filled.
+    const doc = await blankDoc();
+    const pages = pagesOf(doc);
+    const original = readForm(doc, pages);
+    let s = addField(original, createField(original, { kind: "text", page: "p0", box: { x: 72, y: 72, w: 200, h: 20 }, name: "t" }));
+    s = setValue(s, s.fields[0].id, "abcdef").state;
+    s = updateField(s, s.fields[0].id, { maxLen: 3, comb: true });
+    await applyForms(doc, doc.getPages(), pages, s, original);
+    const t = (await PDFDocument.load(await doc.save())).getForm().getTextField("t");
+    expect([t.getText(), t.getMaxLength(), t.isCombed()]).toEqual(["abc", 3, true]);
+
+    // File field: value and limit shortened together (limit 40 → 4).
+    const { bytes } = await roundTrip(await fixture("form-basic.pdf"), (st) => {
+      const id = st.fields.find((f) => f.name === "name")!.id;
+      return setMaxLen(setValue(st, id, "abc").state, id, 4);
+    });
+    const name = (await PDFDocument.load(bytes)).getForm().getTextField("name");
+    expect([name.getText(), name.getMaxLength()]).toEqual(["abc", 4]);
+
+    // Two emoji are four UTF-16 units: refused at limit 2, written at limit 4.
+    const { bytes: b2 } = await roundTrip(await fixture("form-basic.pdf"), (st) => {
+      const id = st.fields.find((f) => f.name === "name")!.id;
+      st = setMaxLen(st, id, 2);
+      expect(setValue(st, id, "\u{1F600}\u{1F600}").error).toBe("too-long");
+      return setValue(setMaxLen(st, id, 4), id, "\u{1F600}\u{1F600}").state;
+    });
+    expect((await PDFDocument.load(b2)).getForm().getTextField("name").getText()).toBe("\u{1F600}\u{1F600}");
+  });
+
+  it("renames a radio button's export value in the file and keeps the selection on it", async () => {
+    const { bytes } = await roundTrip(await fixture("form-basic.pdf"), (st) => {
+      const size = st.fields.find((f) => f.name === "size")!;
+      st = setRadioValue(st, size.widgets[1].id, "M");
+      return st;
+    });
+    expect(qpdfCheck(bytes)).toEqual([]);
+    const size = readForm(await PDFDocument.load(bytes)).fields.find((f) => f.name === "size")!;
+    expect(size.widgets.map((w) => w.on)).toEqual(["small", "M", "large"]);
+    expect(size.value).toBe("M");
+    const ann = (await annotationsOf(bytes, 1)).filter((a) => a.fieldName === "size");
+    expect(ann.map((a) => a.buttonValue)).toEqual(["small", "M", "large"]);
+  });
+
+  it("removing one radio button keeps the others' export values", async () => {
+    const { bytes } = await roundTrip(await fixture("form-basic.pdf"), (st) => {
+      const size = st.fields.find((f) => f.name === "size")!;
+      st = setValue(st, size.id, "large").state;
+      return deleteWidget(st, size.widgets[0].id);
+    });
+    expect(qpdfCheck(bytes)).toEqual([]);
+    const size = readForm(await PDFDocument.load(bytes)).fields.find((f) => f.name === "size")!;
+    expect(size.widgets.map((w) => w.on)).toEqual(["medium", "large"]);
+    expect(size.value).toBe("large");
+  });
+
+  it("renaming a child field never makes two fields with one name", async () => {
+    const { bytes } = await roundTrip(await fixture("form-basic.pdf"), (st) => {
+      const town = st.fields.find((f) => f.name === "address.town")!;
+      const street = st.fields.find((f) => f.name === "address.street")!;
+      st = updateField(st, town.id, { name: "street" });
+      return updateField(st, street.id, { name: "address.road" });
+    });
+    expect(qpdfCheck(bytes)).toEqual([]);
+    const back = readForm(await PDFDocument.load(bytes));
+    const all = back.fields.map((f) => f.name);
+    expect(new Set(all).size).toBe(all.length);
+    expect(all).toContain("street");
+    expect(all).toContain("address.road");
+    expect(back.fields.find((f) => f.name === "street")?.kind).toBe("text");
+  });
+
+  it("deleting both children of a parent removes the parent too", async () => {
+    const { bytes } = await roundTrip(await fixture("form-basic.pdf"), (st) => {
+      for (const n of ["address.street", "address.town"]) st = deleteField(st, st.fields.find((f) => f.name === n)!.id);
+      return st;
+    });
+    expect(qpdfCheck(bytes)).toEqual([]);
+    const out = await PDFDocument.load(bytes);
+    expect(readForm(out).fields.map((f) => f.name).filter((n) => n.startsWith("address"))).toEqual([]);
+  });
+
+  it("sorting keeps every widget on the page, even one linked only by /P", async () => {
+    const doc = await blankDoc(1, (d) => {
+      const ctx = d.context;
+      const mk = (t: string, y: number, listed: boolean) => {
+        const r = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Widget", FT: "Tx", T: PDFHexString.fromText(t), Rect: [50, y, 250, y + 20], F: 4, P: d.getPage(0).ref, DA: PDFHexString.fromText("/Helv 0 Tf 0 g") }));
+        if (listed) d.getPage(0).node.addAnnot(r);
+        return r;
+      };
+      const c = mk("c", 780, false);
+      const a = mk("a", 700, true);
+      const b = mk("b", 600, true);
+      d.catalog.set(PDFName.of("AcroForm"), ctx.obj({ Fields: [a, b, c] }));
+    });
+    const pages = pagesOf(doc);
+    const original = readForm(doc, pages);
+    await applyForms(doc, doc.getPages(), pages, sortByRows(original, pages), original);
+    const out = await PDFDocument.load(await doc.save());
+    const annots = out.getPage(0).node.Annots()!;
+    const names: string[] = [];
+    for (let i = 0; i < annots.size(); i++) names.push(out.context.lookup(annots.get(i) as PDFRef, PDFDict).lookup(PDFName.of("T"), PDFHexString).decodeText());
+    expect(names).toEqual(["a", "b"]);
+  });
+
+  it("writes rows as the reader sees a turned page", async () => {
+    const doc = await blankDoc(1, (d) => d.getPage(0).setRotation(degrees(90)));
+    const pages = pagesOf(doc);
+    const original = readForm(doc, pages);
+    let s = original;
+    // On a page turned 90° clockwise the frame's left edge is the top of the screen.
+    for (const [name, x, y] of [["below", 300, 500], ["topRight", 50, 100], ["topLeft", 50, 500]] as const)
+      s = addField(s, createField(s, { kind: "text", page: "p0", box: { x, y, w: 100, h: 20 }, name }));
+    await applyForms(doc, doc.getPages(), pages, sortByRows(s, pages), original);
+    const bytes = await doc.save();
+    expect((await annotationsOf(bytes, 1)).map((a) => a.fieldName)).toEqual(["topLeft", "topRight", "below"]);
+  });
+});
+
+describe("readForm and XFA (code review)", () => {
+  const withXfa = (fields: boolean) =>
+    blankDoc(1, (d) => {
+      const ctx = d.context;
+      const xfa = ctx.register(ctx.stream("<xdp:xdp xmlns:xdp=\"http://ns.adobe.com/xdp/\"/>"));
+      const list: PDFRef[] = [];
+      if (fields) {
+        const r = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Widget", FT: "Tx", T: PDFHexString.fromText("a"), Rect: [50, 700, 250, 720], F: 4, P: d.getPage(0).ref }));
+        d.getPage(0).node.addAnnot(r);
+        list.push(r);
+      }
+      d.catalog.set(PDFName.of("AcroForm"), ctx.obj({ Fields: list, XFA: xfa }));
+    });
+
+  it("an XFA-only form keeps its XFA when nothing is added", async () => {
+    const doc = await withXfa(false);
+    const pages = pagesOf(doc);
+    const original = readForm(doc, pages);
+    expect(hasXfa(doc)).toBe(true);
+    await applyForms(doc, doc.getPages(), pages, original, original);
+    const acro = (await PDFDocument.load(await doc.save())).catalog.lookup(PDFName.of("AcroForm"), PDFDict);
+    expect(acro.get(PDFName.of("XFA"))).toBeDefined();
+  });
+
+  it("a hybrid form is still known to have had XFA after it is read", async () => {
+    const doc = await withXfa(true);
+    expect(readForm(doc).fields.map((f) => f.name)).toEqual(["a"]);
+    expect(hasXfa(doc)).toBe(true);
+    expect(doc.catalog.lookup(PDFName.of("AcroForm"), PDFDict).lookup(PDFName.of("Fields"))).toBeInstanceOf(PDFArray);
   });
 });

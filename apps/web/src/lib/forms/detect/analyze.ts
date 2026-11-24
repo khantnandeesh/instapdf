@@ -116,6 +116,42 @@ function components(g: Gray): { comps: Comp[]; label: Int32Array } {
   return { comps: [...map.values()], label };
 }
 
+/**
+ * Number of holes of every component, in one pass over the page (Euler number by 2×2 quads, Gray's
+ * method, 8-connected ink): holes = 1 − (Q1 − Q3 − 2·QD) / 4. Other ink counts as background, as in
+ * `holes`. Lets the analysis skip the hole search for the many shapes that have none (lines,
+ * hatching, letters without bowls), which keeps a busy page linear in its size.
+ */
+function holeCounts(g: Gray, label: Int32Array, size: number): Float64Array {
+  const { width: W, height: H } = g;
+  const q1 = new Int32Array(size);
+  const q3 = new Int32Array(size);
+  const qd = new Int32Array(size);
+  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? -1 : label[y * W + x]);
+  for (let y = -1; y < H; y++) {
+    for (let x = -1; x < W; x++) {
+      const a = at(x, y);
+      const b = at(x + 1, y);
+      const c = at(x, y + 1);
+      const d = at(x + 1, y + 1);
+      if (a < 0 && b < 0 && c < 0 && d < 0) continue;
+      // Each label in the quad once, at its first position.
+      const quad = [a, b, c, d];
+      for (let k = 0; k < 4; k++) {
+        const l = quad[k];
+        if (l < 0 || quad.indexOf(l) !== k) continue;
+        const n = +(a === l) + +(b === l) + +(c === l) + +(d === l);
+        if (n === 1) q1[l]++;
+        else if (n === 3) q3[l]++;
+        else if (n === 2 && ((a === l && d === l) || (b === l && c === l))) qd[l]++;
+      }
+    }
+  }
+  const out = new Float64Array(size);
+  for (let l = 0; l < size; l++) out[l] = 1 - (q1[l] - q3[l] - 2 * qd[l]) / 4;
+  return out;
+}
+
 /** Holes of one component: background regions inside its bounding box not reachable from its edge. */
 function holes(g: Gray, label: Int32Array, c: Comp): Rect[] {
   const W = c.x1 - c.x0 + 1;
@@ -257,6 +293,7 @@ export function analyzePage(input: AnalyzeInput): Found[] {
   const pt = (px: number) => px / s;
   const toPt = (r: Rect): Rect => ({ x: r.x / s, y: r.y / s, w: r.w / s, h: r.h / s });
   const { comps, label } = components(g);
+  const holeCount = holeCounts(g, label, comps.reduce((m, c) => Math.max(m, c.id + 1), 0));
   const pageW = g.width / s;
   const pageH = g.height / s;
 
@@ -302,6 +339,7 @@ export function analyzePage(input: AnalyzeInput): Found[] {
     if (wPt < 5 || hPt < 5) continue;
     const thin = c.n / (w * h) < 0.35;
     if (!thin) continue;
+    if (holeCount[c.id] < 1) continue;
     const hs = holes(g, label, c);
     if (!hs.length) continue;
     const small = wPt <= 30 && hPt <= 30 && wPt / hPt > 0.7 && wPt / hPt < 1.4;
@@ -326,7 +364,8 @@ export function analyzePage(input: AnalyzeInput): Found[] {
     for (let j = i + 1; j < dots.length; j++) {
       const last = chain[chain.length - 1];
       const d = dots[j];
-      if (Math.abs(d.y1 - last.y1) > s * 1) continue;
+      // Sorted by baseline: once a dot is too low, every later one is too.
+      if (d.y1 - last.y1 > s * 1) break;
       if (d.x0 <= last.x1) continue;
       if (d.x0 - last.x1 > s * 6) continue;
       chain.push(d);

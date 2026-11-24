@@ -33,6 +33,8 @@ import {
   type PDFPage,
 } from "@cantoo/pdf-lib";
 import { pageTurn, toPdfRect, type PdfRect } from "./frame";
+import { clipToMaxLen } from "./model";
+import { renamedTo } from "./names";
 import { kindOf, refKey, widgetRefs } from "./read";
 import type { FormField, FormPage, FormState, Widget } from "./types";
 
@@ -149,7 +151,9 @@ class Fonts {
           this.doc.registerFontkit(kit);
           this.kitReady = true;
         }
-        return this.doc.embedFont(await this.opts.fonts!.load(file), { subset: true });
+        // The whole slice (10 to 60 kB), not a subset: the font sits in /DR, so characters typed
+        // later in another viewer can be drawn with it too.
+        return this.doc.embedFont(await this.opts.fonts!.load(file), { subset: false });
       })();
       this.embedded.set(file, p);
     }
@@ -268,15 +272,18 @@ export async function applyForms(doc: PDFDocument, out: PDFPage[], pages: FormPa
   // 2. Fields from the file: change only what differs.
   for (const f of state.fields) {
     if (!f.ref) continue;
-    const field = byRef.get(f.ref);
+    let field = byRef.get(f.ref);
     const o = origById.get(f.id);
     if (!field || !o) continue;
     let changed = false;
     let looks = false;
+    let limits = false;
+
+    // A field merged with its only widget gets a separate widget kid before widgets are added.
+    if (f.widgets.some((w) => !w.ref) && !field.acroField.Kids()) field = splitMerged(doc, form, field);
 
     if (f.name !== o.name) {
-      const part = f.name.split(".").pop()!;
-      field.acroField.setPartialName(part);
+      renameFileField(doc, form, field, renamedTo(o.name, f.name));
       changed = true;
     }
     if (f.tooltip !== o.tooltip) {
@@ -294,14 +301,8 @@ export async function applyForms(doc: PDFDocument, out: PDFPage[], pages: FormPa
         looks = true;
       }
       if (f.comb !== o.comb || f.maxLen !== o.maxLen) {
-        if (f.comb && f.maxLen) {
-          field.setMaxLength(f.maxLen);
-          field.enableCombing();
-        } else {
-          field.disableCombing();
-          if (f.maxLen) field.setMaxLength(f.maxLen);
-          else field.removeMaxLength();
-        }
+        // Written together with the value below, so a shorter limit never meets a longer value.
+        limits = true;
         looks = true;
       }
       if (f.style.align !== o.style.align) {
@@ -340,6 +341,10 @@ export async function applyForms(doc: PDFDocument, out: PDFPage[], pages: FormPa
         const ow = o.widgets.find((x) => x.id === w.id);
         const ref = refs.find((r) => r && refKey(r) === w.ref);
         if (ref) widgetRef.set(w.id, ref);
+        if (field instanceof PDFRadioGroup && i >= 0 && ow?.on != null && w.on != null && ow.on !== w.on) {
+          renameRadioExport(field, i, w.on);
+          looks = true;
+        }
         if (i >= 0 && ow && (ow.x !== w.x || ow.y !== w.y || ow.w !== w.w || ow.h !== w.h || ow.page !== w.page || looks)) {
           placeWidget(doc, field, i, w, f, target.page, target.entry);
           if (ow.page !== w.page && ref) {
@@ -355,7 +360,7 @@ export async function applyForms(doc: PDFDocument, out: PDFPage[], pages: FormPa
       }
     }
 
-    if (!same(f.value, o.value)) {
+    if (!same(f.value, o.value) || limits) {
       setFieldValue(field, f);
       looks = true;
     }
@@ -394,17 +399,150 @@ function removeWidget(doc: PDFDocument, field: PDFField, key: string, out: PDFPa
   if (!ref) return;
   for (const p of out) removeAnnot(p, ref);
   const kids = field.acroField.Kids();
-  if (kids) {
-    for (let i = kids.size() - 1; i >= 0; i--) if (kids.get(i) === ref || (kids.get(i) instanceof PDFRef && refKey(kids.get(i) as PDFRef) === key)) kids.remove(i);
+  if (!kids) return;
+  for (let i = kids.size() - 1; i >= 0; i--) {
+    const kid = kids.get(i);
+    if (!(kid instanceof PDFRef) || refKey(kid) !== key) continue;
+    kids.remove(i);
+    // Buttons keep one export value per widget in /Opt: drop this widget's, so the others keep theirs.
+    if (field instanceof PDFRadioGroup || field instanceof PDFCheckBox) {
+      const opt = field.acroField.dict.lookup(N("Opt"));
+      if (opt instanceof PDFArray && i < opt.size()) opt.remove(i);
+    }
+  }
+}
+
+/**
+ * Text value, max length and comb, in an order that cannot fail: the limit is lifted, the value
+ * written (cut to the limit), then the limit and comb set again. pdf-lib counts UTF-16 units.
+ */
+function writeText(field: PDFTextField, f: FormField) {
+  const max = f.maxLen != null && f.maxLen > 0 ? f.maxLen : null;
+  const text = max == null ? String(f.value) : clipToMaxLen(String(f.value), max);
+  field.disableCombing();
+  field.removeMaxLength();
+  field.setText(text || undefined);
+  if (max != null) field.setMaxLength(max);
+  if (f.comb && max != null) field.enableCombing();
+}
+
+/** Renames one radio button's export value: in /Opt when the field has one, else its appearance state names. */
+function renameRadioExport(field: PDFRadioGroup, index: number, to: string) {
+  const opt = field.acroField.dict.lookup(N("Opt"));
+  if (opt instanceof PDFArray && index < opt.size()) {
+    opt.set(index, PDFHexString.fromText(to));
+    return;
+  }
+  const widget = field.acroField.getWidgets()[index];
+  const from = widget?.getOnValue();
+  if (!widget || !from) return;
+  const next = N(to);
+  const ap = widget.dict.lookup(N("AP"));
+  if (ap instanceof PDFDict) {
+    for (const k of ["N", "D", "R"]) {
+      const sub = ap.lookup(N(k));
+      if (!(sub instanceof PDFDict)) continue;
+      const v = sub.get(from);
+      if (v === undefined) continue;
+      sub.delete(from);
+      sub.set(next, v);
+    }
+  }
+  if (widget.getAppearanceState() === from) widget.setAppearanceState(next);
+  if (field.acroField.dict.get(N("V")) === from) field.acroField.dict.set(N("V"), next);
+}
+
+/** Field-level keys of a dictionary that is both a field and its widget. */
+const FIELD_KEYS = ["FT", "T", "TU", "TM", "Ff", "V", "DV", "DA", "Q", "DS", "RV", "MaxLen", "Opt", "TI", "I", "Lock", "SV", "Parent"];
+
+/**
+ * A field merged with its only widget becomes a field with that widget as its one kid, so more
+ * widgets can be added (pdf-lib would otherwise make the dictionary its own kid's parent).
+ */
+function splitMerged(doc: PDFDocument, form: ReturnType<PDFDocument["getForm"]>, field: PDFField): PDFField {
+  const ctx = doc.context;
+  const widgetRef = field.ref;
+  const dict = field.acroField.dict;
+  const fieldDict = obj(doc, {});
+  for (const k of FIELD_KEYS) {
+    const v = dict.get(N(k));
+    if (v === undefined) continue;
+    fieldDict.set(N(k), v);
+    dict.delete(N(k));
+  }
+  // Field triggers are read from the field and annotation triggers from the widget: both keep them.
+  const aa = dict.get(N("AA"));
+  if (aa) fieldDict.set(N("AA"), aa);
+  fieldDict.set(N("Kids"), ctx.obj([widgetRef]));
+  const fieldRef = ctx.register(fieldDict);
+  dict.set(N("Parent"), fieldRef);
+  const parent = fieldDict.get(N("Parent"));
+  const holder = parent instanceof PDFRef ? ctx.lookup(parent, PDFDict).lookup(N("Kids")) : form.acroForm.dict.lookup(N("Fields"));
+  if (holder instanceof PDFArray) {
+    for (let i = 0; i < holder.size(); i++) {
+      const r = holder.get(i);
+      if (r instanceof PDFRef && refKey(r) === refKey(widgetRef)) holder.set(i, fieldRef);
+    }
+  }
+  return form.getFields().find((x) => refKey(x.ref) === refKey(fieldRef)) ?? field;
+}
+
+/** Attributes a kid may inherit from its parent; copied down when a field leaves its parent. */
+const INHERITED = ["FT", "Ff", "V", "DV", "DA", "Q", "MaxLen", "Opt"];
+
+/**
+ * Renames a field from the file. Within the same parent only the last part changes; a new parent
+ * part moves the field to the top level (see `renamedTo`). The full name never matches another field's.
+ */
+function renameFileField(doc: PDFDocument, form: ReturnType<PDFDocument["getForm"]>, field: PDFField, name: string) {
+  const cut = (s: string): [string, string] => {
+    const i = s.lastIndexOf(".");
+    return i < 0 ? ["", s] : [s.slice(0, i), s.slice(i + 1)];
+  };
+  const [curPrefix] = cut(field.getName());
+  const [prefix, partial] = cut(name);
+  const parentName = prefix === curPrefix ? curPrefix : "";
+  if (prefix !== curPrefix) detach(doc, form, field);
+  const base = prefix === curPrefix ? partial : name.replace(/\./g, "_");
+  const taken = new Set(form.getFields().filter((x) => refKey(x.ref) !== refKey(field.ref)).map((x) => x.getName()));
+  const full = (p: string) => (parentName ? `${parentName}.${p}` : p);
+  let p = base;
+  for (let n = 2; taken.has(full(p)); n++) p = `${base}_${n}`;
+  field.acroField.setPartialName(p);
+}
+
+/** Moves a field to the top level, keeping what it inherited; a parent left with no kids goes too. */
+function detach(doc: PDFDocument, form: ReturnType<PDFDocument["getForm"]>, field: PDFField) {
+  const dict = field.acroField.dict;
+  const parentRef = dict.get(N("Parent"));
+  if (!(parentRef instanceof PDFRef)) return;
+  for (const k of INHERITED) {
+    if (dict.has(N(k))) continue;
+    const v = field.acroField.getInheritableAttribute(N(k));
+    if (v !== undefined) dict.set(N(k), v);
+  }
+  dict.delete(N("Parent"));
+  dropFrom(doc, form, parentRef, field.ref);
+  form.acroForm.addField(field.ref);
+}
+
+function dropFrom(doc: PDFDocument, form: ReturnType<PDFDocument["getForm"]>, holderRef: PDFRef | undefined, ref: PDFRef) {
+  const holder = holderRef ? doc.context.lookup(holderRef) : undefined;
+  const arr = holder instanceof PDFDict ? holder.lookup(N("Kids")) : form.acroForm.dict.lookup(N("Fields"));
+  if (!(arr instanceof PDFArray)) return;
+  for (let i = arr.size() - 1; i >= 0; i--) {
+    const r = arr.get(i);
+    if (r instanceof PDFRef && refKey(r) === refKey(ref)) arr.remove(i);
+  }
+  if (holderRef && holder instanceof PDFDict && arr.size() === 0) {
+    const up = holder.get(N("Parent"));
+    dropFrom(doc, form, up instanceof PDFRef ? up : undefined, holderRef);
   }
 }
 
 function setFieldValue(field: PDFField, f: FormField) {
   if (field instanceof PDFTextField) {
-    const text = String(f.value);
-    if (field.getMaxLength() != null && [...text].length > field.getMaxLength()!) field.removeMaxLength();
-    field.setText(text || undefined);
-    if (f.maxLen != null && field.getMaxLength() == null) field.setMaxLength(f.maxLen);
+    writeText(field, f);
   } else if (field instanceof PDFCheckBox) {
     if (f.value) field.check();
     else field.uncheck();
@@ -451,8 +589,7 @@ async function createField(
     case "text": {
       const t = form.createTextField(name);
       if (f.multiline) t.enableMultiline();
-      if (f.maxLen) t.setMaxLength(f.maxLen);
-      if (f.comb && f.maxLen) t.enableCombing();
+      // Max length and comb are set with the value (`writeText`).
       t.setAlignment(ALIGN[f.style.align]);
       field = t;
       break;
@@ -631,6 +768,15 @@ function applyOrder(doc: PDFDocument, out: PDFPage[], pages: FormPage[], state: 
     const wanted = ids.map((id) => widgetRef.get(id) ?? keyRef(doc, fieldOfWidget.get(id)!.widgets.find((w) => w.id === id)!.ref)).filter((r): r is PDFRef => !!r);
     const annots = page.node.Annots();
     if (annots && wanted.length) {
+      // Only widgets that have a slot here are placed (a widget linked to the page by /P alone has none).
+      const slots = new Set<string>();
+      for (let a = 0; a < annots.size(); a++) {
+        const raw = annots.get(a);
+        if (raw instanceof PDFRef) slots.add(refKey(raw));
+      }
+      const placedHere = wanted.filter((r) => slots.has(refKey(r)));
+      wanted.length = 0;
+      wanted.push(...placedHere);
       const wantedSet = new Set(wanted.map(refKey));
       // Widget slots in /Annots get the widgets in tab order; other annotations keep their places.
       let k = 0;

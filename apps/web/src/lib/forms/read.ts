@@ -145,7 +145,15 @@ function defaultValueOf(f: PDFField): string | string[] {
 /** Reads every field. `pages` are the document's pages in source order (see `pagesOf`). */
 export function readForm(doc: PDFDocument, pages: FormPage[] = pagesOf(doc)): FormState {
   const state = emptyForm();
-  if (!doc.catalog.lookup(N("AcroForm"))) return state;
+  const acro = doc.catalog.lookup(N("AcroForm"));
+  if (!(acro instanceof PDFDict)) return state;
+  // pdf-lib's getForm() removes XFA (unless the file was loaded with preserveXFA), so XFA is noted
+  // first. An XFA-only form has no AcroForm fields to read: getForm() is not called, so the XFA
+  // stays in the output unless the user adds fields. A hybrid form loses its XFA copy, so viewers
+  // that prefer XFA show the AcroForm values the user filled in.
+  xfaSeen.set(doc, acro.get(N("XFA")) != null);
+  const listed = acro.lookup(N("Fields"));
+  if (!(listed instanceof PDFArray) || listed.size() === 0) return state;
   const form = doc.getForm();
   const onPage = widgetPages(doc);
   const pageIndexOrder: { id: string; page: number; annotIndex: number }[] = [];
@@ -245,6 +253,10 @@ function annotPositions(doc: PDFDocument): Map<string, number> {
 
 /** True when the document has an XFA form (shown as a banner: fill what the AcroForm part allows). */
 export function hasXfa(doc: PDFDocument): boolean {
+  if (xfaSeen.get(doc)) return true;
   const acro = doc.catalog.lookup(N("AcroForm"));
   return acro instanceof PDFDict && acro.get(N("XFA")) != null;
 }
+
+/** Whether a document had XFA when its form was read (getForm() may have removed it since). */
+const xfaSeen = new WeakMap<PDFDocument, boolean>();

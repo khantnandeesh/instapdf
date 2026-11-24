@@ -300,6 +300,7 @@ Fill
 - **AC-230 (P0)** [AC-34] Every field type in an existing AcroForm is read with its full name, kind, value, default, options, flags and each widget's page and box: text (single line, multiline, comb, max length), dropdown (editable or not), list (single or multi-select), radio group (export value per button), checkbox, signature and push button (shown, not editable). Fields from inherited parents (`Parent`/`Kids`) are read as one field.
 - **AC-231 (P0)** [AC-34] Filled values are written as `V` with a fresh appearance stream for each changed field, so pdf.js and PDFium show them without relying on `NeedAppearances`. Fields the user did not touch keep their original appearance byte for byte.
 - **AC-232 (P1)** [AC-34] (improvement) Values outside WinAnsi (for example "Zoë Šťastná", "Ирина", "₹ 5,000") show correctly in the output appearance: the field's font is an embedded open font that covers them, never "?" or a blank box.
+  - Note (code review, 24 Nov): one AcroForm field draws with one font, and the Noto files are split by script, so a single value that mixes scripts no one file covers (for example "Ирина Smith") still shows "?" for one script and is reported as missing glyphs. Follow-up: a hand-drawn appearance that switches fonts per run.
 - **AC-233 (P1)** [AC-34] Read-only fields cannot be changed. Max length is enforced while typing. A required field left empty is flagged inline before download, without blocking it.
 
 Create and edit

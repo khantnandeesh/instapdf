@@ -14,6 +14,14 @@ import { frameBoxToView, viewBoxToFrame, type Orientation } from "./view";
 
 /** Pixels per point for detection: 2 resolves 0.5 pt and keeps an A4 page near 2 MP. */
 export const DETECT_SCALE = 2;
+/** Most pixels one page is rendered at (A3 at full scale); larger pages are rendered smaller. */
+export const DETECT_MAX_PIXELS = 6e6;
+
+/** Pixels per point for a page of `w` × `h` points (as the reader sees it). */
+export function detectScale(w: number, h: number): number {
+  const area = Math.max(1, w * h);
+  return Math.min(DETECT_SCALE, Math.sqrt(DETECT_MAX_PIXELS / area));
+}
 /** pdf.js `AnnotationMode.DISABLE`: existing fields are not drawn, so they are not detected again. */
 const ANNOTATION_MODE_DISABLE = 0;
 
@@ -56,16 +64,19 @@ export async function detectFields(pdf: PDFDocumentProxy, opts: DetectOptions): 
     if (opts.signal?.aborted) throw new DOMException("Detection cancelled", "AbortError");
     const page = await pdf.getPage(entry.src! + 1);
     const turn = pageTurn(entry);
-    const viewport = page.getViewport({ scale: DETECT_SCALE, rotation: turn });
+    const unit = page.getViewport({ scale: 1, rotation: turn });
+    const scale = detectScale(unit.width, unit.height);
+    const viewport = page.getViewport({ scale, rotation: turn });
     const canvas = opts.makeCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error(`Page ${entry.src! + 1} is too large to scan`);
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvas: canvas as unknown as HTMLCanvasElement, canvasContext: ctx, viewport, annotationMode: opts.annotationMode ?? ANNOTATION_MODE_DISABLE }).promise;
     const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const content = await page.getTextContent();
     const vt = viewport.transform;
-    const text = textItems(content.items as never[], vt, DETECT_SCALE);
+    const text = textItems(content.items as never[], vt, scale);
     page.cleanup();
 
     const o: Orientation = { w: entry.view[2] - entry.view[0], h: entry.view[3] - entry.view[1], turn };
@@ -73,7 +84,7 @@ export async function detectFields(pdf: PDFDocumentProxy, opts: DetectOptions): 
     const isScan = !text.some((t) => t.str.trim());
     if (isScan) scanned++;
     const found = await opts.analyze({
-      gray: { width: img.width, height: img.height, data: toGray(img.data, img.width * img.height), scale: DETECT_SCALE },
+      gray: { width: img.width, height: img.height, data: toGray(img.data, img.width * img.height), scale },
       text,
       existing,
       taken,

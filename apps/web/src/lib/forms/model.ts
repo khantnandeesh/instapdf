@@ -200,7 +200,8 @@ export function setValue(state: FormState, id: string, value: string | string[])
     case "text":
       v = String(value);
       if (!f.multiline) v = v.replace(/\r?\n/g, " ");
-      if (f.maxLen != null && [...v].length > f.maxLen) return { state, error: "too-long" };
+      // Counted in UTF-16 units, as PDF viewers and pdf-lib count MaxLen ("😀" is 2).
+      if (f.maxLen != null && v.length > f.maxLen) return { state, error: "too-long" };
       break;
     case "dropdown":
       v = String(value);
@@ -224,6 +225,26 @@ export function setValue(state: FormState, id: string, value: string | string[])
       return { state };
   }
   return { state: updateField(state, id, { value: v }) };
+}
+
+/** `text` cut to at most `max` UTF-16 units, never splitting a character. */
+export function clipToMaxLen(text: string, max: number): string {
+  if (text.length <= max) return text;
+  let out = "";
+  for (const ch of text) {
+    if (out.length + ch.length > max) break;
+    out += ch;
+  }
+  return out;
+}
+
+/** Sets a text field's max length (null = none); a longer value is cut to fit, as viewers do. */
+export function setMaxLen(state: FormState, id: string, maxLen: number | null): FormState {
+  const f = state.fields.find((x) => x.id === id);
+  if (!f || f.kind !== "text") return state;
+  const max = maxLen != null && maxLen > 0 ? Math.floor(maxLen) : null;
+  const clip = (v: string | string[]) => (max == null ? v : clipToMaxLen(String(v), max));
+  return updateField(state, id, { maxLen: max, comb: max == null ? false : f.comb, value: clip(f.value), defaultValue: clip(f.defaultValue) });
 }
 
 /** True when a value is empty for its kind. */

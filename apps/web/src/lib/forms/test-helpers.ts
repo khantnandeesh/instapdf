@@ -73,7 +73,7 @@ export async function annotationsOf(bytes: Uint8Array, pageNumber: number) {
   const pdf = await pdfjs.getDocument({ data: bytes.slice(), verbosity: 0 }).promise;
   try {
     const page = await pdf.getPage(pageNumber);
-    return (await page.getAnnotations()) as { subtype: string; fieldName?: string; fieldType?: string; rect: number[]; fieldValue?: unknown; hasAppearance?: boolean; rotation?: number }[];
+    return (await page.getAnnotations()) as { subtype: string; fieldName?: string; fieldType?: string; rect: number[]; fieldValue?: unknown; buttonValue?: string; hasAppearance?: boolean; rotation?: number }[];
   } finally {
     await pdf.loadingTask.destroy();
   }

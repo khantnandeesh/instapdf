@@ -13,6 +13,19 @@ const waiting = new Map<number, { resolve: (f: Found[]) => void; reject: (e: Err
 function analyzeInWorker(input: AnalyzeInput): Promise<Found[]> {
   if (!worker) {
     worker = new Worker(new URL("./detect.worker.ts", import.meta.url), { type: "module", name: "berry-detect" });
+    // A crash in the worker (out of memory on a huge page, say) fails the waiting pages instead of
+    // leaving them pending; the next page starts a fresh worker.
+    const fail = (message: string) => {
+      worker?.terminate();
+      worker = null;
+      for (const w of waiting.values()) w.reject(new Error(message));
+      waiting.clear();
+    };
+    worker.onerror = (e) => {
+      e.preventDefault();
+      fail(e.message || "Detect fields stopped");
+    };
+    worker.onmessageerror = () => fail("Detect fields could not read a page");
     worker.onmessage = (e: MessageEvent<{ id: number; found?: Found[]; error?: string }>) => {
       const w = waiting.get(e.data.id);
       if (!w) return;

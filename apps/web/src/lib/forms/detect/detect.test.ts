@@ -8,7 +8,7 @@ import { inkIn, qpdfCheck, renderPage } from "../test-helpers";
 import type { FormPage, Proposal } from "../types";
 import { applyForms } from "../write";
 import { analyzePage } from "./analyze";
-import { detectFields, type Canvas2D } from "./run";
+import { DETECT_MAX_PIXELS, detectFields, detectScale, type Canvas2D } from "./run";
 import { frameToView, viewToFrame } from "./view";
 
 const fixtures = new URL("../../../../tests/fixtures/forms/", import.meta.url);
@@ -169,8 +169,50 @@ describe("Detect fields: every page, progress, speed (AC-240)", () => {
       [2, 3],
       [3, 3],
     ]);
-    // 0.5 s per page is the desktop target; CI machines get twice that.
-    expect(r.ms / 3).toBeLessThan(1000);
+    // AC-240: 0.5 s per page on a desktop. Shared CI runners are slower, so CI gets twice that.
+    expect(r.ms / 3).toBeLessThan(process.env.CI ? 1000 : 500);
+  });
+
+  it("renders huge pages smaller so a page never needs more than a few megapixels", async () => {
+    expect(detectScale(595, 842)).toBe(2);
+    for (const [w, h] of [[2384, 3370], [14400, 14400], [14400, 200]]) expect(w * h * detectScale(w, h) ** 2).toBeLessThanOrEqual(DETECT_MAX_PIXELS + 1);
+    // An A0 form is rendered just under full scale and its blank is still found; a 5 m × 5 m page
+    // (the PDF maximum) is scanned without running out of memory.
+    const d = await PDFDocument.create();
+    const a0 = d.addPage([2384, 3370]);
+    a0.drawText("Name", { x: 100, y: 3000, size: 12 });
+    a0.drawLine({ start: { x: 140, y: 2998 }, end: { x: 400, y: 2998 }, thickness: 1 });
+    d.addPage([14400, 14400]).drawLine({ start: { x: 100, y: 7000 }, end: { x: 9000, y: 7000 }, thickness: 1 });
+    const r = await detect(await d.save());
+    expect(r.progress.at(-1)).toEqual([2, 2]);
+    expect(r.proposals.filter((x) => x.field.widgets[0].page === "p0").map((x) => x.field.name)).toEqual(["name"]);
+  });
+
+  // Pages that would make a naive hole search or leader search slow (code review).
+  const page = (draw: (data: Uint8Array, W: number, H: number) => void) => {
+    const W = 1190;
+    const H = 1684;
+    const data = new Uint8Array(W * H).fill(255);
+    draw(data, W, H);
+    const t0 = performance.now();
+    const found = analyzePage({ gray: { width: W, height: H, data, scale: 2 }, text: [], existing: [], taken: [], scanned: true });
+    return { ms: performance.now() - t0, found };
+  };
+  it("stays fast on hatched, speckled and gridded pages", () => {
+    const budget = process.env.CI ? 1000 : 500;
+    const hatched = page((d, W, H) => {
+      for (let k = -H; k < W; k += 6) for (let y = 0; y < H; y++) if (k + y >= 0 && k + y < W) d[y * W + k + y] = 0;
+    });
+    expect(hatched.ms).toBeLessThan(budget);
+    expect(hatched.found).toEqual([]);
+    const speckled = page((d, W, H) => {
+      for (let y = 1; y < H - 1; y += 3) for (let x = 1 + (y % 7); x < W - 1; x += 14) d[y * W + x] = d[y * W + x + 1] = 0;
+    });
+    expect(speckled.ms).toBeLessThan(budget);
+    const grid = page((d, W, H) => {
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (y % 20 === 0 || x % 20 === 0) d[y * W + x] = 0;
+    });
+    expect(grid.ms).toBeLessThan(2 * budget);
   });
 
   it("can be cancelled", async () => {

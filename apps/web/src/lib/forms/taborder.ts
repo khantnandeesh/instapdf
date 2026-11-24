@@ -3,13 +3,24 @@
  * one list of widget ids; the output keeps each page's widgets in that order (`/Annots`), and pages
  * in page order.
  */
+import { frameBoxToView } from "./detect/view";
+import { pageTurn } from "./frame";
 import type { FormPage, FormState, Widget } from "./types";
 
 type Placed = Widget & { pageIndex: number };
 
+/** Widgets with their boxes as the reader sees the page, so rows stay rows on turned pages. */
 function placed(state: FormState, pages: FormPage[]): Placed[] {
   const index = new Map(pages.map((p, i) => [p.id, i]));
-  return state.fields.flatMap((f) => f.widgets.filter((w) => index.has(w.page)).map((w) => ({ ...w, pageIndex: index.get(w.page)! })));
+  return state.fields.flatMap((f) =>
+    f.widgets
+      .filter((w) => index.has(w.page))
+      .map((w) => {
+        const p = pages[index.get(w.page)!];
+        const box = frameBoxToView({ w: p.view[2] - p.view[0], h: p.view[3] - p.view[1], turn: pageTurn(p) }, w);
+        return { ...w, ...box, pageIndex: index.get(w.page)! };
+      }),
+  );
 }
 
 /**

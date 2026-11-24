@@ -48,3 +48,16 @@ export function checkName(name: string, others: Iterable<string>, opts: { allowD
   if (list.includes(trimmed)) return { ok: false, reason: "duplicate", suggestion: uniqueName(trimmed, list) };
   return { ok: true };
 }
+
+/**
+ * The name a field ends up with when renamed from `from` to `to`. A field keeps its parent when the
+ * new name starts with the same parent ("address.town" → "address.city"); any other dotted name
+ * would need a new parent, so its dots become "_" and the field moves to the top level.
+ */
+export function renamedTo(from: string, to: string): string {
+  const prefix = (s: string) => (s.includes(".") ? s.slice(0, s.lastIndexOf(".")) : "");
+  const p = prefix(from);
+  const name = to.trim();
+  if (p && name.startsWith(`${p}.`) && !name.slice(p.length + 1).includes(".")) return name;
+  return name.replace(/\./g, "_");
+}
