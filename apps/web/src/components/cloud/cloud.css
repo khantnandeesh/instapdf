@@ -48,11 +48,18 @@
     width: 36px;
     border-inline-start-color: color-mix(in srgb, var(--link) 45%, transparent);
   }
-  /* 640–1023 px: the caret must not push a full toolbar (Merge's pages view) past 768 px (scroll rule 6):
-     the Add files half drops its decorative plus. */
+  /* 640–1023 px: the caret must not push a full toolbar (Merge's pages view) past its panel, so the
+     row ends where it did before F23 (scroll rule 6): the Add files half drops its decorative plus and
+     both halves pack a little tighter. */
   @media (min-width: 640px) and (max-width: 1023px) {
-    .ip-split--tool > .mp-btn--tool:first-child > svg:first-child {
+    .ip-split--tool > .mp-btn--tool:first-child svg:first-child {
       display: none;
+    }
+    .ip-split--tool > .mp-btn--tool:first-child {
+      padding-inline: 10px;
+    }
+    .ip-split--tool .ip-split__caret.mp-btn--tool {
+      width: 32px;
     }
   }
   @media (max-width: 639px) {
