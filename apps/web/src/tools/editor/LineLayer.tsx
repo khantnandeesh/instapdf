@@ -18,6 +18,9 @@ import { LineEditBox } from "./LineEditBox";
 import { dominantHex } from "@/lib/editor/markup";
 
 
+/** Height the hint under an edit box takes, with its gap (CSS pixels). */
+const HINT_ROOM = 36;
+
 export function LineLayer({
   pageNumber,
   view,
@@ -131,7 +134,32 @@ export function LineLayer({
       const [x, y] = toScreen(line.origin[0], line.origin[1], view, rotation, scale);
       start = { x, y };
     }
-    return { box, start, length: b.length, maxWidth: displaySize(view, rotation, scale).width - box.left - 2 };
+    // The paper drawn under the box stops at the neighbouring lines' own text, and the hint goes
+    // where it hides none of it: under the box when that is clear, else over it.
+    let paperTop = 0;
+    let paperBottom = 0;
+    let below = true;
+    if (!box.transform) {
+      const mid = box.top + box.height / 2;
+      text.lines.forEach((other, k) => {
+        if (k === editing!.line || !other.text.trim()) return;
+        const o = lineBox(other.bbox, other.angle, view, rotation, scale);
+        if (o.angle || o.cx + o.length / 2 < box.left || o.cx - o.length / 2 > box.left + box.width) return;
+        const top = o.cy - o.thickness / 2;
+        const bottom = o.cy + o.thickness / 2;
+        if (o.cy > mid) {
+          paperBottom = Math.max(paperBottom, Math.min(box.top + box.height - top, box.height / 2 - 1));
+          if (top < box.top + box.height + HINT_ROOM) below = false;
+        } else if (o.cy < mid) paperTop = Math.max(paperTop, Math.min(bottom - box.top, box.height / 2 - 1));
+      });
+    }
+    // The box itself (its ring and its paper) draws back from a neighbour's text, as far as its
+    // own padding and a little of its height allow; the text keeps its place and may overhang.
+    const give = (box.height - b.thickness) / 2 + b.thickness * 0.2;
+    const top = Math.max(0, Math.min(paperTop, give));
+    const bottom = Math.max(0, Math.min(paperBottom, give));
+    const fitted = { ...box, top: box.top + top, height: box.height - top - bottom };
+    return { box: fitted, start, length: b.length, maxWidth: displaySize(view, rotation, scale).width - box.left - 2, paperInset: { top: Math.max(0, paperTop - top), bottom: Math.max(0, paperBottom - bottom) }, hintBelow: below };
   };
 
   return (

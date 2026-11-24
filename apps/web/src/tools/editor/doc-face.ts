@@ -41,6 +41,8 @@ let generation = 0;
 let serial = 0;
 const faces = new Map<string, Promise<DocFace | null>>();
 const added = new Set<FontFace>();
+/** The loaded font behind each family made here, so a remade one replaces it. */
+const byFamily = new Map<string, FontFace>();
 
 /** Another file: its fonts are removed from the page. */
 export function resetDocFaces(): void {
@@ -48,18 +50,21 @@ export function resetDocFaces(): void {
   faces.clear();
   for (const f of added) document.fonts.delete(f);
   added.clear();
+  byFamily.clear();
 }
 
 const codePoints = (text: string) => new Set([...text].map((c) => c.codePointAt(0)!));
 
-async function build(info: FontInfo, text: string): Promise<DocFace | null> {
-  if (info.object == null) return null;
-  const gen = generation;
-  const chars = [...new Set([...BASE, ...text])].join("");
+async function build(info: FontInfo, text: string, gen: number, prev: DocFace | null): Promise<DocFace | null> {
+  if (info.object == null || gen !== generation) return null;
+  const chars = [...new Set([...BASE, ...(prev ? [...prev.asked].map((cp) => String.fromCodePoint(cp)) : []), ...text])].join("");
   const { program } = await callEngine({ op: "program", font: info.object, chars });
   if (gen !== generation) return null;
   const asked = codePoints(chars);
   const covered = program.format === "none" ? null : coveredBy(program);
+  // Asked again for new characters and the font has none of them: the font already made stays
+  // (nothing new to draw), it only knows more about what it lacks.
+  if (prev && [...asked].every((cp) => prev.asked.has(cp) || !covered?.has(cp))) return { ...prev, covered, asked };
   const file = webFontFromProgram(program, info.family || "Embedded");
   if (file) {
     const family = `bp-doc-${info.object}-${++serial}`;
@@ -69,6 +74,15 @@ async function build(info: FontInfo, text: string): Promise<DocFace | null> {
       if (gen !== generation) return null;
       document.fonts.add(face);
       added.add(face);
+      byFamily.set(family, face);
+      // The one it replaces goes once the box has had time to switch to this one.
+      const old = prev && byFamily.get(prev.family);
+      if (old)
+        setTimeout(() => {
+          document.fonts.delete(old);
+          added.delete(old);
+          byFamily.delete(prev.family);
+        }, 2000);
       const v = verticalOf(file) ?? { ascent: 0.8, descent: 0.2 };
       return { family, kind: "own", bold: false, italic: false, ...v, covered, asked };
     } catch {
@@ -93,8 +107,12 @@ export function docFace(info: FontInfo, text: string, known?: DocFace | null): P
   if (info.object == null) return Promise.resolve(null);
   const key = String(info.object);
   if (known && [...codePoints(text)].every((cp) => known.asked.has(cp))) return Promise.resolve(known);
+  const gen = generation;
   const have = faces.get(key);
-  const fresh = (have ?? Promise.resolve(null)).then((f) => (f && [...codePoints(text)].every((cp) => f.asked.has(cp)) ? f : build(info, text)));
+  // A font that couldn't be made (null) is not tried again for this file.
+  const fresh = have
+    ? have.then((f) => (!f || [...codePoints(text)].every((cp) => f.asked.has(cp)) ? f : build(info, text, gen, f)))
+    : build(info, text, gen, null);
   faces.set(key, fresh.catch(() => null));
   return faces.get(key)!;
 }

@@ -17,7 +17,7 @@ import { foldName } from "@/lib/font-library/client";
 import { cx } from "@/components/ui/cx";
 import { useCtl } from "./context";
 import { docFace, type DocFace } from "./doc-face";
-import { fontLabel, standInCandidates } from "./font-service";
+import { chosenStandIn, fontLabel, standInCandidates } from "./font-service";
 
 type Line = PageText["lines"][number];
 export type EditBoxGeometry = { left: number; top: number; width: number; height: number; transform?: string };
@@ -25,16 +25,19 @@ export type EditBoxGeometry = { left: number; top: number; width: number; height
 const MARK = "ed-miss";
 /** Fonts offered for the characters a document font lacks. */
 const CHOICES = 3;
+/** Room the hint is given on the page (its CSS max-width). */
+const HINT_WIDTH = 300;
 
 const generic = (font: FontInfo | undefined) => (font?.monospace ? "ui-monospace, Menlo, Consolas, monospace" : font?.serif ? "'Times New Roman', Times, serif" : "Arial, Helvetica, sans-serif");
-const familyKey = (font: FontInfo) => foldName(font.family || font.name.replace(/[-,].*$/, ""));
+/** The key a person's stand-in choice is kept under: the same name the controller asks the engine's request by. */
+const familyKey = (font: FontInfo) => foldName(font.family || font.name);
 const cleaned = (s: string | null) => (s ?? "").replace(/[\r\n]+/g, " ");
 
-type Scan = { ranges: Range[]; missing: { font: number; chars: string[] } | null; unasked: Map<number, string> };
+type Scan = { at: number | null; ranges: Range[]; missing: { font: number; chars: string[] } | null; unasked: Map<number, string> };
 
 /** Walks the box: which characters their font can't draw, and which were never asked about. */
 function scan(el: HTMLElement, faces: Record<number, DocFace | null>, first: number): Scan {
-  const out: Scan = { ranges: [], missing: null, unasked: new Map() };
+  const out: Scan = { at: null, ranges: [], missing: null, unasked: new Map() };
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const span = node.parentElement?.closest<HTMLElement>("[data-font]");
@@ -52,6 +55,7 @@ function scan(el: HTMLElement, faces: Record<number, DocFace | null>, first: num
           r.setStart(node, i);
           r.setEnd(node, i + ch.length);
           out.ranges.push(r);
+          out.at ??= r.getBoundingClientRect().left - el.getBoundingClientRect().left;
           out.missing ??= { font, chars: [] };
           if (out.missing.font === font && !out.missing.chars.includes(ch)) out.missing.chars.push(ch);
         }
@@ -94,6 +98,8 @@ export function LineEditBox({
   start,
   length,
   maxWidth,
+  paperInset,
+  hintBelow,
   point,
   paper,
   onChange,
@@ -111,6 +117,10 @@ export function LineEditBox({
   /** Length of the line on the page, in pixels. */
   length: number;
   maxWidth: number;
+  /** How far the paper under the text stays clear of the box's top and bottom, so it never covers a neighbouring line. */
+  paperInset: { top: number; bottom: number };
+  /** The hint goes under the box (false: over it, because text is right under). */
+  hintBelow: boolean;
   /** Where the line was clicked (viewport pixels): the caret goes there. */
   point: { x: number; y: number } | null;
   /** The page's colour under the line. */
@@ -122,6 +132,7 @@ export function LineEditBox({
   const ctl = useCtl();
   const el = useRef<HTMLDivElement>(null);
   const touched = useRef(false);
+  const composing = useRef(false);
   const placed = useRef(false);
   const first = line.runs[0]?.font ?? -1;
   const fontIds = [...new Set(line.runs.map((r) => r.font))];
@@ -131,11 +142,17 @@ export function LineEditBox({
   const [missing, setMissing] = useState<Scan["missing"]>(null);
   const [standIn, setStandIn] = useState<{ font: number; chars: string; ids: string[]; picked: string } | null>(null);
   const [fit, setFit] = useState<CSSProperties | null>(null);
+  /** Where the first missing character stands in the box: the hint starts there. */
+  const [missAt, setMissAt] = useState(0);
   /** What the browser's own rounding puts between the baseline asked for and the one drawn, at this size. */
   const [nudge, setNudge] = useState<{ key: string; px: number } | null>(null);
   const turned = !!box.transform;
   const boxTop = box.top;
-  const ready = fontIds.every((i) => i in faces) || waited;
+  const settled = fontIds.every((i) => i in faces);
+  // Shown in the document's fonts only; a font that never arrives gives way after a long wait.
+  const ready = settled || waited;
+  const standInRef = useRef(standIn);
+  standInRef.current = standIn;
   const facesRef = useRef(faces);
   facesRef.current = faces;
 
@@ -153,6 +170,7 @@ export function LineEditBox({
     if (!box) return;
     const found = scan(box, facesRef.current, first);
     mark(found.ranges);
+    if (found.at !== null) setMissAt(Math.round(found.at));
     setMissing((m) => (m?.font === found.missing?.font && m?.chars.join("") === found.missing?.chars.join("") ? m : found.missing));
     // A character nobody asked the font about yet: ask, and draw with what comes back.
     for (const [font, chars] of found.unasked) {
@@ -178,6 +196,11 @@ export function LineEditBox({
       box.append(span);
     });
     if (!runs.length) box.textContent = value;
+    // No line breaks or rich formatting: the box holds one line of plain text.
+    const guard = (e: InputEvent) => {
+      if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak" || e.inputType.startsWith("format")) e.preventDefault();
+    };
+    box.addEventListener("beforeinput", guard);
     setPaperColor(paper());
     box.focus({ preventScroll: true });
     // The caret at the end, inside the last piece of text (a position after it isn't kept by every browser).
@@ -191,7 +214,10 @@ export function LineEditBox({
     const sel = getSelection();
     sel?.removeAllRanges();
     sel?.addRange(end);
-    return () => mark([]);
+    return () => {
+      box.removeEventListener("beforeinput", guard);
+      mark([]);
+    };
     // Written once per opened line (the box is keyed by it).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -206,9 +232,8 @@ export function LineEditBox({
         () => alive && setFaces((all) => ({ ...all, [i]: null })),
       );
     }
-    // Until the fonts are ready the page's own drawing of the line shows through the box; after
-    // a short wait the box shows the text regardless.
-    const t = setTimeout(() => setWaited(true), 400);
+    // Until the fonts are ready the page's own drawing of the line shows through the box.
+    const t = setTimeout(() => setWaited(true), 4000);
     return () => {
       alive = false;
       clearTimeout(t);
@@ -224,7 +249,7 @@ export function LineEditBox({
       const i = Number(span.dataset.font);
       const info = text.fonts[i];
       const face = faces[i];
-      const stand = standIn && standIn.font === i ? `"${cssFamily(standIn.picked)}", ` : "";
+      const stand = standIn && standIn.font === i && standIn.picked ? `"${cssFamily(standIn.picked)}", ` : "";
       span.style.fontFamily = `${face ? `"${face.family}", ` : ""}${stand}${generic(info)}`;
       // The embedded font already is the bold or italic face: asking again would fake one on top.
       span.style.fontWeight = (face ? face.kind === "close" && face.bold : !!info?.bold) ? "700" : "400";
@@ -235,17 +260,17 @@ export function LineEditBox({
     }
     if (!ready) return;
     // The baseline as the browser really drew it, read off a mark of no size, against the page's.
-    if (start && facesRef.current[first]) {
+    const nudgeKey = `${scale}|${facesRef.current[first]?.family}`;
+    if (start && facesRef.current[first] && nudge?.key !== nudgeKey && !composing.current) {
       const probe = document.createElement("span");
       probe.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
       box.prepend(probe);
       const off = start.y - (probe.getBoundingClientRect().top - box.parentElement!.getBoundingClientRect().top + boxTop);
       probe.remove();
-      const key = `${scale}|${facesRef.current[first]!.family}`;
-      if (Math.abs(off) > 0.1 && Math.abs(off) < 4 && nudge?.key !== key) setNudge({ key, px: off });
+      setNudge({ key: nudgeKey, px: Math.abs(off) < 4 ? off : 0 });
     }
     rescan();
-    if (!placed.current) {
+    if (!placed.current && settled) {
       placed.current = true;
       let fitted = false;
       // Fitted to the line's length on the page (justified text, tracking), measured once.
@@ -263,7 +288,7 @@ export function LineEditBox({
       else placeCaret();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [faces, standIn, scale, ready]);
+  }, [faces, standIn, scale, ready, settled]);
 
   useLayoutEffect(() => {
     if (!fit || !caretTodo.current) return;
@@ -294,7 +319,14 @@ export function LineEditBox({
         .sort((a, b) => has(b) - has(a))
         .slice(0, CHOICES);
       await Promise.allSettled(able.map((id) => ensureFace(id, info.bold, info.italic, chars + fontLabel(id))));
-      if (alive) setStandIn((s) => ({ font: missing.font, chars, ids: able, picked: s && s.font === missing.font && able.includes(s.picked) ? s.picked : (able[0] ?? "") }));
+      if (!alive) return;
+      const kept = standInRef.current;
+      // The same fonts stay in the same places: a pick never reshuffles the row.
+      if (kept && kept.font === missing.font && kept.ids.length === able.length && able.every((id) => kept.ids.includes(id))) able.splice(0, able.length, ...kept.ids);
+      const picked = kept && kept.font === missing.font && able.includes(kept.picked) ? kept.picked : (able[0] ?? "");
+      // What the box shows is what the file gets: the font in use is recorded as the choice.
+      if (picked && chosenStandIn(familyKey(info)) !== picked) await ctl.pickStandIn(familyKey(info), picked);
+      if (alive) setStandIn({ font: missing.font, chars, ids: able, picked });
     })().catch(() => undefined);
     return () => {
       alive = false;
@@ -330,7 +362,17 @@ export function LineEditBox({
     fontFamily: `${firstFace ? `"${firstFace.family}", ` : ""}${standIn && standIn.font === first && standIn.picked ? `"${cssFamily(standIn.picked)}", ` : ""}${generic(info)}`,
     fontWeight: (firstFace ? firstFace.kind === "close" && firstFace.bold : !!info?.bold) ? 700 : 400,
     fontStyle: (firstFace ? firstFace.kind === "close" && firstFace.italic : !!info?.italic) ? "italic" : "normal",
-    ...(ready ? { color: `rgb(${r} ${g} ${b})`, backgroundColor: paperColor ?? "#ffffff", caretColor: `rgb(${r} ${g} ${b})` } : null),
+    ...(ready
+      ? {
+          color: `rgb(${r} ${g} ${b})`,
+          caretColor: `rgb(${r} ${g} ${b})`,
+          // The paper covers the line's own band only: never a neighbouring line's text.
+          backgroundImage: `linear-gradient(${paperColor ?? "#ffffff"}, ${paperColor ?? "#ffffff"})`,
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: `0 ${paperInset.top}px`,
+          backgroundSize: `100% ${Math.max(0, box.height - paperInset.top - paperInset.bottom)}px`,
+        }
+      : null),
     ...fit,
   };
   const settling = !ready || paperColor === null;
@@ -338,7 +380,26 @@ export function LineEditBox({
   const shown = standIn && missing && standIn.font === missing.font ? standIn : null;
 
   return (
-    <div className="absolute" style={{ left: box.left, top: box.top, width: box.width, height: box.height, transform: box.transform }}>
+    <div
+      className="absolute"
+      style={{ left: box.left, top: box.top, width: box.width, height: box.height, transform: box.transform }}
+      // Leaving the box and its hint ends the edit; moving between them (Tab to a font) does not.
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onCommit();
+      }}
+      onKeyDown={(e) => {
+        if (e.target === el.current) return;
+        // Keys on the hint's buttons are theirs alone (no editor shortcuts); Escape still cancels.
+        e.stopPropagation();
+        if (e.key !== "Escape") return;
+        onCancel();
+        (e.target as HTMLElement).blur();
+      }}
+    >
+      {/* Always here, so a screen reader hears the change when a character turns out to be missing. */}
+      <span role="status" className="sr-only" data-testid="line-missing-status">
+        {missing ? `Not in this font: ${missing.chars.join(" ")}.${shown?.picked ? ` ${fontLabel(shown.picked)} draws ${missing.chars.length > 1 ? "them" : "it"}.` : ""}` : ""}
+      </span>
       <div
         ref={el}
         role="textbox"
@@ -363,10 +424,8 @@ export function LineEditBox({
           onChange(cleaned(e.currentTarget.textContent));
           rescan();
         }}
-        onBeforeInput={(e) => {
-          const kind = (e.nativeEvent as InputEvent).inputType ?? "";
-          if (kind === "insertParagraph" || kind === "insertLineBreak" || kind.startsWith("format")) e.preventDefault();
-        }}
+        onCompositionStart={() => (composing.current = true)}
+        onCompositionEnd={() => (composing.current = false)}
         onPaste={(e) => {
           e.preventDefault();
           document.execCommand("insertText", false, cleaned(e.clipboardData.getData("text/plain")));
@@ -375,6 +434,8 @@ export function LineEditBox({
         onPointerDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           e.stopPropagation();
+          // Enter that finishes a composition (an input method) is not the end of the edit.
+          if (e.nativeEvent.isComposing || e.keyCode === 229) return;
           if (e.key === "Enter") {
             e.preventDefault();
             e.currentTarget.blur();
@@ -384,11 +445,17 @@ export function LineEditBox({
             e.currentTarget.blur();
           }
         }}
-        onBlur={onCommit}
       />
       {missing && (
-        <div id={hintId} className={cx("ed-input__hint ed-glass", box.left > maxWidth && "ed-input__hint--end")} data-testid="line-missing">
-          <span role="status">
+        <div
+          id={hintId}
+          className={cx("ed-input__hint", !hintBelow && "ed-input__hint--over")}
+          // Starts at the missing character, and stays inside the page.
+          style={{ left: Math.max(4 - box.left, Math.min(missAt - 10, maxWidth - HINT_WIDTH)) }}
+          data-testid="line-missing"
+          data-side={hintBelow ? "under" : "over"}
+        >
+          <span>
             Not in this font: <span className="ed-input__chars">{missing.chars.slice(0, 8).join(" ")}</span>
           </span>
           {shown && shown.ids.length > 0 && (
@@ -407,9 +474,10 @@ export function LineEditBox({
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => {
                     const font = text.fonts[shown.font];
-                    if (!font || shown.picked === id) return;
+                    if (!font || shown.picked === id) return el.current?.focus({ preventScroll: true });
                     void ctl.pickStandIn(familyKey(font), id);
                     setStandIn({ ...shown, picked: id });
+                    el.current?.focus({ preventScroll: true });
                   }}
                 >
                   {fontLabel(id)}

@@ -120,6 +120,7 @@ Owner, 2026-11-24: on a click the line's font changed to another one while typin
 - **AC-299 (P0)** A click opens the line with the caret where the click landed; the keyboard opens it with the caret at the end. Nothing is selected or animated on opening.
 - **AC-300 (P0)** A typed character the line's font can't draw is underlined where it stands and named under the box as it is typed. Typing is never blocked and focus never leaves the box.
 - **AC-301 (P0)** Next to the name of the missing characters the closest fonts that have them are offered (at most three, the closest first and already in use). Picking one draws the characters with it in the box at once and writes the file with it on Enter; it is remembered for that document font.
+- **AC-304 (P0)** The box and its paper never cover a neighbouring line's text, and the hint is one compact opaque row placed where it hides no text right under the box (under the box when that is clear, else over it), starting at the missing character. The fonts in it are reachable with Tab without ending the edit, and a screen reader is told when a character is missing.
 - **AC-302 (P1)** For characters of another alphabet (Greek, Cyrillic, Hebrew, Arabic, Devanagari, Thai) the fonts offered and tried include library families of the same kind that have that alphabet.
 - **AC-303 (P1)** The edit box lays glyphs out as a PDF does (no kerning or ligatures of the browser's own), and its text is fitted to the line's length on the page (justified text).
 

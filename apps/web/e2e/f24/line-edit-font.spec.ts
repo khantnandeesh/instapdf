@@ -109,6 +109,41 @@ for (const [file, text, faces] of SAME_PLACE) {
   });
 }
 
+test("the paper under the edit box never covers the line below it (tight leading)", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "pixels are compared at one size");
+  await open(page, "chrome-justified-mixed.pdf");
+  const next = lineWith(page, "and it stays in force");
+  const nb = (await next.boundingBox())!;
+  // The lower two thirds of the next line: its own letters, clear of the edited line's descenders.
+  const clip = { x: Math.floor(nb.x) + 4, y: Math.floor(nb.y + nb.height * 0.35), width: Math.ceil(nb.width) - 8, height: Math.floor(nb.height * 0.6) };
+  await page.mouse.move(2, 2);
+  let shot = await page.screenshot({ clip });
+  await expect(async () => {
+    await page.waitForTimeout(250);
+    const again = await page.screenshot({ clip });
+    const same = again.equals(shot);
+    shot = again;
+    expect(same).toBe(true);
+  }).toPass({ timeout: 10_000 });
+  const input = await edit(page, lineWith(page, "This agreement is made"));
+  await input.evaluate((el: HTMLElement) => {
+    el.style.caretColor = "transparent";
+    el.style.outline = "none";
+    el.style.boxShadow = "none";
+  });
+  await page.mouse.move(2, 2);
+  // Not one pixel of the line below changes while the line above it is open.
+  expect((await page.screenshot({ clip })).equals(shot)).toBe(true);
+  // And the hint goes over the box here, because text lies right under it.
+  await page.keyboard.press("End");
+  await page.keyboard.type("ř");
+  await expect(page.getByTestId("line-missing")).toHaveAttribute("data-side", "over");
+  const hb = (await page.getByTestId("line-missing").boundingBox())!;
+  expect(hb.y + hb.height).toBeLessThanOrEqual((await input.boundingBox())!.y);
+  expect(hb.height).toBeLessThanOrEqual(30);
+  expect(await page.getByTestId("line-missing").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(255, 255, 255)");
+});
+
 test("each part of a line is drawn in the font and colour it has in the PDF, never in another font", async ({ page }) => {
   await open(page, "chrome-justified-mixed.pdf");
   const line = lineWith(page, "This agreement is made");
@@ -142,10 +177,10 @@ test("each part of a line is drawn in the font and colour it has in the PDF, nev
   const color = await heading.evaluate((el) => getComputedStyle(el.querySelector("[data-font]")!).color);
   const [r, g, b] = color.match(/\d+/g)!.map(Number);
   expect(r! > g! + 40 && r! > b! + 20, color).toBe(true);
-  expect(await heading.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(255, 255, 255)");
+  expect(await heading.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain("rgb(255, 255, 255)");
 });
 
-test("a click puts the caret where it landed; the keyboard opens the line with the caret at its end", async ({ page }, info) => {
+test("a click puts the caret where it landed", async ({ page }) => {
   await open(page, "report-form-3p.pdf");
   const line = lineWith(page, "This report was made");
   const text = (await line.getAttribute("data-text"))!;
@@ -162,7 +197,12 @@ test("a click puts the caret where it landed; the keyboard opens the line with t
   await input.press("Escape");
   await expect(input).toHaveCount(0);
 
+});
+
+test("the keyboard opens a line with the caret at its end", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "keyboard path is the desktop one");
+  await open(page, "report-form-3p.pdf");
+  const input = page.getByTestId("line-input");
   await page.getByRole("listbox", { name: "Text on page 1" }).focus();
   await page.keyboard.press("Enter");
   await expect(input).toBeFocused();
@@ -217,11 +257,24 @@ test("a typed letter the font lacks is marked as typed, with fonts to draw it; p
   await page.keyboard.type(" Dvořák");
   await expect(hint).toBeVisible();
 
+  // A screen reader is told, and the fonts are reachable by keyboard without ending the edit.
+  await expect(page.getByTestId("line-missing-status")).toContainText("Not in this font: ř");
+  await page.keyboard.press("Tab");
+  await expect(picks.first()).toBeFocused();
+  await expect(input).toHaveCount(1);
+  // The row keeps its order after a pick; Enter on the first font picks it and hands the caret back.
+  await expect(second).toHaveAttribute("data-font-id", id);
+  const firstLabel = (await picks.first().textContent())!;
+  await page.keyboard.press("Enter");
+  await expect(picks.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(input).toBeFocused();
+
   await page.keyboard.press("Enter");
   await expect(input).toHaveCount(0);
   await expect(lineWith(page, "Dvořák")).toBeAttached({ timeout: 15_000 });
   // The file is written with the font that was picked.
-  await expect(page.getByTestId("font-notice")).toContainText(`Using ${label}`);
+  await expect(page.getByTestId("font-notice")).toContainText(`Using ${firstLabel}`);
+  expect(firstLabel).not.toBe(label);
 });
 
 test("a PDF's bare CFF font program becomes a font the browser loads, with the PDF's widths", async ({ page }) => {

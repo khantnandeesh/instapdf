@@ -163,7 +163,7 @@ function nameTable(family: string): Uint8Array {
   head.u16(0).u16(records.length).u16(6 + records.length * 12);
   for (const [id, text] of records) {
     head.u16(3).u16(1).u16(0x409).u16(id).u16(text.length * 2).u16(strings.length);
-    for (const ch of text) strings.u16(ch.charCodeAt(0));
+    for (let i = 0; i < text.length; i++) strings.u16(text.charCodeAt(i));
   }
   return Uint8Array.from([...head.bytes(), ...strings.bytes()]);
 }
