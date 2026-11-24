@@ -189,11 +189,23 @@ export function ToolFlow({
     else setTimeout(go, 1000);
   }, []);
   // Set once listeners (drop, paste, hand-off) are live: tests wait for data-hydrated.
+  // From 1024 px the pages scroll inside their own area (fold fit), so thumbnails are watched
+  // against that area; below, the page itself scrolls and the viewport is the root.
+  const [scrollArea, setScrollArea] = useState<HTMLDivElement | null>(null);
+  const [wide, setWide] = useState(false);
   useEffect(() => {
-    const w = createVisibilityWatcher();
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setWide(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  const watchRoot = wide ? scrollArea : null;
+  useEffect(() => {
+    const w = createVisibilityWatcher(watchRoot);
     setWatcher(w);
     return () => w.disconnect();
-  }, []);
+  }, [watchRoot]);
 
   const heading = useRef<HTMLHeadingElement>(null);
   const picker = useRef<FilePickerHandle>(null);
@@ -526,6 +538,8 @@ export function ToolFlow({
   useEffect(() => {
     if (phase === "processing") progressBox.current?.focus();
     else if (phase === "error") retryButton.current?.focus();
+    // Fit the first screen: the result starts at the top, so Download is never under the header.
+    else if (phase === "done" && window.scrollY > 0) window.scrollTo({ top: 0, behavior: "instant" });
   }, [phase]);
   // Start over focuses the (re-mounted) picker after the empty state is committed.
   const [focusPickerTick, setFocusPickerTick] = useState(0);
@@ -711,7 +725,7 @@ export function ToolFlow({
   );
 
   return (
-    <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" style={thumbSize === THUMB_DEFAULT ? undefined : { ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
+    <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" className="ip-flow" style={thumbSize === THUMB_DEFAULT ? undefined : { ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
       <DropOverlay active={dragging && acceptsDrop} mode={flow.multiFile || files.length === 0 ? "add" : "replace"} />
       <LiveRegion message={message} />
       <ToolIntro ref={heading} title={flow.title} />
@@ -727,7 +741,9 @@ export function ToolFlow({
           announce={announce}
         />
       ) : (
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]">
+        // Empty: the drop area and the tall options panel side by side (both --ip-work-h, fit the
+        // first screen). Loaded: the pages take the full width down to the compact bottom bar.
+        <div className={state === "empty" ? "lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]" : undefined}>
           <section aria-label="Your files" className="min-w-0">
             {state === "empty" ? (
               <DropCard>
@@ -747,8 +763,11 @@ export function ToolFlow({
             ) : (
               // BerryPDF working mode: plain seed-cream, no decoration. A sticky row of editing tools
               // (blueberry EditorToolbar look, Tabs for the view) above the pink page trays.
-              <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 sm:px-5">
-                <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] items-center gap-4 rounded-t-panel bg-cream px-3 sm:-mx-5 sm:px-5">
+              // From 1024 px the area fills the screen down to the bottom bar (--ip-pages-h)
+              // and the pages scroll inside it with a slim BerryPDF scroll bar (shown only on overflow);
+              // below 1024 px the page scrolls and the tools row sticks under the header.
+              <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 sm:px-5 lg:flex lg:h-(--ip-pages-h) lg:flex-col">
+                <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] shrink-0 items-center gap-4 rounded-t-panel bg-cream px-3 sm:-mx-5 sm:px-5 lg:static">
                   {showViewToggle && (
                     <SegmentedControl
                       look="tabs"
@@ -799,7 +818,12 @@ export function ToolFlow({
                   </span>
                   {toolbarEnd?.(wctx)}
                 </div>
-                <div className="flex flex-col gap-4 pt-3 pb-6" style={{ minHeight: "calc(var(--ip-thumb-size) + 76px)" }} inert={state === "processing" ? true : undefined}>
+                <div
+                  ref={setScrollArea}
+                  data-testid="pages-scroll"
+                  className="ip-scroll flex flex-col gap-4 pt-3 pb-6 max-lg:min-h-[calc(var(--ip-thumb-size)+76px)] lg:-mx-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5"
+                  inert={state === "processing" ? true : undefined}
+                >
                   {ownerBlocked.map((f) => (
                     <OwnerPermissionNotice
                       key={f.id}
@@ -853,6 +877,7 @@ export function ToolFlow({
 
           <ControlDock
             label={`${tool.name} options`}
+            layout={state === "empty" ? "side" : "bar"}
             optionsDisabled={optionsDisabled}
             options={renderOptions(ctx)}
             density={flow.optionsDensity}

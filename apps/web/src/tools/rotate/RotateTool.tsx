@@ -15,7 +15,7 @@ const tool = flowTool("rotate-pdf");
 /** ChoiceTile icon (30px, duotone like Phosphor): three small pages, the ones in scope filled. */
 function ScopeIcon({ filled }: { filled: [boolean, boolean, boolean] }) {
   return (
-    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true" className="max-lg:hidden" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round">
+    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true" className="dock-bar:hidden" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round">
       {[2.5, 11.5, 20.5].map((x, i) => (
         <rect key={x} x={x} y="7" width="7" height="16" rx="1.6" fill={filled[i] ? "currentColor" : "none"} fillOpacity={filled[i] ? 0.35 : 0} />
       ))}
@@ -26,7 +26,7 @@ function ScopeIcon({ filled }: { filled: [boolean, boolean, boolean] }) {
 /** A numbered option step: the number in a soft berry disc, then the Fredoka title (decorative; the group has its own label). */
 function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
-    <span className="mp-step hidden lg:flex" aria-hidden="true">
+    <span className="mp-step hidden dock-side:flex" aria-hidden="true">
       <span className="mp-step__n">{n}</span>
       {children}
     </span>
@@ -125,19 +125,20 @@ export function RotateTool() {
       renderOptions={(ctx) => (
         // BerryPDF working mode: numbered steps, ChoiceTiles for the scope, the rotate actions as
         // blueberry editing tools, Reset as a soft button; the berry primary sits below in the dock.
-        <div className="flex items-center gap-3 lg:flex-col lg:items-stretch lg:gap-7">
-          <div className="flex min-w-0 flex-col gap-3.5 max-lg:flex-1">
+        // In the bottom bar (dock-bar) the same controls fold into one row; labels stay from 1024 px.
+        <div className="flex items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-side:gap-7">
+          <div className="flex min-w-0 flex-col gap-3.5 dock-bar:flex-1 lg:dock-bar:max-w-[420px]">
             <Step n={1}>Apply to</Step>
             <SegmentedControl look="tiles" label="Apply to" value={scope} options={scopes} onChange={setScope} fullWidth />
           </div>
           <div className="flex flex-col gap-3.5">
             <Step n={2}>Rotate</Step>
-            <div className="flex items-center gap-3 lg:flex-col lg:items-start">
-              <div className="mp-toolbar lg:flex lg:w-full">
-                <Button variant="tool" className="max-lg:size-11 max-lg:px-0 lg:flex-1" iconStart={<RotateLeftIcon size={18} />} aria-label="Rotate left" title="Rotate left" onClick={() => rotateAll(ctx, -90)}>
+            <div className="flex items-center gap-3 dock-side:flex-col dock-side:items-start">
+              <div className="mp-toolbar dock-side:flex dock-side:w-full">
+                <Button variant="tool" className="max-lg:size-11 max-lg:px-0 dock-side:flex-1" iconStart={<RotateLeftIcon size={18} />} aria-label="Rotate left" title="Rotate left" onClick={() => rotateAll(ctx, -90)}>
                   <span className="hidden lg:inline">Rotate left</span>
                 </Button>
-                <Button variant="tool" className="max-lg:size-11 max-lg:px-0 lg:flex-1" iconStart={<RotateRightIcon size={18} />} aria-label="Rotate right" title="Rotate right" onClick={() => rotateAll(ctx, 90)}>
+                <Button variant="tool" className="max-lg:size-11 max-lg:px-0 dock-side:flex-1" iconStart={<RotateRightIcon size={18} />} aria-label="Rotate right" title="Rotate right" onClick={() => rotateAll(ctx, 90)}>
                   <span className="hidden lg:inline">Rotate right</span>
                 </Button>
               </div>

@@ -7,9 +7,16 @@ import { ProgressBar } from "../ui/ProgressBar";
 import { copy } from "./copy";
 
 /**
- * Options and the primary action. A sticky side column at >= 1024 px, a fixed
- * bottom bar below. Its measured height is written to --ip-dock-actual on the
- * document so `main` keeps the last row of tiles clear of it.
+ * Options and the primary action. The primary action never leaves the viewport.
+ *
+ * - `layout="side"` (the empty state): from 1024 px an app Panel in a sticky column, --ip-work-h
+ *   tall (fits the first screen); options scroll inside it, status + primary pinned at its bottom.
+ * - `layout="bar"` (a file is loaded): one compact row fixed to the bottom, options on the left and
+ *   status + primary on the right, so the pages get the rest of the screen (like the phone dock).
+ *
+ * Below 1024 px it is always the bottom bar. Options style themselves with the `dock-side:` /
+ * `dock-bar:` variants (globals.css), which read data-ip-dock. While fixed, its measured height is
+ * written to --ip-dock-actual on the document so the pages area and the footer stay clear of it.
  */
 /** True at >= 1024 px; null before the first client render (SSR shows the CSS fallback). */
 function useDesktop(): boolean | null {
@@ -26,6 +33,7 @@ function useDesktop(): boolean | null {
 
 export function ControlDock({
   label,
+  layout = "side",
   optionsDisabled,
   options,
   status,
@@ -34,13 +42,15 @@ export function ControlDock({
   sheet,
 }: {
   label: string;
+  layout?: "side" | "bar";
   optionsDisabled: boolean;
   options: ReactNode;
   status: ReactNode;
   footer: ReactNode;
   /**
-   * "full" (spec F1 U-4, F3 M-5): below 1024 px the dock shows an Options
-   * button that opens the panel in a bottom sheet instead of inline options.
+   * "full" (spec F1 U-4, F3 M-5): many options. Inline only in the side panel from 1024 px;
+   * in the bottom bar (and always below 1024 px) a compact Options button with its badge opens
+   * them in a bottom sheet, beside the status and primary.
    */
   density?: "compact" | "full";
   sheet?: { title: string; badge?: string; footer: (close: () => void) => ReactNode };
@@ -48,63 +58,78 @@ export function ControlDock({
   const desktop = useDesktop();
   const [sheetOpen, setSheetOpen] = useState(false);
   const optionsButton = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (desktop) setSheetOpen(false);
-  }, [desktop]);
   const full = density === "full";
+  const side = layout === "side";
+  // "full" density: inline options only in the side panel from 1024 px (the SSR render keeps them,
+  // hidden below lg by CSS); everywhere else an Options button opens the same options in a sheet.
+  const inline = !full || (side && desktop !== false);
+  const sheetMode = full && (!side || desktop !== true);
+  useEffect(() => {
+    if (side && desktop) setSheetOpen(false);
+  }, [desktop, side]);
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const root = document.documentElement;
-    const ro = new ResizeObserver(() => {
+    const measure = () => {
       const fixed = getComputedStyle(el).position === "fixed";
       if (fixed) root.style.setProperty("--ip-dock-actual", `${el.offsetHeight}px`);
       else root.style.removeProperty("--ip-dock-actual");
-    });
+    };
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
+    measure();
     return () => {
       ro.disconnect();
       root.style.removeProperty("--ip-dock-actual");
     };
-  }, []);
+  }, [layout]);
   return (
     <aside
       ref={ref}
-      data-ip-dock=""
+      data-ip-dock={layout}
       role="region"
       aria-label={label}
-      // Below 1024 px: BerryPDF's strawberry-cream action tab fixed to the bottom (EditorToolbar).
-      // From 1024 px: an app Panel (white, sand outline, 20px radius, soft pink shadow) in a sticky column.
+      // Bar: BerryPDF's strawberry-cream action tab fixed to the bottom (EditorToolbar).
+      // Side (>= 1024 px): an app Panel (white, sand outline, 20px radius, soft pink shadow) in a sticky column.
       className={[
         "fixed inset-x-0 bottom-0 z-20 rounded-t-[18px] bg-sand shadow-menu",
         "px-[15px] pt-3 pb-[calc(14px+env(safe-area-inset-bottom))]",
-        "lg:sticky lg:top-[calc(var(--ip-header-h)+24px)] lg:z-auto lg:flex lg:h-[calc(100dvh-var(--ip-header-h)-48px)] lg:max-h-[640px] lg:flex-col lg:rounded-panel lg:border-[1.5px] lg:border-panel-border lg:bg-surface-raised lg:p-7 lg:shadow-card",
+        side
+          ? "lg:sticky lg:top-[calc(var(--ip-header-h)+16px)] lg:z-auto lg:flex lg:h-(--ip-work-h) lg:flex-col lg:rounded-panel lg:border-[1.5px] lg:border-panel-border lg:bg-surface-raised lg:p-6 lg:shadow-card"
+          : "mp-dock-bar lg:px-8 lg:pt-3 lg:pb-[calc(12px+env(safe-area-inset-bottom))]",
       ].join(" ")}
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 lg:h-full lg:flex-col lg:items-stretch">
-        {(!full || desktop !== false) &&
-          (full ? (
-            // The scrolling panel stays keyboard-reachable while every control in it is disabled (axe scrollable-region-focusable).
-            <div tabIndex={optionsDisabled ? 0 : undefined} className="min-w-0 rounded-lg focus-visible:outline-focus max-lg:hidden lg:flex-1 lg:overflow-y-auto">
-              <fieldset disabled={optionsDisabled} className="min-w-0">
-                <legend className="sr-only">{label}</legend>
-                <h2 className="mb-5 hidden font-display text-[22px] leading-[1.2] font-semibold text-ink-black lg:block">Options</h2>
-                {options}
-              </fieldset>
-            </div>
-          ) : (
-            <fieldset disabled={optionsDisabled} className="min-w-0 sm:flex-1 lg:flex-1 lg:overflow-y-auto">
-              <legend className="sr-only">{label}</legend>
-              <h2 className="mb-5 hidden font-display text-[22px] leading-[1.2] font-semibold text-ink-black lg:block">Options</h2>
-              {options}
-            </fieldset>
-          ))}
-        {full && desktop !== true && (
+      <div
+        className={[
+          "flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4",
+          side ? "lg:min-h-0 lg:flex-1 lg:flex-col lg:items-stretch" : "lg:mx-auto lg:max-w-[1216px] lg:gap-8",
+        ].join(" ")}
+      >
+        {inline && (
+          <fieldset
+            disabled={optionsDisabled}
+            // A "full" panel stays keyboard-reachable while every control in it is disabled (axe scrollable-region-focusable).
+            tabIndex={full && optionsDisabled ? 0 : undefined}
+            className={[
+              "min-w-0 sm:flex-1",
+              side ? "ip-dock-scroll lg:min-h-0 lg:flex-1 lg:overflow-y-auto" : "",
+              full ? "rounded-lg focus-visible:outline-focus max-lg:hidden" : "",
+            ].join(" ")}
+            data-testid="dock-options"
+          >
+            <legend className="sr-only">{label}</legend>
+            {/* No visible title (minimal text); kept for heading navigation. */}
+            <h2 className="sr-only">Options</h2>
+            {options}
+          </fieldset>
+        )}
+        {sheetMode && (
           <Button
             ref={optionsButton}
             variant="secondary"
-            className="sm:flex-1 lg:hidden"
+            className={side ? "sm:flex-1 lg:hidden" : "sm:flex-1 lg:flex-none"}
             aria-haspopup="dialog"
             aria-expanded={sheetOpen}
             aria-label={sheet?.badge ? `Options, ${sheet.badge}` : "Options"}
@@ -124,12 +149,14 @@ export function ControlDock({
             </span>
           </Button>
         )}
-        <div className="flex flex-col gap-2 sm:min-w-[200px] lg:min-w-0">
-          <div className="max-lg:sr-only">{status}</div>
+        {full && !side && <span aria-hidden="true" className="hidden lg:block lg:flex-1" />}
+        <div className={["flex shrink-0 flex-col gap-2 sm:min-w-[200px]", side ? "lg:min-w-0" : "lg:flex-row lg:items-center lg:gap-5 lg:[&>*:last-child]:w-[260px] lg:[&>*:last-child]:shrink-0"].join(" ")} data-testid="dock-footer">
+          {/* On the sand bar the status reads in ink (muted on sand is under 4.5:1), beside the primary. */}
+          <div className={["max-lg:sr-only", side ? "" : "min-w-0 text-end [&_p]:text-ink"].join(" ")}>{status}</div>
           {footer}
         </div>
       </div>
-      {full && sheet && desktop === false && (
+      {sheetMode && sheet && (
         <Dialog
           open={sheetOpen}
           variant="sheet"

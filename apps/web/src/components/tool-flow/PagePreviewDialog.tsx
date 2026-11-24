@@ -6,6 +6,9 @@ import { Dialog } from "../ui/Dialog";
 import { ChevronLeftIcon, ChevronRightIcon } from "../ui/icons";
 import type { ReadyFile } from "./types";
 
+/** Vertical space the dialog needs around the page box (padding, title, file name, gaps, footer, margin). */
+const PREVIEW_CHROME_PX = 272;
+
 export type PreviewTarget = { items: { file: ReadyFile; index: number; rotation: number }[]; at: number };
 
 /**
@@ -32,8 +35,13 @@ export function PagePreviewDialog({
   const total = preview?.items.length ?? 0;
   const host = useRef<HTMLSpanElement>(null);
   const [size, setSize] = useState(600);
+  // Fit the first screen: the page box plus the dialog's title, description, footer and margins
+  // (about 270px) stay inside the viewport, so Previous / Next / Close are never below the fold.
   useEffect(() => {
-    setSize(Math.round(Math.min(window.innerHeight * 0.7, window.innerWidth * 0.85)));
+    const fit = () => setSize(Math.round(Math.max(200, Math.min(window.innerHeight - PREVIEW_CHROME_PX, window.innerWidth * 0.85, 900))));
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
   }, [preview]);
   useEffect(() => {
     if (!target || !renderer) return;
