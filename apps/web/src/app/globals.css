@@ -1765,11 +1765,11 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
 @media (min-width: 1024px) {
   .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) {
     --ip-intro-h: 56px;
-    --ip-pages-h: max(320px, calc(100vh - var(--ip-header-h) - var(--ip-intro-h) - var(--ip-dock-actual, 80px) - var(--ip-fold-gap)));
+    --ip-pages-h: max(320px, calc(100vh - var(--ip-header-h) - var(--ip-intro-h) - var(--ip-dock-actual, 88px) - var(--ip-fold-gap)));
   }
   @supports (height: 1dvh) {
     .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) {
-      --ip-pages-h: max(320px, calc(100dvh - var(--ip-header-h) - var(--ip-intro-h) - var(--ip-dock-actual, 80px) - var(--ip-fold-gap)));
+      --ip-pages-h: max(320px, calc(100dvh - var(--ip-header-h) - var(--ip-intro-h) - var(--ip-dock-actual, 88px) - var(--ip-fold-gap)));
     }
   }
   .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) .mp-intro h1 {

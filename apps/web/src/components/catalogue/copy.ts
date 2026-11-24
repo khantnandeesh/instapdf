@@ -8,6 +8,8 @@ export const catalogueCopy = {
   none: (q: string) => `No tools match “${q}”`,
   clear: "Clear search",
   readyOnly: "Only ready tools",
+  /** Phones, beside the search in the sticky bar; the switch is still named "Only ready tools". */
+  readyOnlyShort: "Ready only",
   jumpLabel: "Jump to a category",
   recentTitle: "Recently used",
   recentClear: "Clear",

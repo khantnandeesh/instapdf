@@ -1,11 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { clearRecent } from "@/lib/recent-tools";
-import {
-  matchTools,
-  normalizeQuery,
-  type ToolMatch,
-} from "@/lib/catalogue/search";
+import { matchTools, normalizeQuery, type ToolMatch } from "@/lib/catalogue/search";
 import { Button } from "../ui/Button";
 import { SearchIcon } from "../ui/icons";
 import { LiveRegion } from "../ui/LiveRegion";
@@ -21,12 +17,9 @@ import { useRecentTools } from "./useRecentTools";
 const LIVE_DELAY_MS = 400;
 
 /** Tool tiles: 2 columns on phones, 3 from 640px, 4 from 1024px; each tile rises in, staggered (mp-rise). */
-const TOOL_GRID =
-  "mp-rise grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4";
+const TOOL_GRID = "mp-rise grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4";
 
-const prefersReducedMotion = () =>
-  typeof window !== "undefined" &&
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
  * Home catalogue (spec F2 §3b, H-5): search, ready-only filter, category jump
@@ -50,24 +43,12 @@ export function Catalogue() {
   useEffect(() => {
     const sentinel = stickSentinel.current;
     const bar = stickBar.current;
-    if (!sentinel || !bar || typeof IntersectionObserver === "undefined")
-      return;
+    if (!sentinel || !bar || typeof IntersectionObserver === "undefined") return;
     const root = document.documentElement;
-    const headerH =
-      parseFloat(getComputedStyle(root).getPropertyValue("--ip-header-h")) ||
-      64;
-    const io = new IntersectionObserver(
-      ([e]) =>
-        setStuck(!e.isIntersecting && e.boundingClientRect.top < headerH),
-      { rootMargin: `-${headerH}px 0px 0px 0px` },
-    );
+    const headerH = parseFloat(getComputedStyle(root).getPropertyValue("--ip-header-h")) || 64;
+    const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting && e.boundingClientRect.top < headerH), { rootMargin: `-${headerH}px 0px 0px 0px` });
     io.observe(sentinel);
-    const ro =
-      typeof ResizeObserver === "undefined"
-        ? null
-        : new ResizeObserver(() =>
-            root.style.setProperty("--ip-catbar-h", `${bar.offsetHeight}px`),
-          );
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => root.style.setProperty("--ip-catbar-h", `${bar.offsetHeight}px`));
     ro?.observe(bar);
     return () => {
       io.disconnect();
@@ -91,8 +72,7 @@ export function Catalogue() {
     const q = query.trim();
     if (q) url.searchParams.set("q", q);
     else url.searchParams.delete("q");
-    if (url.href !== window.location.href)
-      window.history.replaceState(window.history.state, "", url);
+    if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
   }, [query]);
 
   const updateQuery = useCallback((q: string) => {
@@ -102,10 +82,7 @@ export function Catalogue() {
 
   // ---- filtering -------------------------------------------------------------------
   const searching = normalizeQuery(query) !== "";
-  const matches = useMemo(
-    () => matchTools(items, query).filter((m) => !readyOnly || usable(m.item)),
-    [items, query, readyOnly],
-  );
+  const matches = useMemo(() => matchTools(items, query).filter((m) => !readyOnly || usable(m.item)), [items, query, readyOnly]);
   const groups = useMemo(
     () =>
       categories
@@ -117,22 +94,14 @@ export function Catalogue() {
     [categories, matches],
   );
   const popular = useMemo(() => {
-    const ranked = items
-      .filter((i) => i.popularRank !== undefined)
-      .sort((a, b) => a.popularRank! - b.popularRank!);
-    return [
-      ...ranked.filter(usable),
-      ...(readyOnly ? [] : ranked.filter((i) => !usable(i))),
-    ];
+    const ranked = items.filter((i) => i.popularRank !== undefined).sort((a, b) => a.popularRank! - b.popularRank!);
+    return [...ranked.filter(usable), ...(readyOnly ? [] : ranked.filter((i) => !usable(i)))];
   }, [items, readyOnly]);
 
   // Polite announcement after typing stops (AC-21); none on load.
   useEffect(() => {
     if (!userChanged.current) return;
-    const t = setTimeout(
-      () => setLive(copy.live(matches.length)),
-      LIVE_DELAY_MS,
-    );
+    const t = setTimeout(() => setLive(copy.live(matches.length)), LIVE_DELAY_MS);
     return () => clearTimeout(t);
   }, [matches.length, query, readyOnly]);
 
@@ -146,20 +115,8 @@ export function Catalogue() {
   }, []);
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      const a =
-        e.target instanceof Element
-          ? e.target.closest("[data-focus-search]")
-          : null;
-      if (
-        !a ||
-        e.defaultPrevented ||
-        e.button !== 0 ||
-        e.metaKey ||
-        e.ctrlKey ||
-        e.shiftKey ||
-        e.altKey
-      )
-        return;
+      const a = e.target instanceof Element ? e.target.closest("[data-focus-search]") : null;
+      if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       e.preventDefault();
       const url = new URL(window.location.href);
       url.hash = "tools";
@@ -192,17 +149,9 @@ export function Catalogue() {
   return (
     // BerryPDF Home: the catalogue, grouped under coloured eyebrows, right on the grid paper (the only
     // background); the hero above is set off by spacing only (page.tsx).
-    <section
-      aria-labelledby="tools-heading"
-      className="pt-(--space-7) pb-(--space-8)"
-      data-testid="catalogue"
-    >
+    <section aria-labelledby="tools-heading" className="pt-(--space-7) pb-(--space-8)" data-testid="catalogue">
       <div className="mx-auto max-w-[1170px] px-[15px]">
-        <div
-          id="tools"
-          ref={headingRef}
-          className="scroll-mt-[calc(var(--ip-header-h)+var(--ip-catbar-h,0px)+16px)] text-center"
-        >
+        <div id="tools" ref={headingRef} className="scroll-mt-[calc(var(--ip-header-h)+var(--ip-catbar-h,0px)+16px)] text-center">
           <h2 id="tools-heading" className="text-section-title text-ink">
             {copy.title}
           </h2>
@@ -212,26 +161,10 @@ export function Catalogue() {
             the jump chips scroll with the page until they reach the header, then stay pinned under it
             while the list scrolls, and drop back into place on the way up. A sentinel just above it
             tells when it is stuck, which adds the soft shadow. */}
-        {/* The filter switch sits just above the bar, so the pinned bar stays compact on phones. */}
-        <div className="mt-5 flex justify-center">
-          <Switch
-            id="ready-only"
-            label={copy.readyOnly}
-            checked={readyOnly}
-            onChange={(v) => {
-              userChanged.current = true;
-              setReadyOnly(v);
-            }}
-          />
-        </div>
-        <div ref={stickSentinel} aria-hidden="true" className="h-px" />
-        <div
-          ref={stickBar}
-          data-stuck={stuck ? "" : undefined}
-          className="ip-sticky-bar sticky top-(--ip-header-h) z-10 -mx-[15px] mt-3 px-[15px] pb-2"
-          data-testid="catalogue-bar"
-        >
-          <div className="mx-auto flex max-w-[957px] pt-2 flex-wrap items-center justify-center gap-x-5 gap-y-2">
+        <div ref={stickSentinel} aria-hidden="true" className="mt-6 h-px" />
+        <div ref={stickBar} data-stuck={stuck ? "" : undefined} className="ip-sticky-bar sticky top-(--ip-header-h) z-10 -mx-[15px] px-[15px] pb-2" data-testid="catalogue-bar">
+          {/* Phones: search and the filter share one row (short label) so the pinned bar stays compact. */}
+          <div className="mx-auto flex max-w-[957px] items-center justify-center gap-x-3 gap-y-2 pt-2 max-sm:flex-nowrap sm:flex-wrap sm:gap-x-5">
             <SearchField
               ref={searchRef}
               id={CATALOGUE_SEARCH_ID}
@@ -243,24 +176,29 @@ export function Catalogue() {
               onEscape={() => updateQuery("")}
               placeholder={copy.searchPlaceholder}
               shortcutHint
-              className="w-full md:max-w-[480px] md:flex-1"
+              className="min-w-0 max-sm:flex-1 sm:w-full md:max-w-[480px] md:flex-1"
+            />
+            <Switch
+              id="ready-only"
+              label={copy.readyOnly}
+              shortLabel={copy.readyOnlyShort}
+              className="shrink-0"
+              checked={readyOnly}
+              onChange={(v) => {
+                userChanged.current = true;
+                setReadyOnly(v);
+              }}
             />
           </div>
           <LiveRegion message={live} />
 
           {!searching && (
             // Inline padding offset by negative margins keeps edge chips' focus outlines inside the scroller.
-            <nav
-              aria-label={copy.jumpLabel}
-              className="ip-scroll-x -mx-1.5 mt-4 px-1.5"
-            >
+            <nav aria-label={copy.jumpLabel} className="ip-scroll-x -mx-1.5 mt-4 px-1.5">
               <ul className="flex gap-2 py-1.5 max-lg:flex-nowrap lg:flex-wrap lg:justify-center">
                 {groups.map((g) => (
                   <li key={g.id} className="shrink-0">
-                    <a
-                      href={`#cat-${g.id}`}
-                      className="mp-navlink mp-navlink--chip"
-                    >
+                    <a href={`#cat-${g.id}`} className="mp-navlink mp-navlink--chip">
                       {g.label}
                     </a>
                   </li>
@@ -273,20 +211,12 @@ export function Catalogue() {
         <div className="mx-auto lg:w-[957px]">
           {!searching && (
             <div className="ip-recent-slot mt-8">
-              <RecentStrip
-                items={readyOnly ? recent.filter(usable) : recent}
-                onClear={onClearRecent}
-                idPrefix="home"
-              />
+              <RecentStrip items={readyOnly ? recent.filter(usable) : recent} onClear={onClearRecent} idPrefix="home" />
             </div>
           )}
 
           {!searching && popular.length > 0 && (
-            <section
-              aria-labelledby="popular-heading"
-              className="ip-cat-popular mt-8"
-              data-testid="popular"
-            >
+            <section aria-labelledby="popular-heading" className="ip-cat-popular mt-8" data-testid="popular">
               <h3 id="popular-heading" className="mp-eyebrow">
                 {copy.popularTitle}
               </h3>
@@ -303,15 +233,7 @@ export function Catalogue() {
           {groups.length === 0 ? (
             <NoResults query={query.trim()} onClear={clearSearch} />
           ) : (
-            groups.map((g) => (
-              <CategorySection
-                key={g.id}
-                id={g.id}
-                label={g.label}
-                matches={g.matches}
-                searching={searching}
-              />
-            ))
+            groups.map((g) => <CategorySection key={g.id} id={g.id} label={g.label} matches={g.matches} searching={searching} />)
           )}
         </div>
       </div>
@@ -319,24 +241,9 @@ export function Catalogue() {
   );
 }
 
-function CategorySection({
-  id,
-  label,
-  matches,
-  searching,
-}: {
-  id: string;
-  label: string;
-  matches: ToolMatch<ToolIndexItem>[];
-  searching: boolean;
-}) {
+function CategorySection({ id, label, matches, searching }: { id: string; label: string; matches: ToolMatch<ToolIndexItem>[]; searching: boolean }) {
   return (
-    <section
-      id={`cat-${id}`}
-      aria-labelledby={`cat-${id}-heading`}
-      className={`ip-cat-${id} mt-8 scroll-mt-[calc(var(--ip-header-h)+var(--ip-catbar-h,0px)+16px)]`}
-      data-testid="category"
-    >
+    <section id={`cat-${id}`} aria-labelledby={`cat-${id}-heading`} className={`ip-cat-${id} mt-8 scroll-mt-[calc(var(--ip-header-h)+var(--ip-catbar-h,0px)+16px)]`} data-testid="category">
       {/* BerryPDF eyebrow: UPPERCASE Fredoka in the category's berry colour (text shade, see tokens.css). */}
       <h3 id={`cat-${id}-heading`} className="mp-eyebrow">
         {label}
@@ -344,11 +251,7 @@ function CategorySection({
       <ul role="list" className={TOOL_GRID}>
         {matches.map((m) => (
           <li key={m.item.slug}>
-            <ToolCard
-              item={m.item}
-              nameRange={searching ? m.name : undefined}
-              summaryRange={searching ? m.summary : undefined}
-            />
+            <ToolCard item={m.item} nameRange={searching ? m.name : undefined} summaryRange={searching ? m.summary : undefined} />
           </li>
         ))}
       </ul>
@@ -358,16 +261,11 @@ function CategorySection({
 
 function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
   return (
-    <div
-      className="mt-10 flex flex-col items-center gap-2 py-8 text-center"
-      data-testid="no-results"
-    >
+    <div className="mt-10 flex flex-col items-center gap-2 py-8 text-center" data-testid="no-results">
       <span className="grid size-16 place-items-center rounded-full bg-surface-raised text-brand-strong shadow-card">
         <SearchIcon size={30} />
       </span>
-      <p className="mt-2 font-bold [overflow-wrap:anywhere]">
-        {copy.none(query)}
-      </p>
+      <p className="mt-2 font-bold [overflow-wrap:anywhere]">{copy.none(query)}</p>
       <Button variant="outline" className="mt-2" onClick={onClear}>
         {copy.clear}
       </Button>

@@ -628,8 +628,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
                 <div
                   ref={setScrollArea}
                   data-testid="pages-scroll"
-                  className="ip-scroll flex flex-col gap-4 pt-3 pb-6 lg:-mx-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5"
-                  style={{ minHeight: "calc(var(--ip-thumb-size) + 76px)" }}
+                  className="ip-scroll flex flex-col gap-4 pt-3 pb-6 max-lg:min-h-[calc(var(--ip-thumb-size)+76px)] lg:-mx-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5"
                   inert={state === "processing" ? true : undefined}
                 >
                   {ownerBlocked.map((f) => (

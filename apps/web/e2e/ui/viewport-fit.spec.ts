@@ -91,7 +91,13 @@ for (const tool of usable) {
         await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
         await page.mouse.wheel(0, 3000);
         await expect.poll(() => pages.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
-        await expect.poll(() => page.evaluate(() => window.scrollY), { message: "the page itself does not scroll" }).toBe(0);
+        // Wheel well past the end of the pages: the scroll must stay inside the pages area
+        // (overscroll-behavior: contain), so the page itself never moves.
+        for (let i = 0; i < 4; i++) await page.mouse.wheel(0, 20_000);
+        await expect.poll(() => pages.evaluate((el) => Math.ceil(el.scrollTop + el.clientHeight) >= el.scrollHeight - 1)).toBe(true);
+        await page.mouse.wheel(0, 2000);
+        await page.waitForTimeout(300);
+        expect(await page.evaluate(() => window.scrollY), "the page itself does not scroll").toBe(0);
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded, pages scrolled)");
         await expectInViewport(page, page.getByRole("button", { name: /Add files|Replace file/ }), "add files (loaded, pages scrolled)");
 
@@ -101,9 +107,25 @@ for (const tool of usable) {
         await expectInViewport(page, page.getByRole("dialog").getByRole("button", { name: "Next" }), "Next in the page preview");
         await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
 
+        // At the largest thumbnail size the pages area still ends above the bottom bar.
+        await page.getByRole("slider", { name: "Thumbnail size" }).focus();
+        await page.keyboard.press("End");
+        await expect
+          .poll(
+            async () => {
+              const scroller = (await pages.boundingBox())!;
+              const bar = (await page.locator("[data-ip-dock]").boundingBox())!;
+              return scroller.y + scroller.height <= bar.y + 1;
+            },
+            {
+              message: "pages area (max thumbnails) ends above the bottom bar",
+            },
+          )
+          .toBe(true);
+
         await page.getByTestId("primary-action").click();
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "done", { timeout: 30_000 });
-        // The result scrolls the page back to the top (smoothly where motion is allowed): wait for it to settle.
+        // The result scrolls the page back to the top: wait for the result to settle.
         await expect(async () => expectInViewport(page, page.getByRole("link", { name: "Download" }), "Download (result)")).toPass({ timeout: 5_000 });
       });
     }
@@ -127,6 +149,10 @@ for (const tool of usable) {
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
         await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded, scrolled)");
+
+        await page.getByTestId("primary-action").click();
+        await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "done", { timeout: 30_000 });
+        await expect(async () => expectInViewport(page, page.getByRole("link", { name: "Download" }), "Download (result)")).toPass({ timeout: 5_000 });
       });
     }
   });
