@@ -28,7 +28,8 @@ test("AC-120: no sources trigger or provider name on /merge-pdf, in any menu", a
   await expect(page.getByTestId("cloud-caret")).toHaveCount(0);
   await pickMerge(page, "alpha.pdf");
   // Open every menu the workspace has: none lists a provider.
-  for (const trigger of await page.locator("[aria-haspopup=menu]:visible").all()) {
+  // A filter, not a visible pseudo-class in the selector: Tailwind scans this file and would read that as a class.
+  for (const trigger of await page.locator("[aria-haspopup=menu]").filter({ visible: true }).all()) {
     await trigger.click();
     await expect(page.getByRole("menu")).toBeVisible();
     expect(await page.getByRole("menu").innerText()).not.toMatch(PROVIDERS);
