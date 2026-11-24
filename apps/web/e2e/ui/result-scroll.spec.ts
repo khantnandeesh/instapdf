@@ -29,6 +29,8 @@ for (const tool of usable) {
     });
     await page.getByTestId("primary-action").click();
     await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "done", { timeout: 30_000 });
+    // The page must be tall enough for the smooth scroll to go somewhere, or the test proves nothing.
+    expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight), "the result page can scroll").toBeGreaterThan(0);
     // Let any smooth scroll run to its end.
     await page.waitForTimeout(1200);
     expect(await page.evaluate(() => window.scrollY), "the result stays at the top").toBe(0);

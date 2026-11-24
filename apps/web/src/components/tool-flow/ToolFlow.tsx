@@ -560,16 +560,22 @@ export function ToolFlow({
     if (phase === "processing") progressBox.current?.focus();
     else if (phase === "error") retryButton.current?.focus();
     // Fit the first screen: the result starts at the top, so Download is never under the header.
-    // Unconditional and repeated after two frames: a smooth scroll already in flight (scrollY may still
-    // read 0) is not cancelled by an instant scrollTo and would otherwise carry the result away.
+    // A smooth scroll already in flight is only cancelled by an instant scroll that really moves the
+    // page (scrollTo(0, 0) while scrollY still reads 0 is a no-op), so step to 1 and back, now and again
+    // after two frames.
     else if (phase === "done") {
       const root = document.documentElement;
+      const before = root.style.scrollBehavior;
+      const toTop = () => {
+        window.scrollTo(0, 1);
+        window.scrollTo(0, 0);
+      };
       root.style.scrollBehavior = "auto";
-      window.scrollTo(0, 0);
+      toTop();
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
-          window.scrollTo(0, 0);
-          root.style.scrollBehavior = "";
+          toTop();
+          root.style.scrollBehavior = before;
         }),
       );
     }
