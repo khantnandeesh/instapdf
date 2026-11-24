@@ -8,7 +8,9 @@
  */
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { Asset } from "@/lib/editor/build";
-import { callEngine, describeEngineError, setEngineFileSize, type EngineError } from "@/lib/editor/engine-client";
+import { callEngine, describeEngineError, engineErrorLog, offersLineReplacement, setEngineFileSize, type EngineError } from "@/lib/editor/engine-client";
+import { editorFontFor, lineReplacement } from "@/lib/editor/replace-line";
+import { ensureFace, measurer } from "@/lib/editor/fonts-browser";
 import * as H from "@/lib/editor/history";
 import {
   addObjects,
@@ -399,11 +401,39 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         if (result.substitutions.some((x) => !x.same_family)) ui.toast({ text: "Some characters use a similar font.", tone: "info" });
       } catch (err) {
         if (isEngineError(err)) {
-          ui.toast({ text: describeEngineError(err), tone: "danger" });
+          console.warn(engineErrorLog(err));
+          const action = offersLineReplacement(err) ? { label: "Replace with new text", run: () => void ctl.replaceLineWithText(e) } : undefined;
+          ui.toast({ text: describeEngineError(err), tone: "danger", action });
           if (err.kind === "crashed" || err.kind === "aborted" || err.kind === "internal") await ctl.recoverEngine();
         } else ui.toast({ text: "That change couldn’t be made.", tone: "danger" });
       } finally {
         store.set({ busy: null });
+      }
+    },
+
+    /**
+     * Fallback for an edit the engine refused: cover the line with a whiteout and put a text box
+     * with the typed text in its place (same size, colour and baseline, the closest editor font).
+     */
+    async replaceLineWithText(edit: { src: number; line: number; text: string }) {
+      const s = store.get();
+      const page = s.texts[edit.src];
+      const line = page?.lines[edit.line];
+      const entry = state().pages.find((p) => p.src === edit.src);
+      if (!page || !line || !entry) return;
+      const face = editorFontFor(page.fonts[line.runs[0]?.font ?? -1]);
+      const size = line.runs[0]?.size ?? line.size;
+      try {
+        const metrics = await ensureFace(face.font, face.bold, face.italic, edit.text);
+        const objs = lineReplacement({ line, fonts: page.fonts, entry, text: edit.text, face, metrics, measure: measurer(face.font, size, face.bold, face.italic) });
+        if (!objs) {
+          ui.toast({ text: "This line can’t be replaced automatically. Use Whiteout and Text instead.", tone: "info" });
+          return;
+        }
+        ctl.add(objs, "Replace line", false);
+        ui.announce("Line replaced with new text");
+      } catch {
+        ui.toast({ text: "The font for the new text couldn’t load. Please try again.", tone: "danger" });
       }
     },
 

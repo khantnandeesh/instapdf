@@ -849,11 +849,25 @@
   color: var(--color-ink-black);
 }
 .ed-toast__act {
+  flex: none;
+  white-space: nowrap;
   height: 36px;
   padding: 0 12px;
   border-radius: 99px;
   color: var(--color-brand-strong);
   font-weight: 700;
+}
+/* Narrow screens: a long notice keeps the full width and its action goes under it. */
+.ed-narrow .ed-toast:has(.ed-toast__act) {
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+}
+.ed-narrow .ed-toast:has(.ed-toast__act) > span {
+  flex: 1 1 calc(100% - 44px);
+}
+.ed-narrow .ed-toast:has(.ed-toast__act) > .ed-toast__act {
+  order: 3;
+  margin-left: -12px;
 }
 .ed-toast__act:hover,
 .ed-toast__x:hover {

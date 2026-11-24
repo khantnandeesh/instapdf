@@ -137,10 +137,11 @@ export function preloadEngine(priority: "low" | "high" = "low"): Promise<boolean
 }
 
 /** Short user-facing text for an engine error. */
+/** What the user is told when an edit is refused. Never quotes the engine's own message. */
 export function describeEngineError(e: EngineError): string {
   switch (e.kind) {
     case "missing-glyphs":
-      return `This font has no ${[...e.chars].map((c) => `“${c}”`).join(" ")}. Try other characters.`;
+      return `This font in the file has no ${[...new Set(e.chars)].map((c) => `“${c}”`).join(" ")}.`;
     case "read-only":
     case "unsupported":
       return "This line can’t be edited yet.";
@@ -152,9 +153,26 @@ export function describeEngineError(e: EngineError): string {
     case "aborted":
       return "The editor restarted. Please try that again.";
     case "verify":
+      if (e.reason === "overflow") return "The edited line would run past the page edge.";
+      if (e.reason === "overlap") return "The edited line would run into the text next to it.";
+      return "We couldn’t apply this edit safely, so the line is unchanged. Try a shorter change, or replace the line with new text.";
     case "save":
-      return "That change didn’t pass our checks, so it wasn’t made.";
+      return "Saving this edit failed, so the line is unchanged. Please try again.";
     default:
       return "Something went wrong. Please try again.";
   }
+}
+
+/** True when "Replace with new text" (cover the line, add a text box in its place) can stand in for an edit the engine refused. */
+export function offersLineReplacement(e: EngineError): boolean {
+  return e.kind === "verify";
+}
+
+/**
+ * One console line for a refused edit: the kind and reason code only. The engine's message can
+ * quote the file's text, so it is never logged.
+ */
+export function engineErrorLog(e: EngineError): string {
+  const reason = "reason" in e && typeof e.reason === "string" ? `/${e.reason}` : "";
+  return `[editor] edit not applied: ${e.kind}${reason}`;
 }
