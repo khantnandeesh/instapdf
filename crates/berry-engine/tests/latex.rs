@@ -221,6 +221,13 @@ fn mixed_direction_text_in_an_arabic_line() {
             ("مرحبا", " 2024"),
             ("مرحبا", " abc 12"),
             ("مرحبا", "!"),
+            // Punctuation next to punctuation, and a left-to-right run of two words: PDFium
+            // reorders them, so they are refused. An Arabic word is the kept control.
+            ("مرحبا", "\u{60c} نعم"),
+            ("مرحبا", ": نعم"),
+            ("مرحبا", ", نعم"),
+            ("مرحبا", " abc def"),
+            ("مرحبا", " جديد"),
         ] {
             let mut e = Engine::open(read(file), None).unwrap();
             assert!(e.add_font("Noto Naskh Arabic", false, false, read("fonts/NotoNaskhArabic-Regular.ttf")));
@@ -229,7 +236,11 @@ fn mixed_direction_text_in_an_arabic_line() {
             let p = e.page_text(0).unwrap();
             let id = line_id(&p, starts);
             let want = format!("{}{tail}", p.lines[id].text);
-            match e.replace_line(0, id, &want) {
+            let result = e.replace_line(0, id, &want);
+            let must_refuse = ["!", "\u{60c} نعم", ": نعم", ", نعم", " abc def"].contains(&tail);
+            assert!(!must_refuse || result.is_err(), "{file} {tail:?}: kept, but PDFium reorders it");
+            assert!(tail != " جديد" || result.is_ok(), "{file} {tail:?}: the Arabic control was refused: {result:?}");
+            match result {
                 Ok(r) => {
                     assert!(texts(&r.page).contains(&want), "{file}: {:?}", texts(&r.page));
                     // No ActualText span covers the new text: the glyphs alone read as typed.

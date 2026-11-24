@@ -58,7 +58,11 @@ codebase that runs as WebAssembly in the browser and natively for the consented 
    (`text-mismatch`), not wrapped in ActualText. In a line with right-to-left text that reads by
    its glyphs, a new word that would need ActualText (digits drawn with an Arabic font's glyphs,
    whose ToUnicode maps them elsewhere) is refused the same way, since pdf.js ignores
-   ActualText. The editor offers "Replace with new text" for both.
+   ActualText. Two more cases PDFium orders differently from UAX #9 (the engine's read-back)
+   are refused the same way in a right-to-left line: punctuation typed next to punctuation
+   ("تجريبي." + "، نعم" reads "تجريبي،. نعم"; also ".!", ": ", ", "), and a left-to-right run
+   of two or more words (" abc def" reads "defabc"). The editor offers "Replace with new text"
+   for all of them.
 7. **Save.** The output is the original bytes plus one appended revision (incremental update).
    It is read back and every object is compared with the engine's copy. A failure is a `save`
    error with a reason code (`write-failed`, `prefix-changed`, `reparse-failed`,
@@ -99,11 +103,12 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
   ToUnicode map lacks the new glyphs). Chrome- and LibreOffice-made Arabic, which uses
   ActualText throughout, already reads reversed in PDFium before any edit.
 - pdf.js orders the text items of a line by content order. A word drawn in a font the line
-  doesn't otherwise use (a registered face, for a character the subset lacks, as "!" after
-  "تجريبي.") is its own item, so in a right-to-left line pdf.js can read it ahead of the line
-  ("تجريبي.!مرحبا بالعالم…"); PDFium reads it in place. Refusing these would also refuse plain
-  Arabic word edits that need a registered face (AC-205), so they are kept;
-  `apps/web/src/lib/editor/mixed-direction.test.ts` pins the limit.
+  doesn't otherwise use (a registered face, for letters the subset lacks, as in AC-205's
+  "بالعالم،" → "بالجميع،" on scripts-plain.pdf) is its own item, so in a right-to-left line pdf.js
+  can read the words out of order ("هذا نص تجريبي. بالجميع، مرحبا"). PDFium reads those edits in
+  order (checked for AC-205 and an appended Arabic word); refusing them would refuse most
+  Arabic word edits on such files, so they are kept. This is a pdf.js-only limit: every kept edit
+  must read correctly in PDFium, and the cases where PDFium reorders are refused (above).
 - A digit typed into an Arabic line is kept when the line's font maps that digit in its
   ToUnicode (digits read in typed order in both readers). A digit the subset doesn't map (the
   "3" in scripts-plain.pdf, whose subset maps only 0, 2, 5 and 7) would read as typed only

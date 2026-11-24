@@ -342,6 +342,41 @@ impl Engine {
         }
         // Whether the line has right-to-left text (see the ActualText check after step 4).
         let any_rtl = rtl || runs.iter().any(|r| r.1);
+        // Readers rebuild a right-to-left line's order from the glyphs with their own bidi rules,
+        // and PDFium does not agree with UAX #9 (our read-back) on two cases, so they are refused:
+        // (a) punctuation typed next to punctuation ("تجريبي." + "، نعم" reads "تجريبي،. نعم"):
+        //     a run of neutrals is ordered by its neighbours, which the edit changed;
+        // (b) a left-to-right run of two or more words in a right-to-left line (" abc def" reads
+        //     "defabc"): PDFium orders the words of the run right to left.
+        if any_rtl {
+            use unicode_bidi::BidiClass::{CS, ES, ET, ON};
+            let neutral = |c: char| matches!(unicode_bidi::bidi_class(c), CS | ES | ET | ON);
+            let mut seq: Vec<char> = Vec::new();
+            if a0 > 0 {
+                seq.extend(text_of(a0 - 1..a0).chars().last());
+            }
+            seq.extend(inserted.chars());
+            if b0 < n {
+                seq.extend(text_of(b0..b0 + 1).chars().next());
+            }
+            if seq.windows(2).any(|w| neutral(w[0]) && neutral(w[1])) {
+                return Err(verify(
+                    "text-mismatch",
+                    format!("{inserted:?} puts punctuation next to punctuation in a right-to-left line, which PDFium reorders"),
+                ));
+            }
+        }
+        if rtl {
+            for (range, run_rtl) in &runs {
+                let words = segment[range.clone()].split_whitespace().filter(|w| w.chars().any(char::is_alphanumeric)).count();
+                if !run_rtl && words >= 2 {
+                    return Err(verify(
+                        "text-mismatch",
+                        format!("{:?} is a left-to-right run of several words in a right-to-left line, which PDFium reverses", &segment[range.clone()]),
+                    ));
+                }
+            }
+        }
         for (range, run_rtl) in runs {
             let run = &segment[range];
             let mut parts: Vec<(bool, &str)> = Vec::new();

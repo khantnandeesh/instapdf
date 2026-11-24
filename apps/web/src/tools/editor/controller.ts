@@ -560,8 +560,9 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
           ui.toast({ text: "This line can’t be replaced automatically. Use Whiteout and Text instead.", tone: "info" });
           return;
         }
-        ctl.add(objs, "Replace line", false);
-        ui.announce("Line replaced with new text");
+        ctl.add([...objs], "Replace line", false);
+        if (objs.overlaps) ui.toast({ text: "The new text runs into text below it. Shorten it, or move or resize the box.", tone: "info" });
+        else ui.announce("Line replaced with new text");
       } catch {
         ui.toast({ text: "The font for the new text couldn’t load. Please try again.", tone: "danger" });
       }

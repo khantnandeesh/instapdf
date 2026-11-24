@@ -127,6 +127,14 @@ describe("lineReplacement", () => {
     expect(w.y + w.h).toBeLessThanOrEqual(792 - below.y1);
   });
 
+  it("flags text that still runs into other text, and not text that fits", () => {
+    const below = { x0: 72, y0: 683, x1: 220, y1: 694 };
+    const r = (text: string) => lineReplacement({ line: line(), fonts: [font({})], entry, text, face: editorFontFor(font({})), metrics, measure, others: [below] })!;
+    expect(r("word ".repeat(30).trim()).overlaps).toBe(true);
+    expect(r("x".repeat(45)).overlaps).toBe(false);
+    expect(r("short").overlaps).toBe(false);
+  });
+
   it("wraps at the page edge for a line that ends near it", () => {
     const near = line({ bbox: { x0: 400, y0: 697, x1: 600, y1: 708 }, origin: [400, 700] });
     const [, t] = lineReplacement({ line: near, fonts: [font({})], entry, text: "word ".repeat(60).trim(), face: editorFontFor(font({})), metrics, measure })!;

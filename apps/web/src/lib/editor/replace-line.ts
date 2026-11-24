@@ -39,7 +39,7 @@ export type LineReplacementInput = {
 };
 
 type Box = { x: number; y: number; w: number; h: number };
-const overlaps = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const overlaps2 = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 const union = (a: Box, b: Box): Box => {
   const x = Math.min(a.x, b.x);
   const y = Math.min(a.y, b.y);
@@ -58,7 +58,10 @@ const union = (a: Box, b: Box): Box => {
  * text. The original text stays in the file under the whiteout (copy and search still find it);
  * removing it is for a later version.
  */
-export function lineReplacement({ line, fonts, entry, text, face, metrics, measure, fill = "#ffffff", others = [] }: LineReplacementInput): [WhiteoutObj, TextObj] | null {
+/** The whiteout and the text box; `overlaps` when the wrapped text still runs into other page text. */
+export type LineReplacement = [WhiteoutObj, TextObj] & { overlaps: boolean };
+
+export function lineReplacement({ line, fonts, entry, text, face, metrics, measure, fill = "#ffffff", others = [] }: LineReplacementInput): LineReplacement | null {
   if (Math.abs(line.angle) > 0.5) return null;
   const run = line.runs[0];
   const size = run?.size ?? line.size;
@@ -88,7 +91,7 @@ export function lineReplacement({ line, fonts, entry, text, face, metrics, measu
     const x = rtl ? start - dims.w : start;
     // The whiteout grows over wrapped lines below the line.
     const cover = lines.length > 1 ? union(box, { x: x - pad, y: y - pad, w: dims.w + 2 * pad, h: dims.h + 2 * pad }) : box;
-    return { fitted, wrap, lines, dims, x, y, cover, free: !taken.some((t) => overlaps(cover, t)) };
+    return { fitted, wrap, lines, dims, x, y, cover, free: !taken.some((t) => overlaps2(cover, t)) };
   };
   let l = layout(0.8);
   if (!l.free) {
@@ -116,5 +119,7 @@ export function lineReplacement({ line, fonts, entry, text, face, metrics, measu
     color: run ? hex(run.color) : "#000000",
     align: rtl ? "right" : "left",
   };
-  return [whiteout, obj];
+  // At 60% and still wrapping into other text: the whiteout doesn't hide that text, so say so.
+  const overlaps = taken.some((t) => overlaps2({ x: l.x, y: l.y, w: l.dims.w, h: l.dims.h }, t));
+  return Object.assign([whiteout, obj] as [WhiteoutObj, TextObj], { overlaps });
 }

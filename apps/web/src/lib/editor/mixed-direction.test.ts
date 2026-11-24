@@ -49,11 +49,12 @@ async function pdfjsText(bytes: Uint8Array): Promise<string> {
 }
 
 const squash = (s: string) => s.replace(/\s+/g, "");
-const sorted = (s: string) => [...squash(s)].sort().join("");
-/** Kept edits pdf.js reads out of order (a word in another font is a text item of its own). */
-const ORDER_LIMIT = new Set(["!"]);
-/** Edits that need ActualText here: refused (crates/berry-engine/src/complex.rs). */
-const MUST_REFUSE = new Set([" 2024", " abc 12"]);
+/**
+ * Edits refused here (crates/berry-engine/src/complex.rs): new words that need ActualText, which
+ * pdf.js ignores; punctuation next to punctuation and a left-to-right run of two words, which
+ * PDFium reorders ("تجريبي،. نعم", "defabc").
+ */
+const MUST_REFUSE = new Set([" 2024", " abc 12", "!", "، نعم", ": نعم", ", نعم", " abc def"]);
 
 describe("mixed-direction edits in an Arabic line (scripts-plain.pdf)", () => {
   for (const [starts, tail] of [
@@ -64,10 +65,12 @@ describe("mixed-direction edits in an Arabic line (scripts-plain.pdf)", () => {
     // typed only through ActualText, which pdf.js ignores ("202v", "abc s2"), so they are refused.
     ["مرحبا", " 2024"],
     ["مرحبا", " abc 12"],
-    // The line ends "تجريبي." already, so this makes ".!". The subset has no "!", so the word is
-    // drawn in the registered face: a text item of its own, which pdf.js puts in content order,
-    // ahead of the line. A known pdf.js ordering limit (crates/README.md): pdfium reads it as typed.
+    // Punctuation next to the line's final "." (".!", ".،"), and two Latin words: PDFium reorders them.
     ["مرحبا", "!"],
+    ["مرحبا", "، نعم"],
+    ["مرحبا", ": نعم"],
+    ["مرحبا", ", نعم"],
+    ["مرحبا", " abc def"],
     // An Arabic word only: kept, and both readers must read it as typed.
     ["مرحبا", " جديد"],
   ] as const) {
@@ -86,7 +89,7 @@ describe("mixed-direction edits in an Arabic line (scripts-plain.pdf)", () => {
         try {
           result = doc.replaceLine(0, id, want);
         } catch (err) {
-          if (!/[A-Za-z0-9\u2013]/.test(tail)) throw err;
+          if (!MUST_REFUSE.has(tail) && !/[A-Za-z0-9\u2013]/.test(tail)) throw err;
           expect((err as { kind: string; reason?: string }).reason).toBe("text-mismatch");
           expect(doc.pageText(0).lines.map((l) => l.text)).toEqual(page.lines.map((l) => l.text));
           return;
@@ -95,13 +98,7 @@ describe("mixed-direction edits in an Arabic line (scripts-plain.pdf)", () => {
         expect(result.page.lines.map((l) => l.text)).toContain(want);
         const bytes = doc.save().bytes;
         if (pdfium) expect(squash(pdfiumText(bytes))).toContain(squash(want));
-        const read = squash(await pdfjsText(bytes));
-        if (ORDER_LIMIT.has(tail)) {
-          // Every character is there; only the order of the line's text items differs.
-          const before = squash(await pdfjsText(new Uint8Array(readFileSync(corpus("scripts-plain.pdf")))));
-          expect(sorted(read)).toBe(sorted(before + tail));
-          expect(read).not.toContain(squash(want));
-        } else expect(read).toContain(squash(want));
+        expect(squash(await pdfjsText(bytes))).toContain(squash(want));
       } finally {
         doc.free();
       }
