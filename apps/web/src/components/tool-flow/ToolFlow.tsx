@@ -794,10 +794,12 @@ export function ToolFlow({
           cloud={cloud.enabled ? { pushNotice, from: files.map((f) => cloudOrigin(f.source)).find(Boolean) ?? null } : undefined}
         />
       ) : (
-        // Empty: the drop area and the tall options panel side by side (both --ip-work-h, fit the
-        // first screen). Loaded: the pages take the full width down to the compact bottom bar.
+        // Empty: the drop area (--ip-work-h, fits the first screen) beside the options panel, which grows
+        // with its options. When the panel runs past the fold the page scrolls (never the panel), the drop
+        // area stays in view (sticky) and the primary stays pinned at the bottom of the screen.
+        // Loaded: the pages take the full width down to the compact bottom bar.
         <div className={state === "empty" ? "lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]" : undefined}>
-          <section aria-label="Your files" className="min-w-0">
+          <section aria-label="Your files" className={state === "empty" ? "min-w-0 lg:sticky lg:top-[calc(var(--ip-header-h)+16px)]" : "min-w-0"}>
             {state === "empty" ? (
               <DropCard>
                 <FilePicker
@@ -822,7 +824,7 @@ export function ToolFlow({
               // and the pages scroll inside it with a slim BerryPDF scroll bar (shown only on overflow);
               // below 1024 px the page scrolls and the tools row sticks under the header.
               <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 sm:px-5 lg:flex lg:h-(--ip-pages-h) lg:flex-col">
-                <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] shrink-0 items-center gap-4 rounded-t-panel bg-cream px-3 sm:-mx-5 sm:px-5 lg:static">
+                <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] shrink-0 items-center gap-2 rounded-t-panel bg-cream px-3 sm:-mx-5 sm:gap-3 sm:px-5 lg:static lg:gap-4">
                   {showViewToggle && (
                     <SegmentedControl
                       look="tabs"
@@ -845,7 +847,8 @@ export function ToolFlow({
                   {toolbarStart?.(wctx)}
                   {view === "pages" && (
                     <Slider
-                      className="max-sm:hidden"
+                      // Tablets: a shorter track so the row (view, sort, size, add) fits 768 px without widening the page.
+                      className="max-sm:hidden max-lg:[&_.ip-range]:w-20"
                       label="Thumbnail size"
                       min={THUMB_MIN}
                       max={THUMB_MAX}
@@ -888,6 +891,7 @@ export function ToolFlow({
                   ref={setScrollArea}
                   data-testid="pages-scroll"
                   className="ip-scroll flex flex-col gap-4 pt-3 pb-6 max-lg:min-h-[calc(var(--ip-thumb-size)+76px)] lg:-mx-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5"
+                  data-ip-scroll="pages"
                   inert={state === "processing" ? true : undefined}
                 >
                   {ownerBlocked.map((f) => (

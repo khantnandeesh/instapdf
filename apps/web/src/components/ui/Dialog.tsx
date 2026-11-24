@@ -112,6 +112,9 @@ export function Dialog({
       aria-labelledby={titleId}
       aria-modal={variant === "fullscreen" ? true : undefined}
       aria-describedby={description ? descId : undefined}
+      // One scroller per layer (docs/design/berrypdf.md "Scrolling"): the full-screen dialog scrolls itself;
+      // the sheet and the modal scroll their inner body, so the <dialog> element never does.
+      data-ip-scroll={variant === "fullscreen" ? "overlay" : undefined}
       className={cx(
         variant === "fullscreen"
           ? "mp-modal-in m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto overscroll-contain border-0 bg-surface-raised p-0 text-ink backdrop:bg-transparent"
@@ -146,12 +149,16 @@ export function Dialog({
               {onCloseButton && <IconButton label="Close" icon={<CloseIcon size={18} />} variant="soft" tooltip={false} onClick={onCloseButton} />}
             </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4" data-ip-scroll="overlay">
+            {children}
+          </div>
           {footer && <div className="flex shrink-0 flex-wrap gap-2 border-t-[1.5px] border-sand px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">{footer}</div>}
         </div>
       )}
       {open && variant === "default" && (
-        <div className="flex flex-col gap-5 px-7 pt-[34px] pb-[26px]">
+        // The modal's one scroll region (only used when it is taller than the screen). A dialog with a long list
+        // (the page picker) caps the list instead, so this never scrolls around a second scroller.
+        <div className="flex max-h-[calc(100dvh-32px)] flex-col gap-5 overflow-y-auto overscroll-contain px-7 pt-[34px] pb-[26px]" data-ip-scroll="overlay">
           <div className="min-w-0 text-center">
             {/* One icon says what the dialog is about: berry duotone in a white circle with a pink ring, on the wave. */}
             {icon && <span className="mp-modal__icon">{icon}</span>}

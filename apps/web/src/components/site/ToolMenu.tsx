@@ -203,6 +203,7 @@ export function ToolMenu() {
           <div
             id={MENU_ID}
             className="mp-menu fixed overflow-y-auto overscroll-contain"
+            data-ip-scroll="overlay"
             style={{ top: anchor.top, left: anchor.left, width: anchor.width, maxHeight: `calc(100dvh - ${anchor.top}px - 24px)` }}
             data-testid="tool-menu"
           >
