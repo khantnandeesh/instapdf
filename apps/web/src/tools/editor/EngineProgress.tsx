@@ -18,14 +18,17 @@ const C = 2 * Math.PI * R;
 
 function useEngineProgress() {
   const ctl = useCtl();
-  const shaping = useStore(ctl.store, (s) => s.shaping === "loading" || s.shaping === "failed");
+  const build = useStore(ctl.store, (s) => s.shaping);
+  const loadingShaping = build === "loading" || build === "failed";
   const wanted = useStore(ctl.store, (s) => s.engineWanted && !s.engineReady);
   const base = useSyncExternalStore(subscribeEngine, getEngineStatus, getEngineStatus);
   const shaped = useSyncExternalStore(subscribeEngine, getShapingStatus, getShapingStatus);
-  // The shaping download comes after the default build, so it takes over the ring.
+  // The ring follows the build the document is (or is being) opened in: the shaping download
+  // takes over from the default build, and a restart after a crash reloads the shaping one.
+  const shaping = build !== "idle";
   const status = shaping ? shaped : base;
-  const retry = shaping ? () => void ctl.loadShaping() : () => void ctl.openEngine();
-  return { ctl, shaping, retry, show: (wanted || shaping) && ctl.engineAllowed, failed: status.state === "failed", pct: status.state === "ready" ? 100 : percent(status) };
+  const retry = loadingShaping ? () => void ctl.loadShaping() : () => void ctl.openEngine();
+  return { ctl, shaping, retry, show: (wanted || loadingShaping) && ctl.engineAllowed, failed: status.state === "failed", pct: status.state === "ready" ? 100 : percent(status) };
 }
 
 function Ring({ pct }: { pct: number }) {

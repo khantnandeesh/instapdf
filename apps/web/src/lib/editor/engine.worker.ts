@@ -4,10 +4,9 @@
  * content-hashed paths) on the first message: an idle prefetch on /edit-pdf, or opening a file.
  * Bytes stay in memory on this device: the only fetches are the engine's own same-origin files.
  *
- * Two builds, one worker: the default engine, and the shaping one (Hindi, Arabic and other complex
- * scripts), loaded only when an "open" asks for it (`shaping: true`), never prefetched. The two
- * modules have separate memories, so they live side by side; opening with the shaping build frees
- * the default build's document and every later call uses the shaping one.
+ * Two builds with one interface: each "open" says which (`shaping`). The page side starts the
+ * shaping build in a fresh worker (engine-client openInShapingEngine), so in practice a worker
+ * holds one build; a worker asked for both keeps their separate memories side by side.
  */
 import type { BerryDocument as BerryDocumentType, BerryError, EditResult, FontInfo, FontProgram, PageText } from "./berry-engine";
 
@@ -130,7 +129,7 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
   }
   if (req.op === "open") {
     // A download failure leaves the open document as it was.
-    const variant: EngineVariant = req.shaping ? "shaping" : active;
+    const variant: EngineVariant = req.shaping ? "shaping" : "base";
     const { BerryDocument } = await loadEngine(variant);
     dropDoc();
     current = null;

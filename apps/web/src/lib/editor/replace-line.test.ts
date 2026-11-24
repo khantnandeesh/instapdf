@@ -52,7 +52,7 @@ describe("editorFontFor", () => {
 
 describe("lineReplacement", () => {
   it("covers the line and puts the new text on its baseline, in its size and colour", () => {
-    const r = lineReplacement({ line: line(), fonts: [font({})], entry, text: "The effect of finite stiffness ₹", face: editorFontFor(font({})), metrics, measure });
+    const r = lineReplacement({ line: line(), fonts: [font({})], entry, text: "The effect of finite stiff ₹", face: editorFontFor(font({})), metrics, measure });
     expect(r).not.toBeNull();
     const [w, t] = r!;
     expect(w.kind).toBe("whiteout");
@@ -62,7 +62,7 @@ describe("lineReplacement", () => {
     expect(w.x + w.w).toBeGreaterThanOrEqual(220);
     expect(w.y + w.h).toBeGreaterThanOrEqual(792 - 697);
     expect(t.kind).toBe("text");
-    expect(t.text).toBe("The effect of finite stiffness ₹");
+    expect(t.text).toBe("The effect of finite stiff ₹");
     expect(t.size).toBeCloseTo(9.9626);
     expect(t.color).toBe("#1a1a1a");
     expect(t.font).toBe("tinos");
@@ -74,12 +74,33 @@ describe("lineReplacement", () => {
     expect(t.page).toBe("p0");
   });
 
-  it("wraps at the page edge instead of running past it", () => {
-    const long = "x".repeat(200);
+  it("keeps to the line's width: a little longer text is set smaller, on one line", () => {
+    // 33 characters × 5 = 165 at full size; the line is 148 wide (+5 slack): 93% of the size fits.
+    const [, t] = lineReplacement({ line: line(), fonts: [font({})], entry, text: "The effect of finite stiffness ₹₹", face: editorFontFor(font({})), metrics, measure })!;
+    expect(t.wrap).toBeNull();
+    expect(t.lines).toHaveLength(1);
+    expect(t.size).toBeLessThan(9.9626);
+    expect(t.size).toBeGreaterThanOrEqual(9.9626 * 0.8 - 0.05);
+    // The box's own padding aside, the text keeps to the line's width.
+    expect(t.w).toBeLessThanOrEqual(148 + 5 + 2);
+    // Still on the line's baseline at the smaller size.
+    expect(t.y + baselineOffset(metrics, t.size)).toBeCloseTo(792 - 700, 1);
+  });
+
+  it("wraps at the line's width (never into the text beside it, nor past the page edge) once 80% isn't enough", () => {
+    const long = "word ".repeat(60).trim();
     const [, t] = lineReplacement({ line: line(), fonts: [font({})], entry, text: long, face: editorFontFor(font({})), metrics, measure })!;
     expect(t.wrap).not.toBeNull();
+    expect(t.wrap!).toBeLessThanOrEqual(148 + 5 + 0.01);
+    expect(t.size).toBeCloseTo(Math.floor(9.9626 * 8) / 10, 5);
     expect(t.x + t.w).toBeLessThanOrEqual(612);
     expect(t.lines.length).toBeGreaterThan(1);
+  });
+
+  it("wraps at the page edge for a line that ends near it", () => {
+    const near = line({ bbox: { x0: 400, y0: 697, x1: 600, y1: 708 }, origin: [400, 700] });
+    const [, t] = lineReplacement({ line: near, fonts: [font({})], entry, text: "word ".repeat(60).trim(), face: editorFontFor(font({})), metrics, measure })!;
+    expect(t.x + t.w).toBeLessThanOrEqual(612);
   });
 
   it("keeps the right edge of a right-to-left line", () => {

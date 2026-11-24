@@ -215,6 +215,17 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     }
   };
 
+  // "Replace with new text" asks for the page colour behind a line.
+  const sampleRef = useRef(sampleColor);
+  sampleRef.current = sampleColor;
+  useEffect(() => {
+    const fn = (b: Box) => sampleRef.current(b);
+    ctl.samplers.set(entry.id, fn);
+    return () => {
+      if (ctl.samplers.get(entry.id) === fn) ctl.samplers.delete(entry.id);
+    };
+  }, [ctl, entry.id]);
+
   const createAt = (a: Pt, b: Pt, clicked: boolean, shift: boolean) => {
     const t = store.get().tool;
     const d = defaults();

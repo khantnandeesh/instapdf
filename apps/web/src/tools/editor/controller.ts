@@ -299,7 +299,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     async showVersion(index: number) {
       const bytes = ctl.bytesOf(index);
       const copy = bytes.slice();
-      if (store.get().engineReady) await callEngine({ op: "open", bytes: copy }, [copy.buffer]);
+      if (store.get().engineReady) await callEngine({ op: "open", bytes: copy, shaping: store.get().shaping === "ready" }, [copy.buffer]);
       const opened = await openPdf(bytes.slice(), rt.password);
       if (!opened.ok) throw new Error("pdf.js");
       const prev = rt.pdf;
@@ -319,7 +319,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
           const shown = rt.shown;
           const copy = ctl.bytesOf(shown).slice();
           setEngineFileSize(copy.length);
-          await callEngine({ op: "open", bytes: copy }, [copy.buffer]);
+          await callEngine({ op: "open", bytes: copy, shaping: store.get().shaping === "ready" }, [copy.buffer]);
           if (shown === rt.shown) break;
         }
         store.set({ engineReady: true, fresh: {} });
@@ -379,13 +379,31 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
           ctl.failedText.clear();
           store.set({ shaping: "ready", engineReady: true, fresh: {} });
           ui.announce("Text editing for this script is ready.");
+          const edit = ctl.pendingEdit;
+          ctl.pendingEdit = null;
+          if (edit) void ctl.applyPendingEdit(edit);
           return true;
         } catch {
           store.set({ shaping: "failed", engineReady: true });
+          if (ctl.pendingEdit) ui.announce("Your edit is kept. It is made once editing for this script loads.");
           return false;
         }
       })().finally(() => (ctl.shapingOpening = null));
       return ctl.shapingOpening;
+    },
+    /**
+     * An edit that typed Hindi, Arabic or similar into a line of the default build, waiting for
+     * the shaping build (kept across a failed download, made after Retry). `at` finds the same
+     * line in the shaping build's reading of the page.
+     */
+    pendingEdit: null as { src: number; at: [number, number]; text: string } | null,
+    async applyPendingEdit(edit: { src: number; at: [number, number]; text: string }) {
+      await ctl.ensureText(edit.src);
+      const page = store.get().texts[edit.src];
+      const i = page ? lineAt(page.lines, edit.at[0], edit.at[1]) : -1;
+      if (i < 0) return ui.toast({ text: "That line can’t be edited any more.", tone: "danger" });
+      store.set({ lineEdit: { src: edit.src, line: i, text: edit.text } });
+      await ctl.commitLine();
     },
     /** A click on a line that needs the shaping build: load it, then open that line for editing. */
     wantShapedLine(src: number, at: [number, number]) {
@@ -429,7 +447,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       ctl.recovering ??= (async () => {
         try {
           const copy = ctl.bytesOf(rt.shown).slice();
-          await callEngine({ op: "open", bytes: copy }, [copy.buffer]);
+          await callEngine({ op: "open", bytes: copy, shaping: store.get().shaping === "ready" }, [copy.buffer]);
           store.set({ fresh: {} });
         } catch {
           ui.toast({ text: "The editor couldn’t restart. Download what you have, then reload the page.", tone: "danger" });
@@ -451,7 +469,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         const opened = await openPdf(bytes.slice(), rt.password);
         if (!opened.ok) {
           const back = ctl.bytesOf(rt.shown).slice();
-          await callEngine({ op: "open", bytes: back }, [back.buffer]).catch(() => {});
+          await callEngine({ op: "open", bytes: back, shaping: store.get().shaping === "ready" }, [back.buffer]).catch(() => {});
           ui.toast({ text: "That change couldn’t be shown, so it wasn’t made.", tone: "danger" });
           return;
         }
@@ -486,14 +504,10 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         // build, find the same line in its reading of the page, and make the same edit there.
         if (isEngineError(err) && err.kind === "read-only" && err.reason === "needs-shaping" && store.get().shaping !== "ready") {
           store.set({ busy: null });
-          const at: [number, number] = [(line.bbox.x0 + line.bbox.x1) / 2, (line.bbox.y0 + line.bbox.y1) / 2];
-          if (!(await ctl.loadShaping())) return;
-          await ctl.ensureText(e.src);
-          const page = store.get().texts[e.src];
-          const i = page ? lineAt(page.lines, at[0], at[1]) : -1;
-          if (i < 0) return ui.toast({ text: describeEngineError(err), tone: "danger" });
-          store.set({ lineEdit: { src: e.src, line: i, text: e.text } });
-          return ctl.commitLine();
+          // Kept until the shaping build is there: a failed download keeps it for Retry.
+          ctl.pendingEdit = { src: e.src, at: [(line.bbox.x0 + line.bbox.x1) / 2, (line.bbox.y0 + line.bbox.y1) / 2], text: e.text };
+          await ctl.loadShaping();
+          return;
         }
         if (isEngineError(err)) {
           console.warn(engineErrorLog(err));
@@ -521,6 +535,8 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       try {
         const metrics = await ensureFace(face.font, face.bold, face.italic, edit.text);
         const objs = lineReplacement({ line, fonts: page.fonts, entry, text: edit.text, face, metrics, measure: measurer(face.font, size, face.bold, face.italic) });
+        // The whiteout takes the page's colour behind the line (a tinted page stays tinted).
+        if (objs) objs[0].fill = ctl.samplers.get(entry.id)?.(objs[0]) ?? objs[0].fill;
         if (!objs) {
           ui.toast({ text: "This line can’t be replaced automatically. Use Whiteout and Text instead.", tone: "info" });
           return;
@@ -531,6 +547,9 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         ui.toast({ text: "The font for the new text couldn’t load. Please try again.", tone: "danger" });
       }
     },
+
+    /** Per page (by id): the dominant colour of the shown raster in a frame box (PageView registers it). */
+    samplers: new Map<string, (b: { x: number; y: number; w: number; h: number }) => string>(),
 
     /** Engine family name → the font id it was registered from. */
     standIns: new Map<string, string>(),

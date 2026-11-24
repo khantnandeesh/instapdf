@@ -39,6 +39,11 @@ export type LineReplacementInput = {
 /**
  * A whiteout over the line and a text box drawing `text` on the line's baseline, or null when
  * the line is not horizontal (a rotated line needs a rotated box: not offered yet).
+ *
+ * The box keeps to the line's own width, so it never runs into the text beside it (the reason
+ * an edit is often refused): a longer text is set smaller, down to 80% of the line's size, and
+ * what still doesn't fit wraps at that width. The original text stays in the file under the
+ * whiteout (copy and search still find it); removing it is for a later version.
  */
 export function lineReplacement({ line, fonts, entry, text, face, metrics, measure, fill = "#ffffff" }: LineReplacementInput): [WhiteoutObj, TextObj] | null {
   if (Math.abs(line.angle) > 0.5) return null;
@@ -51,11 +56,18 @@ export function lineReplacement({ line, fonts, entry, text, face, metrics, measu
   const whiteout: WhiteoutObj = { kind: "whiteout", id: newId(), page: entry.id, ...box, fill, border: null, borderWidth: 0 };
   const rtl = line.direction === "rtl";
   const start = rtl ? line.bbox.x1 - vx0 : line.origin[0] - vx0;
-  // Wrap at the page edge (keeping a small margin) instead of running past it.
-  const room = (rtl ? start : entry.view[2] - vx0 - start) - size * 0.5;
-  const wrap = measure(text) > room && room > size * 4 ? room : null;
-  const lines = layoutText(text, wrap, measure);
-  const size2 = textBoxSize(lines, wrap, size, measure);
+  // Room: the line's own width (a little slack), and never past the page edge.
+  const edge = (rtl ? start : entry.view[2] - vx0 - start) - size * 0.5;
+  const room = Math.min(edge, line.bbox.x1 - line.bbox.x0 + size * 0.5);
+  // `measure` is at the line's size: widths scale with the size.
+  const natural = measure(text);
+  // Set smaller (to a tenth of a point, rounded down) only when the text is longer than the room.
+  const fitted = natural > room && room > 0 ? Math.floor(Math.max(0.8, room / natural) * size * 10) / 10 : size;
+  const k = fitted / size;
+  const at = (s: string) => measure(s) * k;
+  const wrap = at(text) > room + 0.01 && room > fitted * 4 ? room : null;
+  const lines = layoutText(text, wrap, at);
+  const size2 = textBoxSize(lines, wrap, fitted, at);
   const baseline = vy1 - line.origin[1];
   const x = rtl ? start - size2.w : start;
   const obj: TextObj = {
@@ -63,7 +75,7 @@ export function lineReplacement({ line, fonts, entry, text, face, metrics, measu
     id: newId(),
     page: entry.id,
     x,
-    y: baseline - baselineOffset(metrics, size),
+    y: baseline - baselineOffset(metrics, fitted),
     wrap,
     lines,
     w: size2.w,
@@ -71,7 +83,7 @@ export function lineReplacement({ line, fonts, entry, text, face, metrics, measu
     rot: 0,
     text,
     font: face.font,
-    size,
+    size: fitted,
     bold: face.bold || !!(run && fonts[run.font]?.bold),
     italic: face.italic || !!(run && fonts[run.font]?.italic),
     underline: false,
