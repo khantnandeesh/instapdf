@@ -22,8 +22,21 @@ const BUDGET_KB = {
   "/merge-pdf/page": [150, 160],
   "/rotate-pdf/page": [141, 151],
 };
+/** Cloud-on builds carry the F23 source caret and row (~0.9 KB entry, ~2 KB phone), accepted by the lead 24 Nov. */
+const CLOUD_BUDGET_KB = {
+  ...BUDGET_KB,
+  "/merge-pdf/page": [152, 162],
+  "/rotate-pdf/page": [143, 153],
+};
 
 const dir = process.argv[2] ?? process.cwd();
+/**
+ * Whether this build has cloud sources: next.config.ts CLOUD_ON (the flag and at least one provider),
+ * as that build resolved it into its env.
+ */
+const cloudOn = JSON.parse(readFileSync(join(dir, ".next/required-server-files.json"), "utf8")).config.env?.NEXT_PUBLIC_CLOUD_SOURCES === "1";
+const budgets = cloudOn ? CLOUD_BUDGET_KB : BUDGET_KB;
+console.log(`First-load JS budget: ${cloudOn ? "cloud sources on (F23 budgets)" : "cloud sources off"}`);
 const pages = JSON.parse(readFileSync(join(dir, ".next/app-build-manifest.json"), "utf8")).pages;
 const gz = (f) => gzipSync(readFileSync(join(dir, ".next", f)), { level: 9 }).length;
 const sum = (files) => files.reduce((s, f) => s + gz(f), 0);
@@ -47,7 +60,7 @@ export function scriptsInHtml(html) {
 
 const kb = (b) => Math.round(b / 1000);
 let failed = 0;
-for (const [route, [budget, budgetAll]] of Object.entries(BUDGET_KB)) {
+for (const [route, [budget, budgetAll]] of Object.entries(budgets)) {
   const entry = [...new Set(pages[route] ?? [])].filter((f) => f.endsWith(".js"));
   if (!entry.length) {
     console.error(`${route}: not in the build`);

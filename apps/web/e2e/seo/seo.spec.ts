@@ -5,6 +5,7 @@
  * page is covered as soon as it is usable.
  */
 import { expect, test, type Page } from "@playwright/test";
+import { cloudSourcesOn } from "../../src/lib/cloud/providers";
 import { indexableRoutes } from "../../src/lib/seo/routes";
 import { absoluteUrl, SITE_ORIGIN } from "../../src/lib/seo/site";
 import { tools } from "../../src/tools/registry";
@@ -16,7 +17,9 @@ const PLANNED = tools.filter((t) => t.status === "planned").map((t) => `/${t.slu
 const STAGING_HOST = "web-staging-qzq5fa2g7q-uc.a.run.app";
 
 /** Performance budgets (docs/seo/strategy.md, "Performance budgets"), checked on the mobile project. */
-const BUDGET = { jsKB: 170, lcpMs: 2500, cls: 0.1 };
+// Cloud-on builds (next.config.ts CLOUD_ON: the flag and a provider) carry the F23 source caret and row
+// (~2 KB on a phone), accepted by the lead 24 Nov; the same check as the build's, from the same env.
+const BUDGET = { jsKB: cloudSourcesOn() ? 172 : 170, lcpMs: 2500, cls: 0.1 };
 
 type Ld = { "@graph": { "@type": string; [k: string]: unknown }[] };
 
