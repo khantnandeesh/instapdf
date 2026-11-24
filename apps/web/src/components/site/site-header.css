@@ -1,0 +1,96 @@
+/* Site header and the All tools panel (owner 2026-11-24: a full-width bar, not an inset pill; the
+   menu opens as a full-width panel under the bar with the page behind it blurred and dimmed).
+   Component-local so the shared globals.css stays inside its gzip budget. */
+
+@media (min-width: 768px) {
+  :root {
+    --ip-header-h: 72px;
+  }
+}
+
+/* The bar: edge to edge, frosted white with a hairline. The glass sits on ::before, never on the
+   header itself: backdrop-filter (like filter, transform, contain) would make the header the
+   containing block of its position:fixed descendants (the panel and its backdrop). */
+.mp-header {
+  isolation: isolate;
+}
+.mp-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
+  box-shadow: inset 0 -1px 0 var(--sand);
+  transition: background-color var(--dur-base);
+}
+.mp-header[data-menu-open]::before {
+  background: var(--surface);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .mp-header::before {
+    background: var(--surface);
+  }
+}
+@media (forced-colors: active) {
+  .mp-header::before {
+    box-shadow: inset 0 -1px 0 CanvasText;
+  }
+}
+
+/* The panel: full width under the bar, content centred. */
+.mp-menu-panel {
+  inset-inline: 0;
+  background: var(--surface);
+  box-shadow:
+    inset 0 1px 0 var(--sand),
+    0 24px 48px -24px rgba(120, 20, 40, 0.28);
+  border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+  animation: mp-panel-in var(--dur-move) var(--ease-enter, ease-out) both;
+}
+/* The page behind: dimmed and blurred; a click on it closes the panel. */
+.mp-menu-backdrop {
+  inset-inline: 0;
+  bottom: 0;
+  background: rgba(42, 28, 32, 0.22);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: mp-fade-in var(--dur-move) ease-out both;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .mp-menu-backdrop {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(42, 28, 32, 0.4);
+  }
+}
+@keyframes mp-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@keyframes mp-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mp-menu-panel,
+  .mp-menu-backdrop {
+    animation: none;
+  }
+}
+
+/* Denser rows in the panel so every group fits one screen at 1280x720 without names wrapping. */
+.mp-menu-panel .mp-menu-row {
+  padding: 6px 10px;
+  font-size: 15px;
+}
+/* "Soon" reads as a quiet word here, not a pill, so names keep their line. */
+.mp-menu-panel .mp-menu-row .mp-tag {
+  background: none;
+  padding-inline: 0;
+}
