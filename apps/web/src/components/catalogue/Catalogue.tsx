@@ -149,7 +149,7 @@ export function Catalogue() {
   return (
     // BerryPDF Home: the catalogue, grouped under coloured eyebrows, right on the grid paper (the only
     // background); the hero above is set off by spacing only (page.tsx).
-    <section aria-labelledby="tools-heading" className="pt-(--space-7) pb-(--space-8)" data-testid="catalogue">
+    <section aria-labelledby="tools-heading" className="pt-(--space-7) pb-(--space-8)" data-testid="catalogue" data-ip-smooth-anchors="">
       <div className="mx-auto max-w-[1170px] px-[15px]">
         <div id="tools" ref={headingRef} className="scroll-mt-[calc(var(--ip-header-h)+var(--ip-catbar-h,0px)+16px)] text-center">
           <h2 id="tools-heading" className="text-section-title text-ink">
