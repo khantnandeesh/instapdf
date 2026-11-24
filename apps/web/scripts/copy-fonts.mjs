@@ -66,3 +66,32 @@ for (const { pkg, prefix, keys } of packages) {
 await writeFile(join(outDir, "manifest.json"), JSON.stringify({ fonts }));
 await writeFile(join(outDir, "cmap.json"), JSON.stringify(cmap));
 console.log(`copy-fonts: ${fonts.length} Noto Sans slices from ${packages.length} families -> public/fonts/noto/`);
+
+// Fonts the shaping engine draws added Hindi, Arabic, Hebrew and Thai text with (AC-224), under
+// the family names the engine asks for. Written to public/fonts/shaping/manifest.json, kept apart
+// from the list above (Merge reads that one and does not shape). Files already copied above are
+// referenced where they are; the download worker fetches them only for text that needs shaping.
+const shapingDir = join(here, "..", "public", "fonts", "shaping");
+await rm(shapingDir, { recursive: true, force: true });
+await mkdir(shapingDir, { recursive: true });
+const shaping = [
+  { family: "Noto Naskh Arabic", pkg: "@fontsource/noto-naskh-arabic", prefix: "noto-naskh-arabic", key: "arabic", copy: true },
+  { family: "Noto Sans Devanagari", pkg: "@fontsource/noto-sans", prefix: "noto-sans", key: "devanagari" },
+  { family: "Noto Sans Hebrew", pkg: "@fontsource/noto-sans-hebrew", prefix: "noto-sans-hebrew", key: "hebrew" },
+  { family: "Noto Sans Thai", pkg: "@fontsource/noto-sans-thai", prefix: "noto-sans-thai", key: "thai" },
+  // Punctuation and digits the script slices leave out ("." and ":" are not in the Arabic slice).
+  { family: "Noto Sans", pkg: "@fontsource/noto-sans", prefix: "noto-sans", key: "latin" },
+];
+const shapingFonts = [];
+for (const { family, pkg, prefix, key, copy } of shaping) {
+  const root = dirname(require.resolve(`${pkg}/package.json`));
+  const unicode = JSON.parse(await readFile(join(root, "unicode.json"), "utf8"));
+  const file = `${prefix}-${key}-400-normal.woff`;
+  if (copy) {
+    await copyFile(join(root, "files", file), join(shapingDir, file));
+    await copyFile(join(root, "LICENSE"), join(shapingDir, `OFL-${prefix}.txt`));
+  }
+  shapingFonts.push({ family, url: `/fonts/${copy ? "shaping" : "noto"}/${file}`, ranges: parse(unicode[key]) });
+}
+await writeFile(join(shapingDir, "manifest.json"), JSON.stringify({ fonts: shapingFonts }));
+console.log(`copy-fonts: ${shapingFonts.length} shaping fonts -> public/fonts/shaping/`);

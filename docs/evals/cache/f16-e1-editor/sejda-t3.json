@@ -1,0 +1,13 @@
+{
+ "tag": "t3",
+ "apply_click": "2026-11-24T10:50:54.987Z",
+ "ready_ms": 7694,
+ "ready": "2026-11-24T10:51:02.681Z",
+ "href": "https://www.sejda.com/api/tasks/WVWUAKX2-202611241150/download/para-times.pdf",
+ "taskId": "WVWUAKX2-202611241150",
+ "status": 200,
+ "file": "/tmp/claude-0/-home-user/df61c1b3-c832-5e4c-ad98-67c374819772/scratchpad/sejda/t3-para-times.pdf",
+ "bytes": 4032,
+ "downloaded": "2026-11-24T10:51:03.134Z",
+ "total_ms": 8147
+}

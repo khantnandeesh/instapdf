@@ -10,6 +10,7 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo/metadata";
 import { Code, Contact, Fill, LegalPage, List, Section, Sub, Summary, TextLink } from "@/components/legal/Legal";
 import { legalFacts as f } from "@/components/legal/facts";
+import { configuredProviders } from "@/lib/cloud/providers";
 
 export const metadata: Metadata = pageMetadata({
   path: "/privacy",
@@ -18,6 +19,9 @@ export const metadata: Metadata = pageMetadata({
 });
 
 export default function PrivacyPage() {
+  // F23: the clouds this build offers (none without cloud sources: the page stays as it was).
+  const providers = configuredProviders();
+  const cloud = providers.length > 0;
   return (
     <LegalPage
       title="Privacy"
@@ -93,7 +97,14 @@ export default function PrivacyPage() {
       <Section id="not-collect" title="What we don't do">
         <List>
           <li>No analytics or usage tracking, and no advertising.</li>
-          <li>No third-party scripts, tracking pixels or social media widgets. Fonts and icons are served from our own site.</li>
+          {cloud ? (
+            <li>
+              No third-party scripts, tracking pixels or social media widgets on our pages. Fonts and icons are served from our own site. The only exception is
+              the separate cloud window described <TextLink href="#third-party">below</TextLink>, and only when you open it.
+            </li>
+          ) : (
+            <li>No third-party scripts, tracking pixels or social media widgets. Fonts and icons are served from our own site.</li>
+          )}
           <li>
             No cookies. The <TextLink href="/cookies">cookie notice</TextLink> describes the small amount of browser storage we use instead.
           </li>
@@ -109,6 +120,42 @@ export default function PrivacyPage() {
           clearing this site&apos;s data in your browser settings. Details are in the <TextLink href="/cookies">cookie notice</TextLink>.
         </p>
       </Section>
+
+      {/* F23: only in builds that offer a cloud. */}
+      {cloud && (
+        <Section id="third-party" title="Third-party services (cloud storage)">
+          <p>
+            Where it is available, you can choose files from, or save results to, a cloud storage account you already have. This happens in a separate BerryPDF
+            window, never on the tool page, and only after you click a cloud button. That window loads the provider&apos;s own sign-in and file chooser from the
+            provider&apos;s site, and your browser downloads the files you pick straight from the provider. They then go to the tool tab and are processed on your
+            device like any other file. Nothing passes through our servers.
+          </p>
+          <List>
+            {providers.includes("dropbox") && (
+              <li>
+                <strong className="font-bold text-ink">Dropbox Chooser</strong> (Dropbox, Inc.) for choosing files from Dropbox.
+              </li>
+            )}
+            {providers.includes("google") && (
+              <li>
+                <strong className="font-bold text-ink">Google Picker and Google Identity Services</strong> (Google LLC) for signing in to Google Drive, choosing
+                files and saving results. We ask only for access to the files you pick or that BerryPDF creates (the <Code>drive.file</Code> permission).
+              </li>
+            )}
+            {providers.includes("onedrive") && (
+              <li>
+                <strong className="font-bold text-ink">Microsoft sign-in and the OneDrive file picker</strong> (Microsoft Corporation) for OneDrive, including
+                saving results.
+              </li>
+            )}
+          </List>
+          <p>
+            The access the provider gives us is kept in that window&apos;s memory only. It is never stored and never sent to us, and it is gone when the window
+            closes. The provider sees your sign-in and the files you choose, under its own privacy policy. To remember which cloud you used last, your browser keeps
+            one word (for example <Code>dropbox</Code>) under the key <Code>berrypdf:cloud-last</Code>. It never leaves your device.
+          </p>
+        </Section>
+      )}
 
       <Section id="providers" title="Service providers">
         <p>

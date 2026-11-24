@@ -382,7 +382,7 @@ Build note: the field model, reader, writer, tab order and detection live in `ap
 - **AC-50 (P1)** Motion respects `prefers-reduced-motion`.
 
 ### Performance
-- **AC-51 (P1)** The editor engine (WASM) is not downloaded until the editor opens a file; editor route JS (excluding WASM) ≤ 250 KB gzip.
+- **AC-51 (P1)** The editor engine (WASM) never blocks the landing page: it is not part of first load, and it is fetched only at low priority, after the landing has loaded and the browser is idle (U-E13), or when a file is picked. With Data Saver on or on a 2g connection it waits for the pick or for intent (hovering or focusing the picker). The landing's first-load JS stays within the 150 KB tool budget, and the editor chunk (JS excluding pdf.js, fonts and WASM) is ≤ 250 KB gzip. *(Revised after the E1 eval: the idle prefetch is by design, so Edit text is ready when the user reaches it.)*
 - **AC-52 (P1)** Lighthouse mobile performance ≥ 90 on the editor's empty state.
 
 ## 10. Improvements (research step)

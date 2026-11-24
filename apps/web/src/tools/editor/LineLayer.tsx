@@ -4,22 +4,22 @@
  * line; keyboard, the page's line list is one tab stop (a listbox), arrows pick a line, Enter
  * edits it. The engine rewrites only that line (berry-engine). Lines are laid out in displayed
  * (rotated) page coordinates.
+ *
+ * The edit box draws the line in the PDF's own font (doc-face.ts), so opening and closing it
+ * changes nothing on screen. A typed character that font lacks is underlined in place and named
+ * under the box; the closest font draws it, and the notice after Enter offers another.
  */
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { PageText } from "@/lib/editor/berry-engine";
-import { displaySize, lineBox, type PageBox } from "@/lib/editor/geometry";
+import { displaySize, lineBox, quarterTurns, toScreen, type PageBox } from "@/lib/editor/geometry";
 import { cx } from "@/components/ui/cx";
+import { docFace } from "./doc-face";
+import { LineEditBox } from "./LineEditBox";
+import { dominantHex } from "@/lib/editor/markup";
 
-type Line = PageText["lines"][number];
 
-function fontFamilyOf(text: PageText, line: Line): string {
-  const font = text.fonts[line.runs[0]?.font ?? -1];
-  if (font?.monospace) return "ui-monospace, Menlo, Consolas, monospace";
-  if (font?.serif) return "'Times New Roman', Times, serif";
-  return "Arial, Helvetica, sans-serif";
-}
-
-let measureCtx: CanvasRenderingContext2D | null = null;
+/** Height the hint under an edit box takes, with its gap (CSS pixels). */
+const HINT_ROOM = 36;
 
 export function LineLayer({
   pageNumber,
@@ -53,7 +53,8 @@ export function LineLayer({
   const list = useRef<HTMLDivElement>(null);
   const refocus = useRef(false);
   const [active, setActive] = useState(-1);
-  const editable = text.lines.map((l, i) => (l.editable && l.text.trim() ? i : -1)).filter((i) => i >= 0);
+  // Lines that need the shaping build (Hindi, Arabic…) are listed too: picking one loads it.
+  const editable = text.lines.map((l, i) => ((l.editable || l.read_only_reason === "needs-shaping") && l.text.trim() ? i : -1)).filter((i) => i >= 0);
   const [seen, setSeen] = useState(text);
   if (seen !== text) {
     setSeen(text);
@@ -89,6 +90,7 @@ export function LineLayer({
     else if (e.key === "End") setActive(editable[editable.length - 1]);
     else if ((e.key === "Enter" || e.key === "F2") && active >= 0) {
       refocus.current = true;
+      point.current = null;
       onEdit(active, text.lines[active].text);
     } else return;
     e.preventDefault();
@@ -96,21 +98,63 @@ export function LineLayer({
   };
 
   const editLine = editing ? text.lines[editing.line] : undefined;
-
-  const inputStyle = () => {
+  /** Where the line being opened was clicked: the caret goes there. */
+  const point = useRef<{ x: number; y: number } | null>(null);
+  /** Makes a line's fonts ahead of the click (hover or touch), so the box opens in them at once. */
+  const warm = (i: number) => {
+    for (const f of new Set(text.lines[i]?.runs.map((r) => r.font))) {
+      const info = text.fonts[f];
+      if (info) void docFace(info, text.lines[i]!.runs.filter((r) => r.font === f).map((r) => r.text).join("")).catch(() => null);
+    }
+  };
+  /** The paper under a line, read off the drawn page: the edit box takes its colour. */
+  const paperOf = (i: number): string => {
+    try {
+      const canvas = list.current?.parentElement?.parentElement?.querySelector<HTMLCanvasElement>("canvas.ed-raster");
+      const box = geometryOf(i);
+      if (!canvas || !canvas.clientWidth) return "#ffffff";
+      const k = canvas.width / canvas.clientWidth;
+      const x = Math.max(0, Math.floor(box.left * k));
+      const y = Math.max(0, Math.floor(box.top * k));
+      const w = Math.min(canvas.width - x, Math.ceil(box.width * k));
+      const h = Math.min(canvas.height - y, Math.ceil(box.height * k));
+      if (w <= 0 || h <= 0) return "#ffffff";
+      return dominantHex(canvas.getContext("2d", { willReadFrequently: true })!.getImageData(x, y, w, h).data);
+    } catch {
+      return "#ffffff";
+    }
+  };
+  const editBox = () => {
     const line = editLine!;
     const box = geometryOf(editing!.line);
-    const fontSize = line.size * scale;
-    const fontFamily = fontFamilyOf(text, line);
-    const font = text.fonts[line.runs[0]?.font ?? -1];
-    measureCtx ??= document.createElement("canvas").getContext("2d");
-    let width = box.width;
-    if (measureCtx && !box.transform) {
-      measureCtx.font = `${font?.italic ? "italic " : ""}${font?.bold ? "700 " : ""}${fontSize}px ${fontFamily}`;
-      width = Math.max(width, measureCtx.measureText(editing!.text).width + 12, 120);
-      width = Math.max(box.width, Math.min(width, displaySize(view, rotation, scale).width - box.left - 2));
+    const b = lineBox(line.bbox, line.angle, view, rotation, scale);
+    // On the line's own baseline and start, so the box opens exactly over the text on the page
+    // (left-to-right lines on an upright page; others keep the centred text).
+    let start: { x: number; y: number } | null = null;
+    if (!box.transform && line.direction !== "rtl" && quarterTurns(rotation) === 0) {
+      const [x, y] = toScreen(line.origin[0], line.origin[1], view, rotation, scale);
+      start = { x, y };
     }
-    return { ...box, width, fontSize, fontFamily, fontWeight: font?.bold ? 700 : 400, fontStyle: font?.italic ? "italic" : "normal", lineHeight: 1 };
+    // The paper drawn under the box stops at the neighbouring lines' own text, and the hint goes
+    // where it hides none of it: under the box when that is clear, else over it.
+    let paperTop = 0;
+    let paperBottom = 0;
+    let below = true;
+    if (!box.transform) {
+      const mid = box.top + box.height / 2;
+      text.lines.forEach((other, k) => {
+        if (k === editing!.line || !other.text.trim()) return;
+        const o = lineBox(other.bbox, other.angle, view, rotation, scale);
+        if (o.angle || o.cx + o.length / 2 < box.left || o.cx - o.length / 2 > box.left + box.width) return;
+        const top = o.cy - o.thickness / 2;
+        const bottom = o.cy + o.thickness / 2;
+        if (o.cy > mid) {
+          paperBottom = Math.max(paperBottom, Math.min(box.top + box.height - top, box.height / 2 - 1));
+          if (top < box.top + box.height + HINT_ROOM) below = false;
+        } else if (o.cy < mid) paperTop = Math.max(paperTop, Math.min(bottom - box.top, box.height / 2 - 1));
+      });
+    }
+    return { box, start, length: b.length, maxWidth: displaySize(view, rotation, scale).width - box.left - 2, paperInset: { top: Math.max(0, paperTop), bottom: Math.max(0, paperBottom) }, hintBelow: below };
   };
 
   return (
@@ -137,11 +181,19 @@ export function LineLayer({
               aria-selected={active === i}
               data-testid="line"
               data-text={line.text}
+              data-needs-shaping={line.read_only_reason === "needs-shaping" || undefined}
               className={cx("ed-line absolute cursor-text rounded-[3px]", active === i && "ed-line--active", disabled && "ed-line--busy")}
               style={geometryOf(i)}
-              onPointerDown={(e) => interactive && e.stopPropagation()}
-              onClick={() => {
+              onPointerEnter={() => interactive && !disabled && warm(i)}
+              onPointerDown={(e) => {
+                if (!interactive) return;
+                e.stopPropagation();
+                if (!disabled) warm(i);
+              }}
+              onClick={(e) => {
                 if (disabled || !interactive) return;
+                // A real click puts the caret where it landed; the keyboard opens at the end.
+                point.current = e.detail > 0 ? { x: e.clientX, y: e.clientY } : null;
                 setActive(i);
                 onEdit(i, line.text);
               }}
@@ -152,33 +204,24 @@ export function LineLayer({
         })}
       </div>
       {editing && editLine && (
-        <input
+        <LineEditBox
           key={`${editing.line}`}
-          autoFocus
-          aria-label={`Edit line: ${editLine.text}`}
-          data-testid="line-input"
-          className="ed-input absolute rounded-[4px] border-0 bg-white px-[2px] text-ink-black outline-2 outline-brand"
-          style={inputStyle()}
+          text={text}
+          line={editLine}
           value={editing.text}
-          onFocus={(e) => e.currentTarget.select()}
-          onChange={(e) => onChange(e.target.value)}
-          onPointerDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => {
-            e.stopPropagation();
-            if (e.key === "Enter") {
-              e.preventDefault();
-              e.currentTarget.blur();
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              cancelled.current = true;
-              e.currentTarget.blur();
-            }
-          }}
-          onBlur={() => {
+          scale={scale}
+          {...editBox()}
+          point={point.current}
+          paper={() => paperOf(editing.line)}
+          onChange={onChange}
+          onCommit={() => {
             if (cancelled.current) {
               cancelled.current = false;
               onCancel();
             } else onCommit();
+          }}
+          onCancel={() => {
+            cancelled.current = true;
           }}
         />
       )}

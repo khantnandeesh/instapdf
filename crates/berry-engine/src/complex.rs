@@ -2,10 +2,12 @@
 //! Hebrew). Shaping depends on neighbouring letters, so an edit replaces whole words. Each new
 //! word is drawn by the first exact source: the same word already on the page in the same font,
 //! the font's own codes (simple scripts), the embedded program when it can shape, or a
-//! registered open font shaped here. Every new word is wrapped in `/ActualText` so copy and
-//! search read it right.
+//! registered open font shaped here. A word whose glyphs the page font's ToUnicode maps to other
+//! text (an Arabic subset that draws "4" but maps it nowhere) is drawn with a sibling of that font:
+//! the same font program and glyphs under a new font dictionary whose ToUnicode maps just those
+//! glyphs to the text they draw, so every reader gets the word from the glyphs themselves.
 
-use crate::engine::{limit, show_state, EditResult, Engine, Error, Item, Plan, Result, Substitution};
+use crate::engine::{limit, show_state, verify, EditResult, Engine, Error, Item, Plan, Result, Substitution};
 use crate::fallback::{self, FontRequest};
 use crate::font::{strip_subset_prefix, PdfFont};
 use crate::geom::Rect;
@@ -24,6 +26,9 @@ enum GlyphFont {
     Page(usize),
     /// A registered face: index into `Engine::faces`.
     Face(usize),
+    /// A page font drawn through its sibling: the same dictionary and program with a ToUnicode
+    /// written for the glyphs this edit draws with it (see [`Engine::sibling_font`]).
+    Sibling(usize),
 }
 
 /// One glyph of new text. Lengths are text-space units before horizontal scaling.
@@ -32,7 +37,8 @@ struct NewGlyph {
     font: GlyphFont,
     /// Code in a page font; glyph id in a face.
     code: u32,
-    /// ToUnicode text for a face glyph (first glyph of a cluster only).
+    /// The text the glyph stands for (first glyph of a cluster only): the ToUnicode text of a
+    /// face or sibling glyph. Empty when unknown (a glyph reused from the page).
     text: String,
     /// Advance to the next glyph.
     adv: f64,
@@ -50,10 +56,13 @@ enum Piece {
         face: Option<usize>,
         style: usize,
         actual: bool,
+        /// Byte offset of the word in the new segment (logical order).
+        at: usize,
     },
     Space {
         glyph: Option<NewGlyph>,
         adv: f64,
+        at: usize,
     },
 }
 
@@ -170,7 +179,7 @@ impl Ctx<'_> {
                 Some(NewGlyph {
                     font: GlyphFont::Page(style),
                     code,
-                    text: String::new(),
+                    text: c.to_string(),
                     adv: natural(font, code, self.state),
                     x_off: 0.0,
                     y_off: 0.0,
@@ -187,14 +196,17 @@ impl Ctx<'_> {
             return None;
         }
         let tfs = self.state.tfs;
-        shape::shape(data, word, rtl)?
+        let shaped = shape::shape(data, word, rtl)?;
+        let texts = shape::cluster_texts(word, &shaped);
+        shaped
             .into_iter()
-            .map(|g| {
+            .zip(texts)
+            .map(|(g, text)| {
                 let cid = font.cid_for_gid(g.gid)?;
                 (font.has_glyph(cid) != Some(false)).then_some(NewGlyph {
                     font: GlyphFont::Page(fi),
                     code: cid,
-                    text: String::new(),
+                    text,
                     adv: g.advance * tfs,
                     x_off: g.x_offset * tfs,
                     y_off: g.y_offset * tfs,
@@ -340,6 +352,46 @@ impl Engine {
                 runs.push((r, odd));
             }
         }
+        // Whether the line has right-to-left text (see the ActualText check after step 4).
+        let any_rtl = rtl || runs.iter().any(|r| r.1);
+        // Readers rebuild a right-to-left line's order from the glyphs with their own bidi rules,
+        // and PDFium does not agree with UAX #9 (our read-back) on two cases, so they are refused:
+        // (a) punctuation typed next to punctuation ("تجريبي." + "، نعم" reads "تجريبي،. نعم"):
+        //     a run of neutrals is ordered by its neighbours, which the edit changed;
+        // (b) a left-to-right run of two or more words in a right-to-left line (" abc def" reads
+        //     "defabc"): PDFium orders the words of the run right to left.
+        if any_rtl {
+            use unicode_bidi::BidiClass::{CS, ES, ET, ON};
+            let neutral = |c: char| matches!(unicode_bidi::bidi_class(c), CS | ES | ET | ON);
+            let mut seq: Vec<char> = Vec::new();
+            if a0 > 0 {
+                seq.extend(text_of(a0 - 1..a0).chars().last());
+            }
+            seq.extend(inserted.chars());
+            if b0 < n {
+                seq.extend(text_of(b0..b0 + 1).chars().next());
+            }
+            if seq.windows(2).any(|w| neutral(w[0]) && neutral(w[1])) {
+                return Err(verify(
+                    "text-mismatch",
+                    format!("{inserted:?} puts punctuation next to punctuation in a right-to-left line, which PDFium reorders"),
+                ));
+            }
+        }
+        if rtl {
+            for (range, run_rtl) in &runs {
+                let words = segment[range.clone()].split_whitespace().filter(|w| w.chars().any(char::is_alphanumeric)).count();
+                if !run_rtl && words >= 2 {
+                    return Err(verify(
+                        "text-mismatch",
+                        format!(
+                            "{:?} is a left-to-right run of several words in a right-to-left line, which PDFium reverses",
+                            &segment[range.clone()]
+                        ),
+                    ));
+                }
+            }
+        }
         for (range, run_rtl) in runs {
             let run = &segment[range];
             let mut parts: Vec<(bool, &str)> = Vec::new();
@@ -363,9 +415,10 @@ impl Engine {
             }
             for (is_space, part) in parts {
                 let style = style_for(part);
+                let at = part.as_ptr() as usize - segment.as_ptr() as usize;
                 if is_space {
-                    for _ in part.chars() {
-                        pieces.push(space_piece(&ctx, style));
+                    for (i, _) in part.char_indices() {
+                        pieces.push(space_piece(&ctx, style, at + i));
                     }
                     continue;
                 }
@@ -373,17 +426,28 @@ impl Engine {
                 // words skip ActualText when they can: PDFium reverses right-to-left ActualText.
                 let folded = script::canonical_marks(&script::fold_presentation(part));
                 let plain_ok = |glyphs: &[NewGlyph]| plain_reading(&pc, glyphs, run_rtl) == folded;
+                // Left-to-right page glyphs (digits, Latin) whose ToUnicode reads wrong move to the
+                // font's sibling, when the text of every glyph is known. A right-to-left word keeps
+                // preferring a registered face (below).
+                let readable_glyphs = |glyphs: Vec<NewGlyph>| match sibling(&pc, &glyphs) {
+                    Some(s) if !run_rtl && !plain_ok(&glyphs) && plain_ok(&s) => s,
+                    _ => glyphs,
+                };
                 let word = |glyphs: Vec<NewGlyph>, face| {
                     let actual = !plain_ok(&glyphs) || (spans_on_line && !run_rtl);
-                    Piece::Word { text: part.to_string(), glyphs, face, style, actual }
+                    Piece::Word { text: part.to_string(), glyphs, face, style, actual, at }
                 };
                 if let Some(g) = ctx.reuse(part, style).or_else(|| ctx.encode(part, style)) {
-                    pieces.push(word(g, None));
+                    pieces.push(word(readable_glyphs(g), None));
                     continue;
                 }
                 let others = (0..pc.fonts.len()).filter(|&i| i != style && pc.fonts[i].truetype_program().is_some());
-                let shaped_here: Vec<Vec<NewGlyph>> =
-                    std::iter::once(style).chain(others).filter_map(|f| ctx.embedded(part, run_rtl, f)).take(2).collect();
+                let shaped_here: Vec<Vec<NewGlyph>> = std::iter::once(style)
+                    .chain(others)
+                    .filter_map(|f| ctx.embedded(part, run_rtl, f))
+                    .take(2)
+                    .map(readable_glyphs)
+                    .collect();
                 // A right-to-left word whose embedded glyphs cannot carry its text prefers a
                 // registered face, whose Unicode mapping is written here.
                 let readable = shaped_here.iter().position(|g| !run_rtl || plain_ok(g));
@@ -431,6 +495,45 @@ impl Engine {
         if let Some(request) = request {
             return Err(Error::MissingGlyphs { chars: missing, request });
         }
+        // One sibling per page font: a code must stand for one text in it. Otherwise the words
+        // keep the page font's glyphs (and the ActualText check below decides).
+        let mut sib_text: HashMap<(usize, u32), &str> = HashMap::new();
+        let clash = pieces.iter().flat_map(piece_glyphs).any(|g| match g.font {
+            GlyphFont::Sibling(fi) => *sib_text.entry((fi, g.code)).or_insert(&g.text) != g.text,
+            _ => false,
+        });
+        if clash {
+            for p in &mut pieces {
+                if let Piece::Word { glyphs, actual, .. } = p {
+                    if glyphs.iter().any(|g| matches!(g.font, GlyphFont::Sibling(_))) {
+                        for g in glyphs.iter_mut() {
+                            if let GlyphFont::Sibling(fi) = g.font {
+                                g.font = GlyphFont::Page(fi);
+                            }
+                        }
+                        *actual = true;
+                    }
+                }
+            }
+        }
+        // pdf.js ignores ActualText and pdfium reorders it, so in a line with right-to-left text a
+        // word that reads as typed only through ActualText is refused; "Replace with new text"
+        // covers it. (Digits an Arabic subset draws but does not map read by their glyphs through
+        // a sibling font, above.) A word drawn in another font is kept: pdfium reads it in place, while pdf.js, which
+        // puts a line's text items in content order, can read it out of order (crates/README.md).
+        // A line already drawn with ActualText spans (Chrome's output) is left out: neither reader
+        // reads it by its glyphs before the edit either.
+        if any_rtl && !spans_on_line {
+            if let Some(text) = pieces.iter().find_map(|p| match p {
+                Piece::Word { text, actual: true, .. } => Some(text),
+                _ => None,
+            }) {
+                return Err(verify(
+                    "text-mismatch",
+                    format!("{text:?} would read as typed only through ActualText, which pdf.js ignores"),
+                ));
+            }
+        }
 
         // 5. Geometry: left-to-right lines keep their start, right-to-left lines their end.
         let k = ctx.k();
@@ -462,15 +565,93 @@ impl Engine {
                 want.insert(g, -delta);
             }
         }
-        let plan = Plan { removed, want, anchor, after: false, segs: Vec::new(), insert_at: start - u_of(anchor), drop_ops };
+        // Where the new text goes in the content. pdf.js reads a line's text items in content
+        // order, and new glyphs in another font than the line's are items of their own. So when
+        // a right-to-left line gets new text at its logical end (typing at the end of a sentence),
+        // the runs in the line's font are drawn in place and the others after the line's last
+        // glyph, in logical order. Elsewhere no content order reads right in pdf.js: a word in a
+        // registered face is kept (PDFium reads it in order; see crates/README.md), but a sibling
+        // word is refused, as the ActualText it replaces was. A line drawn with ActualText spans
+        // (Chrome's) is left as it was: no reader goes by its glyphs, and glyphs after its last
+        // one would land inside a span.
+        let (runs, _) = runs_of(&pieces);
+        let foreign = |r: usize| runs[r].font.is_some_and(|f| f != GlyphFont::Page(state.font));
+        let all: Vec<usize> = (0..runs.len()).collect();
+        let mut lists = vec![all.clone()];
+        let mut tail: Option<(usize, f64)> = None;
+        if rtl && !spans_on_line && all.iter().any(|&r| foreign(r)) {
+            let mut logical = all.clone();
+            logical.sort_by_key(|&r| runs[r].at);
+            let first = logical.iter().position(|&r| foreign(r)).unwrap_or(0);
+            let ordered = logical[first..].iter().all(|&r| foreign(r) || runs[r].font.is_none());
+            let kept = line.glyphs.iter().copied().filter(|g| !removed.contains(g));
+            let at_end = kept.clone().all(|g| !want.contains_key(&g));
+            let same_style = |g: usize| {
+                let (a, h) = (&pc.glyphs[anchor], &pc.glyphs[g]);
+                h.source == a.source
+                    && h.size == a.size
+                    && h.color == a.color
+                    && h.render_mode == a.render_mode
+                    && (h.angle - a.angle).abs() < 1e-9
+                    && (across(h.origin, ang) - base_v).abs() < 0.01 * h.size
+                    && show_state(&pc, g).is_some_and(|s| {
+                        s.font == state.font
+                            && s.font_res == state.font_res
+                            && (s.tfs, s.th, s.tc, s.tw, s.scale, s.rise)
+                                == (state.tfs, state.th, state.tc, state.tw, state.scale, state.rise)
+                    })
+            };
+            let placed = ordered
+                && at_end
+                && match kept.max() {
+                    // The new text is drawn after the rest of the line already.
+                    None => true,
+                    Some(g) if g < anchor => true,
+                    Some(g) if same_style(g) => {
+                        tail = Some((g, start - (u_of(g) + pc.glyphs[g].advance)));
+                        true
+                    }
+                    Some(_) => false,
+                };
+            if placed {
+                lists = match tail {
+                    Some(_) => vec![
+                        all.iter().copied().filter(|&r| !foreign(r)).collect(),
+                        logical.iter().copied().filter(|&r| foreign(r)).collect(),
+                    ],
+                    None => vec![logical],
+                };
+            } else if pieces.iter().flat_map(piece_glyphs).any(|g| matches!(g.font, GlyphFont::Sibling(_))) {
+                return Err(verify(
+                    "text-mismatch",
+                    format!(
+                        "{inserted:?} needs glyphs of another font inside a right-to-left line, which pdf.js reads out of order"
+                    ),
+                ));
+            }
+        }
+        let plan =
+            Plan { removed, want, anchor, after: false, segs: Vec::new(), insert_at: start - u_of(anchor), drop_ops, tail };
 
-        // 6. Apply in a transaction, check, then keep or roll back.
+        // 6. Apply in a transaction, check, then keep or roll back. A line that reads back in
+        // another order than typed (digits or Latin inside a right-to-left line, which readers
+        // rebuild from glyph positions with their own bidi rules) is refused: wrapping it in one
+        // ActualText span would satisfy this check but not readers that go by the glyphs
+        // (pdfium, pdf.js). The editor then offers "Replace with new text".
         let snapshot = (self.doc.max_id, self.dirty.clone(), self.embeds.clone());
         let mut backup: Vec<(ObjectId, Option<Object>)> = Vec::new();
-        let outcome = self.emit(page_id, &ctx, &pieces, &mut backup).and_then(|(items, expect)| {
-            self.apply_items(page_id, &pc, &plan, &items, new_width, &mut backup)?;
+        let outcome = self.emit(page_id, &ctx, &pieces, &lists, &mut backup).and_then(|drawn| {
+            let none = (Vec::new(), Vec::new());
+            let ((items, expect), (tail_items, tail_expect)) = (&drawn[0], drawn.get(1).unwrap_or(&none));
+            self.apply_items(page_id, &pc, &plan, (items, tail_items), new_width, &mut backup)?;
             let after = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
-            let (touched, map) = check(&pc, &after, &plan, &expect, start, ang, &state)?;
+            let (touched, map) = check(&pc, &after, &plan, (expect, tail_expect), start, ang, &state)?;
+            if self.overflows(page, &pc, &line.glyphs, &after, &touched) {
+                return Err(verify("overflow", "the line would run past the page edge".into()));
+            }
+            if Self::collides(&pc, &line.glyphs, &after, &touched) {
+                return Err(verify("overlap", "the line would run into other text on its baseline".into()));
+            }
             let (new_lines, paragraphs) = layout::group(&after);
             // The edited line must read back exactly as asked.
             let probe = touched.first().copied().or_else(|| line.glyphs.iter().find_map(|&g| map[g]));
@@ -478,9 +659,10 @@ impl Engine {
             // Nothing left to probe: the whole line was deleted, which is right when nothing visible was asked for.
             let gone = probe.is_none() && expected.trim().is_empty();
             if !gone && reads.as_deref().map(script::canonical_marks) != Some(script::canonical_marks(&expected)) {
-                return Err(Error::Verify {
-                    message: format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
-                });
+                return Err(verify(
+                    "text-mismatch",
+                    format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
+                ));
             }
             Ok((after, touched, new_lines, paragraphs))
         });
@@ -525,15 +707,17 @@ impl Engine {
         Ok(EditResult { page: self.describe(page, &after, new_lines, paragraphs), changed, substitutions, shift })
     }
 
-    /// Turns the pieces into content items (embedding faces as needed) and lists every glyph
-    /// they draw.
+    /// Turns the pieces into content items (embedding faces and siblings as needed) and lists
+    /// every glyph they draw: one list of items per entry of `lists` (indices into
+    /// [`runs_of`]'s runs, in the order they are drawn).
     fn emit(
         &mut self,
         page_id: ObjectId,
         ctx: &Ctx,
         pieces: &[Piece],
+        lists: &[Vec<usize>],
         backup: &mut Vec<(ObjectId, Option<Object>)>,
-    ) -> Result<(Vec<Item>, Vec<Expect>)> {
+    ) -> Result<Vec<(Vec<Item>, Vec<Expect>)>> {
         let pc = ctx.pc;
         let state = ctx.state;
         let tfs = state.tfs;
@@ -555,82 +739,179 @@ impl Engine {
         for (f, glyphs) in &per_face {
             face_font.insert(*f, self.embed(*f, glyphs, backup)?);
         }
+        let mut per_sibling: Vec<(usize, Vec<(u32, String)>)> = Vec::new();
+        for g in pieces.iter().flat_map(piece_glyphs) {
+            if let GlyphFont::Sibling(fi) = g.font {
+                let i = match per_sibling.iter().position(|(x, _)| *x == fi) {
+                    Some(i) => i,
+                    None => {
+                        per_sibling.push((fi, Vec::new()));
+                        per_sibling.len() - 1
+                    }
+                };
+                if !per_sibling[i].1.iter().any(|(c, _)| *c == g.code) {
+                    per_sibling[i].1.push((g.code, g.text.clone()));
+                }
+            }
+        }
+        // A sibling of a Type 0 font also declares the widths of its codes the font leaves to
+        // `/DW` (glyphs the subset never drew), from the program, so readers advance by the real
+        // width.
+        let mut sibling_font: HashMap<usize, ObjectId> = HashMap::new();
+        let mut sibling_width: HashMap<(usize, u32), f64> = HashMap::new();
+        for (fi, map) in &per_sibling {
+            let f = &pc.fonts[*fi];
+            let id = f.object_id.ok_or_else(|| limit("inline-font"))?;
+            let mut widths: Vec<(u32, f64)> = Vec::new();
+            if f.kind == crate::font::FontKind::Type0 {
+                for (code, _) in map {
+                    if f.declares_width(*code) {
+                        continue;
+                    }
+                    let w = f.truetype_program().zip(f.program_gid(*code)).map(|(d, gid)| face_width(d, gid));
+                    if let Some(w) = w.filter(|w| *w > 0.0) {
+                        widths.push((*code, w));
+                        sibling_width.insert((*fi, *code), w);
+                    }
+                }
+            }
+            sibling_font.insert(*fi, self.sibling_font(id, if f.two_byte { 2 } else { 1 }, map, &widths, backup)?);
+        }
         let mut names: HashMap<GlyphFont, Vec<u8>> = HashMap::new();
         names.insert(GlyphFont::Page(state.font), state.font_res.clone());
         let kern = |d: f64| -d * 1000.0 / tfs;
-        let mut items: Vec<Item> = Vec::new();
-        let mut expect: Vec<Expect> = Vec::new();
-        let mut cur_font = GlyphFont::Page(state.font);
-        let mut cur_rise = 0.0f64;
-        let mut pen = 0.0f64;
-        for p in pieces {
-            let glyphs: &[NewGlyph] = match p {
-                Piece::Word { text, glyphs, actual, .. } => {
-                    if *actual {
-                        items.push(Item::BeginSpan(text.clone()));
-                    }
-                    glyphs
+        let (runs, total) = runs_of(pieces);
+        let mut out: Vec<(Vec<Item>, Vec<Expect>)> = Vec::new();
+        for list in lists {
+            // Each list starts and ends at the line's font and rise, its pen at the segment's
+            // start and end.
+            let mut items: Vec<Item> = Vec::new();
+            let mut expect: Vec<Expect> = Vec::new();
+            let mut cur_font = GlyphFont::Page(state.font);
+            let mut cur_rise = 0.0f64;
+            let mut pen = 0.0f64;
+            for &r in list {
+                let run = &runs[r];
+                if (run.start - pen).abs() > 1e-9 {
+                    items.push(Item::Kern(kern(run.start - pen)));
+                    pen = run.start;
                 }
-                Piece::Space { glyph: Some(g), .. } => std::slice::from_ref(g),
-                Piece::Space { glyph: None, adv } => {
-                    items.push(Item::Kern(kern(*adv)));
-                    pen += adv;
-                    continue;
-                }
-            };
-            for g in glyphs {
-                if g.font != cur_font {
-                    let name = match names.get(&g.font) {
-                        Some(n) => n.clone(),
-                        None => {
-                            let obj = match g.font {
-                                GlyphFont::Page(fi) => pc.fonts[fi].object_id.ok_or_else(|| limit("inline-font"))?,
-                                GlyphFont::Face(f) => face_font[&f],
-                            };
-                            let n = self.font_resource(page_id, pc, source, obj, backup)?;
-                            names.insert(g.font, n.clone());
-                            n
+                for p in &pieces[run.range.clone()] {
+                    let glyphs: &[NewGlyph] = match p {
+                        Piece::Word { text, glyphs, actual, .. } => {
+                            if *actual {
+                                items.push(Item::BeginSpan(text.clone()));
+                            }
+                            glyphs
+                        }
+                        Piece::Space { glyph: Some(g), .. } => std::slice::from_ref(g),
+                        Piece::Space { glyph: None, adv, .. } => {
+                            items.push(Item::Kern(kern(*adv)));
+                            pen += adv;
+                            continue;
                         }
                     };
-                    items.push(Item::Font(name, tfs));
-                    cur_font = g.font;
-                }
-                if (g.y_off - cur_rise).abs() > 1e-9 {
-                    items.push(Item::Rise(state.rise + g.y_off));
-                    cur_rise = g.y_off;
-                }
-                let (bytes, code, actual, obj) = match g.font {
-                    GlyphFont::Page(fi) => {
-                        let f = &pc.fonts[fi];
-                        (f.code_bytes(g.code), g.code, natural(f, g.code, state), f.object_id)
+                    for g in glyphs {
+                        if g.font != cur_font {
+                            let name = match names.get(&g.font) {
+                                Some(n) => n.clone(),
+                                None => {
+                                    let obj = match g.font {
+                                        GlyphFont::Page(fi) => pc.fonts[fi].object_id.ok_or_else(|| limit("inline-font"))?,
+                                        GlyphFont::Face(f) => face_font[&f],
+                                        GlyphFont::Sibling(fi) => sibling_font[&fi],
+                                    };
+                                    let n = self.font_resource(page_id, pc, source, obj, backup)?;
+                                    names.insert(g.font, n.clone());
+                                    n
+                                }
+                            };
+                            items.push(Item::Font(name, tfs));
+                            cur_font = g.font;
+                        }
+                        if (g.y_off - cur_rise).abs() > 1e-9 {
+                            items.push(Item::Rise(state.rise + g.y_off));
+                            cur_rise = g.y_off;
+                        }
+                        let (bytes, code, actual, obj) = match g.font {
+                            GlyphFont::Page(fi) => {
+                                let f = &pc.fonts[fi];
+                                (f.code_bytes(g.code), g.code, natural(f, g.code, state), f.object_id)
+                            }
+                            GlyphFont::Sibling(fi) => {
+                                let f = &pc.fonts[fi];
+                                let w = match sibling_width.get(&(fi, g.code)) {
+                                    Some(w) => w / 1000.0 * tfs + state.tc,
+                                    None => natural(f, g.code, state),
+                                };
+                                (f.code_bytes(g.code), g.code, w, Some(sibling_font[&fi]))
+                            }
+                            GlyphFont::Face(f) => {
+                                let embed = self.embeds[f].as_ref().expect("embedded above");
+                                let cid = embed.code_for(g.code as u16, &g.text);
+                                let w = face_width(&self.faces[f].data, g.code as u16) / 1000.0;
+                                (cid.to_be_bytes().to_vec(), cid as u32, w * tfs + state.tc, Some(face_font[&f]))
+                            }
+                        };
+                        if g.x_off.abs() > 1e-9 {
+                            items.push(Item::Kern(kern(g.x_off)));
+                        }
+                        items.push(Item::Bytes(bytes));
+                        items.push(Item::Kern(kern(g.adv - g.x_off - actual)));
+                        expect.push(Expect { code, font: obj, along: pen + g.x_off, rise: g.y_off });
+                        pen += g.adv;
                     }
-                    GlyphFont::Face(f) => {
-                        let embed = self.embeds[f].as_ref().expect("embedded above");
-                        let cid = embed.code_for(g.code as u16, &g.text);
-                        let w = face_width(&self.faces[f].data, g.code as u16) / 1000.0;
-                        (cid.to_be_bytes().to_vec(), cid as u32, w * tfs + state.tc, Some(face_font[&f]))
+                    if matches!(p, Piece::Word { actual: true, .. }) {
+                        items.push(Item::EndSpan);
                     }
-                };
-                if g.x_off.abs() > 1e-9 {
-                    items.push(Item::Kern(kern(g.x_off)));
                 }
-                items.push(Item::Bytes(bytes));
-                items.push(Item::Kern(kern(g.adv - g.x_off - actual)));
-                expect.push(Expect { code, font: obj, along: pen + g.x_off, rise: g.y_off });
-                pen += g.adv;
             }
-            if matches!(p, Piece::Word { actual: true, .. }) {
-                items.push(Item::EndSpan);
+            if (total - pen).abs() > 1e-9 {
+                items.push(Item::Kern(kern(total - pen)));
             }
+            if cur_rise.abs() > 1e-9 {
+                items.push(Item::Rise(state.rise));
+            }
+            if cur_font != GlyphFont::Page(state.font) {
+                items.push(Item::Font(state.font_res.clone(), tfs));
+            }
+            out.push((items, expect));
         }
-        if cur_rise.abs() > 1e-9 {
-            items.push(Item::Rise(state.rise));
-        }
-        if cur_font != GlyphFont::Page(state.font) {
-            items.push(Item::Font(state.font_res.clone(), tfs));
-        }
-        Ok((items, expect))
+        Ok(out)
     }
+}
+
+/// A run of pieces in one font (a space drawn as a gap joins the run before it), in visual order.
+struct Run {
+    range: std::ops::Range<usize>,
+    /// Font of its glyphs (`None`: gaps only).
+    font: Option<GlyphFont>,
+    /// Offset along the baseline from the segment's start, text space.
+    start: f64,
+    /// Smallest byte offset of its pieces in the segment (logical order).
+    at: usize,
+}
+
+/// The pieces' runs and their total width.
+fn runs_of(pieces: &[Piece]) -> (Vec<Run>, f64) {
+    let mut runs: Vec<Run> = Vec::new();
+    let mut x = 0.0f64;
+    for (i, p) in pieces.iter().enumerate() {
+        let (font, at, w) = match p {
+            Piece::Word { glyphs, at, .. } => (glyphs.first().map(|g| g.font), *at, glyphs.iter().map(|g| g.adv).sum::<f64>()),
+            Piece::Space { glyph, at, adv } => (glyph.as_ref().map(|g| g.font), *at, *adv),
+        };
+        match runs.last_mut() {
+            Some(r) if font.is_none() || r.font.is_none() || font == r.font => {
+                r.range.end = i + 1;
+                r.at = r.at.min(at);
+                r.font = r.font.or(font);
+            }
+            _ => runs.push(Run { range: i..i + 1, font, start: x, at }),
+        }
+        x += w;
+    }
+    (runs, x)
 }
 
 /// The text a reader gets from the glyphs' own Unicode mappings, in logical order: left to
@@ -643,7 +924,7 @@ fn plain_reading(pc: &PageContent, glyphs: &[NewGlyph], rtl: bool) -> String {
             // PDFium reads a right-to-left glyph mapped to nothing as U+FFFE: such a word
             // needs ActualText.
             GlyphFont::Face(_) if rtl && g.text.is_empty() => "\u{FFFD}".into(),
-            GlyphFont::Face(_) => g.text.clone(),
+            GlyphFont::Face(_) | GlyphFont::Sibling(_) => g.text.clone(),
         })
         .collect();
     if rtl {
@@ -652,18 +933,46 @@ fn plain_reading(pc: &PageContent, glyphs: &[NewGlyph], rtl: bool) -> String {
     script::canonical_marks(&script::fold_presentation(&parts.concat()))
 }
 
+/// The glyphs a piece draws.
+fn piece_glyphs(p: &Piece) -> &[NewGlyph] {
+    match p {
+        Piece::Word { glyphs, .. } => glyphs,
+        Piece::Space { glyph: Some(g), .. } => std::slice::from_ref(g),
+        Piece::Space { glyph: None, .. } => &[],
+    }
+}
+
+/// The word's page glyphs moved to their fonts' siblings, or `None` when a glyph is not a page
+/// glyph, has no known text, or its font cannot have a sibling (inline, Type 3, or codes of
+/// another length than the ToUnicode written for it).
+fn sibling(pc: &PageContent, glyphs: &[NewGlyph]) -> Option<Vec<NewGlyph>> {
+    glyphs
+        .iter()
+        .map(|g| {
+            let GlyphFont::Page(fi) = g.font else { return None };
+            let f = &pc.fonts[fi];
+            let width = if f.two_byte { 2 } else { 1 };
+            let ok = !g.text.is_empty()
+                && f.object_id.is_some()
+                && f.kind != crate::font::FontKind::Type3
+                && f.code_bytes(g.code).len() == width;
+            ok.then(|| NewGlyph { font: GlyphFont::Sibling(fi), ..g.clone() })
+        })
+        .collect()
+}
+
 /// A space between new words: the style font's own space glyph, else an empty advance.
-fn space_piece(ctx: &Ctx, style: usize) -> Piece {
+fn space_piece(ctx: &Ctx, style: usize, at: usize) -> Piece {
     let font = &ctx.pc.fonts[style];
     if font.object_id.is_some() {
         let seen: HashSet<u32> = ctx.pc.glyphs.iter().filter(|g| g.font == style).map(|g| g.code).collect();
         if let Some(code) = font.encode(' ', &seen) {
             let adv = natural(font, code, ctx.state);
             let glyph = NewGlyph { font: GlyphFont::Page(style), code, text: String::new(), adv, x_off: 0.0, y_off: 0.0 };
-            return Piece::Space { glyph: Some(glyph), adv };
+            return Piece::Space { glyph: Some(glyph), adv, at };
         }
     }
-    Piece::Space { glyph: None, adv: 0.25 * ctx.state.tfs }
+    Piece::Space { glyph: None, adv: 0.25 * ctx.state.tfs, at }
 }
 
 type Checked = (Vec<usize>, Vec<Option<usize>>);
@@ -677,15 +986,16 @@ fn check(
     before: &PageContent,
     after: &PageContent,
     plan: &Plan,
-    expect: &[Expect],
+    (expect, tail_expect): (&[Expect], &[Expect]),
     start: f64,
     angle: f64,
     state: &ShowState,
 ) -> Result<Checked> {
-    let fail = |m: String| Err(Error::Verify { message: m });
+    let fail = |r: &'static str, m: String| Err(verify(r, m));
     let kept = before.glyphs.len() - plan.removed.len();
-    if after.glyphs.len() != kept + expect.len() {
-        return fail(format!("expected {} glyphs after the edit, found {}", kept + expect.len(), after.glyphs.len()));
+    let new = expect.len() + tail_expect.len();
+    if after.glyphs.len() != kept + new {
+        return fail("glyph-mismatch", format!("expected {} glyphs after the edit, found {}", kept + new, after.glyphs.len()));
     }
     let (dx, dy) = (angle.cos(), angle.sin());
     let anchor = &before.glyphs[plan.anchor];
@@ -694,28 +1004,30 @@ fn check(
     let mut touched = Vec::new();
     let mut map = vec![None; before.glyphs.len()];
     let mut j = 0;
+    let place_new = |expect: &[Expect], j: &mut usize, touched: &mut Vec<usize>| -> Result<()> {
+        for e in expect {
+            let h = &after.glyphs[*j];
+            let du = start + e.along * k - base_u;
+            let target =
+                (anchor.origin.0 + du * dx + e.rise * state.rise_dir.0, anchor.origin.1 + du * dy + e.rise * state.rise_dir.1);
+            let off = (h.origin.0 - target.0).hypot(h.origin.1 - target.1);
+            if h.code != e.code || after.fonts[h.font].object_id != e.font {
+                return Err(verify("glyph-mismatch", format!("new glyph {j} is not the planned glyph")));
+            }
+            if (h.size - anchor.size).abs() > 1e-6 || h.color != anchor.color || h.render_mode != anchor.render_mode {
+                return Err(verify("glyph-mismatch", format!("new glyph {j} has the wrong style")));
+            }
+            if !(off <= TOLERANCE) {
+                return Err(verify("position-drift", format!("new glyph {j} is {off:.3} pt from where it should be")));
+            }
+            touched.push(*j);
+            *j += 1;
+        }
+        Ok(())
+    };
     for (i, g) in before.glyphs.iter().enumerate() {
         if i == plan.anchor {
-            for e in expect {
-                let h = &after.glyphs[j];
-                let du = start + e.along * k - base_u;
-                let target = (
-                    anchor.origin.0 + du * dx + e.rise * state.rise_dir.0,
-                    anchor.origin.1 + du * dy + e.rise * state.rise_dir.1,
-                );
-                let off = (h.origin.0 - target.0).hypot(h.origin.1 - target.1);
-                if h.code != e.code || after.fonts[h.font].object_id != e.font {
-                    return fail(format!("new glyph {j} is not the planned glyph"));
-                }
-                if (h.size - anchor.size).abs() > 1e-6 || h.color != anchor.color || h.render_mode != anchor.render_mode {
-                    return fail(format!("new glyph {j} has the wrong style"));
-                }
-                if !(off <= TOLERANCE) {
-                    return fail(format!("new glyph {j} is {off:.3} pt from where it should be"));
-                }
-                touched.push(j);
-                j += 1;
-            }
+            place_new(expect, &mut j, &mut touched)?;
         }
         if plan.removed.contains(&i) {
             continue;
@@ -732,16 +1044,19 @@ fn check(
             || h.color != g.color
             || h.render_mode != g.render_mode
         {
-            return fail(format!("glyph {i} ({:?}) changed", g.text));
+            return fail("glyph-mismatch", format!("glyph {i} ({:?}) changed", g.text));
         }
         if !(moved <= TOLERANCE) {
-            return fail(format!("glyph {i} ({:?}) is {moved:.3} pt from where it should be", g.text));
+            return fail("position-drift", format!("glyph {i} ({:?}) is {moved:.3} pt from where it should be", g.text));
         }
         if want != 0.0 {
             touched.push(j);
         }
         map[i] = Some(j);
         j += 1;
+        if plan.tail.is_some_and(|t| t.0 == i) {
+            place_new(tail_expect, &mut j, &mut touched)?;
+        }
     }
     Ok((touched, map))
 }

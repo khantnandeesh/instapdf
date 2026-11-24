@@ -926,11 +926,26 @@
   color: var(--color-ink-black);
 }
 .ed-toast__act {
+  flex: none;
+  white-space: nowrap;
   height: 36px;
   padding: 0 12px;
   border-radius: 99px;
   color: var(--color-brand-strong);
   font-weight: 700;
+}
+/* Narrow screens: a long notice keeps the full width and its action goes under it (the font
+   notice is one short row of its own, F24). */
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) {
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+}
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) > span {
+  flex: 1 1 calc(100% - 44px);
+}
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) > .ed-toast__act {
+  order: 3;
+  margin-left: -12px;
 }
 .ed-toast__act:hover,
 .ed-toast__x:hover {
@@ -1067,8 +1082,14 @@
     width: 12px;
     height: 12px;
   }
+  /* A 48 px target centred on the handle, whatever its border (AC-48: at least 44 px). */
   .ed-handle::before {
-    inset: -16px;
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    width: 48px;
+    height: 48px;
+    transform: translate(-50%, -50%);
   }
 }
 .ed-handle--nw,
@@ -1113,7 +1134,24 @@
 }
 .ed-rotate > span {
   position: absolute;
-  inset: -12px;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -50%);
+}
+@media (pointer: coarse) {
+  /* Further up on touch so its 48 px target clears the top resize handle's. */
+  .ed-rotate {
+    top: -56px;
+  }
+  .ed-rotate::after {
+    height: 42px;
+  }
+  .ed-rotate > span {
+    width: 48px;
+    height: 48px;
+  }
 }
 .ed-guide {
   position: absolute;
@@ -1200,8 +1238,105 @@
   background: color-mix(in srgb, var(--color-brand) 22%, transparent);
   opacity: 0;
 }
+/* The ring is painted inside the box by the box itself (LineEditBox), so nothing of it reaches a neighbouring line. */
 .ed-input {
-  box-shadow: 0 2px 10px rgb(0 0 0 / 0.12);
+  outline: none;
+}
+/* The font is still being made: the page's own drawing of the line shows through, so no other
+   font is ever seen in its place. */
+.ed-input--settling {
+  background: transparent;
+  color: transparent;
+  caret-color: var(--color-ink-black, #111);
+}
+.ed-input {
+  box-sizing: border-box;
+  width: max-content;
+  /* Text longer than the page scrolls inside the box as it is typed (the caret stays in view). */
+  overflow: hidden;
+  white-space: pre;
+  border: 0;
+  /* Drawn as a PDF draws text: glyph after glyph, no kerning or ligatures of the browser's own. */
+  font-kerning: none;
+  font-variant-ligatures: none;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+/* A typed character the line's font can't draw. */
+::highlight(ed-miss) {
+  text-decoration: underline wavy var(--color-warning, #b45309);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.12em;
+}
+.ed-input__hint {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: min(calc(100vw - 16px), 300px);
+  margin: 0;
+  padding: 2px 3px 2px 9px;
+  border: 1px solid color-mix(in srgb, var(--color-ink) 10%, transparent);
+  border-radius: 999px;
+  background: var(--ip-surface-overlay, #fff);
+  box-shadow: var(--shadow-menu);
+  font: 500 11px/1.4 var(--font-sans, system-ui, sans-serif);
+  white-space: nowrap;
+  color: var(--color-ink);
+  animation: ed-hint-in var(--dur-base, 160ms) ease-out;
+}
+/* Text lies right under the box: the hint goes over it instead. */
+.ed-input__hint--over {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.ed-input__chars {
+  font-weight: 700;
+}
+.ed-input__picks {
+  display: inline-flex;
+  gap: 3px;
+}
+.ed-input__pick {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-ink) 16%, transparent);
+  background: transparent;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--color-ink);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-base, 160ms) ease-out,
+    border-color var(--dur-base, 160ms) ease-out;
+}
+.ed-input__pick:hover {
+  background: color-mix(in srgb, var(--color-brand) 8%, transparent);
+}
+.ed-input__pick--on {
+  border-color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+}
+/* Phones: one short row, two fonts. */
+@media (max-width: 480px) {
+  .ed-input__pick:nth-child(n + 3) {
+    display: none;
+  }
+}
+@keyframes ed-hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ed-input__hint {
+    animation: none;
+  }
 }
 
 /* ---- side panel, thumbnails, lists ------------------------------------------------------ */
@@ -1508,14 +1643,13 @@
   .ed-shell {
     animation: ed-fade 180ms ease-out both;
   }
-  .ed-raster,
+  .ed-raster--in,
   .ed-thumb__canvas {
     animation: ed-fade 260ms ease-out both;
   }
   .ed-toast,
   .ed-recover,
   .ed-hint,
-  .ed-input,
   .ed-notice {
     animation: ed-rise 180ms var(--ease-enter) both;
   }

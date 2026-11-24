@@ -17,7 +17,7 @@ import { useLeaveGuard } from "@/components/tool-flow/useLeaveGuard";
 import { buildInWorker, checkOwnerPassword, disposeBuild } from "@/lib/editor/build-client";
 import { OwnerPasswordDialog, OwnerPermissionNotice } from "@/components/tool-flow/OwnerPassword";
 import type { Permission } from "@/tools/registry";
-import { disposeEngine, getEngineStatus, subscribeEngine } from "@/lib/editor/engine-client";
+import { disposeEngine, getEngineStatus, getShapingStatus, subscribeEngine } from "@/lib/editor/engine-client";
 import { fontsForBuild, resolveFonts } from "@/lib/editor/fonts-browser";
 import { screenDeltaToFrame, screenToFrame, displaySize } from "@/lib/editor/geometry";
 import * as H from "@/lib/editor/history";
@@ -31,7 +31,8 @@ import { listChars } from "@/lib/editor/coverage";
 import { missingInFormValues, missingInObjects } from "./coverage-browser";
 import { addAsset, IMAGE_ACCEPT, imageError, imageFromFile, isImageFile, plainAssets, releaseAssets } from "./assets";
 import { EnginePill } from "./EngineProgress";
-import { resetDocFonts } from "./font-service";
+import { fontLabel, resetDocFonts } from "./font-service";
+import { resetDocFaces } from "./doc-face";
 import { disposeMatcher } from "@/lib/font-library/match-client";
 import { FontNotice } from "./FontMenu";
 import { AnnotsToggle, DOCK_ORDER, MoreTools, PageChip, PageHeader, PrivacyChip, SaveChip, ToolDock, ToolRail, TopBar, TOOLS, ViewPill } from "./Chrome";
@@ -47,7 +48,8 @@ import { createStore, shallowArray, useStore, type EditorState, type Placement, 
 async function buildFonts(objects: readonly EditorObject[]) {
   const ids = objects.flatMap((o) => (o.kind === "text" ? [o.font] : []));
   await resolveFonts(ids);
-  return fontsForBuild(ids);
+  // Names for the shaping engine, which embeds a font under the family it was registered as.
+  return { ...fontsForBuild(ids), labels: Object.fromEntries([...new Set(ids)].map((id) => [id, fontLabel(id)])) };
 }
 
 const SignDialog = lazy(() => import("./SignDialog").then((m) => ({ default: m.SignDialog })));
@@ -79,6 +81,8 @@ const writeLocal = (k: string, v: string) => {
   }
 };
 
+/** Largest zoom the document opens at on desktop (fit width up to this). */
+const OPEN_ZOOM_CAP = 1.5;
 const reducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function initialState(pages: PageEntry[], wide: boolean): EditorState {
@@ -113,11 +117,12 @@ function initialState(pages: PageEntry[], wide: boolean): EditorState {
     pdfRev: 0,
     engineReady: false,
     engineWanted: false,
+    shaping: "idle",
     pendingLine: null,
     lineEdit: null,
     fontNotice: null,
     busy: null,
-    panel: wide && (readLocal(PANEL_KEY) ?? (typeof innerWidth !== "undefined" && innerWidth >= 1280 ? "1" : "0")) === "1",
+    panel: wide && (readLocal(PANEL_KEY) ?? (typeof innerWidth !== "undefined" && innerWidth >= 1600 ? "1" : "0")) === "1",
     panelTab: "pages",
     wide,
     readOnly: false,
@@ -153,6 +158,7 @@ export function EditorShell(props: ShellProps) {
       if (!el) return;
       const s = getEngineStatus();
       el.dataset.engine = s.state;
+      el.dataset.shaping = getShapingStatus().state;
       if (s.cached) el.dataset.engineCached = "true";
       else delete el.dataset.engineCached;
     };
@@ -204,11 +210,17 @@ export function EditorShell(props: ShellProps) {
       const wide = matchMedia("(min-width: 1024px)").matches;
       const rt: Runtime = { name: props.name, password: props.password, hash: null, versions: initialVersions(props.bytes), pdf: props.pdf.doc, shown: 0, src, assets: {}, held: new Set(), clip: null, wasEncrypted: props.pdf.wasEncrypted };
       // Owner-restricted (no modify): read-only until the owner password is entered (U-E9). A file
-      // opened with its owner password is unlocked already.
-      const restricted = props.pdf.denied.includes("modify") && !(props.password && (await checkOwnerPassword(props.bytes.slice(), props.password).catch(() => false)));
-      if (!alive) return;
+      // opened with a password opens at once, read-only, and unlocks if that was the owner password
+      // (checked in the background: the check loads the download worker).
+      const restricted = props.pdf.denied.includes("modify");
       const store = createStore({ ...initialState(initialPages(src), wide), readOnly: restricted });
       resetDocFonts();
+      resetDocFaces();
+      if (restricted && props.password)
+        void checkOwnerPassword(props.bytes.slice(), props.password).then(
+          (owner) => alive && owner && store.set({ readOnly: false }),
+          () => undefined,
+        );
       made = createController(store, rt, { announce: say, toast: showToast });
       setCtl(made);
       // Form fields: read in the build worker, only when pdf.js says the file has some.
@@ -302,7 +314,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   const [confirm, setConfirm] = useState<"close" | "clear" | null>(null);
   /** Opening another file (or a blank one) while there are edits not downloaded: asks first. */
   const [replace, setReplace] = useState<{ run: () => void; label: string } | null>(null);
-  const [missingAsk, setMissingAsk] = useState<{ chars: string[]; name?: string } | null>(null);
+  const [missingAsk, setMissingAsk] = useState<{ chars: string[]; unchecked: boolean; name?: string } | null>(null);
   const readOnly = useStore(store, (s) => s.readOnly);
   const [ownerOpen, setOwnerOpen] = useState(false);
   const [ownerError, setOwnerError] = useState<string | undefined>();
@@ -401,16 +413,17 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     },
     [store, fitZoom, scroller],
   );
-  // First fit: 100% when the widest page fits, else fit width (always fit width on phones).
+  // First fit: fit width, so the page fills the view (M12). On very wide screens the zoom is
+  // capped, so a line of text stays a readable length.
   const fitted = useRef(false);
   useLayoutEffect(() => {
     if (!scroller || fitted.current) return;
     fitted.current = true;
     const inner = innerSize();
     if (inner) setAvail(inner.w);
-    const fits = fitZoom("width") >= 1;
-    if (wide && fits) store.set({ zoom: 1, fit: null });
-    else store.set({ zoom: fitZoom("width"), fit: "width" });
+    const z = fitZoom("width");
+    if (wide && z > OPEN_ZOOM_CAP) store.set({ zoom: OPEN_ZOOM_CAP, fit: null });
+    else store.set({ zoom: z, fit: "width" });
   }, [scroller, wide, fitZoom, store, innerSize]);
   useEffect(() => {
     if (!scroller) return;
@@ -433,11 +446,33 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   // Ctrl/Cmd + wheel zooms around the pointer; two fingers pinch-zoom and pan (AC-94).
   useEffect(() => {
     if (!scroller) return;
+    // Ctrl+wheel: while the wheel turns, the pages (bitmaps, text layer and objects together) are
+    // only scaled with a transform; the zoom is applied, and the pages re-rendered, once it rests.
+    let wheeling: { z: number; f: number; at: number; timer: number } | null = null;
+    const settle = () => {
+      if (!wheeling) return;
+      const { z, f, at } = wheeling;
+      wheeling = null;
+      // Dropped before the zoom is measured; the new layout comes in the same frame (no paint between).
+      if (column.current) column.current.style.transform = "";
+      if (Math.abs(f - 1) > 0.001) zoomTo(z * f, at);
+    };
     const wheel = (e: WheelEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
-      const r = scroller.getBoundingClientRect();
-      zoomTo(store.get().zoom * Math.exp(-e.deltaY * 0.0025), e.clientY - r.top);
+      const col = column.current;
+      if (!col) return;
+      if (!wheeling) {
+        const r = col.getBoundingClientRect();
+        // Pages are centred in the column, so they grow from its centre line; vertically, around the pointer.
+        col.style.transformOrigin = `${r.width / 2}px ${e.clientY - r.top}px`;
+        wheeling = { z: store.get().zoom, f: 1, at: e.clientY - scroller.getBoundingClientRect().top, timer: 0 };
+      }
+      const w = wheeling;
+      w.f = Math.max(MIN_ZOOM / w.z, Math.min(MAX_ZOOM / w.z, w.f * Math.exp(-e.deltaY * 0.0025)));
+      col.style.transform = `scale(${w.f})`;
+      clearTimeout(w.timer);
+      w.timer = window.setTimeout(settle, 160);
     };
     let pinch: { d: number; z: number; cx: number; cy: number; f: number } | null = null;
     const pts = (e: TouchEvent) => {
@@ -470,8 +505,8 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       if (!pinch || e.touches.length >= 2) return;
       const { z, f, cy } = pinch;
       pinch = null;
-      const col = column.current;
-      if (col) col.style.transform = "";
+      // Dropped before the zoom is measured; the new layout comes in the same frame (no paint between).
+      if (column.current) column.current.style.transform = "";
       if (Math.abs(f - 1) > 0.02) zoomTo(z * f, cy - scroller.getBoundingClientRect().top);
     };
     scroller.addEventListener("wheel", wheel, { passive: false });
@@ -480,6 +515,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     scroller.addEventListener("touchend", end);
     scroller.addEventListener("touchcancel", end);
     return () => {
+      if (wheeling) clearTimeout(wheeling.timer);
       scroller.removeEventListener("wheel", wheel);
       scroller.removeEventListener("touchstart", start);
       scroller.removeEventListener("touchmove", move);
@@ -635,8 +671,10 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       // Added text with characters no font can print: say so before the file is made (AC-75).
       if (!force && !s.readOnly) {
         const now = H.current(store.get().history);
-        const missing = [...new Set([...(await missingInObjects(now.objects)), ...(await missingInFormValues(now.forms, store.get().forms.original))])];
-        if (missing.length) return setMissingAsk({ chars: missing, name });
+        const [objs, form] = await Promise.all([missingInObjects(now.objects), missingInFormValues(now.forms, store.get().forms.original)]);
+        const chars = [...new Set([...objs.chars, ...form.chars])];
+        const unchecked = objs.unchecked || form.unchecked;
+        if (chars.length || unchecked) return setMissingAsk({ chars, unchecked, name });
       }
       store.set({ busy: "save" });
       const at = store.get().history.index;
@@ -722,7 +760,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       clearTimeout(retry);
       retry = setTimeout(() => void save(), 30_000);
     };
-    const save = async () => {
+    const save = async (rewrite = false) => {
       const s = store.get();
       if (blocked()) return;
       const h = s.history;
@@ -736,8 +774,15 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       const plan = planSession({ hash: rt.hash!, name: rt.name, history: h, versions: rt.versions, assets: plainAssets(rt.assets), written, keyOf, sweep: p.fresh });
       // Too big to keep even the last step: the last good record stays.
       if (!plan) return fail();
-      const ok = await writeSession(plan);
-      if (!ok) return fail();
+      const result = await writeSession(plan);
+      if (result === "stale" && !rewrite) {
+        // Another tab's first write swept blobs this page had written: write them all again, but
+        // without a sweep of our own, which would delete that tab's blobs and start it over too
+        // (two tabs would keep rewriting each other's). Only a page's first write sweeps.
+        written.clear();
+        return save(true);
+      }
+      if (result !== "ok") return fail();
       p.fresh = false;
       plan.put.forEach(([k]) => written.add(k));
       plan.drop.forEach((k) => written.delete(k));
@@ -883,10 +928,20 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         return;
       }
       if (k === "Escape") {
-        if (s.placement || (s.tool !== "select" && s.tool !== "edit")) {
+        ctl.dropPendingEdit();
+        // Spec order: a placement is cancelled; else the selection goes first, then the tool
+        // (unlock / back to Select). A sticky tool stays armed while only a selection is dropped.
+        if (s.placement) {
           ctl.setTool("select");
           ctl.announce("Select tool");
-        } else if (sel.length) ctl.select([]);
+        } else if (sel.length) {
+          ctl.select([]);
+          ctl.announce("Deselected");
+          if (t?.closest("[data-obj-id]")) document.querySelector<HTMLElement>("[data-testid=canvas]")?.focus({ preventScroll: true });
+        } else if (s.tool !== "select" && s.tool !== "edit") {
+          ctl.setTool("select");
+          ctl.announce("Select tool");
+        }
         return;
       }
       if ((k === "Delete" || k === "Backspace") && sel.length) {
@@ -1058,7 +1113,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
           {readOnly && <OwnerLock name={rt.name} denied={pdf.denied} onUnlock={() => setOwnerOpen(true)} />}
           {recovery && <RecoveryNotice s={recovery} onRestore={() => void restore(recovery)} onDiscard={() => (setRecovery(null), rt.hash && void deleteSession(rt.hash))} />}
           {placement && <ModeHint text={`Click to place ${placement.label.toLowerCase()} · Esc cancels`} />}
-          {!placement && (tool === "draw" || tool === "mark" || tool === "shapes" || tool === "whiteout") && <ModeHint text={`${TOOL_HINTS[tool]} · Esc to stop`} />}
+          {!placement && (tool === "text" || tool === "draw" || tool === "mark" || tool === "shapes" || tool === "whiteout") && <ModeHint text={`${TOOL_HINTS[tool]} · Esc to stop`} />}
           {!wide && <PageChip onOpen={() => setSheet("pages")} />}
           <EnginePill wide={wide} />
           <FormsChrome wide={wide} />
@@ -1183,8 +1238,12 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       <Dialog
         open={!!missingAsk}
         onClose={() => setMissingAsk(null)}
-        title="Some characters won’t print"
-        description={`No font here can draw ${missingAsk ? listChars(missingAsk.chars) : ""}. They come out as “?” in the downloaded copy.`}
+        title={missingAsk?.chars.length ? "Some characters won’t print" : "Couldn’t check your text"}
+        description={
+          missingAsk?.chars.length
+            ? `No font here can draw ${listChars(missingAsk.chars)}. They come out as “?” in the downloaded copy.${missingAsk.unchecked ? " Some of your text couldn’t be checked." : ""}`
+            : "The font lists didn’t load, so we couldn’t check that every character of your added text prints. Any that can’t come out as “?”."
+        }
         footer={
           <>
             <Button variant="plain" onClick={() => setMissingAsk(null)} data-autofocus>
@@ -1249,6 +1308,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
 }
 
 const TOOL_HINTS: Partial<Record<ToolId, string>> = {
+  text: "Click to type, drag for a box",
   draw: "Drag to draw",
   mark: "Drag across text",
   shapes: "Click or drag",

@@ -8,7 +8,7 @@
  * default for the next object (AC-96).
  */
 import { FormsToolOptions } from "@/tools/forms/lazy";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { MenuButton, type MenuEntry } from "@/components/ui/Menu";
 import { cx } from "@/components/ui/cx";
 import { cssFamily } from "@/lib/editor/fonts";
@@ -17,7 +17,7 @@ import { layoutText, textBoxSize } from "@/lib/editor/text-layout";
 import { measurer } from "@/lib/editor/fonts-browser";
 import { FontMenuBody, useFontState } from "./FontMenu";
 import { fontLabel } from "./font-service";
-import { kindName, type EditorObject, type MarkupKind, type TextObj } from "@/lib/editor/model";
+import { canRotate, kindName, type EditorObject, type MarkupKind, type TextObj } from "@/lib/editor/model";
 import { useCtl } from "./context";
 import {
   AlignCenterBold,
@@ -500,8 +500,23 @@ function relayout(o: EditorObject): EditorObject {
   return { ...o, lines, w: box.w, h: box.h } satisfies TextObj;
 }
 
+/** True on very narrow screens (under 360 px), where a strip holds at most 6 controls (AC-98). */
+function useTiny(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      const mq = matchMedia("(max-width: 359.98px)");
+      mq.addEventListener("change", cb);
+      return () => mq.removeEventListener("change", cb);
+    },
+    () => matchMedia("(max-width: 359.98px)").matches,
+    () => false,
+  );
+}
+
 function Bar({ controls, more, compact, label }: { controls: Control[]; more: MenuEntry[]; compact?: boolean; label: string }) {
-  const max = compact ? 5 : 99;
+  const tiny = useTiny();
+  // Five items fit a phone strip; under 360 px three (a size stepper counts as three controls).
+  const max = compact ? (tiny ? 3 : 5) : 99;
   const shown = controls.slice(0, max);
   const overflow = controls.slice(max);
   const ref = useRef<HTMLDivElement>(null);
@@ -547,10 +562,13 @@ function Bar({ controls, more, compact, label }: { controls: Control[]; more: Me
 /** Properties of the selection (popover ≥ 1024; the context strip uses `SelectionBar`). */
 export function PropertiesPopover({ objs, anchor, pageHeight }: { objs: EditorObject[]; anchor: { left: number; top: number; width: number; height: number }; pageHeight: number }) {
   const { main, more } = useSelectionControls(objs);
-  const below = anchor.top < 56;
+  // Clear the rotate handle above a rotatable object (it reaches 30 px up, 56 px on touch).
+  const coarse = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
+  const gap = objs.length === 1 && canRotate(objs[0]) ? (coarse ? 84 : 50) : 10;
+  const below = anchor.top < 46 + gap;
   const name = objs.length === 1 ? kindName(objs[0]) : "Selection";
   return (
-    <div data-popover className={cx("ed-popover", below && "ed-popover--below")} style={{ left: anchor.left + anchor.width / 2, top: below ? Math.min(pageHeight, anchor.top + anchor.height) + 10 : anchor.top - 10 }} onPointerDown={(e) => e.stopPropagation()}>
+    <div data-popover className={cx("ed-popover", below && "ed-popover--below")} style={{ left: anchor.left + anchor.width / 2, top: below ? Math.min(pageHeight, anchor.top + anchor.height) + 10 : anchor.top - gap }} onPointerDown={(e) => e.stopPropagation()}>
       <Bar controls={main} more={more} label={`${name} properties`} />
     </div>
   );

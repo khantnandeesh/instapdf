@@ -32,7 +32,13 @@ codebase that runs as WebAssembly in the browser and natively for the consented 
    content stream or Form XObject is copied first, so other pages do not change.
 6. **Check, then keep.** The page is read again and compared glyph by glyph with the plan: same
    glyph, font, size and colour, at the old position plus the planned shift (0.05 pt
-   tolerance). If the check fails, the edit is rolled back and an error is returned.
+   tolerance). A space typed in a font without a space glyph (every TeX font, many subsets) is
+   a gap before the new glyphs, and the check expects them after it. An edit that would push the
+   line past the page edge, or into other text on its baseline (a TOC page number, the next
+   column), is refused too. If any check fails, the edit is rolled back and a `verify` error
+   with a reason code is returned: `text-mismatch`, `position-drift`, `glyph-mismatch`,
+   `overflow` or `overlap`. Letters a subset cannot draw alone but has as a ligature (a TeX
+   heading that kept only "fi") are drawn with the ligature.
    Complex scripts (Hindi and the other Indic scripts, Arabic, Hebrew) take their own path in
    `complex.rs`: the edit widens to whole words, the new text is laid out with the Unicode
    bidi algorithm and each word is drawn from the same word already on the page, the embedded
@@ -46,9 +52,22 @@ codebase that runs as WebAssembly in the browser and natively for the consented 
    On either path, an edit that touches an `/ActualText` span (a ligature, replaced text)
    rewrites the whole span with its real characters and removes the span. Its other
    properties, such as a tagged PDF's `/MCID`, stay; a named property list holding more than
-   the ActualText is left alone and the edit is refused (`actual-text-span`).
+   the ActualText is left alone and the edit is refused (`actual-text-span`). When the read-back
+   of a right-to-left line has the right glyphs in the wrong order (digits or Latin typed into
+   Arabic, which readers reorder with their own bidi rules), the edit is refused
+   (`text-mismatch`), not wrapped in ActualText. In a line with right-to-left text that reads by
+   its glyphs, a new word that would need ActualText is refused the same way, since pdf.js
+   ignores ActualText; digits an Arabic subset draws but does not map go through a sibling font
+   instead (see Known limits). Two more cases PDFium orders differently from
+   UAX #9 (the engine's read-back) are refused the same way in a right-to-left line:
+   punctuation typed next to punctuation
+   ("تجريبي." + "، نعم" reads "تجريبي،. نعم"; also ".!", ": ", ", "), and a left-to-right run
+   of two or more words (" abc def" reads "defabc"). The editor offers "Replace with new text"
+   for all of them.
 7. **Save.** The output is the original bytes plus one appended revision (incremental update).
-   It is read back and every object is compared with the engine's copy.
+   It is read back and every object is compared with the engine's copy. A failure is a `save`
+   error with a reason code (`write-failed`, `prefix-changed`, `reparse-failed`,
+   `object-mismatch`, `page-mismatch`, `text-mismatch`).
 
 ## Commands
 
@@ -76,12 +95,43 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
 - Edits one line at a time. Paragraph reflow is phase E3.
 - Fallback fonts must have TrueType outlines. Latin text in a fallback font is not shaped
   (no kerning or ligatures); complex-script words are.
+- A Latin letter typed inside an Arabic word next to digits or a Latin word can read back in
+  the wrong order and is refused (`text-mismatch`); the editor offers "Replace with new text".
 - Adding new text (not editing a line) is not in the engine yet, so there is no shaping call for
   it in the interface.
 - PDFium reverses right-to-left `/ActualText`, so for Arabic and Hebrew the engine relies on the
   glyphs' own Unicode where it can (a registered face is preferred over an embedded font whose
   ToUnicode map lacks the new glyphs). Chrome- and LibreOffice-made Arabic, which uses
   ActualText throughout, already reads reversed in PDFium before any edit.
+- pdf.js orders the text items of a line by content order. A word drawn in a font the line
+  doesn't otherwise use (a registered face, for letters the subset lacks, as in AC-205's
+  "بالعالم،" → "بالجميع،" on scripts-plain.pdf) is its own item, so in a right-to-left line pdf.js
+  can read the words out of order ("هذا نص تجريبي. بالجميع، مرحبا"). PDFium reads those edits in
+  order (checked for AC-205 and an appended Arabic word); refusing them would refuse most
+  Arabic word edits on such files, so they are kept. This is a pdf.js-only limit: every kept edit
+  must read correctly in PDFium, and the cases where PDFium reorders are refused (above).
+- A digit (or other left-to-right text) typed into an Arabic line reads by its glyphs, with no
+  ActualText, in two ways:
+  - the line's font maps the digit in its ToUnicode: drawn in place;
+  - otherwise (no entry for the code, or an entry for other text): the digits are drawn through a
+    *sibling* font, a copy of the font's dictionary with the same program and its own ToUnicode
+    for just the codes it draws (a Type 0 sibling also declares their widths, from the program,
+    in a copy of its CIDFont). The font's own ToUnicode is never changed: other pages, forms and
+    text may share it, and a new entry would change how they read. The sibling is a text item of
+    its own, so in a right-to-left line it is drawn after the line's last glyph, where pdf.js
+    reads it in logical order; that works when the new text ends the line (oracle case
+    `plain-arabic-digits-unmapped-at-end`). Anywhere else in the line (inside it, or at its
+    start) no content order reads right in pdf.js, so the edit is refused (`text-mismatch`;
+    oracle case `plain-arabic-number-unmapped`, "2500" → "3750" on scripts-plain.pdf, whose
+    subset has no width for "3"). pdf.js drops the space between the line and the sibling's
+    digits ("تجريبي.2024"), as it does at any change of font and direction there; PDFium and
+    copy and paste keep it. Each such edit makes a new sibling (reusing one is a follow-up), and
+    a second digit edit at the end of the same line is refused for now (the engine reads the
+    line back with the sibling runs out of order).
+  Tests: crates/berry-engine/tests/font_mapping.rs, and pdfium and pdf.js read-back in
+  apps/web/src/lib/editor/mixed-direction.test.ts.
+- Lines already drawn with ActualText spans (Chrome and LibreOffice Arabic) are not covered by
+  the ActualText refusal: neither reader reads them by their glyphs before an edit either.
 - Vertical text, CID fonts with a non-Identity CMap and invisible (OCR) text are read-only.
 - A shared Form XObject nested inside another form is refused (`shared-nested-form`).
 - Superscripts and subscripts are separate lines. Table cells closer than 1.5 em read as one line.

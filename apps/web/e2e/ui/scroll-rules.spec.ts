@@ -11,7 +11,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { isUsable, tools } from "../../src/tools/registry";
-import { fx } from "../support/flow";
+import { cloudOn, fx } from "../support/flow";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
 const comingSoon = tools.find((t) => !isUsable(t));
@@ -123,13 +123,14 @@ for (const [project, sizes] of [
         await expectClean(page, "editor open");
         await page.getByTestId("canvas").evaluate((el) => el.scrollTo(0, el.scrollHeight / 2));
         await expectClean(page, "editor scrolled");
-        // Phones: the pages sheet (the side panel in a sheet).
+        // Below 1024 px the pages panel is a sheet behind the page chip; from 1024 px there is no chip.
         const chip = page.getByTestId("page-chip");
-        if (await chip.isVisible()) {
+        if (width < 1024) {
+          await expect(chip).toBeVisible();
           await chip.click();
           await expect(page.getByRole("tab", { name: "Pages" })).toBeVisible();
           await expectClean(page, "pages sheet open");
-        }
+        } else await expect(chip).toHaveCount(0);
       });
 
       for (const tool of usable) {
@@ -168,7 +169,7 @@ for (const [project, sizes] of [
           const addPages = page.getByTestId("add-pages-menu");
           if (await addPages.isVisible()) {
             await addPages.click();
-            const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("menuitem", { name: "Pages from a file…" }).click()]);
+            const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("menuitem", { name: cloudOn ? "This device" : "Pages from a file…", exact: true }).click()]);
             await chooser.setFiles(fx("sixty-pages.pdf"));
             await expect(page.getByTestId("picker-grid")).toBeVisible();
             await expectClean(page, "page picker open");

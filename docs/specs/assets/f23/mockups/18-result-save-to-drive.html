@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en" class="__variable_ea1ba5"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="next-size-adjust" content=""><link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/tool-page.css">
+<link rel="stylesheet" href="css/segment-grid.css">
+<link rel="stylesheet" href="css/page-grid.css">
+<style type="text/css">/*
+ * F23 Cloud sources: mockup styles. This is the proposal for the component-local stylesheet
+ * (apps/web/src/components/cloud/cloud.css, imported by the cloud components only; nothing goes in
+ * globals.css). Values come from the BerryPDF tokens; no raw colours except the provider marks.
+ */
+
+/* ---- Split button: the upload button + a caret that opens the source menu ------------------- */
+.ip-split {
+  display: inline-flex;
+  align-items: stretch;
+}
+.ip-split > .mp-btn:first-child {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+.ip-split__caret.mp-btn {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  padding-inline: 0;
+  width: 52px;
+}
+/* The seam: a light line inside the berry, so the two halves read as two targets. */
+.ip-split__caret.mp-btn:not(.mp-btn--tool)::before {
+  content: "";
+  position: absolute;
+  inset-block: 12px;
+  inset-inline-start: 0;
+  width: 1.5px;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 0.45);
+}
+.ip-split__caret svg {
+  transition: transform var(--dur-base) var(--ease-standard);
+}
+.ip-split__caret[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+/* Tool (blueberry) variant in the working toolbar: the halves share one outline. */
+.ip-split--tool > .mp-btn--tool:first-child {
+  border-inline-end-width: 0;
+}
+.ip-split--tool .ip-split__caret.mp-btn--tool {
+  width: 36px;
+  border-inline-start-color: color-mix(in srgb, var(--link) 45%, transparent);
+}
+.ip-split--tool {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-glow);
+}
+
+/* ---- Cloud row: one tap to each provider, under the upload button --------------------------- */
+.ip-cloud-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 44px;
+}
+.ip-cloud-glyph {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: transparent;
+  transition:
+    background-color var(--dur-base),
+    transform var(--dur-lift);
+}
+.ip-cloud-glyph:hover {
+  background: var(--band);
+}
+.ip-cloud-glyph:active {
+  transform: scale(0.92);
+}
+.ip-cloud-glyph:focus-visible,
+.ip-cloud-chip:focus-visible,
+.ip-cloud-item:focus-visible {
+  outline: 3px solid var(--link);
+  outline-offset: 2px;
+}
+/* The last used provider: its name beside its mark (a soft pill, the only label in the row). */
+.ip-cloud-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px 0 10px;
+  margin-inline-end: 4px;
+  border-radius: 999px;
+  background: var(--band);
+  box-shadow: inset 0 0 0 1.5px var(--sand);
+  color: var(--ink);
+  font: 500 15px/20px var(--font-display);
+  white-space: nowrap;
+  transition: background-color var(--dur-base);
+}
+.ip-cloud-chip:hover {
+  background: var(--mp-pink-hover);
+  color: var(--brand-strong);
+}
+@media (pointer: coarse), (max-width: 639px) {
+  .ip-cloud-chip {
+    height: 44px;
+  }
+}
+.ip-cloud-chip, .ip-cloud-glyph {
+  animation: ip-cloud-fade 200ms var(--ease-enter) both;
+}
+@keyframes ip-cloud-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---- Source menu (popover, >= 640 px) --------------------------------------------------------- */
+.ip-cloud-menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 248px;
+  padding: 6px;
+}
+.ip-cloud-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 9px;
+  color: var(--ink);
+  font: 400 15px/20px var(--font-sans);
+  text-align: start;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-base),
+    color var(--dur-base);
+}
+.ip-cloud-item[data-focus],
+.ip-cloud-item:hover {
+  background: var(--band);
+  color: var(--brand-strong);
+}
+.ip-cloud-item .ip-cloud-item__out {
+  margin-inline-start: auto;
+  padding-inline-start: 16px;
+  color: var(--muted);
+}
+.ip-cloud-item .ip-cloud-item__muted {
+  color: var(--muted);
+}
+.ip-cloud-group {
+  padding: 8px 12px 4px;
+  font: 600 13px/18px var(--font-display);
+  color: var(--muted);
+}
+.ip-cloud-sep {
+  height: 1.5px;
+  margin: 4px 8px;
+  background: var(--sand);
+}
+.ip-cloud-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 6px 0;
+  padding: 8px 6px 4px;
+  border-top: 1.5px solid var(--sand);
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--muted);
+}
+.ip-cloud-foot svg {
+  flex: none;
+  color: var(--brand-strong);
+}
+
+/* ---- Source sheet (< 640 px): rises from the top edge of the dock, never covers it ----------- */
+.ip-cloud-scrim {
+  position: fixed;
+  inset: 0 0 var(--f23-dock, 0px) 0;
+  z-index: 39;
+  background: rgb(58 20 30 / 0.16);
+}
+.ip-cloud-sheet {
+  position: fixed;
+  inset-inline: 8px;
+  bottom: calc(var(--f23-dock, 0px) + 8px);
+  z-index: 40;
+  padding: 8px;
+  border-radius: 20px;
+  animation: mp-pop-in 300ms var(--ease-pop) both;
+}
+.ip-cloud-sheet .ip-cloud-item {
+  height: 48px;
+  font-size: 16px;
+}
+
+/* ---- Waiting / alerts (reuse the floating NoticeStack alert) ---------------------------------- */
+.ip-cloud-wait {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 2.5px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: currentColor;
+}
+.ip-alert-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ---- Download card (in the grid while a cloud file arrives) ----------------------------------- */
+.ip-dl {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+.ip-dl__page {
+  display: grid;
+  place-items: center;
+  height: 66%;
+  aspect-ratio: 0.72;
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: var(--ip-shadow-paper);
+}
+.ip-dl__bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 13px/18px var(--font-display);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ip-dl__bar .mp-jam {
+  height: 12px;
+  flex: 1;
+}
+.ip-dl--failed .ip-dl__page {
+  box-shadow: inset 0 0 0 1.5px var(--mp-alert-danger-border);
+}
+
+/* ---- Save to cloud (result) ------------------------------------------------------------------- */
+.ip-save .mp-btn--line {
+  height: 44px;
+  padding-inline: 14px;
+}
+.ip-save .ip-split__caret.mp-btn--line {
+  width: 40px;
+  box-shadow: inset 0 0 0 1.5px var(--brand);
+  margin-inline-start: -1.5px;
+}
+
+/* ---- The /cloud/<provider> window ------------------------------------------------------------- */
+.ip-cw {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.ip-cw__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 16px;
+  font: 600 16px/1 var(--font-display);
+  color: var(--ink-black);
+}
+.ip-cw__top .ip-cw__close {
+  margin-inline-start: auto;
+}
+.ip-cw__main {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 8px 16px 24px;
+}
+.ip-cw__card {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 16px 16px 28px 16px;
+  border: 1.5px solid var(--sand);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  padding: 32px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  animation: mp-pop-in 380ms var(--ease-pop) both;
+}
+.ip-cw__title {
+  font: 600 24px/28px var(--font-display);
+  color: var(--ink-black);
+}
+.ip-cw__privacy {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  text-align: start;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+  max-width: 340px;
+}
+.ip-cw__privacy svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--brand-strong);
+}
+.ip-cw__rows {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: start;
+}
+.ip-cw__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  align-items: center;
+}
+.ip-cw__row .mp-jam {
+  grid-column: 1 / -1;
+  height: 12px;
+}
+.ip-cw__name {
+  font: 600 15px/20px var(--font-display);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ip-cw__meta {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ip-cw__meta--bad {
+  color: var(--danger);
+  font-weight: 600;
+}
+.ip-cw__picker {
+  width: 100%;
+  flex: 1;
+  border-top: 1.5px solid var(--sand);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* A mock OS window frame, for the composite screenshots only (not product UI). */
+.mock-popup {
+  position: fixed;
+  z-index: 100;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f3f3f4;
+  box-shadow:
+    0 24px 60px rgb(0 0 0 / 0.28),
+    0 0 0 1px rgb(0 0 0 / 0.12);
+}
+.mock-popup__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  font: 13px/1 system-ui, sans-serif;
+  color: #3c3c43;
+}
+.mock-popup__bar i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #d0d0d4;
+}
+.mock-popup__url {
+  flex: 1;
+  margin-inline-start: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: #fff;
+  color: #555;
+}
+.mock-popup iframe {
+  display: block;
+  border: 0;
+  background: #fff;
+}
+.mock-note {
+  position: fixed;
+  z-index: 120;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #24338f;
+  color: #fff;
+  font: 600 13px/18px system-ui, sans-serif;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.2);
+}
+
+/* Inline alert action (short alerts: waiting, saved). */
+.ip-alert-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block: -4px;
+}
+.ip-cw__tick {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--mp-alert-ok-bg);
+  color: var(--leaf);
+}
+.ip-dl--failed .ip-dl__page {
+  height: 50%;
+}
+/*# sourceURL=/home/user/instapdf/docs/specs/assets/f23/mockups/css/f23.css*/</style><link rel="stylesheet" href="css/f23.css">
+</head><body class="flex min-h-dvh flex-col antialiased"><div hidden=""><!--$--><!--/$--></div><svg width="0" height="0" class="mp-sprite" aria-hidden="true" focusable="false"><defs><linearGradient id="mp-skin" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff5a4e"></stop><stop offset=".55" stop-color="#ee2238"></stop><stop offset="1" stop-color="#d4142f"></stop></linearGradient><radialGradient id="mp-flesh" cx="50%" cy="52%" r="60%"><stop offset="0" stop-color="#fff"></stop><stop offset=".4" stop-color="#ffd5db"></stop><stop offset=".8" stop-color="#ff8798"></stop><stop offset="1" stop-color="#f2405a"></stop></radialGradient><clipPath id="mp-sil"><path d="M48 95C35 90 14 69 12 46c-1-15 9-26 22-26 5 0 10 1.5 14 3 4-1.5 9-3 14-3 13 0 23 11 22 26-2 23-23 44-36 49z"></path></clipPath><clipPath id="mp-clip-l"><rect x="-200" y="-200" width="300.5" height="600"></rect></clipPath><clipPath id="mp-clip-r"><rect x="99.5" y="-200" width="300" height="600"></rect></clipPath><symbol id="mp-berry-skin" viewBox="0 0 96 96" overflow="visible"><path fill="url(#mp-skin)" d="M48 95C35 90 14 69 12 46c-1-15 9-26 22-26 5 0 10 1.5 14 3 4-1.5 9-3 14-3 13 0 23 11 22 26-2 23-23 44-36 49z"></path><g clip-path="url(#mp-sil)"><path fill="#ff7a68" d="M16 44c0-12 8-20 18-20 8 0 10 8 6 16-4 9-12 18-18 18-4 0-6-6-6-14z"></path><path fill="#b80d2c" d="M63 16C82 40 71 74 44 97H100V10z"></path><path fill="#8f0926" d="M78 30C88 52 77 80 53 97H100V20z"></path><path fill="none" stroke="#ff8fa0" stroke-width="2" stroke-linecap="round" d="M80 52c-4 16-17 31-28 38"></path><g transform="translate(44.2 34) rotate(-3) scale(0.96 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(57.5 34) rotate(7) scale(0.89 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(69.6 34) rotate(15) scale(0.76 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(37.9 43) rotate(-7) scale(0.89 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(50.5 43) rotate(2) scale(0.97 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(63.8 43) rotate(11) scale(0.82 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(74.1 43) rotate(18) scale(0.71 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(21.9 52) rotate(-18) scale(0.71 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(33.9 52) rotate(-10) scale(0.84 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(45.3 52) rotate(-2) scale(0.97 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(58.8 52) rotate(8) scale(0.88 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(69.2 52) rotate(15) scale(0.76 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(26.9 61) rotate(-15) scale(0.77 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(38.5 61) rotate(-7) scale(0.89 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(52.1 61) rotate(3) scale(0.95 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(64.1 61) rotate(11) scale(0.82 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(32.0 70) rotate(-11) scale(0.82 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(44.4 70) rotate(-2) scale(0.96 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(56.6 70) rotate(6) scale(0.90 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(40.8 79) rotate(-5) scale(0.92 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(51.5 79) rotate(2) scale(0.96 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><g transform="translate(46.3 87) rotate(-1) scale(0.98 1)"><path fill="#7d0820" opacity=".75" d="M-2.6-.4a2.6 3 0 0 1 5.2 0c0 .6-.4 0-2.6 0s-2.6.6-2.6 0z"></path><ellipse fill="#ffe9a6" rx="1.5" ry="2.2" cy=".6"></ellipse><circle fill="#fff" cx="-.4" cy="-.1" r=".55"></circle></g><path fill="#fff" d="M20 48c-1-11 5-19 13-21 3-.7 4 3 1.2 4.4-5 2.4-7.6 8-7.6 15 0 4-6 4.4-6.6 1.600z"></path><ellipse fill="#fff" cx="23.5" cy="58" rx="2.2" ry="2.8"></ellipse><path fill="#fff" transform="translate(38 30) scale(.75)" d="M0-7C.9-2 2-.9 7 0 2 .9 .9 2 0 7-.9 2-2 .9-7 0-2-.9-.9-2 0-7z"></path></g><path fill="none" stroke="#6d0a1c" stroke-width="1.8" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M48 95C35 90 14 69 12 46c-1-15 9-26 22-26 5 0 10 1.5 14 3 4-1.5 9-3 14-3 13 0 23 11 22 26-2 23-23 44-36 49z"></path><g transform="translate(48 25) rotate(-80)"><path fill="#1f8a45" d="M-5.5 3C-10.0 -11.5 -8.0 -26.4 -3.0 -33.0C2.0 -24.8 10.0 -9.9 5.5 3z"></path><path fill="#136332" d="M0 3C-0.9 -13.2 -2.4 -26.4 -3.0 -33.0C2.0 -24.8 10.0 -9.9 5.5 3z"></path><path fill="none" stroke="#c4f7a8" stroke-width="1.2" stroke-linecap="round" d="M-5.0 -7.3C-6.2 -14.8 -4.8 -23.1 -2.4 -29.0"></path><path fill="none" stroke="#0f4f25" stroke-width=".9" opacity=".55" stroke-linecap="round" d="M0 1C-0.9 -13.2 -2.1 -23.1 -2.7 -29.7"></path><path fill="none" stroke="#0f4f25" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M-5.5 3C-10.0 -11.5 -8.0 -26.4 -3.0 -33.0C2.0 -24.8 10.0 -9.9 5.5 3z"></path></g><g transform="translate(48 25) rotate(82)"><path fill="#1f8a45" d="M-5.5 3C-10.0 -11.2 -2.0 -25.6 3.0 -32.0C8.0 -24.0 10.0 -9.6 5.5 3z"></path><path fill="#136332" d="M0 3C0.9 -12.8 2.4 -25.6 3.0 -32.0C8.0 -24.0 10.0 -9.6 5.5 3z"></path><path fill="none" stroke="#c4f7a8" stroke-width="1.2" stroke-linecap="round" d="M-5.0 -7.0C-6.2 -14.4 -1.2 -22.4 2.4 -28.2"></path><path fill="none" stroke="#0f4f25" stroke-width=".9" opacity=".55" stroke-linecap="round" d="M0 1C0.9 -12.8 2.1 -22.4 2.7 -28.8"></path><path fill="none" stroke="#0f4f25" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M-5.5 3C-10.0 -11.2 -2.0 -25.6 3.0 -32.0C8.0 -24.0 10.0 -9.6 5.5 3z"></path></g><g transform="translate(48 25) rotate(-40)"><path fill="#1f8a45" d="M-5.5 3C-10.0 -14.0 -8.0 -32.0 -3.0 -40.0C2.0 -30.0 10.0 -12.0 5.5 3z"></path><path fill="#136332" d="M0 3C-0.9 -16.0 -2.4 -32.0 -3.0 -40.0C2.0 -30.0 10.0 -12.0 5.5 3z"></path><path fill="none" stroke="#c4f7a8" stroke-width="1.2" stroke-linecap="round" d="M-5.0 -8.8C-6.2 -18.0 -4.8 -28.0 -2.4 -35.2"></path><path fill="none" stroke="#0f4f25" stroke-width=".9" opacity=".55" stroke-linecap="round" d="M0 1C-0.9 -16.0 -2.1 -28.0 -2.7 -36.0"></path><path fill="none" stroke="#0f4f25" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M-5.5 3C-10.0 -14.0 -8.0 -32.0 -3.0 -40.0C2.0 -30.0 10.0 -12.0 5.5 3z"></path></g><g transform="translate(48 25) rotate(43)"><path fill="#1f8a45" d="M-5.5 3C-10.0 -13.6 -2.0 -31.2 3.0 -39.0C8.0 -29.2 10.0 -11.7 5.5 3z"></path><path fill="#136332" d="M0 3C0.9 -15.6 2.4 -31.2 3.0 -39.0C8.0 -29.2 10.0 -11.7 5.5 3z"></path><path fill="none" stroke="#c4f7a8" stroke-width="1.2" stroke-linecap="round" d="M-5.0 -8.6C-6.2 -17.6 -1.2 -27.3 2.4 -34.3"></path><path fill="none" stroke="#0f4f25" stroke-width=".9" opacity=".55" stroke-linecap="round" d="M0 1C0.9 -15.6 2.1 -27.3 2.7 -35.1"></path><path fill="none" stroke="#0f4f25" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M-5.5 3C-10.0 -13.6 -2.0 -31.2 3.0 -39.0C8.0 -29.2 10.0 -11.7 5.5 3z"></path></g><g transform="translate(48 25) rotate(2)"><path fill="#1f8a45" d="M-5.5 3C-10.0 -15.0 -4.0 -34.4 1.0 -43.0C6.0 -32.2 10.0 -12.9 5.5 3z"></path><path fill="#136332" d="M0 3C0.3 -17.2 0.8 -34.4 1.0 -43.0C6.0 -32.2 10.0 -12.9 5.5 3z"></path><path fill="none" stroke="#c4f7a8" stroke-width="1.2" stroke-linecap="round" d="M-5.0 -9.5C-6.2 -19.4 -2.4 -30.1 0.8 -37.8"></path><path fill="none" stroke="#0f4f25" stroke-width=".9" opacity=".55" stroke-linecap="round" d="M0 1C0.3 -17.2 0.7 -30.1 0.9 -38.7"></path><path fill="none" stroke="#0f4f25" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M-5.5 3C-10.0 -15.0 -4.0 -34.4 1.0 -43.0C6.0 -32.2 10.0 -12.9 5.5 3z"></path></g><g transform="translate(48 25) rotate(-98)"><path fill="#3fc25a" d="M-5.8 3C-10.5 -9.4 -10.2 -21.6 -5.0 -27.0C0.2 -20.2 10.5 -8.1 5.8 3z"></path><path fill="#229149" d="M0 3C-1.5 -10.8 -4.0 -21.6 -5.0 -27.0C0.2 -20.2 10.5 -8.1 5.8 3z"></path><path fill="none" stroke="#c4f7a8" stroke-width="1.2" stroke-linecap="round" d="M-5.2 -5.9C-6.5 -12.2 -6.2 -18.9 -4.0 -23.8"></path><path fill="none" stroke="#0f4f25" stroke-width=".9" opacity=".55" stroke-linecap="round" d="M0 1C-1.5 -10.8 -3.5 -18.9 -4.5 -24.3"></path><path fill="none" stroke="#0f4f25" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M-5.8 3C-10.5 -9.4 -10.2 -21.6 -5.0 -27.0C0.2 -20.2 10.5 -8.1 5.8 3z"></path></g><g transform="translate(48 25) rotate(98)"><path fill="#3fc25a" d="M-5.8 3C-10.5 -9.1 -0.2 -20.8 5.0 -26.0C10.2 -19.5 10.5 -7.8 5.8 3z"></path><path fill="#229149" d="M0 3C1.5 -10.4 4.0 -20.8 5.0 -26.0C10.2 -19.5 10.5 -7.8 5.8 3z"></path><path fill="none" stroke="#c4f7a8" stroke-width="1.2" stroke-linecap="round" d="M-5.2 -5.7C-6.5 -11.7 -0.1 -18.2 4.0 -22.9"></path><path fill="none" stroke="#0f4f25" stroke-width=".9" opacity=".55" stroke-linecap="round" d="M0 1C1.5 -10.4 3.5 -18.2 4.5 -23.4"></path><path fill="none" stroke="#0f4f25" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M-5.8 3C-10.5 -9.1 -0.2 -20.8 5.0 -26.0C10.2 -19.5 10.5 -7.8 5.8 3z"></path></g><g transform="translate(48 25) rotate(-58)"><path fill="#3fc25a" d="M-5.8 3C-10.5 -11.5 -9.2 -26.4 -4.0 -33.0C1.2 -24.8 10.5 -9.9 5.8 3z"></path><path fill="#229149" d="M0 3C-1.2 -13.2 -3.2 -26.4 -4.0 -33.0C1.2 -24.8 10.5 -9.9 5.8 3z"></path><path fill="none" stroke="#c4f7a8" stroke-width="1.2" stroke-linecap="round" d="M-5.2 -7.3C-6.5 -14.8 -5.5 -23.1 -3.2 -29.0"></path><path fill="none" stroke="#0f4f25" stroke-width=".9" opacity=".55" stroke-linecap="round" d="M0 1C-1.2 -13.2 -2.8 -23.1 -3.6 -29.7"></path><path fill="none" stroke="#0f4f25" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M-5.8 3C-10.5 -11.5 -9.2 -26.4 -4.0 -33.0C1.2 -24.8 10.5 -9.9 5.8 3z"></path></g><g transform="translate(48 25) rotate(60)"><path fill="#3fc25a" d="M-5.8 3C-10.5 -11.2 -1.2 -25.6 4.0 -32.0C9.2 -24.0 10.5 -9.6 5.8 3z"></path><path fill="#229149" d="M0 3C1.2 -12.8 3.2 -25.6 4.0 -32.0C9.2 -24.0 10.5 -9.6 5.8 3z"></path><path fill="none" stroke="#c4f7a8" stroke-width="1.2" stroke-linecap="round" d="M-5.2 -7.0C-6.5 -14.4 -0.8 -22.4 3.2 -28.2"></path><path fill="none" stroke="#0f4f25" stroke-width=".9" opacity=".55" stroke-linecap="round" d="M0 1C1.2 -12.8 2.8 -22.4 3.6 -28.8"></path><path fill="none" stroke="#0f4f25" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M-5.8 3C-10.5 -11.2 -1.2 -25.6 4.0 -32.0C9.2 -24.0 10.5 -9.6 5.8 3z"></path></g><g transform="translate(48 25) rotate(-20)"><path fill="#3fc25a" d="M-5.8 3C-10.5 -12.2 -7.2 -28.0 -2.0 -35.0C3.2 -26.2 10.5 -10.5 5.8 3z"></path><path fill="#229149" d="M0 3C-0.6 -14.0 -1.6 -28.0 -2.0 -35.0C3.2 -26.2 10.5 -10.5 5.8 3z"></path><path fill="none" stroke="#c4f7a8" stroke-width="1.2" stroke-linecap="round" d="M-5.2 -7.7C-6.5 -15.8 -4.3 -24.5 -1.6 -30.8"></path><path fill="none" stroke="#0f4f25" stroke-width=".9" opacity=".55" stroke-linecap="round" d="M0 1C-0.6 -14.0 -1.4 -24.5 -1.8 -31.5"></path><path fill="none" stroke="#0f4f25" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M-5.8 3C-10.5 -12.2 -7.2 -28.0 -2.0 -35.0C3.2 -26.2 10.5 -10.5 5.8 3z"></path></g><g transform="translate(48 25) rotate(23)"><path fill="#3fc25a" d="M-5.8 3C-10.5 -11.9 -3.2 -27.2 2.0 -34.0C7.2 -25.5 10.5 -10.2 5.8 3z"></path><path fill="#229149" d="M0 3C0.6 -13.6 1.6 -27.2 2.0 -34.0C7.2 -25.5 10.5 -10.2 5.8 3z"></path><path fill="none" stroke="#c4f7a8" stroke-width="1.2" stroke-linecap="round" d="M-5.2 -7.5C-6.5 -15.3 -1.9 -23.8 1.6 -29.9"></path><path fill="none" stroke="#0f4f25" stroke-width=".9" opacity=".55" stroke-linecap="round" d="M0 1C0.6 -13.6 1.4 -23.8 1.8 -30.6"></path><path fill="none" stroke="#0f4f25" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M-5.8 3C-10.5 -11.9 -3.2 -27.2 2.0 -34.0C7.2 -25.5 10.5 -10.2 5.8 3z"></path></g><path stroke="#0f4f25" stroke-width="7" fill="none" stroke-linecap="round" vector-effect="non-scaling-stroke" d="M48 24c-1.5-7 1-13 7-17"></path><path stroke="#3fc25a" stroke-width="4.2" fill="none" stroke-linecap="round" vector-effect="non-scaling-stroke" d="M48 24c-1.5-7 1-13 7-17"></path><path stroke="#c4f7a8" stroke-width="1.2" fill="none" stroke-linecap="round" vector-effect="non-scaling-stroke" d="M47 22c-1-5 .5-9.5 4.5-13"></path></symbol><symbol id="mp-berry-face" viewBox="0 0 96 96" overflow="visible"><path fill="#e01f3a" d="M48 95C35 90 14 69 12 46c-1-15 9-26 22-26 5 0 10 1.5 14 3 4-1.5 9-3 14-3 13 0 23 11 22 26-2 23-23 44-36 49z"></path><path fill="url(#mp-flesh)" transform="translate(48 58) scale(.92) translate(-48 -58)" d="M48 95C35 90 14 69 12 46c-1-15 9-26 22-26 5 0 10 1.5 14 3 4-1.5 9-3 14-3 13 0 23 11 22 26-2 23-23 44-36 49z"></path><path stroke="#fff" stroke-width="1.4" opacity=".75" stroke-linecap="round" d="M44.0 69.3L38.0 81.4"></path><path stroke="#fff" stroke-width="1.4" opacity=".75" stroke-linecap="round" d="M41.1 64.5L30.7 71.5"></path><path stroke="#fff" stroke-width="1.4" opacity=".75" stroke-linecap="round" d="M40.0 58.0L28.0 58.0"></path><path stroke="#fff" stroke-width="1.4" opacity=".75" stroke-linecap="round" d="M41.1 51.5L30.7 44.5"></path><path stroke="#fff" stroke-width="1.4" opacity=".75" stroke-linecap="round" d="M44.0 46.7L38.0 34.6"></path><path stroke="#fff" stroke-width="1.4" opacity=".75" stroke-linecap="round" d="M48.0 45.0L48.0 31.0"></path><path stroke="#fff" stroke-width="1.4" opacity=".75" stroke-linecap="round" d="M52.0 46.7L58.0 34.6"></path><path stroke="#fff" stroke-width="1.4" opacity=".75" stroke-linecap="round" d="M54.9 51.5L65.3 44.5"></path><path stroke="#fff" stroke-width="1.4" opacity=".75" stroke-linecap="round" d="M56.0 58.0L68.0 58.0"></path><path stroke="#fff" stroke-width="1.4" opacity=".75" stroke-linecap="round" d="M54.9 64.5L65.3 71.5"></path><path stroke="#fff" stroke-width="1.4" opacity=".75" stroke-linecap="round" d="M52.0 69.3L58.0 81.4"></path><path fill="#fff" d="M48 36c8 6 10 17 7 28-2 7-4 11-7 14-3-3-5-7-7-14-3-11-1-22 7-28z"></path><path fill="#ffc2cc" d="M48 47c3 3 4 9 3 15-.7 3-1.7 5-3 7-1.3-2-2.3-4-3-7-1-6 0-12 3-15z"></path><path fill="#fff" opacity=".9" d="M22 44c1-8 5-13 10-15-4 6-5 14-4 24z"></path><path fill="none" stroke="#6d0a1c" stroke-width="1.8" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M48 95C35 90 14 69 12 46c-1-15 9-26 22-26 5 0 10 1.5 14 3 4-1.5 9-3 14-3 13 0 23 11 22 26-2 23-23 44-36 49z"></path><path fill="#3fc25a" stroke="#0f4f25" stroke-width="1.5" vector-effect="non-scaling-stroke" d="M36 23c7-6 17-6 24 0-6 5-18 5-24 0z"></path></symbol><symbol id="mp-star" viewBox="-8 -8 16 16" overflow="visible"><path d="M0-7C.9-2 2-.9 7 0 2 .9 .9 2 0 7-.9 2-2 .9-7 0-2-.9-.9-2 0-7z"></path></symbol><symbol id="mp-blossom" viewBox="-10 -10 20 20" overflow="visible"><g transform="translate(0 0) scale(1)"><g fill="#fff" stroke="#f7b9c4" stroke-width=".8"><ellipse rx="3.4" ry="4.4" cy="-4.6" transform="rotate(0)"></ellipse><ellipse rx="3.4" ry="4.4" cy="-4.6" transform="rotate(72)"></ellipse><ellipse rx="3.4" ry="4.4" cy="-4.6" transform="rotate(144)"></ellipse><ellipse rx="3.4" ry="4.4" cy="-4.6" transform="rotate(216)"></ellipse><ellipse rx="3.4" ry="4.4" cy="-4.6" transform="rotate(288)"></ellipse></g><circle r="2.6" fill="#ffd84d"></circle></g></symbol><symbol id="mp-leaf" viewBox="-6 -10 12 17" overflow="visible"><path fill="#3fc25a" stroke="#0f4f25" stroke-width="1" d="M0 6C-5 2-5-5 0-9 5-5 5 2 0 6z"></path><path stroke="#0f4f25" stroke-width=".7" opacity=".6" d="M0 5V-6"></path></symbol></defs></svg><a href="#main" class="sr-only z-[60] rounded-sm bg-surface-raised px-3 py-2 text-nav text-ink-black shadow-menu focus:not-sr-only focus:fixed focus:top-2 focus:left-2">Skip to main content</a><header class="ip-site-header mp-header sticky top-0 z-(--ip-z-header) h-(--ip-header-h) data-[menu-open]:z-(--ip-z-header-open)"><div class="mx-auto flex h-full max-w-[1170px] items-center gap-1 px-[15px]"><a aria-label="BerryPDF home" class="me-6 inline-flex items-center rounded-sm max-sm:me-2" href="/"><span class="mp-brand"><svg width="34" height="34" viewBox="-12 -28 120 126" class="mp-mark" aria-hidden="true" focusable="false"><use href="#mp-berry-skin" width="96" height="96"></use></svg><span>BerryPDF</span></span></a><div class="flex items-center"><button type="button" aria-expanded="false" aria-controls="tool-menu" data-testid="all-tools-button" class="ip-js-only mp-navlink mp-navlink--chip relative cursor-pointer before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-['']">All tools<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" focusable="false" class="transition-transform duration-(--dur-base)"><path d="M216.49,104.49l-80,80a12,12,0,0,1-17,0l-80-80a12,12,0,0,1,17-17L128,159l71.51-71.52a12,12,0,0,1,17,17Z"></path></svg></button><noscript><a class="mp-navlink mp-navlink--chip" href="/#tools">All tools</a></noscript></div><nav aria-label="Quick links" class="hidden md:block"><ul class="flex items-center gap-1"><li><a aria-current="page" class="mp-navlink" href="/rotate-pdf">Rotate</a></li><li><a class="mp-navlink" href="/merge-pdf">Merge</a></li></ul></nav></div></header><div class="flex-1 pb-(--space-8)"><main id="main" tabindex="-1" class="mx-auto w-full max-w-[1280px] px-4 pb-12 outline-none sm:px-6 lg:px-8"><div class="mp-toolstage"><div data-state="done" data-testid="tool-flow" class="ip-flow" data-hydrated=""><div aria-hidden="true" data-testid="drop-overlay" class="pointer-events-none fixed inset-0 z-40 bg-drop-overlay transition-opacity duration-(--dur-base) invisible opacity-0"><div class="absolute inset-3 grid place-items-center rounded-tray border-2 border-dashed border-brand"><div class="flex flex-col items-center gap-3 text-card-heading text-ink"><svg width="40" height="40" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" focusable="false" class="text-brand-strong"><path d="M208,72V184a8,8,0,0,1-8,8H176V104L136,64H80V40a8,8,0,0,1,8-8h80Z" opacity="0.2"></path><path d="M213.66,66.34l-40-40A8,8,0,0,0,168,24H88A16,16,0,0,0,72,40V56H56A16,16,0,0,0,40,72V216a16,16,0,0,0,16,16H168a16,16,0,0,0,16-16V200h16a16,16,0,0,0,16-16V72A8,8,0,0,0,213.66,66.34ZM168,216H56V72h76.69L168,107.31v84.53c0,.06,0,.11,0,.16s0,.1,0,.16V216Zm32-32H184V104a8,8,0,0,0-2.34-5.66l-40-40A8,8,0,0,0,136,56H88V40h76.69L200,75.31Zm-56-32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h48A8,8,0,0,1,144,152Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h48A8,8,0,0,1,144,184Z"></path></svg>Drop to add files</div></div></div><div aria-live="polite" aria-atomic="true" class="sr-only">Your PDF is ready</div><div class="mp-intro pt-(--space-5) pb-4 text-center lg:flex lg:h-(--ip-intro-h) lg:items-center lg:justify-center lg:py-0" data-testid="tool-intro"><h1 tabindex="-1" class="text-page-title text-ink-black outline-none">Rotate PDF</h1></div><section aria-labelledby="ip-result-title" class="mp-panel mp-pop-in mx-auto w-full max-w-[760px] p-5 sm:p-10" data-testid="result"><h2 id="ip-result-title" class="flex items-center gap-3 font-display text-[22px] leading-[1.2] font-semibold text-ink-black"><span class="mp-tick-in grid size-10 place-items-center rounded-full bg-[var(--mp-alert-ok-bg)] text-leaf"><svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" focusable="false"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"></path></svg></span>Your PDF is ready</h2><div class="mt-[30px] flex flex-col items-center gap-[30px] sm:flex-row sm:items-start"><div class="mp-tray relative grid size-[200px] shrink-0 place-items-center p-4 sm:size-[240px]"><span class="grid h-full w-full place-items-center"><img src="data:image/jpeg;base64,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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/9k=" class="ip-fade-in block max-h-full max-w-full shadow-paper" style="width: 1264px;" alt=""></span></div><div class="flex w-full min-w-0 flex-1 flex-col gap-4"><div><p class="text-tile-title break-all text-ink-black" data-testid="result-name">alpha.pdf</p><p id="ip-result-summary" class="text-sm text-muted tabular-nums">1.9 KB · 3 pages</p></div><div class="flex flex-wrap gap-2"><a download="alpha.pdf" aria-describedby="ip-result-summary" class="mp-btn mp-btn--lg max-sm:w-full" href="blob:http://localhost:3000/80d4d984-3db2-4a3d-8504-038e3602b6bd"><span class="inline-flex items-center gap-2"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" focusable="false"><path d="M216,48V208H40V48A16,16,0,0,1,56,32H200A16,16,0,0,1,216,48Z" opacity="0.2"></path><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,124.69V32a8,8,0,0,0-16,0v92.69L93.66,98.34a8,8,0,0,0-11.32,11.32Z"></path></svg>Download</span></a><span class="ip-save ip-split self-center max-sm:w-full"><button type="button" class="mp-btn mp-btn--line max-sm:flex-1"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#1FA463" d="M8 3.2 1.2 15l3.4 5.8L11.4 9z"></path><path fill="#FFD04B" d="M8 3.2h7.9L22.8 15h-7.8z"></path><path fill="#4687F4" d="M4.6 20.8 8 15h14.8l-3.4 5.8z"></path></svg>Save to Drive</button><button type="button" class="mp-btn mp-btn--line ip-split__caret" aria-label="Save to another cloud" title="Save to another cloud" aria-haspopup="menu" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" focusable="false" class=""><path d="M216.49,104.49l-80,80a12,12,0,0,1-17,0l-80-80a12,12,0,0,1,17-17L128,159l71.51-71.52a12,12,0,0,1,17,17Z"></path></svg></button></span></div><div class="flex flex-col gap-2"><p class="flex items-center gap-2 text-sm text-ink" data-testid="privacy-result"><svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" focusable="false" class="shrink-0 text-brand-strong"><path d="M216,56v56c0,96-88,120-88,120S40,208,40,112V56a8,8,0,0,1,8-8H208A8,8,0,0,1,216,56Z" opacity="0.2"></path><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z"></path></svg>Done on this device. Never uploaded.</p></div><div><h3 class="font-display text-[15px] font-semibold text-ink">Keep going with this file</h3><div class="mt-2 flex flex-wrap gap-2"><button type="button" class="mp-btn mp-btn--soft"><span class="inline-flex items-center gap-[inherit]">Merge</span></button><button type="button" class="mp-btn mp-btn--soft"><span class="inline-flex items-center gap-[inherit]">Rotate</span></button></div></div></div></div><div class="mt-[30px] flex flex-col gap-2 border-t-[1.5px] border-sand pt-5 sm:flex-row sm:items-center sm:justify-between"><button type="button" class="mp-btn mp-btn--ghost max-sm:w-full"><span class="inline-flex items-center gap-[inherit]">Start over</span></button><button type="button" class="h-11 rounded-sm px-2 font-display text-[16px] font-medium text-brand-strong underline-offset-4 hover:underline max-sm:w-full">Back to options</button></div></section><div class="pointer-events-none fixed inset-x-0 top-3 z-30 flex justify-center px-4"><div class="pointer-events-auto flex max-h-[60dvh] w-[min(520px,calc(100vw-32px))] flex-col items-stretch gap-2 overflow-y-auto"></div></div><dialog aria-labelledby="_r_2_" aria-describedby="_r_3_" class="mp-modal m-auto max-h-[calc(100dvh-32px)] p-0 w-[min(380px,calc(100vw-32px))]"></dialog><dialog aria-labelledby="_r_6_" aria-describedby="_r_7_" class="mp-modal m-auto max-h-[calc(100dvh-32px)] p-0 w-[min(380px,calc(100vw-32px))]"></dialog><dialog aria-labelledby="_R_26inebnelb_" aria-describedby="_R_26inebnelbH1_" class="mp-modal m-auto max-h-[calc(100dvh-32px)] p-0 w-[min(380px,calc(100vw-32px))]"></dialog><dialog aria-labelledby="_r_8_" aria-describedby="_r_9_" class="mp-modal m-auto max-h-[calc(100dvh-32px)] p-0 w-[min(380px,calc(100vw-32px))]"></dialog></div></div><section class="mp-guide" aria-labelledby="guide-howto" data-testid="tool-guide"><nav aria-label="Breadcrumb" class="mp-guide__crumbs"><a href="/">BerryPDF</a><span aria-hidden="true"> › </span><span aria-current="page">Rotate PDF</span></nav><h2 id="guide-howto">How to rotate a PDF</h2><ol class="mp-guide__steps"><li><strong>Add your PDF</strong><span>Drop one or more PDF files on the page, or choose them from your device. Nothing is uploaded.</span></li><li><strong>Rotate the pages</strong><span>Turn all, odd or even pages left or right, or use the arrows on a single page.</span></li><li><strong>Save</strong><span>Select Rotate PDF and download the result. Several files come back as one ZIP.</span></li></ol><h2 id="guide-faq">Questions</h2><div class="mp-guide__faq"><details><summary>How do I rotate a PDF and save it permanently?</summary><p>Rotate the pages here, then select Rotate PDF and download the file. The new orientation is saved in the PDF itself, so it opens the same way in every viewer.</p></details><details><summary>Does rotating a PDF reduce its quality?</summary><p>No. Only the page orientation setting changes. Text, images and fonts are not re-rendered or recompressed.</p></details><details><summary>Can I rotate just one page?</summary><p>Yes. Each page has its own rotate buttons, and you can also turn only the odd or the even pages.</p></details><details><summary>Are my files uploaded?</summary><p>No. Rotation runs in your browser, so your files stay on your device.</p></details><details><summary>Can I rotate a password-protected PDF?</summary><p>Yes. Enter the password when asked and the file is rotated in your browser.</p></details><details><summary>How many files can I rotate at once?</summary><p>Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up and no watermark.</p></details></div><h2 id="guide-related">Related tools</h2><ul class="flex flex-wrap gap-2"><li><a class="mp-navlink mp-navlink--chip gap-2 ip-cat-organize" href="/merge-pdf"><span class="text-(--c) [&amp;_svg]:size-[18px]"><svg width="22" height="22" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" focusable="false"><path d="M184,40v64l-56,56L72,104V40Z" opacity="0.2"></path><path d="M192,40v64a8,8,0,0,1-2.34,5.66L136,163.31v49.38l18.34-18.35a8,8,0,0,1,11.32,11.32l-32,32a8,8,0,0,1-11.32,0l-32-32a8,8,0,0,1,11.32-11.32L120,212.69V163.31L66.34,109.66A8,8,0,0,1,64,104V40a8,8,0,0,1,16,0v60.69l48,48,48-48V40a8,8,0,0,1,16,0Z"></path></svg></span>Merge</a></li></ul></section></main><!--$--><!--/$--></div><footer class="ip-site-footer mp-footer"><div class="mx-auto flex max-w-[1170px] flex-wrap items-center justify-between gap-x-8 gap-y-3 px-[15px] pt-5 pb-3"><div class="flex items-center gap-3"><span class="mp-brand"><svg width="34" height="34" viewBox="-12 -28 120 126" class="mp-mark" aria-hidden="true" focusable="false"><use href="#mp-berry-skin" width="96" height="96"></use></svg><span>BerryPDF</span></span><small class="text-sm text-muted">© <!-- -->2026<!-- --> BerryPDF</small></div><div class="flex flex-wrap items-center gap-x-5 gap-y-1"><a class="mp-footer__link" href="/#tools">All tools</a><nav aria-labelledby="footer-company"><h2 id="footer-company" class="sr-only">Company</h2><ul class="flex flex-wrap gap-x-5 gap-y-1"><li><a class="mp-footer__link" href="/about">About</a></li><li><a class="mp-footer__link" href="/help">Help</a></li></ul></nav><nav aria-labelledby="footer-legal"><h2 id="footer-legal" class="sr-only">Legal</h2><ul class="flex flex-wrap gap-x-5 gap-y-1"><li><a class="mp-footer__link" href="/privacy">Privacy</a></li><li><a class="mp-footer__link" href="/terms">Terms</a></li><li><a class="mp-footer__link" href="/cookies">Cookies</a></li><li><a class="mp-footer__link" href="/licenses">Licenses</a></li><li><a class="mp-footer__link" href="/security">Security</a></li></ul></nav></div></div><details class="mp-footer__az mx-auto max-w-[1170px] px-[15px] pb-5"><summary class="mp-footer__link w-fit cursor-pointer">Tools A–Z</summary><nav aria-labelledby="footer-tools"><h2 id="footer-tools" class="sr-only">Tools A–Z</h2><ul class="mt-2 columns-2 gap-6 sm:columns-4 lg:columns-6" data-testid="footer-az"><li class="break-inside-avoid"><a class="mp-footer__link" href="/alternate-mix-pdf"><span>Alternate &amp; mix<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/bates-numbering"><span>Bates numbering<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/pdf-bookmarks"><span>Bookmarks<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/combine-reorder-pdf"><span>Combine &amp; reorder<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/compress-pdf"><span>Compress<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/create-fillable-pdf"><span>Create forms<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/crop-pdf"><span>Crop<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/delete-pdf-pages"><span>Delete pages<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/deskew-pdf"><span>Deskew<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/edit-pdf-metadata"><span>Edit metadata<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/pdf-editor"><span>Edit PDF<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/extract-images"><span>Extract images<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/extract-pdf-pages"><span>Extract pages<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/sign-pdf"><span>Fill &amp; sign<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/flatten-pdf"><span>Flatten<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/flip-pdf"><span>Flip<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/grayscale-pdf"><span>Grayscale<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/pdf-header-footer"><span>Header &amp; footer<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/jpg-to-pdf"><span>Image to PDF<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/merge-pdf"><span>Merge</span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/n-up-pdf"><span>N-up<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/ocr-pdf"><span>OCR<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/organize-pdf"><span>Organize<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/add-page-numbers"><span>Page numbers<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/pdf-to-excel"><span>PDF to Excel<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/pdf-to-jpg"><span>PDF to image<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/pdf-to-ppt"><span>PDF to PowerPoint<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/pdf-to-text"><span>PDF to text<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/pdf-to-word"><span>PDF to Word<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/protect-pdf"><span>Protect<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/remove-pdf-annotations"><span>Remove annotations<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/rename-pdf"><span>Rename by content<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/repair-pdf"><span>Repair<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/resize-pdf"><span>Resize<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/rotate-pdf"><span>Rotate</span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/split-pdf"><span>Split<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/split-pdf-by-bookmarks"><span>Split by bookmarks<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/split-pdf-by-size"><span>Split by size<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/split-pdf-by-text"><span>Split by text<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/split-pdf-in-half"><span>Split in half<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/unlock-pdf"><span>Unlock<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/watermark-pdf"><span>Watermark<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/html-to-pdf"><span>Web page to PDF<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/word-to-pdf"><span>Word to PDF<span class="sr-only">, coming soon</span></span></a></li><li class="break-inside-avoid"><a class="mp-footer__link" href="/workflows"><span>Workflows<span class="sr-only">, coming soon</span></span></a></li></ul></nav></details></footer><title>Rotate PDF: Turn Pages and Save Online Free | BerryPDF</title><meta name="description" content="Rotate PDF pages and save them for good. Turn all, odd, even or single pages with no quality loss. Free. Runs in your browser, nothing is uploaded."><meta name="application-name" content="BerryPDF"><meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"><meta name="format-detection" content="telephone=no, address=no, email=no"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="BerryPDF"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta property="og:title" content="Rotate PDF: Turn Pages and Save Online Free | BerryPDF"><meta property="og:description" content="Rotate PDF pages and save them for good. Turn all, odd, even or single pages with no quality loss. Free. Runs in your browser, nothing is uploaded."><meta property="og:url" content="https://www.berrypdf.com/rotate-pdf"><meta property="og:site_name" content="BerryPDF"><meta property="og:locale" content="en_US"><meta property="og:image" content="https://www.berrypdf.com/opengraph-image"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="BerryPDF: free, private PDF tools"><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Rotate PDF: Turn Pages and Save Online Free | BerryPDF"><meta name="twitter:description" content="Rotate PDF pages and save them for good. Turn all, odd, even or single pages with no quality loss. Free. Runs in your browser, nothing is uploaded."><meta name="twitter:image" content="https://www.berrypdf.com/opengraph-image"><meta name="twitter:image:width" content="1200"><meta name="twitter:image:height" content="630"><meta name="twitter:image:alt" content="BerryPDF: free, private PDF tools"></body></html>

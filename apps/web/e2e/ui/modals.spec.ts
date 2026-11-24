@@ -18,6 +18,7 @@
  * inside its stage, whole.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { chooseAddPages } from "../f3/support";
 import { fx } from "../support/flow";
 
 const SIZES = [
@@ -296,8 +297,8 @@ for (const size of SIZES) {
     test("page picker", async ({ page }) => {
       await openTool(page, "merge-pdf", ["alpha.pdf", "bravo.pdf"]);
       await ready(page);
-      await page.getByRole("button", { name: size.width < 640 ? "Add" : "Add pages", exact: true }).first().click();
-      await page.getByRole("menuitem", { name: "Pages from a file…", exact: true }).click();
+      // The same menu path with or without F23's cloud sources (its "From a file" lists This device first).
+      await chooseAddPages(page, "Pages from a file…");
       await page.getByTestId("pages-file-input").setInputFiles(fx("three-pages.pdf"));
       const dialog = openDialog(page);
       await expect(dialog.getByTestId("picker-grid")).toBeVisible();

@@ -1,0 +1,429 @@
+/*
+ * F23 Cloud sources: mockup styles. This is the proposal for the component-local stylesheet
+ * (apps/web/src/components/cloud/cloud.css, imported by the cloud components only; nothing goes in
+ * globals.css). Values come from the BerryPDF tokens; no raw colours except the provider marks.
+ */
+
+/* ---- Split button: the upload button + a caret that opens the source menu ------------------- */
+.ip-split {
+  display: inline-flex;
+  align-items: stretch;
+}
+.ip-split > .mp-btn:first-child {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+.ip-split__caret.mp-btn {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  padding-inline: 0;
+  width: 52px;
+}
+/* The seam: a light line inside the berry, so the two halves read as two targets. */
+.ip-split__caret.mp-btn:not(.mp-btn--tool)::before {
+  content: "";
+  position: absolute;
+  inset-block: 12px;
+  inset-inline-start: 0;
+  width: 1.5px;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 0.45);
+}
+.ip-split__caret svg {
+  transition: transform var(--dur-base) var(--ease-standard);
+}
+.ip-split__caret[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+/* Tool (blueberry) variant in the working toolbar: the halves share one outline. */
+.ip-split--tool > .mp-btn--tool:first-child {
+  border-inline-end-width: 0;
+}
+.ip-split--tool .ip-split__caret.mp-btn--tool {
+  width: 36px;
+  border-inline-start-color: color-mix(in srgb, var(--link) 45%, transparent);
+}
+.ip-split--tool {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-glow);
+}
+
+/* ---- Cloud row: one tap to each provider, under the upload button --------------------------- */
+.ip-cloud-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 44px;
+}
+.ip-cloud-glyph {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: transparent;
+  transition:
+    background-color var(--dur-base),
+    transform var(--dur-lift);
+}
+.ip-cloud-glyph:hover {
+  background: var(--band);
+}
+.ip-cloud-glyph:active {
+  transform: scale(0.92);
+}
+.ip-cloud-glyph:focus-visible,
+.ip-cloud-chip:focus-visible,
+.ip-cloud-item:focus-visible {
+  outline: 3px solid var(--link);
+  outline-offset: 2px;
+}
+/* The last used provider: its name beside its mark (a soft pill, the only label in the row). */
+.ip-cloud-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px 0 10px;
+  margin-inline-end: 4px;
+  border-radius: 999px;
+  background: var(--band);
+  box-shadow: inset 0 0 0 1.5px var(--sand);
+  color: var(--ink);
+  font: 500 15px/20px var(--font-display);
+  white-space: nowrap;
+  transition: background-color var(--dur-base);
+}
+.ip-cloud-chip:hover {
+  background: var(--mp-pink-hover);
+  color: var(--brand-strong);
+}
+@media (pointer: coarse), (max-width: 639px) {
+  .ip-cloud-chip {
+    height: 44px;
+  }
+}
+/* No entrance animation: the row is part of the drop card, which already pops in. */
+
+/* ---- Source menu (popover, >= 640 px) --------------------------------------------------------- */
+.ip-cloud-menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 248px;
+  padding: 6px;
+}
+.ip-cloud-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 9px;
+  color: var(--ink);
+  font: 400 15px/20px var(--font-sans);
+  text-align: start;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-base),
+    color var(--dur-base);
+}
+.ip-cloud-item[data-focus],
+.ip-cloud-item:hover {
+  background: var(--band);
+  color: var(--brand-strong);
+}
+.ip-cloud-item .ip-cloud-item__out {
+  margin-inline-start: auto;
+  padding-inline-start: 16px;
+  color: var(--muted);
+}
+.ip-cloud-item .ip-cloud-item__muted {
+  color: var(--muted);
+}
+.ip-cloud-group {
+  padding: 8px 12px 4px;
+  font: 600 13px/18px var(--font-display);
+  color: var(--muted);
+}
+.ip-cloud-sep {
+  height: 1.5px;
+  margin: 4px 8px;
+  background: var(--sand);
+}
+.ip-cloud-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 6px 0;
+  padding: 8px 6px 4px;
+  border-top: 1.5px solid var(--sand);
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--muted);
+}
+.ip-cloud-foot svg {
+  flex: none;
+  color: var(--brand-strong);
+}
+
+/* ---- Source sheet (< 640 px): rises from the top edge of the dock, never covers it ----------- */
+.ip-cloud-scrim {
+  position: fixed;
+  inset: 0 0 var(--f23-dock, 0px) 0;
+  z-index: 39;
+  background: rgb(58 20 30 / 0.16);
+}
+.ip-cloud-sheet {
+  position: fixed;
+  inset-inline: 8px;
+  bottom: calc(var(--f23-dock, 0px) + 8px);
+  z-index: 40;
+  padding: 8px;
+  border-radius: 20px;
+  animation: mp-pop-in 300ms var(--ease-pop) both;
+}
+.ip-cloud-sheet .ip-cloud-item {
+  height: 48px;
+  font-size: 16px;
+}
+
+/* ---- Waiting / alerts (reuse the floating NoticeStack alert) ---------------------------------- */
+.ip-cloud-wait {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 2.5px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: currentColor;
+}
+.ip-alert-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ---- Download card (in the grid while a cloud file arrives) ----------------------------------- */
+.ip-dl {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+.ip-dl__page {
+  display: grid;
+  place-items: center;
+  height: 66%;
+  aspect-ratio: 0.72;
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: var(--ip-shadow-paper);
+}
+.ip-dl__bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 13px/18px var(--font-display);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ip-dl__bar .mp-jam {
+  height: 12px;
+  flex: 1;
+}
+.ip-dl--failed .ip-dl__page {
+  box-shadow: inset 0 0 0 1.5px var(--mp-alert-danger-border);
+}
+
+/* ---- Save to cloud (result) ------------------------------------------------------------------- */
+.ip-save .mp-btn--line {
+  height: 44px;
+  padding-inline: 14px;
+}
+.ip-save .ip-split__caret.mp-btn--line {
+  width: 40px;
+  box-shadow: inset 0 0 0 1.5px var(--brand);
+  margin-inline-start: -1.5px;
+}
+
+/* ---- The /cloud/<provider> window ------------------------------------------------------------- */
+.ip-cw {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.ip-cw__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 16px;
+  font: 600 16px/1 var(--font-display);
+  color: var(--ink-black);
+}
+.ip-cw__top .ip-cw__close {
+  margin-inline-start: auto;
+}
+.ip-cw__main {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 8px 16px 24px;
+}
+.ip-cw__card {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 16px 16px 28px 16px;
+  border: 1.5px solid var(--sand);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  padding: 32px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  animation: mp-pop-in 380ms var(--ease-pop) both;
+}
+.ip-cw__title {
+  font: 600 24px/28px var(--font-display);
+  color: var(--ink-black);
+}
+.ip-cw__privacy {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  text-align: start;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+  max-width: 340px;
+}
+.ip-cw__privacy svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--brand-strong);
+}
+.ip-cw__rows {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: start;
+}
+.ip-cw__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  align-items: center;
+}
+.ip-cw__row .mp-jam {
+  grid-column: 1 / -1;
+  height: 12px;
+}
+.ip-cw__name {
+  font: 600 15px/20px var(--font-display);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ip-cw__meta {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ip-cw__meta--bad {
+  color: var(--danger);
+  font-weight: 600;
+}
+.ip-cw__picker {
+  width: 100%;
+  flex: 1;
+  border-top: 1.5px solid var(--sand);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* A mock OS window frame, for the composite screenshots only (not product UI). */
+.mock-popup {
+  position: fixed;
+  z-index: 100;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f3f3f4;
+  box-shadow:
+    0 24px 60px rgb(0 0 0 / 0.28),
+    0 0 0 1px rgb(0 0 0 / 0.12);
+}
+.mock-popup__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  font: 13px/1 system-ui, sans-serif;
+  color: #3c3c43;
+}
+.mock-popup__bar i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #d0d0d4;
+}
+.mock-popup__url {
+  flex: 1;
+  margin-inline-start: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: #fff;
+  color: #555;
+}
+.mock-popup iframe {
+  display: block;
+  border: 0;
+  background: #fff;
+}
+.mock-note {
+  position: fixed;
+  z-index: 120;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #24338f;
+  color: #fff;
+  font: 600 13px/18px system-ui, sans-serif;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.2);
+}
+
+/* Inline alert action (short alerts: waiting, saved). */
+.ip-alert-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block: -4px;
+}
+.ip-cw__tick {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--mp-alert-ok-bg);
+  color: var(--leaf);
+}
+.ip-dl--failed .ip-dl__page {
+  height: 50%;
+}

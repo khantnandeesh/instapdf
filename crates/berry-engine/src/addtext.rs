@@ -639,14 +639,17 @@ struct Place {
 // `!(x <= tol)` is deliberate: it also rejects NaN.
 #[allow(clippy::neg_cmp_op_on_partial_ord)]
 fn check_added(before: &PageContent, after: &PageContent, text: &str, expect: &[(f64, f64)], place: &Place) -> Result<()> {
-    let fail = |m: String| Err(Error::Verify { message: m });
+    let fail = |r: &'static str, m: String| Err(crate::engine::verify(r, m));
     if after.glyphs.len() != before.glyphs.len() + expect.len() {
-        return fail(format!("{} glyphs on the page, expected {}", after.glyphs.len(), before.glyphs.len() + expect.len()));
+        return fail(
+            "glyph-mismatch",
+            format!("{} glyphs on the page, expected {}", after.glyphs.len(), before.glyphs.len() + expect.len()),
+        );
     }
     for (a, b) in before.glyphs.iter().zip(&after.glyphs) {
         let moved = (a.origin.0 - b.origin.0).abs().max((a.origin.1 - b.origin.1).abs());
         if a.code != b.code || !(moved <= 1e-6) || a.text != b.text {
-            return fail("text already on the page changed".into());
+            return fail("glyph-mismatch", "text already on the page changed".into());
         }
     }
     let (sin, cos) = place.angle.to_radians().sin_cos();
@@ -656,10 +659,10 @@ fn check_added(before: &PageContent, after: &PageContent, text: &str, expect: &[
         let want = (place.origin.0 + u * cos - v * sin, place.origin.1 + u * sin + v * cos);
         let off = (g.origin.0 - want.0).abs().max((g.origin.1 - want.1).abs());
         if !(off <= 0.01 + place.size * 1e-4) {
-            return fail(format!("new glyph {:?} is {off:.3} pt from where it was laid out", g.text));
+            return fail("position-drift", format!("new glyph {:?} is {off:.3} pt from where it was laid out", g.text));
         }
         if !((g.size - place.size).abs() <= 1e-6) || g.color != place.color {
-            return fail(format!("new glyph {:?} has the wrong size or colour", g.text));
+            return fail("glyph-mismatch", format!("new glyph {:?} has the wrong size or colour", g.text));
         }
     }
     // The new line must read back as typed. It may join text already on that baseline.
@@ -671,7 +674,7 @@ fn check_added(before: &PageContent, after: &PageContent, text: &str, expect: &[
         .map(|l| squash(&script::canonical_marks(&script::fold_presentation(&l.text))))
         .collect();
     if !reads.iter().any(|r| r.contains(&expected)) {
-        return fail(format!("the new text reads {:?}, expected {expected:?}", reads.join(" | ")));
+        return fail("text-mismatch", format!("the new text reads {:?}, expected {expected:?}", reads.join(" | ")));
     }
     Ok(())
 }

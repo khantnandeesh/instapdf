@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
-import { contentSecurityPolicy, hashesFor, type CspManifest } from "@/lib/security/csp";
+import { cloudPolicy, cloudRouteOf, contentSecurityPolicy, hashesFor, type CspManifest } from "@/lib/security/csp";
 import { isIndexable } from "@/lib/seo/site";
 
 export const config = {
@@ -36,7 +36,14 @@ function loadManifest(): CspManifest | null {
 }
 
 export function middleware(request: NextRequest) {
-  const policy = dev ? contentSecurityPolicy({ dev }) : contentSecurityPolicy({ scriptHashes: hashesFor(loadManifest(), request.nextUrl.pathname) });
+  const path = request.nextUrl.pathname;
+  // F23: a /cloud/<provider> window gets its own policy (its provider's hosts only); every other page the strict one.
+  const cloud = cloudRouteOf(path);
+  const policy = cloud
+    ? cloudPolicy(cloud, dev ? { dev } : { scriptHashes: hashesFor(loadManifest(), path) })
+    : dev
+      ? contentSecurityPolicy({ dev })
+      : contentSecurityPolicy({ scriptHashes: hashesFor(loadManifest(), path) });
   const response = NextResponse.next();
   response.headers.set("Content-Security-Policy", policy);
   // Only prod on the canonical host may be indexed (src/lib/seo/site.ts): staging and raw Cloud Run URLs never are.

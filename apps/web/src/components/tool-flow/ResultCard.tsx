@@ -7,11 +7,31 @@ import { renderPage } from "@/lib/pdf/thumbnails";
 import type { FlowTool } from "@/tools/registry";
 import { Button, buttonClasses } from "../ui/Button";
 import { BerryLoader } from "../berry/Berry";
-import { CheckIcon, DownloadIcon, FilesIcon, ShareIcon } from "../ui/icons";
+import { CheckIcon, DownloadIcon, FilesIcon, ShareIcon, ShieldIcon } from "../ui/icons";
 import { Notice } from "../ui/Notice";
 import { copy } from "./copy";
 import { PrivacyNote } from "./notes";
 import type { ToolOutput } from "./types";
+import { cloudUi, loadCloud } from "../cloud/tool-cloud";
+
+/*
+ * F23: every check is `process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"` written out (a build-time constant),
+ * shaped so that builds without cloud sources fold to main's exact code.
+ */
+
+/**
+ * F23: the cloud chunk for the result (Save to cloud), and the privacy line when a cloud is involved.
+ * When any file came from a cloud the chunk is here already, so that line is right in the first draw
+ * (AC-131); otherwise the chunk comes in its own time (it is idle-prefetched once files are in).
+ */
+function useResultCloud() {
+  const [ui, setUi] = useState(cloudUi);
+  useEffect(() => {
+    if (!ui) loadCloud().then(setUi, () => {});
+  }, [ui]);
+  const [line, setLine] = useState(() => ui?.originPrivacyLine() ?? null);
+  return { ui, line, setLine };
+}
 
 export function ResultCard({
   output,
@@ -30,6 +50,10 @@ export function ResultCard({
   onBack: () => void;
   announce: (message: string) => void;
 }) {
+  // F23: the privacy line when the files came from a cloud or a copy went to one.
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- the flag is a build-time constant: the same call on every render
+  const cloud = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? useResultCloud() : null;
+  const SaveToCloud = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? cloud!.ui?.SaveToCloud : undefined;
   const download = useRef<HTMLAnchorElement>(null);
   const isZip = output.type === "application/zip";
   // Created in an effect and revoked in its cleanup, so StrictMode's double
@@ -112,21 +136,49 @@ export function ResultCard({
                 Download
               </span>
             </a>
-            {canShare && (
-              <Button
-                variant="line"
-                className="self-center max-sm:w-full"
-                iconStart={<ShareIcon size={16} />}
-                onClick={() => {
-                  navigator.share({ files: [file] }).catch(() => {});
-                }}
-              >
-                Share
-              </Button>
+            {/* F23: Save to cloud before Share. Share is written out twice so that builds without cloud sources
+                keep main's children exactly (the second branch is main's code). */}
+            {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
+              <>
+                {SaveToCloud && <SaveToCloud file={file} toolName={tool.flow.title} announce={announce} onSaved={cloud!.setLine} />}
+                {canShare && (
+                  <Button
+                    variant="line"
+                    className="self-center max-sm:w-full"
+                    iconStart={<ShareIcon size={16} />}
+                    onClick={() => {
+                      navigator.share({ files: [file] }).catch(() => {});
+                    }}
+                  >
+                    Share
+                  </Button>
+                )}
+              </>
+            ) : (
+              canShare && (
+                <Button
+                  variant="line"
+                  className="self-center max-sm:w-full"
+                  iconStart={<ShareIcon size={16} />}
+                  onClick={() => {
+                    navigator.share({ files: [file] }).catch(() => {});
+                  }}
+                >
+                  Share
+                </Button>
+              )
             )}
           </div>
           <div className="flex flex-col gap-2">
-            <PrivacyNote runtime={tool.runtime} context="result" />
+            {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && tool.runtime === "client" && cloud!.line ? (
+              // F23: the privacy line names the cloud the files came from or went to (PrivacyNote's look).
+              <p className="flex items-center gap-2 text-sm text-ink" data-testid="privacy-result">
+                <ShieldIcon size={18} className="shrink-0 text-brand-strong" />
+                {cloud!.line}
+              </p>
+            ) : (
+              <PrivacyNote runtime={tool.runtime} context="result" />
+            )}
             {output.wasEncrypted && <Notice tone="warning">{copy.resultUnencrypted}</Notice>}
           </div>
           {!isZip && continueTargets.length > 0 && (

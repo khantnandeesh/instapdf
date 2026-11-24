@@ -86,6 +86,10 @@ for (const tool of usable) {
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (empty state)");
         await expectInViewport(page, page.getByTestId("drop-card").getByRole("button").first(), "file picker");
         await expectInViewport(page, page.getByTestId("dock-status"), "status line");
+        if (await page.getByTestId("cloud-caret").count()) {
+          await expectInViewport(page, page.getByTestId("cloud-caret"), "sources caret (empty state)");
+          await expectInViewport(page, page.getByTestId("cloud-row"), "cloud row (empty state)");
+        }
         // The panel grows with its options and never scrolls inside (design rule "Scrolling"): its top
         // and first option are on the first screen; a tall panel runs past the fold while its status and
         // primary stay pinned to the bottom of the screen.
@@ -96,11 +100,14 @@ for (const tool of usable) {
         // Scroll the page to the end of the panel (every option read): the drop area and the primary stay in view.
         await page.evaluate(() => {
           const r = document.querySelector("[data-ip-dock]")!.getBoundingClientRect();
-          window.scrollTo(0, Math.max(0, window.scrollY + r.bottom - window.innerHeight + 20));
+          // "instant": the checks below are about layout, so they never ride on a smooth scroll. Before #31 the
+          // site-wide scroll-behavior: smooth turned this into an animation that the reset to 0 below did not
+          // cancel (scrollY stayed at 2 or 3).
+          window.scrollTo({ top: Math.max(0, window.scrollY + r.bottom - window.innerHeight + 20), behavior: "instant" });
         });
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (empty state, all options scrolled into view)");
         await expectInViewport(page, page.getByTestId("drop-card").getByRole("button").first(), "file picker (all options scrolled into view)");
-        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
         await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
         const title = await page.getByRole("heading", { level: 1 }).boundingBox();
         expect(title!.height, "tool title fits on one line (the head has a fixed height)").toBeLessThanOrEqual(44);
@@ -135,7 +142,7 @@ for (const tool of usable) {
         await page.waitForTimeout(300);
         expect(await page.evaluate(() => window.scrollY), "the page itself does not scroll").toBe(0);
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded, pages scrolled)");
-        await expectInViewport(page, page.getByRole("button", { name: /Add files|Replace file/ }), "add files (loaded, pages scrolled)");
+        await expectInViewport(page, page.getByRole("button", { name: /^(Add files|Replace file)$/ }), "add files (loaded, pages scrolled)");
 
         // The bigger page view fits too: its buttons are on screen.
         await openFirstPagePreview(page);
@@ -163,6 +170,11 @@ for (const tool of usable) {
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "done", { timeout: 30_000 });
         // The result scrolls the page back to the top: wait for the result to settle.
         await expect(async () => expectInViewport(page, page.getByRole("link", { name: "Download" }), "Download (result)")).toPass({ timeout: 5_000 });
+        // F23 (AC-169): with cloud sources on, the result's second action (Save to…) fits beside Download.
+        if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1") {
+          await expect(page.getByTestId("save-main")).toBeVisible();
+          await expectInViewport(page, page.getByTestId("save-main"), "Save to cloud (result)");
+        }
       });
     }
 
@@ -174,6 +186,11 @@ for (const tool of usable) {
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (empty state)");
         await expectInViewport(page, page.getByTestId("drop-card").getByRole("button").first(), "file picker");
         await expectInViewport(page, page.getByTestId("privacy-intro"), "privacy line");
+        // F23 (AC-156, from 390x664): with cloud sources on, the sources caret and the cloud row are on the first screen too.
+        if (height >= 664 && (await page.getByTestId("cloud-caret").count())) {
+          await expectInViewport(page, page.getByTestId("cloud-caret"), "sources caret (empty state)");
+          await expectInViewport(page, page.getByTestId("cloud-row"), "cloud row (empty state)");
+        }
         await noHorizontalScroll(page);
 
         await page.getByTestId("file-input").setInputFiles(fx("sixty-pages.pdf"));
@@ -182,13 +199,18 @@ for (const tool of usable) {
         await openFirstPagePreview(page);
         await expectInViewport(page, page.getByRole("dialog").getByRole("button", { name: "Close" }), "Close in the page preview");
         await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
-        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
         await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded, scrolled)");
 
         await page.getByTestId("primary-action").click();
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "done", { timeout: 30_000 });
         await expect(async () => expectInViewport(page, page.getByRole("link", { name: "Download" }), "Download (result)")).toPass({ timeout: 5_000 });
+        // F23 (AC-169): with cloud sources on, the result's second action (Save to…) fits beside Download.
+        if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1") {
+          await expect(page.getByTestId("save-main")).toBeVisible();
+          await expectInViewport(page, page.getByTestId("save-main"), "Save to cloud (result)");
+        }
       });
     }
   });

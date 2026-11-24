@@ -7,6 +7,9 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/web/package.json apps/web/
 RUN pnpm install --frozen-lockfile --filter web...
 COPY apps/web apps/web
+# F23 cloud sources: public IDs only (never secrets), inlined at build. Unset means the feature is off.
+ARG NEXT_PUBLIC_CLOUD_SOURCES="" NEXT_PUBLIC_DROPBOX_APP_KEY="" NEXT_PUBLIC_GOOGLE_CLIENT_ID="" \
+    NEXT_PUBLIC_GOOGLE_API_KEY="" NEXT_PUBLIC_GOOGLE_APP_ID="" NEXT_PUBLIC_ONEDRIVE_CLIENT_ID=""
 # Set (https://storage.googleapis.com/<bucket>) when the fonts bucket holds a library: /fonts/lib/*
 # is then passed through to it and no copy of the fonts is built into the image.
 ARG FONTS_ORIGIN=""

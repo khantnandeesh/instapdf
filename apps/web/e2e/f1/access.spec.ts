@@ -66,7 +66,7 @@ test("AC-48: the whole flow works by keyboard alone, and the password modal trap
   await (await chooser).setFiles(fx("three-pages.pdf"));
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
   // The empty-state picker is gone; focus moves to the workspace's picker, not <body>.
-  const addFiles = page.getByRole("button", { name: "Add files" });
+  const addFiles = page.getByRole("button", { name: "Add files", exact: true });
   await expect(addFiles).toBeFocused();
   expect(await page.evaluate(() => document.activeElement?.textContent?.trim())).toBe("Add files");
   await tabTo(page, rotateRight(page));

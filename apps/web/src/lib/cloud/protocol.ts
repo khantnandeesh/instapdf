@@ -1,0 +1,211 @@
+/**
+ * F23 hand-off protocol between a tool tab and its `/cloud/<provider>` window
+ * (research §3.1, spec D-3). Both sides talk over `BroadcastChannel("cloud:<req>")`,
+ * where `<req>` is a random UUID made for one request. Neither side relies on the other's window
+ * object: Google's and Dropbox's windows get a different COOP (a new browsing context group), and
+ * OneDrive's shares the tool tab's (`same-origin`, for MSAL's redirect) but sets `window.opener = null`
+ * first thing (CloudWindow), so there is no `window.opener` and no `win.closed` to watch. Instead the
+ * window sends a heartbeat every second and the tool tab answers it.
+ *
+ * Every message is checked here before either side acts on it: an unknown shape, another
+ * request's id, a field of the wrong type or a non-File "file" is dropped (null).
+ */
+import { hasAcceptedType, type AcceptSpec } from "@/lib/pdf/validation";
+import { type WindowParams } from "./opener";
+import { isProvider, isRoute, type CloudProvider, type CloudRoute } from "./providers";
+
+export { channelName, newRequestId, windowUrl, type WindowParams } from "./opener";
+
+export const HEARTBEAT_MS = 1000;
+/** The tool tab treats this much silence from the window as "closed" (= cancelled). */
+export const WINDOW_LOST_MS = 3000;
+/** Before the first message the window is still loading: allow longer. */
+export const FIRST_CONTACT_MS = 15000;
+/** The window treats this much silence from the tool tab as "lost its tool" (AC-168: within 5 s). */
+export const TOOL_LOST_MS = 3000;
+/** A full-page sign-in (OneDrive) may take this long before the window must be back (MFA, a new account, an SMS code). */
+export const SIGN_IN_AWAY_MS = 10 * 60 * 1000;
+/**
+ * While the window is away on a sign-in page, the tool tab says it stopped waiting once it has been
+ * visible and focused this long with nothing back: the person came back here, and the window was
+ * most likely closed on the sign-in page (it can say nothing from there). It still listens until
+ * SIGN_IN_AWAY_MS, so a sign-in that does come back carries on.
+ */
+export const AWAY_FOCUSED_MS = 15000;
+
+/** At most this many files in one request (a hard cap on top of each tool's own limits). */
+export const MAX_FILES_PER_MESSAGE = 200;
+const MAX_TEXT = 1024;
+
+export type ErrorCode = "unreachable" | "denied" | "offline" | "unknown";
+/** "export": a Google document too large for Drive to turn into a PDF (AC-141). */
+export type SkipReason = "size" | "type" | "access" | "export";
+
+export type FromWindow =
+  | { t: "ready" }
+  | { t: "hb" }
+  | { t: "progress"; id: string; name: string; loaded: number; total: number }
+  | { t: "files"; files: { id: string; file: File }[] }
+  | { t: "skipped"; items: { name: string; reason: SkipReason; id?: string }[] }
+  | { t: "failed"; id: string; name: string }
+  | { t: "done" }
+  | { t: "cancel" }
+  | { t: "error"; code: ErrorCode }
+  | { t: "saveProgress"; loaded: number; total: number }
+  | { t: "saved"; name: string; link?: string }
+  /** The window leaves for a full-page sign-in (OneDrive): keep the request open for up to `ms`. */
+  | { t: "away"; ms: number };
+
+/** Longest "away" a window may ask for (a sign-in page). */
+export const MAX_AWAY_MS = 10 * 60 * 1000;
+
+export type FromTool =
+  | { t: "pong" }
+  | { t: "ack" }
+  | { t: "cancel" }
+  | { t: "stop"; id: string }
+  | { t: "retry"; id: string }
+  | { t: "save"; file: File };
+
+/** What actually travels: the message plus its sender and request id. */
+export type Envelope<M> = M & { from: "window" | "tool"; req: string };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export const isRequestId = (v: unknown): v is string => typeof v === "string" && UUID.test(v);
+
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+const isText = (v: unknown, max = MAX_TEXT): v is string => typeof v === "string" && v.length > 0 && v.length <= max;
+const isCount = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0;
+const isId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(v);
+const isFile = (v: unknown): v is File => typeof File !== "undefined" && v instanceof File;
+const ERRORS: readonly ErrorCode[] = ["unreachable", "denied", "offline", "unknown"];
+const SKIPS: readonly SkipReason[] = ["size", "type", "access", "export"];
+
+function envelope(data: unknown, from: "window" | "tool", req: string): Record<string, unknown> | null {
+  if (!isObj(data) || data.from !== from || data.req !== req || typeof data.t !== "string") return null;
+  return data;
+}
+
+/** A message the window sent on request `req`, or null if it is not one we expect. */
+export function parseFromWindow(data: unknown, req: string): FromWindow | null {
+  const m = envelope(data, "window", req);
+  if (!m) return null;
+  switch (m.t) {
+    case "ready":
+    case "hb":
+    case "done":
+    case "cancel":
+      return { t: m.t };
+    case "progress":
+      if (!isId(m.id) || !isText(m.name) || !isCount(m.loaded) || !isCount(m.total)) return null;
+      return { t: "progress", id: m.id, name: m.name, loaded: m.loaded, total: m.total };
+    case "files": {
+      if (!Array.isArray(m.files) || m.files.length === 0 || m.files.length > MAX_FILES_PER_MESSAGE) return null;
+      const files: { id: string; file: File }[] = [];
+      for (const f of m.files) {
+        if (!isObj(f) || !isId(f.id) || !isFile(f.file)) return null;
+        files.push({ id: f.id, file: f.file });
+      }
+      return { t: "files", files };
+    }
+    case "skipped": {
+      if (!Array.isArray(m.items) || m.items.length === 0 || m.items.length > MAX_FILES_PER_MESSAGE) return null;
+      const items: { name: string; reason: SkipReason; id?: string }[] = [];
+      for (const it of m.items) {
+        if (!isObj(it) || !isText(it.name) || !SKIPS.includes(it.reason as SkipReason) || (it.id !== undefined && !isId(it.id))) return null;
+        items.push(it.id === undefined ? { name: it.name, reason: it.reason as SkipReason } : { name: it.name, reason: it.reason as SkipReason, id: it.id });
+      }
+      return { t: "skipped", items };
+    }
+    case "failed":
+      if (!isId(m.id) || !isText(m.name)) return null;
+      return { t: "failed", id: m.id, name: m.name };
+    case "error":
+      if (!ERRORS.includes(m.code as ErrorCode)) return null;
+      return { t: "error", code: m.code as ErrorCode };
+    case "away":
+      if (!isCount(m.ms) || m.ms > MAX_AWAY_MS) return null;
+      return { t: "away", ms: m.ms };
+    case "saveProgress":
+      if (!isCount(m.loaded) || !isCount(m.total)) return null;
+      return { t: "saveProgress", loaded: m.loaded, total: m.total };
+    case "saved": {
+      if (!isText(m.name)) return null;
+      const link = typeof m.link === "string" && /^https:\/\//.test(m.link) && m.link.length <= 2048 ? m.link : undefined;
+      return { t: "saved", name: m.name, link };
+    }
+    default:
+      return null;
+  }
+}
+
+/** A message the tool tab sent on request `req`, or null. */
+export function parseFromTool(data: unknown, req: string): FromTool | null {
+  const m = envelope(data, "tool", req);
+  if (!m) return null;
+  switch (m.t) {
+    case "pong":
+    case "ack":
+    case "cancel":
+      return { t: m.t };
+    case "stop":
+    case "retry":
+      return isId(m.id) ? { t: m.t, id: m.id } : null;
+    case "save":
+      return isFile(m.file) ? { t: "save", file: m.file } : null;
+    default:
+      return null;
+  }
+}
+
+export function wrap<M extends { t: string }>(from: "window" | "tool", req: string, m: M): Envelope<M> {
+  return { ...m, from, req };
+}
+
+// ---- files arriving in the tool tab ----------------------------------------------------
+
+export type IncomingLimits = { accept: AcceptSpec; maxFileBytes: number; multiple: boolean };
+
+/**
+ * The tool tab's own check of files from the window (never trust the other side): a file over
+ * the tool's size cap or of a type the tool doesn't take is skipped with that reason, and a
+ * single-file tool takes only the first file of the whole request (`alreadyReceived` counts
+ * files accepted earlier on the same request).
+ */
+export function screenIncoming(files: readonly File[], limits: IncomingLimits, alreadyReceived = 0): { accepted: File[]; skipped: { name: string; reason: SkipReason }[] } {
+  const accepted: File[] = [];
+  const skipped: { name: string; reason: SkipReason }[] = [];
+  for (const file of files) {
+    if (!limits.multiple && alreadyReceived + accepted.length >= 1) continue; // unexpected: dropped
+    if (!hasAcceptedType(file, limits.accept)) skipped.push({ name: file.name, reason: "type" });
+    else if (file.size > limits.maxFileBytes) skipped.push({ name: file.name, reason: "size" });
+    else accepted.push(file);
+  }
+  return { accepted, skipped };
+}
+
+// ---- the window's URL -------------------------------------------------------------------
+
+const EXT = /^\.[a-z0-9]{1,8}$/;
+
+/** Reads and checks the window's own URL; null when anything is missing or malformed. */
+export function parseWindowParams(route: string, search: string): (WindowParams & { route: CloudRoute }) | null {
+  if (!isRoute(route)) return null;
+  const q = new URLSearchParams(search);
+  const req = q.get("req");
+  if (!isRequestId(req)) return null;
+  const accept = (q.get("accept") ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (accept.length === 0 || accept.length > 20 || !accept.every((e) => EXT.test(e))) return null;
+  const max = Number(q.get("max"));
+  if (!Number.isSafeInteger(max) || max <= 0) return null;
+  const multiple = q.get("multiple") === "1";
+  const tool = (q.get("tool") ?? "").slice(0, 80) || "BerryPDF";
+  const mode = q.get("mode") === "save" ? "save" : "pick";
+  const p = q.get("p");
+  if (route === "mock" && !isProvider(p)) return null;
+  return { route, req, accept, multiple, max, tool, mode, provider: route === "mock" ? (p as CloudProvider) : (route as CloudProvider) };
+}

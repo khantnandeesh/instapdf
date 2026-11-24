@@ -42,11 +42,19 @@ pub enum Error {
     Unsupported {
         reason: String,
     },
-    /// The edit was computed but failed its own check, so nothing was changed.
+    /// The edit was computed but failed its own check, so nothing was changed. `reason`:
+    /// `text-mismatch` (the line would not read as typed), `position-drift` (a glyph would not
+    /// sit where planned), `glyph-mismatch` (a glyph, font or style would change) or `overflow`
+    /// (the line would run past the page edge) or `overlap` (it would run into other text on
+    /// its baseline).
     Verify {
+        reason: &'static str,
         message: String,
     },
+    /// Writing the file, or reading it back, failed. `reason`: `write-failed`,
+    /// `prefix-changed`, `reparse-failed`, `object-mismatch`, `page-mismatch` or `text-mismatch`.
     Save {
+        reason: &'static str,
         message: String,
     },
 }
@@ -59,6 +67,14 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {}
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Ligatures a font may draw letters with, longest first, and their presentation forms.
+const LIGATURES: [(&str, char); 5] =
+    [("ffi", '\u{FB03}'), ("ffl", '\u{FB04}'), ("ff", '\u{FB00}'), ("fi", '\u{FB01}'), ("fl", '\u{FB02}')];
+
+pub(crate) fn verify(reason: &'static str, message: String) -> Error {
+    Error::Verify { reason, message }
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct FontInfo {
@@ -209,8 +225,9 @@ pub struct Engine {
 
 /// One planned piece of new text.
 pub(crate) enum Seg {
-    /// Bytes in the anchor operator's own font.
-    Orig { bytes: Vec<u8>, text: String, width_em: f64, spaces: usize },
+    /// Bytes in the anchor operator's own font. `text` reads as the glyphs do; `glyphs` counts
+    /// codes (a ligature is one glyph for several characters).
+    Orig { bytes: Vec<u8>, text: String, width_em: f64, spaces: usize, glyphs: usize },
     /// Bytes in a fallback face.
     Fallback { face: usize, gids: Vec<u16>, text: String, width_em: f64 },
     /// A space the font cannot draw: an empty advance.
@@ -243,6 +260,10 @@ pub(crate) struct Plan {
     /// Operators to rewrite: (stream, operator, new bytes; empty deletes it), e.g. the BDC/EMC
     /// of removed ActualText spans.
     pub(crate) drop_ops: Vec<(usize, usize, Vec<u8>)>,
+    /// A second place for new text: after this kept glyph (in the anchor's stream), starting
+    /// this far along the baseline from the glyph's end. Its items take the same width as the
+    /// anchor's.
+    pub(crate) tail: Option<(usize, f64)>,
 }
 
 /// The operator rewrites that take whole ActualText spans out of the content, so the glyphs that
@@ -406,14 +427,72 @@ impl Engine {
         }
     }
 
-    pub(crate) fn describe(&self, page: usize, pc: &PageContent, lines: Vec<Line>, paragraphs: Vec<Paragraph>) -> PageText {
+    /// True when an edit moves a glyph of the line past the visible page edge, where none of
+    /// the line's glyphs were before.
+    pub(crate) fn overflows(
+        &self,
+        page: usize,
+        before: &PageContent,
+        line: &[usize],
+        after: &PageContent,
+        touched: &[usize],
+    ) -> bool {
+        let [x0, y0, x1, y1] = self.page_box(page);
+        let out = |g: &Glyph| {
+            let end = (g.origin.0 + g.advance * g.angle.cos(), g.origin.1 + g.advance * g.angle.sin());
+            [g.origin, end].iter().any(|p| p.0 < x0 - 0.5 || p.0 > x1 + 0.5 || p.1 < y0 - 0.5 || p.1 > y1 + 0.5)
+        };
+        !line.iter().any(|&g| out(&before.glyphs[g])) && touched.iter().any(|&g| out(&after.glyphs[g]))
+    }
+
+    /// True when a new or moved glyph of the line would draw over other text on its baseline
+    /// (a page number after a table-of-contents entry, the next column) that it did not touch
+    /// before.
+    pub(crate) fn collides(before: &PageContent, line: &[usize], after: &PageContent, touched: &[usize]) -> bool {
+        let Some(&first) = line.first() else { return false };
+        let a = before.glyphs[first].angle;
+        let (cos, sin) = (a.cos(), a.sin());
+        let along = |g: &Glyph| g.origin.0 * cos + g.origin.1 * sin;
+        let across = |g: &Glyph| -g.origin.0 * sin + g.origin.1 * cos;
+        let span = |g: &Glyph| {
+            let u = along(g);
+            (u.min(u + g.advance), u.max(u + g.advance))
+        };
+        let mine: HashSet<usize> = line.iter().copied().collect();
+        let (lo, hi) = line
+            .iter()
+            .map(|&g| span(&before.glyphs[g]))
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(l, h), (a, b)| (l.min(a), h.max(b)));
+        let v = across(&before.glyphs[first]);
+        let size = before.glyphs[first].size;
+        let others: Vec<(f64, f64)> = before
+            .glyphs
+            .iter()
+            .enumerate()
+            .filter(|(i, g)| !mine.contains(i) && (g.angle - a).abs() < 0.01 && (across(g) - v).abs() < size * 0.5)
+            .map(|(_, g)| span(g))
+            .filter(|&(x0, x1)| x1 - x0 > 1e-6 && (x1 <= lo + 0.1 || x0 >= hi - 0.1))
+            .collect();
+        touched
+            .iter()
+            .map(|&t| span(&after.glyphs[t]))
+            .any(|(t0, t1)| others.iter().any(|&(x0, x1)| t1.min(x1) - t0.max(x0) > 0.1))
+    }
+
+    /// `[x0, y0, x1, y1]` of the visible page: CropBox, else MediaBox.
+    pub(crate) fn page_box(&self, page: usize) -> [f64; 4] {
         let page_id = self.pages[page];
         let read_box = |key: &[u8]| -> Option<[f64; 4]> {
             let a = self.inherited(page_id, key)?.as_array().ok()?;
             let v: Vec<f64> = a.iter().filter_map(|o| deref(&self.doc, o).as_float().ok()).map(f64::from).collect();
             (v.len() == 4).then(|| [v[0].min(v[2]), v[1].min(v[3]), v[0].max(v[2]), v[1].max(v[3])])
         };
-        let page_box = read_box(b"CropBox").or_else(|| read_box(b"MediaBox")).unwrap_or([0.0, 0.0, 612.0, 792.0]);
+        read_box(b"CropBox").or_else(|| read_box(b"MediaBox")).unwrap_or([0.0, 0.0, 612.0, 792.0])
+    }
+
+    pub(crate) fn describe(&self, page: usize, pc: &PageContent, lines: Vec<Line>, paragraphs: Vec<Paragraph>) -> PageText {
+        let page_id = self.pages[page];
+        let page_box = self.page_box(page);
         let rotation = self.inherited(page_id, b"Rotate").and_then(|o| o.as_i64().ok()).unwrap_or(0).rem_euclid(360);
         PageText { page, page_box, rotation, fonts: pc.fonts.iter().map(|f| Self::font_info(f)).collect(), lines, paragraphs }
     }
@@ -714,19 +793,42 @@ impl Engine {
         let mut segs: Vec<Seg> = Vec::new();
         let mut missing = String::new();
         let mut substitutions: Vec<Substitution> = Vec::new();
-        for ch in inserted.chars() {
-            if let Some(code) = font.encode(ch, &seen) {
+        let chars: Vec<char> = inserted.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            let ch = chars[i];
+            i += 1;
+            // Letters the font cannot draw alone, but as a ligature it has: a TeX subset often
+            // keeps only "fi" from a word like "Definitions".
+            let lig = LIGATURES.iter().find_map(|&(seq, form)| {
+                let n = seq.chars().count();
+                let here = chars[i - 1..].iter().take(n).copied().eq(seq.chars());
+                if !here || seq.chars().all(|c| font.encode(c, &seen).is_some()) {
+                    return None;
+                }
+                let code = font.encode_text(seq, &seen).or_else(|| font.encode(form, &seen))?;
+                Some((code, n, font.unicode(code).unwrap_or_else(|| seq.to_string())))
+            });
+            let found = match lig {
+                Some((code, n, text)) => {
+                    i += n - 1;
+                    Some((code, text))
+                }
+                None => font.encode(ch, &seen).map(|c| (c, ch.to_string())),
+            };
+            if let Some((code, ch_text)) = found {
                 let bytes = font.code_bytes(code);
                 let w = font.width(code) / 1000.0;
                 let space = font.is_word_space(code, bytes.len()) as usize;
                 match segs.last_mut() {
-                    Some(Seg::Orig { bytes: b0, text, width_em, spaces }) => {
+                    Some(Seg::Orig { bytes: b0, text, width_em, spaces, glyphs }) => {
                         b0.extend(bytes);
-                        text.push(ch);
+                        text.push_str(&ch_text);
                         *width_em += w;
                         *spaces += space;
+                        *glyphs += 1;
                     }
-                    _ => segs.push(Seg::Orig { bytes, text: ch.to_string(), width_em: w, spaces: space }),
+                    _ => segs.push(Seg::Orig { bytes, text: ch_text, width_em: w, spaces: space, glyphs: 1 }),
                 }
                 continue;
             }
@@ -777,16 +879,24 @@ impl Engine {
         let mut new_width = 0.0;
         for seg in &segs {
             new_width += match seg {
-                Seg::Orig { text, width_em, spaces, .. } => {
-                    (width_em * state.tfs + state.tc * text.chars().count() as f64 + state.tw * *spaces as f64) * unit
+                Seg::Orig { width_em, spaces, glyphs, .. } => {
+                    (width_em * state.tfs + state.tc * *glyphs as f64 + state.tw * *spaces as f64) * unit
                 }
                 Seg::Fallback { text, width_em, .. } => (width_em * state.tfs + state.tc * text.chars().count() as f64) * unit,
                 Seg::Gap { width_em } => width_em * state.tfs * unit,
             };
         }
         let shift = new_width - (pos(b) - pos(a));
-        let mut plan =
-            Plan { removed: HashSet::new(), want: HashMap::new(), anchor, after: after_anchor, segs, insert_at: 0.0, drop_ops };
+        let mut plan = Plan {
+            removed: HashSet::new(),
+            want: HashMap::new(),
+            anchor,
+            after: after_anchor,
+            segs,
+            insert_at: 0.0,
+            drop_ops,
+            tail: None,
+        };
         plan.removed.extend(line.chars[a..b].iter().flat_map(|c| c.glyphs.iter().copied()));
         for g in line.chars[b..n].iter().flat_map(|c| c.glyphs.iter().copied()) {
             plan.want.insert(g, shift);
@@ -798,7 +908,24 @@ impl Engine {
         let mut backup: Vec<(ObjectId, Option<Object>)> = Vec::new();
         let outcome = self.apply(page_id, &pc, &plan, &state, &mut backup).and_then(|()| {
             let after = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
-            let touched = check_edit(&pc, &after, &plan, ang)?;
+            // A space typed in a font without a space glyph is a gap (a TJ kern) before the
+            // first new glyph, so that glyph starts after the gap, not at the old text.
+            let lead: f64 = plan
+                .segs
+                .iter()
+                .take_while(|s| matches!(s, Seg::Gap { .. }))
+                .map(|s| match s {
+                    Seg::Gap { width_em } => width_em * state.tfs * unit,
+                    _ => 0.0,
+                })
+                .sum();
+            let touched = check_edit(&pc, &after, &plan, ang, lead)?;
+            if self.overflows(page, &pc, &line.glyphs, &after, &touched) {
+                return Err(verify("overflow", "the line would run past the page edge".into()));
+            }
+            if Self::collides(&pc, &line.glyphs, &after, &touched) {
+                return Err(verify("overlap", "the line would run into other text on its baseline".into()));
+            }
             // Where marked content changed, the glyphs alone do not prove how the line reads.
             if !plan.drop_ops.is_empty() || line.glyphs.iter().any(|&g| pc.glyphs[g].span.is_some()) {
                 let text_of = |r: std::ops::Range<usize>| line.chars[r].iter().map(|c| c.text.as_str()).collect::<String>();
@@ -820,9 +947,10 @@ impl Engine {
                 let reads = edited.map(|l| l.text.clone());
                 let gone = edited.is_none() && expected.trim().is_empty();
                 if !gone && reads.as_deref() != Some(expected.as_str()) {
-                    return Err(Error::Verify {
-                        message: format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
-                    });
+                    return Err(verify(
+                        "text-mismatch",
+                        format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
+                    ));
                 }
             }
             Ok((after, touched))
@@ -967,8 +1095,8 @@ impl Engine {
             plan.segs
                 .iter()
                 .map(|seg| match seg {
-                    Seg::Orig { text, width_em, spaces, .. } => {
-                        (width_em * state.tfs + state.tc * text.chars().count() as f64 + state.tw * *spaces as f64) * unit
+                    Seg::Orig { width_em, spaces, glyphs, .. } => {
+                        (width_em * state.tfs + state.tc * *glyphs as f64 + state.tw * *spaces as f64) * unit
                     }
                     Seg::Fallback { text, width_em, .. } => {
                         (width_em * state.tfs + state.tc * text.chars().count() as f64) * unit
@@ -977,7 +1105,7 @@ impl Engine {
                 })
                 .sum()
         };
-        self.apply_items(page_id, pc, plan, &seg_items, inserted_width, backup)
+        self.apply_items(page_id, pc, plan, (&seg_items, &[]), inserted_width, backup)
     }
 
     /// Rewrites the streams that hold affected glyphs, with `items` as the new text at the
@@ -987,7 +1115,7 @@ impl Engine {
         page_id: ObjectId,
         pc: &PageContent,
         plan: &Plan,
-        seg_items: &[Item],
+        (seg_items, tail_items): (&[Item], &[Item]),
         inserted_width: f64,
         backup: &mut Vec<(ObjectId, Option<Object>)>,
     ) -> Result<()> {
@@ -1000,8 +1128,10 @@ impl Engine {
         }
         let mut splices: BTreeMap<usize, Vec<(usize, Vec<u8>)>> = BTreeMap::new();
         for &si in &touched {
-            let mut ins = Some(seg_items.iter());
-            let reps = rewrite_source(pc, si, plan, if si == anchor_source { ins.take() } else { None }, inserted_width);
+            let here = si == anchor_source;
+            let ins = here.then(|| seg_items.iter());
+            let tail = here.then(|| tail_items.iter()).filter(|_| plan.tail.is_some());
+            let reps = rewrite_source(pc, si, plan, ins, tail, inserted_width);
             if !reps.is_empty() {
                 splices.insert(si, reps);
             }
@@ -1227,6 +1357,69 @@ impl Engine {
             SourceKind::Page => None,
         };
         self.add_resource(page_id, form, b"Font", "BE", font_id, backup)
+    }
+
+    /// A sibling of the font `font_id`: a copy of its dictionary (same program, widths and
+    /// encoding, so it draws exactly the same glyphs) whose ToUnicode maps only `map`'s codes
+    /// (`width` bytes each) to their text. New text drawn through it reads right everywhere,
+    /// while the text already in the original font keeps its own mapping. `widths` (Type 0 only)
+    /// adds `/W` entries for codes the font leaves to `/DW`, in a copy of its CIDFont.
+    #[cfg(feature = "shaping")]
+    pub(crate) fn sibling_font(
+        &mut self,
+        font_id: ObjectId,
+        width: usize,
+        map: &[(u32, String)],
+        widths: &[(u32, f64)],
+        backup: &mut Vec<(ObjectId, Option<Object>)>,
+    ) -> Result<ObjectId> {
+        let mut dict = self.doc.get_dictionary(font_id).map_err(|_| limit("font-object"))?.clone();
+        if !widths.is_empty() {
+            let cid_ref = dict.get(b"DescendantFonts").ok().and_then(|o| match o {
+                Object::Array(a) => a.first().cloned(),
+                Object::Reference(id) => self.doc.get_object(*id).ok().and_then(|o| o.as_array().ok()?.first().cloned()),
+                _ => None,
+            });
+            let mut cid = match cid_ref {
+                Some(Object::Reference(id)) => self.doc.get_dictionary(id).map_err(|_| limit("font-object"))?.clone(),
+                Some(Object::Dictionary(d)) => d,
+                _ => return Err(limit("font-object")),
+            };
+            let mut w: Vec<Object> = match cid.get(b"W") {
+                Ok(Object::Array(a)) => a.clone(),
+                Ok(Object::Reference(id)) => {
+                    self.doc.get_object(*id).and_then(|o| o.as_array()).map_err(|_| limit("font-object"))?.clone()
+                }
+                _ => Vec::new(),
+            };
+            for (code, wd) in widths {
+                w.push(Object::Integer(*code as i64));
+                w.push(Object::Array(vec![Object::Real(*wd as f32)]));
+            }
+            cid.set("W", Object::Array(w));
+            let cid_id = self.add_object(Object::Dictionary(cid), backup);
+            dict.set("DescendantFonts", Object::Array(vec![Object::Reference(cid_id)]));
+        }
+        let hex = |n: u32| format!("{n:0w$X}", w = 2 * width);
+        let mut cmap = format!(
+            "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<{}> <{}>\nendcodespacerange\n",
+            hex(0),
+            hex(if width == 1 { 0xFF } else { 0xFFFF }),
+        );
+        let mut entries: Vec<&(u32, String)> = map.iter().collect();
+        entries.sort();
+        for chunk in entries.chunks(100) {
+            cmap.push_str(&format!("{} beginbfchar\n", chunk.len()));
+            for (code, text) in chunk {
+                let t: String = text.encode_utf16().map(|u| format!("{u:04X}")).collect();
+                cmap.push_str(&format!("<{}> <{t}>\n", hex(*code)));
+            }
+            cmap.push_str("endbfchar\n");
+        }
+        cmap.push_str("endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n");
+        let to_unicode = self.add_object(Object::Stream(new_stream(cmap.into_bytes())), backup);
+        dict.set("ToUnicode", Object::Reference(to_unicode));
+        Ok(self.add_object(Object::Dictionary(dict), backup))
     }
 
     /// Embeds (or extends) the subset of a fallback face and returns its Type 0 font object.
@@ -1456,7 +1649,8 @@ impl Engine {
     /// Writes the document as the original bytes plus one appended revision, then reads the
     /// result back and checks it against what the engine holds.
     pub fn save(&mut self) -> Result<(Vec<u8>, SaveReport)> {
-        let err = |m: String| Error::Save { message: m };
+        let err = |m: String| Error::Save { reason: "write-failed", message: m };
+        let fail = |reason: &'static str, message: String| Error::Save { reason, message };
         if self.dirty.is_empty() {
             let report = SaveReport {
                 bytes_before: self.orig.len(),
@@ -1480,9 +1674,9 @@ impl Engine {
 
         // Verify.
         if out.len() < self.orig.len() || out[..self.orig.len()] != self.orig[..] {
-            return Err(Error::Verify { message: "original bytes were not preserved".into() });
+            return Err(fail("prefix-changed", "original bytes were not preserved".into()));
         }
-        let reread = Document::load_mem(&out).map_err(|e| Error::Verify { message: format!("output does not parse: {e}") })?;
+        let reread = Document::load_mem(&out).map_err(|e| fail("reparse-failed", format!("output does not parse: {e}")))?;
         let mut verified = 0;
         for (id, o) in &self.doc.objects {
             // Object and xref streams are rebuilt by the writer, not carried over.
@@ -1494,13 +1688,13 @@ impl Engine {
             }
             match reread.objects.get(id) {
                 Some(r) if same_object(r, o) => verified += 1,
-                Some(_) => return Err(Error::Verify { message: format!("object {} {} differs after saving", id.0, id.1) }),
-                None => return Err(Error::Verify { message: format!("object {} {} is missing after saving", id.0, id.1) }),
+                Some(_) => return Err(fail("object-mismatch", format!("object {} {} differs after saving", id.0, id.1))),
+                None => return Err(fail("object-mismatch", format!("object {} {} is missing after saving", id.0, id.1))),
             }
         }
         let reread_pages: Vec<ObjectId> = reread.get_pages().into_values().collect();
         if reread_pages != self.pages {
-            return Err(Error::Verify { message: "page list changed".into() });
+            return Err(fail("page-mismatch", "page list changed".into()));
         }
         let mut cache = FontCache::default();
         for &p in &self.edited_pages {
@@ -1508,7 +1702,7 @@ impl Engine {
             let theirs = interp::interpret_page(&reread, &mut cache, reread_pages[p]).map_err(limit)?;
             let text = |pc: &PageContent| layout::group(pc).0.into_iter().map(|l| l.text).collect::<Vec<_>>();
             if text(&mine) != text(&theirs) {
-                return Err(Error::Verify { message: format!("page {} reads differently after saving", p + 1) });
+                return Err(fail("text-mismatch", format!("page {} reads differently after saving", p + 1)));
             }
         }
         let report = SaveReport {
@@ -1590,6 +1784,7 @@ pub(crate) fn rewrite_source(
     si: usize,
     plan: &Plan,
     mut insert: Option<std::slice::Iter<'_, Item>>,
+    mut tail: Option<std::slice::Iter<'_, Item>>,
     inserted_width: f64,
 ) -> Vec<(usize, Vec<u8>)> {
     let src = &pc.sources[si];
@@ -1682,6 +1877,15 @@ pub(crate) fn rewrite_source(
                         }
                         if gi == plan.anchor && plan.after {
                             place_insert!();
+                        }
+                        if let Some(at) = plan.tail.filter(|t| t.0 == gi).map(|t| t.1) {
+                            if let Some(it) = tail.take() {
+                                fix!(at);
+                                items.extend(it.cloned());
+                                cur += inserted_width;
+                                fresh = false;
+                                changed = true;
+                            }
                         }
                         gi += 1;
                     }
@@ -1805,13 +2009,13 @@ pub(crate) fn serialize_items(items: Vec<Item>) -> Vec<u8> {
 /// Returns the indices (in `after`) of glyphs that are new or moved.
 // `!(x <= tol)` is deliberate: it also rejects NaN.
 #[allow(clippy::neg_cmp_op_on_partial_ord)]
-fn check_edit(before: &PageContent, after: &PageContent, plan: &Plan, angle: f64) -> Result<Vec<usize>> {
-    let fail = |m: String| Err(Error::Verify { message: m });
+fn check_edit(before: &PageContent, after: &PageContent, plan: &Plan, angle: f64, lead: f64) -> Result<Vec<usize>> {
+    let fail = |r: &'static str, m: String| Err(verify(r, m));
     let inserted: usize = plan
         .segs
         .iter()
         .map(|s| match s {
-            Seg::Orig { text, .. } => text.chars().count(),
+            Seg::Orig { glyphs, .. } => *glyphs,
             Seg::Fallback { text, .. } => text.chars().count(),
             Seg::Gap { .. } => 0,
         })
@@ -1826,7 +2030,10 @@ fn check_edit(before: &PageContent, after: &PageContent, plan: &Plan, angle: f64
         .collect();
     let kept = before.glyphs.len() - plan.removed.len();
     if after.glyphs.len() != kept + inserted {
-        return fail(format!("expected {} glyphs after the edit, found {}", kept + inserted, after.glyphs.len()));
+        return fail(
+            "glyph-mismatch",
+            format!("expected {} glyphs after the edit, found {}", kept + inserted, after.glyphs.len()),
+        );
     }
     let (dx, dy) = (angle.cos(), angle.sin());
     let anchor = &before.glyphs[plan.anchor];
@@ -1840,31 +2047,32 @@ fn check_edit(before: &PageContent, after: &PageContent, plan: &Plan, angle: f64
             touched.push(*j + k);
             text.push_str(&g.text);
             if !g.origin.0.is_finite() || !g.origin.1.is_finite() {
-                return Err(Error::Verify { message: "new text has no valid position".into() });
+                return Err(verify("position-drift", "new text has no valid position".into()));
             }
             // New glyphs take the anchor's size, colour and rendering mode.
             if (g.size - anchor.size).abs() > 1e-6 || g.color != anchor.color || g.render_mode != anchor.render_mode {
-                return Err(Error::Verify { message: format!("new glyph {:?} has the wrong style", g.text) });
+                return Err(verify("glyph-mismatch", format!("new glyph {:?} has the wrong style", g.text)));
             }
             // And they stay on the baseline.
             if let Some(p) = prev {
                 // (Negative character spacing may legitimately move them backwards.)
                 let off = -(g.origin.0 - p.0) * dy + (g.origin.1 - p.1) * dx;
                 if !(off.abs() <= POSITION_TOLERANCE) {
-                    return Err(Error::Verify { message: format!("new glyph {:?} is out of line", g.text) });
+                    return Err(verify("position-drift", format!("new glyph {:?} is out of line", g.text)));
                 }
             }
             prev = Some(g.origin);
             if k == 0 {
                 if let Some(s) = start {
+                    let s = (s.0 + lead * dx, s.1 + lead * dy);
                     if !((g.origin.0 - s.0).hypot(g.origin.1 - s.1) <= POSITION_TOLERANCE) {
-                        return Err(Error::Verify { message: "new text does not start where the old text did".into() });
+                        return Err(verify("position-drift", "new text does not start where the old text did".into()));
                     }
                 }
             }
         }
         if text != expected_text {
-            return Err(Error::Verify { message: format!("new text reads {text:?}, expected {expected_text:?}") });
+            return Err(verify("text-mismatch", format!("new text reads {text:?}, expected {expected_text:?}")));
         }
         *j += inserted;
         Ok(())
@@ -1885,10 +2093,10 @@ fn check_edit(before: &PageContent, after: &PageContent, plan: &Plan, angle: f64
                 || h.color != g.color
                 || h.render_mode != g.render_mode
             {
-                return fail(format!("glyph {i} ({:?}) changed", g.text));
+                return fail("glyph-mismatch", format!("glyph {i} ({:?}) changed", g.text));
             }
             if !(moved <= POSITION_TOLERANCE) {
-                return fail(format!("glyph {i} ({:?}) is {moved:.3} pt from where it should be", g.text));
+                return fail("position-drift", format!("glyph {i} ({:?}) is {moved:.3} pt from where it should be", g.text));
             }
             if want != 0.0 {
                 touched.push(j);

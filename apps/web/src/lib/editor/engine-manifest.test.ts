@@ -82,7 +82,17 @@ describe("engine artifact", () => {
   it("inlines the same hashed paths for the site-wide prefetch (next.config env)", async () => {
     const { default: config } = await import("../../../next.config");
     const { ENGINE_JS, ENGINE_WASM } = await import("./engine-assets");
-    expect(config.env).toEqual({ ENGINE_JS_PATH: ENGINE_JS, ENGINE_WASM_PATH: ENGINE_WASM });
+    const { cloudSourcesOn, configuredProviders, providerList } = await import("../cloud/providers");
+    const on = cloudSourcesOn();
+    // Exactly these keys: the two prefetched engine files plus the F23 cloud build values (never the shaping module).
+    expect(config.env).toEqual({
+      ENGINE_JS_PATH: ENGINE_JS,
+      ENGINE_WASM_PATH: ENGINE_WASM,
+      NEXT_PUBLIC_CLOUD_SOURCES: on ? "1" : "",
+      NEXT_PUBLIC_CLOUD_LIST: on ? configuredProviders().join(",") : "",
+      NEXT_PUBLIC_CLOUD_NAMES: on ? providerList(configuredProviders()) : "",
+      NEXT_PUBLIC_CLOUD_MOCK: process.env.NEXT_PUBLIC_CLOUD_MOCK ?? "",
+    });
   });
 
   it("serves the shaping module from hashed, precompressed paths but never prefetches it", async () => {

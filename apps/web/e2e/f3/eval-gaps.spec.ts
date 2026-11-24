@@ -3,7 +3,7 @@
  * Spec: docs/specs/f3-merge.md (M-3 toolbar, §6 output name, M-6 focus).
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { downloadResult, flow, fx, isDesktop, openMerge, pickMerge, run, runAndDownload, setMergeOptions, tileLabels, tileMain } from "./support";
+import { cloudOn, downloadResult, flow, fromFileItem, fx, isDesktop, openMerge, pickMerge, run, runAndDownload, setMergeOptions, tileLabels, tileMain } from "./support";
 
 test.beforeEach(async ({ page }) => {
   await openMerge(page);
@@ -14,7 +14,8 @@ const visibleAddButtons = (page: Page) =>
   page
     .getByRole("button", { name: /^Add/ })
     .filter({ visible: true })
-    .evaluateAll((els) => els.filter((e) => !e.closest("[data-testid=segment-grid],[data-testid=page-grid]")).map((e) => e.getAttribute("aria-label") ?? e.textContent?.trim() ?? ""));
+    // F23's cloud caret is the second half of the Add files split, not another Add control.
+    .evaluateAll((els) => els.filter((e) => !e.closest("[data-testid=segment-grid],[data-testid=page-grid],[data-testid=cloud-caret-toolbar]")).map((e) => e.getAttribute("aria-label") ?? e.textContent?.trim() ?? ""));
 
 /** The toolbar's Add files button (the grid's end tile has the same name). */
 const toolbarAddFiles = (page: Page) => page.getByRole("button", { name: "Add files", exact: true }).and(page.locator(":not([data-testid=add-tile])"));
@@ -39,9 +40,11 @@ test.describe("G-2: below 640 px the toolbar has one Add menu", () => {
     expect(box.height).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await add.tap();
-    await expect(page.getByRole("menuitem")).toHaveText(["Files…", "Pages from a file…", "Blank page"]);
+    // With F23 on, the sheet groups Files (This device + clouds) and Pages (spec U-2 E4); e2e/f23 checks the clouds.
+    if (cloudOn) await expect(page.getByRole("menuitem")).toHaveText([/^This device/, /^Google Drive/, /^Dropbox/, /^OneDrive/, /^Pages from a file/, "Blank page"]);
+    else await expect(page.getByRole("menuitem")).toHaveText(["Files…", "Pages from a file…", "Blank page"]);
     // Files… opens the multi-file picker and appends.
-    const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("menuitem", { name: "Files…" }).tap()]);
+    const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("menuitem", { name: cloudOn ? "This device" : "Files…", exact: true }).tap()]);
     expect(chooser.isMultiple()).toBe(true);
     await chooser.setFiles(fx("echo.pdf"));
     await expect(flow(page)).toHaveAttribute("data-state", "ready");
@@ -53,7 +56,8 @@ test.describe("G-2: below 640 px the toolbar has one Add menu", () => {
     expect(await tileLabels(page)).toEqual(["A1", "A2", "A3", "B1", "B2", "C1", "Blank"]);
     // Pages from a file… opens the single-file page picker.
     await add.tap();
-    const [single] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("menuitem", { name: "Pages from a file…" }).tap()]);
+    if (cloudOn) await page.getByRole("menuitem", { name: "Pages from a file" }).tap();
+    const [single] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("menuitem", { name: cloudOn ? "This device" : "Pages from a file…", exact: true }).tap()]);
     expect(single.isMultiple()).toBe(false);
     await single.setFiles(fx("three-pages.pdf"));
     await expect(page.getByRole("dialog")).toContainText("Add pages from three-pages.pdf");
@@ -161,7 +165,7 @@ test.describe("G-7: focus after picks", () => {
     await pickMerge(page, "alpha.pdf", "bravo.pdf");
     // Mouse, from the files view: the pages view opens and the first new tile has focus.
     await page.getByRole("button", { name: "Add pages", exact: true }).click();
-    await page.getByRole("menuitem", { name: "Pages from a file…" }).click();
+    await page.getByRole("menuitem", { name: fromFileItem, exact: true }).click();
     await page.getByTestId("pages-file-input").setInputFiles(fx("three-pages.pdf"));
     let dialog = page.getByRole("dialog");
     await dialog.getByTestId("picker-tile").nth(1).click();
@@ -175,7 +179,7 @@ test.describe("G-7: focus after picks", () => {
     page.on("filechooser", () => {});
     await page.getByRole("button", { name: "Add pages", exact: true }).focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("menuitem", { name: "Pages from a file…" })).toBeFocused();
+    await expect(page.getByRole("menuitem", { name: fromFileItem, exact: true })).toBeFocused();
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.keyboard.press("Enter")]);
     await chooser.setFiles(fx("echo.pdf"));
     dialog = page.getByRole("dialog");
