@@ -1053,7 +1053,9 @@ impl PdfFont {
         if declared <= 0.0 {
             return false;
         }
-        match self.program_advance(code) {
+        // A program that gives no advance of its own (some CFF subsets keep none) can't be
+        // compared: the declared width stands, as for a program we cannot read.
+        match self.program_advance(code).filter(|prog| *prog > 0.0) {
             Some(prog) => (declared - prog).abs() <= prog.abs() * 0.02 + 2.0,
             // Type 0 without a readable advance: trust only an explicit /W entry.
             None => !matches!(&self.widths, Widths::Cid { map, .. } if !map.contains_key(&code)),

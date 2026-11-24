@@ -18,7 +18,7 @@ import { LineEditBox } from "./LineEditBox";
 import { dominantHex } from "@/lib/editor/markup";
 
 
-/** Height the hint under an edit box takes, with its gap (CSS pixels). */
+/** How far above and below the box the hint can reach (CSS pixels). */
 const HINT_ROOM = 36;
 
 export function LineLayer({
@@ -46,7 +46,8 @@ export function LineLayer({
   active: boolean;
   onEdit: (line: number, text: string) => void;
   onChange: (text: string) => void;
-  onCommit: () => void;
+  /** `asked`: Enter was pressed (the box was not just left). */
+  onCommit: (asked: boolean) => void;
   onCancel: () => void;
 }) {
   const cancelled = useRef(false);
@@ -139,7 +140,8 @@ export function LineLayer({
     // where it hides none of it: under the box when that is clear, else over it.
     let paperTop = 0;
     let paperBottom = 0;
-    let below = true;
+    /** Where the other lines' text is drawn (its ink, not its taller line box): the hint keeps off it. */
+    const around: { left: number; right: number; top: number; bottom: number }[] = [];
     if (!box.transform) {
       const mid = box.top + box.height / 2;
       text.lines.forEach((other, k) => {
@@ -148,10 +150,18 @@ export function LineLayer({
         if (o.angle || o.cx + o.length / 2 < box.left || o.cx - o.length / 2 > box.left + box.width) return;
         const top = o.cy - o.thickness / 2;
         const bottom = o.cy + o.thickness / 2;
-        if (o.cy > mid) {
-          paperBottom = Math.max(paperBottom, Math.min(box.top + box.height - top, box.height / 2 - 1));
-          if (top < box.top + box.height + HINT_ROOM) below = false;
-        } else if (o.cy < mid) paperTop = Math.max(paperTop, Math.min(bottom - box.top, box.height / 2 - 1));
+        if (o.cy > mid) paperBottom = Math.max(paperBottom, Math.min(box.top + box.height - top, box.height / 2 - 1));
+        else if (o.cy < mid) paperTop = Math.max(paperTop, Math.min(bottom - box.top, box.height / 2 - 1));
+      });
+      text.lines.forEach((other, k) => {
+        if (k === editing!.line || !other.text.trim()) return;
+        const o = lineBox(other.bbox, other.angle, view, rotation, scale);
+        if (o.angle || Math.abs(o.cy - (box.top + box.height / 2)) > box.height / 2 + HINT_ROOM + o.thickness) return;
+        // From the top of a capital to a little under the baseline (the line's own baseline: its
+        // box can be much taller than its text when one glyph comes from a taller font).
+        const em = other.size * scale;
+        const base = quarterTurns(rotation) === 0 ? toScreen(other.origin[0], other.origin[1], view, rotation, scale)[1] : o.cy + em * 0.25;
+        around.push({ left: o.cx - o.length / 2, right: o.cx + o.length / 2, top: base - em * 0.75, bottom: base + em * 0.25 });
       });
     }
     // The page's user-space origin on an upright page: the edit box draws engine glyphs from it.
@@ -160,7 +170,7 @@ export function LineLayer({
       const [x, y] = toScreen(0, 0, view, rotation, scale);
       pageOrigin = { x, y };
     }
-    return { box, start, pageOrigin, length: b.length, maxWidth: displaySize(view, rotation, scale).width - box.left - 2, paperInset: { top: Math.max(0, paperTop), bottom: Math.max(0, paperBottom) }, hintBelow: below };
+    return { box, start, pageOrigin, length: b.length, maxWidth: displaySize(view, rotation, scale).width - box.left - 2, paperInset: { top: Math.max(0, paperTop), bottom: Math.max(0, paperBottom) }, around };
   };
 
   return (
@@ -170,7 +180,8 @@ export function LineLayer({
         role="listbox"
         tabIndex={interactive ? 0 : -1}
         aria-label={`Text on page ${pageNumber}`}
-        aria-activedescendant={active >= 0 ? `ed-p${pageNumber - 1}-l${active}` : undefined}
+        // The line being edited is out of the list while its box is open: it can't be pointed at.
+        aria-activedescendant={active >= 0 && editing?.line !== active ? `ed-p${pageNumber - 1}-l${active}` : undefined}
         aria-disabled={disabled || undefined}
         className="ed-lines absolute inset-0 rounded-[2px]"
         onKeyDown={onListKey}
@@ -220,11 +231,13 @@ export function LineLayer({
           point={point.current}
           paper={() => paperOf(editing.line)}
           onChange={onChange}
-          onCommit={() => {
+          onCommit={(asked) => {
+            // An edit opened again by the editor (it couldn't be saved) has no click to go to.
+            point.current = null;
             if (cancelled.current) {
               cancelled.current = false;
               onCancel();
-            } else onCommit();
+            } else onCommit(asked);
           }}
           onCancel={() => {
             cancelled.current = true;

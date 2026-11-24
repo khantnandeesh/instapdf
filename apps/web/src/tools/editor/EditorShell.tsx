@@ -668,7 +668,16 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       if (typing instanceof HTMLElement && typing.closest(".bf-popover")) typing.blur();
       const s = store.get();
       if (s.editing) store.set({ editing: null });
+      const kept = !!s.lineEdit?.failed;
       if (s.lineEdit) await ctl.commitLine();
+      // Clicking Download left the box, which started the save: its outcome decides.
+      await ctl.committing;
+      // A line whose text couldn't be saved is still open: the file would be made without it.
+      // (A save that failed just now has said why itself, with its own way out.)
+      if (store.get().lineEdit?.failed) {
+        if (kept) ctl.toast({ text: "The line you’re editing couldn’t be saved, so it isn’t in the file yet. Change it, or press Escape to leave it as it was.", tone: "danger" });
+        return;
+      }
       // Added text with characters no font can print: say so before the file is made (AC-75).
       if (!force && !s.readOnly) {
         const now = H.current(store.get().history);
@@ -930,6 +939,12 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       }
       if (k === "Escape") {
         ctl.dropPendingEdit();
+        // A line kept open because it couldn't be saved, with the focus elsewhere: give it up.
+        if (s.lineEdit?.failed) {
+          store.set({ lineEdit: null });
+          ctl.announce("Line left as it was");
+          return;
+        }
         // Spec order: a placement is cancelled; else the selection goes first, then the tool
         // (unlock / back to Select). A sticky tool stays armed while only a selection is dropped.
         if (s.placement) {
@@ -1078,6 +1093,17 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
 
   const pageList = pages.map((p, i) => ({ p, i, first: pages.findIndex((x) => x.src === p.src) === i }));
   const strip = !wide && (selectionObjs.length > 0 || tool !== "select" || !!placement);
+  // The strip hides itself when a tool has no options: what sits above it then sits on the dock.
+  useLayoutEffect(() => {
+    const mark = () => document.querySelector(".ed-frame-root")?.classList.toggle("ed-strip-empty", strip && !document.querySelector(".ed-strip :is(button, input)"));
+    mark();
+    // Its options can arrive later (the form tools load on demand).
+    const bar = document.querySelector(".ed-strip");
+    if (!bar) return;
+    const seen = new MutationObserver(mark);
+    seen.observe(bar, { childList: true, subtree: true });
+    return () => seen.disconnect();
+  });
 
   return (
     <div className={cx("ed-frame-root", wide ? "ed-wide" : "ed-narrow", strip && "ed-has-strip")} data-tool={tool}>
@@ -1360,14 +1386,20 @@ function ToastView({ toast, onDone, children }: { toast: Toast | null; onDone: (
     <div className="ed-toasts">
       {/* The font notice has controls and is announced once by the controller: not in the live region. */}
       {children}
+      {/* On a phone the line-edit hint (a missing letter, fonts for it) is docked here, off the page. */}
+      <div className="ed-hint-slot" data-line-hint-slot="dock" />
       <div className="ed-toasts__live" role="status" aria-live="polite">
       {toast && (
         <div key={toast.key} className={cx("ed-toast ed-glass", `ed-toast--${toast.tone}`)} data-testid="editor-notice">
           <span>{toast.text}</span>
+          {/* While a message shows, the line-edit hint's fonts sit in it: one surface, not two. */}
+          <span className="ed-toast__slot" data-line-hint-slot="toast" />
           {toast.action && (
             <button
               type="button"
               className="ed-toast__act"
+              // A line being edited keeps the caret: the action decides what happens to it.
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 toast.action!.run();
                 onDone();

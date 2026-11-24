@@ -65,6 +65,16 @@ describe("a browser font from a PDF's embedded TrueType program", () => {
     expect(verticalOf(file)).toEqual({ ascent: expect.closeTo(0.905, 3), descent: expect.closeTo(0.212, 3) });
   });
 
+  it("takes each glyph's width from the PDF, not from the program's own advance table", () => {
+    // A subset whose advance table is wrong (seen from reportlab on fixed-pitch fonts): the PDF
+    // says 600 for every letter, and that is what a PDF reader draws.
+    const fixed = { ...program, glyphs: glyphs.map((g) => ({ ...g, width: g.gid ? 600 : 0 })) };
+    const font = parse(webFontFromProgram(fixed, "Arimo")!);
+    for (const c of "Helo,") expect(font.glyphForCodePoint(c.codePointAt(0)!).advanceWidth).toBe(Math.round((600 * whole.unitsPerEm) / 1000));
+    // A glyph the PDF says nothing about keeps the program's advance.
+    expect(font.numGlyphs).toBe(whole.numGlyphs);
+  });
+
   it("maps only the characters the document font has (the rest are reported missing)", () => {
     const lacking = { ...program, glyphs: glyphs.map((g) => (g.cp === 0x17e ? { ...g, gid: 0 } : g)) };
     const font = parse(webFontFromProgram(lacking)!);

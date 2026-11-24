@@ -1,0 +1,20 @@
+const { open, load, log } = require("./lib.cjs");
+const fs = require("fs");
+(async () => {
+  const { browser, page, reqs } = await open();
+  await load(page, "chrome-justified-mixed.pdf");
+  const short = (from) => reqs.slice(from).filter(r=>r.u).map((r) => r.m + " " + r.u.replace(/^https:\/\/[^/]+/, "").slice(0, 110) + (r.len ? " body=" + r.len : ""));
+  let mark = reqs.length;
+  await page.getByRole("button", { name: "Text", exact: true }).click();
+  await page.waitForTimeout(500);
+  await page.mouse.click(700, 620);
+  await page.waitForTimeout(800);
+  await page.keyboard.type("Approved by Dvořák", { delay: 40 });
+  await page.waitForTimeout(1500);
+  log("after add text reqs", short(mark));
+  await page.screenshot({ path: __dirname + "/out/ex3-text.png" });
+  const snap1 = await page.locator("body").ariaSnapshot();
+  fs.writeFileSync(__dirname + "/out/ex3-aria1.txt", snap1);
+  log(snap1.split("\n").filter((l) => /font|Font|combobox|listbox|menu/i.test(l)).join("\n"));
+  await browser.close();
+})().catch((e) => { console.error(String(e).slice(0, 800)); process.exit(1); });

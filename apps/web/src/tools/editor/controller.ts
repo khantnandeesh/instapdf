@@ -104,6 +104,9 @@ export function familyOfFont(name: string): string {
 
 const isEngineError = (e: unknown): e is EngineError => !!e && typeof e === "object" && "kind" in e;
 
+/** Said with every edit that couldn't be saved: the box is open again with what was typed. */
+const KEPT = "Your text is still in the box.";
+
 export function createController(store: Store, rt: Runtime, ui: { announce: Announce; toast: (t: Omit<Toast, "key">) => void }) {
   const state = () => H.current(store.get().history);
   const pageName = (pageId?: string) => {
@@ -293,7 +296,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     /** Set by the shell: opens the sign dialog, the image picker, a download. */
     openSign: null as null | ((role?: "signature" | "initials") => void),
     pickImage: null as null | (() => void),
-    download: null as null | ((name?: string) => void),
+    download: null as null | ((name?: string) => void | Promise<void>),
 
     // ---- existing text (engine) ----
     async showVersion(index: number) {
@@ -459,6 +462,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       }
     },
     recovering: null as Promise<void> | null,
+    committing: null as Promise<void> | null,
     recoverEngine(): Promise<void> {
       ctl.recovering ??= (async () => {
         try {
@@ -472,9 +476,24 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       return ctl.recovering;
     },
 
-    async commitLine(): Promise<void> {
+    /** `asked`: the person pressed Enter (leaving the box is not asking again for a text that just failed). */
+    commitLine(asked = false): Promise<void> {
+      // Download waits for a save that is under way: it may yet fail and keep the line open.
+      const run = ctl.commitLineNow(asked);
+      const all = (ctl.committing = Promise.all([ctl.committing, run]).then(() => undefined));
+      void all.finally(() => {
+        if (ctl.committing === all) ctl.committing = null;
+      });
+      return run;
+    },
+    async commitLineNow(asked: boolean): Promise<void> {
       const s = store.get();
       const e = s.lineEdit;
+      // Reopened while the failed save is still being cleared up (the engine restarting): not yet.
+      if (e?.failed && s.busy === "edit") return;
+      // Leaving the box with the same text that just couldn't be saved: nothing is tried again and
+      // the box stays as it is (so the message's own action can be reached). Enter tries again.
+      if (e?.failed && !asked) return;
       store.set({ lineEdit: null });
       if (!e || s.readOnly) return;
       const line = s.texts[e.src]?.lines[e.line];
@@ -482,13 +501,22 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       // A newer edit of the line an edit is waiting for: the newer one wins.
       ctl.dropPendingEdit(e.src, e.line);
       store.set({ busy: "edit" });
+      // What was typed is never thrown away: the line opens again with it, to change, to try
+      // again with Enter or to give up with Escape (unless something else is open by now). The
+      // message says so only when it happened.
+      const keep = (): string => {
+        const now = store.get();
+        if (now.lineEdit || now.readOnly || now.texts[e.src]?.lines[e.line]?.text !== line.text) return "";
+        store.set({ lineEdit: { ...e, failed: true }, selection: [] });
+        return ` ${KEPT}`;
+      };
       try {
         const { result, bytes, appended } = await ctl.replaceWithStandIn(e, s.texts[e.src]);
         const opened = await openPdf(bytes.slice(), rt.password);
         if (!opened.ok) {
           const back = ctl.bytesOf(rt.shown).slice();
           await callEngine({ op: "open", bytes: back, shaping: store.get().shaping === "ready" }, [back.buffer]).catch(() => {});
-          ui.toast({ text: "That change couldn’t be shown, so it wasn’t made.", tone: "danger" });
+          ui.toast({ text: `That change couldn’t be shown, so it wasn’t made.${keep()}`, tone: "danger" });
           return;
         }
         const prev = rt.pdf;
@@ -529,13 +557,27 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         }
         if (isEngineError(err)) {
           console.warn(engineErrorLog(err));
-          const action = offersLineReplacement(err) ? { label: "Replace with new text", run: () => void ctl.replaceLineWithText(e) } : undefined;
-          ui.toast({ text: describeEngineError(err), tone: "danger", action });
+          // The box may hold newer text than the one that failed: that is what replaces the line.
+          const action = offersLineReplacement(err)
+            ? {
+                label: "Replace with new text",
+                run: () => {
+                  const open = store.get().lineEdit;
+                  void ctl.replaceLineWithText(open && open.src === e.src && open.line === e.line ? { ...e, text: open.text } : e);
+                },
+              }
+            : undefined;
+          ui.toast({ text: `${describeEngineError(err)}${keep()}`, tone: "danger", action });
           if (err.kind === "crashed" || err.kind === "aborted" || err.kind === "internal") await ctl.recoverEngine();
-        } else ui.toast({ text: "That change couldn’t be made.", tone: "danger" });
+        } else ui.toast({ text: `That change couldn’t be made.${keep()}`, tone: "danger" });
       } finally {
         store.set({ busy: null });
       }
+    },
+
+    /** A font was picked or added for the open line: its text is worth trying again when the box is left. */
+    retryable() {
+      store.set((st) => ({ lineEdit: st.lineEdit?.failed ? { ...st.lineEdit, failed: false } : st.lineEdit }));
     },
 
     /** The person picks, while typing, the font that draws what a document font lacks. */
@@ -567,6 +609,9 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
           ui.toast({ text: "This line can’t be replaced automatically. Use Whiteout and Text instead.", tone: "info" });
           return;
         }
+        // The box that kept this text closes: the text is in the new text box now.
+        const open = store.get().lineEdit;
+        if (open && open.src === edit.src && open.line === edit.line) store.set({ lineEdit: null });
         ctl.add([...objs], "Replace line", false);
         if (objs.overlaps) ui.toast({ text: "The new text runs into text below it. Shorten it, or move or resize the box.", tone: "info" });
         else ui.announce("Line replaced with new text");

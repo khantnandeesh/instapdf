@@ -1,0 +1,34 @@
+17:26:30.545 loaded Easy to use Online PDF editor reqs 9
+17:26:30.582 file set
+17:26:40.023 editor ready, reqs 29
+17:26:50.397 box {"x":212.1875,"y":577.53125,"width":349.875,"height":23.265625}
+17:26:59.559 visible dialogs/alerts after typing []
+17:27:02.206 visible dialogs after blur []
+17:27:02.206 APPLY click
+17:27:03.274 resp 200 POST https://www.sejda.com/api/tasks "Y3O3QH4Z-202611241827"
+17:27:08.607 resp 200 GET https://www.sejda.com/api/tasks/Y3O3QH4Z-202611241827/change?_=1795541223648 {"status":"Completed","type":"edit","resultFilename":"chrome-justified-mixed.pdf","resultFileSize":34768,"resultFullUrlPattern":"www.sejda.com/api/tasks/Y3O3QH4Z-202611241827/download/%7B%7Bfilename%7D%7D?s=REDACTED&d=true&_s=42","warnings":[],"resultItems":["chrome-justified-mixed.pdf"],"id":"Y3O3QH4Z-202611241827"}
+17:27:08.790 ready after 6584 ms; url https://www.sejda.com/pdf-editor#results-Y3O3QH4Z-202611241827
+17:27:09.133 href https://www.sejda.com/api/tasks/Y3O3QH4Z-202611241827/download/chrome-justified-mixed.pdf?s=REDACTED&d=true&_s=42
+17:27:09.449 download event https://www.sejda.com/api/tasks/Y3O3QH4Z-202611241827/download/chrome-justified-mixed.pdf?s=REDACTED&d=tr chrome-justified-mixed.pdf
+17:27:09.466 saved
+17:27:34.155 output /tmp/claude-0/-home-user/275877a9-5f1f-5031-984e-694463b39299/scratchpad/f24-eval/out/sejda-t2-output.pdf 34763
+17:27:34.155 non-GET requests [
+ {
+  "t": "2026-11-24T17:26:31.902Z",
+  "m": "POST",
+  "u": "https://www.sejda.com/api/files/upload-check",
+  "len": 19
+ },
+ {
+  "t": "2026-11-24T17:26:35.902Z",
+  "m": "POST",
+  "u": "https://www.sejda.com/api/files/upload?_s=&uplid=REDACTED",
+  "len": 30583
+ },
+ {
+  "t": "2026-11-24T17:27:02.255Z",
+  "m": "POST",
+  "u": "https://www.sejda.com/api/tasks",
+  "len": 1370
+ }
+] total reqs 38
