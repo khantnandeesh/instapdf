@@ -7,8 +7,12 @@ use lopdf::{dictionary, Document, Object, Stream};
 fn build(pages: &[&[&str]]) -> Vec<u8> {
     let mut doc = Document::with_version("1.5");
     let pages_id = doc.new_object_id();
-    let f1 = doc.add_object(dictionary! { "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica", "Encoding" => "WinAnsiEncoding" });
-    let f2 = doc.add_object(dictionary! { "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Times-Roman", "Encoding" => "WinAnsiEncoding" });
+    let f1 = doc.add_object(
+        dictionary! { "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica", "Encoding" => "WinAnsiEncoding" },
+    );
+    let f2 = doc.add_object(
+        dictionary! { "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Times-Roman", "Encoding" => "WinAnsiEncoding" },
+    );
     let resources = doc.add_object(dictionary! { "Font" => dictionary! { "F1" => f1, "F2" => f2 } });
     let mut kids = Vec::new();
     for streams in pages {
@@ -22,7 +26,8 @@ fn build(pages: &[&[&str]]) -> Vec<u8> {
         });
         kids.push(Object::Reference(page));
     }
-    doc.objects.insert(pages_id, Object::Dictionary(dictionary! { "Type" => "Pages", "Count" => kids.len() as i64, "Kids" => kids }));
+    doc.objects
+        .insert(pages_id, Object::Dictionary(dictionary! { "Type" => "Pages", "Count" => kids.len() as i64, "Kids" => kids }));
     let catalog = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
     doc.trailer.set("Root", catalog);
     let mut out = Vec::new();
@@ -35,7 +40,10 @@ fn texts(p: &PageText) -> Vec<String> {
 }
 
 fn line<'a>(p: &'a PageText, containing: &str) -> &'a berry_engine::layout::Line {
-    p.lines.iter().find(|l| l.text.contains(containing)).unwrap_or_else(|| panic!("no line with {containing:?} in {:?}", texts(p)))
+    p.lines
+        .iter()
+        .find(|l| l.text.contains(containing))
+        .unwrap_or_else(|| panic!("no line with {containing:?} in {:?}", texts(p)))
 }
 
 fn word_x(p: &PageText, word: &str) -> f64 {
@@ -60,7 +68,9 @@ fn edit(pdf: &[u8], find: &str, replace: &str) -> (PageText, PageText, Vec<u8>) 
 fn tj_array_edit_keeps_neighbours_in_place() {
     // AC-11c: a word inside a kerned TJ array changes; the words before it must not move at
     // all, and the words after it move together by exactly the change in width.
-    let pdf = build(&[&["BT /F1 12 Tf 72 700 Td [(The qu) -20 (ick brown) 15 ( fox jumps)] TJ ET\nBT /F1 12 Tf 72 680 Td (Second line) Tj ET"]]);
+    let pdf = build(&[&[
+        "BT /F1 12 Tf 72 700 Td [(The qu) -20 (ick brown) 15 ( fox jumps)] TJ ET\nBT /F1 12 Tf 72 680 Td (Second line) Tj ET",
+    ]]);
     let (before, after, _) = edit(&pdf, "brown", "purple");
     assert_eq!(texts(&after), ["The quick purple fox jumps", "Second line"]);
     assert_eq!(word_x(&before, "quick"), word_x(&after, "quick"));
@@ -104,7 +114,8 @@ fn words_placed_one_by_one_keep_their_gaps() {
 
 #[test]
 fn quote_operators_are_split_correctly() {
-    let pdf = build(&[&["BT /F1 12 Tf 14 TL 72 700 Td (First line) Tj (Second line) ' 2 1 (Third wide line) \" (Fourth line) ' ET"]]);
+    let pdf =
+        build(&[&["BT /F1 12 Tf 14 TL 72 700 Td (First line) Tj (Second line) ' 2 1 (Third wide line) \" (Fourth line) ' ET"]]);
     let (before, after, _) = edit(&pdf, "Second", "2nd");
     assert_eq!(texts(&after)[1], "2nd line");
     for l in ["First", "Fourth"] {
@@ -157,7 +168,9 @@ fn edit_spans_content_streams() {
 
 #[test]
 fn content_stream_shared_by_two_pages_is_copied_first() {
-    let mut doc = Document::load_mem(&build(&[&["BT /F1 12 Tf 72 700 Td (Shared header) Tj ET"], &["BT /F1 12 Tf 72 700 Td (x) Tj ET"]])).unwrap();
+    let mut doc =
+        Document::load_mem(&build(&[&["BT /F1 12 Tf 72 700 Td (Shared header) Tj ET"], &["BT /F1 12 Tf 72 700 Td (x) Tj ET"]]))
+            .unwrap();
     let pages: Vec<_> = doc.get_pages().into_values().collect();
     let first = doc.get_dictionary(pages[0]).unwrap().get(b"Contents").unwrap().clone();
     doc.get_dictionary_mut(pages[1]).unwrap().set("Contents", first);
@@ -215,7 +228,8 @@ fn several_edits_then_one_save() {
 #[test]
 fn scaled_and_rotated_text_matrix() {
     // Font size comes from the matrix (Tf 1), and the line runs uphill at 30 degrees.
-    let pdf = build(&[&["BT /F1 1 Tf 10.3923 6 -6 10.3923 100 100 Tm (slanted text here) Tj ET BT /F1 12 Tf 72 700 Td (flat) Tj ET"]]);
+    let pdf =
+        build(&[&["BT /F1 1 Tf 10.3923 6 -6 10.3923 100 100 Tm (slanted text here) Tj ET BT /F1 12 Tf 72 700 Td (flat) Tj ET"]]);
     let (before, after, _) = edit(&pdf, "text", "words");
     assert_eq!(texts(&after).iter().filter(|t| *t == "slanted words here").count(), 1);
     let (b, a) = (line(&before, "slanted"), line(&after, "slanted"));
@@ -227,7 +241,8 @@ fn scaled_and_rotated_text_matrix() {
 fn chrome_justified_line_keeps_its_gaps() {
     // AC-11g on the real Chrome export: after "made" → "signed" the gap before the bold
     // "Provider" survives (the reference editor produces "theProvider").
-    let pdf = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/parity/editor/chrome-justified-mixed.pdf")).unwrap();
+    let pdf =
+        std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/parity/editor/chrome-justified-mixed.pdf")).unwrap();
     let (before, after, _) = edit(&pdf, "made", "signed");
     let gap = |p: &PageText| {
         let l = line(p, "Provider");
@@ -278,5 +293,7 @@ fn subset_font_is_reused_when_it_has_the_glyphs() {
     assert_eq!(report.objects_written, 1, "only the content stream is rewritten");
     // "Monday" needs an M the subset lacks: refused until a font is registered.
     let m = e.find(0, "Friday", true).unwrap()[0].clone();
-    assert!(matches!(e.replace_range(0, m.line, m.start, m.end, "Monday"), Err(Error::MissingGlyphs { chars, .. }) if chars == "M"));
+    assert!(
+        matches!(e.replace_range(0, m.line, m.start, m.end, "Monday"), Err(Error::MissingGlyphs { chars, .. }) if chars == "M")
+    );
 }

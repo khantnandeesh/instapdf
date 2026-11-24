@@ -14,14 +14,7 @@ impl Matrix {
     pub fn then(&self, o: &Matrix) -> Matrix {
         let [a, b, c, d, e, f] = self.0;
         let [a2, b2, c2, d2, e2, f2] = o.0;
-        Matrix([
-            a * a2 + b * c2,
-            a * b2 + b * d2,
-            c * a2 + d * c2,
-            c * b2 + d * d2,
-            e * a2 + f * c2 + e2,
-            e * b2 + f * d2 + f2,
-        ])
+        Matrix([a * a2 + b * c2, a * b2 + b * d2, c * a2 + d * c2, c * b2 + d * d2, e * a2 + f * c2 + e2, e * b2 + f * d2 + f2])
     }
 
     pub fn apply(&self, x: f64, y: f64) -> (f64, f64) {

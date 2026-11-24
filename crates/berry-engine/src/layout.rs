@@ -111,10 +111,12 @@ fn build_line(pc: &PageContent, id: usize, glyphs: Vec<usize>) -> Line {
     }
 
     let first = &pc.glyphs[glyphs[0]];
-    let style = |c: &LineChar| c.glyph.map(|g| {
-        let g = &pc.glyphs[g];
-        (g.font, (g.size * 100.0).round() as i64, g.color)
-    });
+    let style = |c: &LineChar| {
+        c.glyph.map(|g| {
+            let g = &pc.glyphs[g];
+            (g.font, (g.size * 100.0).round() as i64, g.color)
+        })
+    };
     let mut runs: Vec<Run> = Vec::new();
     let mut start = 0;
     let mut cur = style(&chars[0]);

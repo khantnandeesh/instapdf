@@ -19,20 +19,33 @@ const POSITION_TOLERANCE: f64 = 0.05;
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum Error {
     /// The file could not be read as a PDF.
-    Parse { message: String },
+    Parse {
+        message: String,
+    },
     /// The file is encrypted and needs a password.
     Encrypted,
     BadPage,
     BadLine,
     /// The line cannot be edited (vertical text, unsupported encoding, invisible text).
-    ReadOnly { reason: String },
+    ReadOnly {
+        reason: String,
+    },
     /// No registered font can draw these characters. Register one of `request.families`
     /// (or any font that covers them) with `add_font` and try again.
-    MissingGlyphs { chars: String, request: FontRequest },
-    Unsupported { reason: String },
+    MissingGlyphs {
+        chars: String,
+        request: FontRequest,
+    },
+    Unsupported {
+        reason: String,
+    },
     /// The edit was computed but failed its own check, so nothing was changed.
-    Verify { message: String },
-    Save { message: String },
+    Verify {
+        message: String,
+    },
+    Save {
+        message: String,
+    },
 }
 
 impl std::fmt::Display for Error {
@@ -79,6 +92,8 @@ pub struct Substitution {
     pub chars: String,
     pub original_font: String,
     pub substitute_font: String,
+    /// The substitute is the same family as the original, so the text looks the same.
+    pub same_family: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -203,7 +218,7 @@ impl Engine {
     /// Opens a PDF. `password` is tried when the file is encrypted.
     pub fn open(bytes: Vec<u8>, password: Option<&str>) -> Result<Engine> {
         let doc = match password {
-            Some(p) => Document::load_mem_with_password(&bytes, p),
+            Some(p) => Document::load_mem_with_options(&bytes, lopdf::LoadOptions::with_password(p)),
             None => Document::load_mem(&bytes),
         }
         .map_err(|e| Error::Parse { message: e.to_string() })?;
@@ -372,7 +387,8 @@ impl Engine {
             a = a.min(b);
         }
         let before: usize = old.iter().filter(|(_, i)| *i < a).count();
-        let inserted: String = new[before.min(new.len())..new.len().saturating_sub(after).max(before.min(new.len()))].iter().collect();
+        let inserted: String =
+            new[before.min(new.len())..new.len().saturating_sub(after).max(before.min(new.len()))].iter().collect();
         if a == b && inserted.is_empty() {
             let page_text = self.page_text(page)?;
             return Ok(EditResult { page: page_text, changed: Vec::new(), substitutions: Vec::new(), shift: 0.0 });
@@ -394,11 +410,12 @@ impl Engine {
         };
 
         // 3. Where the new text goes and which style it takes.
-        let (anchor, after_anchor) = if a < n && line.chars[a].glyph.is_some() && !(a == b && a > 0 && line.chars[a - 1].glyph.is_some()) {
-            (line.chars[a].glyph.unwrap(), false)
-        } else {
-            (prev_real(a).ok_or(Error::BadLine)?, true)
-        };
+        let (anchor, after_anchor) =
+            if a < n && line.chars[a].glyph.is_some() && !(a == b && a > 0 && line.chars[a - 1].glyph.is_some()) {
+                (line.chars[a].glyph.unwrap(), false)
+            } else {
+                (prev_real(a).ok_or(Error::BadLine)?, true)
+            };
         let anchor_glyph = &pc.glyphs[anchor];
         let state = show_state(&pc, anchor).ok_or(Error::BadLine)?.clone();
         let font = pc.fonts[anchor_glyph.font].clone();
@@ -445,13 +462,15 @@ impl Engine {
                 .ok()
                 .and_then(|f| f.glyph_hor_advance(ttf_parser::GlyphId(gid)).map(|w| w as f64 / f.units_per_em() as f64))
                 .unwrap_or(0.5);
-            let name = format!("{}{}{}", face.family, if face.bold { " Bold" } else { "" }, if face.italic { " Italic" } else { "" });
+            let name =
+                format!("{}{}{}", face.family, if face.bold { " Bold" } else { "" }, if face.italic { " Italic" } else { "" });
             match substitutions.last_mut() {
                 Some(sub) if sub.substitute_font == name => sub.chars.push(ch),
                 _ => substitutions.push(Substitution {
                     chars: ch.to_string(),
                     original_font: strip_subset_prefix(&font.base_font).0.to_string(),
                     substitute_font: name,
+                    same_family: fallback::normalize(&face.family) == fallback::family_stem(&font.base_font),
                 }),
             }
             match segs.last_mut() {
@@ -527,7 +546,12 @@ impl Engine {
         // The edited line now covers the old extent shifted by the change.
         let mut changed = vec![old_box];
         let (ox, oy) = (shift * ang.cos(), shift * ang.sin());
-        changed.push(Rect { x0: old_box.x0 + ox.min(0.0), y0: old_box.y0 + oy.min(0.0), x1: old_box.x1 + ox.max(0.0), y1: old_box.y1 + oy.max(0.0) });
+        changed.push(Rect {
+            x0: old_box.x0 + ox.min(0.0),
+            y0: old_box.y0 + oy.min(0.0),
+            x1: old_box.x1 + ox.max(0.0),
+            y1: old_box.y1 + oy.max(0.0),
+        });
         let union = changed.iter().copied().reduce(|x, y| x.union(&y)).unwrap();
         // Fallback fonts may be a little taller than the original.
         let pad = line.size * 0.35;
@@ -551,7 +575,11 @@ impl Engine {
 
     /// Rewrites the affected show operators and commits the new streams to the document.
     fn apply(
-        &mut self, page_id: ObjectId, pc: &PageContent, plan: &Plan, state: &ShowState,
+        &mut self,
+        page_id: ObjectId,
+        pc: &PageContent,
+        plan: &Plan,
+        state: &ShowState,
         backup: &mut Vec<(ObjectId, Option<Object>)>,
     ) -> Result<()> {
         let anchor_source = pc.glyphs[plan.anchor].source;
@@ -595,7 +623,9 @@ impl Engine {
                     Seg::Orig { text, width_em, spaces, .. } => {
                         (width_em * state.tfs + state.tc * text.chars().count() as f64 + state.tw * *spaces as f64) * unit
                     }
-                    Seg::Fallback { text, width_em, .. } => (width_em * state.tfs + state.tc * text.chars().count() as f64) * unit,
+                    Seg::Fallback { text, width_em, .. } => {
+                        (width_em * state.tfs + state.tc * text.chars().count() as f64) * unit
+                    }
                     Seg::Gap { width_em } => width_em * state.tfs * unit,
                 })
                 .sum()
@@ -626,7 +656,11 @@ impl Engine {
             let shared = invocations > 1 || count_refs(&self.doc, form_id) > 1;
             if !shared {
                 self.touch(form_id, backup);
-                let stream = self.doc.get_object_mut(form_id).and_then(Object::as_stream_mut).map_err(|e| Error::Unsupported { reason: e.to_string() })?;
+                let stream = self
+                    .doc
+                    .get_object_mut(form_id)
+                    .and_then(Object::as_stream_mut)
+                    .map_err(|e| Error::Unsupported { reason: e.to_string() })?;
                 stream.set_plain_content(data);
                 let _ = stream.compress();
                 continue;
@@ -635,7 +669,12 @@ impl Engine {
             if *parent != 0 {
                 return Err(Error::Unsupported { reason: "shared-nested-form".into() });
             }
-            let mut clone = self.doc.get_object(form_id).and_then(Object::as_stream).map_err(|e| Error::Unsupported { reason: e.to_string() })?.clone();
+            let mut clone = self
+                .doc
+                .get_object(form_id)
+                .and_then(Object::as_stream)
+                .map_err(|e| Error::Unsupported { reason: e.to_string() })?
+                .clone();
             clone.set_plain_content(data);
             let _ = clone.compress();
             let new_id = self.add_object(Object::Stream(clone), backup);
@@ -655,7 +694,12 @@ impl Engine {
     }
 
     fn commit_page_content(
-        &mut self, page_id: ObjectId, pc: &PageContent, data: &[u8], ops: &[content::Op], reps: &[(usize, Vec<u8>)],
+        &mut self,
+        page_id: ObjectId,
+        pc: &PageContent,
+        data: &[u8],
+        ops: &[content::Op],
+        reps: &[(usize, Vec<u8>)],
         backup: &mut Vec<(ObjectId, Option<Object>)>,
     ) -> Result<()> {
         let seg_of = |op: &content::Op| pc.segments.iter().position(|s| op.start >= s.start && op.end <= s.end);
@@ -683,7 +727,11 @@ impl Engine {
                     contents_changed = true;
                 } else {
                     self.touch(seg.id, backup);
-                    let stream = self.doc.get_object_mut(seg.id).and_then(Object::as_stream_mut).map_err(|e| Error::Unsupported { reason: e.to_string() })?;
+                    let stream = self
+                        .doc
+                        .get_object_mut(seg.id)
+                        .and_then(Object::as_stream_mut)
+                        .map_err(|e| Error::Unsupported { reason: e.to_string() })?;
                     stream.set_plain_content(part);
                     let _ = stream.compress();
                 }
@@ -701,7 +749,12 @@ impl Engine {
     /// Adds `target` to a resource category and returns its name. `form` selects a form's own
     /// resources; otherwise the page's nearest resources are used.
     fn add_resource(
-        &mut self, page_id: ObjectId, form: Option<ObjectId>, category: &[u8], prefix: &str, target: ObjectId,
+        &mut self,
+        page_id: ObjectId,
+        form: Option<ObjectId>,
+        category: &[u8],
+        prefix: &str,
+        target: ObjectId,
         backup: &mut Vec<(ObjectId, Option<Object>)>,
     ) -> Result<Vec<u8>> {
         let err = |m: &str| Error::Unsupported { reason: m.to_string() };
@@ -750,9 +803,14 @@ impl Engine {
         let name = loop {
             let candidate = format!("{prefix}{n}").into_bytes();
             // The name must not hide one from an outer resource dictionary either.
-            let clash = cat.has(&candidate) || interp::page_resources(&self.doc, page_id).iter().any(|r| {
-                r.get(category).ok().and_then(|c| deref(&self.doc, c).as_dict().ok()).map(|d| d.has(&candidate)).unwrap_or(false)
-            });
+            let clash = cat.has(&candidate)
+                || interp::page_resources(&self.doc, page_id).iter().any(|r| {
+                    r.get(category)
+                        .ok()
+                        .and_then(|c| deref(&self.doc, c).as_dict().ok())
+                        .map(|d| d.has(&candidate))
+                        .unwrap_or(false)
+                });
             if !clash {
                 break candidate;
             }
@@ -781,12 +839,22 @@ impl Engine {
     }
 
     fn font_resource(
-        &mut self, page_id: ObjectId, pc: &PageContent, source: usize, font_id: ObjectId,
+        &mut self,
+        page_id: ObjectId,
+        pc: &PageContent,
+        source: usize,
+        font_id: ObjectId,
         backup: &mut Vec<(ObjectId, Option<Object>)>,
     ) -> Result<Vec<u8>> {
         let form = match pc.sources[source].kind {
             SourceKind::Form(id) => {
-                let has_own = self.doc.get_object(id).ok().and_then(|o| o.as_stream().ok()).map(|s| s.dict.has(b"Resources")).unwrap_or(false);
+                let has_own = self
+                    .doc
+                    .get_object(id)
+                    .ok()
+                    .and_then(|o| o.as_stream().ok())
+                    .map(|s| s.dict.has(b"Resources"))
+                    .unwrap_or(false);
                 has_own.then_some(id)
             }
             SourceKind::Page => None,
@@ -795,7 +863,13 @@ impl Engine {
     }
 
     /// Embeds (or extends) the subset of a fallback face and returns its Type 0 font object.
-    fn embed(&mut self, face_index: usize, gids: &[u16], text: &str, backup: &mut Vec<(ObjectId, Option<Object>)>) -> Result<ObjectId> {
+    fn embed(
+        &mut self,
+        face_index: usize,
+        gids: &[u16],
+        text: &str,
+        backup: &mut Vec<(ObjectId, Option<Object>)>,
+    ) -> Result<ObjectId> {
         let err = |m: String| Error::Unsupported { reason: m };
         let face = self.faces[face_index].clone();
         let mut embed = match self.embeds[face_index].take() {
@@ -807,7 +881,15 @@ impl Engine {
                 }
                 let mut remap = GlyphRemapper::new();
                 remap.remap(0);
-                Embed { type0: ids[0], cid: ids[1], desc: ids[2], file: ids[3], to_unicode: ids[4], remap, chars: BTreeMap::new() }
+                Embed {
+                    type0: ids[0],
+                    cid: ids[1],
+                    desc: ids[2],
+                    file: ids[3],
+                    to_unicode: ids[4],
+                    remap,
+                    chars: BTreeMap::new(),
+                }
             }
         };
         for (g, ch) in gids.iter().zip(text.chars()) {
@@ -819,10 +901,23 @@ impl Engine {
         let k = 1000.0 / upem;
         let subset = subsetter::subset(&face.data, 0, &embed.remap).map_err(|e| err(e.to_string()))?;
 
-        let ps_base: String = format!("{}{}{}", face.family, if face.bold { "-Bold" } else { "" }, if face.italic { if face.bold { "Italic" } else { "-Italic" } } else { "" })
-            .chars()
-            .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
-            .collect();
+        let ps_base: String = format!(
+            "{}{}{}",
+            face.family,
+            if face.bold { "-Bold" } else { "" },
+            if face.italic {
+                if face.bold {
+                    "Italic"
+                } else {
+                    "-Italic"
+                }
+            } else {
+                ""
+            }
+        )
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
+        .collect();
         let tag: String = {
             let mut n = face_index;
             let mut t = String::from("BERRY");
@@ -1005,7 +1100,8 @@ fn same_object(a: &Object, b: &Object) -> bool {
                 d.remove(b"Length");
                 d
             };
-            strip(&x.dict) == strip(&y.dict) && (x.content == y.content || x.get_plain_content().ok() == y.get_plain_content().ok())
+            strip(&x.dict) == strip(&y.dict)
+                && (x.content == y.content || x.get_plain_content().ok() == y.get_plain_content().ok())
         }
         _ => a == b,
     }
@@ -1054,10 +1150,15 @@ fn splice_range(data: &[u8], ops: &[content::Op], reps: &[(usize, Vec<u8>)], seg
     out
 }
 
+#[allow(unused_assignments)] // `changed` is set inside the fix-up macros
 /// Walks one stream's text events and returns replacement bytes for the show operators that
 /// must change. `insert` carries the new text when this stream holds the anchor glyph.
 fn rewrite_source(
-    pc: &PageContent, si: usize, plan: &Plan, mut insert: Option<std::slice::Iter<'_, Item>>, inserted_width: f64,
+    pc: &PageContent,
+    si: usize,
+    plan: &Plan,
+    mut insert: Option<std::slice::Iter<'_, Item>>,
+    inserted_width: f64,
 ) -> Vec<(usize, Vec<u8>)> {
     let src = &pc.sources[si];
     let mut out = Vec::new();
@@ -1272,7 +1373,7 @@ fn check_edit(before: &PageContent, after: &PageContent, plan: &Plan, angle: f64
     }
     let (dx, dy) = (angle.cos(), angle.sin());
     let mut j = 0;
-    let mut check_inserted = |j: &mut usize, start: Option<(f64, f64)>| -> Result<()> {
+    let check_inserted = |j: &mut usize, start: Option<(f64, f64)>| -> Result<()> {
         let mut text = String::new();
         for k in 0..inserted {
             let g = &after.glyphs[*j + k];

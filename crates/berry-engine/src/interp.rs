@@ -70,8 +70,16 @@ pub struct ShowState {
 #[derive(Clone, Debug)]
 pub enum TextEvent {
     /// A text positioning operator. `absolute` ones (`BT`, `Tm`) discard earlier line offsets.
-    Position { op: usize, absolute: bool },
-    Show { op: usize, kind: ShowKind, state: ShowState, glyphs: std::ops::Range<usize> },
+    Position {
+        op: usize,
+        absolute: bool,
+    },
+    Show {
+        op: usize,
+        kind: ShowKind,
+        state: ShowState,
+        glyphs: std::ops::Range<usize>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -281,9 +289,7 @@ impl<'a> Interp<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn show(
-        &mut self, gs: &GState, tm: &mut Matrix, source: usize, op: usize, elem: usize, bytes: &[u8],
-    ) {
+    fn show(&mut self, gs: &GState, tm: &mut Matrix, source: usize, op: usize, elem: usize, bytes: &[u8]) {
         let Some(fi) = gs.font else { return };
         let font = self.out.fonts[fi].clone();
         for (byte, (code, nbytes)) in decode_with_offsets(&font, bytes) {
@@ -464,7 +470,8 @@ impl<'a> Interp<'a> {
                     let Ok(data) = stream.get_plain_content() else { continue };
                     let matrix = match stream.dict.get(b"Matrix").ok().map(|o| deref(self.doc, o)) {
                         Some(Object::Array(a)) if a.len() == 6 => {
-                            let v: Vec<f64> = a.iter().map(|o| deref(self.doc, o).as_float().map(f64::from).unwrap_or(0.0)).collect();
+                            let v: Vec<f64> =
+                                a.iter().map(|o| deref(self.doc, o).as_float().map(f64::from).unwrap_or(0.0)).collect();
                             Matrix([v[0], v[1], v[2], v[3], v[4], v[5]])
                         }
                         _ => Matrix::IDENTITY,
@@ -512,7 +519,11 @@ pub fn interpret_page(doc: &Document, cache: &mut FontCache, page_id: ObjectId) 
 /// Same as [`interpret_page`] but with the page content supplied by the caller. The editor uses
 /// this to check a rewritten stream before committing it.
 pub fn interpret_bytes(
-    doc: &Document, cache: &mut FontCache, page_id: ObjectId, data: Vec<u8>, segments: Vec<Segment>,
+    doc: &Document,
+    cache: &mut FontCache,
+    page_id: ObjectId,
+    data: Vec<u8>,
+    segments: Vec<Segment>,
 ) -> PageContent {
     let ops = content::parse(&data);
     let resources = page_resources(doc, page_id);

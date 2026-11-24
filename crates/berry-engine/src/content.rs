@@ -298,11 +298,7 @@ fn parse_num(txt: &str) -> f64 {
 fn inline_image_end(d: &[u8], p: usize) -> usize {
     let mut i = p;
     while i + 1 < d.len() {
-        if d[i] == b'E'
-            && d[i + 1] == b'I'
-            && (i == p || is_ws(d[i - 1]))
-            && (i + 2 >= d.len() || is_ws(d[i + 2]))
-        {
+        if d[i] == b'E' && d[i + 1] == b'I' && (i == p || is_ws(d[i - 1])) && (i + 2 >= d.len() || is_ws(d[i + 2])) {
             // Guard against "EI" inside binary data: what follows must look like content.
             let tail = &d[(i + 2).min(d.len())..(i + 12).min(d.len())];
             if tail.iter().all(|&b| b == b'\n' || b == b'\r' || b == b'\t' || (32..127).contains(&b)) {

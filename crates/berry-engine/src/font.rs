@@ -176,7 +176,8 @@ fn parse_to_unicode(data: &[u8]) -> HashMap<u32, String> {
         b.iter().fold(0u32, |a, &x| a << 8 | x as u32)
     }
     fn text(b: &[u8]) -> String {
-        let units: Vec<u16> = b.chunks(2).map(|c| if c.len() == 2 { (c[0] as u16) << 8 | c[1] as u16 } else { c[0] as u16 }).collect();
+        let units: Vec<u16> =
+            b.chunks(2).map(|c| if c.len() == 2 { (c[0] as u16) << 8 | c[1] as u16 } else { c[0] as u16 }).collect();
         String::from_utf16_lossy(&units)
     }
     let mut map = HashMap::new();
@@ -200,7 +201,10 @@ fn parse_to_unicode(data: &[u8]) -> HashMap<u32, String> {
                 }
                 match tri.get(2) {
                     Some(Operand::Str(t)) => {
-                        let mut units: Vec<u16> = t.chunks(2).map(|c| if c.len() == 2 { (c[0] as u16) << 8 | c[1] as u16 } else { c[0] as u16 }).collect();
+                        let mut units: Vec<u16> = t
+                            .chunks(2)
+                            .map(|c| if c.len() == 2 { (c[0] as u16) << 8 | c[1] as u16 } else { c[0] as u16 })
+                            .collect();
                         for c in lo..=hi {
                             map.insert(c, String::from_utf16_lossy(&units));
                             if let Some(last) = units.last_mut() {
@@ -498,9 +502,7 @@ impl PdfFont {
         if widths.is_empty() {
             first = 0;
             if let Some(s) = std {
-                widths = (0..256)
-                    .map(|c| self.names[c].as_deref().and_then(|n| std14_width(s, n)).unwrap_or(0.0))
-                    .collect();
+                widths = (0..256).map(|c| self.names[c].as_deref().and_then(|n| std14_width(s, n)).unwrap_or(0.0)).collect();
             } else if let Program::TrueType(data) = &self.program {
                 if let Ok(face) = ttf_parser::Face::parse(data, 0) {
                     let upem = face.units_per_em() as f64;
@@ -583,7 +585,9 @@ impl PdfFont {
                             i += 2;
                         }
                         Some(o) => {
-                            let (Ok(c1), Some(Ok(v))) = (o.as_float(), w.get(i + 2).map(|o| deref(doc, o).as_float())) else { break };
+                            let (Ok(c1), Some(Ok(v))) = (o.as_float(), w.get(i + 2).map(|o| deref(doc, o).as_float())) else {
+                                break;
+                            };
                             let c1 = c1 as u32;
                             if c1 >= c0 && c1 - c0 <= 0xFFFF {
                                 for c in c0..=c1 {
@@ -598,7 +602,8 @@ impl PdfFont {
             }
             if let Some(Object::Stream(s)) = get(doc, cid, b"CIDToGIDMap") {
                 if let Ok(data) = s.get_plain_content() {
-                    self.cid_to_gid = Some(data.chunks(2).filter(|c| c.len() == 2).map(|c| (c[0] as u16) << 8 | c[1] as u16).collect());
+                    self.cid_to_gid =
+                        Some(data.chunks(2).filter(|c| c.len() == 2).map(|c| (c[0] as u16) << 8 | c[1] as u16).collect());
                 }
             }
             if let Program::Cff(data) = &self.program {
@@ -810,11 +815,8 @@ impl PdfFont {
             }
             Program::Cff(data) => {
                 let cff = ttf_parser::cff::Table::parse(data)?;
-                let gid = if self.two_byte {
-                    self.gid_for(code)
-                } else {
-                    name().and_then(|n| cff.glyph_index_by_name(n)).map(|g| g.0)
-                };
+                let gid =
+                    if self.two_byte { self.gid_for(code) } else { name().and_then(|n| cff.glyph_index_by_name(n)).map(|g| g.0) };
                 let Some(gid) = gid else { return Some(false) };
                 if gid == 0 || gid >= cff.number_of_glyphs() {
                     return Some(false);

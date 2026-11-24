@@ -26,7 +26,8 @@ pub fn family_stem(base_font: &str) -> String {
     let mut n = normalize(name);
     loop {
         let before = n.len();
-        for suffix in ["mt", "ps", "regular", "roman", "bolditalic", "boldoblique", "bold", "italic", "oblique", "medium", "book"] {
+        for suffix in ["mt", "ps", "regular", "roman", "bolditalic", "boldoblique", "bold", "italic", "oblique", "medium", "book"]
+        {
             if n.len() > suffix.len() + 2 && n.ends_with(suffix) {
                 n.truncate(n.len() - suffix.len());
             }

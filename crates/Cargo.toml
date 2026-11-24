@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["berry-engine", "berry-cli"]
+members = ["berry-engine", "berry-cli", "berry-wasm"]
 
 [workspace.package]
 version = "0.1.0"
