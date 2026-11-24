@@ -119,3 +119,48 @@ export function summarise({ families, rejected }) {
     rejected: count(rejected, (r) => r.reason),
   };
 }
+
+/** "U+0-FF,U+131" → [[0, 255], [305, 305]]. Bad parts are dropped. */
+export function parseUnicodeRange(css) {
+  return String(css ?? "")
+    .split(",")
+    .map((p) => p.trim().replace(/^U\+/i, ""))
+    .filter((p) => /^[0-9a-f]{1,6}(-[0-9a-f]{1,6})?$/i.test(p))
+    .map((p) => {
+      const [lo, hi] = p.split("-");
+      return [parseInt(lo, 16), parseInt(hi ?? lo, 16)];
+    })
+    .filter(([lo, hi]) => lo <= hi && hi <= 0x10ffff);
+}
+
+/** Style key of a face, as the editor's font manifest uses it: "400-normal", "700-italic". */
+export const faceKey = (weight, style) => `${weight}-${style}`;
+
+/** Id of a face in the matching index. */
+export const faceId = (familyId, weight, style) => `${familyId}_${weight}_${style}`;
+
+/** Published name of a font file: "<subset>-<weight>-<style>.<sha8>.woff". */
+export const fontFileName = (subset, weight, style, sha256) => `${subset}-${weight}-${style}.${sha256.slice(0, 8)}.woff`;
+
+/**
+ * The subset whose file is fingerprinted for a family: Latin when it has it (the index
+ * compares Latin letters), else the family's main subset.
+ */
+export function printSubset(entry, defSubset) {
+  if (entry.subsets.includes("latin")) return "latin";
+  return entry.subsets.includes(defSubset) ? defSubset : entry.subsets[0];
+}
+
+/** One row of the family list the font menu searches: short keys keep the download small. */
+export function familyRow(entry, manifestSha) {
+  return {
+    i: entry.id,
+    n: entry.family,
+    c: entry.category,
+    l: entry.licence,
+    s: entry.subsets,
+    w: entry.weights,
+    t: entry.styles.includes("italic") ? 1 : 0,
+    m: manifestSha.slice(0, 8),
+  };
+}
