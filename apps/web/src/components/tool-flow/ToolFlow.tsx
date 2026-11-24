@@ -34,11 +34,12 @@ import { createVisibilityWatcher, ThumbContext } from "./Thumbnail";
 import { ToolIntro } from "./ToolIntro";
 import type { FlowApi, FlowContext, FlowState, LoadedFile, PageDecoration, PreviewItem, ProcessFn, ReadyFile, ToolOutput, WorkspaceContext } from "./types";
 import { LeaveGuard } from "./LeaveGuard";
+import { onIntent } from "./intent";
 // F23 cloud sources: the caret, the row and the hub on tool pages (everything else is the cloud chunk,
 // ui.ts, fetched on intent), compiled out entirely without them (every use sits behind the flag).
 import { CloudCaret, CloudRow, useCloud } from "../cloud/tool-cloud";
 
-// Never needed before a file is picked: separate chunks, prefetched once the page is idle.
+// Never needed before a file is picked: separate chunks, prefetched on intent (see below).
 const lazyParts = {
   result: () => import("./ResultCard"),
   password: () => import("./PasswordDialog"),
@@ -48,6 +49,7 @@ const lazyParts = {
   pageGrid: () => import("./PageGrid"),
   fileGrid: () => import("./FileGrid"),
 };
+const loadLazyParts = () => void Promise.all(Object.values(lazyParts).map((load) => load())).catch(() => {});
 const PageGrid = dynamic(() => lazyParts.pageGrid().then((m) => m.PageGrid), { ssr: false });
 const FileGrid = dynamic(() => lazyParts.fileGrid().then((m) => m.FileGrid), { ssr: false });
 const ResultCard = dynamic(() => lazyParts.result().then((m) => m.ResultCard), { ssr: false });
@@ -200,12 +202,16 @@ export function ToolFlow({
   const docs = useRef(new Map<string, OpenedPdf>());
   const renderer = useMemo(() => (typeof window === "undefined" ? null : new ThumbnailRenderer()), []);
   const [watcher, setWatcher] = useState<ReturnType<typeof createVisibilityWatcher> | null>(null);
+  // The parts needed once a file is in: fetched at the first sign of intent (the file chooser or
+  // the drag hides the load), when files arrive without one (a hand-off), or after 4 s (intent.ts).
+  const stopIntent = useRef<() => void>(() => {});
+  useEffect(() => (stopIntent.current = onIntent(loadLazyParts)), []);
+  const hasFiles = files.length > 0;
   useEffect(() => {
-    const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
-    const go = () => void Promise.all(Object.values(lazyParts).map((load) => load())).catch(() => {});
-    if (idle) idle(go);
-    else setTimeout(go, 1000);
-  }, []);
+    if (!hasFiles) return;
+    stopIntent.current();
+    loadLazyParts();
+  }, [hasFiles]);
   // Set once listeners (drop, paste, hand-off) are live: tests wait for data-hydrated.
   // From 1024 px the pages scroll inside their own area (fold fit), so thumbnails are watched
   // against that area; below, the page itself scrolls and the viewport is the root.
