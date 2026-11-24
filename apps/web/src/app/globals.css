@@ -427,10 +427,30 @@
     background: linear-gradient(var(--sand), rgba(255, 255, 255, 0));
   }
 
-  /* ---- Header: a white bar with a thin sand line ------------------------------------------- */
+  /* ---- Header: a floating glass pill (owner 2026-11-24: no white bar, glass instead) ---------- */
   .mp-header {
-    background: var(--surface);
-    border-bottom: 1.5px solid var(--sand);
+    padding: 10px 10px 0;
+    background: transparent;
+  }
+  .mp-header > div {
+    height: calc(100% - 10px);
+    padding-inline: 22px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    background: color-mix(in srgb, var(--surface) 55%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.7);
+    backdrop-filter: blur(18px) saturate(1.7);
+    box-shadow: 0 10px 30px -16px rgba(140, 30, 60, 0.35);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .mp-header > div {
+      background: var(--surface);
+    }
+  }
+  @media (forced-colors: active) {
+    .mp-header > div {
+      border-color: CanvasText;
+    }
   }
   .mp-brand {
     display: inline-flex;
