@@ -50,17 +50,17 @@ export const FilesIcon: IconComponent = (p) => <Icon {...p}><path d="M208,72V184
 /** Phosphor plus, bold. */
 export const PlusIcon: IconComponent = (p) => <Icon {...p}><path d="M228,128a12,12,0,0,1-12,12H140v76a12,12,0,0,1-24,0V140H40a12,12,0,0,1,0-24h76V40a12,12,0,0,1,24,0v76h76A12,12,0,0,1,228,128Z" /></Icon>;
 
-/** Phosphor minus, duotone. */
-export const MinusIcon: IconComponent = (p) => <Icon {...p}><path d="M216,56V200a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V56A16,16,0,0,1,56,40H200A16,16,0,0,1,216,56Z" opacity="0.2" /><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128Z" /></Icon>;
+/** Phosphor minus, bold. */
+export const MinusIcon: IconComponent = (p) => <Icon {...p}><path d="M228,128a12,12,0,0,1-12,12H40a12,12,0,0,1,0-24H216A12,12,0,0,1,228,128Z" /></Icon>;
 
-/** Phosphor arrow-counter-clockwise, duotone. */
-export const RotateLeftIcon: IconComponent = (p) => <Icon {...p}><path d="M216,128a88,88,0,1,1-88-88A88,88,0,0,1,216,128Z" opacity="0.2" /><path d="M224,128a96,96,0,0,1-94.71,96H128A95.38,95.38,0,0,1,62.1,197.8a8,8,0,0,1,11-11.63A80,80,0,1,0,71.43,71.39a3.07,3.07,0,0,1-.26.25L44.59,96H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V56a8,8,0,0,1,16,0V85.8L60.25,60A96,96,0,0,1,224,128Z" /></Icon>;
+/** Phosphor arrow-counter-clockwise, bold. */
+export const RotateLeftIcon: IconComponent = (p) => <Icon {...p}><path d="M228,128a100,100,0,0,1-98.66,100H128a99.39,99.39,0,0,1-68.62-27.29,12,12,0,0,1,16.48-17.45,76,76,0,1,0-1.57-109c-.13.13-.25.25-.39.37L54.89,92H72a12,12,0,0,1,0,24H24a12,12,0,0,1-12-12V56a12,12,0,0,1,24,0V76.72L57.48,57.06A100,100,0,0,1,228,128Z" /></Icon>;
 
-/** Phosphor arrow-clockwise, duotone. */
-export const RotateRightIcon: IconComponent = (p) => <Icon {...p}><path d="M216,128a88,88,0,1,1-88-88A88,88,0,0,1,216,128Z" opacity="0.2" /><path d="M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16H211.4L184.81,71.64l-.25-.24a80,80,0,1,0-1.67,114.78,8,8,0,0,1,11,11.63A95.44,95.44,0,0,1,128,224h-1.32A96,96,0,1,1,195.75,60L224,85.8V56a8,8,0,1,1,16,0Z" /></Icon>;
+/** Phosphor arrow-clockwise, bold. */
+export const RotateRightIcon: IconComponent = (p) => <Icon {...p}><path d="M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z" /></Icon>;
 
-/** Phosphor arrow-u-up-left, duotone. */
-export const ResetIcon: IconComponent = (p) => <Icon {...p}><path d="M80,40v96L32,88Z" opacity="0.2" /><path d="M168,80H88V40a8,8,0,0,0-13.66-5.66l-48,48a8,8,0,0,0,0,11.32l48,48A8,8,0,0,0,88,136V96h80a48,48,0,0,1,0,96H80a8,8,0,0,0,0,16h88a64,64,0,0,0,0-128ZM72,116.69,43.31,88,72,59.31Z" /></Icon>;
+/** Phosphor arrow-u-up-left, bold. */
+export const ResetIcon: IconComponent = (p) => <Icon {...p}><path d="M236,144a68.07,68.07,0,0,1-68,68H80a12,12,0,0,1,0-24h88a44,44,0,0,0,0-88H61l27.52,27.51a12,12,0,0,1-17,17l-48-48a12,12,0,0,1,0-17l48-48a12,12,0,1,1,17,17L61,76H168A68.08,68.08,0,0,1,236,144Z" /></Icon>;
 
 /** Phosphor x, bold. */
 export const CloseIcon: IconComponent = (p) => <Icon {...p}><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z" /></Icon>;
@@ -95,17 +95,17 @@ export const ErrorIcon: IconComponent = (p) => <Icon {...p}><path d="M224,128a96
 /** Phosphor info, duotone. */
 export const InfoIcon: IconComponent = (p) => <Icon {...p}><path d="M224,128a96,96,0,1,1-96-96A96,96,0,0,1,224,128Z" opacity="0.2" /><path d="M144,176a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176Zm88-48A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128ZM124,96a12,12,0,1,0-12-12A12,12,0,0,0,124,96Z" /></Icon>;
 
-/** Phosphor arrows-out-simple, duotone. */
-export const EnlargeIcon: IconComponent = (p) => <Icon {...p}><path d="M224,48V208a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48Z" opacity="0.2" /><path d="M216,48V96a8,8,0,0,1-16,0V67.31l-50.34,50.35a8,8,0,0,1-11.32-11.32L188.69,56H160a8,8,0,0,1,0-16h48A8,8,0,0,1,216,48ZM106.34,138.34,56,188.69V160a8,8,0,0,0-16,0v48a8,8,0,0,0,8,8H96a8,8,0,0,0,0-16H67.31l50.35-50.34a8,8,0,0,0-11.32-11.32Z" /></Icon>;
+/** Phosphor arrows-out-simple, bold. */
+export const EnlargeIcon: IconComponent = (p) => <Icon {...p}><path d="M220,48V96a12,12,0,0,1-24,0V77l-39.51,39.52a12,12,0,0,1-17-17L179,60H160a12,12,0,0,1,0-24h48A12,12,0,0,1,220,48ZM99.51,139.51,60,179V160a12,12,0,0,0-24,0v48a12,12,0,0,0,12,12H96a12,12,0,0,0,0-24H77l39.52-39.51a12,12,0,0,0-17-17Z" /></Icon>;
 
-/** Phosphor caret-left, duotone. */
-export const ChevronLeftIcon: IconComponent = (p) => <Icon {...p}><path d="M160,48V208L80,128Z" opacity="0.2" /><path d="M163.06,40.61a8,8,0,0,0-8.72,1.73l-80,80a8,8,0,0,0,0,11.32l80,80A8,8,0,0,0,168,208V48A8,8,0,0,0,163.06,40.61ZM152,188.69,91.31,128,152,67.31Z" /></Icon>;
+/** Phosphor caret-left, bold. */
+export const ChevronLeftIcon: IconComponent = (p) => <Icon {...p}><path d="M168.49,199.51a12,12,0,0,1-17,17l-80-80a12,12,0,0,1,0-17l80-80a12,12,0,0,1,17,17L97,128Z" /></Icon>;
 
-/** Phosphor caret-right, duotone. */
-export const ChevronRightIcon: IconComponent = (p) => <Icon {...p}><path d="M176,128,96,208V48Z" opacity="0.2" /><path d="M181.66,122.34l-80-80A8,8,0,0,0,88,48V208a8,8,0,0,0,13.66,5.66l80-80A8,8,0,0,0,181.66,122.34ZM104,188.69V67.31L164.69,128Z" /></Icon>;
+/** Phosphor caret-right, bold. */
+export const ChevronRightIcon: IconComponent = (p) => <Icon {...p}><path d="M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z" /></Icon>;
 
-/** Phosphor caret-down, duotone. */
-export const ChevronDownIcon: IconComponent = (p) => <Icon {...p}><path d="M208,96l-80,80L48,96Z" opacity="0.2" /><path d="M215.39,92.94A8,8,0,0,0,208,88H48a8,8,0,0,0-5.66,13.66l80,80a8,8,0,0,0,11.32,0l80-80A8,8,0,0,0,215.39,92.94ZM128,164.69,67.31,104H188.69Z" /></Icon>;
+/** Phosphor caret-down, bold. */
+export const ChevronDownIcon: IconComponent = (p) => <Icon {...p}><path d="M216.49,104.49l-80,80a12,12,0,0,1-17,0l-80-80a12,12,0,0,1,17-17L128,159l71.51-71.52a12,12,0,0,1,17,17Z" /></Icon>;
 
 /** Phosphor shield-check, duotone. */
 export const ShieldIcon: IconComponent = (p) => <Icon {...p}><path d="M216,56v56c0,96-88,120-88,120S40,208,40,112V56a8,8,0,0,1,8-8H208A8,8,0,0,1,216,56Z" opacity="0.2" /><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z" /></Icon>;
@@ -122,11 +122,11 @@ export const ClockIcon: IconComponent = (p) => <Icon {...p}><path d="M224,128a96
 /** Phosphor browser, duotone. */
 export const DeviceIcon: IconComponent = (p) => <Icon {...p}><path d="M224,56V96H32V56a8,8,0,0,1,8-8H216A8,8,0,0,1,224,56Z" opacity="0.2" /><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,16V88H40V56Zm0,144H40V104H216v96Z" /></Icon>;
 
-/** Phosphor arrow-right, duotone. */
-export const ArrowRightIcon: IconComponent = (p) => <Icon {...p}><path d="M216,128l-72,72V56Z" opacity="0.2" /><path d="M221.66,122.34l-72-72A8,8,0,0,0,136,56v64H40a8,8,0,0,0,0,16h96v64a8,8,0,0,0,13.66,5.66l72-72A8,8,0,0,0,221.66,122.34ZM152,180.69V75.31L204.69,128Z" /></Icon>;
+/** Phosphor arrow-right, bold. */
+export const ArrowRightIcon: IconComponent = (p) => <Icon {...p}><path d="M224.49,136.49l-72,72a12,12,0,0,1-17-17L187,140H40a12,12,0,0,1,0-24H187L135.51,64.48a12,12,0,0,1,17-17l72,72A12,12,0,0,1,224.49,136.49Z" /></Icon>;
 
-/** Phosphor arrow-left, duotone. */
-export const ArrowLeftIcon: IconComponent = (p) => <Icon {...p}><path d="M112,56V200L40,128Z" opacity="0.2" /><path d="M216,120H120V56a8,8,0,0,0-13.66-5.66l-72,72a8,8,0,0,0,0,11.32l72,72A8,8,0,0,0,120,200V136h96a8,8,0,0,0,0-16ZM104,180.69,51.31,128,104,75.31Z" /></Icon>;
+/** Phosphor arrow-left, bold. */
+export const ArrowLeftIcon: IconComponent = (p) => <Icon {...p}><path d="M228,128a12,12,0,0,1-12,12H69l51.52,51.51a12,12,0,0,1-17,17l-72-72a12,12,0,0,1,0-17l72-72a12,12,0,0,1,17,17L69,116H216A12,12,0,0,1,228,128Z" /></Icon>;
 
 /** Phosphor leaf, duotone. */
 export const LeafIcon: IconComponent = (p) => <Icon {...p}><path d="M63.81,192.19c-47.89-79.81,16-159.62,151.64-151.64C223.43,176.23,143.62,240.08,63.81,192.19Z" opacity="0.2" /><path d="M223.45,40.07a8,8,0,0,0-7.52-7.52C139.8,28.08,78.82,51,52.82,94a87.09,87.09,0,0,0-12.76,49c.57,15.92,5.21,32,13.79,47.85l-19.51,19.5a8,8,0,0,0,11.32,11.32l19.5-19.51C81,210.73,97.09,215.37,113,215.94q1.67.06,3.33.06A86.93,86.93,0,0,0,162,203.18C205,177.18,227.93,116.21,223.45,40.07ZM153.75,189.5c-22.75,13.78-49.68,14-76.71.77l88.63-88.62a8,8,0,0,0-11.32-11.32L65.73,179c-13.19-27-13-54,.77-76.71,22.09-36.47,74.6-56.44,141.31-54.06C210.2,114.89,190.22,167.41,153.75,189.5Z" /></Icon>;

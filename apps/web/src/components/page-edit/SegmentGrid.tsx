@@ -300,14 +300,14 @@ export function SegmentGrid({
             disabled={dimmed}
             title={labels.addFiles}
             className={cx(
-              "grid aspect-square w-full place-items-center rounded-tray border-2 border-dashed border-brand-tint-border bg-surface-raised/60 text-brand-strong",
+              "group grid aspect-square w-full place-items-center rounded-tray border-2 border-dashed border-brand-tint-border bg-surface-raised/60 text-brand-strong",
               "transition-[background-color,border-color,transform] duration-(--dur-base) hover:-translate-y-0.5 hover:border-brand hover:bg-brand-tint active:translate-y-0 disabled:opacity-50",
             )}
             data-testid="add-tile"
           >
             <span className="flex flex-col items-center gap-1.5 font-display text-[15px] font-semibold">
-              <span className="grid size-11 place-items-center rounded-full bg-brand-tint">
-                <PlusIcon size={22} />
+              <span className="grid size-11 place-items-center rounded-full bg-brand text-white shadow-menu transition-transform duration-(--dur-base) group-hover:rotate-90 group-focus-visible:rotate-90 motion-reduce:rotate-0">
+                <PlusIcon size={20} />
               </span>
               {labels.addFiles}
             </span>
