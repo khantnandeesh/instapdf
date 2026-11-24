@@ -1,7 +1,6 @@
 "use client";
 import "@/components/berry/berry-loader.css";
-import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatBytes } from "@/lib/pdf/naming";
 import { openPdf } from "@/lib/pdf/pdfjs";
 import { renderPage } from "@/lib/pdf/thumbnails";
@@ -13,13 +12,24 @@ import { Notice } from "../ui/Notice";
 import { copy } from "./copy";
 import { PrivacyNote } from "./notes";
 import type { ToolOutput } from "./types";
-import type { SaveToCloudProps } from "../cloud/SaveToCloud";
+import { cloudUi, loadCloud } from "../cloud/tool-cloud";
 
 /** F23: a build-time constant (DefinePlugin), so builds without cloud sources drop that code. */
 const CLOUD_ON = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1";
-// Its own chunk (ToolFlow preloads it once files are in), so the idle-prefetched result chunk stays small.
-const SaveToCloud: ComponentType<SaveToCloudProps> | null =
-  process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? dynamic(() => import("../cloud/ui").then((m) => m.SaveToCloud), { ssr: false }) : null;
+
+/**
+ * F23: the cloud chunk for the result (Save to cloud), and the privacy line when a cloud is involved.
+ * When any file came from a cloud the chunk is here already, so that line is right in the first draw
+ * (AC-131); otherwise the chunk comes in its own time (it is idle-prefetched once files are in).
+ */
+function useResultCloud() {
+  const [ui, setUi] = useState(cloudUi);
+  useEffect(() => {
+    if (!ui) loadCloud().then(setUi, () => {});
+  }, [ui]);
+  const [line, setLine] = useState(() => ui?.originPrivacyLine() ?? null);
+  return { ui, line, setLine };
+}
 
 export function ResultCard({
   output,
@@ -38,8 +48,10 @@ export function ResultCard({
   onBack: () => void;
   announce: (message: string) => void;
 }) {
-  // F23: the privacy line when the files came from a cloud or a copy went to one (SaveToCloud words it).
-  const [savedLine, setSavedLine] = useState<string | null>(null);
+  // F23: the privacy line when the files came from a cloud or a copy went to one.
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- CLOUD_ON is a build-time constant: the same call on every render
+  const cloud = CLOUD_ON ? useResultCloud() : null;
+  const SaveToCloud = CLOUD_ON ? cloud!.ui?.SaveToCloud : undefined;
   const download = useRef<HTMLAnchorElement>(null);
   const isZip = output.type === "application/zip";
   // Created in an effect and revoked in its cleanup, so StrictMode's double
@@ -122,7 +134,7 @@ export function ResultCard({
                 Download
               </span>
             </a>
-            {CLOUD_ON && SaveToCloud && <SaveToCloud file={file} toolName={tool.flow.title} announce={announce} onSaved={setSavedLine} />}
+            {CLOUD_ON && SaveToCloud && <SaveToCloud file={file} toolName={tool.flow.title} announce={announce} onSaved={cloud!.setLine} />}
             {canShare && (
               <Button
                 variant="line"
@@ -137,11 +149,11 @@ export function ResultCard({
             )}
           </div>
           <div className="flex flex-col gap-2">
-            {CLOUD_ON && tool.runtime === "client" && savedLine ? (
+            {CLOUD_ON && tool.runtime === "client" && cloud!.line ? (
               // F23: the privacy line names the cloud the files came from or went to (PrivacyNote's look).
               <p className="flex items-center gap-2 text-sm text-ink" data-testid="privacy-result">
                 <ShieldIcon size={18} className="shrink-0 text-brand-strong" />
-                {savedLine}
+                {cloud!.line}
               </p>
             ) : (
               <PrivacyNote runtime={tool.runtime} context="result" />

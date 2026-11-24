@@ -1,5 +1,5 @@
 /**
- * F23: the cloud intake behind tool-cloud.ts, in the cloud controls' chunk (ui.ts, never in a tool
+ * F23: the cloud intake behind tool-cloud.tsx, in the cloud controls' chunk (ui.ts, never in a tool
  * page's first-load JS). Opens the `/cloud/<route>` window in the click, mirrors the window's
  * downloads as cards, and hands every file that passes the protocol and screening checks to `intake`
  * in the order a local batch would have. Waiting, blocked, unreachable, denied and offline states
@@ -7,12 +7,12 @@
  */
 import { openCloudWindow, type CloudSession } from "@/lib/cloud/client";
 import { writeLast } from "@/lib/cloud/last-used";
-import { MAX_FILES_PER_MESSAGE, newRequestId, screenIncoming, type ErrorCode, type SkipReason } from "@/lib/cloud/protocol";
-import { routeFor, type CloudProvider } from "@/lib/cloud/providers";
+import { MAX_FILES_PER_MESSAGE, newRequestId, screenIncoming, type ErrorCode, type SkipReason, type WindowParams } from "@/lib/cloud/protocol";
+import { providerName, routeFor, type CloudProvider } from "@/lib/cloud/providers";
 import { copy } from "../tool-flow/copy";
 import { cloudCopy } from "./copy";
 import { busyIcon, cloudAction } from "./NoticeAction";
-import type { CloudDeps, CloudDownload, CloudHub, CloudOpenOptions } from "./tool-cloud";
+import { pageHub, type CloudDeps, type CloudDownload, type CloudHub, type CloudOpenOptions, type PreOpened } from "./tool-cloud";
 import { transferCopy } from "./transfer-copy";
 
 type Entry = CloudDownload & { file?: File; resolved: boolean };
@@ -27,6 +27,8 @@ type SessionState = {
   received: number;
   problems: string[];
   waitNotice: string | null;
+  /** "Stopped waiting for OneDrive" (the window seems closed on its sign-in page). */
+  stoppedNotice: string | null;
   gotFiles: boolean;
   /** Files the user stopped: whatever the window still sends for them is dropped. */
   stopped: Set<string>;
@@ -40,43 +42,35 @@ export type Begin = {
   opts: CloudOpenOptions;
   /** Opens again (runs synchronously in the notice button's click). */
   again: () => void;
+  pre?: PreOpened;
 };
 
-/** The tool page's hub (one ToolFlow per page; its cloud parts hand it over as they mount). */
-let page: CloudHub | undefined;
-let listening = false;
-export function attach(hub: CloudHub) {
-  page = hub;
-  if (listening) return;
-  listening = true;
-  // A pick from this device makes "This device" the last used source (U-12). Capture phase: before
-  // the picker's own handler empties the input.
-  document.addEventListener(
-    "change",
-    (e) => {
-      const t = e.target;
-      if (page && t instanceof HTMLInputElement && t.type === "file" && t.files?.length) writeLast("device");
-    },
-    true,
-  );
+/** The window's query for a pick on this tool page. */
+function pickParams(tool: CloudDeps["tool"], provider: CloudProvider, req: string, multiple: boolean): WindowParams {
+  const { flow } = tool;
+  return { req, accept: flow.accept.extensions.map((e) => e.toLowerCase()), multiple, max: flow.maxFileBytes, tool: flow.title, provider };
 }
 
-/** The tool page's inputs (once a cloud part has mounted). */
-export const pageDeps = () => page?.deps;
-
-/** Opens a provider's window: call it synchronously in the click (the browser allows a window only then). */
-export function openCloud(provider: CloudProvider, trigger: HTMLElement | null, opts: CloudOpenOptions = {}) {
-  if (page) (page.intake ??= createIntake(page)).begin({ provider, trigger, opts, again: () => openCloud(provider, trigger, opts) });
+/**
+ * Opens a provider's window for the tool page: call it synchronously in the click (the browser allows
+ * a window only then). `pre`: the window the page already opened in the click, before this chunk was here.
+ */
+export function openCloud(provider: CloudProvider, trigger: HTMLElement | null, opts: CloudOpenOptions = {}, pre?: PreOpened) {
+  const page = pageHub();
+  if (!page) return pre?.win?.close();
+  // Merge's menus load this chunk on their own: let the page draw with it (the cards).
+  if (!page.ui) void page.load();
+  (page.intake ??= createIntake(page)).begin({ provider, trigger, opts, pre, again: () => openCloud(provider, trigger, opts) });
 }
 
 /** The download cards' Stop and Retry. */
-export const stopDownload = (key: string) => page?.intake?.stop(key);
-export const retryDownload = (key: string) => page?.intake?.retry(key);
+export const stopDownload = (key: string) => pageHub()?.intake?.stop(key);
+export const retryDownload = (key: string) => pageHub()?.intake?.retry(key);
 
 /** Where each cloud file came from (the result's privacy line, AC-131). */
 const origins = new WeakMap<Blob, CloudProvider>();
 /** The provider any of the page's files came from, if one did. */
-export const cloudOrigin = () => page?.deps?.files.map((f) => origins.get(f.source)).find(Boolean) ?? null;
+export const cloudOrigin = () => pageHub()?.deps?.files.map((f) => origins.get(f.source)).find(Boolean) ?? null;
 
 export function createIntake(host: CloudHub) {
   const d = () => host.deps as CloudDeps;
@@ -125,6 +119,8 @@ export function createIntake(host: CloudHub) {
     if (!s) return;
     sessions.delete(req);
     if (s.waitNotice) d().dismissNotice(s.waitNotice);
+    // Lost after the tool stopped waiting: "Stopped waiting" (with Try again) still says it right.
+    if (s.stoppedNotice && reason !== "lost") d().dismissNotice(s.stoppedNotice);
     // A closed window can no longer retry: unfinished cards go.
     for (const e of entries) if (e.req === req && !e.file) e.resolved = true;
     deliver(s);
@@ -145,7 +141,7 @@ export function createIntake(host: CloudHub) {
   const showError = (p: CloudProvider, code: ErrorCode | "blocked", retry: () => void) => {
     const n = d();
     if (code === "blocked") n.pushNotice({ tone: "warning", title: transferCopy.blocked(p), body: transferCopy.blockedBody, action: cloudAction({ label: transferCopy.tryAgain, onClick: retry, autoFocus: true }), sticky: true });
-    else if (code === "offline") n.pushNotice({ tone: "info", title: cloudCopy.offline, body: cloudCopy.offlineBody(p), sticky: true });
+    else if (code === "offline") n.pushNotice({ tone: "info", title: cloudCopy.offline, body: cloudCopy.offlineBody(providerName[p]), sticky: true });
     else if (code === "denied") n.pushNotice({ tone: "warning", title: transferCopy.denied(p), body: transferCopy.deniedBody, action: cloudAction({ label: transferCopy.tryAgain, onClick: retry }), sticky: true });
     else n.pushNotice({ tone: "danger", title: transferCopy.unreachable(p), body: transferCopy.unreachableBody, action: cloudAction({ label: transferCopy.tryAgain, onClick: retry }) });
   };
@@ -153,20 +149,40 @@ export function createIntake(host: CloudHub) {
   const skipText = (name: string, reason: SkipReason, p: CloudProvider) =>
     reason === "access" ? transferCopy.notAccessible(name, p) : reason === "export" ? transferCopy.exportTooBig(name, p) : describeSkip(name, reason);
 
-  function begin({ provider, trigger, opts, again }: Begin) {
+  /** "Waiting for Google Drive…" with a spinner and Cancel. */
+  const waiting = (s: SessionState) =>
+    d().pushNotice({
+      tone: "info",
+      title: transferCopy.waiting(s.provider),
+      sticky: true,
+      action: cloudAction(
+        {
+          label: transferCopy.cancel,
+          onClick: () => {
+            s.session.cancel();
+            endSession(s.session.req, "cancel");
+          },
+        },
+        busyIcon,
+      ),
+    });
+
+  function begin({ provider, trigger, opts, again, pre }: Begin) {
     const { tool, announce, pushNotice, dismissNotice } = d();
-    if (navigator.onLine === false) return showError(provider, "offline", again);
+    if (!pre?.win && navigator.onLine === false) return showError(provider, "offline", again);
+    if (pre && !pre.win) return showError(provider, "blocked", again);
     const req = newRequestId();
     // One cloud window at a time: a window still waiting for a pick is replaced.
     for (const [r, s] of sessions) {
       if (!entries.some((e) => e.req === r) && !s.gotFiles) {
         s.session.cancel();
         if (s.waitNotice) dismissNotice(s.waitNotice);
+        if (s.stoppedNotice) dismissNotice(s.stoppedNotice);
         sessions.delete(r);
       }
     }
     const multiple = opts.multiple ?? tool.flow.multiFile;
-    const params = { req, accept: tool.flow.accept.extensions.map((e) => e.toLowerCase()), multiple, max: tool.flow.maxFileBytes, tool: tool.flow.title, provider };
+    const params = pickParams(tool, provider, req, multiple);
     const limits = { accept: tool.flow.accept, maxFileBytes: tool.flow.maxFileBytes, multiple };
     const box: { s?: SessionState } = {};
     /** A file this session still takes: not stopped, and within the request's file cap. */
@@ -250,7 +266,36 @@ export function createIntake(host: CloudHub) {
         },
         onDone: () => endSession(req, "done"),
         onClosed: (reason) => endSession(req, reason),
+        onGaveUp: () => {
+          const s = box.s;
+          if (!s) return;
+          if (s.waitNotice) dismissNotice(s.waitNotice);
+          s.waitNotice = null;
+          const id = pushNotice({
+            tone: "info",
+            title: transferCopy.stoppedWaiting(provider),
+            body: transferCopy.stoppedWaitingBody,
+            sticky: true,
+            action: cloudAction({
+              label: transferCopy.tryAgain,
+              onClick: () => {
+                dismissNotice(id);
+                again();
+              },
+            }),
+          });
+          s.stoppedNotice = id;
+        },
+        onResumed: () => {
+          const s = box.s;
+          if (!s) return;
+          if (s.stoppedNotice) dismissNotice(s.stoppedNotice);
+          s.stoppedNotice = null;
+          s.waitNotice = waiting(s);
+        },
       },
+      // A window the page opened in the click (before this chunk was here): sent on to the provider's page.
+      pre?.win ? { open: (url) => (pre.win!.location.replace(url), pre.win) } : undefined,
     );
     if (!session) return showError(provider, "blocked", again);
     const state: SessionState = {
@@ -263,26 +308,13 @@ export function createIntake(host: CloudHub) {
       received: 0,
       problems: [],
       waitNotice: null,
+      stoppedNotice: null,
       gotFiles: false,
       stopped: new Set(),
       cap: multiple ? MAX_FILES_PER_MESSAGE : 1,
     };
     box.s = state;
-    state.waitNotice = pushNotice({
-      tone: "info",
-      title: transferCopy.waiting(provider),
-      sticky: true,
-      action: cloudAction(
-        {
-          label: transferCopy.cancel,
-          onClick: () => {
-            session.cancel();
-            endSession(req, "cancel");
-          },
-        },
-        busyIcon,
-      ),
-    });
+    state.waitNotice = waiting(state);
     sessions.set(req, state);
     announce(transferCopy.liveOpening(provider));
   }

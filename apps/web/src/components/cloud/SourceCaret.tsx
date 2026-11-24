@@ -1,5 +1,5 @@
 "use client";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { configuredProviders } from "@/lib/cloud/providers";
 import { MenuButton, type MenuButtonHandle } from "./CloudMenu";
 import { ChevronDownIcon } from "../ui/icons";
@@ -16,6 +16,8 @@ export type SourceCaretProps = {
   replace?: boolean;
   className?: string;
   disabled?: boolean;
+  /** Drawn in place of the stand-in caret (tool-cloud.tsx): take its focus, or open as it was pressed. */
+  start?: "open" | "focus";
 };
 
 /**
@@ -23,10 +25,15 @@ export type SourceCaretProps = {
  * Menu-button pattern (U-7); a popover from 640 px, a sheet above the dock below it.
  * The provider window opens inside the item's click handler (user activation).
  */
-export function SourceCaret({ look, replace, disabled, className }: SourceCaretProps) {
+export function SourceCaret({ look, replace, disabled, className, start }: SourceCaretProps) {
   const ref = useRef<MenuButtonHandle>(null);
+  useEffect(() => {
+    if (start === "open") ref.current?.open();
+    else if (start === "focus") ref.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as it takes over from the stand-in
+  }, []);
   if (!providers.length) return null;
-  const label = look === "primary" ? cloudCopy.caret(providers) : cloudCopy.caretToolbar(providers, !!replace);
+  const label = look === "primary" ? cloudCopy.caret() : cloudCopy.caretToolbar(!!replace);
   return (
     <MenuButton
       ref={ref}

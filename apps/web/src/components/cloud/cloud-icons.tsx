@@ -54,3 +54,7 @@ export const DeviceIcon = ({ size = 20 }: { size?: number }) =>
       <path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,16V88H40V56Zm0,144H40V104H216v96Z" />
     </>,
   );
+
+/** "Opens a window" arrow (Phosphor ArrowUpRight, MIT; regular weight). */
+export const OutIcon = ({ size = 14 }: { size?: number }) =>
+  svg(size, <path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z" />);

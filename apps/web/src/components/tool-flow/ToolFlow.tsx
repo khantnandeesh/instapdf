@@ -33,11 +33,9 @@ import { createVisibilityWatcher, ThumbContext } from "./Thumbnail";
 import { ToolIntro } from "./ToolIntro";
 import type { FlowApi, FlowContext, FlowState, LoadedFile, PageDecoration, PreviewItem, ProcessFn, ReadyFile, ToolOutput, WorkspaceContext } from "./types";
 import { LeaveGuard } from "./LeaveGuard";
-// F23 cloud sources: a few lines on tool pages (everything else is the cloud chunk, ui.ts), and
-// compiled out entirely without NEXT_PUBLIC_CLOUD_SOURCES=1 (every use sits behind the flag).
-import type { ComponentType } from "react";
-import type { CloudPartProps } from "../cloud/parts";
-import { useCloud } from "../cloud/tool-cloud";
+// F23 cloud sources: the caret, the row and the hub on tool pages (everything else is the cloud chunk,
+// ui.ts, fetched on intent), compiled out entirely without them (every use sits behind the flag).
+import { CloudCaret, CloudRow, useCloud } from "../cloud/tool-cloud";
 
 // Never needed before a file is picked: separate chunks, prefetched once the page is idle.
 const lazyParts = {
@@ -64,11 +62,6 @@ const PagePreviewDialog = dynamic(() => lazyParts.preview().then((m) => m.PagePr
  * to main's exact code.
  */
 const CLOUD = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1";
-// The caret, the row and the cards: server-rendered, from the cloud chunk (not first-load JS). Each
-// renders nothing when no provider is configured (AC-120). (The env check is written out: the
-// bundler drops a dead `import()` only then.)
-// Only rendered behind the flag (null without it).
-const Cloud = (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? dynamic(() => import("../cloud/ui").then((m) => m.CloudPart)) : null) as ComponentType<CloudPartProps>;
 
 type Phase = "idle" | "processing" | "done" | "error";
 
@@ -257,6 +250,8 @@ export function ToolFlow({
   // ---- F23 cloud sources: same intake as a local pick (its inputs are set further down) ----
   // eslint-disable-next-line react-hooks/rules-of-hooks -- CLOUD is a build-time constant: the same call on every render
   const cloud = CLOUD ? useCloud() : null;
+  // The download cards come with the cloud chunk (here before any download starts).
+  const CloudCards = CLOUD ? cloud!.ui?.CloudDownloads : undefined;
 
   // ---- derived -------------------------------------------------------------
   const readyFiles = files.filter(isReady);
@@ -855,11 +850,11 @@ export function ToolFlow({
             {state === "empty" ? (
               <DropCard>
                 {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
-                  ? cloneElement(introPicker(), { sources: <Cloud hub={cloud!} part="caret" look="primary" /> })
+                  ? cloneElement(introPicker(), { sources: <CloudCaret hub={cloud!} look="primary" /> })
                   : introPicker()}
                 {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
                   <>
-                    <Cloud hub={cloud!} part="row" />
+                    <CloudRow hub={cloud!} />
                     {pickerHint()}
                   </>
                 ) : (
@@ -913,7 +908,7 @@ export function ToolFlow({
                     {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
                       ? cloneElement(toolbarPicker(), {
                           sources: (
-                            <Cloud hub={cloud!} part="caret" look="tool" className={phoneAddMenu ? "max-sm:hidden" : undefined} disabled={state === "processing"} />
+                            <CloudCaret hub={cloud!} look="tool" className={phoneAddMenu ? "max-sm:hidden" : undefined} disabled={state === "processing"} />
                           ),
                         })
                       : toolbarPicker()}
@@ -955,7 +950,7 @@ export function ToolFlow({
                     )}
                     {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
                       <>
-                        <Cloud hub={cloud!} part="cards" />
+                        {CloudCards && <CloudCards downloads={cloud!.s.downloads} />}
                         {previewDialog()}
                       </>
                     ) : (

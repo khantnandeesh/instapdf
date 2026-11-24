@@ -12,7 +12,7 @@ import { parseWindowParams, SIGN_IN_AWAY_MS, type WindowParams } from "@/lib/clo
 import { providerName, type CloudProvider, type CloudRoute } from "@/lib/cloud/providers";
 import { WindowLink } from "@/lib/cloud/window-link";
 import { transferCopy } from "../transfer-copy";
-import { ProviderMark } from "../ProviderMark";
+import { ProviderArt } from "../marks";
 import { MockPicker, type MockChoice } from "./MockPicker";
 import * as dropbox from "./adapters/dropbox";
 import * as google from "./adapters/google";
@@ -419,7 +419,7 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
       {params?.mode === "save" ? windowCopy.savingPrivacy(provider) : windowCopy.windowPrivacy(provider)}
     </p>
   );
-  const mark = provider && <ProviderMark provider={provider} size={56} />;
+  const mark = provider && <ProviderArt provider={provider} size={56} />;
   const h1 = (text: string) => (
     <h1 ref={heading} tabIndex={-1} className="ip-cw__title">
       {text}

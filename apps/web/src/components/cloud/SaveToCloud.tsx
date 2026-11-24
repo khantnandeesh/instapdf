@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { openCloudWindow, type CloudSession } from "@/lib/cloud/client";
 import { newRequestId } from "@/lib/cloud/protocol";
-import { configuredProviders, routeFor, SAVE_PROVIDERS, type CloudProvider } from "@/lib/cloud/providers";
+import { configuredProviders, providerName, routeFor, SAVE_PROVIDERS, type CloudProvider } from "@/lib/cloud/providers";
 import { buttonClasses } from "../ui/Button";
 import { MenuButton, type MenuButtonHandle } from "./CloudMenu";
 import { CheckIcon, ChevronDownIcon } from "../ui/icons";
@@ -11,8 +11,8 @@ import { transferCopy } from "./transfer-copy";
 import { ProviderMark } from "./ProviderMark";
 import { cloudFootnote, providerItems } from "./items";
 import { cloudAction } from "./NoticeAction";
-import { cloudOrigin, pageDeps } from "./intake-engine";
-import type { CloudDeps } from "./tool-cloud";
+import { cloudOrigin } from "./intake-engine";
+import { pageHub, type CloudDeps } from "./tool-cloud";
 
 /**
  * Result screen "Save to Drive" (spec U-2 E5, AC-160 to AC-164, AC-169): a `line` split next to
@@ -28,6 +28,12 @@ export type SaveToCloudProps = {
   onSaved: (privacyLine: string) => void;
 };
 
+/** The result's privacy line when the files came from a cloud (AC-131), or null. ResultCard reads it as it first draws. */
+export function originPrivacyLine(): string | null {
+  const o = cloudOrigin();
+  return o ? transferCopy.resultPrivacy(o) : null;
+}
+
 /** Providers the result can save to in this build. */
 const providers = SAVE_PROVIDERS.filter((p) => configuredProviders().includes(p));
 
@@ -38,12 +44,11 @@ export function SaveToCloud({ file, toolName, announce, onSaved }: SaveToCloudPr
   const menu = useRef<MenuButtonHandle>(null);
   // The provider the files came from, if any (checked once: the result's inputs are fixed).
   const [preferred] = useState(cloudOrigin);
-  useEffect(() => {
-    if (preferred) onSaved(transferCopy.resultPrivacy(preferred));
-    return () => session.current?.cancel();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
-  }, []);
-  const pushNotice: CloudDeps["pushNotice"] = (n) => pageDeps()?.pushNotice(n) ?? "";
+  useEffect(() => () => session.current?.cancel(), []);
+  // The tool page's notices (its hub lives in the page's own code, so they never depend on what else loaded).
+  const pushNotice: CloudDeps["pushNotice"] = (n) => pageHub()?.deps?.pushNotice(n) ?? "";
+  const dismissNotice = (id: string) => pageHub()?.deps?.dismissNotice(id);
+  const stopped = useRef<string | null>(null);
   useEffect(() => {
     if (!saved) return;
     const t = setTimeout(() => setSaved(false), 3000);
@@ -54,13 +59,18 @@ export function SaveToCloud({ file, toolName, announce, onSaved }: SaveToCloudPr
 
   function save(p: CloudProvider) {
     if (busy) return;
+    // A save still listening after "Stopped waiting" is replaced (it never tells this tab anything more).
+    session.current?.cancel();
+    if (stopped.current) dismissNotice(stopped.current);
+    stopped.current = null;
     const fail = () =>
       pushNotice({ tone: "danger", title: transferCopy.saveFailed(p), body: transferCopy.saveFailedBody, action: cloudAction({ label: transferCopy.tryAgain, onClick: () => save(p) }) });
     if (navigator.onLine === false) {
-      pushNotice({ tone: "info", title: cloudCopy.offline, body: cloudCopy.offlineBody(p) });
+      pushNotice({ tone: "info", title: cloudCopy.offline, body: cloudCopy.offlineBody(providerName[p]) });
       return;
     }
     let done = false;
+    let gaveUp = false;
     const s = openCloudWindow(
       routeFor(p),
       { req: newRequestId(), accept: [`.${file.name.split(".").pop()?.toLowerCase() || "pdf"}`], multiple: false, max: Math.max(1, file.size), tool: toolName, provider: p, mode: "save" },
@@ -82,7 +92,28 @@ export function SaveToCloud({ file, toolName, announce, onSaved }: SaveToCloudPr
         onDone: () => setBusy(null),
         onClosed: () => {
           setBusy(null);
-          if (!done) fail();
+          // After "Stopped waiting", the end of the sign-in allowance says nothing new.
+          if (!done && !gaveUp) fail();
+        },
+        // The window seems closed on its sign-in page: say so, free the button, keep listening.
+        onGaveUp: () => {
+          gaveUp = true;
+          setBusy(null);
+          const id = pushNotice({
+            tone: "info",
+            title: transferCopy.stoppedWaiting(p),
+            body: transferCopy.stoppedWaitingBody,
+            sticky: true,
+            action: cloudAction({ label: transferCopy.tryAgain, onClick: () => save(p) }),
+          });
+          stopped.current = id;
+        },
+        // It came back after all.
+        onResumed: () => {
+          gaveUp = false;
+          if (stopped.current) dismissNotice(stopped.current);
+          stopped.current = null;
+          setBusy({ p, pct: 0 });
         },
       },
     );

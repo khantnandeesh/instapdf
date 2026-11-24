@@ -2,6 +2,7 @@
 import { forwardRef, useImperativeHandle, useRef, type ReactNode } from "react";
 import { prefetchPdfjs } from "@/lib/pdf/pdfjs";
 import { Button, type ButtonSize, type ButtonVariant } from "../ui/Button";
+import { pickedFromDevice } from "../cloud/tool-cloud";
 
 export type FilePickerHandle = { open: () => void; focus: () => void; element: HTMLButtonElement | null };
 
@@ -64,7 +65,11 @@ export const FilePicker = forwardRef<
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = "";
-          if (files.length) onFiles(files, button.current);
+          if (files.length) {
+            // F23: a pick here (a tool's own picker) makes "This device" the last used source (U-12).
+            if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && sources) pickedFromDevice();
+            onFiles(files, button.current);
+          }
         }}
       />
     </span>
