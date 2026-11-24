@@ -101,7 +101,7 @@ test.describe("indexable pages", () => {
     });
   }
 
-  test("pages stay within the performance budgets on a phone", async ({ page }, info) => {
+  test("pages stay within the performance budgets on a phone", { tag: "@serial" }, async ({ page }, info) => {
     test.skip(info.project.name !== "mobile", "budgets are measured on the mobile project");
     for (const path of ROUTES) {
       await page.addInitScript(() => {

@@ -94,7 +94,7 @@ test("AC-123, AC-167: Add pages from a cloud file opens the page picker; on phon
   expect((await mockLog(page))!.requests.at(-1)!.multiple).toBe(false);
 });
 
-test("AC-148: 51 files from the cloud load 50 and show the local over-the-cap message", async ({ page }) => {
+test("AC-148: 51 files from the cloud load 50 and show the local over-the-cap message", { tag: "@serial" }, async ({ page }) => {
   test.setTimeout(120_000);
   const win = await openWindow(page, () => page.getByTestId("cloud-row").getByRole("button", { name: /^Choose from Google Drive/ }).click());
   await reachPicker(win);

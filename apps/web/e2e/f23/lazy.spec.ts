@@ -38,7 +38,7 @@ test("the cloud chunk is not fetched with the page, only once a cloud control is
   await expect.poll(async () => (await scripts(page)).length).toBeGreaterThan(before.length);
 });
 
-test("a tap on the row before the cloud chunk is here still opens the window inside the click", async ({ page, context }) => {
+test("a tap on the row before the cloud chunk is here still opens the window inside the click", { tag: "@serial" }, async ({ page, context }) => {
   await page.waitForLoadState("networkidle");
   await slowScripts(page, 2000);
   const t0 = Date.now();

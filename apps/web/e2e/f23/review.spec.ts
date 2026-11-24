@@ -100,7 +100,7 @@ test("AC-168: the tool tab goes away mid-download: a banner over the downloads, 
   await expect(win.getByTestId("cloud-lost-banner")).toBeVisible();
 });
 
-test("closing the window on a sign-in page: 'Stopped waiting' once this tab has been focused for 15 s (never while it isn't), and a late sign-in still carries on", async ({ page }) => {
+test("closing the window on a sign-in page: 'Stopped waiting' once this tab has been focused for 15 s (never while it isn't), and a late sign-in still carries on", { tag: "@serial" }, async ({ page }) => {
   test.setTimeout(90_000);
   // Playwright's tabs always report focus: drive this tab's own, from the start.
   await page.evaluate(() => {
