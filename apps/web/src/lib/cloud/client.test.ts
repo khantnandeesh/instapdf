@@ -159,9 +159,72 @@ describe("openCloudWindow (tool tab)", () => {
     s.dispose();
     win.close();
   });
+
+  it("re-sends the file on every 'ready' until the session ends (a window back from a sign-in redirect is a new page)", async () => {
+    const s = openCloudWindow("mock", { ...params, mode: "save" }, {}, { Channel, open: () => ({}) as Window, hidden: () => false })!;
+    const win = peer();
+    const saves: string[] = [];
+    win.onmessage = (e) => e.data.t === "save" && saves.push(e.data.file.name);
+    s.sendSave(new File(["%PDF"], "out.pdf"));
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    await vi.waitFor(() => expect(saves).toHaveLength(1));
+    win.postMessage(wrap("window", REQ, { t: "away", ms: 60_000 }));
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    await vi.waitFor(() => expect(saves).toEqual(["out.pdf", "out.pdf"]));
+    win.postMessage(wrap("window", REQ, { t: "saved", name: "out.pdf" }));
+    win.postMessage(wrap("window", REQ, { t: "done" }));
+    await vi.waitFor(() => expect(s.ended).toBe(true));
+    win.close();
+  });
 });
 
 describe("WindowLink (cloud window)", () => {
+  it("while away on a sign-in page: no heartbeat, but a cancel still goes out; back() resumes", async () => {
+    let t = 0;
+    const onToolLost = vi.fn();
+    const link = new WindowLink(REQ, { onToolLost }, { Channel, now: () => t });
+    const tool = peer();
+    const got: string[] = [];
+    tool.onmessage = (e) => got.push(e.data.t);
+    link.away(60_000);
+    t = TOOL_LOST_MS * 10;
+    link.beat();
+    expect(onToolLost).not.toHaveBeenCalled();
+    link.back();
+    await vi.waitFor(() => expect(got).toEqual(["away", "ready"]));
+    link.cancel();
+    await vi.waitFor(() => expect(got).toContain("cancel"));
+    tool.close();
+  });
+
+  it("an error sent while away reaches the tool", async () => {
+    const link = new WindowLink(REQ, {}, { Channel });
+    const tool = peer();
+    const got: string[] = [];
+    tool.onmessage = (e) => got.push(e.data.t);
+    link.away(60_000);
+    link.send({ t: "error", code: "denied" });
+    await vi.waitFor(() => expect(got).toEqual(["away", "error"]));
+    link.close();
+    tool.close();
+  });
+
+  it("says when the tool tab answers again after it was lost", async () => {
+    let t = 0;
+    const onToolLost = vi.fn();
+    const onToolBack = vi.fn();
+    const link = new WindowLink(REQ, { onToolLost, onToolBack }, { Channel, now: () => t });
+    const tool = peer();
+    t = TOOL_LOST_MS + 1;
+    link.beat();
+    expect(onToolLost).toHaveBeenCalledTimes(1);
+    tool.postMessage(wrap("tool", REQ, { t: "pong" }));
+    await vi.waitFor(() => expect(onToolBack).toHaveBeenCalledTimes(1));
+    expect(link.toolLost).toBe(false);
+    link.close();
+    tool.close();
+  });
+
   it("notices when the tool tab stops answering", () => {
     let t = 0;
     const onToolLost = vi.fn();

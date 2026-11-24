@@ -18,23 +18,46 @@ const PICKER_SCOPES = ["OneDrive.ReadOnly"];
 
 type PickedItem = { id: string; name?: string; size?: number; parentReference?: { driveId?: string } };
 
+async function createPca(): Promise<IPublicClientApplication> {
+  const msal = await import("@azure/msal-browser");
+  return msal.createStandardPublicClientApplication({
+    auth: { clientId: process.env.NEXT_PUBLIC_ONEDRIVE_CLIENT_ID ?? "", authority: AUTHORITY, redirectUri: `${window.location.origin}/cloud/onedrive` },
+    // Tokens stay in memory; MSAL keeps only the sign-in round trip's temporary state in sessionStorage.
+    cache: { cacheLocation: "memoryStorage" },
+  });
+}
+
+const denied = (e: unknown) => new CloudError(/access_denied|consent|user_cancelled/.test((e as { errorCode?: string }).errorCode ?? "") ? "denied" : "unreachable");
+
+/**
+ * The window came back from Microsoft's sign-in on `/cloud/onedrive` (no request in the URL): MSAL
+ * keeps the response and returns to the window's own URL, where `prepare()` finishes the sign-in.
+ * False: it stayed here (nothing to return to).
+ */
+export async function completeRedirect(): Promise<boolean> {
+  const pca = await createPca();
+  await pca.handleRedirectPromise({ navigateToLoginRequestUrl: true });
+  // A return navigation is under way when MSAL found the request URL; give it a moment to unload.
+  return new Promise((resolve) => setTimeout(() => resolve(false), 3000));
+}
+
 export function createAdapter(ctx: AdapterCtx): Adapter {
-  const clientId = process.env.NEXT_PUBLIC_ONEDRIVE_CLIENT_ID ?? "";
   let pca: IPublicClientApplication | null = null;
 
-  const token = async (scopes: string[]): Promise<string> => {
+  /** A token for `scopes`. Signing in consents to `extra` too, so the next token needs no second round trip. */
+  const token = async (scopes: string[], extra: string[] = []): Promise<string> => {
     if (!pca) throw new CloudError("unreachable");
     const account = pca.getActiveAccount() ?? pca.getAllAccounts()[0];
     if (!account) {
       ctx.leaving();
-      await pca.loginRedirect({ scopes, prompt: "select_account" });
+      await pca.loginRedirect({ scopes, extraScopesToConsent: extra });
       return new Promise(() => {}); // the page navigates away
     }
     try {
       return (await pca.acquireTokenSilent({ scopes, account })).accessToken;
     } catch {
       ctx.leaving();
-      await pca.acquireTokenRedirect({ scopes, account });
+      await pca.acquireTokenRedirect({ scopes, account, extraScopesToConsent: extra });
       return new Promise(() => {});
     }
   };
@@ -43,24 +66,21 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
     needsTap: false,
     prepare: async () => {
       ctx.setPhase("connecting");
-      const msal = await import("@azure/msal-browser");
-      const app = await msal.createStandardPublicClientApplication({
-        auth: { clientId, authority: AUTHORITY, redirectUri: `${window.location.origin}/cloud/onedrive` },
-        // Tokens stay in memory; MSAL keeps only the sign-in round trip's temporary state in sessionStorage.
-        cache: { cacheLocation: "memoryStorage" },
-      });
+      const app = await createPca();
       pca = app;
       try {
-        // Back from Microsoft's sign-in: return to this window's own URL (with its request), then continue.
+        // Back from Microsoft's sign-in (completeRedirect brought us to this URL): finish it, then continue.
         const r = await app.handleRedirectPromise({ navigateToLoginRequestUrl: true });
         if (r?.account) app.setActiveAccount(r.account);
       } catch (e) {
-        const code = (e as { errorCode?: string }).errorCode ?? "";
-        throw new CloudError(/access_denied|consent|user_cancelled/.test(code) ? "denied" : "unreachable");
+        throw denied(e);
       }
     },
     pick: async () => {
-      const pickerToken = await token(PICKER_SCOPES);
+      // Both tokens before the picker shows: a first-time sign-in consents to both at once, and
+      // the Graph token never needs a redirect after the pick (which would lose it).
+      const pickerToken = await token(PICKER_SCOPES, READ);
+      const graph = await token(READ);
       const channelId = crypto.randomUUID();
       const options = {
         sdk: "8.0",
@@ -106,7 +126,6 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
       });
       void ctx.frame(null);
       if (items === "cancel") return "cancel";
-      const graph = await token(READ);
       return items.map(
         (it, i): Picked => ({
           id: `f${i + 1}`,

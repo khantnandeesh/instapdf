@@ -30,7 +30,7 @@ export type CloudSession = {
   req: string;
   stop: (id: string) => void;
   retry: (id: string) => void;
-  /** Save mode: hands the result to the window (sent once the window is ready). */
+  /** Save mode: hands the result to the window, on its every "ready" until the session ends. */
   sendSave: (file: File) => void;
   /** Tells the window to close and stops listening. */
   cancel: () => void;
@@ -65,7 +65,9 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
   let ready = false;
   let contacted = false;
   let lastSeen = now();
-  let pendingSave: File | null = null;
+  // Save mode: kept until the session ends, and sent on every "ready": a window back from a
+  // full-page sign-in (OneDrive) is a new page that has not seen it (it ignores a repeat).
+  let saveFile: File | null = null;
   const post = (m: FromTool) => {
     if (!ended) channel.postMessage(wrap("tool", params.req, m));
   };
@@ -73,6 +75,7 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
   const end = () => {
     if (ended) return;
     ended = true;
+    saveFile = null;
     clearI(timer);
     channel.close();
     if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
@@ -93,10 +96,7 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
       case "ready":
         ready = true;
         events.onReady?.();
-        if (pendingSave) {
-          post({ t: "save", file: pendingSave });
-          pendingSave = null;
-        }
+        if (saveFile) post({ t: "save", file: saveFile });
         break;
       case "hb":
         post({ t: "pong" });
@@ -156,8 +156,8 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
     stop: (id) => post({ t: "stop", id }),
     retry: (id) => post({ t: "retry", id }),
     sendSave: (file) => {
+      saveFile = file;
       if (ready) post({ t: "save", file });
-      else pendingSave = file;
     },
     cancel: () => {
       post({ t: "cancel" });

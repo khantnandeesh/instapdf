@@ -11,6 +11,8 @@ export type WindowLinkEvents = {
   onRetry?: (id: string) => void;
   onSave?: (file: File) => void;
   onToolLost?: () => void;
+  /** The tool tab answers again after `onToolLost`. */
+  onToolBack?: () => void;
 };
 
 type Deps = { Channel?: typeof BroadcastChannel; now?: () => number };
@@ -20,6 +22,8 @@ export class WindowLink {
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastPong: number;
   private finished = false;
+  /** Away on a full-page sign-in: no heartbeat (the page is leaving), but cancel and error still go out. */
+  private isAway = false;
   private lost = false;
   private ackWaiters: (() => void)[] = [];
   private now: () => number;
@@ -44,7 +48,7 @@ export class WindowLink {
 
   /** One heartbeat tick (exposed for tests). */
   beat() {
-    if (this.finished) return;
+    if (this.finished || this.isAway) return;
     this.send({ t: "hb" });
     if (!this.lost && this.now() - this.lastPong > TOOL_LOST_MS) {
       this.lost = true;
@@ -74,10 +78,22 @@ export class WindowLink {
 
   /** Leaving for a full-page sign-in: tell the tool to wait, and don't report the navigation as a cancel. */
   away(ms: number) {
+    if (this.finished) return;
     this.send({ t: "away", ms });
-    this.finished = true;
+    this.isAway = true;
     if (this.timer) clearInterval(this.timer);
+    this.timer = null;
     if (typeof window !== "undefined") window.removeEventListener("pagehide", this.onHide);
+  }
+
+  /** The sign-in did not leave after all (it failed): heartbeat and close-as-cancel resume. */
+  back() {
+    if (!this.isAway || this.finished) return;
+    this.isAway = false;
+    this.lastPong = this.now();
+    this.send({ t: "ready" });
+    this.timer = setInterval(() => this.beat(), HEARTBEAT_MS);
+    if (typeof window !== "undefined") window.addEventListener("pagehide", this.onHide);
   }
 
   /** The user cancelled here (×, Escape, Cancel, the provider's own cancel). */
@@ -101,7 +117,10 @@ export class WindowLink {
   private receive(m: FromTool | null) {
     if (!m) return;
     this.lastPong = this.now();
-    if (this.lost) this.lost = false;
+    if (this.lost) {
+      this.lost = false;
+      this.events.onToolBack?.();
+    }
     switch (m.t) {
       case "ack":
         this.ackWaiters.splice(0).forEach((f) => f());

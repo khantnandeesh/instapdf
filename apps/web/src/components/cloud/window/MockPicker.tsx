@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { writeLog } from "./adapters/mock";
+import { exportName } from "./adapters/native";
 import type { Picked } from "./adapters/types";
 
 export type MockChoice = Picked[] | "cancel" | "denied" | "unreachable";
@@ -10,11 +11,13 @@ export type MockChoice = Picked[] | "cancel" | "denied" | "unreachable";
 const FIXTURES = ["alpha.pdf", "bravo.pdf", "echo.pdf", "charlie.png", "notes.txt", "user-pw.pdf", "corrupt.pdf", "three-pages.pdf"];
 const MB = 1024 * 1024;
 
-function item(id: string, fixture: string, opts: { as?: string; slow?: boolean; fail?: boolean; size?: number; status?: number } = {}): Picked {
-  const name = opts.as ?? fixture;
+function item(id: string, fixture: string, opts: { as?: string; slow?: boolean; fail?: boolean; size?: number; status?: number; native?: boolean } = {}): Picked {
+  // A "Google document" arrives as an exported PDF, like the real Drive adapter (AC-141).
+  const name = opts.native ? exportName(opts.as ?? fixture) : (opts.as ?? fixture);
   return {
     id,
     name,
+    native: opts.native,
     size: opts.size ?? 0,
     request: async () => {
       writeLog((l) => l.downloads.push(name));
@@ -24,7 +27,7 @@ function item(id: string, fixture: string, opts: { as?: string; slow?: boolean; 
       if (opts.status) q.set("status", String(opts.status));
       const url = `/cloud-mock/${encodeURIComponent(fixture)}`;
       // Real pickers report each file's size up front; streamed bodies carry no Content-Length.
-      const total = opts.status ? undefined : Number(await (await fetch(`${url}?size=1`)).text()) || undefined;
+      const total = opts.status || opts.native ? undefined : Number(await (await fetch(`${url}?size=1`)).text()) || undefined;
       return { url: `${url}${q.size ? `?${q}` : ""}`, name, type: fixture.endsWith(".pdf") ? "application/pdf" : "", total };
     },
   };
@@ -43,7 +46,7 @@ export function MockPicker({ multiple, onChoose }: { multiple: boolean; onChoose
     const failed = new Set<string>();
     onChoose(
       sel.map((f, i) => {
-        const base = item(`f${i + 1}`, f, { slow: slow === f });
+        const base = item(`f${i + 1}`, f, { slow: slow === f || slow === "*" });
         if (failOnce !== f) return base;
         // Fails the first time only, so Retry (without the picker) then succeeds (AC-150).
         return {
@@ -73,6 +76,7 @@ export function MockPicker({ multiple, onChoose }: { multiple: boolean; onChoose
         Slow file
         <select value={slow} onChange={(e) => setSlow(e.target.value)} aria-label="Slow file">
           <option value="">none</option>
+          <option value="*">all</option>
           {FIXTURES.map((f) => (
             <option key={f}>{f}</option>
           ))}
@@ -102,6 +106,9 @@ export function MockPicker({ multiple, onChoose }: { multiple: boolean; onChoose
         </Button>
         <Button variant="outline" onClick={() => onChoose(Array.from({ length: 51 }, (_, i) => item(`n${i + 1}`, "alpha.pdf", { as: `file-${String(i + 1).padStart(2, "0")}.pdf` })))}>
           51 files
+        </Button>
+        <Button variant="outline" onClick={() => onChoose([item("doc", "three-pages.pdf", { as: "Plan", native: true }), item("big-doc", "alpha.pdf", { as: "Big plan", native: true, status: 403 })])}>
+          Google documents
         </Button>
         <Button variant="outline" onClick={() => onChoose("denied")}>
           Deny access

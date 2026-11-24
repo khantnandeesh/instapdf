@@ -1,9 +1,11 @@
 /**
  * F23 hand-off protocol between a tool tab and its `/cloud/<provider>` window
  * (research §3.1, spec D-3). Both sides talk over `BroadcastChannel("cloud:<req>")`,
- * where `<req>` is a random UUID made for one request. The window's opener link is cut
- * (its COOP differs, or it went through an OAuth redirect), so there is no `window.opener`
- * and no `win.closed`: the window sends a heartbeat every second and the tool tab answers it.
+ * where `<req>` is a random UUID made for one request. Neither side relies on the other's window
+ * object: Google's and Dropbox's windows get a different COOP (a new browsing context group), and
+ * OneDrive's shares the tool tab's (`same-origin`, for MSAL's redirect) but sets `window.opener = null`
+ * first thing (CloudWindow), so there is no `window.opener` and no `win.closed` to watch. Instead the
+ * window sends a heartbeat every second and the tool tab answers it.
  *
  * Every message is checked here before either side acts on it: an unknown shape, another
  * request's id, a field of the wrong type or a non-File "file" is dropped (null).
@@ -27,7 +29,8 @@ export const MAX_FILES_PER_MESSAGE = 200;
 const MAX_TEXT = 1024;
 
 export type ErrorCode = "unreachable" | "denied" | "offline" | "unknown";
-export type SkipReason = "size" | "type" | "access";
+/** "export": a Google document too large for Drive to turn into a PDF (AC-141). */
+export type SkipReason = "size" | "type" | "access" | "export";
 
 export type FromWindow =
   | { t: "ready" }
@@ -68,7 +71,7 @@ const isCount = (v: unknown): v is number => typeof v === "number" && Number.isF
 const isId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(v);
 const isFile = (v: unknown): v is File => typeof File !== "undefined" && v instanceof File;
 const ERRORS: readonly ErrorCode[] = ["unreachable", "denied", "offline", "unknown"];
-const SKIPS: readonly SkipReason[] = ["size", "type", "access"];
+const SKIPS: readonly SkipReason[] = ["size", "type", "access", "export"];
 
 function envelope(data: unknown, from: "window" | "tool", req: string): Record<string, unknown> | null {
   if (!isObj(data) || data.from !== from || data.req !== req || typeof data.t !== "string") return null;

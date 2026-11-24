@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CloudWindow } from "@/components/cloud/window/CloudWindow";
 import { cloudRoutes, isProvider, isRoute, providerName } from "@/lib/cloud/providers";
+import { tools } from "@/tools/registry";
 
 /**
  * F23: the /cloud/<provider> window (spec D-3). Prerendered for the providers this build has
@@ -25,5 +26,7 @@ export async function generateMetadata({ params }: { params: Promise<{ provider:
 export default async function CloudPage({ params }: { params: Promise<{ provider: string }> }) {
   const { provider } = await params;
   if (!isRoute(provider) || !cloudRoutes().includes(provider)) notFound();
-  return <CloudWindow route={provider} />;
+  // The window shows "Added to <tool>" from its URL: only these titles are accepted (never free text).
+  const toolTitles = tools.flatMap((t) => (t.flow ? [t.flow.title] : []));
+  return <CloudWindow route={provider} toolTitles={toolTitles} />;
 }

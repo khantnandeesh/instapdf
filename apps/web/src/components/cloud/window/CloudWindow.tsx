@@ -14,7 +14,10 @@ import { WindowLink } from "@/lib/cloud/window-link";
 import { transferCopy } from "../transfer-copy";
 import { ProviderMark } from "../ProviderMark";
 import { MockPicker, type MockChoice } from "./MockPicker";
-import { CloudError, type Adapter, type AdapterCtx, type FrameSpec, type Phase, type Picked } from "./adapters/types";
+import * as dropbox from "./adapters/dropbox";
+import * as google from "./adapters/google";
+import * as onedrive from "./adapters/onedrive";
+import { CloudError, isSignInResponse, type Adapter, type AdapterCtx, type FrameSpec, type Phase, type Picked } from "./adapters/types";
 
 type Params = WindowParams & { route: CloudRoute; provider: CloudProvider };
 
@@ -34,12 +37,21 @@ type View =
   | { k: "saving"; name: string; pct: number }
   | { k: "saved"; name: string };
 
+/** Back from a full-page sign-in on the bare redirect URL: return to the window's own URL. */
+async function completeRedirect(route: CloudRoute): Promise<boolean> {
+  if ((process.env.NEXT_PUBLIC_CLOUD_MOCK === "1" || process.env.NODE_ENV !== "production") && route === "mock") return (await import("./adapters/mock")).completeRedirect();
+  if (route === "onedrive") return onedrive.completeRedirect();
+  return false;
+}
+
 async function loadAdapter(route: CloudRoute, ctx: AdapterCtx): Promise<Adapter> {
-  // One chunk per provider: MSAL ships only with the OneDrive window.
-  if (route === "mock") return (await import("./adapters/mock")).createAdapter(ctx);
-  if (route === "dropbox") return (await import("./adapters/dropbox")).createAdapter(ctx);
-  if (route === "google") return (await import("./adapters/google")).createAdapter(ctx);
-  return (await import("./adapters/onedrive")).createAdapter(ctx);
+  // The adapters are small and ship with this page (every extra chunk grows the webpack runtime on
+  // every page); MSAL stays its own chunk, loaded by the OneDrive adapter. The mock exists only in
+  // mock builds and `next dev` (lib/cloud/providers.ts mockActive).
+  if ((process.env.NEXT_PUBLIC_CLOUD_MOCK === "1" || process.env.NODE_ENV !== "production") && route === "mock") return (await import("./adapters/mock")).createAdapter(ctx);
+  if (route === "dropbox") return dropbox.createAdapter(ctx);
+  if (route === "google") return google.createAdapter(ctx);
+  return onedrive.createAdapter(ctx);
 }
 
 /**
@@ -48,13 +60,19 @@ async function loadAdapter(route: CloudRoute, ctx: AdapterCtx): Promise<Adapter>
  * straight into this browser with per-file progress, hands them to the tool tab over the request's
  * BroadcastChannel and closes itself. In save mode it uploads the result the tool tab sends.
  */
-export function CloudWindow({ route }: { route: CloudRoute }) {
+export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Every tool's title: the only values `?tool=` may carry. */ toolTitles: readonly string[] }) {
   const [params, setParams] = useState<Params | null>(null);
   const [view, setView] = useState<View>({ k: "before" });
   const [ready, setReady] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [canClose, setCanClose] = useState(false);
   const [live, setLive] = useState("");
+  /** The tool tab stopped answering while this window is busy: a banner, cleared when it answers again. */
+  const [toolLost, setToolLost] = useState(false);
+  const viewRef = useRef<View>(view);
+  viewRef.current = view;
+  /** Files the tool tab stopped: never downloaded, or dropped if one is under way (AC-136). */
+  const stopped = useRef(new Set<string>());
   const rowsRef = useRef<Row[]>([]);
   const link = useRef<WindowLink | null>(null);
   const adapter = useRef<Adapter | null>(null);
@@ -104,6 +122,8 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
   const downloadOne = useCallback(
     async (p: Picked) => {
       const l = link.current!;
+      // Stopped while still queued: never starts.
+      if (stopped.current.has(p.id)) return void checkComplete();
       const ctrl = new AbortController();
       aborts.current.set(p.id, ctrl);
       patchRow(p.id, { status: "downloading", loaded: 0, note: undefined });
@@ -127,7 +147,11 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
         l.send({ t: "files", files: [{ id: p.id, file }] });
       } catch (e) {
         if (ctrl.signal.aborted) patchRow(p.id, { status: "stopped", note: windowCopy.stopped });
-        else if ((e instanceof DownloadError && e.kind === "access") || (e instanceof CloudError && e.code === "denied")) {
+        else if (p.native && e instanceof DownloadError && e.kind === "access") {
+          // Drive refuses to export a document over its size limit (AC-141).
+          patchRow(p.id, { status: "skipped", note: windowCopy.tooBigToExport });
+          l.send({ t: "skipped", items: [{ name: p.name, reason: "export", id: p.id }] });
+        } else if ((e instanceof DownloadError && e.kind === "access") || (e instanceof CloudError && e.code === "denied")) {
           patchRow(p.id, { status: "skipped", note: windowCopy.cantOpen });
           l.send({ t: "skipped", items: [{ name: p.name, reason: "access", id: p.id }] });
         } else {
@@ -178,6 +202,8 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
 
   const fail = useCallback((e: unknown) => {
     const code = e instanceof CloudError ? e.code : "unreachable";
+    // A sign-in that was to leave the page failed instead: the heartbeat resumes, so the tool hears this.
+    link.current?.back();
     link.current?.send({ t: "error", code });
     setView({ k: code === "denied" ? "denied" : "unreachable" });
   }, []);
@@ -228,7 +254,24 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
 
   // ---- set up: params, channel, adapter (after the disclosure is on screen) -----------------------
   useEffect(() => {
-    const prm = parseWindowParams(route, window.location.search) as Params | null;
+    // Nothing here may reach back into the tool tab: cut the opener first (OneDrive's window shares
+    // the tool tab's COOP group, so the browser keeps it there).
+    try {
+      window.opener = null;
+    } catch {}
+    if ((route === "onedrive" || route === "mock") && isSignInResponse(window.location.hash, window.location.search)) {
+      // Back from a full-page sign-in on the bare redirect URL: hand the response over and return to
+      // the window's own URL (with its request), where the adapter finishes the sign-in.
+      setView({ k: "busy", phase: "connecting" });
+      completeRedirect(route).then(
+        (went) => !went && setView({ k: "invalid" }),
+        (e) => setView({ k: e instanceof CloudError && e.code === "denied" ? "denied" : "invalid" }),
+      );
+      return;
+    }
+    const parsed = parseWindowParams(route, window.location.search) as Params | null;
+    // `tool` names the tool in "Added to …": only a real tool's title is shown.
+    const prm = parsed && toolTitles.includes(parsed.tool) ? parsed : null;
     if (!prm) {
       setView({ k: "invalid" });
       return;
@@ -242,6 +285,7 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
         window.close();
       },
       onStop: (id) => {
+        stopped.current.add(id);
         const a = aborts.current.get(id);
         if (a) a.abort();
         else {
@@ -262,7 +306,14 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
         }
       },
       onToolLost: () => {
-        if (!finished.current) setView({ k: "lost" });
+        if (finished.current) return;
+        // Idle (before anything was picked): nothing to keep, the full view. Busy: a banner over it.
+        if (viewRef.current.k === "before") setView({ k: "lost" });
+        else setToolLost(true);
+      },
+      onToolBack: () => {
+        setToolLost(false);
+        if (viewRef.current.k === "lost") setView({ k: "before" });
       },
     });
     link.current = l;
@@ -405,7 +456,7 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
             </>
           ) : (
             <p role="status" className="flex items-center gap-2">
-              <span className="ip-busy-ring text-brand" aria-hidden="true" />
+              <span className="ip-busy-ring ip-cw__ring" aria-hidden="true" />
               {view.phase === "connecting" ? windowCopy.connecting : `Finish in the ${name} window.`}
             </p>
           )}
@@ -440,7 +491,7 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
                   <ProgressBar label={transferCopy.downloadingLabel(r.name)} value={r.total ? Math.round((r.loaded / r.total) * 100) : r.status === "done" ? 100 : 0} />
                 )}
                 {r.status === "failed" && picked.current.get(r.id) && (
-                  <Button variant="line" size="sm" className="col-span-2 justify-self-start" onClick={() => void downloadOne(picked.current.get(r.id)!)}>
+                  <Button variant="line" size="sm" className="ip-cw__retry col-span-2" onClick={() => void downloadOne(picked.current.get(r.id)!)}>
                     {transferCopy.retry}
                   </Button>
                 )}
@@ -527,6 +578,11 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
           <CloseIcon size={20} />
         </button>
       </header>
+      {toolLost && view.k !== "lost" && (
+        <p role="status" className="ip-cw__banner" data-testid="cloud-lost-banner">
+          {windowCopy.lostBanner}
+        </p>
+      )}
       {view.k === "frame" ? (
         <main id="main" className="flex flex-1 flex-col">
           {"post" in view.spec ? (

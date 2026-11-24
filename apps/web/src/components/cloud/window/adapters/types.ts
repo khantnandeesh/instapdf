@@ -3,7 +3,14 @@ import type { DownloadRequest } from "@/lib/cloud/download";
 import type { WindowParams } from "@/lib/cloud/protocol";
 import type { CloudProvider } from "@/lib/cloud/providers";
 
-export type Picked = { id: string; name: string; size: number; request: () => Promise<DownloadRequest> };
+export type Picked = {
+  id: string;
+  name: string;
+  size: number;
+  request: () => Promise<DownloadRequest>;
+  /** A Google document exported as PDF: a refused export is "too large to export" (AC-141). */
+  native?: boolean;
+};
 
 export type Phase = "signing" | "picking" | "connecting";
 
@@ -30,6 +37,13 @@ export type Adapter = {
   /** Uploads the result into the provider (save mode). */
   save?: (file: File, onProgress: (loaded: number, total: number) => void) => Promise<{ name: string; link?: string }>;
 };
+
+/** A sign-in response (`#code=…&state=…` or `#error=…&state=…`) on the bare redirect URL (OneDrive, and the mock's redirect mode). */
+export const isSignInResponse = (hash: string, search: string) =>
+  [hash.slice(1), search.slice(1)].some((q) => {
+    const p = new URLSearchParams(q);
+    return p.has("state") && (p.has("code") || p.has("error"));
+  });
 
 export class CloudError extends Error {
   constructor(readonly code: "denied" | "unreachable") {
