@@ -29,6 +29,11 @@ export type FormsUi = {
   tabOrder: boolean;
   /** A download went ahead with required fields empty: the top-bar chip says so (AC-233). */
   nudge: boolean;
+  /** The file's form has been read (or it has none). Until then nothing may add fields: a form
+   * made before it arrives would replace the file's own on Download. */
+  ready: boolean;
+  /** A signature field was clicked: the next signature made goes into this widget's box. */
+  signFor: { field: string; widget: string } | null;
 };
 
 export type ToolDefaults = {

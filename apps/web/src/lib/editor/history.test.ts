@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canRedo, canUndo, commit, createHistory, current, MAX_STEPS, redo, revertEntries, undo, undoEntry } from "./history";
 import { addField, createField, emptyForm, setValue } from "@/lib/forms/model";
-import { addObjects, initialPages, moveObject, removeObjects, rotatePage, updateObjects, type DocState, type ShapeObj } from "./model";
+import { addObjects, deletePage, initialPages, moveObject, removeObjects, rotatePage, updateObjects, type DocState, type ShapeObj } from "./model";
 
 const base = (): DocState => ({ pages: initialPages([{ view: [0, 0, 600, 800], rotate: 0 }, { view: [0, 0, 600, 800], rotate: 0 }]), objects: [], engine: 0 });
 const rect = (id: string): ShapeObj => ({ kind: "shape", id, page: "p0", shape: "rect", x: 0, y: 0, w: 10, h: 10, rot: 0, stroke: "#000000", fill: null, width: 1 });
@@ -64,7 +64,7 @@ describe("history (AC-43, AC-73)", () => {
     h = revertEntries(h, [0], 3);
     expect((current(h).objects[0] as ShapeObj).x).toBe(5);
   });
-  it("reverts form changes with their entries, and keeps the form when a later kept change edited it (F16 E3)", () => {
+  it("reverts form changes field by field and keeps later kept changes (F16 E3)", () => {
     const pages = initialPages([{ view: [0, 0, 600, 800], rotate: 0 }, { view: [0, 0, 600, 800], rotate: 0 }]);
     const f0 = emptyForm();
     let h = createHistory({ pages, objects: [], engine: 0, forms: f0 });
@@ -72,16 +72,27 @@ describe("history (AC-43, AC-73)", () => {
     const f1 = addField(f0, name);
     h = commit(h, { ...current(h), forms: f1 }, { label: "Add text field", at: 1 });
     h = commit(h, addObjects(current(h), [rect("a")]), { label: "Add rectangle", at: 2 });
-    // Revert only the field: the rectangle stays, the form goes back.
-    const r = revertEntries(h, [0], 3);
-    expect(current(r).forms).toBe(f0);
+    // Revert only the field: the rectangle stays, the field goes.
+    let r = revertEntries(h, [0], 3);
+    expect(current(r).forms!.fields).toHaveLength(0);
     expect(current(r).objects).toHaveLength(1);
-    // A later form change that is kept: the form is left as it is now.
-    const f2 = setValue(f1, name.id, "Ada").state;
-    h = commit(h, { ...current(h), forms: f2 }, { label: "Fill in field", at: 4 });
-    expect(current(revertEntries(h, [0], 5)).forms!.fields[0].value).toBe("Ada");
-    // Deleting the page drops its widgets when the revert brings pages back without it.
-    h = commit(h, { ...current(h), pages: current(h).pages.slice(0, 1) }, { label: "Delete page 2", at: 6 });
-    expect(current(revertEntries(h, [1], 7)).forms!.fields).toHaveLength(0);
+    // A second field filled later: reverting the first one leaves the second one's value.
+    const other = createField(current(h).forms!, { kind: "text", page: "p0", box: { x: 10, y: 50, w: 100, h: 20 } });
+    h = commit(h, { ...current(h), forms: addField(current(h).forms!, other) }, { label: "Add text field", at: 4 });
+    h = commit(h, { ...current(h), forms: setValue(current(h).forms!, other.id, "Ada").state }, { label: "Fill in field", at: 5 });
+    r = revertEntries(h, [0], 6);
+    expect(current(r).forms!.fields.map((f) => [f.name, f.value])).toEqual([[other.name, "Ada"]]);
+    // Deleting page 2 takes its field; a later fill of another field is kept. Reverting the
+    // deletion brings the page back with its field.
+    h = commit(h, deletePage(current(h), "p1"), { label: "Delete page 2", at: 7 });
+    expect(current(h).forms!.fields.map((f) => f.id)).toEqual([other.id]);
+    h = commit(h, { ...current(h), forms: setValue(current(h).forms!, other.id, "Grace").state }, { label: "Fill in field", at: 8 });
+    r = revertEntries(h, [h.index - 2], 9);
+    expect(current(r).pages.map((p) => p.id)).toEqual(["p0", "p1"]);
+    expect(current(r).forms!.fields.map((f) => [f.id, f.value])).toEqual([
+      [name.id, ""],
+      [other.id, "Grace"],
+    ]);
+    expect(current(r).forms!.order).toEqual([...name.widgets.map((w) => w.id), ...other.widgets.map((w) => w.id)]);
   });
 });

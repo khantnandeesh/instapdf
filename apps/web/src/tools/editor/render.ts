@@ -3,7 +3,7 @@
  * Page rasters from pdf.js, one queue for the whole editor: visible pages first, at most two
  * renders at a time, canvases capped at 16.7 megapixels (iOS limit) (U-E5).
  */
-import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
+import type { PDFDocumentProxy, PDFPageProxy, PageViewport, RenderTask } from "pdfjs-dist";
 
 const MAX_PIXELS = 16_700_000;
 
@@ -52,9 +52,13 @@ export function renderPage(pdf: PDFDocumentProxy, src: number, scale: number, ro
         canvas.width = Math.max(1, Math.floor(viewport.width));
         canvas.height = Math.max(1, Math.floor(viewport.height));
         // With the form loaded, its fields are drawn live by the field layer: leave them off the raster
-        // (pdf.js AnnotationMode.ENABLE_FORMS), so a changed or deleted field never shows twice.
-        task = page.render({ canvas, viewport, annotationMode: forms ? 2 : 1 });
+        // (pdf.js AnnotationMode.ENABLE_FORMS), so a changed, moved or deleted field never shows twice.
+        // Annotations pdf.js gives their own canvas (check boxes, radios, read-only text, no-rotate
+        // notes) go to `own` instead of the page; the ones that aren't fields are drawn back.
+        const own = forms ? new Map<string, HTMLCanvasElement>() : undefined;
+        task = page.render({ canvas, viewport, annotationMode: forms ? 2 : 1, annotationCanvasMap: own });
         await task.promise;
+        if (own?.size && !job.cancelled) await drawOwnCanvases(page, viewport, canvas, own);
         if (job.cancelled) release(canvas);
         resolve(job.cancelled ? null : canvas);
       } catch {
@@ -91,4 +95,23 @@ export function swapCanvas(holder: HTMLElement, next: HTMLCanvasElement | null) 
   }
   if (next) holder.replaceChildren(next);
   else holder.replaceChildren();
+}
+
+const WIDGET = 20; // pdf.js AnnotationType.WIDGET
+
+/** Draws the non-field annotations pdf.js painted on canvases of their own back onto the page. */
+async function drawOwnCanvases(page: PDFPageProxy, viewport: PageViewport, canvas: HTMLCanvasElement, own: Map<string, HTMLCanvasElement>) {
+  try {
+    const ctx = canvas.getContext("2d");
+    const annots = await page.getAnnotations({ intent: "display" });
+    for (const a of annots) {
+      const c = own.get(a.id);
+      if (!c || !ctx || a.annotationType === WIDGET) continue;
+      const [x0, y0] = viewport.convertToViewportPoint(a.rect[0], a.rect[1]) as number[];
+      const [x1, y1] = viewport.convertToViewportPoint(a.rect[2], a.rect[3]) as number[];
+      ctx.drawImage(c, Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+    }
+  } finally {
+    for (const c of own.values()) release(c);
+  }
 }

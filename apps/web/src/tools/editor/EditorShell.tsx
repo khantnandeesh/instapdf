@@ -108,7 +108,7 @@ function initialState(pages: PageEntry[], wide: boolean): EditorState {
     panelTab: "pages",
     wide,
     readOnly: false,
-    forms: { original: null, xfa: false, selected: null, draw: "text", proposals: [], detect: { phase: "idle" }, tabOrder: false, nudge: false },
+    forms: { original: null, xfa: false, selected: null, draw: "text", proposals: [], detect: { phase: "idle" }, tabOrder: false, nudge: false, ready: false, signFor: null },
     lineFlash: null,
   };
 }
@@ -1085,6 +1085,8 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
             role={sign.role}
             onClose={() => {
               setSign(null);
+              // Closed without signing: a signature field that asked for it stops waiting.
+              store.set((st) => ({ forms: { ...st.forms, signFor: null } }));
               if (!store.get().placement) ctl.setTool("select");
             }}
             onPlace={(pl) => {

@@ -286,3 +286,46 @@ export function prunePages(state: FormState, pageIds: Iterable<string>): FormSta
   for (const f of state.fields) for (const w of f.widgets) if (!keep.has(w.page)) next = deleteWidget(next, w.id);
   return next;
 }
+
+/**
+ * Undoes one recorded form change (`before` → `after`) inside the form as it is `now`, field by
+ * field, so later changes that are kept stay (History "revert these", AC-73):
+ * - a field the change added is removed;
+ * - a field the change removed comes back (as it was before);
+ * - a field the change edited goes back to its earlier version if nothing changed it since; if
+ *   something did, it keeps that later version and only gets back the widgets the change took
+ *   away (a deleted page's widgets, say).
+ * Tab order: widgets that come back return after the widget they followed before.
+ */
+export function revertFormChange(now: FormState, before: FormState, after: FormState): FormState {
+  const prev = new Map(before.fields.map((f) => [f.id, f]));
+  const next = new Map(after.fields.map((f) => [f.id, f]));
+  const fields: FormField[] = [];
+  for (const f of now.fields) {
+    const b = prev.get(f.id);
+    const a = next.get(f.id);
+    if (!b && a) continue; // added by the change
+    if (!b || !a || a === b) fields.push(f);
+    else if (f === a) fields.push(b);
+    else {
+      const have = new Set(f.widgets.map((w) => w.id));
+      const lost = b.widgets.filter((w) => !have.has(w.id) && !a.widgets.some((x) => x.id === w.id));
+      fields.push(lost.length ? { ...f, widgets: [...f.widgets, ...lost] } : f);
+    }
+  }
+  const present = new Set(fields.map((f) => f.id));
+  for (const [i, b] of before.fields.entries()) {
+    if (next.has(b.id) || present.has(b.id)) continue; // removed by the change: put it back in place
+    const at = fields.findIndex((f) => before.fields.findIndex((x) => x.id === f.id) > i);
+    fields.splice(at < 0 ? fields.length : at, 0, b);
+  }
+  const widgets = new Set(fields.flatMap((f) => f.widgets.map((w) => w.id)));
+  const order = now.order.filter((id) => widgets.has(id));
+  for (const [i, id] of before.order.entries()) {
+    if (!widgets.has(id) || order.includes(id)) continue;
+    const prevId = before.order.slice(0, i).reverse().find((x) => order.includes(x));
+    order.splice(prevId ? order.indexOf(prevId) + 1 : 0, 0, id);
+  }
+  for (const id of widgets) if (!order.includes(id)) order.push(id);
+  return { ...now, fields, order, orderMode: order.join() === now.order.join() ? now.orderMode : "custom" };
+}

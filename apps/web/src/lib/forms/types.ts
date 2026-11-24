@@ -35,6 +35,8 @@ export type Widget = {
   on?: string;
   /** Object number of the widget in the source file ("12 0"), for fields read from the file. */
   ref?: string;
+  /** The file hides this widget (annotation flag Hidden or NoView): not shown, kept as it is. */
+  hidden?: boolean;
 };
 
 export type FieldStyle = {

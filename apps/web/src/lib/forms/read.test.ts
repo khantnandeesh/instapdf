@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { PDFDocument } from "@cantoo/pdf-lib";
+import { PDFDocument, PDFName, PDFNumber } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
 import { readForm } from "./read";
 
@@ -30,5 +30,17 @@ describe("readForm (AC-230)", () => {
     expect(name.y).toBeGreaterThan(60);
     expect(name.y).toBeLessThan(100);
     expect(form.order.length).toBe(form.fields.reduce((n, f) => n + f.widgets.length, 0));
+  });
+  it("marks widgets the file hides (Hidden or NoView) so the editor leaves them out", async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([300, 300]);
+    const form = doc.getForm();
+    form.createTextField("shown").addToPage(page, { x: 10, y: 10, width: 100, height: 20 });
+    form.createTextField("hidden").addToPage(page, { x: 10, y: 50, width: 100, height: 20, hidden: true });
+    const noView = form.createTextField("noview");
+    noView.addToPage(page, { x: 10, y: 90, width: 100, height: 20 });
+    noView.acroField.getWidgets()[0].dict.set(PDFName.of("F"), PDFNumber.of(32));
+    const state = readForm(await PDFDocument.load(await doc.save()));
+    expect(Object.fromEntries(state.fields.map((f) => [f.name, !!f.widgets[0].hidden]))).toEqual({ shown: false, hidden: true, noview: true });
   });
 });

@@ -32,17 +32,29 @@ const NO_FIELDS: FormField[] = [];
 
 /** Reads the file's form in the download worker, once pdf.js says there is one (no pdf-lib in the editor chunk). */
 export async function loadForms(ctl: Controller, bytes: Uint8Array, password?: string): Promise<void> {
-  // pdf.js answers null when there is no form, else the fields by name (a Map in pdf.js 5+).
-  const fields: unknown = await ctl.rt.pdf.getFieldObjects().catch(() => null);
-  if (!fields || !(fields instanceof Map ? fields.size : Object.keys(fields).length)) return;
-  const { forms, xfa } = await readFormsInWorker(bytes.slice(), password);
-  if (!forms.fields.length && !xfa) return;
-  // Every state without a form gets the file's (edits made while it loaded keep theirs).
-  ctl.store.set((s) => ({
-    history: { ...s.history, states: s.history.states.map((st) => (st.forms ? st : { ...st, forms })) },
-    forms: { ...s.forms, original: forms, xfa },
-  }));
-  if (xfa) ctl.toast({ text: "This form also has an XFA version. Fields that only exist there can’t be filled here.", tone: "info" });
+  try {
+    // pdf.js answers null when there is no form, else the fields by name (a Map in pdf.js 5+).
+    const fields: unknown = await ctl.rt.pdf.getFieldObjects().catch(() => null);
+    if (!fields || !(fields instanceof Map ? fields.size : Object.keys(fields).length)) return;
+    const { forms, xfa } = await readFormsInWorker(bytes.slice(), password);
+    if (!forms.fields.length && !xfa) return;
+    // Every state without a form gets the file's. Nothing can add fields before this point (the
+    // Form tool and Detect wait for `ready`), so no state has a form the file's would be missing from.
+    ctl.store.set((s) => ({
+      history: { ...s.history, states: s.history.states.map((st) => (st.forms ? st : { ...st, forms })) },
+      forms: { ...s.forms, original: forms, xfa },
+    }));
+    if (xfa) ctl.toast({ text: "This form also has an XFA version. Fields that only exist there can’t be filled here.", tone: "info" });
+  } finally {
+    setUi(ctl, { ready: true });
+  }
+}
+
+/** False (and says why) while the file's form is still being read. */
+function formReady(ctl: Controller): boolean {
+  if (ctl.store.get().forms.ready) return true;
+  ctl.announce("Reading this file’s form fields. Try again in a moment.");
+  return false;
 }
 
 /** Records a form change as one undoable step. */
@@ -53,9 +65,6 @@ export function applyForm(ctl: Controller, next: FormState, label: string, key?:
 }
 
 const setUi = (ctl: Controller, patch: Partial<FormsUi>) => ctl.store.set((s) => ({ forms: { ...s.forms, ...patch } }));
-
-/** Pending "sign into this field" (a signature field was clicked): the next placement lands in its box. */
-let signTarget: { page: string; x: number; y: number; w: number; h: number } | null = null;
 
 // ---- on each page --------------------------------------------------------------------------
 
@@ -69,6 +78,7 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
   const proposals = useStore(store, (s) => s.forms.proposals, shallowArray);
   const tabOrder = useStore(store, (s) => s.forms.tabOrder);
   const order = useStore(store, (s) => formsOf(s)?.order ?? null);
+  const pageList = useStore(store, (s) => H.current(s.history).pages, shallowArray);
   const draw = useStore(store, (s) => s.forms.draw);
   const edit = tool === "form" && !readOnly;
   const turn = totalRotation(entry);
@@ -82,16 +92,16 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
     if (!tabOrder || !order) return null;
     const form = formsOf(store.get());
     if (!form) return null;
-    const pages = H.current(store.get().history).pages;
     const m = new Map<string, number>();
     let n = 0;
-    for (const p of pages) for (const id of pageOrder(form, p.id)) m.set(id, ++n);
+    for (const p of pageList) for (const id of pageOrder(form, p.id)) m.set(id, ++n);
     return m;
-  }, [tabOrder, order, store]);
+  }, [tabOrder, order, pageList, store]);
 
   if (!fields.length && !proposals.length && !edit) return null;
 
   const create = (x0: number, y0: number, x1: number, y1: number, shift: boolean) => {
+    if (!formReady(ctl)) return;
     const state = formsOf(store.get()) ?? emptyForm();
     const kind = draw === "multiline" ? "text" : draw;
     const dragged = Math.abs(x1 - x0) * scale > 4 || Math.abs(y1 - y0) * scale > 4;
@@ -173,7 +183,7 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
           const f = formsOf(store.get())?.fields.find((x) => x.id === fieldId);
           const w = f?.widgets.find((x) => x.id === widgetId);
           if (!w || readOnly) return;
-          signTarget = { page: w.page, x: w.x, y: w.y, w: w.w, h: w.h };
+          setUi(ctl, { signFor: { field: fieldId, widget: widgetId } });
           ctl.openSign?.("signature");
         }}
         onAccept={(p) => {
@@ -257,9 +267,12 @@ export function FormsChrome({ wide }: { wide: boolean }) {
       store.subscribe(() => {
         const s = store.get();
         const pl = s.placement;
-        if (!pl || pl.kind !== "signature" || !signTarget) return;
-        const t = signTarget;
-        signTarget = null;
+        const want = s.forms.signFor;
+        if (!pl || pl.kind !== "signature" || !want) return;
+        // The field as it is now (it may have moved); gone: the signature is placed by hand as usual.
+        const t = formsOf(s)?.fields.find((f) => f.id === want.field)?.widgets.find((x) => x.id === want.widget);
+        setUi(ctl, { signFor: null });
+        if (!t) return;
         let w = t.w;
         let h = w / pl.aspect;
         if (h > t.h) {
@@ -279,8 +292,11 @@ export function FormsChrome({ wide }: { wide: boolean }) {
   // Starts Detect fields when asked (FormsToolOptions sets phase "running" with total 0).
   useEffect(() => {
     if (detect.phase !== "running" || detect.total !== 0) return;
+    abort.current?.abort();
     const ctrl = new AbortController();
     abort.current = ctrl;
+    /** This run is still the one the pill shows (not cancelled, not replaced by a newer run). */
+    const live = () => !ctrl.signal.aborted && abort.current === ctrl;
     void (async () => {
       const s = store.get();
       const pages = H.current(s.history).pages;
@@ -292,9 +308,9 @@ export function FormsChrome({ wide }: { wide: boolean }) {
           pages,
           form: formsOf(store.get()) ?? emptyForm(),
           signal: ctrl.signal,
-          onProgress: (done, total) => setUi(ctl, { detect: { phase: "running", done, total } }),
+          onProgress: (done, total) => live() && setUi(ctl, { detect: { phase: "running", done, total } }),
         });
-        if (ctrl.signal.aborted) return;
+        if (!live()) return;
         setUi(ctl, r.proposals.length ? { proposals: r.proposals, detect: reviewOf(r.proposals) } : { proposals: [], detect: { phase: "none" } });
         // Bring the first proposal into view (they may be pages away).
         const first = r.proposals[0]?.field.widgets[0];
@@ -302,11 +318,15 @@ export function FormsChrome({ wide }: { wide: boolean }) {
         ctl.announce(r.proposals.length ? `${r.proposals.length} fields found. Review them on the pages.` : "No new fields found");
         if (!r.proposals.length) setTimeout(() => store.get().forms.detect.phase === "none" && setUi(ctl, { detect: { phase: "idle" } }), 3000);
       } catch (e) {
+        if (!live()) return;
         if ((e as Error).name !== "AbortError") ctl.toast({ text: "Detect fields stopped. Please try again.", tone: "danger" });
         setUi(ctl, { detect: { phase: "idle" } });
       }
     })();
   }, [detect, store, ctl]);
+
+  // Leaving the editor stops a run.
+  useEffect(() => () => abort.current?.abort(), []);
 
   const go = (step: 1 | -1) => {
     const s = store.get();
@@ -333,7 +353,9 @@ export function FormsChrome({ wide }: { wide: boolean }) {
             onPrev={() => go(-1)}
             onNext={() => go(1)}
             onAcceptAll={() => {
-              const ps = store.get().forms.proposals;
+              // Proposals on pages deleted since the run are left out.
+              const ids = new Set(H.current(store.get().history).pages.map((p) => p.id));
+              const ps = store.get().forms.proposals.filter((p) => p.field.widgets.every((w) => ids.has(w.page)));
               applyForm(ctl, addFields(formsOf(store.get()) ?? emptyForm(), ps.map((p) => p.field)), `Add ${ps.length} detected fields`);
               setUi(ctl, { proposals: [], detect: { phase: "idle" } });
               ctl.announce(`${ps.length} fields added`);
@@ -365,7 +387,7 @@ export function FormsToolOptions() {
       onKind={(k) => setUi(ctl, { draw: k })}
       detecting={detect === "running" || detect === "review"}
       onDetect={() => {
-        if (detect === "running") return;
+        if (detect === "running" || !formReady(ctl)) return;
         setUi(ctl, { detect: { phase: "running", done: 0, total: 0 }, proposals: [] });
       }}
       tabOrderOpen={tabOrder}
@@ -437,10 +459,13 @@ export function nudgeAfterDownload(ctl: Controller): number {
  * Keys for the selected field (Form tool): Delete removes it, Escape lets go, arrows nudge it by
  * 1 pt (10 with Shift), Ctrl/Cmd+D duplicates it. Returns true when handled.
  */
-export function fieldKey(ctl: Controller, e: Pick<KeyboardEvent, "key" | "shiftKey" | "ctrlKey" | "metaKey">): boolean {
+export function fieldKey(ctl: Controller, e: Pick<KeyboardEvent, "key" | "shiftKey" | "ctrlKey" | "metaKey" | "target" | "defaultPrevented">): boolean {
   const { key } = e;
   const sel = ctl.store.get().forms.selected;
   if (!sel || ctl.store.get().tool !== "form") return false;
+  // Keys a control already used (tab order list, the properties popover, its buttons) are theirs.
+  const t = e.target instanceof Element ? e.target : null;
+  if (e.defaultPrevented || t?.closest(".bf-popover, .bf-taborder, [role=dialog], [role=menu]")) return false;
   if (key === "Escape") {
     setUi(ctl, { selected: null });
     return true;

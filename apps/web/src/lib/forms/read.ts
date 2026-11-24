@@ -11,6 +11,7 @@ import {
   PDFDropdown,
   PDFHexString,
   PDFName,
+  PDFNumber,
   PDFOptionList,
   PDFRadioGroup,
   PDFRef,
@@ -179,6 +180,9 @@ export function readForm(doc: PDFDocument, pages: FormPage[] = pagesOf(doc)): Fo
       const widget: Widget = { id, page: pages[pi].id, ...box, ref: ref ? refKey(ref) : undefined };
       if (kind === "radio") widget.on = radioValues[i] ?? w.getOnValue()?.decodeText();
       if (kind === "checkbox") widget.on = w.getOnValue()?.decodeText() ?? "Yes";
+      // Annotation flags: Hidden (2) or NoView (32) widgets stay hidden in the editor, as viewers do.
+      const flags = w.dict.lookup(N("F"));
+      if (flags instanceof PDFNumber && flags.asNumber() & (2 | 32)) widget.hidden = true;
       widgets.push(widget);
       pageIndexOrder.push({ id, page: pi, annotIndex: ref ? (annotIndex.get(refKey(ref)) ?? 1e6) : 1e6 });
     });

@@ -61,7 +61,7 @@ function fontPx(f: FormField, w: Widget, scale: number, turn: number) {
 
 export const FieldLayer = memo(function FieldLayer(p: FieldLayerProps) {
   const { scale, turn, mode } = p;
-  const mine = p.fields.flatMap((f) => f.widgets.filter((w) => w.page === p.pageId).map((w) => ({ f, w })));
+  const mine = p.fields.flatMap((f) => f.widgets.filter((w) => w.page === p.pageId && !w.hidden).map((w) => ({ f, w })));
   const props = (p.proposals ?? []).flatMap((pr) => pr.field.widgets.filter((w) => w.page === p.pageId).map((w) => ({ pr, w })));
 
   return (
