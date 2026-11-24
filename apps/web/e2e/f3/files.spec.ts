@@ -83,7 +83,7 @@ test("AC-6: an unreadable image is named in an error and the PDF stays", async (
   expect(await cardNames(page)).toEqual(["alpha.pdf"]);
 });
 
-test("AC-7: a 64-megapixel image is refused fast, naming the 50-megapixel cap", async ({ page }) => {
+test("AC-7: a 64-megapixel image is refused fast, naming the 50-megapixel cap", { tag: "@serial" }, async ({ page }) => {
   const started = Date.now();
   await page.getByTestId("file-input").setInputFiles(await hugePngPayload());
   await expect(page.getByRole("alert").filter({ hasText: /huge\.png.*50 megapixels/ })).toBeVisible({ timeout: 3000 });

@@ -106,7 +106,7 @@ test("AC-1 AC-2 AC-4: no upload, the CSP blocks other origins, and five download
   expect(big).toEqual([]);
 });
 
-test("AC-5 AC-84: a 300-page PDF opens, edits on its last page and downloads every page", async ({ page }) => {
+test("AC-5 AC-84: a 300-page PDF opens, edits on its last page and downloads every page", { tag: "@serial" }, async ({ page }) => {
   test.setTimeout(120_000);
   await openFile(page, { name: "big-300p.pdf", mimeType: "application/pdf", buffer: await numbered(300) });
   await expect(page.getByTestId("page-300")).toHaveCount(1);
@@ -123,7 +123,7 @@ test("AC-5 AC-84: a 300-page PDF opens, edits on its last page and downloads eve
   expect(texts[299]).toContain("Last page note");
 });
 
-test("AC-6 AC-90: page 1 of a 10-page PDF is visible within a second of picking it", async ({ page }, info) => {
+test("AC-6 AC-90: page 1 of a 10-page PDF is visible within a second of picking it", { tag: "@serial" }, async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "Timing target is for the CI desktop profile");
   const buffer = await numbered(10);
   await page.goto("/edit-pdf");

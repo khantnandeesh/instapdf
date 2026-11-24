@@ -144,7 +144,7 @@ test("AC-51: with a cover, the contents page follows the first file and does not
   expect(await linkTargets(out.bytes, 4)).toEqual([5, 7]);
 });
 
-test("AC-52: 50 one-page files: every entry on the contents pages, every link right", async ({ page }) => {
+test("AC-52: 50 one-page files: every entry on the contents pages, every link right", { tag: "@serial" }, async ({ page }) => {
   test.setTimeout(120_000);
   const echo = await readFile(fx("echo.pdf"));
   const names = Array.from({ length: 50 }, (_, i) => `f${String(i + 1).padStart(2, "0")}.pdf`);
