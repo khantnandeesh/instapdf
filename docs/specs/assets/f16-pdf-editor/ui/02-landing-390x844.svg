@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" font-family="Fredoka, Arial, sans-serif">
+<title>Editor landing at 390x844</title>
+<defs><pattern id="g" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="rgba(217,43,75,.07)"/></pattern></defs>
+<rect width="390" height="844" fill="#fffdfb"/><rect width="390" height="844" fill="url(#g)"/>
+<rect x="0" y="0" width="390" height="56" rx="0" fill="#fff" stroke="#fff" stroke-width="0"/>
+<line x1="0" y1="56" x2="390" y2="56" stroke="#fbe4e1" stroke-width="1.5"/>
+<circle cx="28" cy="28.0" r="12" fill="#d92b4b" stroke="#d92b4b" stroke-width="1.5"/>
+<text x="48" y="34.0" font-size="18" fill="#3a2a2e" text-anchor="start" font-weight="600">BerryPDF</text>
+<text x="374" y="33.0" font-size="13" fill="#3a2a2e" text-anchor="end" font-weight="400">All tools</text>
+<text x="195" y="104" font-size="28" fill="#2a1c20" text-anchor="middle" font-weight="600">Edit PDF</text>
+<rect x="16" y="128" width="358" height="300" rx="28" fill="#fff" stroke="#f6cfd6" stroke-width="1.5" stroke-dasharray="8 6"/>
+<circle cx="195" cy="184" r="28" fill="#e2e7ff" stroke="#e2e7ff" stroke-width="1.5"/>
+<text x="195" y="189" font-size="10" fill="#3147b8" text-anchor="middle" font-weight="400">[file-pdf]</text>
+<rect x="47" y="236" width="296" height="56" rx="14" fill="#b01e3c" stroke="#b01e3c" stroke-width="0"/>
+<rect x="47" y="232" width="296" height="56" rx="14" fill="#d92b4b" stroke="#d92b4b" stroke-width="0"/>
+<text x="195.0" y="266.6666666666667" font-size="20" fill="#fff" text-anchor="middle" font-weight="600">Open PDF</text>
+<text x="195" y="320" font-size="14" fill="#3147b8" text-anchor="middle" font-weight="600">Blank page</text>
+<text x="195" y="360" font-size="13" fill="#7a6468" text-anchor="middle" font-weight="400">Up to 200 MB</text>
+<text x="195" y="384" font-size="13" fill="#7a6468" text-anchor="middle" font-weight="400">[shield] Stays on this device</text>
+<text x="16" y="456" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Drop / paste hints only on (pointer: fine).</text>
+<text x="16" y="474" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Card ends y=428; Open PDF ends y=292 of 844.</text>
+<text x="16" y="492" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Guide (ToolSeo) starts below the fold.</text>
+<line x1="0" y1="842" x2="390" y2="842" stroke="#6b3fd1" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="384" y="838" font-size="11" fill="#6b3fd1" text-anchor="end" font-weight="500">fold 844</text>
+</svg>

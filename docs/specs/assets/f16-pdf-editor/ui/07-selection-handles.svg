@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="520" viewBox="0 0 900 520" font-family="Fredoka, Arial, sans-serif">
+<title>Selection, handles, snapping, popover</title>
+<defs><pattern id="g" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="rgba(217,43,75,.07)"/></pattern></defs>
+<rect width="900" height="520" fill="#fffdfb"/><rect width="900" height="520" fill="url(#g)"/>
+<rect x="0" y="0" width="900" height="520" rx="0" fill="#f4eef0" stroke="#f4eef0" stroke-width="0"/>
+<rect x="40" y="20" width="520" height="480" rx="2" fill="#fff" stroke="#e6d3d6" stroke-width="1"/>
+<line x1="300" y1="20" x2="300" y2="500" stroke="#d92b4b" stroke-width="1" stroke-dasharray="4 3"/>
+<text x="306" y="36" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">snap guide: page centre (brand, dashed, white halo)</text>
+<line x1="40" y1="330" x2="560" y2="330" stroke="#d92b4b" stroke-width="1" stroke-dasharray="4 3"/>
+<rect x="220" y="200" width="160" height="130" rx="0" fill="#eaeaea" stroke="#4a63d9" stroke-width="1.5"/>
+<text x="300" y="270" font-size="13" fill="#7a6468" text-anchor="middle" font-weight="400">image</text>
+<rect x="215" y="195" width="10" height="10" rx="2" fill="#fff" stroke="#4a63d9" stroke-width="1.5"/>
+<rect x="375" y="195" width="10" height="10" rx="2" fill="#fff" stroke="#4a63d9" stroke-width="1.5"/>
+<rect x="215" y="325" width="10" height="10" rx="2" fill="#fff" stroke="#4a63d9" stroke-width="1.5"/>
+<rect x="375" y="325" width="10" height="10" rx="2" fill="#fff" stroke="#4a63d9" stroke-width="1.5"/>
+<line x1="300" y1="200" x2="300" y2="176" stroke="#4a63d9" stroke-width="1.5"/>
+<circle cx="300" cy="170" r="7" fill="#fff" stroke="#4a63d9" stroke-width="1.5"/>
+<text x="312" y="172" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">rotate handle (Shift = 15° steps; snaps to 0/90/180/270)</text>
+<rect x="196" y="136" width="208" height="40" rx="14" fill="#fff" stroke="#fbe4e1" stroke-width="1.5"/>
+<text x="208" y="161" font-size="12" fill="#3a2a2e" text-anchor="start" font-weight="400">⟲ │ opacity │ ⧉ │ ↑↓ │ 🗑</text>
+<text x="410" y="150" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">image popover</text>
+<rect x="220" y="350" width="160" height="24" rx="8" fill="#3a2a2e" stroke="#3a2a2e" stroke-width="1.5"/>
+<text x="300" y="366" font-size="11" fill="#fff" text-anchor="middle" font-weight="400">x 210  y 300  ·  160 × 130 pt</text>
+<text x="390" y="366" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">live readout while dragging (sr: aria-live on drop)</text>
+<text x="600" y="60" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Selection outline 1.5px #4a63d9 + 1px white halo</text>
+<text x="600" y="80" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">(≥ 3:1 on any page colour).</text>
+<text x="600" y="110" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Images/signatures: 4 corner handles, aspect locked;</text>
+<text x="600" y="126" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Shift frees aspect.</text>
+<text x="600" y="150" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Shapes/whiteout: 8 handles, free.</text>
+<text x="600" y="174" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Text box: left/right width handles only.</text>
+<text x="600" y="198" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Line/arrow: 2 endpoint handles.</text>
+<text x="600" y="230" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Hit area: 24px (fine pointer), 44px (coarse).</text>
+<text x="600" y="260" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Hover (not selected): 1px dashed outline.</text>
+<text x="600" y="290" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Multi-select: Shift+click or marquee in Select;</text>
+<text x="600" y="306" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">one frame around the group.</text>
+<text x="600" y="340" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Keyboard: arrows 1pt, Shift+arrows 10pt,</text>
+<text x="600" y="356" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Delete, Ctrl/Cmd+D, Esc, Tab = next object.</text>
+</svg>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" font-family="Fredoka, Arial, sans-serif">
+<title>Editor landing at 1280x720: fits above the fold</title>
+<defs><pattern id="g" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="rgba(217,43,75,.07)"/></pattern></defs>
+<rect width="1280" height="720" fill="#fffdfb"/><rect width="1280" height="720" fill="url(#g)"/>
+<rect x="0" y="0" width="1280" height="64" rx="0" fill="#fff" stroke="#fff" stroke-width="0"/>
+<line x1="0" y1="64" x2="1280" y2="64" stroke="#fbe4e1" stroke-width="1.5"/>
+<circle cx="28" cy="32.0" r="12" fill="#d92b4b" stroke="#d92b4b" stroke-width="1.5"/>
+<text x="48" y="38.0" font-size="18" fill="#3a2a2e" text-anchor="start" font-weight="600">BerryPDF</text>
+<rect x="150" y="16.0" width="96" height="32" rx="16" fill="#fff8f3" stroke="#fbe4e1" stroke-width="1.5"/>
+<text x="198" y="37.0" font-size="13" fill="#3a2a2e" text-anchor="middle" font-weight="400">All tools</text>
+<text x="640" y="128" font-size="36" fill="#2a1c20" text-anchor="middle" font-weight="600">Edit PDF</text>
+<rect x="340" y="160" width="600" height="360" rx="28" fill="#fff" stroke="#f6cfd6" stroke-width="1.5" stroke-dasharray="8 6"/>
+<circle cx="640" cy="232" r="32" fill="#e2e7ff" stroke="#e2e7ff" stroke-width="1.5"/>
+<text x="640" y="238" font-size="11" fill="#3147b8" text-anchor="middle" font-weight="400">[file-pdf]</text>
+<rect x="520" y="292" width="240" height="56" rx="14" fill="#b01e3c" stroke="#b01e3c" stroke-width="0"/>
+<rect x="520" y="288" width="240" height="56" rx="14" fill="#d92b4b" stroke="#d92b4b" stroke-width="0"/>
+<text x="640.0" y="322.6666666666667" font-size="20" fill="#fff" text-anchor="middle" font-weight="600">Open PDF</text>
+<text x="640" y="384" font-size="14" fill="#7a6468" text-anchor="middle" font-weight="400">or drop it here · paste with Ctrl+V</text>
+<text x="640" y="412" font-size="13" fill="#3147b8" text-anchor="middle" font-weight="400">[blank page]  ghost button: "Blank page"</text>
+<text x="640" y="452" font-size="13" fill="#7a6468" text-anchor="middle" font-weight="400">Up to 200 MB  (full limits in tooltip)</text>
+<text x="640" y="476" font-size="13" fill="#7a6468" text-anchor="middle" font-weight="400">[shield] Stays on this device</text>
+<line x1="0" y1="718" x2="1280" y2="718" stroke="#6b3fd1" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="1274" y="714" font-size="11" fill="#6b3fd1" text-anchor="end" font-weight="500">fold 720 · card ends y=520 · Open PDF ends y=348</text>
+<text x="960" y="190" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">DropCard (reused), min-h 360, max-h calc(100dvh - 200px)</text>
+<text x="960" y="300" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Primary: the only berry fill</text>
+<text x="20" y="560" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Below the fold: ToolSeo guide (how-to, FAQ). Nothing else above the fold.</text>
+<text x="20" y="580" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Same composition fits 1366x768 and 1440x900 (card centred, more air).</text>
+<text x="20" y="600" font-size="11" fill="#6b3fd1" text-anchor="start" font-weight="500">Editor chunk prefetch starts on pointerenter/focus of Open PDF or on idle after LCP.</text>
+</svg>
