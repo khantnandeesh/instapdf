@@ -926,11 +926,26 @@
   color: var(--color-ink-black);
 }
 .ed-toast__act {
+  flex: none;
+  white-space: nowrap;
   height: 36px;
   padding: 0 12px;
   border-radius: 99px;
   color: var(--color-brand-strong);
   font-weight: 700;
+}
+/* Narrow screens: a long notice keeps the full width and its action goes under it (the font
+   notice is one short row of its own, F24). */
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) {
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+}
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) > span {
+  flex: 1 1 calc(100% - 44px);
+}
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) > .ed-toast__act {
+  order: 3;
+  margin-left: -12px;
 }
 .ed-toast__act:hover,
 .ed-toast__x:hover {
@@ -1067,8 +1082,14 @@
     width: 12px;
     height: 12px;
   }
+  /* A 48 px target centred on the handle, whatever its border (AC-48: at least 44 px). */
   .ed-handle::before {
-    inset: -16px;
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    width: 48px;
+    height: 48px;
+    transform: translate(-50%, -50%);
   }
 }
 .ed-handle--nw,
@@ -1113,7 +1134,24 @@
 }
 .ed-rotate > span {
   position: absolute;
-  inset: -12px;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -50%);
+}
+@media (pointer: coarse) {
+  /* Further up on touch so its 48 px target clears the top resize handle's. */
+  .ed-rotate {
+    top: -56px;
+  }
+  .ed-rotate::after {
+    height: 42px;
+  }
+  .ed-rotate > span {
+    width: 48px;
+    height: 48px;
+  }
 }
 .ed-guide {
   position: absolute;
@@ -1508,7 +1546,7 @@
   .ed-shell {
     animation: ed-fade 180ms ease-out both;
   }
-  .ed-raster,
+  .ed-raster--in,
   .ed-thumb__canvas {
     animation: ed-fade 260ms ease-out both;
   }

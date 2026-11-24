@@ -42,6 +42,15 @@ export function typedSignatureSize(h: number, m: { ascent: number; descent: numb
   return h / ((m.ascent + m.descent) * 1.15);
 }
 
+/**
+ * A typed signature's font size after shrinking to fit the box width: text measured `tw` wide at
+ * `size` never runs past the box (it would otherwise spill past the page edge on a fitted box).
+ */
+export function fitTypedSize(size: number, tw: number, w: number): number {
+  const room = w * 0.96;
+  return tw > room && tw > 0 ? (size * room) / tw : size;
+}
+
 /** Polyline path "M x y L x y …" in frame coordinates (SVG y down). */
 export function svgPolyline(points: Pt[]): string {
   return points.map(([x, y], i) => `${i ? "L" : "M"}${round(x)} ${round(y)}`).join(" ");

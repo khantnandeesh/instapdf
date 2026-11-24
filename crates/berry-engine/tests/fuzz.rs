@@ -209,7 +209,7 @@ fn fuzz_edits() {
                 }
                 let _ = want;
             }
-            Ok(Err(Error::Verify { message })) => {
+            Ok(Err(Error::Verify { message, .. })) => {
                 verify += 1;
                 if verify <= 12 {
                     println!(

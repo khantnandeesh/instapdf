@@ -1,0 +1,13 @@
+{
+ "tag": "t2",
+ "apply_click": "2026-11-24T10:42:14.383Z",
+ "ready_ms": 7663,
+ "ready": "2026-11-24T10:42:22.046Z",
+ "href": "https://www.sejda.com/api/tasks/BV4JF0MA-202611241142/download/para-times.pdf",
+ "taskId": "BV4JF0MA-202611241142",
+ "status": 200,
+ "file": "/tmp/claude-0/-home-user/df61c1b3-c832-5e4c-ad98-67c374819772/scratchpad/sejda/t2-para-times.pdf",
+ "bytes": 7649,
+ "downloaded": "2026-11-24T10:42:22.324Z",
+ "total_ms": 7941
+}

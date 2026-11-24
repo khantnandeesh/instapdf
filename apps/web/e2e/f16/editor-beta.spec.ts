@@ -179,19 +179,19 @@ test("a save that fails after an edit drops only that edit; Download keeps the e
   await patchEngine(
     page,
     `const sv = BerryDocument.prototype.save; let n = 0;
-     BerryDocument.prototype.save = function () { n++; if (n === 2) throw { kind: "verify", message: "test" }; return sv.call(this); };`,
+     BerryDocument.prototype.save = function () { n++; if (n === 2) throw { kind: "save", reason: "object-mismatch", message: "test" }; return sv.call(this); };`,
   );
   await open(page, "chrome-justified-mixed.pdf");
   await editLine(page, "is made between", "made", "signed");
   const cell = page.locator('[data-testid="line"][data-text="Item"]');
   await cell.click();
-  await page.getByTestId("line-input").fill("Items sold");
+  await page.getByTestId("line-input").fill("Items");
   await page.getByTestId("line-input").press("Enter");
-  await expect(page.getByTestId("editor-notice")).toContainText("wasn’t made");
+  await expect(page.getByTestId("editor-notice")).toContainText("Saving this edit failed, so the line is unchanged.");
   await expect(cell).toHaveCount(1);
   const [text] = await pageTexts((await download(page)).bytes);
   expect(text).toContain("is signed between");
-  expect(text).not.toContain("Items sold");
+  expect(text).not.toMatch(/\bItems\b/);
   expect(text).toContain("Item");
 });
 
@@ -206,13 +206,13 @@ test("if reopening after a save fails, the edit is dropped and earlier edits sti
   await editLine(page, "is made between", "made", "signed");
   const cell = page.locator('[data-testid="line"][data-text="Item"]');
   await cell.click();
-  await page.getByTestId("line-input").fill("Items sold");
+  await page.getByTestId("line-input").fill("Items");
   await page.getByTestId("line-input").press("Enter");
   await expect(page.getByTestId("editor-notice")).toContainText("restarted");
   await expect(cell).toHaveCount(1);
   const [text] = await pageTexts((await download(page)).bytes);
   expect(text).toContain("is signed between");
-  expect(text).not.toContain("Items sold");
+  expect(text).not.toMatch(/\bItems\b/);
   // And the editor keeps working.
   await editLine(page, "Fee", "Fee", "Fees");
 });

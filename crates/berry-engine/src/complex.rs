@@ -5,7 +5,7 @@
 //! registered open font shaped here. Every new word is wrapped in `/ActualText` so copy and
 //! search read it right.
 
-use crate::engine::{limit, show_state, EditResult, Engine, Error, Item, Plan, Result, Substitution};
+use crate::engine::{limit, show_state, verify, EditResult, Engine, Error, Item, Plan, Result, Substitution};
 use crate::fallback::{self, FontRequest};
 use crate::font::{strip_subset_prefix, PdfFont};
 use crate::geom::Rect;
@@ -340,6 +340,46 @@ impl Engine {
                 runs.push((r, odd));
             }
         }
+        // Whether the line has right-to-left text (see the ActualText check after step 4).
+        let any_rtl = rtl || runs.iter().any(|r| r.1);
+        // Readers rebuild a right-to-left line's order from the glyphs with their own bidi rules,
+        // and PDFium does not agree with UAX #9 (our read-back) on two cases, so they are refused:
+        // (a) punctuation typed next to punctuation ("تجريبي." + "، نعم" reads "تجريبي،. نعم"):
+        //     a run of neutrals is ordered by its neighbours, which the edit changed;
+        // (b) a left-to-right run of two or more words in a right-to-left line (" abc def" reads
+        //     "defabc"): PDFium orders the words of the run right to left.
+        if any_rtl {
+            use unicode_bidi::BidiClass::{CS, ES, ET, ON};
+            let neutral = |c: char| matches!(unicode_bidi::bidi_class(c), CS | ES | ET | ON);
+            let mut seq: Vec<char> = Vec::new();
+            if a0 > 0 {
+                seq.extend(text_of(a0 - 1..a0).chars().last());
+            }
+            seq.extend(inserted.chars());
+            if b0 < n {
+                seq.extend(text_of(b0..b0 + 1).chars().next());
+            }
+            if seq.windows(2).any(|w| neutral(w[0]) && neutral(w[1])) {
+                return Err(verify(
+                    "text-mismatch",
+                    format!("{inserted:?} puts punctuation next to punctuation in a right-to-left line, which PDFium reorders"),
+                ));
+            }
+        }
+        if rtl {
+            for (range, run_rtl) in &runs {
+                let words = segment[range.clone()].split_whitespace().filter(|w| w.chars().any(char::is_alphanumeric)).count();
+                if !run_rtl && words >= 2 {
+                    return Err(verify(
+                        "text-mismatch",
+                        format!(
+                            "{:?} is a left-to-right run of several words in a right-to-left line, which PDFium reverses",
+                            &segment[range.clone()]
+                        ),
+                    ));
+                }
+            }
+        }
         for (range, run_rtl) in runs {
             let run = &segment[range];
             let mut parts: Vec<(bool, &str)> = Vec::new();
@@ -431,6 +471,24 @@ impl Engine {
         if let Some(request) = request {
             return Err(Error::MissingGlyphs { chars: missing, request });
         }
+        // pdf.js ignores ActualText and pdfium reorders it, so in a line with right-to-left text a
+        // word that reads as typed only through ActualText (digits drawn with an Arabic font's
+        // glyphs, whose ToUnicode maps them elsewhere) is refused; "Replace with new text" covers
+        // it. A word drawn in another font is kept: pdfium reads it in place, while pdf.js, which
+        // puts a line's text items in content order, can read it out of order (crates/README.md).
+        // A line already drawn with ActualText spans (Chrome's output) is left out: neither reader
+        // reads it by its glyphs before the edit either.
+        if any_rtl && !spans_on_line {
+            if let Some(text) = pieces.iter().find_map(|p| match p {
+                Piece::Word { text, actual: true, .. } => Some(text),
+                _ => None,
+            }) {
+                return Err(verify(
+                    "text-mismatch",
+                    format!("{text:?} would read as typed only through ActualText, which pdf.js ignores"),
+                ));
+            }
+        }
 
         // 5. Geometry: left-to-right lines keep their start, right-to-left lines their end.
         let k = ctx.k();
@@ -464,13 +522,23 @@ impl Engine {
         }
         let plan = Plan { removed, want, anchor, after: false, segs: Vec::new(), insert_at: start - u_of(anchor), drop_ops };
 
-        // 6. Apply in a transaction, check, then keep or roll back.
+        // 6. Apply in a transaction, check, then keep or roll back. A line that reads back in
+        // another order than typed (digits or Latin inside a right-to-left line, which readers
+        // rebuild from glyph positions with their own bidi rules) is refused: wrapping it in one
+        // ActualText span would satisfy this check but not readers that go by the glyphs
+        // (pdfium, pdf.js). The editor then offers "Replace with new text".
         let snapshot = (self.doc.max_id, self.dirty.clone(), self.embeds.clone());
         let mut backup: Vec<(ObjectId, Option<Object>)> = Vec::new();
         let outcome = self.emit(page_id, &ctx, &pieces, &mut backup).and_then(|(items, expect)| {
             self.apply_items(page_id, &pc, &plan, &items, new_width, &mut backup)?;
             let after = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
             let (touched, map) = check(&pc, &after, &plan, &expect, start, ang, &state)?;
+            if self.overflows(page, &pc, &line.glyphs, &after, &touched) {
+                return Err(verify("overflow", "the line would run past the page edge".into()));
+            }
+            if Self::collides(&pc, &line.glyphs, &after, &touched) {
+                return Err(verify("overlap", "the line would run into other text on its baseline".into()));
+            }
             let (new_lines, paragraphs) = layout::group(&after);
             // The edited line must read back exactly as asked.
             let probe = touched.first().copied().or_else(|| line.glyphs.iter().find_map(|&g| map[g]));
@@ -478,9 +546,10 @@ impl Engine {
             // Nothing left to probe: the whole line was deleted, which is right when nothing visible was asked for.
             let gone = probe.is_none() && expected.trim().is_empty();
             if !gone && reads.as_deref().map(script::canonical_marks) != Some(script::canonical_marks(&expected)) {
-                return Err(Error::Verify {
-                    message: format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
-                });
+                return Err(verify(
+                    "text-mismatch",
+                    format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
+                ));
             }
             Ok((after, touched, new_lines, paragraphs))
         });
@@ -682,10 +751,13 @@ fn check(
     angle: f64,
     state: &ShowState,
 ) -> Result<Checked> {
-    let fail = |m: String| Err(Error::Verify { message: m });
+    let fail = |r: &'static str, m: String| Err(verify(r, m));
     let kept = before.glyphs.len() - plan.removed.len();
     if after.glyphs.len() != kept + expect.len() {
-        return fail(format!("expected {} glyphs after the edit, found {}", kept + expect.len(), after.glyphs.len()));
+        return fail(
+            "glyph-mismatch",
+            format!("expected {} glyphs after the edit, found {}", kept + expect.len(), after.glyphs.len()),
+        );
     }
     let (dx, dy) = (angle.cos(), angle.sin());
     let anchor = &before.glyphs[plan.anchor];
@@ -705,13 +777,13 @@ fn check(
                 );
                 let off = (h.origin.0 - target.0).hypot(h.origin.1 - target.1);
                 if h.code != e.code || after.fonts[h.font].object_id != e.font {
-                    return fail(format!("new glyph {j} is not the planned glyph"));
+                    return fail("glyph-mismatch", format!("new glyph {j} is not the planned glyph"));
                 }
                 if (h.size - anchor.size).abs() > 1e-6 || h.color != anchor.color || h.render_mode != anchor.render_mode {
-                    return fail(format!("new glyph {j} has the wrong style"));
+                    return fail("glyph-mismatch", format!("new glyph {j} has the wrong style"));
                 }
                 if !(off <= TOLERANCE) {
-                    return fail(format!("new glyph {j} is {off:.3} pt from where it should be"));
+                    return fail("position-drift", format!("new glyph {j} is {off:.3} pt from where it should be"));
                 }
                 touched.push(j);
                 j += 1;
@@ -732,10 +804,10 @@ fn check(
             || h.color != g.color
             || h.render_mode != g.render_mode
         {
-            return fail(format!("glyph {i} ({:?}) changed", g.text));
+            return fail("glyph-mismatch", format!("glyph {i} ({:?}) changed", g.text));
         }
         if !(moved <= TOLERANCE) {
-            return fail(format!("glyph {i} ({:?}) is {moved:.3} pt from where it should be", g.text));
+            return fail("position-drift", format!("glyph {i} ({:?}) is {moved:.3} pt from where it should be", g.text));
         }
         if want != 0.0 {
             touched.push(j);

@@ -136,7 +136,14 @@ fn arabic_append_word() {
 fn ac206_number_in_arabic_line() {
     for f in FIXTURES {
         let mut e = open(f, true);
-        let after = edit(&mut e, ARABIC[1], "2500", "3750").unwrap_or_else(|err| panic!("{f}: {err:?}"));
+        let result = edit(&mut e, ARABIC[1], "2500", "3750");
+        if f == "scripts-plain.pdf" {
+            // The Arabic font's digit glyphs map elsewhere in its ToUnicode: "3750" would read as
+            // typed only through ActualText, which pdf.js ignores ("u750"), so it is refused.
+            assert!(matches!(result, Err(Error::Verify { reason: "text-mismatch", .. })), "{f}: {result:?}");
+            continue;
+        }
+        let after = result.unwrap_or_else(|err| panic!("{f}: {err:?}"));
         shapes_ok(&after, "المبلغ الإجمالي 3750 ريال للفاتورة رقم 77.");
     }
 }

@@ -53,7 +53,8 @@ export function LineLayer({
   const list = useRef<HTMLDivElement>(null);
   const refocus = useRef(false);
   const [active, setActive] = useState(-1);
-  const editable = text.lines.map((l, i) => (l.editable && l.text.trim() ? i : -1)).filter((i) => i >= 0);
+  // Lines that need the shaping build (Hindi, Arabic…) are listed too: picking one loads it.
+  const editable = text.lines.map((l, i) => ((l.editable || l.read_only_reason === "needs-shaping") && l.text.trim() ? i : -1)).filter((i) => i >= 0);
   const [seen, setSeen] = useState(text);
   if (seen !== text) {
     setSeen(text);
@@ -137,6 +138,7 @@ export function LineLayer({
               aria-selected={active === i}
               data-testid="line"
               data-text={line.text}
+              data-needs-shaping={line.read_only_reason === "needs-shaping" || undefined}
               className={cx("ed-line absolute cursor-text rounded-[3px]", active === i && "ed-line--active", disabled && "ed-line--busy")}
               style={geometryOf(i)}
               onPointerDown={(e) => interactive && e.stopPropagation()}

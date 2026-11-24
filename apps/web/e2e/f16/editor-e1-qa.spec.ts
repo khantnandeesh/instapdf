@@ -130,12 +130,13 @@ test("QA P1 (AC-83): one wide page doesn't shrink the others or scroll sideways"
   expect(await canvas.evaluate((c) => c.scrollWidth - c.clientWidth)).toBeLessThanOrEqual(1);
 });
 
-test("QA P2 (AC-75): Arabic added text is marked as not printable and Download asks first", async ({ page }) => {
+// Arabic and Hindi print since AC-224; Bengali still has no font we ship.
+test("QA P2 (AC-75): added text in a script we ship no font for is marked as not printable and Download asks first", async ({ page }) => {
   await open(page, corpus("std14-reportlab.pdf"));
-  await typeText(page, "مرحبا");
+  await typeText(page, "বাংলা");
   const note = page.getByTestId("text-missing");
   await expect(note).toBeVisible();
-  await expect(note).toContainText("م");
+  await expect(note).toContainText("ব");
   await page.getByRole("button", { name: "Download PDF" }).click();
   const ask = page.getByRole("dialog", { name: "Some characters won’t print" });
   await expect(ask).toBeVisible();
