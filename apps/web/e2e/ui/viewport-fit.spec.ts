@@ -86,8 +86,22 @@ for (const tool of usable) {
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (empty state)");
         await expectInViewport(page, page.getByTestId("drop-card").getByRole("button").first(), "file picker");
         await expectInViewport(page, page.getByTestId("dock-status"), "status line");
-        await expectInViewport(page, page.locator("[data-ip-dock]"), "options panel");
+        // The panel grows with its options and never scrolls inside (design rule "Scrolling"): its top
+        // and first option are on the first screen; a tall panel runs past the fold while its status and
+        // primary stay pinned to the bottom of the screen.
+        const dock = (await page.locator("[data-ip-dock]").boundingBox())!;
+        expect(dock.y, "options panel starts on the first screen").toBeGreaterThanOrEqual(0);
+        expect(dock.y + 120, "options panel: its first option is on the first screen").toBeLessThanOrEqual(height);
         await expectInViewport(page, page.getByTestId("drop-card"), "drop area");
+        // Scroll the page to the end of the panel (every option read): the drop area and the primary stay in view.
+        await page.evaluate(() => {
+          const r = document.querySelector("[data-ip-dock]")!.getBoundingClientRect();
+          window.scrollTo(0, Math.max(0, window.scrollY + r.bottom - window.innerHeight + 20));
+        });
+        await expectInViewport(page, page.getByTestId("primary-action"), "primary action (empty state, all options scrolled into view)");
+        await expectInViewport(page, page.getByTestId("drop-card").getByRole("button").first(), "file picker (all options scrolled into view)");
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
         const title = await page.getByRole("heading", { level: 1 }).boundingBox();
         expect(title!.height, "tool title fits on one line (the head has a fixed height)").toBeLessThanOrEqual(44);
         await noHorizontalScroll(page);

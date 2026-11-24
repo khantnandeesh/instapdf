@@ -1,11 +1,13 @@
 "use client";
 /**
  * Main-thread side of the editor engine worker. The worker (and the WebAssembly module it
- * loads) is created on the first call, which happens only after the user opens a file.
+ * loads) is created on the first call: `preloadEngine` when /edit-pdf is idle (not on Data Saver
+ * or 2g), or opening a file. Its load progress is published for the "Edit text" ring.
  * After a crash (WebAssembly.RuntimeError: the instance is unusable) the worker is dropped
  * and the next call starts a fresh one; the caller reopens its last good bytes.
  */
 import type { BerryError } from "./berry-engine";
+import { ENGINE_WASM_BYTES } from "./engine-assets";
 import type { EngineReply, EngineRequest, EngineResponse } from "./engine.worker";
 
 /**
@@ -33,8 +35,28 @@ type ReplyFor<O extends Call["op"]> = Extract<EngineReply, { op: O }>;
 
 let worker: Worker | null = null;
 let nextId = 1;
-type Pending = { resolve: (r: EngineReply) => void; reject: (e: EngineError) => void; timer: ReturnType<typeof setTimeout> };
+type Pending = { resolve: (r: EngineReply) => void; reject: (e: EngineError) => void; timer: ReturnType<typeof setTimeout> | null; ms: number };
 const pending = new Map<number, Pending>();
+
+/** Engine download and compile state (one per page). */
+export type EngineStatus = { state: "idle" | "loading" | "ready" | "failed"; loaded: number; total: number; cached?: boolean };
+let status: EngineStatus = { state: "idle", loaded: 0, total: ENGINE_WASM_BYTES };
+const listeners = new Set<() => void>();
+function setStatus(next: Partial<EngineStatus>) {
+  status = { ...status, ...next };
+  listeners.forEach((l) => l());
+}
+export const getEngineStatus = () => status;
+export function subscribeEngine(l: () => void): () => void {
+  listeners.add(l);
+  return () => listeners.delete(l);
+}
+
+/** The hang watchdog runs only once the engine is compiled: a slow download isn't a hang. */
+function arm(id: number, p: Pending) {
+  if (p.timer || status.state !== "ready") return;
+  p.timer = setTimeout(() => crash(id), p.ms);
+}
 
 /** Terminates the worker. Calls still waiting are rejected with `aborted`. */
 export function disposeEngine(): void {
@@ -43,16 +65,18 @@ export function disposeEngine(): void {
   const all = [...pending.values()];
   pending.clear();
   for (const p of all) {
-    clearTimeout(p.timer);
+    if (p.timer) clearTimeout(p.timer);
     p.reject({ kind: "aborted" });
   }
+  // The files stay in the HTTP cache: a new worker compiles them again without a download.
+  if (status.state !== "failed") setStatus({ state: "idle", loaded: 0 });
 }
 
 /** Settles call `id` with `crashed` and drops the worker. */
 function crash(id: number) {
   const p = pending.get(id);
   pending.delete(id);
-  if (p) clearTimeout(p.timer);
+  if (p?.timer) clearTimeout(p.timer);
   disposeEngine();
   p?.reject({ kind: "crashed" });
 }
@@ -62,13 +86,23 @@ function getWorker(): Worker {
   const w = new Worker(new URL("./engine.worker.ts", import.meta.url), { type: "module", name: "berry-engine" });
   w.onmessage = (event: MessageEvent<EngineResponse>) => {
     const msg = event.data;
+    if (worker !== w) return;
+    if ("progress" in msg) {
+      setStatus({ state: msg.ready ? "ready" : "loading", loaded: msg.progress.loaded, total: msg.progress.total, ...(msg.ready ? { cached: !!msg.cached } : {}) });
+      if (msg.ready) pending.forEach((p, id) => arm(id, p));
+      return;
+    }
     const p = pending.get(msg.id);
     if (!p) return;
     if (!msg.ok && msg.error.kind === "crashed") return crash(msg.id);
     pending.delete(msg.id);
-    clearTimeout(p.timer);
+    if (p.timer) clearTimeout(p.timer);
     if (msg.ok) p.resolve(msg.reply);
-    else p.reject(msg.error);
+    else {
+      // The download or compile failed (offline, server error): offer a retry.
+      if (status.state !== "ready") setStatus({ state: "failed" });
+      p.reject(msg.error);
+    }
   };
   w.onerror = (event) => {
     event.preventDefault();
@@ -84,10 +118,22 @@ function getWorker(): Worker {
 export function callEngine<C extends Call>(call: C, transfer: Transferable[] = []): Promise<ReplyFor<C["op"]>> {
   return new Promise((resolve, reject) => {
     const id = nextId++;
-    const timer = setTimeout(() => crash(id), engineTimeoutMs(call.op === "open" ? call.bytes.length : fileBytes));
-    pending.set(id, { resolve: resolve as (r: EngineReply) => void, reject, timer });
-    getWorker().postMessage({ ...call, id } as EngineRequest, transfer);
+    const p: Pending = { resolve: resolve as (r: EngineReply) => void, reject, timer: null, ms: engineTimeoutMs(call.op === "open" ? call.bytes.length : fileBytes) };
+    pending.set(id, p);
+    const w = getWorker();
+    if (status.state === "idle" || status.state === "failed") setStatus({ state: "loading", loaded: 0 });
+    arm(id, p);
+    w.postMessage({ ...call, id } as EngineRequest, transfer);
   });
+}
+
+/** Starts the engine download early (idle on /edit-pdf). Resolves when it's compiled; never throws. */
+export function preloadEngine(priority: "low" | "high" = "low"): Promise<boolean> {
+  if (status.state === "ready" || status.state === "loading") return Promise.resolve(status.state === "ready");
+  return callEngine({ op: "load", priority }).then(
+    () => true,
+    () => false,
+  );
 }
 
 /** Short user-facing text for an engine error. */

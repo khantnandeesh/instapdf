@@ -6,5 +6,6 @@
     "berry_engine_bg.wasm": "a2f215302c858508263143f12ab432c34123e92e9879619e615e42c3a342a5e1",
     "berry_engine.js": "1f12b7f6c466fb8614594c7895a0f2965172bb496c9dbfc077b1bc87e90c140f"
   },
-  "wasmGzipBytes": 723957
+  "wasmGzipBytes": 723957,
+  "wasmBytes": 2050036
 }

@@ -1,20 +1,26 @@
 /// <reference lib="webworker" />
 /**
- * Editor engine worker (F16 beta). Loads berry-engine (WebAssembly, public/engine/) on the
- * first message, which the page sends only after a file is opened. Bytes stay in memory on
- * this device: the only fetches are the engine's own two same-origin files.
+ * Editor engine worker (F16). Loads berry-engine (WebAssembly, public/engine/, served from
+ * content-hashed paths) on the first message: an idle prefetch on /edit-pdf, or opening a file.
+ * Bytes stay in memory on this device: the only fetches are the engine's own two same-origin files.
  */
 import type { BerryDocument as BerryDocumentType, BerryError, EditResult, PageText } from "./berry-engine";
 
-type EngineModule = { default: (opts: { module_or_path: string }) => Promise<unknown>; BerryDocument: typeof BerryDocumentType };
+import { ENGINE_JS, ENGINE_WASM, ENGINE_WASM_BYTES } from "./engine-assets";
+import { countBody, type Progress } from "./engine-load";
+
+type EngineModule = { default: (opts: { module_or_path: Response | Promise<Response> }) => Promise<unknown>; BerryDocument: typeof BerryDocumentType };
 
 export type EngineRequest =
+  /** Fetches and compiles the engine ahead of a file (`low`: idle prefetch). */
+  | { id: number; op: "load"; priority: "low" | "high" }
   | { id: number; op: "open"; bytes: Uint8Array }
   | { id: number; op: "text"; page: number }
   | { id: number; op: "replace"; page: number; line: number; text: string }
   | { id: number; op: "save" };
 
 export type EngineReply =
+  | { op: "load" }
   | { op: "open"; pageCount: number }
   | { op: "text"; page: PageText }
   /** `appended`: the output starts with the bytes before the edit (undo can keep just a length). */
@@ -23,6 +29,8 @@ export type EngineReply =
 
 export type EngineResponse =
   | { id: number; ok: true; reply: EngineReply }
+  /** Download progress of the WebAssembly file (id 0), and `ready` once it is compiled. */
+  | { id: 0; progress: Progress; ready?: boolean; cached?: boolean }
   /** `crashed`: the module aborted (WebAssembly.RuntimeError); the worker must be recreated. */
   | { id: number; ok: false; error: BerryError | { kind: "crashed" } | { kind: "internal"; message: string } };
 
@@ -32,11 +40,25 @@ let doc: BerryDocumentType | null = null;
 /** The bytes `doc` was opened from: an edit that fails after replaceLine is undone by reopening them. */
 let current: Uint8Array | null = null;
 
-function loadEngine(): Promise<EngineModule> {
+function loadEngine(priority: "low" | "high" = "high"): Promise<EngineModule> {
   engine ??= (async () => {
-    const url = new URL("/engine/berry_engine.js", scope.location.origin).href;
-    const mod = (await import(/* webpackIgnore: true */ url)) as EngineModule;
-    await mod.default({ module_or_path: new URL("/engine/berry_engine_bg.wasm", scope.location.origin).href });
+    const origin = scope.location.origin;
+    const mod = (await import(/* webpackIgnore: true */ new URL(ENGINE_JS, origin).href)) as EngineModule;
+    const res = await fetch(new URL(ENGINE_WASM, origin), { priority: priority === "low" ? "low" : "high" } as RequestInit);
+    if (!res.ok) throw new Error(`engine ${res.status}`);
+    // Still compiled while it streams (instantiateStreaming); each chunk reports progress.
+    let last = -1;
+    const counted = countBody(res, ENGINE_WASM_BYTES, (p) => {
+      const pct = Math.floor((p.loaded / p.total) * 100);
+      if (pct === last) return;
+      last = pct;
+      scope.postMessage({ id: 0, progress: p } satisfies EngineResponse);
+    });
+    await mod.default({ module_or_path: counted });
+    // From the HTTP cache (prefetched or a second visit): nothing came over the network.
+    const timing = performance.getEntriesByName(res.url).at(-1) as PerformanceResourceTiming | undefined;
+    const cached = !!timing && timing.transferSize === 0 && timing.decodedBodySize > 0;
+    scope.postMessage({ id: 0, progress: { loaded: ENGINE_WASM_BYTES, total: ENGINE_WASM_BYTES }, ready: true, cached } satisfies EngineResponse);
     return mod;
   })();
   engine.catch(() => (engine = null));
@@ -67,6 +89,10 @@ function rollback(BerryDocument: EngineModule["BerryDocument"], error: unknown):
 }
 
 async function handle(req: EngineRequest): Promise<EngineReply> {
+  if (req.op === "load") {
+    await loadEngine(req.priority);
+    return { op: "load" };
+  }
   const { BerryDocument } = await loadEngine();
   if (req.op === "open") {
     dropDoc();

@@ -818,7 +818,7 @@ Transitions only on `opacity` and `transform` (plus `background-color` / `border
 | Menu open (desktop) | Scrim fades in (`fast`); panel fades in and moves from `translateY(-8px)` (`base`, `ease-out`). Chevron rotates 180° (`fast`). Close: panel and scrim fade out (`fast`); content is unmounted after the transition (`transitionend`, or at once under reduced motion). |
 | Menu open (mobile) | Dialog fades in and rises from `translateY(16px)` (`base`); `::backdrop` not visible (the dialog is full screen). Close: fade (`fast`). |
 | Hero CTA / "See all" | Smooth scroll to `#tools` (`scroll-behavior` via `scrollIntoView({behavior})`, instant under reduced motion), then the search field gets focus (ring appears). |
-| Jump chip | Native smooth scroll (`html { scroll-behavior: smooth }` inside `@media (prefers-reduced-motion: no-preference)`). |
+| Jump chip | Native smooth scroll (`:root:has([data-ip-smooth-anchors]) { scroll-behavior: smooth }`, only on the home page so a tool's result screen never inherits it, inside `@media (prefers-reduced-motion: no-preference)`). |
 | Recent row fills | Chips fade in (`fast`) inside the already reserved box. |
 | Recent cleared | Row disappears without animation (it is user-initiated). |
 | Search match | `<mark>` appears with no animation. |

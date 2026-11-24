@@ -19,20 +19,6 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
   }
 }
 
-/* Fold fit: when a tool's options are taller than the panel (short laptop screens), they scroll inside
-   it and soft shadows at the cut edges say so. Pure CSS (background-attachment: local covers the
-   shadow while the content is at that end), so the strict CSP and reduced motion need nothing. */
-@media (min-width: 1024px) {
-  [data-ip-dock="side"] .ip-dock-scroll {
-    overscroll-behavior: contain;
-    background:
-      linear-gradient(var(--ip-surface-raised) 30%, transparent) top / 100% 24px no-repeat local,
-      linear-gradient(transparent, var(--ip-surface-raised) 70%) bottom / 100% 24px no-repeat local,
-      radial-gradient(farthest-side at 50% 0, rgb(0 0 0 / 0.1), transparent) top / 100% 10px no-repeat scroll,
-      radial-gradient(farthest-side at 50% 100%, rgb(0 0 0 / 0.1), transparent) bottom / 100% 10px no-repeat scroll;
-  }
-}
-
 /* The pages' own scroll area (>= 1024 px): a slim, squarish BerryPDF scroll bar, shown only when the
    pages overflow (overflow-y: auto). Chrome/Safari/Edge get the shaped bar; Firefox gets the thin
    coloured one (it has no shape control). */
