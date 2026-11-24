@@ -573,7 +573,8 @@ function setFieldValue(field: PDFField, f: FormField) {
     if (f.value) field.select(String(f.value));
     else field.clear();
   } else if (field instanceof PDFDropdown) {
-    if (f.value) field.select(String(f.value), f.editable);
+    // select(value, merge): never merge, a dropdown holds one value (own text on editable ones).
+    if (f.value) field.select(String(f.value));
     else field.clear();
   } else if (field instanceof PDFOptionList) {
     const v = Array.isArray(f.value) ? f.value : f.value ? [f.value] : [];
@@ -687,6 +688,13 @@ function borderWidthOf(widget: PDFWidgetAnnotation): number {
   return 1;
 }
 
+/** The largest size at which every option of a list fits its box (pdf-lib's 1.2 line spacing). */
+function listFit(f: FormField, font: PDFFont, widget: PDFWidgetAnnotation, bw: number): number {
+  const r = widget.getRectangle();
+  const inner = Math.max(1, r.height - 2 * (bw + 1));
+  return inner / Math.max(1, f.options.length) / (1.2 * font.heightAtSize(1));
+}
+
 /**
  * The size an "Auto" (0 Tf) field is drawn at: 12 pt, smaller when the box is short or a single
  * line is too long. The DA keeps 0 so other viewers size it themselves (G-3).
@@ -697,7 +705,7 @@ function autoSize(f: FormField, font: PDFFont, widget: PDFWidgetAnnotation, bw: 
   const [w, h] = rot === 90 ? [r.height, r.width] : [r.width, r.height];
   const inner = Math.max(1, h - 2 * bw - 2);
   let size = f.kind === "list" || f.multiline ? 12 : Math.min(12, inner / font.heightAtSize(1, { descender: true }));
-  if (f.kind === "list") size = Math.min(size, inner / Math.max(1, f.options.length) / 1.2);
+  if (f.kind === "list") size = Math.min(size, listFit(f, font, widget, bw));
   if (f.kind === "text" && !f.multiline && !f.comb) {
     const text = String(f.value);
     const room = w - 2 * bw - 4;
@@ -751,9 +759,16 @@ async function refreshAppearance(doc: PDFDocument, field: PDFField, f: FormField
   }
   const name = fonts.drName(font);
   const da = daString(name, f);
-  if (f.style.fontSize > 0) {
+  const fit = field instanceof PDFOptionList ? Math.min(...widgets.map((w) => listFit(f, font, w, borderWidthOf(w)))) : Infinity;
+  if (f.style.fontSize > 0 && f.style.fontSize <= fit) {
     field.acroField.setDefaultAppearance(da);
     field.updateAppearances(font);
+  } else if (f.style.fontSize > 0) {
+    // A list whose options don't all fit at its size is drawn smaller, so none is cut off (G-18).
+    for (const w of widgets) if (w.dict !== field.acroField.dict) w.dict.delete(N("DA"));
+    field.acroField.setDefaultAppearance(daString(name, { ...f, style: { ...f.style, fontSize: Math.max(4, Math.floor(fit * 10) / 10) } }));
+    field.updateAppearances(font);
+    field.acroField.setDefaultAppearance(da);
   } else {
     // Auto: drawn at a size that fits the smallest widget, the DA left at 0 Tf.
     for (const w of widgets) if (w.dict !== field.acroField.dict) w.dict.delete(N("DA"));

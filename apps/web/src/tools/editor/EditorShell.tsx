@@ -5,7 +5,8 @@
  * separate chunk once the user shows intent (AC-86).
  */
 import { emptyForm } from "@/lib/forms/model";
-import { FormsChrome, fieldKey, fieldTab, loadForms, nudgeAfterDownload } from "@/tools/forms/EditorForms";
+import { fieldKey, fieldTab, loadForms, nudgeAfterDownload } from "@/tools/forms/core";
+import { FormsChrome } from "@/tools/forms/lazy";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
@@ -246,7 +247,7 @@ export function EditorShell(props: ShellProps) {
         </EditorContext.Provider>
       ) : (
         <div className="ed-opening">
-          <header className="ed-top ed-glass">
+          <header className="ed-top ed-glass" role="group" aria-label="File">
             <h2 className="ed-file truncate">{props.name}</h2>
           </header>
           <div className="grid flex-1 place-items-center">

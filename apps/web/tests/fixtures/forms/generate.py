@@ -184,7 +184,37 @@ def scan_form():
     c.save()
 
 
+def form_extra():
+    """An editable dropdown, a push button, and a page whose crop box does not start at 0,0 (AC-230, AC-238)."""
+    path = os.path.join(HERE, "form-extra.pdf")
+    c = canvas.Canvas(path, pagesize=(700, 900), invariant=1, pageCompression=0)
+    f = c.acroForm
+    c.setFont("Helvetica", 12)
+    c.drawString(122, 800, "City")
+    f.choice(name="city", x=200, y=796, width=160, height=18, options=["Pune", "Delhi", "Chennai"], value="Pune", fieldFlags="combo edit", borderWidth=1)
+    c.drawString(122, 760, "Reset the form")
+    c.drawString(122, 720, "Crop box starts at 50, 60; this page is 595 x 820 as shown.")
+    c.showPage()
+    c.save()
+    with pikepdf.open(path, allow_overwriting_input=True) as pdf:
+        page = pdf.pages[0]
+        page.obj.CropBox = [50, 60, 645, 880]
+        ap = pdf.make_stream(b"0.85 g 0 0 90 20 re f 0 g BT /Helv 10 Tf 22 6 Td (Reset) Tj ET")
+        ap.Type = pikepdf.Name.XObject
+        ap.Subtype = pikepdf.Name.Form
+        ap.BBox = [0, 0, 90, 20]
+        ap.Resources = pikepdf.Dictionary(Font=pikepdf.Dictionary(Helv=pdf.Root.AcroForm.DR.Font.Helv))
+        btn = pdf.make_indirect(pikepdf.Dictionary(
+            Type=pikepdf.Name.Annot, Subtype=pikepdf.Name.Widget, FT=pikepdf.Name.Btn, Ff=65536, T=pikepdf.String("reset"),
+            Rect=[220, 754, 310, 774], F=4, P=page.obj, MK=pikepdf.Dictionary(CA=pikepdf.String("Reset")),
+            AP=pikepdf.Dictionary(N=ap), A=pikepdf.Dictionary(S=pikepdf.Name.ResetForm)))
+        page.obj.Annots.append(btn)
+        pdf.Root.AcroForm.Fields.append(btn)
+        pdf.save(path, deterministic_id=True)
+
+
 if __name__ == "__main__":
     detect_mix()
     form_basic()
     scan_form()
+    form_extra()

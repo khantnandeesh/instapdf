@@ -160,6 +160,13 @@ Totals: 6 win (M1, M5, M6, M7, M9, M10), 3 tie (M3, M4, M11), **3 lose (M2, M8, 
 
 None recorded.
 
+## Ownership of cross-cutting gaps (lead thread, 2026-11-24 16:39 UTC)
+
+- **M2 / G-8 (cloud and URL sources):** owned elsewhere, by the cloud pickers work (PR #32). Not a forms gap.
+- **M12 / G-7 (pages' share of the screen):** this run was before PR #37 (fit width, pages panel closed below 1600 px) reached staging. Re-measure on a build that has it. If it is still under about 80%, it is editor-wide layout work for the lead, not forms.
+- **Lighthouse TBT / G-9:** editor-wide chunk work, owned by the lead. For forms, the check is that the forms UI and Detect are not part of the editor's first load.
+- **Re-run fixtures:** `tests/parity/forms/form-extra.pdf` adds an editable dropdown, a push button and a crop box that starts at 50, 60 (G-17). "Repeat on all pages" is offered only on files with more than one page, so check G-5 on `detect-mix.pdf` or `report-form-3p.pdf`.
+
 ## Re-run notes
 
 - Sejda outputs and screenshots are cached in `docs/evals/cache/f16-forms/` (`sejda-t1-fill.pdf`, `sejda-t2-create.pdf`, `sejda-t3-detect.pdf`, `sejda-runs.json`). Reuse them. A re-evaluation needs no new Sejda task unless the reference changes.

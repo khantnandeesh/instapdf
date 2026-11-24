@@ -161,19 +161,22 @@ function dragWidget(e: ReactPointerEvent<HTMLDivElement>, w: Widget, p: FieldLay
 }
 
 /** The fill control for one widget (U-F1). */
-function Control({ f, w, fontPx, widthPx, onValue, onSign }: { f: FormField; w: Widget; fontPx: number; widthPx: number } & FieldLayerProps) {
+function Control({ f, w, fontPx, widthPx, onValue, onSign, mode }: { f: FormField; w: Widget; fontPx: number; widthPx: number } & FieldLayerProps) {
   const style: CSSProperties = { fontSize: fontPx, textAlign: f.style.align, color: f.style.color };
   const label = f.tooltip || f.name;
+  // With the Form tool, an empty field shows its name inside it, clear of the page's own text (U-F2).
+  const named = mode === "edit" ? f.name : undefined;
   switch (f.kind) {
     case "text":
       return f.multiline ? (
-        <textarea className="bf-input" style={style} value={String(f.value)} readOnly={f.readOnly} maxLength={f.maxLen ?? undefined} aria-label={label} aria-required={f.required} onChange={(e) => onValue?.(f.id, e.target.value)} />
+        <textarea className="bf-input" style={style} value={String(f.value)} placeholder={named} readOnly={f.readOnly} maxLength={f.maxLen ?? undefined} aria-label={label} aria-required={f.required} onChange={(e) => onValue?.(f.id, e.target.value)} />
       ) : (
         <input
           className="bf-input"
           data-comb={f.comb && f.maxLen ? f.maxLen : undefined}
           style={f.comb && f.maxLen ? combStyle(style, widthPx / f.maxLen, fontPx) : style}
           value={String(f.value)}
+          placeholder={named}
           readOnly={f.readOnly}
           maxLength={f.maxLen ?? undefined}
           aria-label={label}
@@ -197,7 +200,7 @@ function Control({ f, w, fontPx, widthPx, onValue, onSign }: { f: FormField; w: 
     case "dropdown":
       return (
         <select className="bf-input" style={style} value={String(f.value)} disabled={f.readOnly} aria-label={label} onChange={(e) => onValue?.(f.id, e.target.value)}>
-          <option value="" />
+          <option value="">{named}</option>
           {f.options.map((o) => (
             <option key={o}>{o}</option>
           ))}
@@ -213,8 +216,9 @@ function Control({ f, w, fontPx, widthPx, onValue, onSign }: { f: FormField; w: 
       );
     case "signature":
       return (
-        <button type="button" className="bf-sign" onClick={() => onSign?.(f.id, w.id)} aria-label={`Sign: ${label}`}>
-          Sign
+        // A field from the file with its own look ("Sign here") already shows on the page image.
+        <button type="button" className="bf-sign" data-drawn={w.drawn || undefined} onClick={() => onSign?.(f.id, w.id)} aria-label={`Sign: ${label}`}>
+          {!w.drawn && "Sign"}
         </button>
       );
     default:

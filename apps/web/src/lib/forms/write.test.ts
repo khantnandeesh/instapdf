@@ -167,6 +167,19 @@ describe("applyForms: appearance details (G-3, G-6)", () => {
     expect(raw).not.toContain("dummy__noop");
   });
 
+  it("draws every option of a list that is too short for its size (G-18)", async () => {
+    const { bytes } = await roundTrip(await fixture("form-basic.pdf"), (s) => setValue(s, s.fields.find((f) => f.name === "days")!.id, ["Mon", "Thu"]).state);
+    const doc = await PDFDocument.load(bytes);
+    const list = doc.getForm().getOptionList("days");
+    expect(list.acroField.getDefaultAppearance()).toMatch(/ 12 Tf/);
+    const w = list.acroField.getWidgets()[0];
+    const content = new TextDecoder().decode(decodePDFRawStream(doc.context.lookup(w.getNormalAppearance() as PDFRef) as PDFRawStream).decode());
+    expect(content.match(/Tj/g)?.length).toBeGreaterThanOrEqual(list.getOptions().length);
+    const size = Number(/([\d.]+) Tf/.exec(content)?.[1]);
+    const helv = await doc.embedFont("Helvetica");
+    expect(list.getOptions().length * 1.2 * helv.heightAtSize(size)).toBeLessThanOrEqual(w.getRectangle().height - 2);
+  });
+
   it("keeps a legacy /Border on refill and leaves untouched fields without an appearance alone", async () => {
     const src = await fixture("form-basic.pdf");
     const before = await PDFDocument.load(src);
@@ -178,6 +191,28 @@ describe("applyForms: appearance details (G-3, G-6)", () => {
     expect(street.acroField.getDefaultAppearance()).toMatch(/ 0 Tf/);
     const town = doc.getForm().getTextField("address.town").acroField.getWidgets()[0].dict.get(PDFName.of("AP"));
     expect(String(town)).toBe(String(townAp));
+  });
+});
+
+describe("form-extra.pdf: editable dropdown, push button, offset crop box (AC-230, AC-238, G-17)", () => {
+  it("reads an editable dropdown and a push button, and keeps the button on fill", async () => {
+    const src = await fixture("form-extra.pdf");
+    const doc = await PDFDocument.load(src);
+    const s = readForm(doc, pagesOf(doc));
+    const city = s.fields.find((f) => f.name === "city")!;
+    expect(city).toMatchObject({ kind: "dropdown", editable: true, value: "Pune", options: ["Pune", "Delhi", "Chennai"] });
+    expect(s.fields.find((f) => f.name === "reset")?.kind).toBe("button");
+    const { bytes } = await roundTrip(src, (st) => setValue(st, st.fields.find((f) => f.name === "city")!.id, "Nagpur").state);
+    const out = await PDFDocument.load(bytes);
+    expect(out.getForm().getDropdown("city").getSelected()).toEqual(["Nagpur"]);
+    expect(out.getForm().getButton("reset")).toBeDefined();
+    expect(qpdfCheck(bytes)).toEqual([]);
+  });
+
+  it("places a new field where it was drawn on a page whose crop box starts at 50, 60", async () => {
+    const { bytes } = await roundTrip(await fixture("form-extra.pdf"), (st) => addField(st, createField(st, { kind: "text", page: "p0", box: { x: 72, y: 72, w: 200, h: 20 }, name: "added" })));
+    const r = (await PDFDocument.load(bytes)).getForm().getTextField("added").acroField.getWidgets()[0].getRectangle();
+    expect([r.x, r.y + r.height, r.width, r.height]).toEqual([50 + 72, 880 - 72, 200, 20]);
   });
 });
 

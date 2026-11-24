@@ -25,7 +25,7 @@ import { lineAt } from "@/lib/editor/line-hit";
 import { release, renderPage, swapCanvas } from "./render";
 import { shallowArray, useStore, type EditorState } from "./store";
 import { TOOL_NAMES } from "./controller";
-import { FieldPopover, PageFields } from "@/tools/forms/EditorForms";
+import { FieldPopover, PageFields } from "@/tools/forms/lazy";
 
 type Gesture =
   | { type: "move"; ids: string[]; start: Pt; origin: EditorObject[]; moved: boolean; pointer: number }
