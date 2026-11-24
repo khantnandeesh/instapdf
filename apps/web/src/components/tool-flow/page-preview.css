@@ -1,0 +1,131 @@
+/*
+ * The big page view (PagePreviewDialog; docs/design/berrypdf.md "Modals"). Component-local: ships with the lazy
+ * preview chunk only. The page fills the stage; the chrome is a quiet counter, a small close button and two small
+ * round arrows. Guarded by e2e/ui/modals.spec.ts.
+ */
+.ip-pv {
+  position: relative;
+  display: grid;
+  grid-template-rows: 48px minmax(0, 1fr) auto;
+  width: 100%;
+  height: 100%;
+  color: var(--surface);
+  user-select: none;
+}
+
+/* Slim top row: only the close button (and the counter from 640px, positioned below). */
+.ip-pv__top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 8px;
+}
+
+/* The space the page fills. Clips (never scrolls) a quarter-turned page's layout box. Horizontal swipes are ours;
+   pinch-zoom stays the browser's. */
+.ip-pv__stage {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 0 8px;
+  overflow: clip;
+  touch-action: pinch-zoom;
+}
+
+/* The page: white paper with a hairline edge and a soft drop, so a white page reads on the scrim. */
+.ip-pv__paper {
+  display: block;
+  flex: none;
+  background: var(--color-paper);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ink-black) 35%, transparent),
+    0 12px 40px color-mix(in srgb, black 45%, transparent);
+}
+.ip-pv__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ip-pv__canvas--in {
+  animation: ip-pv-in 140ms ease-out;
+}
+@keyframes ip-pv-in {
+  from {
+    opacity: 0.4;
+  }
+}
+
+/* Phones: prev, counter and next in a bottom bar, in reach of the thumb. */
+.ip-pv__bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 8px 8px calc(10px + env(safe-area-inset-bottom));
+}
+
+.ip-pv__count {
+  min-width: 64px;
+  text-align: center;
+  font: 500 14px/20px var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+
+/* Small, quiet round icon buttons on the scrim. */
+.ip-pv__btn {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 12%, transparent);
+  color: var(--surface);
+  cursor: pointer;
+  transition: background-color var(--dur-base);
+}
+.ip-pv__btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--surface) 22%, transparent);
+}
+.ip-pv__btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* From 640px: the arrows sit beside the page, centred on it; the counter sits top left. */
+@media (min-width: 640px) {
+  .ip-pv {
+    grid-template-rows: 52px minmax(0, 1fr);
+  }
+  .ip-pv__top {
+    padding: 0 12px;
+  }
+  .ip-pv__stage {
+    padding: 0 72px 16px;
+  }
+  .ip-pv__bar {
+    display: contents;
+  }
+  .ip-pv__prev,
+  .ip-pv__next {
+    position: absolute;
+    top: calc(50% + 18px);
+    width: 44px;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+  .ip-pv__prev {
+    left: 16px;
+  }
+  .ip-pv__next {
+    right: 16px;
+  }
+  .ip-pv__count {
+    position: absolute;
+    top: 14px;
+    left: 20px;
+    min-width: 0;
+    text-align: start;
+  }
+}

@@ -1,0 +1,39 @@
+/*
+ * Modal chrome (docs/design/berrypdf.md "Modals"). Component-local: imported by Dialog, never globals.css.
+ * Guarded by e2e/ui/modals.spec.ts.
+ */
+
+/* A small title: the content is what the dialog is about, not the heading. */
+.mp-modal__title {
+  margin: 0;
+  color: var(--ink-black);
+  font: 600 18px/1.35 var(--font-display);
+}
+
+/* Normal-size buttons: 15px, about 40px tall with the lip (cap 48px), as wide as their label. */
+.mp-modal .mp-btn:not(.mp-btn--plain) {
+  font-size: 15px;
+  line-height: 20px;
+  padding: 9px 16px;
+  border-radius: 12px;
+}
+
+/* On-theme focus: a 2px berry ring, keyboard only (:focus-visible), never after a pointer click.
+   Fields keep their own focus edge; a focus the page moved after a click stays quiet. */
+:is(.mp-modal, .mp-sheet) :focus-visible:not(.ip-field, [data-quiet-focus]) {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* The page viewer's scrim: dark enough that a white page reads, berry-warm like the rest. */
+.mp-viewer::backdrop {
+  background: color-mix(in srgb, var(--ink-black) 92%, transparent);
+  backdrop-filter: blur(4px);
+}
+.mp-viewer :focus-visible:not([data-quiet-focus]) {
+  outline: 2px solid var(--brand-tint);
+  outline-offset: 2px;
+}
+.mp-viewer :focus:not(:focus-visible) {
+  outline: none;
+}
