@@ -16,7 +16,8 @@ export function collect(report, acc = { desktop: {}, mobile: {}, serial: {} }) {
       for (const t of spec.tests ?? []) {
         const last = t.results?.at(-1);
         if (!last) continue;
-        const serial = spec.title.includes("@serial") || (spec.tags ?? []).includes("@serial") || (t.tags ?? []).includes("@serial");
+        const tags = [...(spec.tags ?? []), ...(t.tags ?? [])].map((x) => x.replace(/^@/, ""));
+        const serial = spec.title.includes("@serial") || tags.includes("serial");
         const bucket = serial ? "serial" : t.projectName;
         if (!acc[bucket]) continue;
         const key = `e2e/${spec.file ?? f}`;

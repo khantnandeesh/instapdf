@@ -19,33 +19,39 @@ import { CLOUD_SPECS, listSpecs, selectSpecs } from "./affected.mjs";
 const webRoot = fileURLToPath(new URL("../../", import.meta.url));
 const repoRoot = join(webRoot, "../..");
 
-/** Seconds of test time a shard should hold (per worker), before the fixed ~1.5 min of setup. */
-export const TARGET_SECONDS = 150;
+/** Seconds of test time a machine should hold (per worker), before the fixed ~1.5 min of setup. */
+export const TARGET_SECONDS = 180;
 
 /** The kinds of e2e rows. Cloud rows build the app with cloud sources and the mock provider on. */
 export const ROW_KINDS = [
-  { key: "desktop", bucket: "desktop", args: ["--project", "desktop", "--grep-invert", "@serial"], workers: 4, maxShards: 5 },
-  { key: "mobile", bucket: "mobile", args: ["--project", "mobile", "--grep-invert", "@serial"], workers: 4, maxShards: 4 },
+  { key: "desktop", bucket: "desktop", args: ["--project", "desktop", "--grep-invert", "@serial"], workers: 3, maxShards: 5 },
+  { key: "mobile", bucket: "mobile", args: ["--project", "mobile", "--grep-invert", "@serial"], workers: 3, maxShards: 4 },
   // Wall-clock limits and heavy loads: one worker, so no other test's load decides their result.
   { key: "serial", bucket: "serial", args: ["--grep", "@serial"], workers: 1, maxShards: 4 },
-  { key: "cloud desktop", bucket: "desktop", cloud: true, args: ["--project", "desktop", "--grep-invert", "@serial"], workers: 4, maxShards: 4 },
-  { key: "cloud mobile", bucket: "mobile", cloud: true, args: ["--project", "mobile", "--grep-invert", "@serial"], workers: 4, maxShards: 4 },
+  { key: "cloud desktop", bucket: "desktop", cloud: true, args: ["--project", "desktop", "--grep-invert", "@serial"], workers: 3, maxShards: 4 },
+  { key: "cloud mobile", bucket: "mobile", cloud: true, args: ["--project", "mobile", "--grep-invert", "@serial"], workers: 3, maxShards: 4 },
   { key: "cloud serial", bucket: "serial", cloud: true, args: ["--grep", "@serial"], workers: 1, maxShards: 3 },
 ];
 
-const testCount = (src, serial) =>
-  [...src.matchAll(/^\s*test(?:\.(?:only|fixme))?\(\s*(["'`])(.*?)\1/gm)].filter((m) => m[2].includes("@serial") === serial).length +
+/** Tests declared in a spec file, by whether their line carries the @serial tag. */
+export const testCount = (src, serial) =>
+  [...src.matchAll(/^\s*test(?:\.(?:only|fixme))?\(.*$/gm)].filter((m) => m[0].includes("@serial") === serial).length +
   (serial ? 0 : [...src.matchAll(/^\s*for \(/gm)].length * 2); // a loop of tests: guess a few
 
-/** Estimated seconds for a spec file in a bucket: measured when known, else from its test count. */
+/**
+ * Estimated seconds for a spec file in a bucket: measured when known, else from its test count.
+ * Whether a file belongs in a bucket comes from its source, never from old timings, so a test
+ * added to a file always runs; 0 means the file has no tests for that bucket.
+ */
 export function estimate(timings, bucket, spec) {
-  const known = timings[bucket]?.[spec];
-  if (typeof known === "number") return known;
   const src = readFileSync(join(webRoot, spec), "utf8");
-  const tagged = src.includes("@serial");
+  const serial = bucket === "serial";
+  const count = testCount(src, serial);
+  if (count === 0) return 0;
+  const known = timings[bucket]?.[spec];
   // Measured in CI on 24 Nov: about 3 s of worker time per test, 15 s per @serial test and project.
-  if (bucket === "serial") return tagged ? 15 * Math.max(1, testCount(src, true)) * 2 : 0;
-  return 3 * testCount(src, false);
+  const guess = serial ? 30 * count : 3 * count;
+  return Math.max(1, typeof known === "number" ? known : guess);
 }
 
 /** Longest-processing-time-first packing of weighted items into n bins. */

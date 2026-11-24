@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ALWAYS, AREAS, CLOUD_SPECS, listSpecs, selectSpecs, specGroup } from "./affected.mjs";
-import { buildMatrix, pack, ROW_KINDS } from "./plan.mjs";
+import { buildMatrix, pack, ROW_KINDS, testCount } from "./plan.mjs";
 
 const webRoot = fileURLToPath(new URL("../../", import.meta.url));
 const repoRoot = join(webRoot, "../..");
@@ -107,7 +107,7 @@ describe("shard plan", () => {
       const files = rows.filter((r) => r.name === kind.key || r.name.startsWith(`${kind.key} `)).flatMap((r) => r.files.split(" "));
       const want = specs.filter((s) => !kind.cloud || CLOUD_SPECS.some((c) => s === c || s.startsWith(c)));
       // Files whose every test is @serial may be left out of the parallel rows.
-      const allSerial = (s) => !/^\s*test(?:\.(?:only|fixme))?\(\s*(["'`])(?:(?!@serial).)*?\1/m.test(readFileSync(join(webRoot, s), "utf8"));
+      const allSerial = (s) => testCount(readFileSync(join(webRoot, s), "utf8"), false) === 0;
       expect(want.filter((s) => !files.includes(s) && !allSerial(s)), kind.key).toEqual([]);
       expect(new Set(files).size, `${kind.key}: a file in two shards`).toBe(files.length);
     }
