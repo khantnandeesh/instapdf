@@ -119,6 +119,30 @@ export class BerryDocument {
         }
     }
     /**
+     * Returns `{ bytes: Uint8Array, format, complete, glyphs }`.
+     * @param {number} font_object
+     * @param {string} chars
+     * @returns {any}
+     */
+    fontProgram(font_object, chars) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16) >>> 0;
+            const val2 = +font_object;
+            const ptr0 = passStringToWasm0(chars, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.berrydocument_fontProgram(retptr, this.__wbg_ptr, val2, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeFromExternrefTable0(r1);
+            }
+            return takeFromExternrefTable0(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
      * Every font in the document, once each.
      * @returns {any}
      */

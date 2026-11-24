@@ -8,3 +8,6 @@ publish.workspace = true
 
 [dependencies]
 ttf-parser = "0.25"
+
+[dev-dependencies]
+berry-engine = { path = "../berry-engine" }

@@ -34,7 +34,8 @@ struct Set<'a>(&'a [(char, Glyph)]);
 impl<'a> Set<'a> {
     fn of(&self, chars: &'a str) -> impl Iterator<Item = &'a Glyph> + 'a {
         let all = self.0;
-        all.iter().filter(move |(c, _)| chars.contains(*c)).map(|(_, g)| g)
+        // Shape measurements need ink: a widths-only glyph has an advance and nothing else.
+        all.iter().filter(move |(c, g)| chars.contains(*c) && g.has_ink()).map(|(_, g)| g)
     }
 }
 

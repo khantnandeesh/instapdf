@@ -72,6 +72,7 @@ dependencies = [
 name = "berry-fontmatch"
 version = "0.1.0"
 dependencies = [
+ "berry-engine",
  "ttf-parser",
 ]
 

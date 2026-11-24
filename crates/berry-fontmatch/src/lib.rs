@@ -11,7 +11,7 @@
 mod measure;
 mod outline;
 
-pub use outline::{Glyph, GlyphSource, OpenTypeSource};
+pub use outline::{Glyph, GlyphSource, OpenTypeSource, ProgramSource};
 
 /// Length of the coarse vector in bytes.
 pub const COARSE_LEN: usize = 64;
@@ -62,27 +62,58 @@ pub const ALPHABET: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
 #[derive(Clone, Debug, PartialEq)]
 pub struct Fingerprint {
     pub coarse: [u8; COARSE_LEN],
-    /// Signature per character the font draws, in [`ALPHABET`] order.
+    /// Signature per character the font draws, in the order asked for.
     pub glyphs: Vec<(char, [u8; SIG_LEN])>,
 }
 
-/// Fingerprints a font from the characters of [`ALPHABET`] that `keep` allows and the font draws.
-/// `keep` lets a caller measure a font as a subset would show it.
-pub fn fingerprint_with(src: &dyn GlyphSource, keep: &dyn Fn(char) -> bool) -> Fingerprint {
-    let glyphs: Vec<(char, Glyph)> =
-        ALPHABET.chars().filter(|c| keep(*c)).filter_map(|c| src.glyph(c).filter(|g| g.has_ink()).map(|g| (c, g))).collect();
+/// Fingerprints a font from the characters of `chars` it draws. The coarse vector reads only
+/// the Latin letters among them; every character gets a signature, so fonts of any script can be
+/// compared glyph by glyph.
+pub fn fingerprint_chars(src: &dyn GlyphSource, chars: &str) -> Fingerprint {
+    let mut glyphs: Vec<(char, Glyph)> = Vec::new();
+    for c in chars.chars() {
+        if glyphs.iter().any(|(have, _)| *have == c) {
+            continue;
+        }
+        if let Some(g) = src.glyph(c).filter(|g| g.has_ink()) {
+            glyphs.push((c, g));
+        }
+    }
     let coarse = measure::coarse(&glyphs);
     let sigs = glyphs.iter().map(|(c, g)| (*c, measure::signature(g))).collect();
     Fingerprint { coarse, glyphs: sigs }
 }
 
+/// Fingerprints a font from the characters of [`ALPHABET`] that `keep` allows and the font draws.
+/// `keep` lets a caller measure a font as a subset would show it.
+pub fn fingerprint_with(src: &dyn GlyphSource, keep: &dyn Fn(char) -> bool) -> Fingerprint {
+    let chars: String = ALPHABET.chars().filter(|c| keep(*c)).collect();
+    fingerprint_chars(src, &chars)
+}
+
 pub fn fingerprint(src: &dyn GlyphSource) -> Fingerprint {
-    fingerprint_with(src, &|_| true)
+    fingerprint_chars(src, ALPHABET)
 }
 
 /// Fingerprints a TrueType or OpenType font file. `None` when the bytes are not such a font.
 pub fn fingerprint_bytes(bytes: &[u8]) -> Option<Fingerprint> {
     Some(fingerprint(&OpenTypeSource::parse(bytes)?))
+}
+
+/// Fingerprints a font program embedded in a PDF. `glyphs` lists, per character, the glyph
+/// index in the program and the advance in 1/1000 em, as the PDF's font dictionary gives them.
+/// `None` when the program cannot be read (compare widths with [`fingerprint_widths`] then).
+pub fn fingerprint_program(format: &str, bytes: &[u8], glyphs: &[(char, u16, f32)]) -> Option<Fingerprint> {
+    let chars: String = glyphs.iter().map(|g| g.0).collect();
+    Some(fingerprint_chars(&ProgramSource::parse(format, bytes, glyphs)?, &chars))
+}
+
+/// The little a font without a readable program still tells: its letter widths. Enough to find
+/// a metric-compatible twin, not a look-alike.
+pub fn fingerprint_widths(widths: &[(char, f32)]) -> Fingerprint {
+    let glyphs: Vec<(char, Glyph)> =
+        widths.iter().map(|(c, w)| (*c, Glyph { advance: w / 1000.0, contours: Vec::new() })).collect();
+    Fingerprint { coarse: measure::coarse(&glyphs), glyphs: Vec::new() }
 }
 
 /// Weighted mean difference of two coarse vectors over the bytes both have measured, 0 (same)

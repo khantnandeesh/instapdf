@@ -145,3 +145,47 @@ impl ttf_parser::OutlineBuilder for Flatten {
     }
     fn close(&mut self) {}
 }
+
+/// A font program embedded in a PDF: the PDF, not the program, says which glyph draws a
+/// character and how wide it is.
+pub struct ProgramSource<'a> {
+    kind: ProgramKind<'a>,
+    /// (character, glyph index, advance in 1/1000 em).
+    glyphs: &'a [(char, u16, f32)],
+}
+
+enum ProgramKind<'a> {
+    OpenType(Box<OpenTypeSource<'a>>),
+    Cff(Box<ttf_parser::cff::Table<'a>>),
+}
+
+impl<'a> ProgramSource<'a> {
+    /// `format` is "truetype" (a TrueType or OpenType file) or "cff" (a bare CFF table).
+    pub fn parse(format: &str, bytes: &'a [u8], glyphs: &'a [(char, u16, f32)]) -> Option<Self> {
+        let kind = match format {
+            "truetype" => ProgramKind::OpenType(Box::new(OpenTypeSource::parse(bytes)?)),
+            "cff" => ProgramKind::Cff(Box::new(ttf_parser::cff::Table::parse(bytes)?)),
+            _ => return None,
+        };
+        Some(ProgramSource { kind, glyphs })
+    }
+}
+
+impl GlyphSource for ProgramSource<'_> {
+    fn glyph(&self, ch: char) -> Option<Glyph> {
+        let &(_, gid, width) = self.glyphs.iter().find(|(c, _, _)| *c == ch)?;
+        if gid == 0 {
+            return None;
+        }
+        let contours = match &self.kind {
+            ProgramKind::OpenType(src) => src.glyph_by_id(gid)?.contours,
+            ProgramKind::Cff(cff) => {
+                // CFF outlines are in glyph space; the font matrix (usually 0.001) scales to the em.
+                let mut b = Flatten { scale: cff.matrix().sx, contours: Vec::new(), at: (0.0, 0.0) };
+                cff.outline(ttf_parser::GlyphId(gid), &mut b).ok()?;
+                b.contours
+            }
+        };
+        Some(Glyph { advance: width / 1000.0, contours })
+    }
+}
