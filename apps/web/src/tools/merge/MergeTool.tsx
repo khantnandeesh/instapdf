@@ -493,8 +493,18 @@ export function MergeTool() {
     api.current?.setView("pages");
     setInserted(new Set(added.map((p) => p.uid)));
     announce(c.pagesAdded(added.length, before ? c.after(labelOf(before)) : c.atEnd));
-    focusOn(added[0]?.uid, true);
+    // Focus the first new tile once the picker has closed (spec M-6): while the modal is
+    // open the grid behind it is inert, and closing it hands focus back to its opener.
+    focusAfterPicker.current = added[0]?.uid ?? null;
   };
+  const focusAfterPicker = useRef<string | null>(null);
+  // Runs after the dialog's own close effect (a parent's effects run after its children's).
+  useEffect(() => {
+    if (picker || !focusAfterPicker.current) return;
+    const uid = focusAfterPicker.current;
+    focusAfterPicker.current = null;
+    focusOn(uid, true);
+  }, [picker]);
   const cancelPicker = () => {
     const pk = pickerRef.current;
     if (!pk) return;
@@ -650,6 +660,8 @@ export function MergeTool() {
 
   // BerryPDF EditorToolbar: blueberry editing tools, like "Add files" beside them.
   const toolbarButton = "mp-btn mp-btn--tool whitespace-nowrap max-sm:size-11 max-sm:px-0";
+  // The phone Add menu: + and the word "Add", 44 px tall (the only add control below 640 px).
+  const phoneAddButton = "mp-btn mp-btn--tool shadow-glow h-11 gap-1.5 whitespace-nowrap px-3.5";
 
   const renderWorkspace = (w: WorkspaceContext) => (
     <>
@@ -752,7 +764,6 @@ export function MergeTool() {
         }}
         workspaceEmpty={pages.length === 0 && !picker}
         viewToggleFromOneFile
-        compactAddFiles
         optionsBadge={changed ? c.changed(changed) : undefined}
         copyOverrides={{ pickerButton: c.pickerButton, pickerHint: c.pickerHint, limits: c.limits, limitsFull: c.limitsFull, statusEmpty: c.statusEmpty, errorType: c.errorType }}
         canRun={() => (pages.some((p) => p.pending) || picker ? c.statusPending : pages.length ? true : c.statusEmpty)}
@@ -767,22 +778,45 @@ export function MergeTool() {
             <ChevronDownIcon size={16} className="max-md:hidden" />
           </MenuButton>
         )}
+        phoneAddMenu={() => document.querySelector<HTMLElement>("[data-testid=add-menu]")}
         toolbarEnd={(w) => (
-          <MenuButton
-            label={c.addPages}
-            placement="bottom-end"
-            disabled={w.dimmed}
-            className={cx(toolbarButton, "-ms-1")}
-            items={[
-              { id: "from-file", label: c.fromFile, onSelect: () => openPagesPicker(null) },
-              { id: "blank", label: c.blankPage, onSelect: toolbarBlank },
-            ]}
-            data-testid="add-pages-menu"
-          >
-            <PlusIcon size={18} className="sm:hidden" />
-            <span className="max-sm:sr-only">{c.addPages}</span>
-            <ChevronDownIcon size={16} className="max-sm:hidden" />
-          </MenuButton>
+          <>
+            {/* ≥ 640 px: "Add pages" beside the flow's "Add files" (spec F3 M-3). */}
+            <span className="contents max-sm:hidden">
+              <MenuButton
+                label={c.addPages}
+                placement="bottom-end"
+                disabled={w.dimmed}
+                className={cx(toolbarButton, "-ms-1")}
+                items={[
+                  { id: "from-file", label: c.fromFile, onSelect: () => openPagesPicker(null) },
+                  { id: "blank", label: c.blankPage, onSelect: toolbarBlank },
+                ]}
+                data-testid="add-pages-menu"
+              >
+                <span>{c.addPages}</span>
+                <ChevronDownIcon size={16} />
+              </MenuButton>
+            </span>
+            {/* < 640 px: one "Add" menu replaces both (spec F3 M-3, eval G-2). */}
+            <span className="contents sm:hidden">
+              <MenuButton
+                label={c.add}
+                placement="bottom-end"
+                disabled={w.dimmed}
+                className={phoneAddButton}
+                items={[
+                  { id: "files", label: c.addFilesItem, onSelect: () => w.api.openPicker() },
+                  { id: "from-file", label: c.fromFile, onSelect: () => openPagesPicker(null) },
+                  { id: "blank", label: c.blankPage, onSelect: toolbarBlank },
+                ]}
+                data-testid="add-menu"
+              >
+                <PlusIcon size={18} />
+                <span>{c.add}</span>
+              </MenuButton>
+            </span>
+          </>
         )}
         inspectPdf={inspectPdf}
         renderOptions={(ctx) => <MergeOptions value={options} onChange={changeOptions} announce={ctx.announce} />}

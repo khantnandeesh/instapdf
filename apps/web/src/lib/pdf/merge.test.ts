@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { PDFDict, PDFDocument, PDFName, PDFRawStream } from "pdf-lib";
 import { beforeAll, describe, expect, it } from "vitest";
 import { defaultMergeOptions, type MergeOptions } from "./merge-options";
-import { mergePdf, type MergeInput, type MergePageInput, type MergeSourceInput } from "./merge";
+import { mergePdf, TOC, tocLeader, type MergeInput, type MergePageInput, type MergeSourceInput } from "./merge";
 import type { FontManifest, FontSource } from "./text";
 
 const fixtures = new URL("../../../tests/fixtures/", import.meta.url);
@@ -248,6 +248,37 @@ describe("contents page", () => {
     expect(all).toEqual(names.map((_, i) => toc + i + 1));
     const t = (await texts(r.bytes)).slice(0, toc).join(" ");
     for (const n of names) expect(t).toContain(n);
+  });
+  it("G-4: entries are at least 14 pt and each one has a dot leader running from its name to its number", async () => {
+    const r = await merge(["alpha.pdf", "bravo.pdf"], { toc: "names" });
+    const doc = await pdfjs(r.bytes);
+    const page = await doc.getPage(1);
+    const items = (await page.getTextContent()).items.flatMap((it) => ("str" in it && it.str.trim() ? [{ str: it.str, x: it.transform[4] as number, y: it.transform[5] as number, size: Math.hypot(it.transform[0], it.transform[1]), w: it.width }] : []));
+    const entry = (str: string) => items.find((it) => it.str.includes(str))!;
+    for (const name of ["alpha.pdf", "bravo.pdf", "2", "5"]) expect(entry(name).size).toBeGreaterThanOrEqual(14);
+    expect(entry("Contents").size).toBeGreaterThan(entry("alpha.pdf").size);
+    // The leaders are stroked, round-capped dashes [0 pitch]: one per entry, vector only (no text added).
+    const { OPS } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const ops = await page.getOperatorList();
+    const dashes = ops.fnArray.flatMap((fn, i) => (fn === OPS.setDash ? [ops.argsArray[i] as [number[], number]] : []));
+    const leaders = dashes.filter(([arr]) => arr.length === 2 && arr[0] === 0 && arr[1] === TOC.dotPitch);
+    expect(leaders).toHaveLength(2);
+    expect(ops.fnArray.filter((fn) => fn === OPS.setLineCap)).not.toHaveLength(0);
+    expect(items.map((it) => it.str).join("")).not.toContain("..."); // no text dots
+    await doc.loadingTask.destroy();
+    expect(await links(r.bytes, 1)).toEqual([2, 5]);
+  });
+  it("G-4: the leader sits between the name and the number, on a shared dot grid", () => {
+    const l = tocLeader(120.3, 500, 50)!;
+    expect(l.from).toBeGreaterThanOrEqual(120.3 + TOC.leaderGap);
+    expect(l.to).toBeLessThanOrEqual(500 - TOC.leaderGap);
+    expect((l.from - 50) % TOC.dotPitch).toBe(0);
+    expect((l.to - 50) % TOC.dotPitch).toBe(0);
+    // Two rows with different name lengths and numbers share dot columns.
+    const m = tocLeader(80, 492, 50)!;
+    expect(Math.abs((m.from - l.from) % TOC.dotPitch)).toBe(0);
+    // A name that fills the line gets no leader.
+    expect(tocLeader(485, 500, 50)).toBeNull();
   });
 });
 

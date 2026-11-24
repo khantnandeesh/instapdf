@@ -43,7 +43,7 @@ describe("flow config", () => {
     expect(merge.flow.optionsDensity).toBe("full");
     expect(merge.flow.requiredPermissions).toEqual([]);
     expect(merge.flow.actionLabel).toBe("Merge PDFs");
-    expect(merge.flow.outputName(["alpha.pdf", "bravo.pdf"])).toBe("alpha-merged.pdf");
+    expect(merge.flow.outputName(["alpha.pdf", "bravo.pdf"])).toBe("alpha_merged.pdf");
   });
   it("keeps every other tool planned", () => {
     expect(tools.filter((t) => t.status !== "planned").map((t) => t.slug)).toEqual(["merge-pdf", "rotate-pdf"]);

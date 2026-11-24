@@ -33,6 +33,17 @@ export async function showFiles(page: Page) {
   await expect(page.getByTestId("segment-grid")).toBeVisible();
 }
 
+/** True when the viewport is below 640 px, where the toolbar has one "Add" menu (spec M-3). */
+export const isPhoneToolbar = (page: Page) => (page.viewportSize()?.width ?? 1280) < 640;
+
+/**
+ * Chooses "Pages from a file…" or "Blank page" from the toolbar: the "Add pages" menu at
+ * ≥ 640 px, the one "Add" menu below (spec M-3, eval G-2). Same item names in both.
+ */
+export async function chooseAddPages(page: Page, item: "Pages from a file…" | "Blank page") {
+  await chooseMenu(page, isPhoneToolbar(page) ? "Add" : "Add pages", item);
+}
+
 /** Opens a menu by its trigger name and chooses an item. */
 export async function chooseMenu(page: Page, trigger: string | RegExp, item: string) {
   await (typeof trigger === "string" ? page.getByRole("button", { name: trigger, exact: true }) : page.getByRole("button", { name: trigger })).first().click();

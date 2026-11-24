@@ -86,3 +86,9 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
     transition: font-size var(--dur-move) var(--ease-standard);
   }
 }
+
+/* A focus move the page made after a mouse or touch pick (eval G-7): no ring until the next key
+   press (components/ui/focus.ts removes the mark), the same as :focus-visible for a real click. */
+[data-quiet-focus]:focus-visible {
+  outline: none;
+}

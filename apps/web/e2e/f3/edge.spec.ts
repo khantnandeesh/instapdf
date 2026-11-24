@@ -32,6 +32,7 @@ import {
   tileAction,
   tileLabels,
   tileMain,
+  chooseAddPages,
 } from "./support";
 
 const live = (page: Page) => page.locator("[aria-live=polite]").first();
@@ -174,7 +175,7 @@ test.describe("limits and mixed inputs", () => {
     await expect(flow(page)).toHaveAttribute("data-state", "ready", { timeout: 60_000 });
     await expect(page.getByTestId("dock-status")).toContainText("1,000 pages");
     const capNotice = notice(page, "past 1,000 pages, so nothing was added");
-    await chooseMenu(page, "Add pages", "Blank page");
+    await chooseAddPages(page, "Blank page");
     await expect(capNotice).toBeVisible();
     await expect(page.getByTestId("dock-status")).toContainText("1,000 pages");
     await page.getByRole("button", { name: /Dismiss/ }).first().click().catch(() => {});
@@ -183,7 +184,7 @@ test.describe("limits and mixed inputs", () => {
     await expect(capNotice.first()).toBeVisible();
     await expect(page.getByTestId("dock-status")).toContainText("1,000 pages");
     // The picker is capped at intake.
-    await chooseMenu(page, "Add pages", "Pages from a file…");
+    await chooseAddPages(page, "Pages from a file…");
     await page.getByTestId("pages-file-input").setInputFiles(fx("three-pages.pdf"));
     await expect(page.getByRole("alert").filter({ hasText: "three-pages.pdf" })).toContainText("past 1,000 pages");
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -407,7 +408,7 @@ test.describe("dark mode", () => {
     await tileAction(page, "B2", "Move to position…");
     await expectNoSeriousAxeViolations(page, "dark: move dialog");
     await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
-    await chooseMenu(page, "Add pages", "Pages from a file…");
+    await chooseAddPages(page, "Pages from a file…");
     await page.getByTestId("pages-file-input").setInputFiles(fx("three-pages.pdf"));
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.getByRole("dialog").getByTestId("picker-tile").first().click();
