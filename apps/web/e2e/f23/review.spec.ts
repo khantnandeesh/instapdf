@@ -100,21 +100,47 @@ test("AC-168: the tool tab goes away mid-download: a banner over the downloads, 
   await expect(win.getByTestId("cloud-lost-banner")).toBeVisible();
 });
 
-test("closing the window on a sign-in page: the tool stops waiting once it has been in front for a while", async ({ page }) => {
-  test.setTimeout(60_000);
+test("closing the window on a sign-in page: 'Stopped waiting' once this tab has been focused for 15 s (never while it isn't), and a late sign-in still carries on", async ({ page }) => {
+  test.setTimeout(90_000);
+  // Playwright's tabs always report focus: drive this tab's own, from the start.
+  await page.evaluate(() => {
+    const w = window as Window & { __focused?: boolean };
+    w.__focused = false;
+    Document.prototype.hasFocus = () => !!w.__focused;
+  });
+  const focus = (on: boolean) => page.evaluate((v) => ((window as Window & { __focused?: boolean }).__focused = v), on);
   await page.evaluate((k) => localStorage.setItem(k, "hold"), REDIRECT);
   const urls = visited(page);
   // OneDrive starts by itself: the window may leave before it ever shows its own page.
   const [win] = await Promise.all([page.context().waitForEvent("page"), rowButton(page, "OneDrive").click()]);
   // The window leaves for the "sign-in page", which never answers.
   await expect.poll(() => urls.some((u) => new URL(u).pathname === "/"), { timeout: 15_000 }).toBe(true);
-  const waiting = page.getByTestId("notice").filter({ hasText: "Waiting for OneDrive" });
+  const waiting = page.getByTestId("notice").filter({ hasText: /^Waiting for OneDrive/ });
+  const stopped = page.getByTestId("notice").filter({ hasText: /^Stopped waiting for OneDrive\./ });
   await expect(waiting).toBeVisible();
-  await win.close();
-  await page.bringToFront();
-  // Well before the sign-in allowance (2 min) runs out: the tab in front, focused, about 15 s.
-  await expect(waiting).toHaveCount(0, { timeout: 25_000 });
+  // This tab not focused (the person is signing in over there): still waiting, well past 15 s.
+  await page.waitForTimeout(18_000);
+  await expect(waiting).toBeVisible();
+  await expect(stopped).toHaveCount(0);
+  // Focused here: about 15 s later the tool says it stopped waiting, with Try again.
+  const t0 = Date.now();
+  await focus(true);
+  await expect(stopped).toBeVisible({ timeout: 25_000 });
+  expect(Date.now() - t0).toBeGreaterThan(13_000);
+  await expect(waiting).toHaveCount(0);
+  await expect(stopped.getByRole("button", { name: "Try again" })).toBeVisible();
   await expect(rowButton(page, "OneDrive")).toBeEnabled();
+  // The sign-in comes back after all (a slow MFA prompt): the window is back on its own URL, and the
+  // tool, still listening, carries on.
+  const own = urls.find((u) => new URL(u).pathname === "/cloud/mock")!;
+  await win.evaluate(() => sessionStorage.setItem("berrypdf:cloud-mock-signed", "1"));
+  await win.goto(own);
+  await expect(stopped).toHaveCount(0);
+  await expect(waiting).toBeVisible();
+  await mockPick(win, ["alpha.pdf"]);
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await expect(tiles(page)).toHaveCount(3);
+  await closed(win);
 });
 
 test("AC-168: the tool tab closes just before the hand-off: no 'Added', the rows stay under the banner", async ({ page }) => {

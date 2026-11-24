@@ -1,0 +1,109 @@
+/**
+ * F23 cloud sources, second PR #32 review (mock provider): the cloud chunk loads on intent and never
+ * with the page (L-a), a tap before it arrives still opens the window inside the click, Save to cloud
+ * speaks without the empty state's cloud parts (L-b), and a cloud notice's action sits on its row (M-b).
+ * Spec: docs/specs/f23-cloud-pickers.md (U-4 "Notice", U-5, AC-131).
+ */
+import { expect, test, type Page } from "@playwright/test";
+import { caret, closed, flow, mockPick, needsCloud, openRotate, openWindow, pickReady, rowButton, run, tiles } from "./support";
+
+needsCloud();
+
+test.beforeEach(async ({ page }) => {
+  await openRotate(page);
+});
+
+/** Every script the page has fetched so far (scripts and script preloads). */
+const scripts = (page: Page) =>
+  page.evaluate(() =>
+    (performance.getEntriesByType("resource") as PerformanceResourceTiming[]).filter((r) => new URL(r.name).pathname.endsWith(".js")).map((r) => r.name),
+  );
+
+/** Holds every script fetched from now on for `ms` (the cloud chunk among them). */
+async function slowScripts(page: Page, ms: number) {
+  await page.route(/\/_next\/static\/chunks\/.*\.js$/, async (route) => {
+    await new Promise((r) => setTimeout(r, ms));
+    await route.continue();
+  });
+}
+
+test("the cloud chunk is not fetched with the page, only once a cloud control is about to be used", async ({ page }) => {
+  // The page's own idle prefetches are done.
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(500);
+  const before = await scripts(page);
+  await page.waitForTimeout(1000);
+  expect(await scripts(page)).toEqual(before);
+  await rowButton(page, "Dropbox").hover();
+  await expect.poll(async () => (await scripts(page)).length).toBeGreaterThan(before.length);
+});
+
+test("a tap on the row before the cloud chunk is here still opens the window inside the click", async ({ page, context }) => {
+  await page.waitForLoadState("networkidle");
+  await slowScripts(page, 2000);
+  const t0 = Date.now();
+  const [win] = await Promise.all([context.waitForEvent("page"), rowButton(page, "Dropbox").click()]);
+  // Opened by the click itself (a blank window first), well before the chunk could arrive.
+  expect(Date.now() - t0).toBeLessThan(1500);
+  // The chunk then sends it on to the provider's page.
+  await expect(win.getByTestId("cloud-window")).toBeVisible({ timeout: 15_000 });
+  await expect(win.getByRole("heading", { level: 1 })).toHaveText("Dropbox");
+  await mockPick(win, ["alpha.pdf"]);
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await expect(tiles(page)).toHaveCount(3);
+  await closed(win);
+});
+
+test("a press on the caret before the cloud chunk is here opens the menu once it arrives; keyboard focus carries over", async ({ page }) => {
+  await page.waitForLoadState("networkidle");
+  await slowScripts(page, 1500);
+  await caret(page).click();
+  const first = page.getByRole("menuitem").first();
+  await expect(first).toBeFocused({ timeout: 10_000 });
+  await expect(caret(page)).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Escape");
+  await expect(caret(page)).toBeFocused();
+  await expect(caret(page)).toHaveAttribute("aria-expanded", "false");
+});
+
+test("keyboard: focus on the caret before the chunk stays on it after the real menu button takes over", async ({ page }) => {
+  await page.waitForLoadState("networkidle");
+  await slowScripts(page, 1500);
+  await caret(page).focus();
+  // The real menu button replaces the stand-in once the chunk is here: the same place, still focused.
+  await expect(caret(page)).toHaveAttribute("aria-controls", /.+/, { timeout: 10_000 });
+  await expect(caret(page)).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menuitem").first()).toBeFocused();
+});
+
+test("Save to cloud speaks for itself on a page that never touched a cloud control (L-b)", async ({ page }) => {
+  await pickReady(page, "alpha.pdf");
+  await run(page);
+  // The browser refuses the window: the save says so in the tool's own notices.
+  await page.evaluate(() => (window.open = () => null));
+  // Two clouds to save to and none the files came from: "Save to…" opens a menu.
+  await page.getByTestId("save-main").click();
+  await page.getByRole("menuitem", { name: /^Google Drive/ }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Your browser blocked the Google Drive window." })).toBeVisible();
+});
+
+test("M-b: a cloud notice's action sits on the notice's row, after the words and before the close (under them on a phone)", async ({ page }, info) => {
+  const win = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  const notice = page.getByTestId("notice").filter({ hasText: "Waiting for Dropbox" });
+  const words = await notice.getByText("Waiting for Dropbox…").boundingBox();
+  const action = await notice.getByRole("button", { name: "Cancel" }).boundingBox();
+  const close = await notice.getByRole("button", { name: /^Dismiss/ }).boundingBox();
+  if (info.project.name === "desktop") {
+    // On the words' row: level with them, to their right, left of the close.
+    expect(action!.y).toBeLessThan(words!.y + words!.height);
+    expect(action!.y + action!.height).toBeGreaterThan(words!.y);
+    expect(action!.x).toBeGreaterThanOrEqual(words!.x + words!.width);
+    expect(action!.x + action!.width).toBeLessThanOrEqual(close!.x);
+  } else {
+    // A phone: under the words, lined up with them, so they keep the width.
+    expect(action!.y).toBeGreaterThanOrEqual(words!.y + words!.height);
+    expect(Math.abs(action!.x - words!.x)).toBeLessThan(2);
+  }
+  await win.close();
+});
