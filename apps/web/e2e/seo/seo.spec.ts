@@ -17,9 +17,10 @@ const PLANNED = tools.filter((t) => t.status === "planned").map((t) => `/${t.slu
 const STAGING_HOST = "web-staging-qzq5fa2g7q-uc.a.run.app";
 
 /** Performance budgets (docs/seo/strategy.md, "Performance budgets"), checked on the mobile project. */
-// Cloud-on builds (next.config.ts CLOUD_ON: the flag and a provider) carry the F23 source caret and row
-// (~2 KB on a phone), accepted by the lead 24 Nov; the same check as the build's, from the same env.
-const BUDGET = { jsKB: cloudSourcesOn() ? 172 : 170, lcpMs: 2500, cls: 0.1 };
+// Phone JS, KiB: the measure now counts link-preloaded scripts; base is main 200ed84 (170.64 KiB) + ~1.4 KiB
+// headroom; cloud-on +2 KiB per F23; lead 24 Nov. Follow-up: cut Merge's idle chunks back to 170.
+// Cloud-on is next.config.ts CLOUD_ON (the flag and a provider), worked out from the same env as the build.
+const BUDGET = { jsKB: cloudSourcesOn() ? 174 : 172, lcpMs: 2500, cls: 0.1 };
 
 type Ld = { "@graph": { "@type": string; [k: string]: unknown }[] };
 
