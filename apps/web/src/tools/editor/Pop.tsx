@@ -38,6 +38,9 @@ export function Pop({
   const [leaving, setLeaving] = useState(false);
   // Each opening draws the content afresh, even when it reopens while the last one is fading.
   const [opened, setOpened] = useState(0);
+  // The timer that ends a fade. Cleared on every toggle: one left from an earlier close would otherwise
+  // cut a later fade short (close, reopen, close again within 160ms).
+  const leaveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const id = useId();
 
   const place = useCallback(() => {
@@ -62,7 +65,8 @@ export function Pop({
       if (isOpen) setOpened((n) => n + 1);
       const fades = !isOpen && getComputedStyle(p).transitionDuration.split(",").some((d) => parseFloat(d) > 0);
       setLeaving(fades);
-      if (fades) setTimeout(() => !p.matches(":popover-open") && setLeaving(false), 160);
+      clearTimeout(leaveTimer.current);
+      if (fades) leaveTimer.current = setTimeout(() => !p.matches(":popover-open") && setLeaving(false), 160);
       if (isOpen) {
         place();
         onOpen?.();
@@ -82,6 +86,7 @@ export function Pop({
       p.removeEventListener("beforetoggle", popoverLeaving);
       p.removeEventListener("toggle", onToggle);
       ro?.disconnect();
+      clearTimeout(leaveTimer.current);
     };
   }, [place, onOpen]);
 
