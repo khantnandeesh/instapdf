@@ -110,7 +110,7 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
   order (checked for AC-205 and an appended Arabic word); refusing them would refuse most
   Arabic word edits on such files, so they are kept. This is a pdf.js-only limit: every kept edit
   must read correctly in PDFium, and the cases where PDFium reorders are refused (above).
-- A digit (or - A digit (or other left-to-right text) typed into an Arabic line reads by its glyphs, with no
+- A digit (or other left-to-right text) typed into an Arabic line reads by its glyphs, with no
   ActualText, in two ways:
   - the line's font maps the digit in its ToUnicode: drawn in place;
   - otherwise (no entry for the code, or an entry for other text): the digits are drawn through a
@@ -125,8 +125,10 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
     oracle case `plain-arabic-number-unmapped`, "2500" → "3750" on scripts-plain.pdf, whose
     subset has no width for "3"). pdf.js drops the space between the line and the sibling's
     digits ("تجريبي.2024"), as it does at any change of font and direction there; PDFium and
-    copy and paste keep it. Each such edit makes a new sibling (reusing one is a follow-up).
-s/berry-engine/tests/font_mapping.rs, and pdfium and pdf.js read-back in
+    copy and paste keep it. Each such edit makes a new sibling (reusing one is a follow-up), and
+    a second digit edit at the end of the same line is refused for now (the engine reads the
+    line back with the sibling runs out of order).
+  Tests: crates/berry-engine/tests/font_mapping.rs, and pdfium and pdf.js read-back in
   apps/web/src/lib/editor/mixed-direction.test.ts.
 - Lines already drawn with ActualText spans (Chrome and LibreOffice Arabic) are not covered by
   the ActualText refusal: neither reader reads them by their glyphs before an edit either.
