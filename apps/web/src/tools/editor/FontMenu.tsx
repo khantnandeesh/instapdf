@@ -294,7 +294,10 @@ export function FontNotice() {
               const f = e.target.files?.[0];
               e.target.value = "";
               if (!f) return;
-              void addUserFontFile(f).then((out) => ("error" in out ? setMessage(out.error) : void ctl.changeStandIn(out.id)));
+              void addUserFontFile(f).then(
+                (out) => ("error" in out ? setMessage(out.error) : void ctl.changeStandIn(out.id)),
+                () => setMessage("That font couldn’t be read."),
+              );
             }}
           />
         </>

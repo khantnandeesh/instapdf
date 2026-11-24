@@ -160,6 +160,30 @@ test.describe("font library (desktop)", () => {
     expect(seen.sent).toEqual([]);
   });
 
+  test("each font and style of the document gets its own closest font", async ({ page }) => {
+    await open(page);
+    await page.getByTestId("canvas").focus();
+    await page.keyboard.press("e");
+    const edit = async (n: number, add: string) => {
+      const line = page.getByTestId("line").nth(n);
+      await expect(line).toBeVisible({ timeout: 30_000 });
+      const before = (await line.getAttribute("data-text"))!;
+      await line.click();
+      await page.getByTestId("line-input").fill(`${before}${add}`);
+      await page.keyboard.press("Enter");
+      await expect(page.getByTestId("line").nth(n)).toHaveAttribute("data-text", `${before}${add}`, { timeout: 30_000 });
+    };
+    // Regular serif, then the bold heading, then the monospaced line.
+    await edit(1, " QXZ");
+    await expect(page.getByTestId("font-notice")).toContainText("Using Tinos.");
+    await edit(0, " QXZ");
+    await expect(page.getByTestId("font-notice")).toContainText(/Using Tinos Bold\./);
+    await edit(3, " QXZ");
+    await expect(page.getByTestId("font-notice")).toContainText(/JetBrains Mono isn’t complete in this file\. Using (?!Tinos)/);
+    const names = await fontNames(await download(page));
+    expect(names.filter((n) => /\+Tinos/.test(n)).length).toBeGreaterThanOrEqual(2);
+  });
+
   test("a character no font here can draw is refused with a plain message, and nothing changes", async ({ page }) => {
     await open(page);
     await page.getByTestId("canvas").focus();
@@ -214,7 +238,7 @@ test.describe("font library (desktop)", () => {
     const families = (await (await request.get(`/fonts/lib/${m.families}`)).json()) as { i: string; l: string }[];
     expect(families.length).toBeGreaterThan(40);
     // AC-270: only licences on the serving list.
-    expect(families.filter((f) => !["OFL-1.1", "Apache-2.0", "UFL-1.0", "CC0-1.0", "MIT", "Unlicense"].includes(f.l))).toEqual([]);
+    expect(families.filter((f) => !["OFL-1.1", "Apache-2.0", "MIT"].includes(f.l))).toEqual([]);
     // AC-271: each family's licence text is published beside it.
     expect((await request.get(`/fonts/lib/licences/${families[0].i}.txt`)).ok()).toBe(true);
   });

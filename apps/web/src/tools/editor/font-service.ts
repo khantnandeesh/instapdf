@@ -125,12 +125,12 @@ export function fontLabel(id: string): string {
   return state.library?.byId.get(id)?.n ?? id.replace(/(^|-)([a-z])/g, (_, dash: string, c: string) => (dash ? " " : "") + c.toUpperCase());
 }
 
-const familyKey = (info: Pick<FontInfo, "family" | "name"> | undefined, request: FontRequest) => foldName(info?.family || info?.name || request.families[0] || "");
-
-/** Remembers the person's choice of stand-in for a document font. */
-export function chooseStandIn(original: string, id: string): void {
-  choices.set(foldName(original), id);
+/** Remembers (or with `id` undefined, forgets) the person's stand-in for a document family (folded name). */
+export function chooseStandIn(key: string, id: string | undefined): void {
+  if (id) choices.set(key, id);
+  else choices.delete(key);
 }
+export const chosenStandIn = (key: string) => choices.get(key);
 
 /**
  * Font ids to try for the characters a document font lacks, best first: the person's choice,
@@ -139,7 +139,7 @@ export function chooseStandIn(original: string, id: string): void {
 export async function standInCandidates(info: FontInfo | undefined, request: FontRequest): Promise<string[]> {
   const out: string[] = [];
   const add = (id?: string) => id && !out.includes(id) && out.push(id);
-  add(choices.get(familyKey(info, request)));
+  add(choices.get(foldName(request.families[0] ?? "")));
   const known = info && state.doc.find((d) => d.key === info.name)?.matches;
   const matches = known ?? (info ? await matchOf(info).catch(() => []) : []);
   if (isClose(matches[0])) add(matches[0].family);

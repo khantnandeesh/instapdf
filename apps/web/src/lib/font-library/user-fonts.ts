@@ -86,7 +86,11 @@ export async function readUserFont(bytes: Uint8Array): Promise<AddedFont | { err
   if ("error" in d) return d;
   const id = userFontId(d.family);
   const key = styleKey(d.bold, d.italic);
-  const file = `${USER_FILE}${id.slice(USER_FONT.length)}/${key}`;
+  // The name carries a hash of the bytes, so a second file of the same family and style is a
+  // new file to the preview as well as to the download.
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as BufferSource));
+  const hash = Array.from(digest.slice(0, 4), (b) => b.toString(16).padStart(2, "0")).join("");
+  const file = `${USER_FILE}${id.slice(USER_FONT.length)}/${key}.${hash}`;
   return { id, label: d.family, faces: { [key]: { files: [{ file, ranges: d.ranges }], ...d.face } }, bytes: { [file]: bytes } };
 }
 

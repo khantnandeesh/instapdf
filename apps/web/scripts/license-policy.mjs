@@ -11,11 +11,12 @@ export const ALLOWED_CODE = new Set(["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3
 export const ALLOWED_FONT = new Set(["OFL-1.1"]);
 
 /**
- * SPDX ids the font library may serve (entries with `library: true`): its serving list in
- * docs/specs/f24-font-library.md §3, approved by the owner on 2026-11-24. Must stay equal to
- * FONT_LICENCES in scripts/font-library/lib.mjs (src/lib/licenses/policy.test.ts checks).
+ * SPDX ids the font library may serve (entries with `library: true`): licences CLAUDE.md rule 3
+ * already allows (OFL-1.1 for fonts; Apache-2.0 and MIT from the permissive list). UFL-1.0,
+ * CC0-1.0, the GUST Font License and Bitstream Vera wait for the owner to write them into rule 3.
+ * Must stay equal to FONT_LICENCES in scripts/font-library/lib.mjs (policy.test.ts checks).
  */
-export const ALLOWED_LIBRARY_FONT = new Set(["OFL-1.1", "Apache-2.0", "UFL-1.0", "CC0-1.0", "MIT", "Unlicense"]);
+export const ALLOWED_LIBRARY_FONT = new Set(["OFL-1.1", "Apache-2.0", "MIT"]);
 
 /**
  * npm packages that ship only font files and their CSS (no program code), e.g. self-hosted

@@ -96,3 +96,7 @@ Not in this PR:
 - AC-280 for added text placed on an existing line, AC-283 (twin table beyond the engine's own stand-in list), AC-285 (timing on a phone), AC-287 (x-height scaling), AC-288 (script-aware matching: the index holds Latin letters and digits only), AC-297 (keeping an uploaded font for later sessions).
 - The engine takes TrueType outlines only for stand-ins: an OTF (CFF) font of your own works for added text but not yet for existing text.
 - The recognise-only tier and the GUST and Bitstream Vera families (CLAUDE.md rule 3 needs the owner's exception written in first).
+
+Licences served today: OFL-1.1, Apache-2.0 and MIT only, which CLAUDE.md rule 3 already allows. UFL-1.0 (Ubuntu), CC0-1.0, the GUST Font License and Bitstream Vera are approved in principle by the owner (2026-11-24) but are not served until rule 3 is amended; the gate in `scripts/font-library/lib.mjs` refuses them until then.
+
+Review follow-ups (not blocking): validate `FONTS_ORIGIN` and narrow its rewrite before the bucket ships; build the notices from the published catalogue when the bucket serves the library; arrow-key movement in the font list; parse large user fonts off the main thread; a timeout on the match worker.

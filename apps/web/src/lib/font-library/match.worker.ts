@@ -27,10 +27,22 @@ function load(): Promise<Module> {
   return matcher;
 }
 
+/** Signatures already fetched: a document's fonts share most of their candidates. */
+const signatures = new Map<string, Promise<Uint8Array>>();
+function signature(face: string, sig: string): Promise<Uint8Array> {
+  let p = signatures.get(face);
+  if (!p) {
+    p = loadSignature(face, sig);
+    p.catch(() => signatures.delete(face));
+    signatures.set(face, p);
+  }
+  return p;
+}
+
 scope.onmessage = async (event: MessageEvent<MatchRequest>) => {
   const { id, program, top } = event.data;
   try {
-    const matches = await matchProgram({ matcher: await load(), index: loadIndex, signature: loadSignature }, program, top);
+    const matches = await matchProgram({ matcher: await load(), index: loadIndex, signature }, program, top);
     scope.postMessage({ id, ok: true, matches } satisfies MatchResponse);
   } catch (error) {
     scope.postMessage({ id, ok: false, message: error instanceof Error ? error.message : String(error) } satisfies MatchResponse);

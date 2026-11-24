@@ -29,6 +29,7 @@ import { missingInObjects } from "./coverage-browser";
 import { addAsset, IMAGE_ACCEPT, imageError, imageFromFile, isImageFile, plainAssets, releaseAssets } from "./assets";
 import { EnginePill } from "./EngineProgress";
 import { resetDocFonts } from "./font-service";
+import { disposeMatcher } from "@/lib/font-library/match-client";
 import { FontNotice } from "./FontMenu";
 import { AnnotsToggle, DOCK_ORDER, MoreTools, PageChip, PageHeader, PrivacyChip, SaveChip, ToolDock, ToolRail, TopBar, TOOLS, ViewPill } from "./Chrome";
 import { createController, TOOL_NAMES, type Controller, type Runtime, type Toast } from "./controller";
@@ -225,6 +226,7 @@ export function EditorShell(props: ShellProps) {
       alive = false;
       if (made) releaseAssets(made.rt.assets);
       disposeEngine();
+      disposeMatcher();
       disposeBuild();
     };
     // Opened once per file: the route remounts the shell for another file.
@@ -1270,8 +1272,10 @@ function RecoveryNotice({ s, onRestore, onDiscard }: { s: LoadedSession; onResto
 
 function ToastView({ toast, onDone, children }: { toast: Toast | null; onDone: () => void; children?: ReactNode }) {
   return (
-    <div className="ed-toasts" role="status" aria-live="polite">
+    <div className="ed-toasts">
+      {/* The font notice has controls and is announced once by the controller: not in the live region. */}
       {children}
+      <div className="ed-toasts__live" role="status" aria-live="polite">
       {toast && (
         <div key={toast.key} className={cx("ed-toast ed-glass", `ed-toast--${toast.tone}`)} data-testid="editor-notice">
           <span>{toast.text}</span>
@@ -1292,6 +1296,7 @@ function ToastView({ toast, onDone, children }: { toast: Toast | null; onDone: (
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 }

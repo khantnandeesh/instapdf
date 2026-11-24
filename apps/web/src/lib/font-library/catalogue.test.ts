@@ -18,11 +18,10 @@ describe("licence gate (AC-270)", () => {
     expect(canonicalLicence("OFL-1.1")).toBe("OFL-1.1");
     expect(canonicalLicence("apache-2.0")).toBe("Apache-2.0");
     expect(canonicalLicence(" mit ")).toBe("MIT");
-    expect(canonicalLicence("UFL-1.0")).toBe("UFL-1.0");
   });
 
   it("refuses anything else, including a missing licence", () => {
-    for (const l of ["GPL-3.0", "AGPL-3.0", "proprietary", "free for personal use", "", undefined, null, 7]) {
+    for (const l of ["GPL-3.0", "AGPL-3.0", "UFL-1.0", "CC0-1.0", "proprietary", "free for personal use", "", undefined, null, 7]) {
       expect(canonicalLicence(l as string)).toBeNull();
     }
     expect(gate({ ...roboto, license: "GPL-2.0" }, "x")).toEqual({ ok: false, reason: "licence:GPL-2.0" });

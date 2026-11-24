@@ -131,7 +131,8 @@ describe("findViolations", () => {
   it("font library entries follow the library's own serving list (F24, AC-270)", () => {
     expect([...ALLOWED_LIBRARY_FONT].sort()).toEqual([...FONT_LICENCES.values()].sort());
     const lib = (name: string, license: string | null) => ({ ...pkg(name, license, "font"), library: true });
-    expect(findViolations([lib("Roboto (font library)", "Apache-2.0"), lib("Ubuntu (font library)", "UFL-1.0"), lib("Lato (font library)", "OFL-1.1")])).toEqual([]);
+    expect(findViolations([lib("Roboto Slab (font library)", "Apache-2.0"), lib("Lato (font library)", "OFL-1.1")])).toEqual([]);
+    expect(findViolations([lib("Ubuntu (font library)", "UFL-1.0")]).map((e) => e.name)).toEqual(["Ubuntu (font library)"]);
     expect(findViolations([lib("Paid (font library)", "LicenseRef-Commercial"), lib("Copyleft (font library)", "GPL-3.0-only"), lib("None (font library)", null)]).map((e) => e.name)).toEqual([
       "Paid (font library)",
       "Copyleft (font library)",

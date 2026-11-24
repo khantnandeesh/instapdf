@@ -10,10 +10,7 @@
 export const FONT_LICENCES = new Map([
   ["ofl-1.1", "OFL-1.1"],
   ["apache-2.0", "Apache-2.0"],
-  ["ufl-1.0", "UFL-1.0"],
-  ["cc0-1.0", "CC0-1.0"],
   ["mit", "MIT"],
-  ["unlicense", "Unlicense"],
 ]);
 
 /** Canonical SPDX id for a catalogue's licence string, or null when it is not on the list. */

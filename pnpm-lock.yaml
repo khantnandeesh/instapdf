@@ -200,9 +200,6 @@ importers:
       '@fontsource/tinos':
         specifier: 5.3.0
         version: 5.3.0
-      '@fontsource/ubuntu':
-        specifier: 5.3.0
-        version: 5.3.0
       '@fontsource/work-sans':
         specifier: 5.3.0
         version: 5.3.0
@@ -468,9 +465,6 @@ packages:
 
   '@fontsource/tinos@5.3.0':
     resolution: {integrity: sha512-VVDyyZdbcsLKxo/W7rClAvacD/7DsGc7J5xzzp51Tndib8kDkEe/0bqbb3Xb3iH6+IUjt07aRsvtQ9MGeGGi4w==}
-
-  '@fontsource/ubuntu@5.3.0':
-    resolution: {integrity: sha512-LsjJXgE430QLs8LKfn1RIFbbdGAiZBU1gao8ASa4Z2kGNGh7lMb7Rzx09v3bLLuuK+3XA/JSLgPWTAbLD6r1fg==}
 
   '@fontsource/work-sans@5.3.0':
     resolution: {integrity: sha512-3cKV28+bEiLGdyOl0VgEGCFWE1XdZJu/K+nH4Jt76XC3T//XrRtm2EF7jA61GSMIy8sYp6ZFTE01nD3lLaBV9A==}
@@ -2631,8 +2625,6 @@ snapshots:
   '@fontsource/source-serif-4@5.3.1': {}
 
   '@fontsource/tinos@5.3.0': {}
-
-  '@fontsource/ubuntu@5.3.0': {}
 
   '@fontsource/work-sans@5.3.0': {}
 
