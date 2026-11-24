@@ -117,10 +117,10 @@ test.describe("indexable pages", () => {
       await page.waitForTimeout(1000);
       const m = await page.evaluate(() => {
         const w = window as Window & { __lcp?: number; __cls?: number };
-        const js = performance
-          .getEntriesByType("resource")
-          .filter((r) => (r as PerformanceResourceTiming).initiatorType === "script")
-          .reduce((a, r) => a + (r as PerformanceResourceTiming).encodedBodySize, 0);
+        // Scripts, and scripts fetched by a <link rel="preload"> (a server-rendered lazy part), which run all the same.
+        const js = (performance.getEntriesByType("resource") as PerformanceResourceTiming[])
+          .filter((r) => r.initiatorType === "script" || (r.initiatorType === "link" && new URL(r.name).pathname.endsWith(".js")))
+          .reduce((a, r) => a + r.encodedBodySize, 0);
         return { jsKB: js / 1024, lcp: w.__lcp ?? 0, cls: w.__cls ?? 0 };
       });
       expect(m.jsKB, `${path} JS`).toBeLessThanOrEqual(BUDGET.jsKB);
