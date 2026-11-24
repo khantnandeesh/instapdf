@@ -39,10 +39,12 @@ Let anyone change a PDF the way they expect a document editor to work: click tex
 
 ### 2a. Feature inventory (observed + crawl)
 
+A second-by-second inventory from the owner's screen recording (2026-11-24) is in `f16-reference-recording-inventory.md`. It added AC-53 to AC-73 below.
+
 | Area | Reference behaviour | Our decision |
 |---|---|---|
 | Edit existing text | Text tool: click a line, it becomes a `contenteditable` box for **that line only**. Floating bar: bold, italic, size, font family, colour, link, move, duplicate, delete. Edit is replayed on the server. | Match, then exceed: paragraph mode (§5, phase E3). |
-| Font list | ~45 bundled open fonts, each labelled with the proprietary font it stands in for (e.g. Carlito for Calibri). "More fonts" says local fonts need the desktop app. | Match with our own self-hosted OFL set and copy. Local fonts via the Local Font Access API where the browser supports it (improvement). |
+| Font list | ~45 bundled open fonts, each labelled with the proprietary font it stands in for (e.g. Carlito for Calibri). "More fonts" says local fonts need the desktop app. A second section lists the document's embedded fonts with a warning icon, with duplicates. | Match with our own self-hosted OFL set and copy. Local fonts via the Local Font Access API where the browser supports it (improvement). |
 | Missing glyphs | "Font Replacement" dialog: original font lacks typed characters; choose a replacement; "Always use"; Keep original. Status "Original font replaced…" | Match, but automatic with a clear inline notice and a one-tap override. |
 | Add text | Click empty page area; default Helvetica 10 pt black. | Match; default size follows nearby text. |
 | Find & Replace | Dialog with match case, include links, Find, Replace, Replace all. | Match; replace preserves font when glyphs exist. |
@@ -52,7 +54,7 @@ Let anyone change a PDF the way they expect a document editor to work: click tex
 | Publish to fill & sign | Saves to the user's Google Drive and shares a public link. | **Skip** (needs storage/accounts; privacy conflict). |
 | Images | New image (move, resize, rotate), delete existing image, new stamp (subject, author, date styles, colour). | Match. |
 | Sign | Type (≈13 handwriting styles, 7 colours), draw, upload image (original / two transparent variants), camera; saved signatures in browser storage. | Match; signatures stay in IndexedDB on device. |
-| Whiteout | Area select draws a white rectangle. Warning: hides but does not remove content; not for redaction. | Match, plus a **true Redact** tool (phase E4). |
+| Whiteout | Area select draws a white rectangle whose border width, border colour and fill colour can be changed. Warning: hides but does not remove content; not for redaction. | Match, plus a **true Redact** tool (phase E4). |
 | Annotate | Text strike-out, highlight, underline (colour swatches); freehand highlight and draw; show/hide annotations. | Match. |
 | Shapes | Ellipse, rectangle, line, arrow; border and fill colour. | Match. |
 | Page ops in editor | Per page: delete, zoom in/out, rotate left/right; "Insert page here"; thumbnails panel. | Match, plus duplicate and reorder by drag. |
@@ -265,7 +267,7 @@ Priority: P0 = parity must-have; P1 = parity nice-to-have or key differentiator;
 ### Add content
 - **AC-23 (P0)** Clicking empty page space with the Text tool adds a text box; typed text appears in the output at that position (±2 pt) as real, extractable text.
 - **AC-24 (P0)** Image: inserting a PNG places it; move, resize (corner, aspect locked by default) and rotate are reflected in the output.
-- **AC-25 (P0)** Whiteout: dragging an area draws a white rectangle in the output; a warning says it hides but does not remove content.
+- **AC-25 (P0)** Whiteout: dragging an area draws a white rectangle in the output; a warning says it hides but does not remove content. Fill colour, border colour and border width can be changed.
 - **AC-26 (P0)** Shapes: rectangle, ellipse, line, arrow with stroke and fill colour appear in the output.
 - **AC-27 (P0)** Annotate: highlight, underline and strike-out of selected text create standard markup annotations of the chosen colour over the right words; freehand draw and freehand highlight create ink annotations.
 - **AC-28 (P1)** Links: area select → URL, email (`mailto:`), phone (`tel:`) and internal page; output has Link annotations with the right actions; existing links in `links.pdf` can be edited and deleted.
@@ -282,7 +284,7 @@ Priority: P0 = parity must-have; P1 = parity nice-to-have or key differentiator;
 - **AC-35 (P1)** Creating text, multiline text, dropdown (options one per line, multiselect), radio group, checkbox and signature fields produces AcroForm fields with the given names, defaults, required flag, max length and comb setting.
 - **AC-36 (P1)** A duplicate field name shows a warning; "repeat on all pages" creates one field with one widget per page.
 - **AC-37 (P1)** Tab order can be set by rows, columns or custom drag, and the output's widget order follows it.
-- **AC-38 (P2)** (improvement) "Detect fields" proposes fields on underscore lines and boxes; the user accepts or rejects each.
+- **AC-38 (P2)** (improvement) "Detect fields" proposes fields on underscore lines and boxes on **all pages**; on a page that already has fields it proposes only the new ones (no duplicates, no error); the user accepts or rejects each.
 - **AC-39 (P1)** Form fields and annotations can be added on `rotated-90.pdf` (the reference refuses).
 - **AC-40 (P2)** `xfa-only.pdf` shows a banner explaining limited support and does not crash.
 
@@ -295,6 +297,29 @@ Priority: P0 = parity must-have; P1 = parity nice-to-have or key differentiator;
 - **AC-44 (P0)** Download produces the edited PDF in under 3 s for `para-times.pdf` with 10 edits, without leaving the editor; further edits and a second download work.
 - **AC-45 (P1)** Closing the tab with unsaved edits and reopening the same file on the same device offers to restore them; accepting restores every edit.
 - **AC-46 (P1)** Output passes `qpdf --check` and renders without errors in pdf.js and PDFium for every fixture.
+
+### Reference recording details (2026-11-24, `f16-reference-recording-inventory.md`)
+- **AC-53 (P2)** (improvement) A "Recent" list on the empty state shows files edited on this device (name, page count, time), from local storage only, with a one-tap "Clear". Nothing is listed from any server.
+- **AC-54 (P0)** The editor toolbar stays visible (sticky) while pages scroll, on desktop and phone.
+- **AC-55 (P1)** The page in focus shows its page number and page actions (rotate, delete, duplicate, insert page after); thumbnails open from a side rail.
+- **AC-56 (P1)** Every tool has a short tooltip (desktop) or first-use hint (touch) that says how to use it in one line, with its keyboard shortcut.
+- **AC-57 (P0)** A new text box opens with its placeholder selected, so the first keystroke replaces it; an empty box is removed when it loses focus; placeholder text is never written to the output.
+- **AC-58 (P1)** Text, image, shape and field objects have Duplicate: the copy appears offset by one line below the original (or at the same spot on the next page with Alt) and is selected. The size control takes a typed value and offers presets from 8 to 72.
+- **AC-59 (P1)** (improvement) The font menu has an "In this document" section with each embedded font listed once (by family and style). Each font shows whether it covers the characters in the selected box; if it does not, choosing it uses the same-family re-subset (AC-11d) or tells the user which characters will fall back.
+- **AC-60 (P1)** The colour picker has a palette, a hex field, "no colour" (for fills) and recent colours; an eyedropper is offered where the browser supports the EyeDropper API.
+- **AC-61 (P1)** (improvement) Link fields are checked: a URL without a scheme gets `https://`, email and phone are checked for format, the internal page must exist; invalid input shows an inline error and is not saved. Hovering a link shows its destination.
+- **AC-62 (P1)** Quick symbols ✓ ✗ ● (and text) can be placed with one click for filling flat, non-fillable forms; their size follows the nearby text.
+- **AC-63 (P1)** (improvement) A signature field gets a visible appearance in the output (border and "Sign here" label), so it shows in Chrome, Edge and Firefox viewers without any warning dialog.
+- **AC-64 (P1)** While an object or field is moved or resized, it snaps to the edges and centres of other objects and the page, with guides shown; Alt (or a second finger) turns snapping off.
+- **AC-65 (P1)** (improvement) Information about the editor (field shading not saved, whiteout not removing content, font fallback) is shown inline or as a toast; no information-only modal blocks the page.
+- **AC-66 (P2)** The Image and Sign menus show the last 5 images and signatures used on this device for one-click reuse; each can be removed.
+- **AC-67 (P1)** After choosing an image, stamp, signature or symbol, a semi-transparent preview follows the pointer until a click or tap places it; Esc cancels.
+- **AC-68 (P0)** Esc cancels any draw, area-select or placement mode and returns to Select; the mode shows a short hint that says so.
+- **AC-69 (P1)** (improvement) Objects have Bring forward / Send backward (menu and Ctrl/Cmd+] / [), and the output's drawing order follows it.
+- **AC-70 (P1)** Annotate has a Show/Hide annotations toggle (view only, not saved). Highlight, underline and strike-out each offer at least 5 colours, plus recent colours.
+- **AC-71 (P0)** (improvement) Text highlight, underline and strike-out work on every corpus file that has a text layer (including Devanagari lines), with the markup covering the selected glyphs (±1 pt). No "use freehand instead" fallback is needed.
+- **AC-72 (P1)** Shapes: a single click places a default-size shape; a drag sets the size; Shift keeps the aspect ratio (or 45° for lines and arrows). Border width, border colour and fill colour can be set.
+- **AC-73 (P1)** The history panel lists each change with its type, page and time; any set of changes can be reverted at once, and the revert itself can be undone.
 
 ### Redaction (phase E4)
 - **AC-47 (P1)** (improvement) Redact: marking "ZEBRA-7731" and applying removes it from extracted text and from decompressed content streams; images under the area are cut; output is a full rewrite with no earlier revision.
@@ -342,9 +367,9 @@ Each phase is a separate backlog item that passes the full pipeline and evaluato
 | Phase | Scope | ACs | Key risk | Rough size |
 |---|---|---|---|---|
 | **E0 Engine spike** | `berry-engine` Rust crate: content-stream interpreter (glyph positions), run/line grouping, embedded-font coverage check, surgical show-text removal with `TJ` splitting, append block, same-family re-subset, WASM + native builds, fidelity guard. Run on the Parity Lab corpus against the reference | 11b, 11c, 11f (engine level) | Font edge cases (Type 3, no ToUnicode, CFF, vertical) | M (1–2 weeks) |
-| **E1 Editor core** | Editor shell, PDFium worker + lazy load, overlay model, op log, undo/redo, autosave/recovery, add text, image, whiteout, shapes, annotate, sign (type/draw/upload), page ops, download, mobile toolbar | 1–8, 23–27, 31–32, 41, 43–46, 48–52 | WASM size and two-engine alignment | L |
-| **E2 Edit existing text (line)** | Line edit via PDFium text objects, font reuse + coverage check, OFL substitution + notice, style changes, move/delete, find & replace, scan/Type3 fallbacks | 9–13, 17–19 | Subset fonts, odd encodings | L |
-| **E3 Paragraphs, links, forms** | Paragraph detection + reflow inside box, toggle; links; form fill + create, tab order, repeat on pages, rotated pages, XFA banner, detect fields, stamps, attachments | 14–16, 28–30, 34–40, 42 | Paragraph detection quality across real files | L |
+| **E1 Editor core** | Editor shell, pdf.js render worker + lazy engine load, overlay model, op log, undo/redo, autosave/recovery, add text, image, whiteout, shapes, annotate, sign (type/draw/upload), page ops, download, mobile toolbar, snapping, placement preview, z-order | 1–8, 23–27, 31–32, 41, 43–46, 48–52, 54–58, 60, 64–73 | WASM size and two-engine alignment | L |
+| **E2 Edit existing text (line)** | Line edit via `berry-engine` text runs, font reuse + coverage check, OFL substitution + notice, document fonts menu, style changes, move/delete, find & replace, scan/Type3 fallbacks | 9–13, 17–19, 59 | Subset fonts, odd encodings | L |
+| **E3 Paragraphs, links, forms** | Paragraph detection + reflow inside box, toggle; links; form fill + create, tab order, repeat on pages, rotated pages, XFA banner, detect fields, stamps, attachments | 14–16, 28–30, 34–40, 42, 53, 61–63 | Paragraph detection quality across real files | L |
 | **E4 Beyond parity** | True redaction, Devanagari/Arabic shaping (new + replace run), OCR scan-to-editable (tesseract.js, small docs), camera signature, local fonts | 20–22, 33, 47 | Shaping correctness, redaction completeness | M–L |
 
 E0 and E1 can run in parallel (E1 needs no engine). Parity with the reference is reached at the end of E3; E1 alone already beats it on privacy, limits, speed and mobile for the most common jobs (fill, sign, add text, whiteout, annotate).
