@@ -27,7 +27,7 @@ import { DropOverlay } from "./DropOverlay";
 import { FilePicker, type FilePickerHandle } from "./FilePicker";
 import { LimitsNote, PrivacyNote } from "./notes";
 import { NoticeStack, type FlowNotice } from "./NoticeStack";
-import { OwnerPermissionNotice } from "./OwnerNotice";
+import { OwnerPermissionNotice } from "./OwnerPassword";
 import type { PageActionsRenderer } from "./PageGrid";
 import type { PreviewTarget } from "./PagePreviewDialog";
 import { createVisibilityWatcher, ThumbContext } from "./Thumbnail";
