@@ -15,13 +15,17 @@ import { needsShaping, SHAPING_MANIFEST, type ShapingManifest } from "@/lib/edit
 let ready: Promise<{ m: EditorFontManifest; fallback: FontFileEntry[] }> | null = null;
 let known: { m: EditorFontManifest; fallback: FontFileEntry[] } | null = null;
 
+async function fontList<T>(url: string): Promise<T> {
+  const r = await fetch(url);
+  // A missing list would read as "no font prints this": a failed load, not an answer.
+  if (!r.ok) throw new Error(`font list ${r.status}`);
+  return (await r.json()) as T;
+}
+
 export function loadCoverage() {
-  ready ??= Promise.all([
-    loadFontManifest(),
-    fetch("/fonts/noto/manifest.json")
-      .then((r) => (r.ok ? (r.json() as Promise<{ fonts: FontFileEntry[] }>) : { fonts: [] }))
-      .then((j) => j.fonts),
-  ]).then(([m, fallback]) => (known = { m, fallback }));
+  ready ??= Promise.all([loadFontManifest(), fontList<{ fonts: FontFileEntry[] }>("/fonts/noto/manifest.json").then((j) => j.fonts)]).then(
+    ([m, fallback]) => (known = { m, fallback }),
+  );
   ready.catch(() => (ready = null));
   return ready;
 }
@@ -29,24 +33,29 @@ export function loadCoverage() {
 let shapingReady: Promise<FontFileEntry[]> | null = null;
 let shaping: FontFileEntry[] | null = null;
 function loadShapingCoverage() {
-  shapingReady ??= fetch(SHAPING_MANIFEST)
-    .then((r) => (r.ok ? (r.json() as Promise<ShapingManifest>) : { fonts: [] }))
-    .then((j) => (shaping = j.fonts.map((f) => ({ file: f.url, ranges: f.ranges }))));
+  shapingReady ??= fontList<ShapingManifest>(SHAPING_MANIFEST).then((j) => (shaping = j.fonts.map((f) => ({ file: f.url, ranges: f.ranges }))));
   shapingReady.catch(() => (shapingReady = null));
   return shapingReady;
 }
 
-/** Characters of a text object that won't print, or [] while the lists load. */
-export function missingIn(o: Pick<TextObj, "text" | "font" | "bold" | "italic">): string[] {
-  if (!known) return [];
-  const face = faceOf(knownManifest() ?? known.m, o.font, o.bold, o.italic);
+type Coverable = Pick<TextObj, "text" | "lines" | "font" | "bold" | "italic">;
+
+/** The lines as the build draws them: wrapped (`lines`), each shaped or not on its own (build.ts). */
+function linesOf(o: Coverable): string[] {
+  return o.lines?.length ? o.lines : o.text.split("\n");
+}
+
+/** Characters of a text object that won't print, or null while (or if) the font lists aren't loaded. */
+export function missingIn(o: Coverable): string[] | null {
+  if (!known) return null;
+  const face = faceOf(knownManifest() ?? known.m, o.font, o.bold, o.italic)?.files ?? [];
   // Lines with complex scripts print through the shaping engine, with the face and the script fonts.
-  const shaped = o.text.split("\n").filter(needsShaping);
-  if (!shaped.length) return missingChars(o.text, face?.files ?? [], known.fallback);
-  if (!shaping) return [];
-  const plain = o.text.split("\n").filter((l) => !needsShaping(l)).join("\n");
-  const out = missingChars(plain, face?.files ?? [], known.fallback);
-  for (const c of missingChars(shaped.join("\n"), face?.files ?? [], shaping)) if (!out.includes(c)) out.push(c);
+  const lines = linesOf(o);
+  const shaped = lines.filter(needsShaping);
+  const out = missingChars(lines.filter((l) => !needsShaping(l)).join("\n"), face, known.fallback);
+  if (!shaped.length) return out;
+  if (!shaping) return null;
+  for (const c of missingChars(shaped.join("\n"), face, shaping)) if (!out.includes(c)) out.push(c);
   return out;
 }
 
@@ -55,20 +64,30 @@ function loadFor(withShaping: boolean) {
   return Promise.all([loadCoverage(), withShaping ? loadShapingCoverage() : null]);
 }
 
-/** Every character of the added text in `objects` that won't print. */
-export async function missingInObjects(objects: readonly EditorObject[]): Promise<string[]> {
-  if (!objects.some((o) => o.kind === "text")) return [];
-  await Promise.all(objects.map((o) => (o.kind === "text" ? loadFor(needsShaping(o.text)).catch(() => null) : null)));
+/**
+ * Every character of the added text in `objects` that won't print. `unchecked` is true when a
+ * font list couldn't be fetched, so the caller warns that printing wasn't checked rather than
+ * saying nothing.
+ */
+export async function missingInObjects(objects: readonly EditorObject[]): Promise<{ chars: string[]; unchecked: boolean }> {
+  const texts = objects.filter((o): o is TextObj => o.kind === "text");
+  if (!texts.length) return { chars: [], unchecked: false };
+  await Promise.all(texts.map((o) => loadFor(linesOf(o).some(needsShaping)).catch(() => null)));
   const all = new Set<string>();
-  for (const o of objects) if (o.kind === "text") missingIn(o).forEach((c) => all.add(c));
-  return [...all];
+  let unchecked = false;
+  for (const o of texts) {
+    const m = missingIn(o);
+    if (m) m.forEach((c) => all.add(c));
+    else unchecked = true;
+  }
+  return { chars: [...all], unchecked };
 }
 
 export function useMissing(o: TextObj): string[] {
   const [, setLoaded] = useState(0);
-  const wantShaping = needsShaping(o.text);
+  const wantShaping = linesOf(o).some(needsShaping);
   useEffect(() => {
     if (!known || (wantShaping && !shaping)) void loadFor(wantShaping).then(() => setLoaded((n) => n + 1), () => undefined);
   }, [wantShaping]);
-  return missingIn(o);
+  return missingIn(o) ?? [];
 }

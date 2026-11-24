@@ -306,7 +306,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   const [confirm, setConfirm] = useState<"close" | "clear" | null>(null);
   /** Opening another file (or a blank one) while there are edits not downloaded: asks first. */
   const [replace, setReplace] = useState<{ run: () => void; label: string } | null>(null);
-  const [missingAsk, setMissingAsk] = useState<{ chars: string[]; name?: string } | null>(null);
+  const [missingAsk, setMissingAsk] = useState<{ chars: string[]; unchecked: boolean; name?: string } | null>(null);
   const readOnly = useStore(store, (s) => s.readOnly);
   const [ownerOpen, setOwnerOpen] = useState(false);
   const [ownerError, setOwnerError] = useState<string | undefined>();
@@ -659,8 +659,8 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       if (s.lineEdit) await ctl.commitLine();
       // Added text with characters no font can print: say so before the file is made (AC-75).
       if (!force && !s.readOnly) {
-        const missing = await missingInObjects(H.current(store.get().history).objects);
-        if (missing.length) return setMissingAsk({ chars: missing, name });
+        const { chars, unchecked } = await missingInObjects(H.current(store.get().history).objects);
+        if (chars.length || unchecked) return setMissingAsk({ chars, unchecked, name });
       }
       store.set({ busy: "save" });
       const at = store.get().history.index;
@@ -737,7 +737,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       clearTimeout(retry);
       retry = setTimeout(() => void save(), 30_000);
     };
-    const save = async () => {
+    const save = async (rewrite = false) => {
       const s = store.get();
       if (blocked()) return;
       const h = s.history;
@@ -752,11 +752,12 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       // Too big to keep even the last step: the last good record stays.
       if (!plan) return fail();
       const result = await writeSession(plan);
-      if (result === "stale" && !p.fresh) {
-        // Another tab swept blobs this page had written: write everything again, sweeping too.
+      if (result === "stale" && !rewrite) {
+        // Another tab's first write swept blobs this page had written: write them all again, but
+        // without a sweep of our own, which would delete that tab's blobs and start it over too
+        // (two tabs would keep rewriting each other's). Only a page's first write sweeps.
         written.clear();
-        p.fresh = true;
-        return save();
+        return save(true);
       }
       if (result !== "ok") return fail();
       p.fresh = false;
@@ -1208,8 +1209,12 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       <Dialog
         open={!!missingAsk}
         onClose={() => setMissingAsk(null)}
-        title="Some characters won’t print"
-        description={`No font here can draw ${missingAsk ? listChars(missingAsk.chars) : ""}. They come out as “?” in the downloaded copy.`}
+        title={missingAsk?.chars.length ? "Some characters won’t print" : "Couldn’t check your text"}
+        description={
+          missingAsk?.chars.length
+            ? `No font here can draw ${listChars(missingAsk.chars)}. They come out as “?” in the downloaded copy.${missingAsk.unchecked ? " Some of your text couldn’t be checked." : ""}`
+            : "The font lists didn’t load, so we couldn’t check that every character of your added text prints. Any that can’t come out as “?”."
+        }
         footer={
           <>
             <Button variant="plain" onClick={() => setMissingAsk(null)} data-autofocus>
