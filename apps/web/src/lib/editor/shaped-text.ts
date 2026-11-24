@@ -24,8 +24,8 @@ export type ShapingDeps = {
   loadUrl: (url: string) => Promise<Uint8Array>;
 };
 
-/** The family name a face is registered under: its label, e.g. "Arimo". */
-export const familyOf = (id: string) => TEXT_FONTS.find((f) => f.id === id)?.label ?? "Arimo";
+/** The family name a face is registered under: its label, e.g. "Arimo" (library and user fonts: their id). */
+export const familyOf = (id: string) => TEXT_FONTS.find((f) => f.id === id)?.label ?? id;
 
 type Style = { font: string; bold: boolean; italic: boolean };
 

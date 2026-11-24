@@ -13,6 +13,7 @@ const font = (over: Partial<FontInfo>): FontInfo => ({
   bold: false,
   italic: false,
   serif: true,
+  complete: true,
   monospace: false,
   object: 5,
   stand_ins: [],

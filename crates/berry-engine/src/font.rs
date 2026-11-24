@@ -828,6 +828,30 @@ impl PdfFont {
         }
     }
 
+    /// The embedded program's bytes and its kind ("truetype" or "cff"), for the font matcher.
+    pub fn program_bytes(&self) -> Option<(&'static str, &[u8])> {
+        match &self.program {
+            Program::TrueType(d) => Some(("truetype", d)),
+            Program::Cff(d) => Some(("cff", d)),
+            _ => None,
+        }
+    }
+
+    /// Glyph index in the embedded program for a code, for the programs we can read.
+    pub fn program_gid(&self, code: u32) -> Option<u16> {
+        if self.two_byte {
+            return self.gid_for(code);
+        }
+        match &self.program {
+            Program::TrueType(_) => self.gid_for(code),
+            Program::Cff(data) => {
+                let cff = ttf_parser::cff::Table::parse(data)?;
+                Some(cff.glyph_index_by_name(self.names.get(code as usize)?.as_deref()?)?.0)
+            }
+            _ => None,
+        }
+    }
+
     /// Whether the font can actually draw this code: `Some(true)` when the embedded program has
     /// a non-empty outline (or the code is blank by nature), `Some(false)` when it does not,
     /// `None` when we cannot tell.

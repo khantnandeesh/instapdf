@@ -4,7 +4,7 @@
  * first Download intent. Bytes stay on this device; the only fetches are our own font files.
  */
 import { buildPdf, type BuildInput } from "./build";
-import { FONT_BASE, type EditorFontManifest } from "./fonts";
+import { FONT_BASE, USER_FILE, fontUrl, type EditorFontManifest } from "./fonts";
 import { needsShaping, SHAPING_MANIFEST, type ShapingManifest } from "./shaping";
 
 export type BuildRequest = { id: number; input: BuildInput } | { id: number; owner: { bytes: Uint8Array; password: string } };
@@ -27,7 +27,7 @@ const fonts = {
     manifest.catch(() => (manifest = null));
     return manifest;
   },
-  load: (file: string) => bytes(`${FONT_BASE}${encodeURIComponent(file)}`),
+  load: (file: string) => bytes(fontUrl(file)),
   fallback: {
     manifest: () => {
       noto ??= json("/fonts/noto/manifest.json");
@@ -65,6 +65,20 @@ scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: 
   }
   try {
     const fontkit = (await import("@cantoo/fontkit")).default;
+    // Library and user faces come with the request; the user's own bytes are never fetched.
+    const more = msg.input.fonts;
+    const withMore: typeof fonts = more
+      ? {
+          ...fonts,
+          manifest: async () => ({ faces: { ...more.faces, ...(await fonts.manifest()).faces } }),
+          load: async (file) => {
+            if (!file.startsWith(USER_FILE)) return fonts.load(file);
+            const own = more.bytes[file];
+            if (!own) throw new Error("A font you added is no longer available. Add it again.");
+            return own;
+          },
+        }
+      : fonts;
     const input = msg.input;
     let out: Uint8Array;
     if (wantsShaping(input)) {
@@ -76,19 +90,19 @@ scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: 
             engine.catch(() => (engine = null));
             return engine;
           },
-          editorManifest: fonts.manifest,
+          editorManifest: withMore.manifest,
           shapingManifest: () => {
             shapingFonts ??= json<ShapingManifest>(SHAPING_MANIFEST);
             shapingFonts.catch(() => (shapingFonts = null));
             return shapingFonts;
           },
-          loadFace: fonts.load,
+          loadFace: withMore.load,
           loadUrl: bytes,
         },
-        (defer) => buildPdf(input, fonts, fontkit, defer),
+        (defer) => buildPdf(input, withMore, fontkit, defer),
         input.password,
       );
-    } else out = await buildPdf(input, fonts, fontkit);
+    } else out = await buildPdf(input, withMore, fontkit);
     scope.postMessage({ id: msg.id, ok: true, bytes: out } satisfies BuildResponse, [out.buffer as ArrayBuffer]);
   } catch (error) {
     // Logged locally only, without file content.

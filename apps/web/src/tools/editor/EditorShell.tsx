@@ -4,7 +4,7 @@
  * history entry (Back closes it), the canvas with every page, and the bars around it. Loaded as a
  * separate chunk once the user shows intent (AC-86).
  */
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -15,6 +15,7 @@ import { buildInWorker, checkOwnerPassword, disposeBuild } from "@/lib/editor/bu
 import { OwnerPasswordDialog, OwnerPermissionNotice } from "@/components/tool-flow/OwnerPassword";
 import type { Permission } from "@/tools/registry";
 import { disposeEngine, getEngineStatus, getShapingStatus, subscribeEngine } from "@/lib/editor/engine-client";
+import { fontsForBuild, resolveFonts } from "@/lib/editor/fonts-browser";
 import { screenDeltaToFrame, screenToFrame, displaySize } from "@/lib/editor/geometry";
 import * as H from "@/lib/editor/history";
 import { clampDelta, initialPages, isPristine, kindName, moveObject, newId, objectBounds, pageSize, totalRotation, type EditorObject, type PageEntry, type Pt } from "@/lib/editor/model";
@@ -27,6 +28,9 @@ import { listChars } from "@/lib/editor/coverage";
 import { missingInObjects } from "./coverage-browser";
 import { addAsset, IMAGE_ACCEPT, imageError, imageFromFile, isImageFile, plainAssets, releaseAssets } from "./assets";
 import { EnginePill } from "./EngineProgress";
+import { resetDocFonts } from "./font-service";
+import { disposeMatcher } from "@/lib/font-library/match-client";
+import { FontNotice } from "./FontMenu";
 import { AnnotsToggle, DOCK_ORDER, MoreTools, PageChip, PageHeader, PrivacyChip, SaveChip, ToolDock, ToolRail, TopBar, TOOLS, ViewPill } from "./Chrome";
 import { createController, TOOL_NAMES, type Controller, type Runtime, type Toast } from "./controller";
 import { BASE_SCALE, EditorContext, MAX_ZOOM, MIN_ZOOM, ZOOM_STEPS, useCtl } from "./context";
@@ -35,6 +39,13 @@ import { PageView, unionBox } from "./PageView";
 import { SelectionBar, ToolOptions } from "./Properties";
 import { SidePanel } from "./SidePanel";
 import { createStore, shallowArray, useStore, type EditorState, type Placement, type ToolId } from "./store";
+
+/** The library and user fonts the added text uses, for the download worker. */
+async function buildFonts(objects: readonly EditorObject[]) {
+  const ids = objects.flatMap((o) => (o.kind === "text" ? [o.font] : []));
+  await resolveFonts(ids);
+  return fontsForBuild(ids);
+}
 
 const SignDialog = lazy(() => import("./SignDialog").then((m) => ({ default: m.SignDialog })));
 
@@ -104,6 +115,7 @@ function initialState(pages: PageEntry[], wide: boolean): EditorState {
     shaping: "idle",
     pendingLine: null,
     lineEdit: null,
+    fontNotice: null,
     busy: null,
     panel: wide && (readLocal(PANEL_KEY) ?? (typeof innerWidth !== "undefined" && innerWidth >= 1600 ? "1" : "0")) === "1",
     panelTab: "pages",
@@ -196,6 +208,7 @@ export function EditorShell(props: ShellProps) {
       // (checked in the background: the check loads the download worker).
       const restricted = props.pdf.denied.includes("modify");
       const store = createStore({ ...initialState(initialPages(src), wide), readOnly: restricted });
+      resetDocFonts();
       if (restricted && props.password)
         void checkOwnerPassword(props.bytes.slice(), props.password).then(
           (owner) => alive && owner && store.set({ readOnly: false }),
@@ -222,6 +235,7 @@ export function EditorShell(props: ShellProps) {
       alive = false;
       if (made) releaseAssets(made.rt.assets);
       disposeEngine();
+      disposeMatcher();
       disposeBuild();
     };
     // Opened once per file: the route remounts the shell for another file.
@@ -633,7 +647,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         let out: Uint8Array;
         if (s.readOnly) out = original; // nothing changed: the file as it came, its restrictions intact
         else try {
-          out = await buildInWorker({ bytes: base.slice(), password: rt.password, pages: doc.pages, objects: doc.objects, assets: plainAssets(rt.assets, assetsOf(doc.objects)) });
+          out = await buildInWorker({ bytes: base.slice(), password: rt.password, pages: doc.pages, objects: doc.objects, assets: plainAssets(rt.assets, assetsOf(doc.objects)), fonts: await buildFonts(doc.objects) });
         } catch (err) {
           if (!isPristine(doc)) throw err;
           out = base;
@@ -1055,7 +1069,9 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
             {wide && <SaveChip />}
             <ViewPill pageCount={pages.length} onZoom={(z) => zoomTo(z)} onFit={fitTo} onGo={goto} />
           </div>
-          <ToastView toast={toast} onDone={() => setToast(null)} />
+          <ToastView toast={toast} onDone={() => setToast(null)}>
+            <FontNotice />
+          </ToastView>
         </div>
       </div>
       {!wide && (
@@ -1280,9 +1296,12 @@ function RecoveryNotice({ s, onRestore, onDiscard }: { s: LoadedSession; onResto
   );
 }
 
-function ToastView({ toast, onDone }: { toast: Toast | null; onDone: () => void }) {
+function ToastView({ toast, onDone, children }: { toast: Toast | null; onDone: () => void; children?: ReactNode }) {
   return (
-    <div className="ed-toasts" role="status" aria-live="polite">
+    <div className="ed-toasts">
+      {/* The font notice has controls and is announced once by the controller: not in the live region. */}
+      {children}
+      <div className="ed-toasts__live" role="status" aria-live="polite">
       {toast && (
         <div key={toast.key} className={cx("ed-toast ed-glass", `ed-toast--${toast.tone}`)} data-testid="editor-notice">
           <span>{toast.text}</span>
@@ -1303,6 +1322,7 @@ function ToastView({ toast, onDone }: { toast: Toast | null; onDone: () => void 
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 }

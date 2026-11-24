@@ -45,6 +45,8 @@ export interface FontInfo {
   object: number | null;
   /** Open font families that can stand in for this font, best first. */
   stand_ins: string[];
+  /** False for a subset: some characters may be missing (check with coverage()). */
+  complete: boolean;
 }
 
 /** Consecutive characters of a line in one font, size and colour. */
@@ -182,6 +184,21 @@ export interface ShapedText {
   runs: ShapedRun[];
 }
 
+/** A document font's embedded program, for matching it against the font library (F24). The
+ * matching runs in the separate berry_fontmatch module, never in the engine. */
+export interface FontProgram {
+  /** The embedded program as stored. Empty when format is "none". */
+  bytes: Uint8Array;
+  /** "truetype": a TrueType or OpenType file. "cff": a bare CFF table. "none": not embedded,
+   * Type 1 or Type 3, so only the widths below can be compared. */
+  format: "truetype" | "cff" | "none";
+  /** False for a subset. */
+  complete: boolean;
+  /** Each requested character the font draws: its glyph index in `bytes` (0 when format is
+   * "none") and its advance in 1/1000 em. */
+  glyphs: { cp: number; gid: number; width: number }[];
+}
+
 /** What every method throws. Nothing is changed when an edit throws. */
 export type BerryError =
   | { kind: "parse"; message: string }
@@ -223,6 +240,9 @@ export class BerryDocument {
    * embedded font program. Blank characters count as covered.
    */
   coverage(fontObject: number, text: string): Coverage;
+  /** The embedded program of a document font and where it keeps each character of `chars`.
+   * Throws bad-font for an unknown object. */
+  fontProgram(fontObject: number, chars: string): FontProgram;
   find(page: number, needle: string, matchCase: boolean): Match[];
   /** Sets a line's text. Only the characters that differ are rewritten. */
   replaceLine(page: number, line: number, text: string): EditResult;

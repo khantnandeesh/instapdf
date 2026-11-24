@@ -10,10 +10,12 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { MenuButton, type MenuEntry } from "@/components/ui/Menu";
 import { cx } from "@/components/ui/cx";
-import { TEXT_FONTS, cssFamily } from "@/lib/editor/fonts";
+import { cssFamily } from "@/lib/editor/fonts";
 import { ensureFace } from "@/lib/editor/fonts-browser";
 import { layoutText, textBoxSize } from "@/lib/editor/text-layout";
 import { measurer } from "@/lib/editor/fonts-browser";
+import { FontMenuBody, useFontState } from "./FontMenu";
+import { fontLabel } from "./font-service";
 import { canRotate, kindName, type EditorObject, type MarkupKind, type TextObj } from "@/lib/editor/model";
 import { useCtl } from "./context";
 import {
@@ -232,46 +234,51 @@ export function SizeStepper({ value, onChange }: { value: number; onChange: (n: 
   );
 }
 
+/** Loads a font's regular face and re-renders once it is in (the picker shows the name in it). */
+function useFontName(id: string): string {
+  const fonts = useFontState();
+  const [, setReady] = useState(0);
+  const label = fontLabel(id);
+  useEffect(() => {
+    let live = true;
+    void ensureFace(id, false, false, label).then(
+      () => live && setReady((n) => n + 1),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [id, label, fonts.library]);
+  return label;
+}
+
+/** Font menu (F24): the PDF's own fonts and their closest matches, the person's fonts, the library. */
 export function FontPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
-  const fam = TEXT_FONTS.find((f) => f.id === value) ?? TEXT_FONTS[0];
+  const label = useFontName(value);
   return (
     <Pop
-      label={`Font ${fam.label}`}
-      title={`Font: ${fam.label}`}
+      label={`Font ${label}`}
+      title={`Font: ${label}`}
       className="ed-ctl--wide"
       testId="font-picker"
-      onOpen={() => TEXT_FONTS.forEach((f) => void ensureFace(f.id, false, false, f.label).catch(() => {}))}
       trigger={
         <>
-          <span className="max-w-[84px] truncate" style={{ fontFamily: `"${cssFamily(fam.id)}", Arial` }}>
-            {fam.label}
+          <span className="max-w-[84px] truncate" style={{ fontFamily: `"${cssFamily(value)}", Arial` }}>
+            {label}
           </span>
           <CaretDownBold size={12} />
         </>
       }
-      panelClassName="w-[220px] p-1.5"
+      panelClassName="ed-fonts-pop"
     >
       {(close) => (
-        <div role="listbox" aria-label="Font" className="flex flex-col">
-          {TEXT_FONTS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              role="option"
-              aria-selected={f.id === value}
-              className={cx("ed-menurow", f.id === value && "ed-menurow--on")}
-              onClick={() => {
-                onChange(f.id);
-                close();
-              }}
-            >
-              <span className="text-[17px]" style={{ fontFamily: `"${cssFamily(f.id)}", Arial` }}>
-                {f.label}
-              </span>
-              <span className="text-help text-muted">{f.standsFor}</span>
-            </button>
-          ))}
-        </div>
+        <FontMenuBody
+          value={value}
+          onPick={(id) => {
+            onChange(id);
+            close();
+          }}
+        />
       )}
     </Pop>
   );

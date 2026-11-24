@@ -93,6 +93,28 @@ pub struct FontInfo {
     pub object: Option<u32>,
     /// Open fonts that can stand in for this one, best first.
     pub stand_ins: Vec<String>,
+    /// False for a subset: some characters may be missing.
+    pub complete: bool,
+}
+
+/// One character of a font program: its glyph index (0 when the program is not readable) and
+/// its advance in 1/1000 em.
+#[derive(Clone, Debug, Serialize)]
+pub struct ProgramGlyph {
+    pub cp: u32,
+    pub gid: u16,
+    pub width: f64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct FontProgram {
+    /// "truetype", "cff" (bare CFF) or "none" (not embedded, Type 1 or Type 3: widths only).
+    pub format: &'static str,
+    /// False for a subset.
+    pub complete: bool,
+    pub glyphs: Vec<ProgramGlyph>,
+    #[serde(skip)]
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -397,6 +419,7 @@ impl Engine {
             monospace: f.is_monospace(),
             object: f.object_id.map(|i| i.0),
             stand_ins: fallback::request_for(f).families,
+            complete: !f.subset,
         }
     }
 
@@ -506,6 +529,24 @@ impl Engine {
             }
         }
         Ok(out)
+    }
+
+    /// The embedded program of a document font with where it keeps each character of `chars`,
+    /// for matching the font against the library (the matching itself is not in the engine).
+    pub fn font_program(&mut self, font_object: u32, chars: &str) -> Result<FontProgram> {
+        let id = self.doc.objects.keys().find(|k| k.0 == font_object).copied().ok_or(Error::BadFont)?;
+        let is_font = self.doc.get_dictionary(id).is_ok_and(|d| d.has_type(b"Font"));
+        let font = is_font.then(|| self.cache.get(&self.doc, &Object::Reference(id))).flatten().ok_or(Error::BadFont)?;
+        let none = HashSet::new();
+        let (format, bytes) = font.program_bytes().map(|(f, b)| (f, b.to_vec())).unwrap_or(("none", Vec::new()));
+        let glyphs = chars
+            .chars()
+            .filter_map(|ch| {
+                let code = font.encode(ch, &none)?;
+                Some(ProgramGlyph { cp: ch as u32, gid: font.program_gid(code).unwrap_or(0), width: font.width(code) })
+            })
+            .collect();
+        Ok(FontProgram { format, complete: !font.subset, glyphs, bytes })
     }
 
     /// Text of a page: lines with runs, words, fonts and positions, and paragraphs.
