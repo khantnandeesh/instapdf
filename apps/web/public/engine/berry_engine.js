@@ -221,6 +221,32 @@ export class BerryDocument {
         }
     }
     /**
+     * How a complex-script line would look with `text` (nothing is changed): `{ paths, glyphs }`.
+     * @param {number} page
+     * @param {number} line
+     * @param {string} text
+     * @returns {any}
+     */
+    previewLine(page, line, text) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16) >>> 0;
+            const val2 = +page;
+            const val3 = +line;
+            const ptr0 = passStringToWasm0(text, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.berrydocument_previewLine(retptr, this.__wbg_ptr, val2, val3, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeFromExternrefTable0(r1);
+            }
+            return takeFromExternrefTable0(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
      * @param {number} page
      * @param {number} line
      * @param {string} text

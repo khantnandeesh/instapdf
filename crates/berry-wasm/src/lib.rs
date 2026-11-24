@@ -91,6 +91,18 @@ impl BerryDocument {
         to_js(&self.engine.replace_range(page, line, start, end, text).map_err(fail)?)
     }
 
+    /// How a complex-script line would look with `text` (nothing is changed): `{ paths, glyphs }`.
+    #[wasm_bindgen(js_name = previewLine)]
+    pub fn preview_line(&mut self, page: usize, line: usize, text: &str) -> Result<JsValue, JsValue> {
+        #[cfg(feature = "shaping")]
+        return to_js(&self.engine.preview_line(page, line, text).map_err(fail)?);
+        #[cfg(not(feature = "shaping"))]
+        {
+            let _ = (page, line, text);
+            Err(fail(berry_engine::Error::ReadOnly { reason: "needs-shaping".into() }))
+        }
+    }
+
     /// Lays out one line of new text with the registered fonts.
     pub fn shape(&mut self, text: &str, font: JsValue, size: f64) -> Result<JsValue, JsValue> {
         to_js(&self.engine.shape_text(text, &font_request(font)?, size).map_err(fail)?)

@@ -1249,6 +1249,25 @@
   color: transparent;
   caret-color: var(--color-ink-black, #111);
 }
+/* Joined scripts: the engine's glyphs are drawn over the box (LineEditBox), and the box's own
+   text stays for the caret and typing without being seen. */
+.ed-input--drawn,
+.ed-input--drawn * {
+  color: transparent !important;
+}
+.ed-input__glyphs {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+/* Forced colours override the transparent text: the box's own text shows instead of the glyphs. */
+@media (forced-colors: active) {
+  .ed-input__glyphs {
+    display: none;
+  }
+}
 .ed-input {
   box-sizing: border-box;
   width: max-content;

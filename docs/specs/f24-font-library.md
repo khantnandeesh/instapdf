@@ -127,3 +127,16 @@ Owner, 2026-11-24: on a click the line's font changed to another one while typin
 Checked in `e2e/f24/line-edit-font.spec.ts` (the box's ink is compared with the page's, pixel for pixel in place) and `lib/font-library/embedded-face.test.ts`.
 
 Not in this PR: Hindi, Arabic and other joined scripts open in a stand-in font that can join their letters (the embedded program carries the glyphs but not the joining rules), with nothing marked as missing; lines turned on the page and right-to-left lines open in their own font but centred in the box, not on their baseline; a CFF font is covered by a made-up program in the tests because the corpus has no PDF with one.
+
+## Joined scripts in the edit box (fourth PR)
+
+Hindi, Arabic and other joined scripts: a PDF's subset has the glyphs but usually not the rules that join them (Chrome's and LibreOffice's subsets carry no GSUB or GPOS), so no browser can set such text in the document's own font. The engine already knows how the edit will be drawn, so it says so: `previewLine` makes the edit, reads the line back, rolls it back and returns every glyph the line then draws, with its outline from the embedded program and its place on the page. The box draws those outlines over its own text, which stays (unseen) for the caret, selection and input methods.
+
+- **AC-305 (P0)** A Hindi or Arabic line opens in the box exactly as it is on the page (same glyphs, same place), in the document's own font.
+- **AC-306 (P0)** While typing, the box shows the line as Enter will write it: the same glyphs and places (a new word in the document's font where its program can shape it, in the stand-in the engine embeds otherwise). A right-to-left line keeps its right end and grows to the left.
+- **AC-307 (P0)** An edit the engine would refuse (for example punctuation next to punctuation in an Arabic line) shows the typed text in a font that joins letters, so typing is never hidden; nothing is written until Enter, which reports the refusal as before.
+- **AC-308 (P1)** The caret stands where the drawn text ends (the unseen text is spread to the drawn glyphs' length), and the box and its paper cover the drawn glyphs without reaching a neighbouring line.
+
+Checked in `crates/berry-engine/tests/line_preview.rs` (the preview is exactly what the edit draws and changes nothing) and `e2e/f24/line-edit-joined.spec.ts` (the box's ink against the page's, on opening and after Enter).
+
+Not in this PR: turned pages and turned lines keep the stand-in font, and so do a font the engine can't read outlines from (Type 1, Type 3, not embedded) and stroked text (render modes 1, 2, 5, 6); slanted text (a skewed text matrix, such as a synthetic italic) is drawn upright, and a CID-keyed CFF font whose matrix sits in its FDArray is drawn at the top-level scale; the caret inside a word is placed by the unseen text, so it can sit a little off the drawn letters; text typed past the page's edge scrolls inside the box while the drawn glyphs do not; each keystroke makes and rolls back a full edit (fine for a line, and requests never queue up: only the latest text is asked for).

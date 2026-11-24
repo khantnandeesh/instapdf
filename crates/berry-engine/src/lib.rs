@@ -16,4 +16,6 @@ mod sfnt;
 pub mod shape;
 mod tables;
 mod woff;
+#[cfg(feature = "shaping")]
+pub use complex::{LinePreview, PreviewGlyph};
 pub use engine::{Coverage, EditResult, Engine, Error, Match, PageText, SaveReport};

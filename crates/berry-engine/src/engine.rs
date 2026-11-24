@@ -221,6 +221,12 @@ pub struct Engine {
     pub(crate) faces: Vec<Face>,
     pub(crate) embeds: Vec<Option<Embed>>,
     pub(crate) edited_pages: BTreeSet<usize>,
+    /// Set while `preview_line` runs: a complex-script edit is drawn, read, then rolled back,
+    /// and what it drew lands in `preview`.
+    #[cfg(feature = "shaping")]
+    pub(crate) dry: bool,
+    #[cfg(feature = "shaping")]
+    pub(crate) preview: Option<crate::complex::LinePreview>,
 }
 
 /// One planned piece of new text.
@@ -365,6 +371,10 @@ impl Engine {
             faces: Vec::new(),
             embeds: Vec::new(),
             edited_pages: BTreeSet::new(),
+            #[cfg(feature = "shaping")]
+            dry: false,
+            #[cfg(feature = "shaping")]
+            preview: None,
         })
     }
 
@@ -754,6 +764,11 @@ impl Engine {
             return self.edit_complex(page, page_id, pc, lines, line_id, a, b, inserted);
             #[cfg(not(feature = "shaping"))]
             return Err(Error::ReadOnly { reason: "needs-shaping".into() });
+        }
+        // A preview covers complex-script lines only: nothing below may change the file.
+        #[cfg(feature = "shaping")]
+        if self.dry {
+            return Err(limit("preview-simple-script"));
         }
 
         // 2. Positions along the baseline.

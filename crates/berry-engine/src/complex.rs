@@ -664,15 +664,22 @@ impl Engine {
                     format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
                 ));
             }
-            Ok((after, touched, new_lines, paragraphs))
+            Ok((after, touched, new_lines, paragraphs, probe))
         });
-        let (after, touched, new_lines, paragraphs) = match outcome {
+        let (after, touched, new_lines, paragraphs, probe) = match outcome {
             Ok(v) => v,
             Err(e) => {
                 self.rollback(backup, snapshot);
                 return Err(e);
             }
         };
+        // A preview: what the line now draws, then the file as it was.
+        if self.dry {
+            let drawn = probe.and_then(|g| new_lines.iter().find(|l| l.glyphs.contains(&g))).map_or(&[][..], |l| &l.glyphs);
+            self.preview = preview_of(&after, drawn);
+            self.rollback(backup, snapshot);
+            return Err(limit(if self.preview.is_some() { "preview" } else { "preview-no-outline" }));
+        }
         self.edited_pages.insert(page);
 
         let mut union = line.bbox;
@@ -1059,4 +1066,112 @@ fn check(
         }
     }
     Ok((touched, map))
+}
+
+/// A line as an edit draws it, for the edit box: each glyph's outline and place on the page.
+#[derive(Clone, Debug, Default, serde::Serialize)]
+pub struct LinePreview {
+    /// Glyph outlines as SVG path data, 1/1000 em, y up; each one once.
+    pub paths: Vec<String>,
+    pub glyphs: Vec<PreviewGlyph>,
+}
+
+/// One glyph of a [`LinePreview`].
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct PreviewGlyph {
+    /// Index into [`LinePreview::paths`].
+    pub path: usize,
+    /// Baseline origin, PDF user space.
+    pub x: f64,
+    pub y: f64,
+    /// Em size across the baseline, and along it (horizontal scaling), in points.
+    pub size: f64,
+    pub width: f64,
+    /// Baseline direction, degrees counter-clockwise.
+    pub angle: f64,
+    pub color: [u8; 3],
+}
+
+/// The outlines and places of a line's glyphs; `None` when a font's program can't be read or
+/// the text is stroked (outlines are only filled here).
+fn preview_of(pc: &PageContent, glyphs: &[usize]) -> Option<LinePreview> {
+    let mut out = LinePreview::default();
+    let mut seen: HashMap<(usize, u32), usize> = HashMap::new();
+    // Horizontal over vertical em per font, from a glyph that advances: zero-advance marks
+    // (virama, harakat) take their base letters' scaling.
+    let mut stretch: HashMap<usize, f64> = HashMap::new();
+    for &gi in glyphs {
+        let g = &pc.glyphs[gi];
+        let w = pc.fonts[g.font].width(g.code);
+        if w > 0.0 && g.width > 0.0 && g.size > 0.0 {
+            stretch.entry(g.font).or_insert(g.width * 1000.0 / w / g.size);
+        }
+    }
+    for &gi in glyphs {
+        let g = &pc.glyphs[gi];
+        match g.render_mode {
+            3 | 7 => continue,
+            1 | 2 | 5 | 6 => return None,
+            _ => {}
+        }
+        let font = &pc.fonts[g.font];
+        let path = match seen.get(&(g.font, g.code)) {
+            Some(&i) => i,
+            None => {
+                let d = font.outline_path(g.code)?;
+                out.paths.push(d);
+                seen.insert((g.font, g.code), out.paths.len() - 1);
+                out.paths.len() - 1
+            }
+        };
+        if out.paths[path].is_empty() {
+            continue;
+        }
+        let w = font.width(g.code);
+        let width =
+            if w > 0.0 && g.width > 0.0 { g.width * 1000.0 / w } else { g.size * stretch.get(&g.font).copied().unwrap_or(1.0) };
+        out.glyphs.push(PreviewGlyph {
+            path,
+            x: g.origin.0,
+            y: g.origin.1,
+            size: g.size,
+            width,
+            angle: g.angle.to_degrees(),
+            color: g.color,
+        });
+    }
+    Some(out)
+}
+
+impl Engine {
+    /// How the line would look with `text`: the edit is made, read and rolled back, and every
+    /// glyph the line then draws is returned with its outline. Complex-script lines only.
+    pub fn preview_line(&mut self, page: usize, line_id: usize, text: &str) -> Result<LinePreview> {
+        /// Clears the flag however the edit ends.
+        struct Dry<'a>(&'a mut Engine);
+        impl Drop for Dry<'_> {
+            fn drop(&mut self) {
+                self.0.dry = false;
+            }
+        }
+        self.preview = None;
+        let r = {
+            let d = Dry(self);
+            d.0.dry = true;
+            d.0.replace_line(page, line_id, text)
+        };
+        if let Some(p) = self.preview.take() {
+            return Ok(p);
+        }
+        r?;
+        // Nothing to change: the line as it is.
+        let page_id = self.page_id(page)?;
+        let pc = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
+        let (lines, _) = layout::group(&pc);
+        let line = lines.get(line_id).ok_or(Error::BadLine)?;
+        if !script::needs_shaping(&line.text, line.direction == "rtl") {
+            return Err(limit("preview-simple-script"));
+        }
+        preview_of(&pc, &line.glyphs).ok_or_else(|| limit("preview-no-outline"))
+    }
 }

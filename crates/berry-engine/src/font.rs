@@ -326,6 +326,41 @@ impl ttf_parser::OutlineBuilder for NullOutline {
     fn close(&mut self) {}
 }
 
+/// A glyph outline as SVG path data, scaled by `k` (to 1/1000 em), y up.
+#[cfg(feature = "shaping")]
+struct SvgPath {
+    d: String,
+    k: f32,
+}
+#[cfg(feature = "shaping")]
+impl SvgPath {
+    fn put(&mut self, op: char, pts: &[f32]) {
+        use std::fmt::Write;
+        self.d.push(op);
+        for (i, v) in pts.iter().enumerate() {
+            let _ = write!(self.d, "{}{}", if i > 0 { " " } else { "" }, (v * self.k).round() as i32);
+        }
+    }
+}
+#[cfg(feature = "shaping")]
+impl ttf_parser::OutlineBuilder for SvgPath {
+    fn move_to(&mut self, x: f32, y: f32) {
+        self.put('M', &[x, y]);
+    }
+    fn line_to(&mut self, x: f32, y: f32) {
+        self.put('L', &[x, y]);
+    }
+    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
+        self.put('Q', &[x1, y1, x, y]);
+    }
+    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+        self.put('C', &[x1, y1, x2, y2, x, y]);
+    }
+    fn close(&mut self) {
+        self.d.push('Z');
+    }
+}
+
 fn is_blank_char(text: &str) -> bool {
     !text.is_empty() && text.chars().all(|c| c.is_whitespace() || c == '\u{a0}' || c == '\u{200b}')
 }
@@ -858,6 +893,28 @@ impl PdfFont {
             }
             _ => None,
         }
+    }
+
+    /// A code's outline in the embedded program as SVG path data, in 1/1000 em with y up (empty
+    /// for a blank glyph). `None` when the program can't be read (not embedded, Type 1, Type 3).
+    #[cfg(feature = "shaping")]
+    pub fn outline_path(&self, code: u32) -> Option<String> {
+        let gid = ttf_parser::GlyphId(self.program_gid(code)?);
+        let mut b = SvgPath { d: String::new(), k: 1.0 };
+        match &self.program {
+            Program::TrueType(data) => {
+                let face = ttf_parser::Face::parse(data, 0).ok()?;
+                b.k = 1000.0 / f32::from(face.units_per_em());
+                face.outline_glyph(gid, &mut b);
+            }
+            Program::Cff(data) => {
+                let cff = ttf_parser::cff::Table::parse(data)?;
+                b.k = cff.matrix().sx * 1000.0;
+                let _ = cff.outline(gid, &mut b);
+            }
+            _ => return None,
+        }
+        Some(b.d)
     }
 
     /// Whether the font can actually draw this code: `Some(true)` when the embedded program has
