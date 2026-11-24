@@ -78,3 +78,8 @@ export async function annotationsOf(bytes: Uint8Array, pageNumber: number) {
     await pdf.loadingTask.destroy();
   }
 }
+
+/** public/fonts/noto, generated once before the tests by vitest.global-setup.ts. */
+export function ensureNotoFonts(): URL {
+  return new URL("../../../public/fonts/noto/", import.meta.url);
+}

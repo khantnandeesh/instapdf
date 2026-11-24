@@ -26,6 +26,7 @@
     {"id": "plain-arabic-append", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "تجريبي.", "replace": "تجريبي. شكرا", "expect": ["تجريبي. شكرا"], "absent": [], "substituted": true},
     {"id": "plain-arabic-number", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "2500", "replace": "7520", "expect": ["الإجمالي 7520 ريال"], "absent": ["2500"], "substituted": false},
     {"id": "plain-arabic-number-unmapped", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "2500", "replace": "3750", "refused": "text-mismatch"},
+    {"id": "plain-arabic-digits-unmapped-at-end", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "تجريبي.", "replace": "تجريبي. 2024", "expect": ["مرحبا بالعالم، هذا نص تجريبي. 2024"], "absent": [], "substituted": false},
     {"id": "chrome-hindi-word", "file": "scripts-chrome.pdf", "fonts": "fonts", "find": "कुल", "replace": "संपूर्ण", "expect": ["संपूर्ण"], "absent": [], "substituted": true},
     {"id": "chrome-arabic-word", "file": "scripts-chrome.pdf", "fonts": "fonts", "find": "بالعالم،", "replace": "بالجميع،", "expect": ["بالجميع،"], "absent": [], "substituted": true},
     {"id": "lo-hindi-word", "file": "scripts-libreoffice.pdf", "fonts": "fonts", "find": "कुल", "replace": "संपूर्ण", "expect": ["संपूर्ण"], "absent": [], "substituted": true},

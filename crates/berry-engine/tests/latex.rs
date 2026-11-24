@@ -208,8 +208,10 @@ fn actual_texts(bytes: &[u8]) -> Vec<Vec<u8>> {
 /// Latin, digits and an en dash typed into a right-to-left line: readers rebuild their order from
 /// the glyph positions with their own bidi rules. The edit is kept only when the line reads back
 /// as typed without any ActualText help; otherwise it is refused ("text-mismatch") and the page is
-/// left as it was (the editor offers "Replace with new text"). Extraction by pdfium and pdf.js of
-/// the kept edits is checked in apps/web (mixed-direction.test.ts).
+/// left as it was (the editor offers "Replace with new text"). Digits the Arabic subset draws but
+/// does not map (" 2024") are kept through the font's own ToUnicode or a sibling font
+/// (font_mapping.rs). Extraction by pdfium and pdf.js of the kept edits is checked in apps/web
+/// (mixed-direction.test.ts).
 #[cfg(feature = "shaping")]
 #[test]
 fn mixed_direction_text_in_an_arabic_line() {
@@ -239,7 +241,8 @@ fn mixed_direction_text_in_an_arabic_line() {
             let result = e.replace_line(0, id, &want);
             let must_refuse = ["!", "\u{60c} نعم", ": نعم", ", نعم", " abc def"].contains(&tail);
             assert!(!must_refuse || result.is_err(), "{file} {tail:?}: kept, but PDFium reorders it");
-            assert!(tail != " جديد" || result.is_ok(), "{file} {tail:?}: the Arabic control was refused: {result:?}");
+            let must_keep = [" جديد", " 2024"].contains(&tail);
+            assert!(!must_keep || result.is_ok(), "{file} {tail:?}: refused: {result:?}");
             match result {
                 Ok(r) => {
                     assert!(texts(&r.page).contains(&want), "{file}: {:?}", texts(&r.page));

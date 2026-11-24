@@ -903,6 +903,18 @@
 .ed-narrow.ed-has-strip .ed-toasts {
   bottom: calc(190px + env(safe-area-inset-bottom));
 }
+/* A phone has no zoom pill over the dock: messages and the line-edit hint sit directly above the
+   dock, or above the options strip while it has something in it (`ed-strip-empty` is set by the
+   shell: `:has()` can't be nested to ask for it here). */
+@media (max-width: 639px) {
+  .ed-narrow .ed-toasts,
+  .ed-narrow.ed-has-strip.ed-strip-empty .ed-toasts {
+    bottom: max(calc(82px + env(safe-area-inset-bottom)), calc(var(--ed-keyboard, 0px) + 8px));
+  }
+  .ed-narrow.ed-has-strip:not(.ed-strip-empty) .ed-toasts {
+    bottom: max(calc(140px + env(safe-area-inset-bottom)), calc(var(--ed-keyboard, 0px) + 8px));
+  }
+}
 .ed-toast {
   display: flex;
   align-items: center;
@@ -936,16 +948,32 @@
 }
 /* Narrow screens: a long notice keeps the full width and its action goes under it (the font
    notice is one short row of its own, F24). */
-.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) {
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act, .ed-toast__picks) {
   flex-wrap: wrap;
   padding-bottom: 8px;
 }
-.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) > span {
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act, .ed-toast__picks) > span {
   flex: 1 1 calc(100% - 44px);
 }
-.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act) > .ed-toast__act {
+.ed-narrow .ed-toast:not(.ed-toast--font):has(.ed-toast__act, .ed-toast__picks) > .ed-toast__act {
   order: 3;
   margin-left: -12px;
+}
+.ed-toast__slot {
+  display: contents;
+}
+.ed-toast__picks {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+.ed-narrow .ed-toast:has(.ed-toast__picks) > .ed-toast__slot > .ed-toast__picks {
+  order: 3;
+}
+.ed-toast__picks .ed-input__pick {
+  padding: 5px 12px;
+  font-size: 13px;
 }
 .ed-toast__act:hover,
 .ed-toast__x:hover {

@@ -7,7 +7,7 @@
  * A property change on a selection applies live, is one undo step, and becomes that tool's
  * default for the next object (AC-96).
  */
-import { FormsToolOptions } from "@/tools/forms/EditorForms";
+import { FormsToolOptions } from "@/tools/forms/lazy";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { MenuButton, type MenuEntry } from "@/components/ui/Menu";
 import { cx } from "@/components/ui/cx";

@@ -296,7 +296,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     /** Set by the shell: opens the sign dialog, the image picker, a download. */
     openSign: null as null | ((role?: "signature" | "initials") => void),
     pickImage: null as null | (() => void),
-    download: null as null | ((name?: string) => void),
+    download: null as null | ((name?: string) => void | Promise<void>),
 
     // ---- existing text (engine) ----
     async showVersion(index: number) {
@@ -462,6 +462,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       }
     },
     recovering: null as Promise<void> | null,
+    committing: null as Promise<void> | null,
     recoverEngine(): Promise<void> {
       ctl.recovering ??= (async () => {
         try {
@@ -476,9 +477,20 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     },
 
     /** `asked`: the person pressed Enter (leaving the box is not asking again for a text that just failed). */
-    async commitLine(asked = false): Promise<void> {
+    commitLine(asked = false): Promise<void> {
+      // Download waits for a save that is under way: it may yet fail and keep the line open.
+      const run = ctl.commitLineNow(asked);
+      const all = (ctl.committing = Promise.all([ctl.committing, run]).then(() => undefined));
+      void all.finally(() => {
+        if (ctl.committing === all) ctl.committing = null;
+      });
+      return run;
+    },
+    async commitLineNow(asked: boolean): Promise<void> {
       const s = store.get();
       const e = s.lineEdit;
+      // Reopened while the failed save is still being cleared up (the engine restarting): not yet.
+      if (e?.failed && s.busy === "edit") return;
       // Leaving the box with the same text that just couldn't be saved: nothing is tried again and
       // the box stays as it is (so the message's own action can be reached). Enter tries again.
       if (e?.failed && !asked) return;

@@ -56,10 +56,11 @@ codebase that runs as WebAssembly in the browser and natively for the consented 
    of a right-to-left line has the right glyphs in the wrong order (digits or Latin typed into
    Arabic, which readers reorder with their own bidi rules), the edit is refused
    (`text-mismatch`), not wrapped in ActualText. In a line with right-to-left text that reads by
-   its glyphs, a new word that would need ActualText (digits drawn with an Arabic font's glyphs,
-   whose ToUnicode maps them elsewhere) is refused the same way, since pdf.js ignores
-   ActualText. Two more cases PDFium orders differently from UAX #9 (the engine's read-back)
-   are refused the same way in a right-to-left line: punctuation typed next to punctuation
+   its glyphs, a new word that would need ActualText is refused the same way, since pdf.js
+   ignores ActualText; digits an Arabic subset draws but does not map go through a sibling font
+   instead (see Known limits). Two more cases PDFium orders differently from
+   UAX #9 (the engine's read-back) are refused the same way in a right-to-left line:
+   punctuation typed next to punctuation
    ("تجريبي." + "، نعم" reads "تجريبي،. نعم"; also ".!", ": ", ", "), and a left-to-right run
    of two or more words (" abc def" reads "defabc"). The editor offers "Replace with new text"
    for all of them.
@@ -109,12 +110,26 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
   order (checked for AC-205 and an appended Arabic word); refusing them would refuse most
   Arabic word edits on such files, so they are kept. This is a pdf.js-only limit: every kept edit
   must read correctly in PDFium, and the cases where PDFium reorders are refused (above).
-- A digit typed into an Arabic line is kept when the line's font maps that digit in its
-  ToUnicode (digits read in typed order in both readers). A digit the subset doesn't map (the
-  "3" in scripts-plain.pdf, whose subset maps only 0, 2, 5 and 7) would read as typed only
-  through ActualText, so the edit is refused (`text-mismatch`; oracle case
-  `plain-arabic-number-unmapped`, AC-206 on that file). Writing the new codes into the font's
-  ToUnicode would let both readers read them; not done yet.
+- A digit (or other left-to-right text) typed into an Arabic line reads by its glyphs, with no
+  ActualText, in two ways:
+  - the line's font maps the digit in its ToUnicode: drawn in place;
+  - otherwise (no entry for the code, or an entry for other text): the digits are drawn through a
+    *sibling* font, a copy of the font's dictionary with the same program and its own ToUnicode
+    for just the codes it draws (a Type 0 sibling also declares their widths, from the program,
+    in a copy of its CIDFont). The font's own ToUnicode is never changed: other pages, forms and
+    text may share it, and a new entry would change how they read. The sibling is a text item of
+    its own, so in a right-to-left line it is drawn after the line's last glyph, where pdf.js
+    reads it in logical order; that works when the new text ends the line (oracle case
+    `plain-arabic-digits-unmapped-at-end`). Anywhere else in the line (inside it, or at its
+    start) no content order reads right in pdf.js, so the edit is refused (`text-mismatch`;
+    oracle case `plain-arabic-number-unmapped`, "2500" → "3750" on scripts-plain.pdf, whose
+    subset has no width for "3"). pdf.js drops the space between the line and the sibling's
+    digits ("تجريبي.2024"), as it does at any change of font and direction there; PDFium and
+    copy and paste keep it. Each such edit makes a new sibling (reusing one is a follow-up), and
+    a second digit edit at the end of the same line is refused for now (the engine reads the
+    line back with the sibling runs out of order).
+  Tests: crates/berry-engine/tests/font_mapping.rs, and pdfium and pdf.js read-back in
+  apps/web/src/lib/editor/mixed-direction.test.ts.
 - Lines already drawn with ActualText spans (Chrome and LibreOffice Arabic) are not covered by
   the ActualText refusal: neither reader reads them by their glyphs before an edit either.
 - Vertical text, CID fonts with a non-Identity CMap and invisible (OCR) text are read-only.

@@ -4,67 +4,30 @@
  * and the editor's store, history and pages. Fields live in `DocState.forms`, so undo, redo,
  * History, autosave and Download cover them like any other change.
  *
- * Mount points: `PageFields` inside each page's turning overlay, `FieldPopover` beside it,
+ * Loaded as its own chunk through ./lazy. Mount points: `PageFields` inside each page's turning overlay, `FieldPopover` beside it,
  * `FormsChrome` once in the shell, `FormsToolOptions` in the tool-options slot, `FieldsChipSlot`
  * in the top bar and `TabOrderTab` in the side panel.
  */
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { Dialog } from "@/components/ui/Dialog";
 import * as H from "@/lib/editor/history";
-import { readFormsInWorker } from "@/lib/editor/build-client";
 import { addObjects, clampDelta, newId, pageSize, totalRotation, type EditorObject, type PageEntry } from "@/lib/editor/model";
 import { nextEmptyWidget } from "@/lib/forms/edit";
-import { addField, addFields, addRadioButton, createField, defaultSize, deleteField, deleteWidget, duplicateField, emptyForm, fieldOfWidget, missingRequired, setValue, setWidgetBox } from "@/lib/forms/model";
+import { addField, addFields, addRadioButton, createField, defaultSize, deleteWidget, emptyForm, fieldOfWidget, missingRequired, setValue, setWidgetBox } from "@/lib/forms/model";
 import { moveInOrder, pageOrder, restoreOriginal, sortByColumns, sortByRows } from "@/lib/forms/taborder";
-import type { FormField, FormState, Proposal } from "@/lib/forms/types";
+import type { FormField, Proposal } from "@/lib/forms/types";
 import type { Controller } from "@/tools/editor/controller";
 import { useCtl } from "@/tools/editor/context";
-import { shallowArray, useStore, type EditorState, type FormsUi } from "@/tools/editor/store";
+import { shallowArray, useStore, type FormsUi } from "@/tools/editor/store";
 import { FieldLayer } from "./FieldLayer";
 import { FieldProps } from "./FieldProps";
 import { FieldsChip, FormToolOptions } from "./FormToolOptions";
 import { ReviewPill } from "./ReviewPill";
 import { TabOrderPanel } from "./TabOrderPanel";
 import "./forms.css";
+import { applyForm, fieldTab, formReady, formsOf, setUi } from "./core";
 
-const formsOf = (s: EditorState) => H.current(s.history).forms;
 const NO_FIELDS: FormField[] = [];
-
-/** Reads the file's form in the download worker, once pdf.js says there is one (no pdf-lib in the editor chunk). */
-export async function loadForms(ctl: Controller, bytes: Uint8Array, password?: string): Promise<void> {
-  try {
-    // pdf.js answers null when there is no form, else the fields by name (a Map in pdf.js 5+).
-    const fields: unknown = await ctl.rt.pdf.getFieldObjects().catch(() => null);
-    if (!fields || !(fields instanceof Map ? fields.size : Object.keys(fields).length)) return;
-    const { forms, xfa } = await readFormsInWorker(bytes.slice(), password);
-    if (!forms.fields.length && !xfa) return;
-    // Every state without a form gets the file's. Nothing can add fields before this point (the
-    // Form tool and Detect wait for `ready`), so no state has a form the file's would be missing from.
-    ctl.store.set((s) => ({
-      history: { ...s.history, states: s.history.states.map((st) => (st.forms ? st : { ...st, forms })) },
-      forms: { ...s.forms, original: forms, xfa },
-    }));
-    if (xfa) ctl.toast({ text: "This form also has an XFA version. Fields that only exist there can’t be filled here.", tone: "info" });
-  } finally {
-    setUi(ctl, { ready: true });
-  }
-}
-
-/** False (and says why) while the file's form is still being read. */
-function formReady(ctl: Controller): boolean {
-  if (ctl.store.get().forms.ready) return true;
-  ctl.announce("Reading this file’s form fields. Try again in a moment.");
-  return false;
-}
-
-/** Records a form change as one undoable step. */
-export function applyForm(ctl: Controller, next: FormState, label: string, key?: string, page?: string) {
-  const doc = ctl.state();
-  if (next === doc.forms) return;
-  ctl.apply({ ...doc, forms: next }, label, { key, page });
-}
-
-const setUi = (ctl: Controller, patch: Partial<FormsUi>) => ctl.store.set((s) => ({ forms: { ...s.forms, ...patch } }));
 
 // ---- on each page --------------------------------------------------------------------------
 
@@ -83,7 +46,7 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
   const edit = tool === "form" && !readOnly;
   const turn = totalRotation(entry);
   const { w: pw, h: ph } = pageSize(entry);
-  const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number; sel: FormsUi["selected"] } | null>(null);
 
   const shown = useMemo(() => (readOnly ? fields.map((f) => (f.readOnly ? f : { ...f, readOnly: true })) : fields), [fields, readOnly]);
 
@@ -100,7 +63,7 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
 
   if (!fields.length && !proposals.length && !edit) return null;
 
-  const create = (x0: number, y0: number, x1: number, y1: number, shift: boolean) => {
+  const create = (x0: number, y0: number, x1: number, y1: number, shift: boolean, sel: FormsUi["selected"]) => {
     if (!formReady(ctl)) return;
     const state = formsOf(store.get()) ?? emptyForm();
     const kind = draw === "multiline" ? "text" : draw;
@@ -113,7 +76,6 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
     box.x += dx;
     box.y += dy;
     // Radio: clicks while a radio group is selected add buttons to it; Shift starts a new group.
-    const sel = store.get().forms.selected;
     const group = sel && !shift ? state.fields.find((f) => f.id === sel.field && f.kind === "radio") : undefined;
     if (kind === "radio" && group) {
       const next = addRadioButton(state, group.id, { ...box, page: entry.id });
@@ -141,7 +103,9 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
             e.stopPropagation();
             e.currentTarget.setPointerCapture(e.pointerId);
             const [x, y] = local(e);
-            setDrag({ x0: x, y0: y, x1: x, y1: y });
+            // The selection as it was at the press: a click next to a selected radio group adds a
+            // button to it (U-F2). Closing the popover commits what was typed there first.
+            setDrag({ x0: x, y0: y, x1: x, y1: y, sel: store.get().forms.selected });
             setUi(ctl, { selected: null });
           }}
           onPointerMove={(e) => {
@@ -152,7 +116,7 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
           onPointerUp={(e) => {
             if (!drag) return;
             setDrag(null);
-            create(drag.x0, drag.y0, drag.x1, drag.y1, e.shiftKey);
+            create(drag.x0, drag.y0, drag.x1, drag.y1, e.shiftKey, drag.sel);
           }}
           onPointerCancel={() => setDrag(null)}
         />
@@ -203,11 +167,15 @@ export const PageFields = memo(function PageFields({ entry, scale }: { entry: Pa
 });
 
 function dropProposal(ctl: Controller, p: Proposal) {
-  const proposals = ctl.store.get().forms.proposals.filter((x) => x !== p);
-  setUi(ctl, { proposals, detect: proposals.length ? { ...reviewOf(proposals), index: 0 } : { phase: "idle" } });
+  const all = ctl.store.get().forms.proposals;
+  const at = all.indexOf(p);
+  const proposals = all.filter((x) => x !== p);
+  // Next goes to the proposal that followed the one just handled.
+  setUi(ctl, { proposals, detect: proposals.length ? { ...reviewOf(proposals), index: at - 1 } : { phase: "idle" } });
 }
 
-const reviewOf = (ps: Proposal[]) => ({ phase: "review" as const, count: ps.length, pages: new Set(ps.map((p) => p.field.widgets[0].page)).size, index: 0 });
+/** `index` is the proposal last stepped to; -1 before the first step, so Next starts at the first. */
+const reviewOf = (ps: Proposal[]) => ({ phase: "review" as const, count: ps.length, pages: new Set(ps.map((p) => p.field.widgets[0].page)).size, index: -1 });
 
 const KIND_LABEL: Record<FormField["kind"], string> = { text: "text field", checkbox: "checkbox", radio: "radio button", dropdown: "dropdown", list: "list", signature: "signature field", button: "button" };
 const kindLabel = (f: FormField) => (f.kind === "text" && f.multiline ? "multi-line text field" : KIND_LABEL[f.kind]);
@@ -228,23 +196,42 @@ export const FieldPopover = memo(function FieldPopover({ entry, place, pageWidth
   useLayoutEffect(() => {
     const el = box.current;
     if (!el || !r) return;
-    const { offsetWidth: bw, offsetHeight: bh } = el;
-    const left = Math.max(0, Math.min(r.left, pageWidth - bw));
-    const below = r.top + r.height + 8;
-    const top = below + bh > pageHeight + 48 && r.top - 8 - bh >= 0 ? r.top - 8 - bh : below;
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
-    el.style.visibility = "visible";
+    const place = () => {
+      const { offsetWidth: bw, offsetHeight: bh } = el;
+      // Away from where the next field usually goes (right, then below): beside the field on the
+      // right, else above it, else on its left, else below (G-12).
+      const clampX = (x: number) => Math.max(0, Math.min(x, pageWidth - bw));
+      const clampY = (y: number) => Math.max(0, Math.min(y, pageHeight - bh));
+      const spots = [
+        { left: r.left + r.width + 8, top: clampY(r.top), fits: r.left + r.width + 8 + bw <= pageWidth },
+        { left: clampX(r.left), top: r.top - 8 - bh, fits: r.top - 8 - bh >= 0 },
+        { left: r.left - 8 - bw, top: clampY(r.top), fits: r.left - 8 - bw >= 0 },
+      ];
+      const { left, top } = spots.find((p) => p.fits) ?? { left: clampX(r.left), top: r.top + r.height + 8 };
+      el.style.left = `${left}px`;
+      el.style.top = `${top}px`;
+      el.style.visibility = "visible";
+    };
+    place();
+    // "More" grows the popover: find it a spot again, so it never grows over its own field.
+    const ro = new ResizeObserver(place);
+    ro.observe(el);
+    return () => ro.disconnect();
   });
   if (!sel || !form || !f || !w || !r || readOnly || tool !== "form") return null;
   return (
     <div ref={box} className="bf-popover" data-popover style={{ left: r.left, top: r.top + r.height + 8, visibility: "hidden" }} onPointerDown={(e) => e.stopPropagation()}>
       <FieldProps
+        key={f.id}
         form={form}
         fieldId={f.id}
         widgetId={w.id}
         pages={pages}
-        onChange={(next, label) => applyForm(ctl, next, label, label === "Rename field" ? undefined : `prop:${f.id}:${label}`, entry.id)}
+        onChange={(next, label) => {
+          // A commit on unmount can arrive after the field was deleted or undone away: drop it.
+          if (!formsOf(store.get())?.fields.some((x) => x.id === f.id)) return;
+          applyForm(ctl, next, label, label === "Rename field" ? undefined : `prop:${f.id}:${label}`, entry.id);
+        }}
         onClose={() => setUi(ctl, { selected: null })}
       />
     </div>
@@ -336,7 +323,8 @@ export function FormsChrome({ wide }: { wide: boolean }) {
     const s = store.get();
     if (s.forms.detect.phase !== "review") return;
     const ps = s.forms.proposals;
-    const index = (s.forms.detect.index + step + ps.length) % ps.length;
+    const at = s.forms.detect.index;
+    const index = at < 0 ? (step > 0 ? 0 : ps.length - 1) : (at + step + ps.length) % ps.length;
     setUi(ctl, { detect: { ...s.forms.detect, index } });
     const w = ps[index]?.field.widgets[0];
     const el = w && document.querySelector<HTMLElement>(`.bf-proposal[data-w="${w.id}"]`);
@@ -368,12 +356,61 @@ export function FormsChrome({ wide }: { wide: boolean }) {
           />
         </div>
       )}
+      {!wide && <FillPeek />}
       {!wide && (
         <Dialog open={tabOrder} onClose={() => setUi(ctl, { tabOrder: false })} title="Tab order" variant="sheet" onCloseButton={() => setUi(ctl, { tabOrder: false })}>
           {tabOrder && <TabOrderTab />}
         </Dialog>
       )}
     </>
+  );
+}
+
+/**
+ * Phones (G-15): a field drawn smaller than a finger shows what is typed into it, large, in a
+ * strip under the top bar while it has focus (where the keyboard never covers it), with Next.
+ */
+function FillPeek() {
+  const ctl = useCtl();
+  const { store } = ctl;
+  const [at, setAt] = useState<{ widget: string; field: string } | null>(null);
+  const form = useStore(store, formsOf);
+  useEffect(() => {
+    const small = (el: Element) => el.getBoundingClientRect().height < 28;
+    const onIn = (e: FocusEvent) => {
+      const t = e.target instanceof HTMLElement ? e.target : null;
+      const box = t?.matches("input:not([type=checkbox]):not([type=radio]), textarea") ? t.closest<HTMLElement>(".bf-layer[data-mode=fill] .bf-field[data-w]") : null;
+      const f = box && formsOf(store.get()) && fieldOfWidget(formsOf(store.get())!, box.dataset.w!);
+      setAt(box && f && small(box) ? { widget: box.dataset.w!, field: f.id } : null);
+    };
+    const onOut = (e: FocusEvent) => {
+      if (!(e.relatedTarget instanceof Element && e.relatedTarget.closest(".bf-peek"))) setAt(null);
+    };
+    document.addEventListener("focusin", onIn);
+    document.addEventListener("focusout", onOut);
+    return () => {
+      document.removeEventListener("focusin", onIn);
+      document.removeEventListener("focusout", onOut);
+    };
+  }, [store]);
+  const f = at && form?.fields.find((x) => x.id === at.field);
+  if (!at || !f) return null;
+  return (
+    <div className="bf-peek">
+      <span className="bf-peek-name">{f.tooltip || f.name}</span>
+      <span className="bf-peek-value">{String(f.value) || "\u00a0"}</span>
+      <button
+        type="button"
+        className="bf-act"
+        onPointerDown={(e) => e.preventDefault()}
+        onClick={() => {
+          const el = document.querySelector<HTMLElement>(`.bf-field[data-w="${at.widget}"] :is(input, textarea)`);
+          if (!el || !fieldTab(ctl, { key: "Tab", shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, target: el, defaultPrevented: false })) el?.blur();
+        }}
+      >
+        Next
+      </button>
+    </div>
   );
 }
 
@@ -449,56 +486,4 @@ export function TabOrderTab() {
       onFocusWidget={(id) => document.querySelector<HTMLElement>(`.bf-field[data-w="${id}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" })}
     />
   );
-}
-
-/** After a download: required fields still empty turn the chip into a nudge (never a block). Returns how many. */
-export function nudgeAfterDownload(ctl: Controller): number {
-  const form = ctl.state().forms;
-  const missing = form ? missingRequired(form).length : 0;
-  setUi(ctl, { nudge: missing > 0 });
-  return missing;
-}
-
-/**
- * Keys for the selected field (Form tool): Delete removes it, Escape lets go, arrows nudge it by
- * 1 pt (10 with Shift), Ctrl/Cmd+D duplicates it. Returns true when handled.
- */
-export function fieldKey(ctl: Controller, e: Pick<KeyboardEvent, "key" | "shiftKey" | "ctrlKey" | "metaKey" | "target" | "defaultPrevented">): boolean {
-  const { key } = e;
-  const sel = ctl.store.get().forms.selected;
-  if (!sel || ctl.store.get().tool !== "form") return false;
-  // Keys a control already used (tab order list, the properties popover, its buttons) are theirs.
-  const t = e.target instanceof Element ? e.target : null;
-  if (e.defaultPrevented || t?.closest(".bf-popover, .bf-taborder, [role=dialog], [role=menu]")) return false;
-  if (key === "Escape") {
-    setUi(ctl, { selected: null });
-    return true;
-  }
-  if (key === "Delete" || key === "Backspace") {
-    const form = ctl.state().forms;
-    if (!form) return false;
-    applyForm(ctl, deleteField(form, sel.field), "Delete field");
-    setUi(ctl, { selected: null });
-    return true;
-  }
-  const form = ctl.state().forms;
-  const w = form?.fields.find((x) => x.id === sel.field)?.widgets.find((x) => x.id === sel.widget);
-  if (!form || !w) return false;
-  const step = e.shiftKey ? 10 : 1;
-  const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[key];
-  if (d) {
-    const entry = H.current(ctl.store.get().history).pages.find((p) => p.id === w.page);
-    const size = entry ? pageSize(entry) : { w: Infinity, h: Infinity };
-    const [dx, dy] = clampDelta(w, d[0], d[1], size);
-    applyForm(ctl, setWidgetBox(form, w.id, { x: w.x + dx, y: w.y + dy, w: w.w, h: w.h }), "Move field", `nudge:${w.id}`, w.page);
-    return true;
-  }
-  if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === "d") {
-    const r = duplicateField(form, sel.field);
-    if (!r.field) return false;
-    applyForm(ctl, r.state, "Duplicate field", undefined, w.page);
-    setUi(ctl, { selected: { field: r.field.id, widget: r.field.widgets[0].id } });
-    return true;
-  }
-  return false;
 }

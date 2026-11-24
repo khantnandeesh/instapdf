@@ -10,6 +10,8 @@ import { missingChars } from "@/lib/editor/coverage";
 import { faceOf, type EditorFontManifest, type FontFileEntry } from "@/lib/editor/fonts";
 import { knownManifest, loadFontManifest } from "@/lib/editor/fonts-browser";
 import type { EditorObject, TextObj } from "@/lib/editor/model";
+import { changedTexts, drawnWithoutSlice, missingInForm, type SliceCmaps } from "@/lib/forms/coverage";
+import type { FormState } from "@/lib/forms/types";
 import { needsShaping, SHAPING_MANIFEST, type ShapingManifest } from "@/lib/editor/shaping";
 
 let ready: Promise<{ m: EditorFontManifest; fallback: FontFileEntry[] }> | null = null;
@@ -21,6 +23,18 @@ async function fontList<T>(url: string): Promise<T> {
   if (!r.ok) throw new Error(`font list ${r.status}`);
   return (await r.json()) as T;
 }
+
+/** A JSON file of our own, fetched once; a failed or refused fetch is tried again next time. */
+function once<T>(url: string, pick: (j: unknown) => T, cache: { p: Promise<T> | null }): Promise<T> {
+  cache.p ??= fetch(url).then(async (r) => {
+    if (!r.ok) throw new Error(`${url}: ${r.status}`);
+    return pick(await r.json());
+  });
+  cache.p.catch(() => (cache.p = null));
+  return cache.p;
+}
+const formsCache: { p: Promise<[number, number][]> | null } = { p: null };
+const cmapCache: { p: Promise<SliceCmaps> | null } = { p: null };
 
 export function loadCoverage() {
   ready ??= Promise.all([loadFontManifest(), fontList<{ fonts: FontFileEntry[] }>("/fonts/noto/manifest.json").then((j) => j.fonts)]).then(
@@ -81,6 +95,21 @@ export async function missingInObjects(objects: readonly EditorObject[]): Promis
     else unchecked = true;
   }
   return { chars: [...all], unchecked };
+}
+
+/** Every character of changed form values that won't print (AC-232); `unchecked` as for missingInObjects. */
+export async function missingInFormValues(state: FormState | undefined, original: FormState | null | undefined): Promise<{ chars: string[]; unchecked: boolean }> {
+  const texts = changedTexts(state, original);
+  if (!texts.length) return { chars: [], unchecked: false };
+  const [ranges] = await Promise.all([
+    once("/fonts/forms/noto-sans-forms.json", (j) => (j as { ranges: [number, number][] }).ranges, formsCache).catch(() => null),
+    loadCoverage().catch(() => null),
+  ]);
+  if (!known || !ranges) return { chars: [], unchecked: true };
+  // The slices' real character lists are only needed for text Helvetica and the forms font can't draw.
+  const cmaps = texts.every((t) => drawnWithoutSlice(t, ranges)) ? {} : await once("/fonts/noto/cmap.json", (j) => j as SliceCmaps, cmapCache).catch(() => null);
+  if (!cmaps) return { chars: [], unchecked: true };
+  return { chars: missingInForm(state, original, ranges, known.fallback, cmaps), unchecked: false };
 }
 
 export function useMissing(o: TextObj): string[] {

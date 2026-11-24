@@ -1,0 +1,57 @@
+{
+ "1280-loaded": [
+  {
+   "id": "landmark-banner-is-top-level",
+   "impact": "moderate",
+   "n": 1,
+   "help": "Banner landmark should not be contained in another landmark",
+   "t": [
+    ".ed-top"
+   ]
+  }
+ ],
+ "1280-formtool-popover": [
+  {
+   "id": "landmark-banner-is-top-level",
+   "impact": "moderate",
+   "n": 1,
+   "help": "Banner landmark should not be contained in another landmark",
+   "t": [
+    ".ed-top"
+   ]
+  }
+ ],
+ "1280-taborder": [
+  {
+   "id": "landmark-banner-is-top-level",
+   "impact": "moderate",
+   "n": 1,
+   "help": "Banner landmark should not be contained in another landmark",
+   "t": [
+    ".ed-top"
+   ]
+  }
+ ],
+ "1280-detect-review": [
+  {
+   "id": "landmark-banner-is-top-level",
+   "impact": "moderate",
+   "n": 1,
+   "help": "Banner landmark should not be contained in another landmark",
+   "t": [
+    ".ed-top"
+   ]
+  }
+ ],
+ "390-loaded": [
+  {
+   "id": "landmark-banner-is-top-level",
+   "impact": "moderate",
+   "n": 1,
+   "help": "Banner landmark should not be contained in another landmark",
+   "t": [
+    ".ed-top"
+   ]
+  }
+ ]
+}

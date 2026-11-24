@@ -111,6 +111,37 @@ test("AC-248 AC-231 AC-233: fields fill with any tool, Tab follows the order, th
   expect(form.getRadioGroup("contact").getSelected()).toBe("Phone");
 });
 
+test("AC-248: Tab follows a custom tab order and crosses pages without stopping on page controls", async ({ page }) => {
+  test.skip(page.viewportSize()!.width < 1024, "the order is set in the side panel; phones share the same key handling");
+  await open(page, await fillable());
+  await formTool(page);
+  await page.getByRole("button", { name: "Tab order", exact: true }).first().click();
+  // Move email above full_name with the keyboard: pick up, up, drop.
+  const chip = page.locator(".bf-taborder li.bf-chip").filter({ hasText: "email" }).first();
+  await chip.focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Space");
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("v");
+  const text = (n: string) => page.getByRole("textbox", { name: n });
+  await text("email").focus();
+  await page.keyboard.press("Tab");
+  await expect(text("full_name")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.locator('.bf-field[data-kind="dropdown"] select')).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("checkbox", { name: "agree" })).toBeFocused();
+  // Page 1's last field to page 2's first: the radio group, one stop, then notes.
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("radio", { name: "contact: Email" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(text("notes")).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("checkbox", { name: "agree" })).toBeFocused();
+});
+
 test("AC-233: required fields left empty become a nudge after Download, never a block", async ({ page }) => {
   await open(page, await fillable());
   await page.locator('.bf-field[data-kind="text"] input').first().fill("Ada");

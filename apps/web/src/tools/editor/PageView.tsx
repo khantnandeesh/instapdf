@@ -25,7 +25,7 @@ import { lineAt } from "@/lib/editor/line-hit";
 import { release, renderPage, swapCanvas } from "./render";
 import { shallowArray, useStore, type EditorState } from "./store";
 import { TOOL_NAMES, onPage, reflowText } from "./controller";
-import { FieldPopover, PageFields } from "@/tools/forms/EditorForms";
+import { FieldPopover, PageFields } from "@/tools/forms/lazy";
 
 type Gesture =
   | { type: "move"; ids: string[]; start: Pt; origin: EditorObject[]; moved: boolean; pointer: number }
@@ -613,6 +613,13 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
             active={interactiveLines}
             onEdit={(line, t) => {
               const l = text.lines[line];
+              // Text that couldn't be saved is still open in another line: it is not dropped for this one.
+              const open = store.get().lineEdit;
+              if (open?.failed && (open.src !== src || open.line !== line)) {
+                ctl.toast({ text: "The line you were editing couldn’t be saved. Change it, or press Escape to leave it as it was.", tone: "danger" });
+                document.querySelector<HTMLElement>("[data-testid=line-input]")?.focus({ preventScroll: true });
+                return;
+              }
               ctl.dropPendingEdit(src, line);
               // A line the default build can't edit: load the shaping build, then open this line.
               if (l?.read_only_reason === "needs-shaping") ctl.wantShapedLine(src, [(l.bbox.x0 + l.bbox.x1) / 2, (l.bbox.y0 + l.bbox.y1) / 2]);

@@ -4,7 +4,7 @@
  * kind in one row, the rest under "More". Every change goes out as a new form state with a short
  * label for the undo history; the popover itself holds only what is being typed.
  */
-import { memo, useEffect, useId, useState, type ReactNode } from "react";
+import { memo, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { checkFieldName, propsFor, renameField, setCheckboxOn, setDefaultValue, setOptions, suggestsMultiline, type PropKey } from "@/lib/forms/edit";
 import { addRadioButton, deleteField, duplicateField, repeatOnAllPages, setMaxLen, setRadioValue, updateField } from "@/lib/forms/model";
 import type { FieldStyle, FormField, FormPage, FormState } from "@/lib/forms/types";
@@ -72,7 +72,21 @@ export const FieldProps = memo(function FieldProps({ form, fieldId, widgetId, pa
       case "color":
         return <ColorInput key={k} label="Colour" value={f.style.color} onChange={(c) => style({ color: c ?? "#000000" }, "Change text colour")} />;
       case "border":
-        return <ColorInput key={k} label="Border" value={f.style.border} allowNone onChange={(c) => style({ border: c }, "Change border")} />;
+        return (
+          <div key={k} className="bf-propgroup">
+            <ColorInput label="Border" value={f.style.border} allowNone onChange={(c) => style({ border: c, borderWidth: c && !f.style.borderWidth ? 1 : f.style.borderWidth }, "Change border")} />
+            {f.style.border && (
+              <div className="bf-prop bf-prop--tight" role="radiogroup" aria-label="Border width">
+                <span className="bf-prop-label">Width</span>
+                {[1, 2, 3].map((n) => (
+                  <button key={n} type="button" role="radio" aria-checked={(f.style.borderWidth || 1) === n} aria-label={`${n} pt`} className="bf-seg" onClick={() => style({ borderWidth: n }, "Change border width")}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
       case "background":
         return <ColorInput key={k} label="Fill" value={f.style.background} allowNone onChange={(c) => style({ background: c }, "Change fill")} />;
       case "align":
@@ -174,14 +188,29 @@ export const FieldProps = memo(function FieldProps({ form, fieldId, widgetId, pa
   );
 });
 
+/**
+ * Commits a draft that was typed but not yet committed when the input goes away: a click on the
+ * page that closes the popover, or Escape (G-10, G-11). Runs once, on unmount.
+ */
+function useCommitOnUnmount(pending: () => void) {
+  const latest = useRef(pending);
+  latest.current = pending;
+  useEffect(() => () => latest.current(), []);
+}
+
 function NameInput({ id, form, field, label, onChange }: { id: string; form: FormState; field: FormField; label: string; onChange: FieldPropsProps["onChange"] }) {
   const [draft, setDraft] = useState(field.name);
   useEffect(() => setDraft(field.name), [field.name]);
   const check = draft === field.name ? ({ ok: true } as const) : checkFieldName(form, field.id, draft);
+  const done = useRef(field.name);
   const commit = (name: string) => {
+    done.current = name;
     const r = renameField(form, field.id, name);
     if (r.check.ok && r.state !== form) onChange(r.state, "Rename field");
   };
+  useCommitOnUnmount(() => {
+    if (draft !== field.name && draft !== done.current && check.ok) commit(draft);
+  });
   return (
     <div className="bf-prop bf-prop--name">
       <label htmlFor={id} className="bf-prop-label">{label}</label>
@@ -230,7 +259,13 @@ function TextInput({ label, value, placeholder, inputMode, onCommit }: { label: 
   const id = useId();
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
-  const commit = () => draft !== value && onCommit(draft);
+  const done = useRef(value);
+  const commit = () => {
+    if (draft === value || draft === done.current) return;
+    done.current = draft;
+    onCommit(draft);
+  };
+  useCommitOnUnmount(commit);
   return (
     <div className="bf-prop">
       <label htmlFor={id} className="bf-prop-label">{label}</label>

@@ -143,7 +143,35 @@ export function LineEditBox({
   // On a phone the page's text is smaller than the hint: it is docked above the tools instead of floating over the page.
   const wide = useStore(ctl.store, (s) => s.wide);
   const [slot, setSlot] = useState<Element | null>(null);
-  useEffect(() => setSlot(wide ? null : document.querySelector("[data-line-hint-slot]")), [wide]);
+  useLayoutEffect(() => {
+    if (wide) return setSlot(null);
+    const area = document.querySelector<HTMLElement>(".ed-toasts");
+    // A message, while one shows, takes the hint's fonts in: the two are never stacked.
+    const find = () => {
+      const next = area?.querySelector('[data-line-hint-slot="toast"]') ?? area?.querySelector('[data-line-hint-slot="dock"]') ?? null;
+      setSlot((was) => {
+        // A font button that had the focus went with the old place: the box takes it back.
+        if (was && was !== next && was.contains(document.activeElement)) queueMicrotask(() => el.current?.focus({ preventScroll: true }));
+        return next;
+      });
+    };
+    find();
+    if (!area) return;
+    const seen = new MutationObserver(find);
+    seen.observe(area, { childList: true, subtree: true });
+    // An on-screen keyboard covers the bottom of the page without resizing it: the row stays above it.
+    const vv = window.visualViewport;
+    const lift = () => area.style.setProperty("--ed-keyboard", `${Math.max(0, Math.round(window.innerHeight - (vv?.height ?? window.innerHeight) - (vv?.offsetTop ?? 0)))}px`);
+    lift();
+    vv?.addEventListener("resize", lift);
+    vv?.addEventListener("scroll", lift);
+    return () => {
+      seen.disconnect();
+      vv?.removeEventListener("resize", lift);
+      vv?.removeEventListener("scroll", lift);
+      area.style.removeProperty("--ed-keyboard");
+    };
+  }, [wide]);
   const el = useRef<HTMLDivElement>(null);
   const touched = useRef(false);
   const composing = useRef(false);
@@ -454,19 +482,20 @@ export function LineEditBox({
   const shown = standIn && missing && standIn.font === missing.font ? standIn : null;
 
   const docked = !!slot;
+  const inMessage = slot?.getAttribute("data-line-hint-slot") === "toast";
   const hint = missing ? (
         <div
           id={hintId}
-          className={docked ? "ed-input__hint ed-input__hint--docked ed-glass" : cx("ed-input__hint", side !== "under" && `ed-input__hint--${side}`)}
+          className={inMessage ? "ed-toast__picks" : docked ? "ed-input__hint ed-input__hint--docked ed-glass" : cx("ed-input__hint", side !== "under" && `ed-input__hint--${side}`)}
           ref={(node) => {
             // Its real size (it depends on the fonts offered) decides which side is clear.
             if (node && !docked && (Math.abs(node.offsetWidth - hintSize.w) > 1 || Math.abs(node.offsetHeight - hintSize.h) > 1)) setHintSize({ w: node.offsetWidth, h: node.offsetHeight });
           }}
           style={docked ? undefined : side === "beside" ? { left: hintLeft, top: besideTop - box.top } : { left: hintLeft }}
           data-testid="line-missing"
-          data-side={docked ? "docked" : side}
+          data-side={inMessage ? "message" : docked ? "docked" : side}
         >
-          <span>
+          <span className={inMessage ? "sr-only" : undefined}>
             {docked ? "Not in " : "Not in this font: "}
             <span className="ed-input__chars">{missing.chars.slice(0, 8).join(" ")}</span>
           </span>
@@ -541,8 +570,8 @@ export function LineEditBox({
         e.stopPropagation();
         // From the ends of the docked hint, Tab comes back to the box.
         if (e.key === "Tab" && slot) {
-          const all = [...slot.querySelectorAll<HTMLElement>("button")];
-          if (e.target === (e.shiftKey ? all[0] : all[all.length - 1])) {
+          // Back from its first button, Shift+Tab returns to the box; Tab past its last one leaves (and ends the edit).
+          if (e.shiftKey && e.target === slot.querySelector("button")) {
             e.preventDefault();
             el.current?.focus({ preventScroll: true });
           }

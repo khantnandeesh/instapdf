@@ -5,7 +5,7 @@
  */
 import { frameBoxToView } from "./detect/view";
 import { pageTurn } from "./frame";
-import type { FormPage, FormState, Widget } from "./types";
+import type { FormField, FormPage, FormState, Widget } from "./types";
 
 type Placed = Widget & { pageIndex: number };
 
@@ -100,4 +100,40 @@ export function pageOrder(state: FormState, pageId: string): string[] {
   const onPage = new Set(state.fields.flatMap((f) => f.widgets.filter((w) => w.page === pageId && !w.hidden).map((w) => w.id)));
   const listed = state.order.filter((id) => onPage.has(id));
   return [...listed, ...[...onPage].filter((id) => !listed.includes(id))];
+}
+
+/**
+ * Where Tab goes from widget `from` (AC-248): the next (or previous, `back`) stop in tab order
+ * across the pages in their current order. A radio group is one stop, at its first button's
+ * place, entered at its checked button (else its first). Returns null past either end, so Tab
+ * then leaves the fields as usual. Widgets `canFocus` rejects are passed over.
+ */
+export function nextTabStop(state: FormState, pageIds: readonly string[], from: string, back = false, canFocus: (widgetId: string) => boolean = () => true): string | null {
+  const fieldOf = new Map(state.fields.flatMap((f) => f.widgets.map((w) => [w.id, f] as const)));
+  const seq = pageIds.flatMap((p) => pageOrder(state, p)).filter((id) => fieldOf.has(id) && (id === from || canFocus(id)));
+  // One stop per field for radio groups (the group's first focusable button), one per widget otherwise.
+  const stops: { field: FormField; widgets: string[] }[] = [];
+  const groupStop = new Map<FormField, { field: FormField; widgets: string[] }>();
+  for (const id of seq) {
+    const f = fieldOf.get(id)!;
+    if (f.kind === "radio") {
+      const g = groupStop.get(f);
+      if (g) g.widgets.push(id);
+      else {
+        const stop = { field: f, widgets: [id] };
+        groupStop.set(f, stop);
+        stops.push(stop);
+      }
+    } else stops.push({ field: f, widgets: [id] });
+  }
+  const at = stops.findIndex((s) => s.widgets.includes(from));
+  if (at < 0) return null;
+  for (let i = at + (back ? -1 : 1); i >= 0 && i < stops.length; i += back ? -1 : 1) {
+    const { field: f, widgets } = stops[i];
+    const ok = widgets.filter((id) => id !== from && canFocus(id));
+    if (!ok.length) continue;
+    if (f.kind !== "radio") return ok[0];
+    return f.widgets.find((w) => ok.includes(w.id) && w.on != null && w.on === f.value)?.id ?? ok[0];
+  }
+  return null;
 }

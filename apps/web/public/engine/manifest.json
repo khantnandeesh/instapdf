@@ -3,17 +3,17 @@
   "rust": "1.100.0",
   "wasmBindgen": "0.2.130",
   "files": {
-    "berry_engine_bg.wasm": "b349918a3f105318e6e67b5cf38d9ba82f1c79100427e6f1857d176bff123027",
+    "berry_engine_bg.wasm": "cb46ac34401bed202cbdb8b5dc2312e429939eb0b1722313e1a7ec1f8732c3fe",
     "berry_engine.js": "a2ce6372462ffe53b14a0d9d392ae0528b8207346218a4a0a0c05da6ef0d2efc",
-    "berry_engine_shaping_bg.wasm": "5624973120fe4a40c0bb04e4d5119cb1af68183cbdcbadd78bdef24a3903127b",
+    "berry_engine_shaping_bg.wasm": "d9ccd30b4b8487aaa3d1c87785f7d48b7283f5f46544644e7f02ffa0b693218d",
     "berry_engine_shaping.js": "64cafc6a35dcdce51ce8dbe92fed4db1871d4fbeb76d0dff098ed0ff062e369c",
     "berry_fontmatch_bg.wasm": "7186962e4d02f3faff21bae56adcb83ec47a82fd8d1bac90457d0ab3fd89bb04",
     "berry_fontmatch.js": "d7dd14e493fd2cf1e8b71c14714e212db1e7aac70a3cd2d390a1f408f4818948"
   },
-  "wasmGzipBytes": 791877,
-  "wasmBytes": 2235541,
-  "shapingWasmGzipBytes": 964425,
-  "shapingWasmBytes": 2674318,
+  "wasmGzipBytes": 791778,
+  "wasmBytes": 2235903,
+  "shapingWasmGzipBytes": 970083,
+  "shapingWasmBytes": 2698264,
   "fontmatchWasmGzipBytes": 77412,
   "fontmatchWasmBytes": 187252
 }

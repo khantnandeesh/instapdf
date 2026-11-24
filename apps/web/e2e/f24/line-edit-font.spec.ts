@@ -159,6 +159,8 @@ test("nothing of the edit box (paper, ring) covers the line below it, at any siz
     const hb = (await hb0.boundingBox())!;
     const dock = (await page.getByTestId("dock").boundingBox())!;
     expect(hb.y + hb.height).toBeLessThanOrEqual(dock.y);
+    // Always at the same spot, directly above the dock.
+    expect(dock.y - (hb.y + hb.height)).toBeLessThanOrEqual(24);
     expect(hb.x).toBeGreaterThanOrEqual(0);
     expect(hb.x + hb.width).toBeLessThanOrEqual(page.viewportSize()!.width);
     expect(hb.height).toBeLessThanOrEqual(48);
@@ -491,4 +493,60 @@ test("a fixed-pitch subset whose own advance table is wrong is still matched to 
   await picker.click();
   const row = page.getByTestId("font-doc").filter({ hasText: "Fixture Mono" });
   await expect(row).toContainText("Roboto Mono · Exact", { timeout: 30_000 });
+});
+
+test("Download pressed while a save that fails is under way makes no file; another line or Escape never drops the text silently", async ({ page }) => {
+  await open(page, "chrome-justified-mixed.pdf");
+  const line = lineWith(page, "This agreement is made");
+  const text = (await line.getAttribute("data-text"))!;
+  const input = await edit(page, line);
+  await page.keyboard.press("End");
+  await page.keyboard.type(" and then the date");
+  let files = 0;
+  page.on("download", () => files++);
+  // Download is pressed with the box still open: leaving it starts the save, which is refused.
+  await page.getByRole("button", { name: "Download PDF" }).click();
+  const notice = page.getByTestId("editor-notice");
+  await expect(notice).toContainText("couldn’t be saved, so it isn’t in the file yet", { timeout: 30_000 });
+  await expect(input).toHaveText(`${text} and then the date`);
+  // Another line is not opened over the kept text.
+  await lineWith(page, "Total amount due").click({ force: true });
+  await expect(input).toHaveText(`${text} and then the date`);
+  await expect(input).toBeFocused();
+  // Escape gives the line back as it was, also when the focus is not in the box.
+  await page.getByRole("button", { name: "Download PDF" }).focus();
+  await page.keyboard.press("Escape");
+  await expect(input).toHaveCount(0);
+  await expect(lineWith(page, "This agreement is made")).toHaveAttribute("data-text", text);
+  expect(files).toBe(0);
+});
+
+test("AC-308: on a phone a message takes the hint's action in; the two are never stacked", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "the docked hint is the phone layout");
+  await open(page, "chrome-justified-mixed.pdf");
+  const line = lineWith(page, "in full.");
+  const text = (await line.getAttribute("data-text"))!;
+  const input = await edit(page, line);
+  await page.keyboard.press("End");
+  // A private-use code point: no font here has it.
+  await page.keyboard.type(" \uE123");
+  const hint = page.getByTestId("line-missing");
+  await expect(hint).toHaveAttribute("data-side", "docked");
+  await expect(page.getByTestId("line-missing-own")).toBeVisible();
+  await page.keyboard.press("Enter");
+  const notice = page.getByTestId("editor-notice");
+  await expect(notice).toContainText("Your text is still in the box.", { timeout: 30_000 });
+  await expect(hint).toHaveCount(1);
+  await expect(hint).toHaveAttribute("data-side", "message");
+  await expect(notice.getByRole("button", { name: "Use your own font" })).toBeVisible();
+  await expect(page.locator('[data-line-hint-slot="dock"] > *')).toHaveCount(0);
+  await expect(input).toHaveText(`${text} \uE123`);
+  const nb = (await notice.boundingBox())!;
+  const dock = (await page.getByTestId("dock").boundingBox())!;
+  expect(dock.y - (nb.y + nb.height)).toBeLessThanOrEqual(24);
+  expect(nb.x + nb.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  // When the message goes, the row is back at the same spot.
+  await notice.getByRole("button", { name: "Dismiss" }).tap();
+  await expect(hint).toHaveAttribute("data-side", "docked");
+  await expect(input).toHaveCount(1);
 });

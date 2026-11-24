@@ -5,7 +5,8 @@
  * separate chunk once the user shows intent (AC-86).
  */
 import { emptyForm } from "@/lib/forms/model";
-import { FormsChrome, fieldKey, loadForms, nudgeAfterDownload } from "@/tools/forms/EditorForms";
+import { fieldKey, fieldTab, loadForms, nudgeAfterDownload } from "@/tools/forms/core";
+import { FormsChrome } from "@/tools/forms/lazy";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
@@ -27,7 +28,7 @@ import { initialVersions } from "@/lib/editor/versions";
 import type { OpenedPdf } from "@/lib/pdf/pdfjs";
 import { assetsOf } from "@/lib/editor/asset-refs";
 import { listChars } from "@/lib/editor/coverage";
-import { missingInObjects } from "./coverage-browser";
+import { missingInFormValues, missingInObjects } from "./coverage-browser";
 import { addAsset, IMAGE_ACCEPT, imageError, imageFromFile, isImageFile, plainAssets, releaseAssets } from "./assets";
 import { EnginePill } from "./EngineProgress";
 import { fontLabel, resetDocFonts } from "./font-service";
@@ -258,7 +259,7 @@ export function EditorShell(props: ShellProps) {
         </EditorContext.Provider>
       ) : (
         <div className="ed-opening">
-          <header className="ed-top ed-glass">
+          <header className="ed-top ed-glass" role="group" aria-label="Document">
             <h2 className="ed-file truncate">{props.name}</h2>
           </header>
           <div className="grid flex-1 place-items-center">
@@ -660,10 +661,15 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   // ---- download (AC-44) ----
   const download = useCallback(
     async (name?: string, force = false) => {
+      if (store.get().busy === "save") return;
+      // A field property still being typed in the popover commits on blur: do that first.
+      const typing = document.activeElement;
+      if (typing instanceof HTMLElement && typing.closest(".bf-popover")) typing.blur();
       const s = store.get();
-      if (s.busy === "save") return;
       if (s.editing) store.set({ editing: null });
       if (s.lineEdit) await ctl.commitLine();
+      // Clicking Download left the box, which started the save: its outcome decides.
+      await ctl.committing;
       // A line whose text couldn't be saved is still open: the file would be made without it.
       if (store.get().lineEdit?.failed) {
         ctl.toast({ text: "The line you’re editing couldn’t be saved, so it isn’t in the file yet. Change it, or press Escape to leave it as it was.", tone: "danger" });
@@ -671,7 +677,10 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       }
       // Added text with characters no font can print: say so before the file is made (AC-75).
       if (!force && !s.readOnly) {
-        const { chars, unchecked } = await missingInObjects(H.current(store.get().history).objects);
+        const now = H.current(store.get().history);
+        const [objs, form] = await Promise.all([missingInObjects(now.objects), missingInFormValues(now.forms, store.get().forms.original)]);
+        const chars = [...new Set([...objs.chars, ...form.chars])];
+        const unchecked = objs.unchecked || form.unchecked;
         if (chars.length || unchecked) return setMissingAsk({ chars, unchecked, name });
       }
       store.set({ busy: "save" });
@@ -892,6 +901,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         void download();
         return;
       }
+      if (fieldTab(ctl, e)) return e.preventDefault();
       if (typing(t)) return;
       if (fieldKey(ctl, e)) return e.preventDefault();
       if (mod && !e.altKey && (k === "z" || k === "Z")) {
@@ -926,6 +936,12 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       }
       if (k === "Escape") {
         ctl.dropPendingEdit();
+        // A line kept open because it couldn't be saved, with the focus elsewhere: give it up.
+        if (s.lineEdit?.failed) {
+          store.set({ lineEdit: null });
+          ctl.announce("Line left as it was");
+          return;
+        }
         // Spec order: a placement is cancelled; else the selection goes first, then the tool
         // (unlock / back to Select). A sticky tool stays armed while only a selection is dropped.
         if (s.placement) {
@@ -1074,6 +1090,10 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
 
   const pageList = pages.map((p, i) => ({ p, i, first: pages.findIndex((x) => x.src === p.src) === i }));
   const strip = !wide && (selectionObjs.length > 0 || tool !== "select" || !!placement);
+  // The strip hides itself when a tool has no options: what sits above it then sits on the dock.
+  useLayoutEffect(() => {
+    document.querySelector(".ed-frame-root")?.classList.toggle("ed-strip-empty", strip && !document.querySelector(".ed-strip :is(button, input)"));
+  });
 
   return (
     <div className={cx("ed-frame-root", wide ? "ed-wide" : "ed-narrow", strip && "ed-has-strip")} data-tool={tool}>
@@ -1357,11 +1377,13 @@ function ToastView({ toast, onDone, children }: { toast: Toast | null; onDone: (
       {/* The font notice has controls and is announced once by the controller: not in the live region. */}
       {children}
       {/* On a phone the line-edit hint (a missing letter, fonts for it) is docked here, off the page. */}
-      <div className="ed-hint-slot" data-line-hint-slot />
+      <div className="ed-hint-slot" data-line-hint-slot="dock" />
       <div className="ed-toasts__live" role="status" aria-live="polite">
       {toast && (
         <div key={toast.key} className={cx("ed-toast ed-glass", `ed-toast--${toast.tone}`)} data-testid="editor-notice">
           <span>{toast.text}</span>
+          {/* While a message shows, the line-edit hint's fonts sit in it: one surface, not two. */}
+          <span className="ed-toast__slot" data-line-hint-slot="toast" />
           {toast.action && (
             <button
               type="button"
