@@ -8,6 +8,7 @@
  * the message parser below accepts the documented response shape wherever it appears.
  */
 import type { Adapter, AdapterCtx, Picked } from "./types";
+import { exportName, exportUrl, isNative, nativeMimes } from "./native";
 import { CloudError, loadScript, xhrUpload } from "./types";
 
 type TokenResponse = { access_token?: string; error?: string };
@@ -121,7 +122,8 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
         throw e;
       }
       const gp = g()!.picker;
-      const mimes = ctx.params.accept.map((e) => MIME[e]).filter(Boolean).join(",");
+      // Google Docs, Sheets and Slides too where the tool takes PDFs: Drive exports them (AC-141).
+      const mimes = [...ctx.params.accept.map((e) => MIME[e]).filter(Boolean), ...nativeMimes(ctx.params.accept)].join(",");
       const view = new gp.DocsView(gp.ViewId.DOCS);
       view.setMimeTypes(mimes);
       view.setIncludeFolders(true);
@@ -146,18 +148,28 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
           void ctx.frame(null);
           if (r.action === "cancel") return resolve("cancel");
           resolve(
-            r.docs.map((d, i) => ({
-              id: `f${i + 1}`,
-              name: d.name,
-              size: Number(d.sizeBytes) || 0,
-              request: async () => ({
-                url: `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(d.id)}?alt=media`,
-                headers: { Authorization: `Bearer ${t}` },
-                name: d.name,
-                type: d.mimeType,
-                total: Number(d.sizeBytes) || undefined,
-              }),
-            })),
+            r.docs.map((d, i): Picked =>
+              isNative(d.mimeType)
+                ? {
+                    id: `f${i + 1}`,
+                    name: exportName(d.name),
+                    size: 0, // unknown until exported
+                    native: true,
+                    request: async () => ({ url: exportUrl(d.id), headers: { Authorization: `Bearer ${t}` }, name: exportName(d.name), type: "application/pdf" }),
+                  }
+                : {
+                    id: `f${i + 1}`,
+                    name: d.name,
+                    size: Number(d.sizeBytes) || 0,
+                    request: async () => ({
+                      url: `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(d.id)}?alt=media`,
+                      headers: { Authorization: `Bearer ${t}` },
+                      name: d.name,
+                      type: d.mimeType,
+                      total: Number(d.sizeBytes) || undefined,
+                    }),
+                  },
+            ),
           );
         };
         window.addEventListener("message", onMessage);
