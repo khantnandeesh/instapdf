@@ -60,7 +60,7 @@ This doc records **behaviour only**. Hard rule 1 still applies: no copy, icons o
 
 ## 3. Not in this recording (ask the owner to record)
 
-See §3 of the thread summary, repeated here so the evaluator can track it:
+All of these were checked live on 2026-11-24, except item 6 (New Image upload): see `f16-reference-live-checks.md` and AC-74 to AC-84. The original list:
 
 1. Editing **existing** text: a Hindi line and an English line, a change of font and size, then **Apply changes**, the result page and the downloaded file opened in another viewer.
 2. The **Font Replacement** dialog: type a character the subset lacks (for example ₹ or a capital letter not used in the line).
