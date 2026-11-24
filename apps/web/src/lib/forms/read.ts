@@ -251,6 +251,15 @@ function annotPositions(doc: PDFDocument): Map<string, number> {
   return map;
 }
 
+/** Loads a file (decrypting it with `password` when needed) and reads its form, for the editor. */
+export async function readFormFromBytes(bytes: Uint8Array, password?: string): Promise<{ form: FormState; xfa: boolean }> {
+  const { PDFDocument: Doc } = await import("@cantoo/pdf-lib");
+  const probe = await Doc.load(bytes, { ignoreEncryption: true, updateMetadata: false });
+  const doc = probe.isEncrypted ? await Doc.load(bytes, { password: password ?? "", updateMetadata: false }) : probe;
+  const xfa = hasXfa(doc);
+  return { form: readForm(doc, pagesOf(doc)), xfa };
+}
+
 /** True when the document has an XFA form (shown as a banner: fill what the AcroForm part allows). */
 export function hasXfa(doc: PDFDocument): boolean {
   if (xfaSeen.get(doc)) return true;

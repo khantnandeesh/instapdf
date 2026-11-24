@@ -8,6 +8,9 @@
  * `rot` is clockwise degrees in the frame (CSS convention).
  */
 
+import { duplicateWidgetsToPage, prunePages } from "@/lib/forms/model";
+import type { FormState } from "@/lib/forms/types";
+
 export type Pt = [number, number];
 export type Box = { x: number; y: number; w: number; h: number };
 
@@ -80,6 +83,8 @@ export type DocState = {
   objects: EditorObject[];
   /** Index of the engine byte version these pages and lines are drawn from (existing-text edits). */
   engine: number;
+  /** The file's form fields and the ones the user added (F16 E3 forms, lib/forms). Absent: no form. */
+  forms?: FormState;
 };
 
 let counter = 0;
@@ -348,7 +353,8 @@ export function rotatePage(s: DocState, pageId: string, delta: 90 | -90): DocSta
 /** Deletes a page and its objects. The last remaining page is never deleted. */
 export function deletePage(s: DocState, pageId: string): DocState {
   if (s.pages.length <= 1) return s;
-  return { ...s, pages: s.pages.filter((p) => p.id !== pageId), objects: s.objects.filter((o) => o.page !== pageId) };
+  const pages = s.pages.filter((p) => p.id !== pageId);
+  return { ...s, pages, objects: s.objects.filter((o) => o.page !== pageId), ...(s.forms ? { forms: prunePages(s.forms, pages.map((p) => p.id)) } : {}) };
 }
 
 /** Duplicates a page right after itself, with copies of its objects. */
@@ -359,7 +365,9 @@ export function duplicatePage(s: DocState, pageId: string): { state: DocState; i
   const pages = [...s.pages];
   pages.splice(i + 1, 0, { ...s.pages[i], id });
   const copies = s.objects.filter((o) => o.page === pageId).map((o) => ({ ...o, id: newId(), page: id }));
-  return { state: { ...s, pages, objects: [...s.objects, ...copies] }, id };
+  // Fields on the page show on the copy too, as more widgets of the same fields (same values).
+  const forms = s.forms ? { forms: duplicateWidgetsToPage(s.forms, pageId, id) } : {};
+  return { state: { ...s, pages, objects: [...s.objects, ...copies], ...forms }, id };
 }
 
 /** Inserts a blank page after `pageId`, the same size and orientation as it. */
@@ -385,8 +393,9 @@ export function movePage(s: DocState, pageId: string, to: number): DocState {
 }
 
 /** True when the state differs from the untouched document (no objects, original pages, no text edits). */
-export function isPristine(s: DocState): boolean {
-  return !s.objects.length && !s.engine && s.pages.every((p, i) => p.src === i && !p.rotate && p.id === `p${i}`);
+/** No edits at all. `forms` is the form as read from the file (a changed form is an edit). */
+export function isPristine(s: DocState, forms?: FormState): boolean {
+  return !s.objects.length && !s.engine && (!s.forms || s.forms === forms) && s.pages.every((p, i) => p.src === i && !p.rotate && p.id === `p${i}`);
 }
 
 // ---- names (accessible names, object list, history) -----------------------------------------

@@ -5,9 +5,17 @@
  */
 import { buildPdf, type BuildInput } from "./build";
 import { FONT_BASE, type EditorFontManifest } from "./fonts";
+import type { FormState } from "@/lib/forms/types";
 
-export type BuildRequest = { id: number; input: BuildInput } | { id: number; owner: { bytes: Uint8Array; password: string } };
-export type BuildResponse = { id: number; ok: true; bytes: Uint8Array } | { id: number; ok: true; owner: boolean } | { id: number; ok: false; message: string };
+export type BuildRequest =
+  | { id: number; input: BuildInput }
+  | { id: number; owner: { bytes: Uint8Array; password: string } }
+  | { id: number; forms: { bytes: Uint8Array; password?: string } };
+export type BuildResponse =
+  | { id: number; ok: true; bytes: Uint8Array }
+  | { id: number; ok: true; owner: boolean }
+  | { id: number; ok: true; forms: FormState; xfa: boolean }
+  | { id: number; ok: false; message: string };
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -44,6 +52,16 @@ scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: 
     const { isOwnerPassword } = await import("./owner");
     const owner = await isOwnerPassword(msg.owner.bytes, msg.owner.password);
     scope.postMessage({ id: msg.id, ok: true, owner } satisfies BuildResponse);
+    return;
+  }
+  if ("forms" in msg) {
+    try {
+      const { readFormFromBytes } = await import("@/lib/forms/read");
+      const r = await readFormFromBytes(msg.forms.bytes, msg.forms.password);
+      scope.postMessage({ id: msg.id, ok: true, forms: r.form, xfa: r.xfa } satisfies BuildResponse);
+    } catch (error) {
+      scope.postMessage({ id: msg.id, ok: false, message: error instanceof Error ? error.message : String(error) } satisfies BuildResponse);
+    }
     return;
   }
   try {

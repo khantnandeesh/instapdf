@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canRedo, canUndo, commit, createHistory, current, MAX_STEPS, redo, revertEntries, undo, undoEntry } from "./history";
+import { addField, createField, emptyForm, setValue } from "@/lib/forms/model";
 import { addObjects, initialPages, moveObject, removeObjects, rotatePage, updateObjects, type DocState, type ShapeObj } from "./model";
 
 const base = (): DocState => ({ pages: initialPages([{ view: [0, 0, 600, 800], rotate: 0 }, { view: [0, 0, 600, 800], rotate: 0 }]), objects: [], engine: 0 });
@@ -62,5 +63,25 @@ describe("history (AC-43, AC-73)", () => {
     h = commit(h, updateObjects(current(h), ["a"], (o) => moveObject(o, 5, 0)), { label: "Move a", at: 2 });
     h = revertEntries(h, [0], 3);
     expect((current(h).objects[0] as ShapeObj).x).toBe(5);
+  });
+  it("reverts form changes with their entries, and keeps the form when a later kept change edited it (F16 E3)", () => {
+    const pages = initialPages([{ view: [0, 0, 600, 800], rotate: 0 }, { view: [0, 0, 600, 800], rotate: 0 }]);
+    const f0 = emptyForm();
+    let h = createHistory({ pages, objects: [], engine: 0, forms: f0 });
+    const name = createField(f0, { kind: "text", page: "p1", box: { x: 10, y: 10, w: 100, h: 20 } });
+    const f1 = addField(f0, name);
+    h = commit(h, { ...current(h), forms: f1 }, { label: "Add text field", at: 1 });
+    h = commit(h, addObjects(current(h), [rect("a")]), { label: "Add rectangle", at: 2 });
+    // Revert only the field: the rectangle stays, the form goes back.
+    const r = revertEntries(h, [0], 3);
+    expect(current(r).forms).toBe(f0);
+    expect(current(r).objects).toHaveLength(1);
+    // A later form change that is kept: the form is left as it is now.
+    const f2 = setValue(f1, name.id, "Ada").state;
+    h = commit(h, { ...current(h), forms: f2 }, { label: "Fill in field", at: 4 });
+    expect(current(revertEntries(h, [0], 5)).forms!.fields[0].value).toBe("Ada");
+    // Deleting the page drops its widgets when the revert brings pages back without it.
+    h = commit(h, { ...current(h), pages: current(h).pages.slice(0, 1) }, { label: "Delete page 2", at: 6 });
+    expect(current(revertEntries(h, [1], 7)).forms!.fields).toHaveLength(0);
   });
 });

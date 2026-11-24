@@ -9,8 +9,27 @@ import type { Guide } from "@/lib/editor/snap";
 import type { History } from "@/lib/editor/history";
 import type { PageText } from "@/lib/editor/berry-engine";
 import type { EditorObject, MarkupKind, SigSource } from "@/lib/editor/model";
+import type { FormState, Proposal } from "@/lib/forms/types";
+import type { DrawKind } from "@/tools/forms/FormToolOptions";
+import type { DetectStatus } from "@/tools/forms/ReviewPill";
 
-export type ToolId = "select" | "edit" | "text" | "sign" | "mark" | "draw" | "shapes" | "image" | "whiteout";
+export type ToolId = "select" | "edit" | "text" | "sign" | "form" | "mark" | "draw" | "shapes" | "image" | "whiteout";
+
+/** Form fields UI (F16 E3 forms): what is selected, what the Form tool draws, Detect fields. */
+export type FormsUi = {
+  /** The file's form as read (null until read, or when it has none). */
+  original: FormState | null;
+  /** The file has XFA (banner: fill what the AcroForm part allows). */
+  xfa: boolean;
+  /** Selected field (Form tool, or Select on a field). */
+  selected: { field: string; widget: string } | null;
+  draw: DrawKind;
+  proposals: Proposal[];
+  detect: DetectStatus;
+  tabOrder: boolean;
+  /** A download went ahead with required fields empty: the top-bar chip says so (AC-233). */
+  nudge: boolean;
+};
 
 export type ToolDefaults = {
   text: { font: string; size: number | null; bold: boolean; italic: boolean; underline: boolean; color: string; align: "left" | "center" | "right" };
@@ -75,10 +94,11 @@ export type EditorState = {
   lineEdit: { src: number; line: number; text: string } | null;
   busy: "edit" | "save" | null;
   panel: boolean;
-  panelTab: "pages" | "objects" | "history";
+  panelTab: "pages" | "objects" | "history" | "fields";
   /** Layout width class: rail and side panel (≥1024) or dock (<1024). */
   wide: boolean;
   readOnly: boolean;
+  forms: FormsUi;
   /** Flash over the glyphs an existing-text edit changed. */
   lineFlash: { src: number; rects: { x0: number; y0: number; x1: number; y1: number }[]; key: number } | null;
 };

@@ -412,7 +412,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       const name = pdfOutputName(rt.name);
       return edited ? `${baseName(name)}-edited.pdf` : name;
     },
-    pristine: () => isPristine(state()),
+    pristine: () => isPristine(state(), store.get().forms.original ?? undefined),
     objectsOn: (pageId: string) => objectsOn(state(), pageId),
   };
   return ctl;
@@ -423,6 +423,7 @@ export const TOOL_NAMES: Record<ToolId, string> = {
   edit: "Edit text",
   text: "Text",
   sign: "Sign",
+  form: "Form",
   mark: "Mark",
   draw: "Draw",
   shapes: "Shapes",

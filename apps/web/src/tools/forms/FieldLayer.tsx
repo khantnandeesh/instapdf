@@ -7,7 +7,7 @@
  *
  * Nothing drawn here is saved: shading, outlines, name tags and badges are editor-only (AC-252).
  */
-import { memo, type CSSProperties, type KeyboardEvent } from "react";
+import { memo, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { FormField, Proposal, Widget } from "@/lib/forms/types";
 import "./forms.css";
 
@@ -30,6 +30,10 @@ export type FieldLayerProps = {
   onAccept?: (proposal: Proposal) => void;
   onReject?: (proposal: Proposal) => void;
   onBadgeClick?: (widgetId: string) => void;
+  /** Edit mode: a widget was dragged (moved or resized) to this frame box. */
+  onBox?: (widgetId: string, box: { x: number; y: number; w: number; h: number }) => void;
+  /** The page size in points (moves and resizes stay on the page). */
+  page?: { w: number; h: number };
 };
 
 const box = (w: Widget, scale: number): CSSProperties => ({ left: w.x * scale, top: w.y * scale, width: w.w * scale, height: w.h * scale });
@@ -69,13 +73,17 @@ export const FieldLayer = memo(function FieldLayer(p: FieldLayerProps) {
           data-kind={f.kind}
           data-selected={p.selected === w.id || undefined}
           data-required={f.required || undefined}
+          data-w={w.id}
           style={box(w, scale)}
-          onPointerDown={mode === "edit" ? (e) => (e.stopPropagation(), p.onSelect?.(w.id)) : undefined}
+          onPointerDown={mode === "edit" ? (e) => dragWidget(e, w, p) : undefined}
         >
-          <div className="bf-inner" style={inner(w, scale, turn)}>
-            {mode === "fill" ? <Control f={f} w={w} fontPx={fontPx(f, w, scale, turn)} widthPx={(turn === 90 || turn === 270 ? w.h : w.w) * scale} {...p} /> : <span className="bf-tag">{f.name}</span>}
+          {/* Edit mode shows the value too, inert: the field itself takes the clicks and drags. */}
+          <div className="bf-inner" style={inner(w, scale, turn)} inert={mode === "edit" || undefined}>
+            <Control f={f} w={w} fontPx={fontPx(f, w, scale, turn)} widthPx={(turn === 90 || turn === 270 ? w.h : w.w) * scale} {...p} />
+            {mode === "edit" && <span className="bf-tag">{f.name}</span>}
           </div>
           {f.required && <span className="bf-req" title="Required" aria-hidden />}
+          {mode === "edit" && p.selected === w.id && <span className="bf-resize" data-resize aria-hidden />}
           {p.badges?.has(w.id) && (
             <button type="button" className="bf-badge" onClick={() => p.onBadgeClick?.(w.id)} aria-label={`${f.name}: tab position ${p.badges.get(w.id)}`}>
               {p.badges.get(w.id)}
@@ -87,6 +95,7 @@ export const FieldLayer = memo(function FieldLayer(p: FieldLayerProps) {
         <div
           key={w.id}
           className="bf-proposal"
+          data-w={w.id}
           style={{ ...box(w, scale), animationDelay: `${Math.min(i, 12) * 20}ms` }}
           tabIndex={0}
           role="group"
@@ -110,6 +119,47 @@ export const FieldLayer = memo(function FieldLayer(p: FieldLayerProps) {
   );
 });
 
+const MIN_SIDE = 6;
+
+/**
+ * Edit mode: drag a field to move it, or its corner to resize it. The element follows the pointer
+ * directly (no re-render per move); one change is committed on release. A click only selects.
+ */
+function dragWidget(e: ReactPointerEvent<HTMLDivElement>, w: Widget, p: FieldLayerProps) {
+  if (e.button !== 0 && e.pointerType === "mouse") return;
+  e.stopPropagation();
+  p.onSelect?.(w.id);
+  const el = e.currentTarget;
+  const resize = !!(e.target as HTMLElement).closest("[data-resize]");
+  const { scale } = p;
+  const page = p.page ?? { w: Infinity, h: Infinity };
+  // The overlay turns with the page: pointer deltas are read in its own (unturned) frame.
+  const t = ((p.turn % 360) + 360) % 360;
+  const toFrame = (dx: number, dy: number): [number, number] => (t === 90 ? [dy, -dx] : t === 180 ? [-dx, -dy] : t === 270 ? [-dy, dx] : [dx, dy]);
+  const x0 = e.clientX;
+  const y0 = e.clientY;
+  let next = { x: w.x, y: w.y, w: w.w, h: w.h };
+  let moved = false;
+  el.setPointerCapture(e.pointerId);
+  const move = (ev: PointerEvent) => {
+    const [dx, dy] = toFrame((ev.clientX - x0) / scale, (ev.clientY - y0) / scale);
+    if (!moved && Math.hypot(dx, dy) * scale < 3) return;
+    moved = true;
+    if (resize) next = { x: w.x, y: w.y, w: Math.max(MIN_SIDE, Math.min(page.w - w.x, w.w + dx)), h: Math.max(MIN_SIDE, Math.min(page.h - w.y, w.h + dy)) };
+    else next = { ...next, x: Math.max(0, Math.min(page.w - w.w, w.x + dx)), y: Math.max(0, Math.min(page.h - w.h, w.y + dy)) };
+    Object.assign(el.style, { left: `${next.x * scale}px`, top: `${next.y * scale}px`, width: `${next.w * scale}px`, height: `${next.h * scale}px` });
+  };
+  const up = () => {
+    el.removeEventListener("pointermove", move);
+    el.removeEventListener("pointerup", up);
+    el.removeEventListener("pointercancel", up);
+    if (moved) p.onBox?.(w.id, next);
+  };
+  el.addEventListener("pointermove", move);
+  el.addEventListener("pointerup", up);
+  el.addEventListener("pointercancel", up);
+}
+
 /** The fill control for one widget (U-F1). */
 function Control({ f, w, fontPx, widthPx, onValue, onSign }: { f: FormField; w: Widget; fontPx: number; widthPx: number } & FieldLayerProps) {
   const style: CSSProperties = { fontSize: fontPx, textAlign: f.style.align, color: f.style.color };
@@ -132,9 +182,18 @@ function Control({ f, w, fontPx, widthPx, onValue, onSign }: { f: FormField; w: 
         />
       );
     case "checkbox":
-      return <input type="checkbox" className="bf-check" checked={!!f.value} disabled={f.readOnly} aria-label={label} onChange={(e) => onValue?.(f.id, e.target.checked ? (w.on ?? "Yes") : "")} />;
+      // The label fills the box (and reaches past it on touch screens), so small boxes are easy to hit.
+      return (
+        <label className="bf-hit">
+          <input type="checkbox" className="bf-check" checked={!!f.value} disabled={f.readOnly} aria-label={label} onChange={(e) => onValue?.(f.id, e.target.checked ? (w.on ?? "Yes") : "")} />
+        </label>
+      );
     case "radio":
-      return <input type="radio" className="bf-check" name={`bf-${f.id}`} checked={f.value === w.on} disabled={f.readOnly} aria-label={`${label}: ${w.on}`} onChange={() => onValue?.(f.id, w.on ?? "")} />;
+      return (
+        <label className="bf-hit">
+          <input type="radio" className="bf-check" name={`bf-${f.id}`} checked={f.value === w.on} disabled={f.readOnly} aria-label={`${label}: ${w.on}`} onChange={() => onValue?.(f.id, w.on ?? "")} />
+        </label>
+      );
     case "dropdown":
       return (
         <select className="bf-input" style={style} value={String(f.value)} disabled={f.readOnly} aria-label={label} onChange={(e) => onValue?.(f.id, e.target.value)}>

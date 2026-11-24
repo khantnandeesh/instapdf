@@ -26,9 +26,9 @@ function pump() {
 
 /**
  * Renders source page `src` (zero-based) at `scale` CSS px per point, turned to `rotation`, at the
- * device pixel ratio. Resolves with the canvas, null if cancelled, or "failed".
+ * device pixel ratio (`forms`: the page's form fields are drawn by the editor, not here). Resolves with the canvas, null if cancelled, or "failed".
  */
-export function renderPage(pdf: PDFDocumentProxy, src: number, scale: number, rotation: number, priority = 0): { promise: Promise<HTMLCanvasElement | null | "failed">; cancel: () => void } {
+export function renderPage(pdf: PDFDocumentProxy, src: number, scale: number, rotation: number, priority = 0, forms = false): { promise: Promise<HTMLCanvasElement | null | "failed">; cancel: () => void } {
   let task: RenderTask | null = null;
   let resolve!: (c: HTMLCanvasElement | null | "failed") => void;
   const promise = new Promise<HTMLCanvasElement | null | "failed">((r) => (resolve = r));
@@ -51,7 +51,9 @@ export function renderPage(pdf: PDFDocumentProxy, src: number, scale: number, ro
         canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.floor(viewport.width));
         canvas.height = Math.max(1, Math.floor(viewport.height));
-        task = page.render({ canvas, viewport });
+        // With the form loaded, its fields are drawn live by the field layer: leave them off the raster
+        // (pdf.js AnnotationMode.ENABLE_FORMS), so a changed or deleted field never shows twice.
+        task = page.render({ canvas, viewport, annotationMode: forms ? 2 : 1 });
         await task.promise;
         if (job.cancelled) release(canvas);
         resolve(job.cancelled ? null : canvas);

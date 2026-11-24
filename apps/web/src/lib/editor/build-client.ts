@@ -2,6 +2,7 @@
 /** Main-thread side of the download worker. Created on the first Download intent (pointerenter/focus) or click. */
 import type { BuildInput } from "./build";
 import type { BuildResponse } from "./build.worker";
+import type { FormState } from "@/lib/forms/types";
 
 let worker: Worker | null = null;
 let nextId = 1;
@@ -32,6 +33,14 @@ export function checkOwnerPassword(bytes: Uint8Array, password: string): Promise
   return request({ owner: { bytes, password } }).then((r) => "owner" in r && r.owner);
 }
 
+/** Reads the file's form fields (lib/forms/read) in the download worker, where pdf-lib lives. */
+export function readFormsInWorker(bytes: Uint8Array, password?: string): Promise<{ forms: FormState; xfa: boolean }> {
+  return request({ forms: { bytes, password } }).then((r) => {
+    if (!("forms" in r)) throw new Error("Unexpected reply");
+    return { forms: r.forms, xfa: r.xfa };
+  });
+}
+
 export function buildInWorker(input: BuildInput): Promise<Uint8Array> {
   return request({ input }).then((r) => {
     if (!("bytes" in r)) throw new Error("Unexpected reply");
@@ -40,7 +49,7 @@ export function buildInWorker(input: BuildInput): Promise<Uint8Array> {
 }
 
 type Ok = Extract<BuildResponse, { ok: true }>;
-type Body = { input: BuildInput } | { owner: { bytes: Uint8Array; password: string } };
+type Body = { input: BuildInput } | { owner: { bytes: Uint8Array; password: string } } | { forms: { bytes: Uint8Array; password?: string } };
 
 function request(body: Body): Promise<Ok> {
   return new Promise((resolve, reject) => {

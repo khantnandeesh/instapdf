@@ -35,7 +35,7 @@ export const FormToolOptions = memo(function FormToolOptions({ kind, onKind, det
     <div className="bf-formopts" data-testid="form-tool-options">
       <KindPicker kind={kind} onKind={onKind} />
       <span className="bf-divider" aria-hidden />
-      <button type="button" className="bf-optbtn" aria-pressed={!!detecting} onClick={onDetect} title="Find the blanks on every page and propose fields">
+      <button type="button" className="bf-optbtn" aria-pressed={!!detecting} onClick={onDetect} title="Find the blanks on every page and propose fields" aria-label="Detect fields">
         <DetectIcon />
         <span>Detect</span>
       </button>

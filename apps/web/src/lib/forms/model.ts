@@ -257,6 +257,20 @@ export function missingRequired(state: FormState): FormField[] {
   return state.fields.filter((f) => f.required && f.kind !== "signature" && f.kind !== "button" && isEmptyValue(f.value)).sort((a, b) => first(a) - first(b));
 }
 
+/** Every widget on page `from` gets a twin on page `to` (a duplicated page), in the same field. */
+export function duplicateWidgetsToPage(state: FormState, from: string, to: string): FormState {
+  let order = state.order;
+  let changed = false;
+  const fields = state.fields.map((f) => {
+    if (f.kind === "radio" || !f.widgets.some((w) => w.page === from)) return f;
+    const twins = f.widgets.filter((w) => w.page === from).map((w) => ({ ...w, id: newId("w"), page: to, ref: undefined }));
+    order = [...order, ...twins.map((w) => w.id)];
+    changed = true;
+    return { ...f, widgets: [...f.widgets, ...twins] };
+  });
+  return changed ? { ...state, fields, order } : state;
+}
+
 /** Widget → its field. */
 export function fieldOfWidget(state: FormState, widgetId: string): FormField | undefined {
   return state.fields.find((f) => f.widgets.some((w) => w.id === widgetId));

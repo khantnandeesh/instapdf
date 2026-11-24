@@ -5,6 +5,7 @@
  * pointers). Every entry names its change, the page it touched and when, for the tooltip, the
  * live region and the history panel. Reverting a set of entries is itself one undoable step.
  */
+import { prunePages } from "@/lib/forms/model";
 import type { DocState } from "./model";
 
 export type Change = {
@@ -123,7 +124,13 @@ export function revertEntries(h: History, chosen: number[], at = Date.now()): Hi
   // Existing-text edits revert to the version before the earliest reverted text edit, if any.
   const engineEdits = picks.filter((i) => h.states[i].engine !== h.states[i + 1].engine);
   const engine = engineEdits.length ? h.states[engineEdits[0]].engine : now.engine;
-  const next: DocState = { pages, objects, engine };
+  // Form changes revert as a whole: to the form before the earliest reverted form change, unless a
+  // kept later change edited the form too.
+  const formEdits = picks.filter((i) => h.states[i].forms !== h.states[i + 1].forms);
+  const keptForm = formEdits.length && Array.from({ length: h.index - formEdits[0] - 1 }, (_, k) => formEdits[0] + 1 + k).some((i) => !picks.includes(i) && h.states[i].forms !== h.states[i + 1].forms);
+  let forms = formEdits.length && !keptForm ? h.states[formEdits[0]].forms : now.forms;
+  if (forms) forms = prunePages(forms, pages.map((p) => p.id));
+  const next: DocState = { pages, objects, engine, ...(forms ? { forms } : {}) };
   return commit(h, next, { label: `Revert ${picks.length} change${picks.length === 1 ? "" : "s"}`, at });
 }
 

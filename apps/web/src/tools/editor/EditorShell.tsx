@@ -4,6 +4,8 @@
  * history entry (Back closes it), the canvas with every page, and the bars around it. Loaded as a
  * separate chunk once the user shows intent (AC-86).
  */
+import { emptyForm } from "@/lib/forms/model";
+import { FormsChrome, fieldKey, loadForms, nudgeAfterDownload } from "@/tools/forms/EditorForms";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
@@ -106,6 +108,7 @@ function initialState(pages: PageEntry[], wide: boolean): EditorState {
     panelTab: "pages",
     wide,
     readOnly: false,
+    forms: { original: null, xfa: false, selected: null, draw: "text", proposals: [], detect: { phase: "idle" }, tabOrder: false, nudge: false },
     lineFlash: null,
   };
 }
@@ -194,6 +197,8 @@ export function EditorShell(props: ShellProps) {
       const store = createStore({ ...initialState(initialPages(src), wide), readOnly: restricted });
       made = createController(store, rt, { announce: say, toast: showToast });
       setCtl(made);
+      // Form fields: read in the build worker, only when pdf.js says the file has some.
+      void loadForms(made, props.bytes, props.password).catch(() => {}); // a form that can’t be read stays drawn on the page
       say(`${props.name} opened, ${src.length} ${src.length === 1 ? "page" : "pages"}`);
       // Viewing and every object tool work at once; only Edit text waits for the engine.
       if (!props.pdf.wasEncrypted) {
@@ -273,7 +278,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     const objs = H.current(s.history).objects;
     return s.selection.map((id) => objs.find((o) => o.id === id)).filter((o): o is EditorObject => !!o);
   }, shallowArray);
-  const dirty = useStore(store, (s) => s.history.index !== s.downloadedAt && !isPristine(H.current(s.history)));
+  const dirty = useStore(store, (s) => s.history.index !== s.downloadedAt && !isPristine(H.current(s.history), s.forms.original ?? undefined));
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const column = useRef<HTMLDivElement>(null);
   const [sign, setSign] = useState<{ role: "signature" | "initials" } | null>(null);
@@ -623,9 +628,16 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         let out: Uint8Array;
         if (s.readOnly) out = original; // nothing changed: the file as it came, its restrictions intact
         else try {
-          out = await buildInWorker({ bytes: base.slice(), password: rt.password, pages: doc.pages, objects: doc.objects, assets: plainAssets(rt.assets, assetsOf(doc.objects)) });
+          out = await buildInWorker({
+            bytes: base.slice(),
+            password: rt.password,
+            pages: doc.pages,
+            objects: doc.objects,
+            assets: plainAssets(rt.assets, assetsOf(doc.objects)),
+            forms: doc.forms ? { state: doc.forms, original: s.forms.original ?? emptyForm() } : undefined,
+          });
         } catch (err) {
-          if (!isPristine(doc)) throw err;
+          if (!isPristine(doc, s.forms.original ?? undefined)) throw err;
           out = base;
         }
         const url = URL.createObjectURL(new Blob([out as Uint8Array<ArrayBuffer>], { type: "application/pdf" }));
@@ -638,7 +650,8 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 30_000);
         store.set({ downloadedAt: at });
-        ctl.toast({ text: `Downloaded · ${file} · 0 B uploaded${rt.wasEncrypted && !s.readOnly ? " · no password" : ""}`, tone: "success" });
+        const empty = nudgeAfterDownload(ctl);
+        ctl.toast({ text: `Downloaded · ${file} · 0 B uploaded${rt.wasEncrypted && !s.readOnly ? " · no password" : ""}${empty ? ` · ${empty} required ${empty === 1 ? "field is" : "fields are"} empty` : ""}`, tone: "success" });
         ctl.announce(`Downloaded ${file}`);
       } catch {
         ctl.toast({ text: "The PDF couldn’t be made. Your edits are still here; please try again.", tone: "danger" });
@@ -693,7 +706,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       const s = store.get();
       if (blocked()) return;
       const h = s.history;
-      if (!h.entries.length || (h.index === 0 && isPristine(H.current(h)))) {
+      if (!h.entries.length || (h.index === 0 && isPristine(H.current(h), s.forms.original ?? undefined))) {
         written.clear();
         await deleteSession(rt.hash!);
         p.fresh = false;
@@ -776,10 +789,10 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     if ((history.state as { berryEditor?: boolean } | null)?.berryEditor) history.back();
     else onClose();
   }, [onClose]);
-  const unsaved = () => store.get().history.index !== store.get().downloadedAt && !isPristine(H.current(store.get().history));
+  const unsaved = () => store.get().history.index !== store.get().downloadedAt && !isPristine(H.current(store.get().history), store.get().forms.original ?? undefined);
   const requestOpen = (run: () => void, label: string) => (unsaved() ? setReplace({ run, label }) : run());
   const requestClose = useCallback(() => {
-    if (store.get().history.index !== store.get().downloadedAt && !isPristine(H.current(store.get().history))) setConfirm("close");
+    if (store.get().history.index !== store.get().downloadedAt && !isPristine(H.current(store.get().history), store.get().forms.original ?? undefined)) setConfirm("close");
     else finishClose();
   }, [store, finishClose]);
   useEffect(() => {
@@ -787,7 +800,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     const pop = () => {
       if (closing.current) return onClose();
       const s = store.get();
-      if (s.history.index !== s.downloadedAt && !isPristine(H.current(s.history))) {
+      if (s.history.index !== s.downloadedAt && !isPristine(H.current(s.history), s.forms.original ?? undefined)) {
         history.pushState({ ...(history.state ?? {}), berryEditor: true }, "");
         setConfirm("close");
       } else {
@@ -817,6 +830,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         return;
       }
       if (typing(t)) return;
+      if (fieldKey(ctl, e)) return e.preventDefault();
       if (mod && !e.altKey && (k === "z" || k === "Z")) {
         e.preventDefault();
         void (e.shiftKey ? ctl.redo() : ctl.undo());
@@ -1026,6 +1040,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
           {!placement && (tool === "draw" || tool === "mark" || tool === "shapes" || tool === "whiteout") && <ModeHint text={`${TOOL_HINTS[tool]} · Esc to stop`} />}
           {!wide && <PageChip onOpen={() => setSheet("pages")} />}
           <EnginePill wide={wide} />
+          <FormsChrome wide={wide} />
           <div className="ed-floor">
             {wide && <SaveChip />}
             <ViewPill pageCount={pages.length} onZoom={(z) => zoomTo(z)} onFit={fitTo} onGo={goto} />
