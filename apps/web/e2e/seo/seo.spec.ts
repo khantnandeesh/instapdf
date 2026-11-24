@@ -4,8 +4,9 @@
  * Playwright config does): metadata, robots and the sitemap are only final in a production build. Every indexable page is checked, so a new tool
  * page is covered as soon as it is usable.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { cloudSourcesOn } from "../../src/lib/cloud/providers";
 import { indexableRoutes } from "../../src/lib/seo/routes";
 import { absoluteUrl, SITE_ORIGIN } from "../../src/lib/seo/site";
 import { tools } from "../../src/tools/registry";
@@ -19,8 +20,10 @@ const STAGING_HOST = "web-staging-qzq5fa2g7q-uc.a.run.app";
 /** Performance budgets (docs/seo/strategy.md, "Performance budgets"), checked on the mobile project. */
 // Phone JS, KiB: the measure now counts link-preloaded scripts; base is main 200ed84 (170.64 KiB) + ~1.4 KiB
 // headroom; cloud-on +2 KiB per F23; lead 24 Nov. Follow-up: cut Merge's idle chunks back to 170.
-// Cloud-on is next.config.ts CLOUD_ON (the flag and a provider), worked out from the same env as the build.
-const BUDGET = { jsKB: cloudSourcesOn() ? 174 : 172, lcpMs: 2500, cls: 0.1 };
+// Cloud-on is what the served build applied (next.config.ts CLOUD_ON), read from its own config the way
+// scripts/first-load-budget.mjs does, so the two always agree.
+const cloudOn = JSON.parse(readFileSync(join(__dirname, "../../.next/required-server-files.json"), "utf8")).config.env?.NEXT_PUBLIC_CLOUD_SOURCES === "1";
+const BUDGET = { jsKB: cloudOn ? 174 : 172, lcpMs: 2500, cls: 0.1 };
 
 type Ld = { "@graph": { "@type": string; [k: string]: unknown }[] };
 
