@@ -3,7 +3,7 @@
  * Builds the published font library: font files, a manifest per family, the family list the
  * font menu searches, and the matching index.
  *
- *   node scripts/font-library/build-library.mjs --out <dir> --fontindex <path to the fontindex binary>
+ *   node scripts/font-library/build-library.mjs --out <dir>
  *        [--source packages | catalogue] [--catalogue <catalogue.json>] [--families id,id] [--limit n]
  *
  * --source packages (default) reads the @fontsource packages installed in this app: the small
@@ -21,13 +21,11 @@
  *   fonts/<id>/<subset>-<weight>-<style>.<sha8>.woff
  *   licences/<id>.txt
  */
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { faceId, faceKey, familyRow, fontFileName, gate, parseUnicodeRange, printSubset } from "./lib.mjs";
 import { mayEmbed, verticalMetrics, woffToSfnt } from "./sfnt.mjs";
 
@@ -37,7 +35,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function args() {
   const a = process.argv.slice(2);
   const get = (k) => (a.includes(k) ? a[a.indexOf(k) + 1] : undefined);
-  return { out: get("--out"), fontindex: get("--fontindex"), source: get("--source") ?? "packages", catalogue: get("--catalogue"), families: get("--families")?.split(","), limit: Number(get("--limit") ?? 0) };
+  return { out: get("--out"), source: get("--source") ?? "packages", catalogue: get("--catalogue"), families: get("--families")?.split(","), limit: Number(get("--limit") ?? 0) };
 }
 
 /** Installed @fontsource packages as a source: { entry, unicode, defSubset, read(subset, weight, style), licence() }. */
@@ -108,20 +106,29 @@ async function catalogueSource(path, only, limit) {
   });
 }
 
+/** The font matcher: the WebAssembly module the editor loads, built by scripts/build-engine-wasm.sh. */
+async function loadMatcher() {
+  const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "public", "engine");
+  const matcher = await import(pathToFileURL(join(dir, "berry_fontmatch.js")).href);
+  matcher.initSync({ module: await readFile(join(dir, "berry_fontmatch_bg.wasm")) });
+  return matcher;
+}
+
 async function main() {
   const opt = args();
-  if (!opt.out || !opt.fontindex) {
-    console.error("usage: build-library.mjs --out <dir> --fontindex <binary> [--source packages|catalogue] [--catalogue file] [--families a,b] [--limit n]");
+  if (!opt.out) {
+    console.error("usage: build-library.mjs --out <dir> [--source packages|catalogue] [--catalogue file] [--families a,b] [--limit n]");
     process.exit(2);
   }
   const sources = opt.source === "catalogue" ? await catalogueSource(opt.catalogue, opt.families, opt.limit) : await packageSource(opt.families);
-  const work = await mkdtemp(join(tmpdir(), "fontlib-"));
+  const matcher = await loadMatcher();
   const put = async (rel, bytes) => {
     await mkdir(dirname(join(opt.out, rel)), { recursive: true });
     await writeFile(join(opt.out, rel), bytes);
   };
   const rows = [];
-  const printManifest = [];
+  /** [face id, fingerprint] in index order. */
+  const prints = [];
   let files = 0;
   for (const src of sources) {
     const { entry } = src;
@@ -149,9 +156,9 @@ async function main() {
           list.push({ file: `${entry.id}/${name}`, ranges });
           metrics ??= verticalMetrics(sfnt);
           if (subset === forPrint) {
-            const tmp = join(work, `${faceId(entry.id, weight, style)}.ttf`);
-            await writeFile(tmp, sfnt);
-            printManifest.push(`${faceId(entry.id, weight, style)}\t${tmp}`);
+            const print = matcher.fingerprintFile(sfnt);
+            // A face with no Latin letters or digits has nothing the index can compare yet.
+            if (print?.count) prints.push([faceId(entry.id, weight, style), print]);
           }
         }
         if (list.length && metrics) faces[faceKey(weight, style)] = { files: list, ...metrics };
@@ -168,15 +175,12 @@ async function main() {
     rows.push(familyRow({ ...entry, weights: [...new Set(Object.keys(faces).map((k) => Number(k.split("-")[0])))], styles: [...new Set(Object.keys(faces).map((k) => k.split("-")[1]))] }, sha));
   }
 
-  // The matching index, from the same Rust code the browser runs.
-  await writeFile(join(work, "manifest.tsv"), printManifest.join("\n") + "\n");
-  execFileSync(opt.fontindex, [join(work, "manifest.tsv"), join(work, "index")], { stdio: ["ignore", "inherit", "inherit"] });
-  const features = await readFile(join(work, "index", "features.bin"));
-  const faceIds = (await readFile(join(work, "index", "faces.txt"), "utf8")).split("\n").filter(Boolean).map((l) => l.split("\t")[0]);
-  if (features.length !== faceIds.length * 64) throw new Error("index: features.bin does not match faces.txt");
+  // The matching index, from the same Rust code the browser runs (its WebAssembly build).
+  const features = Buffer.concat(prints.map(([, p]) => Buffer.from(p.coarse)));
+  const faceIds = prints.map(([id]) => id);
   const sigs = {};
-  for (const id of faceIds) {
-    const bytes = await readFile(join(work, "index", "sig", `${id}.bin`));
+  for (const [id, p] of prints) {
+    const bytes = Buffer.from(p.glyphs);
     sigs[id] = sha256(bytes).slice(0, 8);
     await put(`index/sig/${id}.${sigs[id]}.bin`, bytes);
   }
@@ -192,7 +196,6 @@ async function main() {
     counts: { families: rows.length, faces: faceIds.length, files },
   };
   await put("manifest.json", JSON.stringify(manifest, null, 1) + "\n");
-  await rm(work, { recursive: true, force: true });
   console.log(`font library: ${rows.length} families, ${faceIds.length} faces indexed, ${files} files -> ${opt.out}`);
 }
 
