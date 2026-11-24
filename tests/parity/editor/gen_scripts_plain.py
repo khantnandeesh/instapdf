@@ -13,6 +13,7 @@ lines = [
     ("deva", 14, "हिंदी में पूर्ण विराम और अर्धविराम का प्रयोग।"),
     ("arab", 15, "مرحبا بالعالم، هذا نص تجريبي."),
     ("arab", 15, "المبلغ الإجمالي 2500 ريال للفاتورة رقم 77."),
+    ("arab", 15, "قال مُحَمَّدٌ: السلام عليكم «تجربة»."),
 ]
 faces = {"deva": f"{FONTS}/NotoSansDevanagari-Regular.ttf", "arab": f"{FONTS}/NotoNaskhArabic-Regular.ttf"}
 pdf = pikepdf.new()
@@ -88,7 +89,8 @@ for key, size, text in lines:
             buf = hb.Buffer(); buf.add_str(rt); buf.direction = "rtl"; buf.script = "Arab"; buf.language = "ar"
         else:
             buf = hb.Buffer(); buf.add_str(rt); buf.guess_segment_properties()
-        hb.shape(f["font"], buf, {})
+        # Arabic without ccmp: one glyph per letter, as Word draws with Arial or Times New Roman.
+        hb.shape(f["font"], buf, {"ccmp": False} if key == "arab" else {})
         infos, poss = buf.glyph_infos, buf.glyph_positions
         # per-cluster char assignment (Word-like)
         clusters = sorted(set(i.cluster for i in infos))
@@ -104,6 +106,9 @@ for key, size, text in lines:
                 ch = f["rev"].get(infos[k].codepoint)
                 if ch in chars:
                     assign[k] = ch; chars.remove(ch)
+                elif ch and len(chars) == 1 and chars[0] in "()[]{}<>«»" and ch in "()[]{}<>«»":
+                    # A mirrored bracket: the glyph's own character, as producers write it.
+                    assign[k] = ch; chars.clear()
             rest = [k for k in idx if k not in assign]
             if rest:
                 first = rest[-1] if (kind == "rtl") else rest[0]

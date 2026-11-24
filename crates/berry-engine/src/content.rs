@@ -11,7 +11,9 @@ pub enum Operand {
     Str(Vec<u8>),
     Name(Vec<u8>),
     Array(Vec<Operand>),
-    /// Dictionaries, booleans and null: kept only so parsing stays in sync.
+    /// An inline dictionary (marked-content properties), keys without the slash.
+    Dict(Vec<(Vec<u8>, Operand)>),
+    /// Booleans, null and anything past the nesting limit: kept only so parsing stays in sync.
     Other,
 }
 
@@ -22,6 +24,14 @@ impl Operand {
             _ => None,
         }
     }
+    /// Value of a key in an inline dictionary.
+    pub fn get(&self, key: &[u8]) -> Option<&Operand> {
+        match self {
+            Operand::Dict(entries) => entries.iter().find(|(k, _)| k == key).map(|(_, v)| v),
+            _ => None,
+        }
+    }
+
     pub fn name(&self) -> Option<&[u8]> {
         match self {
             Operand::Name(n) => Some(n),
@@ -217,14 +227,21 @@ impl<'a> Lexer<'a> {
                     return Tok::Operand(Operand::Other);
                 }
                 self.depth += 1;
+                let mut entries = Vec::new();
+                let mut key: Option<Vec<u8>> = None;
                 loop {
                     match self.next() {
                         Tok::DictEnd | Tok::Eof => break,
-                        _ => {}
+                        Tok::Operand(o) => match (key.take(), o) {
+                            (None, Operand::Name(k)) => key = Some(k),
+                            (Some(k), v) => entries.push((k, v)),
+                            (None, _) => {}
+                        },
+                        _ => key = None,
                     }
                 }
                 self.depth -= 1;
-                Tok::Operand(Operand::Other)
+                Tok::Operand(Operand::Dict(entries))
             }
             b'<' => {
                 self.p += 1;

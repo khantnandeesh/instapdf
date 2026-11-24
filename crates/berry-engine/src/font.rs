@@ -875,6 +875,54 @@ impl PdfFont {
         }
     }
 
+    /// The character the embedded program's Unicode cmap gives the glyph a code draws, when it
+    /// has one. Tells a mirrored bracket glyph from the bracket its ToUnicode names.
+    pub fn program_char(&self, code: u32) -> Option<char> {
+        let Program::TrueType(data) = &self.program else { return None };
+        let face = ttf_parser::Face::parse(data, 0).ok()?;
+        let gid = if self.two_byte { self.gid_for(code)? } else { self.simple_truetype_gid(&face, code)? };
+        let cmap = face.tables().cmap?;
+        let mut found = None;
+        for st in cmap.subtables {
+            if !st.is_unicode() || found.is_some() {
+                continue;
+            }
+            st.codepoints(|cp| {
+                if found.is_none() && st.glyph_index(cp).map(|g| g.0) == Some(gid) {
+                    found = char::from_u32(cp);
+                }
+            });
+        }
+        found
+    }
+
+    /// Horizontal extent of the glyph's ink in 1/1000 em, relative to its origin, when the
+    /// embedded program can tell. Marks often have no advance and draw left of their origin.
+    pub fn ink_x(&self, code: u32) -> Option<(f64, f64)> {
+        match &self.program {
+            Program::TrueType(data) => {
+                let face = ttf_parser::Face::parse(data, 0).ok()?;
+                let gid = if self.two_byte { self.gid_for(code)? } else { self.simple_truetype_gid(&face, code)? };
+                let b = face.glyph_bounding_box(ttf_parser::GlyphId(gid))?;
+                let k = 1000.0 / face.units_per_em() as f64;
+                Some((b.x_min as f64 * k, b.x_max as f64 * k))
+            }
+            Program::Cff(data) => {
+                let cff = ttf_parser::cff::Table::parse(data)?;
+                let gid = if self.two_byte {
+                    self.gid_for(code)?
+                } else {
+                    cff.glyph_index_by_name(self.names.get(code as usize)?.as_deref()?)?.0
+                };
+                let mut sink = NullOutline(false);
+                let b = cff.outline(ttf_parser::GlyphId(gid), &mut sink).ok()?;
+                let k = cff.matrix().sx as f64 * 1000.0;
+                Some((b.x_min as f64 * k, b.x_max as f64 * k))
+            }
+            _ => None,
+        }
+    }
+
     /// The PDF gives this code a real advance: an explicit, non-zero width that agrees with the
     /// font program when we can read it. Producers often write widths only for the codes they
     /// used, so a code nobody showed yet may draw with a zero or default advance and overprint.

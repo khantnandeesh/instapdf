@@ -609,8 +609,8 @@ impl Engine {
         }
         let shift = new_width - (pos(b) - pos(a));
         let mut plan = Plan { removed: HashSet::new(), want: HashMap::new(), anchor, after: after_anchor, segs };
-        plan.removed.extend(line.chars[a..b].iter().filter_map(|c| c.glyph));
-        for g in line.chars[b..n].iter().filter_map(|c| c.glyph) {
+        plan.removed.extend(line.chars[a..b].iter().flat_map(|c| c.glyphs.iter().copied()));
+        for g in line.chars[b..n].iter().flat_map(|c| c.glyphs.iter().copied()) {
             plan.want.insert(g, shift);
         }
 
