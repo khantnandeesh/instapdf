@@ -286,6 +286,37 @@ Priority: P0 = parity must-have; P1 = parity nice-to-have or key differentiator;
 - **AC-37 (P1)** Tab order can be set by rows, columns or custom drag, and the output's widget order follows it.
 - **AC-38 (P2)** (improvement) "Detect fields" proposes fields on underscore lines and boxes on **all pages**; on a page that already has fields it proposes only the new ones (no duplicates, no error); the user accepts or rejects each.
 - **AC-39 (P1)** Form fields and annotations can be added on `rotated-90.pdf` (the reference refuses).
+
+#### Forms detail (E3 forms slice, 2026-11-24). Each refines the AC in brackets
+Reference behaviour these beat (`f16-reference-live-checks.md` §4, recording 1:50–2:24): detection uploads the file and runs on the page in view only, refuses pages that already have fields, turns a signature line into a plain text field and names fields with a random suffix; the signature box comes with a blocking warning; fields cannot go on rotated pages.
+
+Fill
+- **AC-230 (P0)** [AC-34] Every field type in an existing AcroForm is read with its full name, kind, value, default, options, flags and each widget's page and box: text (single line, multiline, comb, max length), dropdown (editable or not), list (single or multi-select), radio group (export value per button), checkbox, signature and push button (shown, not editable). Fields from inherited parents (`Parent`/`Kids`) are read as one field.
+- **AC-231 (P0)** [AC-34] Filled values are written as `V` with a fresh appearance stream for each changed field, so pdf.js and PDFium show them without relying on `NeedAppearances`. Fields the user did not touch keep their original appearance byte for byte.
+- **AC-232 (P1)** [AC-34] (improvement) Values outside WinAnsi (for example "Zoë Šťastná", "Ирина", "₹ 5,000") show correctly in the output appearance: the field's font is an embedded open font that covers them, never "?" or a blank box.
+- **AC-233 (P1)** [AC-34] Read-only fields cannot be changed. Max length is enforced while typing. A required field left empty is flagged inline before download, without blocking it.
+
+Create and edit
+- **AC-234 (P1)** [AC-35] Each new field kind gives the right AcroForm structure: text `Tx` (multiline, comb with N boxes, max length), dropdown `Ch` combo, list `Ch` (multi-select), radio `Btn` group with one widget per option and its own export value, checkbox `Btn` with export value `Yes`, signature `Sig`. Properties: name, tooltip (`TU`), default value, required, read-only, font size (auto or fixed), alignment, text colour, border colour and width, background colour.
+- **AC-235 (P1)** [AC-36] (improvement) Field names are checked as they are typed: an inline note flags a duplicate or a name with a dot, and suggests the next free name (`full_name_2`). "Repeat on all pages" makes one field with one widget per page, so a value typed once shows on every page.
+- **AC-236 (P1)** [AC-35] Editing an existing field (rename, move, resize, new options) keeps its value and its other widgets. Deleting a field removes it from the AcroForm and every widget from its page.
+- **AC-237 (P1)** [AC-63] (improvement) A new signature field has its own appearance (a dashed border and a "Sign here" label in the field), which pdf.js and PDFium both draw. No warning dialog is shown.
+- **AC-238 (P1)** [AC-39] (improvement) Fields can be added on pages turned 90°, 180° and 270° and on pages whose crop box does not start at 0,0. Each lands where it was drawn and its text reads upright for the reader (`MK /R` matches the page turn).
+- **AC-239 (P1)** [AC-37] Tab order offers sort by rows, sort by columns, restore original and custom order. The output's `/Annots` order on each page follows it, `/Tabs` is `/R` or `/C` for the two sorts, and the AcroForm `/Fields` list follows the same order.
+
+Detect fields
+- **AC-240 (P1)** [AC-38, AC-77] Detect fields runs on **every page** in the browser: no network request is made, the code loads only when Detect is used (its own worker chunk, so the editor's first load does not grow), progress shows page n of N, and it can be cancelled. On a desktop it takes under 0.5 s per page.
+- **AC-241 (P1)** [AC-77] On `report-form-3p.pdf` it proposes exactly 7 fields, all on page 2: text fields `full_name`, `email_address`, `phone`, `date_of_birth` sitting on their lines, checkboxes `i_agree_to_the_terms` and `send_me_updates` over their boxes (overlap ≥ 80%), and a **signature** field `signature`. Each field's tooltip is its label. Pages 1 and 3 get none.
+- **AC-242 (P1)** [AC-38] (improvement) It finds, on `detect-mix.pdf`: drawn lines, underscore runs (`_____`), dotted leaders (`.......`), empty boxes (multi-line when tall), a row of equal boxes as one **comb** field with max length equal to the number of boxes, check squares and `☐`, and circles as one **radio group** named from its question. A date label gives a tooltip with the date format.
+- **AC-243 (P1)** [AC-38] (improvement) No proposals on separators that span the text column, underlined words, table cells that hold text, or page borders (`detect-mix.pdf` page 2 has all four).
+- **AC-244 (P1)** [AC-38] (improvement) On a page that already has fields it proposes only new ones: a proposal overlapping an existing widget is dropped, and nothing blocks. The result line says how many fields were found on how many pages.
+- **AC-245 (P2)** [AC-38] (improvement) Scanned pages with no text layer still get lines and boxes, named by kind (`text_1`, `checkbox_1`).
+- **AC-246 (P1)** [AC-38] Proposals show as outlines the user accepts or rejects one by one or all at once. Accepting is one undo step and makes normal fields.
+
+Output
+- **AC-247 (P0)** [AC-46] Every output from fill, create and detect passes qpdf's check (via pikepdf) and draws its fields in pdf.js with appearance streams.
+
+Build note: the field model, reader, writer, tab order and detection live in `apps/web/src/lib/forms/` and depend only on pdf-lib and pdfjs-dist. Field boxes use the editor's page frame (points, origin at the top-left of the unrotated visible page box, y down, keyed by page id), and `applyForms` is the one call the editor's download build makes after drawing objects.
 - **AC-40 (P2)** `xfa-only.pdf` shows a banner explaining limited support and does not crash.
 
 ### Pages
