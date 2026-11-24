@@ -13,6 +13,7 @@ import { exceedsPixelCap, imageFormatOfName, imagePageSize, probeImage, sniffFor
 import { continueTargets, type FlowTool } from "@/tools/registry";
 import { Button } from "../ui/Button";
 import { BerryLoader } from "../berry/Berry";
+import { isShown, moveFocus, trackInputModality, type InputModality } from "../ui/focus";
 import { PlusIcon, UploadIcon } from "../ui/icons";
 import { LiveRegion } from "../ui/LiveRegion";
 import { SegmentedControl } from "../ui/SegmentedControl";
@@ -100,8 +101,13 @@ export type ToolFlowProps = {
   readyStatus?: () => string;
   /** Show the view toggle from one file (Merge) instead of two. */
   viewToggleFromOneFile?: boolean;
-  /** Below 640 px, the toolbar's Add files shows only its icon. */
-  compactAddFiles?: boolean;
+  /**
+   * Below 640 px the toolbar's Add files button is hidden, because the tool's own
+   * one-button Add menu (in `toolbarEnd`, which calls `api.openPicker`) replaces it
+   * (Merge, spec F3 M-3). Returns that menu's trigger, which then takes the focus
+   * moves that would go to Add files.
+   */
+  phoneAddMenu?: () => HTMLElement | null;
   /** Merge's own wording for the empty state and the wrong-type error. */
   copyOverrides?: { pickerButton?: string; pickerHint?: string; limits?: string; limitsFull?: string; statusEmpty?: string; errorType?: (name: string) => string };
   /** Chip on the Options button below 1024 px ("2 changed"), for `optionsDensity: "full"`. */
@@ -138,7 +144,7 @@ export function ToolFlow({
   workspaceEmpty,
   readyStatus,
   viewToggleFromOneFile,
-  compactAddFiles,
+  phoneAddMenu,
   copyOverrides,
   optionsBadge,
   apiRef,
@@ -214,11 +220,20 @@ export function ToolFlow({
   const progressBox = useRef<HTMLDivElement>(null);
   const retryButton = useRef<HTMLButtonElement>(null);
   const abort = useRef<AbortController | null>(null);
+  const phoneAddMenuRef = useRef(phoneAddMenu);
+  phoneAddMenuRef.current = phoneAddMenu;
+  /** The toolbar's Add control that is on screen: Add files, or the phone Add menu that replaces it. */
+  const toolbarAdd = useCallback(() => {
+    const el = picker.current?.element ?? null;
+    if (isShown(el)) return el;
+    const alt = phoneAddMenuRef.current?.() ?? null;
+    return isShown(alt) ? alt : el;
+  }, []);
   const fallbackFocus = useCallback(() => {
     const t = intakeTrigger.current;
-    if (t && t.isConnected) return t;
-    return picker.current?.element ?? heading.current;
-  }, []);
+    if (isShown(t)) return t;
+    return toolbarAdd() ?? heading.current;
+  }, [toolbarAdd]);
 
   // ---- derived -------------------------------------------------------------
   const readyFiles = files.filter(isReady);
@@ -387,19 +402,24 @@ export function ToolFlow({
     [pushNotice],
   );
 
+  // How the visitor last interacted (pointer or keys), for focus moves the page makes itself.
+  const lastInput = useRef<InputModality>("keyboard");
+  useEffect(() => trackInputModality((m) => (lastInput.current = m)), []);
+
   // After a pick from the empty state, its picker unmounts. Once the workspace is
   // committed, move focus to the toolbar's picker (the same control), but only
-  // if focus fell to <body>: newly loaded files never steal focus.
+  // if focus fell to <body>: newly loaded files never steal focus. After a mouse
+  // or touch pick the move shows no focus ring (eval G-7); the next key shows it.
   const [focusToolbarTick, setFocusToolbarTick] = useState(0);
   useEffect(() => {
     if (!focusToolbarTick) return;
     const active = document.activeElement;
     if (active && active !== document.body && active.isConnected) return;
-    const el = picker.current?.element;
+    const el = toolbarAdd();
     if (!el) return;
     intakeTrigger.current = el;
-    el.focus();
-  }, [focusToolbarTick]);
+    moveFocus(el, lastInput.current);
+  }, [focusToolbarTick, toolbarAdd]);
 
   const intake = useCallback(
     async (incomingRaw: File[], trigger: HTMLElement | null, opts: { replace?: boolean; tag?: unknown } = {}) => {
@@ -810,10 +830,9 @@ export function ToolFlow({
                       accept={accept}
                       multiple={flow.multiFile}
                       label={flow.multiFile ? "Add files" : "Replace file"}
-                      compact={compactAddFiles}
                       variant="tool"
                       size="sm"
-                      className="shadow-glow"
+                      className={phoneAddMenu ? "shadow-glow max-sm:hidden" : "shadow-glow"}
                       icon={<PlusIcon size={16} />}
                       disabled={state === "processing"}
                       onFiles={(f, t) => void intake(f, t, { replace: !flow.multiFile })}

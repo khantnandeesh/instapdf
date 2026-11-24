@@ -1,0 +1,435 @@
+{
+ "loadMs": 1252,
+ "textBeforeAction": 27,
+ "empty": {
+  "1366x657": {
+   "prim": null,
+   "upload": null,
+   "area": null,
+   "thumbInfo": [],
+   "hscroll": false
+  },
+  "1280x632": {
+   "prim": null,
+   "upload": null,
+   "area": null,
+   "thumbInfo": [],
+   "hscroll": false
+  },
+  "1536x730": {
+   "prim": null,
+   "upload": null,
+   "area": null,
+   "thumbInfo": [],
+   "hscroll": false
+  },
+  "1920x969": {
+   "prim": null,
+   "upload": null,
+   "area": null,
+   "thumbInfo": [],
+   "hscroll": false
+  },
+  "390x664": {
+   "prim": null,
+   "upload": null,
+   "area": null,
+   "thumbInfo": [],
+   "hscroll": false
+  }
+ },
+ "firstThumbMs": 489,
+ "loaded": {
+  "1366x657": {
+   "prim": {
+    "top": 597,
+    "bottom": 637,
+    "inView": true
+   },
+   "upload": null,
+   "area": {
+    "firstThumbTop": 320
+   },
+   "thumbInfo": [
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    }
+   ],
+   "hscroll": false
+  },
+  "1280x632": {
+   "prim": {
+    "top": 572,
+    "bottom": 612,
+    "inView": true
+   },
+   "upload": null,
+   "area": {
+    "firstThumbTop": 320
+   },
+   "thumbInfo": [
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    }
+   ],
+   "hscroll": false
+  },
+  "1536x730": {
+   "prim": {
+    "top": 670,
+    "bottom": 710,
+    "inView": true
+   },
+   "upload": null,
+   "area": {
+    "firstThumbTop": 320
+   },
+   "thumbInfo": [
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    }
+   ],
+   "hscroll": false
+  },
+  "1920x969": {
+   "prim": {
+    "top": 909,
+    "bottom": 949,
+    "inView": true
+   },
+   "upload": null,
+   "area": {
+    "firstThumbTop": 388
+   },
+   "thumbInfo": [
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    }
+   ],
+   "hscroll": false
+  },
+  "390x664": {
+   "prim": {
+    "top": 604,
+    "bottom": 644,
+    "inView": true
+   },
+   "upload": null,
+   "area": {
+    "firstThumbTop": 451
+   },
+   "thumbInfo": [
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    }
+   ],
+   "hscroll": false
+  }
+ },
+ "pages": {
+  "1366x657": {
+   "prim": {
+    "top": 597,
+    "bottom": 637,
+    "inView": true
+   },
+   "upload": null,
+   "area": {
+    "firstThumbTop": 388
+   },
+   "thumbInfo": [
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    }
+   ],
+   "hscroll": false
+  },
+  "1280x632": {
+   "prim": {
+    "top": 572,
+    "bottom": 612,
+    "inView": true
+   },
+   "upload": null,
+   "area": {
+    "firstThumbTop": 388
+   },
+   "thumbInfo": [
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    }
+   ],
+   "hscroll": false
+  },
+  "1536x730": {
+   "prim": {
+    "top": 670,
+    "bottom": 710,
+    "inView": true
+   },
+   "upload": null,
+   "area": {
+    "firstThumbTop": 388
+   },
+   "thumbInfo": [
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    }
+   ],
+   "hscroll": false
+  },
+  "1920x969": {
+   "prim": {
+    "top": 909,
+    "bottom": 949,
+    "inView": true
+   },
+   "upload": null,
+   "area": {
+    "firstThumbTop": 388
+   },
+   "thumbInfo": [
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    }
+   ],
+   "hscroll": false
+  },
+  "390x664": {
+   "prim": {
+    "top": 604,
+    "bottom": 644,
+    "inView": true
+   },
+   "upload": null,
+   "area": {
+    "firstThumbTop": 451
+   },
+   "thumbInfo": [
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    },
+    {
+     "tag": "CANVAS",
+     "css": 165,
+     "nat": 300
+    }
+   ],
+   "hscroll": false
+  }
+ },
+ "kbd": 0,
+ "errPw": [
+  "Password for user-pw.pdf",
+  "Use this password for all files"
+ ],
+ "m375empty": {
+  "prim": null,
+  "upload": null,
+  "area": null,
+  "thumbInfo": [],
+  "hscroll": false
+ },
+ "m375files": {
+  "prim": {
+   "top": 607,
+   "bottom": 647,
+   "inView": true
+  },
+  "upload": null,
+  "area": {
+   "firstThumbTop": 291
+  },
+  "thumbInfo": [
+   {
+    "tag": "CANVAS",
+    "css": 165,
+    "nat": 300
+   },
+   {
+    "tag": "CANVAS",
+    "css": 165,
+    "nat": 300
+   },
+   {
+    "tag": "IMG",
+    "css": 165,
+    "nat": 400
+   }
+  ],
+  "hscroll": false
+ },
+ "m375pages": {
+  "prim": {
+   "top": 607,
+   "bottom": 647,
+   "inView": true
+  },
+  "upload": null,
+  "area": {
+   "firstThumbTop": 345
+  },
+  "thumbInfo": [
+   {
+    "tag": "IMG",
+    "css": 165,
+    "nat": 400
+   },
+   {
+    "tag": "CANVAS",
+    "css": 165,
+    "nat": 300
+   },
+   {
+    "tag": "CANVAS",
+    "css": 165,
+    "nat": 300
+   }
+  ],
+  "hscroll": false
+ },
+ "m375opts": {
+  "prim": {
+   "top": 607,
+   "bottom": 647,
+   "inView": true
+  },
+  "upload": null,
+  "area": {
+   "firstThumbTop": -790
+  },
+  "thumbInfo": [
+   {
+    "tag": "CANVAS",
+    "css": 165,
+    "nat": 300
+   },
+   {
+    "tag": "CANVAS",
+    "css": 165,
+    "nat": 300
+   },
+   {
+    "tag": "IMG",
+    "css": 165,
+    "nat": 400
+   }
+  ],
+  "hscroll": false
+ }
+}

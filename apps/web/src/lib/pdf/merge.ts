@@ -14,6 +14,7 @@
  * last page is copied; only its outline, title and form defaults are kept.
  */
 import {
+  LineCapStyle,
   PDFArray,
   PDFDict,
   PDFDocument,
@@ -137,33 +138,68 @@ function drawFooter(page: PDFPage, text: TextWriter, name: string) {
 
 type TocEntry = { title: string; sourceId: string };
 
-const TOC = { titleSize: 18, size: 11, line: 20 };
+/**
+ * Contents page type scale (eval G-4: larger entries than the first build's
+ * 11 pt, with dot leaders from each name to its page number).
+ */
+export const TOC = { titleSize: 24, size: 14, line: 30, titleGap: 26, leaderGap: 6, dotPitch: 4, dotSize: 1.4 };
 
 function tocLayout(size: PageSize) {
   const margin = Math.max(36, Math.min(size.width, size.height) * 0.09);
   const top = size.height - margin;
-  const firstRow = top - TOC.titleSize - 18;
+  const firstRow = top - TOC.titleSize - TOC.titleGap;
   const rows = Math.max(1, Math.floor((firstRow - margin) / TOC.line) + 1);
   return { margin, top, firstRow, rows };
+}
+
+/**
+ * Where the dot leader of one contents row runs: from just after the name to
+ * just before the right-aligned page number, with both ends snapped to a
+ * `dotPitch` grid from `origin` (the left margin) so the dots of every row
+ * line up in columns. `null` when the gap is too small for a few dots (a
+ * name that fills the line).
+ */
+export function tocLeader(titleEnd: number, numberStart: number, origin: number): { from: number; to: number } | null {
+  const pitch = TOC.dotPitch;
+  const from = origin + Math.ceil((titleEnd + TOC.leaderGap - origin) / pitch) * pitch;
+  const to = origin + Math.floor((numberStart - TOC.leaderGap - origin) / pitch) * pitch;
+  return to - from >= pitch * 2 ? { from, to } : null;
 }
 
 function drawToc(pages: PDFPage[], size: PageSize, entries: TocEntry[], target: (sourceId: string) => { ref: PDFRef; number: number }, text: TextWriter) {
   const { margin, top, firstRow, rows } = tocLayout(size);
   const ctx = pages[0].doc.context;
+  const ink = grayscale(0.1);
   pages.forEach((page, k) => {
-    text.draw(page, TOC_TITLE, { x: margin, y: top - TOC.titleSize, size: TOC.titleSize, color: grayscale(0.1) });
+    text.draw(page, TOC_TITLE, { x: margin, y: top - TOC.titleSize, size: TOC.titleSize, color: ink });
     entries.slice(k * rows, (k + 1) * rows).forEach((entry, i) => {
       const y = firstRow - i * TOC.line;
       const { ref, number } = target(entry.sourceId);
       const num = String(number);
       const numWidth = text.width(num, TOC.size);
-      const title = text.fit(entry.title, TOC.size, size.width - 2 * margin - numWidth - 16);
-      text.draw(page, title, { x: margin, y, size: TOC.size, color: grayscale(0.1) });
-      text.draw(page, num, { x: size.width - margin - numWidth, y, size: TOC.size, color: grayscale(0.1) });
+      const numX = size.width - margin - numWidth;
+      const title = text.fit(entry.title, TOC.size, numX - margin - TOC.leaderGap * 2 - TOC.dotPitch * 4);
+      // 4 pitches: snapping both ends to the dot grid can cost up to one pitch each, and the leader
+      // needs two, so a name cut to fit still gets its dots.
+      text.draw(page, title, { x: margin, y, size: TOC.size, color: ink });
+      text.draw(page, num, { x: numX, y, size: TOC.size, color: ink });
+      // Vector dots (a round-capped dashed line), so the leader adds no text
+      // to the page and needs no glyphs from the font.
+      const leader = tocLeader(margin + text.width(title, TOC.size), numX, margin);
+      if (leader) {
+        page.drawLine({
+          start: { x: leader.from, y: y + 1 },
+          end: { x: leader.to, y: y + 1 },
+          thickness: TOC.dotSize,
+          color: grayscale(0.55),
+          dashArray: [0, TOC.dotPitch],
+          lineCap: LineCapStyle.Round,
+        });
+      }
       const link = ctx.obj({
         Type: "Annot",
         Subtype: "Link",
-        Rect: [margin, y - 5, size.width - margin, y + TOC.size + 4],
+        Rect: [margin, y - 8, size.width - margin, y + TOC.size + 6],
         Border: [0, 0, 0],
         Dest: [ref, "Fit"],
       });

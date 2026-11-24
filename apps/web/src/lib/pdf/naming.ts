@@ -63,11 +63,11 @@ export function formatBytes(bytes: number): string {
 }
 
 /**
- * Merge output (spec F3 §6): "<first file's base name>-merged.pdf". Characters
+ * Merge output (spec F3 §6): "<first file's base name>_merged.pdf" (the reference's form, eval G-3). Characters
  * not allowed in file names on common systems are replaced with "-".
  */
 export function mergedName(firstInputName: string | undefined): string {
   const base = firstInputName ? baseName(firstInputName) : "";
   const safe = base.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-").replace(/^[\s.]+|[\s.]+$/g, "");
-  return `${safe || "berrypdf"}-merged.pdf`;
+  return `${safe || "berrypdf"}_merged.pdf`;
 }

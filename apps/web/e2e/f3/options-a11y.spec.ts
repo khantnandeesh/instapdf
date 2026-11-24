@@ -20,6 +20,7 @@ import {
   tile,
   tileLabels,
   tileMain,
+  chooseAddPages,
 } from "./support";
 
 /** Presses Shift+Tab until `target` has focus. */
@@ -104,7 +105,7 @@ test("AC-57 (UI): a non-Latin name in the footer goes through the font phase and
   await closeOptions(page);
   await run(page);
   // Headless Chromium reports a non-ASCII download name as "download"; the result screen shows the real one.
-  await expect(page.getByTestId("result-name")).toHaveText("résumé-日本-merged.pdf");
+  await expect(page.getByTestId("result-name")).toHaveText("résumé-日本_merged.pdf");
   const out = await downloadResult(page);
   expect((await textsOf(out.bytes))[0]).toContain("résumé-日本.pdf");
 });
@@ -202,7 +203,7 @@ test("AC-73: the whole flow works with the keyboard alone", async ({ page }, inf
   await expect(flow(page)).toHaveAttribute("data-state", "done", { timeout: 30_000 });
   await expect(page.getByRole("link", { name: "Download" })).toBeFocused();
   const [download] = await Promise.all([page.waitForEvent("download"), page.keyboard.press("Enter")]);
-  expect(download.suggestedFilename()).toBe("bravo-merged.pdf");
+  expect(download.suggestedFilename()).toBe("bravo_merged.pdf");
 });
 
 test("AC-74: no serious axe violations in the Merge states", async ({ page }) => {
@@ -224,7 +225,7 @@ test("AC-74: no serious axe violations in the Merge states", async ({ page }) =>
   await page.getByRole("menuitem", { name: /Move to position/ }).click();
   await expectNoSeriousAxeViolations(page, "move dialog");
   await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
-  await chooseMenu(page, "Add pages", "Pages from a file…");
+  await chooseAddPages(page, "Pages from a file…");
   await page.getByTestId("pages-file-input").setInputFiles(fx("three-pages.pdf"));
   await expect(page.getByRole("dialog")).toBeVisible();
   await expectNoSeriousAxeViolations(page, "page picker");

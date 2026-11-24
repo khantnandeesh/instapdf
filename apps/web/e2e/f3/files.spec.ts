@@ -34,7 +34,7 @@ test("AC-1: /merge-pdf is the tool with a multi-file input for PDFs and images",
   await expect(page.getByRole("button", { name: "Choose files" })).toBeVisible();
 });
 
-test("AC-2, AC-41, AC-66: two PDFs give two cards in order, and a 5-page alpha-merged.pdf", async ({ page }) => {
+test("AC-2, AC-41, AC-66: two PDFs give two cards in order, and a 5-page alpha_merged.pdf", async ({ page }) => {
   await pickMerge(page, "alpha.pdf", "bravo.pdf");
   expect(await cardNames(page)).toEqual(["alpha.pdf", "bravo.pdf"]);
   await expect(page.getByTestId("file-meta").first()).toContainText("3 pages");
@@ -43,7 +43,7 @@ test("AC-2, AC-41, AC-66: two PDFs give two cards in order, and a 5-page alpha-m
   await expect(page.getByRole("radio", { name: "Files" })).toHaveAttribute("aria-checked", "true");
   await run(page);
   const out = await downloadResult(page);
-  expect(out.name).toBe("alpha-merged.pdf");
+  expect(out.name).toBe("alpha_merged.pdf");
   const doc = await outputDoc(out.bytes);
   expect(doc.isEncrypted).toBe(false);
   expect(doc.getPages().map((p) => [p.getWidth(), p.getHeight(), p.getRotation().angle])).toEqual([

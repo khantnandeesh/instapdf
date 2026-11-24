@@ -16,6 +16,9 @@ export const mergeCopy = {
   sortNeedsMore: "Add more files to sort",
   sorted: { "name-asc": "Sorted by name, A to Z", "name-desc": "Sorted by name, Z to A", "date-asc": "Sorted by date, oldest first", "date-desc": "Sorted by date, newest first", reverse: "Order reversed" },
   addPages: "Add pages",
+  /** The one Add menu below 640 px (M-3). */
+  add: "Add",
+  addFilesItem: "Files…",
   fromFile: "Pages from a file…",
   blankPage: "Blank page",
   blankName: "Blank page",

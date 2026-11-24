@@ -19,6 +19,7 @@ import {
   tileAction,
   tileLabels,
   tileMain,
+  chooseAddPages,
 } from "./support";
 
 const live = (page: Page) => page.locator("[aria-live=polite]").first();
@@ -204,11 +205,11 @@ test("AC-29: insert point between A3 and B1 -> Blank page here", async ({ page }
 
 test("AC-30: toolbar blank page goes at the end, or after the selection", async ({ page }) => {
   await pickMerge(page, "alpha.pdf", "bravo.pdf");
-  await chooseMenu(page, "Add pages", "Blank page");
+  await chooseAddPages(page, "Blank page");
   await expect(page.getByTestId("page-grid")).toBeVisible(); // switches to the pages view
   expect(await tileLabels(page)).toEqual(["A1", "A2", "A3", "B1", "B2", "Blank"]);
   await tileMain(page, "A1").click();
-  await chooseMenu(page, "Add pages", "Blank page");
+  await chooseAddPages(page, "Blank page");
   expect(await tileLabels(page)).toEqual(["A1", "Blank", "A2", "A3", "B1", "B2", "Blank"]);
   const out = await texts(page);
   expect([out.doc.getPage(6).getWidth(), out.doc.getPage(6).getHeight()]).toEqual([792, 612]);
@@ -216,7 +217,7 @@ test("AC-30: toolbar blank page goes at the end, or after the selection", async 
 
 test("AC-31, AC-33, AC-39: Add pages from a file opens the picker; C1 and C3 go at the end", async ({ page }) => {
   await pickMerge(page, "alpha.pdf", "bravo.pdf");
-  await chooseMenu(page, "Add pages", "Pages from a file…");
+  await chooseAddPages(page, "Pages from a file…");
   await page.getByTestId("pages-file-input").setInputFiles(fx("three-pages.pdf"));
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("Add pages from three-pages.pdf");
@@ -242,7 +243,7 @@ test("AC-31, AC-33, AC-39: Add pages from a file opens the picker; C1 and C3 go 
 
 test("AC-33: Cancel or Escape adds nothing", async ({ page }) => {
   await pickMerge(page, "alpha.pdf");
-  await chooseMenu(page, "Add pages", "Pages from a file…");
+  await chooseAddPages(page, "Pages from a file…");
   await page.getByTestId("pages-file-input").setInputFiles(fx("three-pages.pdf"));
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");

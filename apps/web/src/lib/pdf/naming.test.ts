@@ -51,14 +51,18 @@ describe("formatBytes", () => {
 
 describe("mergedName (F3 §6, AC-66)", () => {
   it("names the merge after the first file", () => {
-    expect(mergedName("alpha.pdf")).toBe("alpha-merged.pdf");
-    expect(mergedName("charlie.png")).toBe("charlie-merged.pdf");
-    expect(mergedName("résumé-日本.pdf")).toBe("résumé-日本-merged.pdf");
+    expect(mergedName("alpha.pdf")).toBe("alpha_merged.pdf");
+    expect(mergedName("charlie.png")).toBe("charlie_merged.pdf");
+    expect(mergedName("résumé-日本.pdf")).toBe("résumé-日本_merged.pdf");
+  });
+  it("joins with an underscore like the reference (eval G-3) and keeps the base as is", () => {
+    expect(mergedName("my-file_v2.pdf")).toBe("my-file_v2_merged.pdf");
+    expect(mergedName("alpha.pdf")).not.toContain("-merged");
   });
   it("replaces characters file systems do not allow", () => {
-    expect(mergedName('a:b*c?"d<e>f|g.pdf')).toBe("a-b-c--d-e-f-g-merged.pdf");
-    expect(mergedName("folder/x.pdf")).toBe("x-merged.pdf");
-    expect(mergedName(undefined)).toBe("berrypdf-merged.pdf");
-    expect(mergedName("....pdf")).toBe("berrypdf-merged.pdf");
+    expect(mergedName('a:b*c?"d<e>f|g.pdf')).toBe("a-b-c--d-e-f-g_merged.pdf");
+    expect(mergedName("folder/x.pdf")).toBe("x_merged.pdf");
+    expect(mergedName(undefined)).toBe("berrypdf_merged.pdf");
+    expect(mergedName("....pdf")).toBe("berrypdf_merged.pdf");
   });
 });
