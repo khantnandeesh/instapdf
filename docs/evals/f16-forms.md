@@ -1,6 +1,7 @@
 # F16 E3 forms: parity evaluation (step 8)
 
-- **Verdict (re-evaluation 2026-11-24 18:14–18:40 UTC, staging 3fc9e65): FAIL, but only on cross-cutting checks.** No forms blocker remains: every AC passes (24 / 24, all P0) and every forms gap that blocked the first run is fixed. The gate still fails on two micro-check loses that this feature does not own: **M2** (no cloud or URL source, owned by the cloud pickers work) and **M12 at 1536 and 1920 px** (editor-wide layout, owned by the lead). The owner has not waived either one in writing. Once both are fixed or waived, the verdict becomes PASS without a forms re-run. Details are in the re-evaluation section below.
+- **Verdict (updated 2026-11-24 20:25 UTC, staging bc02fa1): FAIL on M2 only.** No forms blocker remains: every AC passes (24 / 24, all P0) and every forms gap that blocked the first run is fixed. **M12 is now a win** (re-measured on bc02fa1, see "M12 re-measure" below). The gate still fails on one micro-check lose that this feature does not own: **M2** (no cloud or URL source, owned by the cloud pickers work, behind a flag until the owner creates the OAuth apps). The owner has not waived it. Once M2 lands, the verdict becomes PASS without a forms re-run (lead, 2026-11-24: no waiver).
+- Re-evaluation verdict (18:14–18:40 UTC, staging 3fc9e65): FAIL on M2 and M12 (cross-cutting only). Details are in the re-evaluation section below.
 - First run verdict (16:01–16:40 UTC, staging 341fa82): FAIL.
 - **First run date:** 2026-11-24, 16:01 to 16:40 UTC.
 - **First run build:** BerryPDF staging `https://web-staging-qzq5fa2g7q-uc.a.run.app/edit-pdf` (main at 341fa82, includes the forms merge 05dd84c, deployed 15:59 UTC).
@@ -23,7 +24,7 @@
 
 | Gate | Bar | Result | Met? |
 |---|---|---|---|
-| Micro-checks M1–M12 | no *lose* unless the owner waived it | 8 win, 2 tie, **2 lose (M2, M12)**. Neither is a forms loss: M2 belongs to the cloud pickers work and M12 to the lead's editor-wide layout work (ownership section). Neither is waived by the owner | **no** (cross-cutting only) |
+| Micro-checks M1–M12 | no *lose* unless the owner waived it | 9 win, 2 tie, **1 lose (M2)** after the M12 re-measure on bc02fa1 (it was 8 / 2 / 2 on 3fc9e65). M2 is not a forms loss: it belongs to the cloud pickers work (ownership section). Not waived by the owner | **no** (M2 only, cross-cutting) |
 | P0 ACs | all pass | AC-230, AC-231, AC-247, AC-248 and AC-253 pass | yes |
 | All ACs | ≥ 90% | **24 / 24 = 100%** | yes |
 | Lighthouse mobile performance | ≥ 90 | **91** (median of the first 3 valid runs: 87 / 91 / 93; a 4th run gave 96) | yes |
@@ -74,9 +75,28 @@ Reference figures are from the cached first-run evidence. The side-by-side captu
 | M9 | Errors | Same as the first run, plus a pre-download missing-glyph dialog | n/a | **win** | 29 |
 | M10 | Privacy and cost | 0 non-GET requests on every flow. The only extra GETs are lazy chunks and `/fonts/forms/noto-sans-forms.woff` from the same origin | n/a | **win** | — |
 | M11 | Look and motion | Calm. The popover is a single row until More is opened (G-12 mostly fixed) | n/a | tie | 07 |
-| M12 | First screen fit | Download visible at every viewport. **Pages area after scroll: 1280×632 90%, 1366×657 87%, 1536×730 78%, 1920×969 62%**; 390×664 93%, 375×812 91%; no sideways scroll. At 1920 the thumbnails panel is open and zoom is capped at 150%, so the page is 62% of the width | Reference after scroll: 90–92% (1280–1536), 83% (1920). Phone 46–69% with sideways overflow | **LOSE at 1536 and 1920** (win on phone, tie at 1280/1366). Still under ~80% → **editor-wide, owned by the lead, not a forms loss** (ownership section). No owner waiver | M12-* |
+| M12 | First screen fit | Download visible at every viewport. **Pages area after scroll: 1280×632 90%, 1366×657 87%, 1536×730 78%, 1920×969 62%**; 390×664 93%, 375×812 91%; no sideways scroll. At 1920 the thumbnails panel is open and zoom is capped at 150%, so the page is 62% of the width | Reference after scroll: 90–92% (1280–1536), 83% (1920). Phone 46–69% with sideways overflow | ~~LOSE at 1536 and 1920~~ → **win on bc02fa1** (see "M12 re-measure"): 90 / 91 / 92 / 84% vs 90–92 / 83%, phones 93 / 91% | M12-* |
 
-Totals: 8 win (M1, M4, M5, M6, M7, M8, M9, M10), 2 tie (M3, M11), 2 lose (M2, M12). Neither lose is a forms loss.
+Totals on 3fc9e65: 8 win, 2 tie, 2 lose (M2, M12). **Totals after the M12 re-measure on bc02fa1: 9 win (M1, M4, M5, M6, M7, M8, M9, M10, M12), 2 tie (M3, M11), 1 lose (M2).** M2 is not a forms loss.
+
+### M12 re-measure (2026-11-24 20:24 UTC, staging bc02fa1)
+
+- **Build:** main at bc02fa1 (PR #46, opening zoom cap derived from the canvas limit), Deploy staging run 53 finished 20:22 UTC; build id changed from `MQTVCpHVJcSkxugHeHm_g` to `J2nAKKeDy_fB7fwgueNPb`.
+- **Method:** unchanged from the re-evaluation: headless Playwright Chromium, `report-form-3p.pdf` opened on `/edit-pdf`, measured 3 s after load and after a wheel scroll of 60% of the viewport height. Pages area = visible area of page canvases over the viewport. **Reference tasks run: 0** (reference values are the cached first-run captures).
+- **Evidence:** `docs/evals/cache/f16-forms/rerun/vp-m12/` (`vp.json`, loaded and scrolled captures per viewport).
+
+  | Viewport | Opening zoom | Pages area after scroll (was on 3fc9e65) | Page width | Reference after scroll | Result |
+  |---|---|---|---|---|---|
+  | 1280×632 | 145% | **90%** (90%) | 90% | 90–92% | tie |
+  | 1280×800 | 145% | **90%** | 90% | 90–92% | tie |
+  | 1366×657 | 156% | **91%** (87%) | 91% | 90–92% | tie |
+  | 1536×730 | 177% | **92%** (78%) | 92% | 90–92% | tie (was lose) |
+  | 1920×969 | 202% | **84%** (62%) | 84% | 83% | tie (was lose) |
+  | 390×664 | 47% | **93%** (93%) | 96% | 46–69%, sideways overflow | win |
+  | 375×812 | 45% | **91%** (91%) | 96% | 46–69%, sideways overflow | win |
+
+- Download visible at every viewport (top 15–16 px), no sideways scroll anywhere. At 1920 the thumbnails panel stays open and the page still gets 84%.
+- **M12: win** (ties on every desktop size, win on phones). G-7 is fixed.
 
 ### Lighthouse and axe (re-run)
 
@@ -109,7 +129,7 @@ Totals: 8 win (M1, M4, M5, M6, M7, M8, M9, M10), 2 tie (M3, M11), 2 lose (M2, M1
 | G-4 border width | **fixed** | 1 / 2 / 3 pt buttons after a border colour is picked → `/BS /W 2` (`analysis/c-1b-border.png`) |
 | G-5 Repeat on all pages | **fixed** | One field, 3 widgets on 3 pages (`outputs/berry-repeat.pdf`) |
 | G-6 street/town border | **fixed** | `/Border [0 0 2]` and `[0 0 1]`, `/BS /W` matching, `MK /BC` black, `0 Tf` kept. Drawn in both renderers |
-| G-7 pages' share of screen | **partly fixed, open (lead)** | 1280: 90%, 1366: 87% (was 54 / 51%). 1536: 78%, 1920: 62% (reference 90–92 / 83%) |
+| G-7 pages' share of screen | **fixed (lead, PR #46, bc02fa1)** | 1280: 90%, 1366: 91%, 1536: 92%, 1920: 84% (reference 90–92 / 83%); phones 91–93% (`rerun/vp-m12/`) |
 | G-8 cloud / URL | **open (cloud pickers)** | Not on `/edit-pdf`, `/merge-pdf` or `/rotate-pdf` on 3fc9e65 (`analysis/m2-*.png`) |
 | G-9 Lighthouse / TBT | **fixed for the gate (lead)** | Median 91, TBT 230–440 ms. The forms UI chunk is lazy |
 | G-10 radio creation | **fixed** | 3 clicks → one group `member_type`, `/Opt` [student, staff, guest] (`analysis/c-5-radio-3.png`) |
@@ -132,7 +152,7 @@ Totals: 8 win (M1, M4, M5, M6, M7, M8, M9, M10), 2 tie (M3, M11), 2 lose (M2, M1
 ### What has to happen for PASS
 
 1. **M2:** cloud and URL sources reach the editor's upload on staging (G-8), or the owner records a written waiver here.
-2. **M12:** the pages' share at 1536×730 and 1920×969 reaches the reference (≥ ~90% / 83%) (G-7, lead), or the owner records a written waiver here.
+2. ~~**M12:** the pages' share at 1536×730 and 1920×969 reaches the reference (≥ ~90% / 83%) (G-7, lead), or the owner records a written waiver here.~~ **Done on bc02fa1** (92% / 84%, see "M12 re-measure").
 3. No forms re-run is needed for either one. Re-measure M12 with `rerun/vp/` and the viewport script method above, and check M2 on `/edit-pdf`.
 4. The forms gaps G-19, G-21, G-22, G-23, G-24, G-25 and the partial G-12, G-13 and G-15 don't block, but they should be scheduled. G-21 and G-23 should come first.
 
