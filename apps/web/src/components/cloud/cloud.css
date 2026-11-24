@@ -166,11 +166,13 @@
     min-width: 248px;
   }
   /* < 640 px: a sheet that rises from the top edge of the dock and never covers it (U-3). */
+  /* !important: the popup's own Tailwind utilities (inset-auto, max-w-…) sit in a later layer. */
   .mp-menu.ip-menu-sheet {
     position: fixed;
-    inset: auto 8px calc(var(--ip-dock-actual, 0px) + 8px) 8px;
-    width: auto;
-    max-width: none;
+    inset: auto 8px calc(var(--ip-dock-actual, 0px) + 8px) 8px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
     max-height: calc(100dvh - var(--ip-dock-actual, 0px) - 72px);
     /* ip-scroll: overlay (the sheet's body; Menu.tsx marks the element) */
     overflow-y: auto;
@@ -284,6 +286,16 @@
   }
   .ip-save > .mp-btn--line:first-child {
     min-width: 168px;
+  }
+  .ip-save__label {
+    display: inline-grid;
+    text-align: start;
+  }
+  .ip-save__label > * {
+    grid-area: 1 / 1;
+  }
+  .ip-save__ghost {
+    visibility: hidden;
   }
   .ip-save .ip-split__caret.mp-btn--line {
     width: 40px;

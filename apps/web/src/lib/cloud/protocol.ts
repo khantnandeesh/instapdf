@@ -17,7 +17,7 @@ export const WINDOW_LOST_MS = 3000;
 /** Before the first message the window is still loading: allow longer. */
 export const FIRST_CONTACT_MS = 15000;
 /** The window treats this much silence from the tool tab as "lost its tool" (AC-168: within 5 s). */
-export const TOOL_LOST_MS = 4000;
+export const TOOL_LOST_MS = 3000;
 
 /** At most this many files in one request (a hard cap on top of each tool's own limits). */
 export const MAX_FILES_PER_MESSAGE = 200;

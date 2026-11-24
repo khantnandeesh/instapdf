@@ -91,14 +91,26 @@ export function SaveToCloud({
     s.sendSave(file);
   }
 
-  const label = busy ? cloudCopy.saving(busy.pct) : saved ? cloudCopy.saved : main ? cloudCopy.saveTo(main) : cloudCopy.saveToAny;
+  const idle = main ? cloudCopy.saveTo(main) : cloudCopy.saveToAny;
+  const label = busy ? cloudCopy.saving(busy.pct) : saved ? cloudCopy.saved : idle;
+  // Every label it can show, stacked invisibly in one grid cell: the button never changes width (AC-169).
+  const text = (
+    <span className="ip-save__label tabular-nums">
+      {[idle, cloudCopy.saving(100), cloudCopy.saved].map((t) => (
+        <span key={t} className="ip-save__ghost" aria-hidden="true">
+          {t}
+        </span>
+      ))}
+      <span>{label}</span>
+    </span>
+  );
   const items = providerItems(providers, save, "save");
   return (
     <span className="ip-split ip-save inline-flex max-sm:w-full" data-testid="save-to-cloud">
       {main ? (
         <button type="button" className={buttonClasses("line", "md")} aria-busy={busy ? true : undefined} disabled={!!busy} onClick={() => save(main)} data-testid="save-main">
           {saved ? <CheckIcon size={18} /> : <ProviderMark provider={main} size={18} />}
-          <span className="tabular-nums">{label}</span>
+          {text}
         </button>
       ) : (
         <MenuButton
@@ -112,7 +124,7 @@ export function SaveToCloud({
           footnote={cloudFootnote(cloudCopy.saveFootnote)}
           data-testid="save-main"
         >
-          <span className="tabular-nums">{label}</span>
+          {text}
           <ChevronDownIcon size={16} />
         </MenuButton>
       )}

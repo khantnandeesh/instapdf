@@ -1,8 +1,8 @@
 /** F23 cloud sources copy (our own words; spec U-6). Intake problems reuse the F1 strings. */
+import { formatBytes } from "@/lib/pdf/naming";
 import { providerList, providerName, providerShort, type CloudProvider } from "@/lib/cloud/providers";
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
-const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1).replace(/\.0$/, "");
 
 export const cloudCopy = {
   caret: (list: readonly CloudProvider[]) => `Choose from ${providerList(list)}`,
@@ -33,7 +33,7 @@ export const cloudCopy = {
   offline: "You're offline.",
   offlineBody: (p: CloudProvider) => `${providerName[p]} needs a connection. Files on this device still work.`,
   notAccessible: (name: string, p: CloudProvider) => `${name} can't be opened from ${providerName[p]}. Check that you can open it there.`,
-  cardBytes: (loaded: number, total: number) => (total > 0 ? `${mb(loaded)} of ${mb(total)} MB` : `${mb(loaded)} MB`),
+  cardBytes: (loaded: number, total: number) => (total > 0 ? `${formatBytes(loaded)} of ${formatBytes(total)}` : formatBytes(loaded)),
   cardPercent: (pct: number) => `${pct}%`,
   cardStopped: "Download stopped",
   retry: "Retry",

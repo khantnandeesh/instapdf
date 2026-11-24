@@ -299,7 +299,8 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
           adapter.current = a;
           await a.prepare();
           if (!alive) return;
-          setReady(true);
+          // OneDrive goes straight on (redirect sign-in): its button never turns live, so it can't flicker.
+          if (a.needsTap) setReady(true);
           if (!a.needsTap) {
             if (prm.mode === "save") {
               pendingSave.current = !saveFile.current;
