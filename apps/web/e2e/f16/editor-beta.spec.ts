@@ -134,9 +134,17 @@ test("keyboard: one tab stop per page, arrows pick a line, Enter edits, Esc retu
   await input.fill(`${before} `);
   await page.keyboard.press("Enter");
   await expect(input).toHaveCount(0);
+  // Wait until the edit has settled: the new line is there and the page's fresh text is in.
+  await expect(page.locator(`[data-testid="line"][data-text="${before} "]`)).toHaveCount(1);
+  await expect(list).not.toHaveAttribute("aria-disabled", "true");
+  await page.waitForTimeout(500);
   await expect(list).toBeFocused();
   const active = await list.getAttribute("aria-activedescendant");
-  expect(active && (await page.locator(`#${active}`).count())).toBe(1);
+  expect(active).toBeTruthy();
+  await expect(page.locator(`#${active}`)).toHaveCount(1);
+  // The keyboard still works without tabbing back in.
+  await page.keyboard.press("ArrowDown");
+  await expect(list).not.toHaveAttribute("aria-activedescendant", active!);
   expect(violations, "the engine loads under the strict CSP").toEqual([]);
 });
 
@@ -178,4 +186,26 @@ test("a save that fails after an edit drops only that edit; Download keeps the e
   expect(text).toContain("is signed between");
   expect(text).not.toContain("Items sold");
   expect(text).toContain("Item");
+});
+
+test("if reopening after a save fails, the edit is dropped and earlier edits still download", async ({ page }) => {
+  // The 3rd BerryDocument is the reopen after edit 2's save (1: open, 2: reopen after edit 1).
+  await patchEngine(
+    page,
+    `const Orig = BerryDocument; let k = 0;
+     BerryDocument = class extends Orig { constructor(b, p) { if (++k === 3) throw new WebAssembly.RuntimeError("oom"); super(b, p); } };`,
+  );
+  await open(page, "chrome-justified-mixed.pdf");
+  await editLine(page, "is made between", "made", "signed");
+  const cell = page.locator('[data-testid="line"][data-text="Item"]');
+  await cell.click();
+  await page.getByTestId("line-input").fill("Items sold");
+  await page.getByTestId("line-input").press("Enter");
+  await expect(page.getByTestId("editor-notice")).toContainText("restarted");
+  await expect(cell).toHaveCount(1);
+  const [text] = await pageTexts((await download(page)).bytes);
+  expect(text).toContain("is signed between");
+  expect(text).not.toContain("Items sold");
+  // And the editor keeps working.
+  await editLine(page, "Fee", "Fee", "Fees");
 });

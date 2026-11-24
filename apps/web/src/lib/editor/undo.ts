@@ -21,11 +21,16 @@ export function isPrefix(before: Uint8Array, after: Uint8Array, samples = 4096):
 }
 
 /**
- * History after an edit that turned `before` into `after` on `page`. Earlier length entries
- * are turned into copies when the prefix property breaks (they are prefixes of `before`).
+ * History after an edit that turned `before` into `after` on `page`. `appended` is the engine's
+ * own full check that `before` is a prefix of `after` (SaveReport.original_preserved); the
+ * sampled `isPrefix` only double-checks it outside production. Earlier length entries are turned
+ * into copies when the prefix property breaks (they are prefixes of `before`).
  */
-export function pushUndo(history: UndoEntry[], before: Uint8Array, after: Uint8Array, page: number, budget = UNDO_COPY_BUDGET): UndoEntry[] {
-  if (isPrefix(before, after)) return [...history, { page, length: before.length }];
+export function pushUndo(history: UndoEntry[], before: Uint8Array, after: Uint8Array, page: number, appended: boolean, budget = UNDO_COPY_BUDGET): UndoEntry[] {
+  if (appended && process.env.NODE_ENV !== "production" && !isPrefix(before, after)) {
+    throw new Error("Engine reported an appended save that does not start with the previous bytes");
+  }
+  if (appended) return [...history, { page, length: before.length }];
   const copies: UndoEntry[] = history.map((e) => ("length" in e ? { page: e.page, bytes: before.slice(0, e.length) } : e));
   copies.push({ page, bytes: before });
   return trimToBudget(copies, budget);

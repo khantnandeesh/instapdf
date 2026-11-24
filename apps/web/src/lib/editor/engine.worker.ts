@@ -43,11 +43,33 @@ function loadEngine(): Promise<EngineModule> {
   return engine;
 }
 
+/** Frees the document without ever leaving a freed object in `doc` (a second free throws). */
+function dropDoc() {
+  const old = doc;
+  doc = null;
+  try {
+    old?.free();
+  } catch {
+    // Already unusable; nothing to release.
+  }
+}
+
+/**
+ * After a failure that may have left changes in the engine: reopen the last good bytes.
+ * A RuntimeError means the instance is unusable, so it is not touched: the client drops the
+ * worker. If reopening fails, `doc` stays null and the reply reports a crash (see onmessage).
+ */
+function rollback(BerryDocument: EngineModule["BerryDocument"], error: unknown): never {
+  if (error instanceof WebAssembly.RuntimeError) throw error;
+  dropDoc();
+  if (current) doc = new BerryDocument(current);
+  throw error;
+}
+
 async function handle(req: EngineRequest): Promise<EngineReply> {
   const { BerryDocument } = await loadEngine();
   if (req.op === "open") {
-    doc?.free();
-    doc = null;
+    dropDoc();
     current = null;
     doc = new BerryDocument(req.bytes);
     current = req.bytes;
@@ -57,23 +79,26 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
   if (req.op === "text") return { op: "text", page: doc.pageText(req.page) };
   if (req.op === "replace") {
     const result = doc.replaceLine(req.page, req.line, req.text); // rolls back on its own errors
+    const before = current!;
+    let saved: { bytes: Uint8Array; report: { original_preserved: boolean } };
     try {
       // The engine has no render of its own: the page is redrawn by pdf.js from the saved
-      // bytes (an incremental save: the original plus one appended revision).
-      const { bytes, report } = doc.save();
-      const before = current!;
-      // Reopen from the output so the next save appends to it, and so undo states stay prefixes.
-      doc.free();
-      doc = new BerryDocument(bytes);
-      current = bytes.slice();
-      return { op: "replace", result, bytes, appended: report.original_preserved && bytes.length >= before.length };
+      // bytes (an incremental save: the previous bytes plus one appended revision).
+      saved = doc.save();
     } catch (error) {
       // save() does not roll back: drop the edit the UI will report as not made.
-      doc.free();
-      doc = null;
-      if (current) doc = new BerryDocument(current);
-      throw error;
+      return rollback(BerryDocument, error);
     }
+    try {
+      // Reopen from the output so the next save appends to it, and undo states stay prefixes.
+      dropDoc();
+      doc = new BerryDocument(saved.bytes);
+      current = saved.bytes.slice();
+    } catch (error) {
+      return rollback(BerryDocument, error);
+    }
+    // original_preserved is the engine's full byte comparison of the prefix.
+    return { op: "replace", result, bytes: saved.bytes, appended: saved.report.original_preserved && saved.bytes.length >= before.length };
   }
   return { op: "save", bytes: doc.save().bytes };
 }
@@ -86,7 +111,8 @@ scope.onmessage = async (event: MessageEvent<EngineRequest>) => {
     scope.postMessage({ id: req.id, ok: true, reply } satisfies EngineResponse, transfer);
   } catch (error) {
     let out: Extract<EngineResponse, { ok: false }>["error"];
-    if (error instanceof WebAssembly.RuntimeError) out = { kind: "crashed" };
+    // No usable document after a failure (a reopen failed): only a fresh worker can recover.
+    if (error instanceof WebAssembly.RuntimeError || (req.op !== "open" && !doc)) out = { kind: "crashed" };
     else if (error && typeof error === "object" && "kind" in error) out = error as BerryError;
     else out = { kind: "internal", message: error instanceof Error ? error.message : String(error) };
     scope.postMessage({ id: req.id, ok: false, error: out } satisfies EngineResponse);

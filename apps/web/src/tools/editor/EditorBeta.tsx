@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { cx } from "@/components/ui/cx";
 import type { PageText, Rect } from "@/lib/editor/berry-engine";
-import { callEngine, describeEngineError, type EngineError } from "@/lib/editor/engine-client";
+import { callEngine, describeEngineError, setEngineFileSize, type EngineError } from "@/lib/editor/engine-client";
 import { displaySize, lineBox, rectToScreen, type PageBox } from "@/lib/editor/geometry";
 import { pushUndo, undoBytes, type UndoEntry } from "@/lib/editor/undo";
 import { pdfOutputName } from "@/lib/pdf/naming";
@@ -71,6 +71,12 @@ const fitScales = (geo: PageGeo[], avail: number) => geo.map((g) => avail / disp
 export function EditorBeta() {
   const [doc, setDoc] = useState<Doc | null>(null);
   const [texts, setTexts] = useState<(PageText | undefined)[]>([]);
+  /**
+   * Pages whose text was read from the engine's current document. After a reload the old text
+   * stays on screen (read-only) until the fresh one arrives, so a focused line list never
+   * unmounts under the keyboard.
+   */
+  const [fresh, setFresh] = useState<boolean[]>([]);
   /** Bumped per page when its canvas must be redrawn from the current bytes. */
   const [versions, setVersions] = useState<number[]>([]);
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -123,7 +129,9 @@ export function EditorBeta() {
       scales = fitScales(geo, Math.min(MAX_PAGE_WIDTH, (stage.current?.clientWidth ?? MAX_PAGE_WIDTH) - 2));
     }
     loadingText.current.clear();
-    setTexts([]);
+    setFresh([]);
+    if (redraw === "all") setTexts([]);
+    setEngineFileSize(bytes.length);
     setVersions((v) => (redraw === "all" ? geo.map(() => 0) : v.map((n, i) => (redraw.includes(i) ? n + 1 : n))));
     setDoc({ name, bytes, pdf, geo, scales });
     if (prev && prev.pdf !== pdf) setTimeout(() => void prev.pdf.loadingTask.destroy(), 2000);
@@ -153,6 +161,11 @@ export function EditorBeta() {
         setTexts((prev) => {
           const next = [...prev];
           next[page] = text;
+          return next;
+        });
+        setFresh((prev) => {
+          const next = [...prev];
+          next[page] = true;
           return next;
         });
       } catch (err) {
@@ -240,7 +253,8 @@ export function EditorBeta() {
         const d = docRef.current;
         if (!d) return;
         const scales = fitScales(d.geo, Math.min(MAX_PAGE_WIDTH, el.clientWidth - 2));
-        if (scales.every((s, i) => Math.abs(s - d.scales[i]) < 0.002)) return;
+        // Ignore small changes (a scrollbar coming and going), which would otherwise oscillate.
+        if (scales.every((s, i) => Math.abs(s - d.scales[i]) * displaySize(d.geo[i].view, d.geo[i].rotate, 1).width < 20)) return;
         setDoc({ ...d, scales });
       }, 150);
     });
@@ -262,7 +276,7 @@ export function EditorBeta() {
     try {
       // The worker rolls the engine back when the edit or its save fails, and reopens from
       // the output when it succeeds, so pdf.js only needs the new bytes here.
-      const { result, bytes } = await callEngine({ op: "replace", page: e.page, line: e.line, text: e.text });
+      const { result, bytes, appended } = await callEngine({ op: "replace", page: e.page, line: e.line, text: e.text });
       try {
         await load(d.name, bytes, [e.page], false);
       } catch {
@@ -272,15 +286,19 @@ export function EditorBeta() {
         return;
       }
       // Recorded only once the new bytes are on screen.
-      setUndo((u) => pushUndo(u, d.bytes, bytes, e.page));
-      // The worker reopened from the new bytes, so the page's lines are read again from there
-      // (load() cleared them) rather than taken from the result.
+      setUndo((u) => pushUndo(u, d.bytes, bytes, e.page, appended));
+      // Show the edit's text (read-only) until the reopened document's text arrives.
+      setTexts((prev) => {
+        const next = [...prev];
+        next[e.page] = result.page;
+        return next;
+      });
       setFlash({ page: e.page, rects: result.changed, key: Date.now() });
       if (result.substitutions.some((s) => !s.same_family)) say("Some characters use a similar font.", "info");
     } catch (err) {
       if (isEngineError(err)) {
         say(describeEngineError(err));
-        if (err.kind === "crashed" || err.kind === "aborted") await recover();
+        if (err.kind === "crashed" || err.kind === "aborted" || err.kind === "internal") await recover();
       } else say("That change couldn’t be made.");
     } finally {
       setBusy(null);
@@ -376,6 +394,7 @@ export function EditorBeta() {
                 geo={geo}
                 version={versions[i] ?? 0}
                 text={texts[i]}
+                fresh={!!fresh[i]}
                 editing={editing?.page === i ? editing : null}
                 flash={flash?.page === i ? flash : null}
                 disabled={!!busy}
@@ -443,6 +462,8 @@ type PageViewProps = {
   geo: PageGeo;
   version: number;
   text: PageText | undefined;
+  /** False while `text` is from before the last reload: shown, but not editable. */
+  fresh: boolean;
   editing: Editing | null;
   flash: Flash | null;
   disabled: boolean;
@@ -453,7 +474,7 @@ type PageViewProps = {
   onCancel: () => void;
 };
 
-function PageView({ doc, index, geo, version, text, editing, flash, disabled, onVisible, onEdit, onChange, onCommit, onCancel }: PageViewProps) {
+function PageView({ doc, index, geo, version, text, fresh, editing, flash, disabled, onVisible, onEdit, onChange, onCommit, onCancel }: PageViewProps) {
   const box = useRef<HTMLDivElement>(null);
   const holder = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -471,8 +492,8 @@ function PageView({ doc, index, geo, version, text, editing, flash, disabled, on
   }, []);
 
   useEffect(() => {
-    if (visible) onVisible(index);
-  }, [visible, text, index, onVisible, doc]);
+    if (visible && !fresh) onVisible(index);
+  }, [visible, fresh, index, onVisible, doc]);
 
   // Draw when visible, and again when this page's version changes (from the current bytes).
   useEffect(() => {
@@ -515,7 +536,7 @@ function PageView({ doc, index, geo, version, text, editing, flash, disabled, on
     <section aria-label={`Page ${index + 1}`} className="w-full">
       <div ref={box} className={cx("ed-page relative mx-auto overflow-hidden rounded-[6px] bg-white shadow-card", drawn && "ed-page--drawn")} data-testid={`page-${index + 1}`} {...sizeStyle(width, height)}>
         <div ref={holder} aria-hidden="true" />
-        {text && <Lines page={index} geo={geo} text={text} scale={scale} editing={editing} disabled={disabled} onEdit={onEdit} onChange={onChange} onCommit={onCommit} onCancel={onCancel} />}
+        {text && <Lines page={index} geo={geo} text={text} scale={scale} editing={editing} disabled={disabled || !fresh} onEdit={onEdit} onChange={onChange} onCommit={onCommit} onCancel={onCancel} />}
         {flash &&
           flash.rects.map((r, k) => {
             if (!text) return null;

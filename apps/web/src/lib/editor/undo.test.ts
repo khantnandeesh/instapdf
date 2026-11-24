@@ -8,8 +8,8 @@ describe("editor undo history", () => {
     const a = bytes(1, 2, 3);
     const b = bytes(1, 2, 3, 4, 5);
     const c = bytes(1, 2, 3, 4, 5, 6);
-    let h = pushUndo([], a, b, 0);
-    h = pushUndo(h, b, c, 1);
+    let h = pushUndo([], a, b, 0, true);
+    h = pushUndo(h, b, c, 1, true);
     expect(h).toEqual([
       { page: 0, length: 3 },
       { page: 1, length: 5 },
@@ -25,9 +25,13 @@ describe("editor undo history", () => {
     const a = bytes(1, 2);
     const b = bytes(1, 2, 3);
     const rewritten = bytes(7, 7, 7, 7);
-    const h = pushUndo(pushUndo([], a, b, 0), b, rewritten, 0);
+    const h = pushUndo(pushUndo([], a, b, 0, true), b, rewritten, 0, false);
     expect(h.map((e) => ("bytes" in e ? [...e.bytes] : e.length))).toEqual([[1, 2], [1, 2, 3]]);
     expect([...undoBytes(h[0], rewritten)]).toEqual([1, 2]);
+  });
+
+  it("refuses an appended claim the bytes contradict (debug check)", () => {
+    expect(() => pushUndo([], bytes(1, 2), bytes(9, 2, 3), 0, true)).toThrow(/appended/);
   });
 
   it("keeps copies within the byte budget, oldest dropped first, newest always kept", () => {

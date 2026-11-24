@@ -14,8 +14,18 @@ import type { EngineReply, EngineRequest, EngineResponse } from "./engine.worker
  */
 export type EngineError = BerryError | { kind: "crashed" } | { kind: "aborted" } | { kind: "internal"; message: string };
 
-/** A call that takes longer is treated as a hang: the worker is terminated. */
-export const ENGINE_TIMEOUT_MS = 20_000;
+/**
+ * A call that takes longer is treated as a hang and the worker is terminated: 20 s, plus 1 s per
+ * 2 MB of the open file (an edit on a big file parses it three times).
+ */
+export function engineTimeoutMs(fileBytes: number): number {
+  return 20_000 + Math.ceil(fileBytes / (2 * 1024 * 1024)) * 1000;
+}
+let fileBytes = 0;
+/** Tells the watchdog how big the open file is. */
+export function setEngineFileSize(bytes: number): void {
+  fileBytes = bytes;
+}
 
 type DistributiveOmit<T, K extends keyof never> = T extends unknown ? Omit<T, K> : never;
 type Call = DistributiveOmit<EngineRequest, "id">;
@@ -74,7 +84,7 @@ function getWorker(): Worker {
 export function callEngine<C extends Call>(call: C, transfer: Transferable[] = []): Promise<ReplyFor<C["op"]>> {
   return new Promise((resolve, reject) => {
     const id = nextId++;
-    const timer = setTimeout(() => crash(id), ENGINE_TIMEOUT_MS);
+    const timer = setTimeout(() => crash(id), engineTimeoutMs(call.op === "open" ? call.bytes.length : fileBytes));
     pending.set(id, { resolve: resolve as (r: EngineReply) => void, reject, timer });
     getWorker().postMessage({ ...call, id } as EngineRequest, transfer);
   });
