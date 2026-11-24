@@ -15,6 +15,10 @@ const before = doc.pageText(0);
 assert.equal(before.lines[0].text, "Service Agreement");
 assert.equal(before.fonts[before.lines[0].runs[0].font].name, "Caladea-Bold");
 
+const caladea = doc.fonts().find((f) => f.name === "Caladea-Bold");
+assert.ok(caladea.subset && caladea.embedded && caladea.bold && caladea.family === "Caladea");
+assert.deepEqual(doc.coverage(caladea.object, "Agree Quote"), { covered: "Agre t", missing: "Quo" });
+
 const [m] = doc.find(0, "made", true);
 const edit = doc.replaceRange(0, m.line, m.start, m.end, "signed");
 assert.equal(edit.substitutions.length, 0);

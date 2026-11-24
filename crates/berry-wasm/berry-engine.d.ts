@@ -18,6 +18,8 @@ export interface Rect { x0: number; y0: number; x1: number; y1: number }
 export interface FontInfo {
   /** PostScript name without the subset prefix, e.g. "Carlito-Bold". */
   name: string;
+  /** Family part of the name, e.g. "Carlito". Style is in bold and italic. */
+  family: string;
   kind: "type1" | "truetype" | "type0" | "type3";
   embedded: boolean;
   subset: boolean;
@@ -98,6 +100,9 @@ export interface EditResult {
   shift: number;
 }
 
+/** Which characters of a string a font can draw (AC-59). Each character is listed once. */
+export interface Coverage { covered: string; missing: string }
+
 export interface Match { page: number; line: number; start: number; end: number }
 
 export interface SaveReport {
@@ -119,6 +124,7 @@ export type BerryError =
   | { kind: "encrypted" }
   | { kind: "bad-page" }
   | { kind: "bad-line" }
+  | { kind: "bad-font" }
   | { kind: "read-only"; reason: string }
   /** Fetch one of request.families, call addFont, then retry the edit. */
   | { kind: "missing-glyphs"; chars: string; request: FontRequest }
@@ -133,6 +139,13 @@ export class BerryDocument {
   readonly pageCount: number;
   /** Lines (with runs, words, fonts, positions) and paragraphs of a page. */
   pageText(page: number): PageText;
+  /** Every font in the document, once each (use FontInfo.object as its stable id). */
+  fonts(): FontInfo[];
+  /**
+   * Which characters of `text` the font with this object number can draw, checked against the
+   * embedded font program. Blank characters count as covered.
+   */
+  coverage(fontObject: number, text: string): Coverage;
   find(page: number, needle: string, matchCase: boolean): Match[];
   /** Sets a line's text. Only the characters that differ are rewritten. */
   replaceLine(page: number, line: number, text: string): EditResult;

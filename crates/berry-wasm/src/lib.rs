@@ -37,6 +37,16 @@ impl BerryDocument {
         to_js(&self.engine.page_text(page).map_err(fail)?)
     }
 
+    /// Every font in the document, once each.
+    pub fn fonts(&mut self) -> Result<JsValue, JsValue> {
+        to_js(&self.engine.fonts())
+    }
+
+    /// Which characters of `text` a font (by PDF object number) can draw.
+    pub fn coverage(&mut self, font_object: u32, text: &str) -> Result<JsValue, JsValue> {
+        to_js(&self.engine.coverage(font_object, text).map_err(fail)?)
+    }
+
     pub fn find(&mut self, page: usize, needle: &str, match_case: bool) -> Result<JsValue, JsValue> {
         to_js(&self.engine.find(page, needle, match_case).map_err(fail)?)
     }

@@ -26,6 +26,8 @@ pub enum Error {
     Encrypted,
     BadPage,
     BadLine,
+    /// No font with that object number.
+    BadFont,
     /// The line cannot be edited (vertical text, unsupported encoding, invisible text).
     ReadOnly {
         reason: String,
@@ -61,6 +63,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct FontInfo {
     /// Name without the subset prefix, e.g. `Carlito-Bold`.
     pub name: String,
+    /// Family part of the name, e.g. `Carlito`.
+    pub family: String,
     pub kind: FontKind,
     pub embedded: bool,
     pub subset: bool,
@@ -106,6 +110,15 @@ pub struct EditResult {
     pub substitutions: Vec<Substitution>,
     /// How far the rest of the line moved along its baseline, in points.
     pub shift: f64,
+}
+
+/// Which characters of a string a font can draw.
+#[derive(Clone, Debug, Serialize)]
+pub struct Coverage {
+    /// Distinct characters the font draws, in order of first use.
+    pub covered: String,
+    /// Distinct characters it cannot draw (or that we cannot prove it draws).
+    pub missing: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -272,6 +285,7 @@ impl Engine {
     fn font_info(f: &PdfFont) -> FontInfo {
         FontInfo {
             name: strip_subset_prefix(&f.base_font).0.to_string(),
+            family: strip_subset_prefix(&f.base_font).0.split([',', '-']).next().unwrap_or("").to_string(),
             kind: f.kind,
             embedded: f.embedded,
             subset: f.subset,
@@ -294,6 +308,44 @@ impl Engine {
         let page_box = read_box(b"CropBox").or_else(|| read_box(b"MediaBox")).unwrap_or([0.0, 0.0, 612.0, 792.0]);
         let rotation = self.inherited(page_id, b"Rotate").and_then(|o| o.as_i64().ok()).unwrap_or(0).rem_euclid(360);
         PageText { page, page_box, rotation, fonts: pc.fonts.iter().map(|f| Self::font_info(f)).collect(), lines, paragraphs }
+    }
+
+    /// Every font in the document, once each, ordered by object number.
+    pub fn fonts(&mut self) -> Vec<FontInfo> {
+        let ids: Vec<ObjectId> = self
+            .doc
+            .objects
+            .iter()
+            .filter(|(_, o)| {
+                o.as_dict().is_ok_and(|d| {
+                    let sub = d.get(b"Subtype").ok().and_then(|s| s.as_name().ok()).unwrap_or(b"");
+                    d.has_type(b"Font") && !sub.starts_with(b"CIDFontType")
+                })
+            })
+            .map(|(id, _)| *id)
+            .collect();
+        ids.into_iter().filter_map(|id| self.cache.get(&self.doc, &Object::Reference(id))).map(|f| Self::font_info(&f)).collect()
+    }
+
+    /// Which characters of `text` the font with this object number can draw. Blank characters
+    /// count as covered. Use it to show coverage in a font menu before the user commits.
+    pub fn coverage(&mut self, font_object: u32, text: &str) -> Result<Coverage> {
+        let id = self.doc.objects.keys().find(|k| k.0 == font_object).copied().ok_or(Error::BadFont)?;
+        let is_font = self.doc.get_dictionary(id).is_ok_and(|d| d.has_type(b"Font"));
+        let font = is_font.then(|| self.cache.get(&self.doc, &Object::Reference(id))).flatten().ok_or(Error::BadFont)?;
+        let none = HashSet::new();
+        let mut out = Coverage { covered: String::new(), missing: String::new() };
+        for ch in text.chars() {
+            if out.covered.contains(ch) || out.missing.contains(ch) {
+                continue;
+            }
+            if ch.is_whitespace() || font.encode(ch, &none).is_some() {
+                out.covered.push(ch);
+            } else {
+                out.missing.push(ch);
+            }
+        }
+        Ok(out)
     }
 
     /// Text of a page: lines with runs, words, fonts and positions, and paragraphs.

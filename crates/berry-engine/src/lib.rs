@@ -6,4 +6,4 @@ pub mod geom;
 pub mod interp;
 pub mod layout;
 mod tables;
-pub use engine::{EditResult, Engine, Error, Match, PageText, SaveReport};
+pub use engine::{Coverage, EditResult, Engine, Error, Match, PageText, SaveReport};
