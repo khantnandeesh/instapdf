@@ -73,7 +73,7 @@ jobs:
           gcloud run deploy "$SERVICE" \
             --image "$IMAGE" \
             --region "$REGION" \
-            --update-env-vars "APP_VERSION=${GITHUB_SHA}" \
+            --update-env-vars "APP_VERSION=${GITHUB_SHA},SITE_INDEXABLE=1" \
             --no-traffic \
             --tag candidate \
             --quiet

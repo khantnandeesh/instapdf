@@ -21,6 +21,8 @@ backlog → 1 Analyze → 2 Research → 3 Design → 4 Build → 5 Test → 6 R
 | 8 Evaluate | `parity-evaluator` (independent, never sees code or builder notes) | spec + Sejda URL + staging URL | `docs/evals/<feature>.md` with PASS/FAIL, a score per AC, the micro-comparison table (M1–M11 win/tie/lose with captures of both sites) and the gap list |
 | 9 Release | `devops-engineer` | PASS verdict | tag `v*`, prod deploy, backlog updated |
 
+Every tool also passes the [SEO checklist](#seo-checklist-part-of-the-definition-of-done-for-every-tool) before step 8.
+
 ## Conventions
 
 - **Branches:** `feat/<feature>`, `fix/<thing>`, `chore/<thing>`. Never push directly to `main` except for docs from the orchestrator.
@@ -30,3 +32,17 @@ backlog → 1 Analyze → 2 Research → 3 Design → 4 Build → 5 Test → 6 R
 - **Evaluator pass bar:** no micro-check (mission.md M1–M11) is a *lose* unless the owner waived it in writing; every P0 AC passes; at least 90% of all ACs pass; Lighthouse performance ≥ 90 on mobile; no critical a11y violations (axe); and, once the Q2 corpus exists, the tool runs over the real-world PDF corpus with zero crashes and its oracle checks green (`qpdf --check`, render diff, text equality).
 - **Design:** all UI follows the owner's BerryPDF system (`docs/design/berrypdf.md`): grid paper, one berry action on its lip, leaf-cornered tool cards coloured by berry category, Fredoka, Phosphor Duotone icons, berry motifs (floating berries, berry loader, jam progress; no vine), light only (dark mode pending the designer's definition). Owner overrides (2026-11-23): minimal text (only what a task needs; details go to tooltips or screen-reader text), quiet CSS motion (entrances ≤ 400ms, all off under reduced motion), no vine; sections separate by spacing. Deviations from BerryPDF are listed there with measured contrast.
 - **Competitor research:** adopt/skip decisions must not rest on unverified claims.
+
+## SEO checklist (part of the definition of done for every tool)
+
+Strategy: `docs/seo/strategy.md`; keywords: `docs/seo/keyword-plan.md`. The automated items run in CI (`src/tools/seo.test.ts`, `e2e/seo/seo.spec.ts`); the evaluator checks the rest.
+
+- [ ] Slug is the primary keyword with hyphens (registry); never renamed after launch without a 308 redirect.
+- [ ] `toolSeo` entry: keyword-first title ≤ 60 characters with the brand, description 110–160, unique, true (browser tools may say "nothing is uploaded"; server tools say files are deleted after 2 hours). *(automated)*
+- [ ] The page exports `metadata = toolMetadata(tool)` and renders `<ToolSeo tool={tool} />` after the tool, inside `.mp-toolstage` wrapping only the tool. *(automated: canonical, hreflang, OG, robots, one `h1`)*
+- [ ] `seoContent` entry: 3–5 how-to steps, 4–8 FAQ answers checked against the tool's real behaviour and limits, 3–6 related tools. *(automated: counts, structured data matches visible text)*
+- [ ] `opengraph-image.tsx` in the tool's route folder (one line with `ogImage`); the card looks right.
+- [ ] Guide starts below the first screen on desktop and phone; nothing new above the fold. *(automated)*
+- [ ] Budgets on a phone: ≤ 170 KB JS, LCP ≤ 2.5 s, CLS ≤ 0.1 *(automated)*; Lighthouse SEO = 100 and performance ≥ 90 mobile *(evaluator)*.
+- [ ] Rich Results Test shows WebApplication, BreadcrumbList, HowTo and FAQPage with no errors *(evaluator, once on a public URL)*.
+- [ ] Variant pages from the keyword plan that this tool enables are listed in the backlog.

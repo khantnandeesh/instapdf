@@ -6,13 +6,15 @@
  * src/components/tool-flow/ToolFlow.tsx). Update this page if that changes.
  */
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/metadata";
 import { Code, Fill, LegalPage, Section, Summary, TextLink } from "@/components/legal/Legal";
 import { legalFacts as f } from "@/components/legal/facts";
 
-export const metadata: Metadata = {
-  title: "Cookies · BerryPDF",
+export const metadata: Metadata = pageMetadata({
+  path: "/cookies",
+  title: "Cookies | BerryPDF",
   description: "BerryPDF sets no cookies. It keeps a short list of recently used tools in your browser, and you can clear it.",
-};
+});
 
 const cell = "border-b border-border px-3 py-2 align-top text-start";
 

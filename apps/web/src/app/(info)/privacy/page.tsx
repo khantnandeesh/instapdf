@@ -7,13 +7,15 @@
  * product changes (server tools, accounts or analytics would each need an update).
  */
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/metadata";
 import { Code, Contact, Fill, LegalPage, List, Section, Sub, Summary, TextLink } from "@/components/legal/Legal";
 import { legalFacts as f } from "@/components/legal/facts";
 
-export const metadata: Metadata = {
-  title: "Privacy · BerryPDF",
+export const metadata: Metadata = pageMetadata({
+  path: "/privacy",
+  title: "Privacy | BerryPDF",
   description: "How BerryPDF handles your files and data: browser tools process files on your device and upload nothing.",
-};
+});
 
 export default function PrivacyPage() {
   return (

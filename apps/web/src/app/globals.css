@@ -1008,6 +1008,97 @@
     transform: translateY(1px) rotate(-135deg);
   }
 
+  /* ---- Tool-page guide: how-to, FAQ, related (docs/seo/strategy.md). Below the tool, quiet:
+     prose colours, FAQ answers folded, sections separated by spacing only. ------------------- */
+  /* The tool fills the first screen, so the guide always starts below the fold. */
+  .mp-toolstage {
+    min-height: calc(100svh - var(--ip-header-h));
+  }
+  .mp-guide {
+    max-width: 760px;
+    margin: var(--space-8) auto 0;
+    color: var(--mp-prose);
+    font-size: 16px;
+    line-height: 26px;
+  }
+  .mp-guide h2 {
+    font: 600 22px/1.2 var(--font-display);
+    color: var(--ink);
+    margin: var(--space-7) 0 var(--space-3);
+  }
+  .mp-guide__crumbs {
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .mp-guide__crumbs a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .mp-guide__steps {
+    counter-reset: step;
+    display: grid;
+    gap: var(--space-3);
+  }
+  .mp-guide__steps > li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    column-gap: var(--space-3);
+  }
+  .mp-guide__steps > li::before {
+    content: counter(step);
+    grid-row: span 2;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--brand-tint);
+    color: var(--brand-strong);
+    font: 600 14px/1 var(--font-display);
+  }
+  .mp-guide__steps strong {
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-weight: 600;
+  }
+  .mp-guide__faq > details {
+    border-bottom: 1.5px solid var(--border);
+  }
+  .mp-guide__faq > details > summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 48px;
+    padding: var(--space-2) 0;
+    cursor: pointer;
+    list-style: none;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-weight: 500;
+  }
+  .mp-guide__faq > details > summary::-webkit-details-marker {
+    display: none;
+  }
+  .mp-guide__faq > details > summary::after {
+    content: "";
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-right: 1.5px solid var(--muted);
+    border-bottom: 1.5px solid var(--muted);
+    transform: translateY(-2px) rotate(45deg);
+    transition: transform var(--dur-base);
+  }
+  .mp-guide__faq > details[open] > summary::after {
+    transform: translateY(1px) rotate(-135deg);
+  }
+  .mp-guide__faq > details > p {
+    margin: 0 0 var(--space-4);
+  }
+
   /* ---- Hero --------------------------------------------------------------------------------- */
   .mp-hero {
     position: relative;

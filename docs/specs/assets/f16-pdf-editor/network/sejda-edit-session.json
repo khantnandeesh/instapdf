@@ -1,0 +1,43 @@
+[
+ {
+  "m": "POST",
+  "url": "https://www.sejda.com/api/files/upload-check"
+ },
+ {
+  "m": "RESP",
+  "status": 200,
+  "url": "https://www.sejda.com/api/files/upload-check",
+  "body": "{\"status\":\"ok\"}"
+ },
+ {
+  "m": "POST",
+  "url": "https://www.sejda.com/api/files/upload?_s=&uplid=…"
+ },
+ {
+  "m": "RESP",
+  "status": 200,
+  "url": "https://www.sejda.com/api/files/upload?_s=&uplid=…",
+  "body": "{\"id\":\"b584c274-2660-4b9c-9cfd-0314af29e179-1OEEMQSUBC0YAVKW_2\"}"
+ },
+ {
+  "m": "POST",
+  "url": "https://www.sejda.com/api/tasks",
+  "body": "{\"type\":\"edit\",\"elapsedTime\":20,\"recovered\":false,\"outputFilenamePattern\":\"\",\"files\":[\"b584c274-2660-4b9c-9cfd-0314af29e179-1OEEMQSUBC0YAVKW_2\"],\"appendTextOperations\":[{\"text\":\"New added text\",\"font\":\"Helvetica\",\"fontSize\":\"10.00\",\"position\":{\"x\":306,\"y\":668},\"lineHeight\":10,\"color\":\"#000000\",\"bold\":false,\"italic\":false,\"pages\":\"1\"}],\"editTextOperations\":[{\"originalText\":\"wrap across the page so we can see how an editor treats paragraphs\",\"text\":\"paragraphs-and-a-much-longer-replacement-string\",\"lineHeight\":\"12.00\",\"font\":\"Times-Roman\",\"fontId\":\"4R\",\"bold\":false,\"italic\":false,\"area\":{\"x\":69,\"y\":105,\"width\":329,\"height\":18},\"pages\":\"1\",\"fontSize\":\"12.00\",\"color\":\"#000000\",\"position\":{\"x\":72,\"y\":723}}],\"uri\":\"/pdf-editor\",\"imageOperations\":[],\"shapeOperations\":[],\"insertPageOperations\":[],\"deletePageOperations\":[],\"highlightTextOperations\":[],\"editHighlightOperations\":[],\"deleteHighlightOperations\":[],\"appendLinkOperations\":[],\"editLinkOperations\":[],\"deleteLinkOperations\":[],\"appendAttachmentOperations\":[],\"deleteAttachmentOperations\":[],\"appendEmbeddedFileOperations\":[],\"deleteEmbeddedFileOperations\":[],\"appendFormFieldOperations\":[],\"deleteFormFieldOperations\":[],\"appendDraw\":[],\"appendLine\":[],\"deleteImageOperations\":[],\"rotatePageOperations\":[],\"userAgent\":\"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36\",\"cvts\":\"0.34\",\"pdfjs\":\"41553a996\",\"libsCache\":\"680\",\"consoleLogs\":[\"Using pdfjs v163\",\"Warning: Unimplemented widget field type \\\"Btn\\\", falling back to base field type.\"],\"traceId\":\"…\",\"www\":\"www49.sejda.com\"}"
+ },
+ {
+  "m": "RESP",
+  "status": 200,
+  "url": "https://www.sejda.com/api/tasks",
+  "body": "\"PMCXDXJO-202611240007\""
+ },
+ {
+  "m": "GET",
+  "url": "https://www.sejda.com/api/tasks/PMCXDXJO-202611240007/change?_=1795475235676"
+ },
+ {
+  "m": "RESP",
+  "status": 200,
+  "url": "https://www.sejda.com/api/tasks/PMCXDXJO-202611240007/change?_=1795475235676",
+  "body": "{\"status\":\"Completed\",\"type\":\"edit\",\"resultFilename\":\"fixture.pdf\",\"resultFileSize\":6112,\"resultFullUrlPattern\":\"www.sejda.com/api/tasks/PMCXDXJO-202611240007/download/%7B%7Bfilename%7D%7D?s=…&d=true&_s=49\",\"warnings\":[],\"resultItems\":[\"fixture.pdf\"],\"id\":\"PMCXDXJO-202611240007\"}"
+ }
+]

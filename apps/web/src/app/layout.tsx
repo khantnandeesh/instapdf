@@ -8,6 +8,7 @@ import { RecentPrepaintScript } from "@/components/site/RecentPrepaintScript";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SkipLink } from "@/components/site/SkipLink";
+import { rootMetadata } from "@/lib/seo/metadata";
 import "./globals.css";
 
 /**
@@ -26,7 +27,8 @@ const fredoka = localFont({
 });
 
 export const metadata: Metadata = {
-  title: siteCopy.homeTitle,
+  ...rootMetadata,
+  title: { absolute: siteCopy.homeTitle },
   description: siteCopy.homeDescription,
 };
 
