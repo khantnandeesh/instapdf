@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { formatBytes } from "@/lib/pdf/naming";
 import { openPdf } from "@/lib/pdf/pdfjs";
 import { renderPage } from "@/lib/pdf/thumbnails";
@@ -13,10 +14,13 @@ import { PrivacyNote } from "./notes";
 import type { FlowNoticeInput, ToolOutput } from "./types";
 import { configuredProviders, SAVE_PROVIDERS, type CloudProvider } from "@/lib/cloud/providers";
 import { cloudCopy } from "../cloud/copy";
-import { SaveToCloud } from "../cloud/SaveToCloud";
+import type { SaveToCloudProps } from "../cloud/SaveToCloud";
 
 /** F23: a build-time constant (DefinePlugin), so builds without cloud sources drop that code. */
 const CLOUD_ON = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1";
+// Its own chunk (ToolFlow preloads it once files are in), so the idle-prefetched result chunk stays small.
+const SaveToCloud: ComponentType<SaveToCloudProps> | null =
+  process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? dynamic(() => import("../cloud/SaveToCloud").then((m) => m.SaveToCloud), { ssr: false }) : null;
 
 export function ResultCard({
   output,
@@ -122,7 +126,7 @@ export function ResultCard({
                 Download
               </span>
             </a>
-            {CLOUD_ON && cloud && savable.length > 0 && (
+            {SaveToCloud && cloud && savable.length > 0 && (
               <SaveToCloud
                 file={file}
                 providers={savable}

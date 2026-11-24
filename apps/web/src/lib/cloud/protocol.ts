@@ -9,7 +9,10 @@
  * request's id, a field of the wrong type or a non-File "file" is dropped (null).
  */
 import { hasAcceptedType, type AcceptSpec } from "@/lib/pdf/validation";
+import { type WindowParams } from "./opener";
 import { isProvider, isRoute, type CloudProvider, type CloudRoute } from "./providers";
+
+export { channelName, newRequestId, windowUrl, type WindowParams } from "./opener";
 
 export const HEARTBEAT_MS = 1000;
 /** The tool tab treats this much silence from the window as "closed" (= cancelled). */
@@ -58,7 +61,6 @@ export type Envelope<M> = M & { from: "window" | "tool"; req: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const isRequestId = (v: unknown): v is string => typeof v === "string" && UUID.test(v);
-export const channelName = (req: string) => `cloud:${req}`;
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isText = (v: unknown, max = MAX_TEXT): v is string => typeof v === "string" && v.length > 0 && v.length <= max;
@@ -173,28 +175,6 @@ export function screenIncoming(files: readonly File[], limits: IncomingLimits, a
 
 // ---- the window's URL -------------------------------------------------------------------
 
-export type WindowParams = {
-  req: string;
-  /** Lower-case extensions with the dot, e.g. [".pdf", ".png"]. */
-  accept: string[];
-  multiple: boolean;
-  /** The tool's per-file size cap in bytes. */
-  max: number;
-  /** Tool name for "Added to Merge PDF". */
-  tool: string;
-  /** Which provider the mock window stands in for (only on /cloud/mock). */
-  provider?: CloudProvider;
-  /** Save mode: the window uploads the file the tool sends. */
-  mode?: "pick" | "save";
-};
-
-export function windowUrl(route: CloudRoute, p: WindowParams): string {
-  const q = new URLSearchParams({ req: p.req, accept: p.accept.join(","), multiple: p.multiple ? "1" : "0", max: String(p.max), tool: p.tool });
-  if (route === "mock" && p.provider) q.set("p", p.provider);
-  if (p.mode === "save") q.set("mode", "save");
-  return `/cloud/${route}?${q.toString()}`;
-}
-
 const EXT = /^\.[a-z0-9]{1,8}$/;
 
 /** Reads and checks the window's own URL; null when anything is missing or malformed. */
@@ -216,9 +196,4 @@ export function parseWindowParams(route: string, search: string): (WindowParams 
   const p = q.get("p");
   if (route === "mock" && !isProvider(p)) return null;
   return { route, req, accept, multiple, max, tool, mode, provider: route === "mock" ? (p as CloudProvider) : (route as CloudProvider) };
-}
-
-/** Crypto-random UUID (tests can pass their own). */
-export function newRequestId(): string {
-  return crypto.randomUUID();
 }

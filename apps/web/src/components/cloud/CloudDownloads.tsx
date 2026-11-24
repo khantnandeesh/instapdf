@@ -5,7 +5,7 @@ import type { CloudDownload } from "./useCloudIntake";
 import { ProgressBar } from "../ui/ProgressBar";
 import { Button } from "../ui/Button";
 import { CloseIcon, ErrorIcon, RotateRightIcon } from "../ui/icons";
-import { cloudCopy } from "./copy";
+import { transferCopy } from "./transfer-copy";
 import { ProviderMark } from "./ProviderMark";
 
 /**
@@ -37,8 +37,8 @@ function DownloadCard({ d, onStop, onRetry }: { d: CloudDownload; onStop: (key: 
         <button
           type="button"
           className="mp-iconbtn ip-dl__x size-[34px]"
-          aria-label={failed ? cloudCopy.remove(d.name) : cloudCopy.stop(d.name)}
-          title={failed ? cloudCopy.remove(d.name) : cloudCopy.stop(d.name)}
+          aria-label={failed ? transferCopy.remove(d.name) : transferCopy.stop(d.name)}
+          title={failed ? transferCopy.remove(d.name) : transferCopy.stop(d.name)}
           onClick={() => onStop(d.key)}
         >
           <CloseIcon size={16} />
@@ -46,19 +46,19 @@ function DownloadCard({ d, onStop, onRetry }: { d: CloudDownload; onStop: (key: 
       </div>
       {failed ? (
         <Button variant="line" size="sm" className="self-center" iconStart={<RotateRightIcon size={14} />} onClick={() => onRetry(d.key)}>
-          {cloudCopy.retry}
+          {transferCopy.retry}
         </Button>
       ) : (
         <div className="ip-dl__bar">
-          <ProgressBar label={cloudCopy.downloadingLabel(d.name)} value={pct} valueText={`${pct}%, ${cloudCopy.cardBytes(d.loaded, d.total)}`} />
-          <span aria-hidden="true">{cloudCopy.cardPercent(pct)}</span>
+          <ProgressBar label={transferCopy.downloadingLabel(d.name)} value={pct} valueText={`${pct}%, ${transferCopy.cardBytes(d.loaded, d.total)}`} />
+          <span aria-hidden="true">{transferCopy.cardPercent(pct)}</span>
         </div>
       )}
       <p className="ip-dl__name" title={d.name}>
         {d.name}
       </p>
       <p id={metaId} className="ip-dl__meta">
-        {failed ? cloudCopy.cardStopped : cloudCopy.cardBytes(d.loaded, d.total)}
+        {failed ? transferCopy.cardStopped : transferCopy.cardBytes(d.loaded, d.total)}
       </p>
     </div>
   );

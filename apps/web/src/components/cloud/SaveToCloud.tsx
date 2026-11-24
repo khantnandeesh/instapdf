@@ -9,6 +9,7 @@ import { buttonClasses } from "../ui/Button";
 import { MenuButton, type MenuButtonHandle } from "../ui/Menu";
 import { CheckIcon, ChevronDownIcon } from "../ui/icons";
 import { cloudCopy } from "./copy";
+import { transferCopy } from "./transfer-copy";
 import { ProviderMark } from "./ProviderMark";
 import { cloudFootnote, providerItems } from "./items";
 
@@ -18,15 +19,7 @@ import { cloudFootnote, providerItems } from "./items";
  * channel, only after that window says it is ready), which uploads it straight to the provider.
  * Our server never sees it; the result's privacy line changes after a save (onSaved).
  */
-export function SaveToCloud({
-  file,
-  providers,
-  preferred,
-  toolName,
-  pushNotice,
-  announce,
-  onSaved,
-}: {
+export type SaveToCloudProps = {
   file: File;
   providers: readonly CloudProvider[];
   preferred: CloudProvider | null;
@@ -34,7 +27,9 @@ export function SaveToCloud({
   pushNotice: (n: Omit<FlowNoticeInput, "id">) => string;
   announce: (m: string) => void;
   onSaved: (p: CloudProvider) => void;
-}) {
+};
+
+export function SaveToCloud({ file, providers, preferred, toolName, pushNotice, announce, onSaved }: SaveToCloudProps) {
   const [busy, setBusy] = useState<{ p: CloudProvider; pct: number } | null>(null);
   const [saved, setSaved] = useState(false);
   const session = useRef<CloudSession | null>(null);
@@ -51,7 +46,7 @@ export function SaveToCloud({
   function save(p: CloudProvider) {
     if (busy) return;
     const fail = () =>
-      pushNotice({ tone: "danger", title: cloudCopy.saveFailed(p), body: cloudCopy.saveFailedBody, action: { label: cloudCopy.tryAgain, onClick: () => save(p) }, inlineAction: true });
+      pushNotice({ tone: "danger", title: transferCopy.saveFailed(p), body: transferCopy.saveFailedBody, action: { label: transferCopy.tryAgain, onClick: () => save(p) }, inlineAction: true });
     if (navigator.onLine === false) {
       pushNotice({ tone: "info", title: cloudCopy.offline, body: cloudCopy.offlineBody(p) });
       return;
@@ -67,8 +62,8 @@ export function SaveToCloud({
           setBusy(null);
           setSaved(true);
           onSaved(p);
-          announce(cloudCopy.savedAlert(p, name));
-          pushNotice({ tone: "success", title: cloudCopy.savedAlert(p, name), action: link ? { label: cloudCopy.openIn(p), href: link } : undefined, inlineAction: true, timeoutMs: 8000 });
+          announce(transferCopy.savedAlert(p, name));
+          pushNotice({ tone: "success", title: transferCopy.savedAlert(p, name), action: link ? { label: transferCopy.openIn(p), href: link } : undefined, inlineAction: true, timeoutMs: 8000 });
         },
         onError: () => {
           done = true;
@@ -83,7 +78,7 @@ export function SaveToCloud({
       },
     );
     if (!s) {
-      pushNotice({ tone: "warning", title: cloudCopy.blocked(p), body: cloudCopy.blockedBody, action: { label: cloudCopy.tryAgain, onClick: () => save(p), autoFocus: true }, inlineAction: true });
+      pushNotice({ tone: "warning", title: transferCopy.blocked(p), body: transferCopy.blockedBody, action: { label: transferCopy.tryAgain, onClick: () => save(p), autoFocus: true }, inlineAction: true });
       return;
     }
     session.current = s;
@@ -91,12 +86,12 @@ export function SaveToCloud({
     s.sendSave(file);
   }
 
-  const idle = main ? cloudCopy.saveTo(main) : cloudCopy.saveToAny;
-  const label = busy ? cloudCopy.saving(busy.pct) : saved ? cloudCopy.saved : idle;
+  const idle = main ? transferCopy.saveTo(main) : transferCopy.saveToAny;
+  const label = busy ? transferCopy.saving(busy.pct) : saved ? transferCopy.saved : idle;
   // Every label it can show, stacked invisibly in one grid cell: the button never changes width (AC-169).
   const text = (
     <span className="ip-save__label tabular-nums">
-      {[idle, cloudCopy.saving(100), cloudCopy.saved].map((t) => (
+      {[idle, transferCopy.saving(100), transferCopy.saved].map((t) => (
         <span key={t} className="ip-save__ghost" aria-hidden="true">
           {t}
         </span>
@@ -121,7 +116,7 @@ export function SaveToCloud({
           className={buttonClasses("line", "md")}
           disabled={!!busy}
           items={items}
-          footnote={cloudFootnote(cloudCopy.saveFootnote)}
+          footnote={cloudFootnote(transferCopy.saveFootnote)}
           data-testid="save-main"
         >
           {text}
@@ -130,15 +125,15 @@ export function SaveToCloud({
       )}
       {main && providers.length > 1 && (
         <MenuButton
-          label={cloudCopy.saveAnother}
-          title={cloudCopy.saveAnother}
+          label={transferCopy.saveAnother}
+          title={transferCopy.saveAnother}
           placement="bottom-end"
           presentation="auto"
           popupClassName="ip-menu-wide"
           className={buttonClasses("line", "md", "ip-split__caret")}
           disabled={!!busy}
           items={items}
-          footnote={cloudFootnote(cloudCopy.saveFootnote)}
+          footnote={cloudFootnote(transferCopy.saveFootnote)}
           data-testid="save-caret"
         >
           <ChevronDownIcon size={16} />

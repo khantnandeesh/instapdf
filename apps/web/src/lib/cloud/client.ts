@@ -7,7 +7,8 @@
  * treats `WINDOW_LOST_MS` of silence as "the window was closed" (never while this tab is hidden:
  * its timers are throttled there, and it re-checks once visible).
  */
-import { channelName, FIRST_CONTACT_MS, parseFromWindow, windowUrl, wrap, WINDOW_LOST_MS, type ErrorCode, type FromTool, type SkipReason, type WindowParams } from "./protocol";
+import { openWindowNow, popupFeatures, type OpenedWindow, type WindowParams } from "./opener";
+import { FIRST_CONTACT_MS, parseFromWindow, wrap, WINDOW_LOST_MS, type ErrorCode, type FromTool, type SkipReason } from "./protocol";
 import type { CloudRoute } from "./providers";
 
 export type SessionEvents = {
@@ -45,35 +46,20 @@ type Deps = {
   hidden?: () => boolean;
   setInterval?: (fn: () => void, ms: number) => unknown;
   clearInterval?: (h: unknown) => void;
+  /** The window was already opened in the click handler (opener.ts): adopt its channel. */
+  opened?: OpenedWindow;
 };
 
-/** Popup features: a small window on desktop, a plain new tab on phones (no features). */
-export function popupFeatures(win: { innerWidth: number; screenX?: number; screenY?: number; outerWidth?: number; outerHeight?: number; matchMedia?: (q: string) => { matches: boolean } }): string {
-  const phone = win.innerWidth < 640 || !!win.matchMedia?.("(pointer: coarse)").matches;
-  if (phone) return "";
-  const w = 480;
-  const h = 640;
-  const left = Math.round((win.screenX ?? 0) + Math.max(0, ((win.outerWidth ?? w) - w) / 2));
-  const top = Math.round((win.screenY ?? 0) + Math.max(0, ((win.outerHeight ?? h) - h) / 2));
-  return `popup,width=${w},height=${h},left=${left},top=${top}`;
-}
+export { popupFeatures };
 
 export function openCloudWindow(route: CloudRoute, params: WindowParams, events: SessionEvents, deps: Deps = {}): CloudSession | null {
-  const Channel = deps.Channel ?? BroadcastChannel;
   const now = deps.now ?? (() => Date.now());
   const hidden = deps.hidden ?? (() => typeof document !== "undefined" && document.visibilityState === "hidden");
   const setI = deps.setInterval ?? ((fn: () => void, ms: number) => setInterval(fn, ms));
   const clearI = deps.clearInterval ?? ((h: unknown) => clearInterval(h as ReturnType<typeof setInterval>));
-  const open = deps.open ?? ((u: string, t: string, f: string) => window.open(u, t, f));
-  const features = typeof window === "undefined" ? "" : popupFeatures(window);
-
-  // Listen before the window exists, so its first "ready" cannot be missed.
-  const channel = new Channel(channelName(params.req));
-  const win = open(windowUrl(route, params), `berrypdf-cloud-${params.req}`, features);
-  if (!win) {
-    channel.close();
-    return null;
-  }
+  const opened = deps.opened ?? openWindowNow(route, params, deps);
+  if (!opened) return null;
+  const { channel, buffered } = opened;
 
   let ended = false;
   let ready = false;
@@ -98,7 +84,7 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
   };
   if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
 
-  channel.onmessage = (e: MessageEvent) => {
+  const onMessage = (e: MessageEvent) => {
     const m = parseFromWindow(e.data, params.req);
     if (!m || ended) return;
     lastSeen = now();
@@ -152,6 +138,9 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
         break;
     }
   };
+
+  channel.onmessage = onMessage;
+  for (const e of buffered.splice(0)) onMessage(e);
 
   const timer = setI(() => {
     if (ended || hidden()) return;

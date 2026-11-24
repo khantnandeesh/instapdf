@@ -1,0 +1,36 @@
+/** F23 copy for the cloud windows, download cards, notices and saves (our own words; spec U-6). Intake problems reuse the F1 strings. */
+import { formatBytes } from "@/lib/pdf/naming";
+import { providerName, providerShort, type CloudProvider } from "@/lib/cloud/providers";
+
+export const transferCopy = {
+  saveFootnote: "Goes from this device to your cloud.",
+  waiting: (p: CloudProvider) => `Waiting for ${providerName[p]}…`,
+  cancel: "Cancel",
+  tryAgain: "Try again",
+  blocked: (p: CloudProvider) => `Your browser blocked the ${providerName[p]} window.`,
+  blockedBody: "Allow pop-ups for this site.",
+  unreachable: (p: CloudProvider) => `Couldn't reach ${providerName[p]}.`,
+  unreachableBody: "Files on this device still work.",
+  denied: (p: CloudProvider) => `${providerName[p]} access wasn't given.`,
+  deniedBody: "We can only open files you allow.",
+  notAccessible: (name: string, p: CloudProvider) => `${name} can't be opened from ${providerName[p]}. Check that you can open it there.`,
+  cardBytes: (loaded: number, total: number) => (total > 0 ? `${formatBytes(loaded)} of ${formatBytes(total)}` : formatBytes(loaded)),
+  cardPercent: (pct: number) => `${pct}%`,
+  cardStopped: "Download stopped",
+  retry: "Retry",
+  stop: (name: string) => `Stop downloading ${name}`,
+  remove: (name: string) => `Remove ${name}`,
+  downloadingLabel: (name: string) => `Downloading ${name}`,
+  liveOpening: (p: CloudProvider) => `Opening ${providerName[p]} in a new window`,
+  liveDownloading: (name: string, p: CloudProvider) => `Downloading ${name} from ${providerName[p]}`,
+  liveStopped: (name: string) => `Download of ${name} stopped`,
+  saveTo: (p: CloudProvider) => `Save to ${providerShort[p]}`,
+  saveToAny: "Save to…",
+  saveAnother: "Save to another cloud",
+  saving: (pct: number) => `Saving… ${pct}%`,
+  saved: "Saved",
+  savedAlert: (p: CloudProvider, name: string) => `Saved to ${providerName[p]} as ${name}.`,
+  openIn: (p: CloudProvider) => `Open in ${providerShort[p]}`,
+  saveFailed: (p: CloudProvider) => `Couldn't save to ${providerName[p]}.`,
+  saveFailedBody: "Download still works.",
+};

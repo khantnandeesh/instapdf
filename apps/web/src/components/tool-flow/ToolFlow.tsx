@@ -64,6 +64,7 @@ const Nothing = () => null;
 // The caret and the row are on the first screen: server-rendered. The download cards come later.
 const SourceCaret: ComponentType<SourceCaretProps> =
   process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? dynamic(() => import("../cloud/SourceCaret").then((m) => m.SourceCaret)) : Nothing;
+const preloadSave = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? () => void import("../cloud/SaveToCloud") : null;
 const CloudRow: ComponentType<CloudRowProps> = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? dynamic(() => import("../cloud/CloudRow").then((m) => m.CloudRow)) : Nothing;
 const CloudDownloads: ComponentType<CloudDownloadsProps> =
   process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? dynamic(() => import("../cloud/CloudDownloads").then((m) => m.CloudDownloads), { ssr: false }) : Nothing;
@@ -286,6 +287,10 @@ export function ToolFlow({
               : files.some((f) => f.status === "loading") || cloud.pending > 0
                 ? "loading"
                 : "ready";
+  // F23: fetch the Save to cloud control while the user works, so the result screen shows it at once.
+  useEffect(() => {
+    if (cloud.enabled && state === "ready") preloadSave?.();
+  }, [cloud.enabled, state]);
   const totalPages = readyFiles.reduce((s, f) => s + f.pageCount, 0);
   const ownerBlocked = readyFiles.filter((f) => flow.requiredPermissions.some((p) => f.denied.includes(p)));
   const runCheck = canRun?.() ?? true;

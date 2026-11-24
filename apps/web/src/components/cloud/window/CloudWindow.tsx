@@ -1,4 +1,5 @@
 "use client";
+import { windowCopy } from "./copy";
 import "../cloud.css";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { BerryMark } from "@/components/berry/Berry";
@@ -10,7 +11,7 @@ import { DownloadError, downloadFile, runPool } from "@/lib/cloud/download";
 import { parseWindowParams, type WindowParams } from "@/lib/cloud/protocol";
 import { providerName, type CloudProvider, type CloudRoute } from "@/lib/cloud/providers";
 import { WindowLink } from "@/lib/cloud/window-link";
-import { cloudCopy } from "../copy";
+import { transferCopy } from "../transfer-copy";
 import { ProviderMark } from "../ProviderMark";
 import { MockPicker, type MockChoice } from "./MockPicker";
 import { CloudError, type Adapter, type AdapterCtx, type FrameSpec, type Phase, type Picked } from "./adapters/types";
@@ -125,12 +126,12 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
         setLive(`${p.name} done`);
         l.send({ t: "files", files: [{ id: p.id, file }] });
       } catch (e) {
-        if (ctrl.signal.aborted) patchRow(p.id, { status: "stopped", note: cloudCopy.stopped });
+        if (ctrl.signal.aborted) patchRow(p.id, { status: "stopped", note: windowCopy.stopped });
         else if ((e instanceof DownloadError && e.kind === "access") || (e instanceof CloudError && e.code === "denied")) {
-          patchRow(p.id, { status: "skipped", note: cloudCopy.cantOpen });
+          patchRow(p.id, { status: "skipped", note: windowCopy.cantOpen });
           l.send({ t: "skipped", items: [{ name: p.name, reason: "access", id: p.id }] });
         } else {
-          patchRow(p.id, { status: "failed", note: cloudCopy.stopped });
+          patchRow(p.id, { status: "failed", note: windowCopy.stopped });
           l.send({ t: "failed", id: p.id, name: p.name });
         }
       } finally {
@@ -152,11 +153,11 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
         const lower = it.name.toLowerCase();
         if (!prm.accept.some((e) => lower.endsWith(e))) {
           skipped.push({ name: it.name, reason: "type" });
-          initial.push({ id: it.id, name: it.name, loaded: 0, total: it.size, status: "skipped", note: cloudCopy.wrongType });
+          initial.push({ id: it.id, name: it.name, loaded: 0, total: it.size, status: "skipped", note: windowCopy.wrongType });
         } else if (it.size > prm.max) {
           // Checked against the size the provider reports, before any download (AC-147).
           skipped.push({ name: it.name, reason: "size" });
-          initial.push({ id: it.id, name: it.name, loaded: 0, total: it.size, status: "skipped", note: cloudCopy.overSize(maxMb) });
+          initial.push({ id: it.id, name: it.name, loaded: 0, total: it.size, status: "skipped", note: windowCopy.overSize(maxMb) });
         } else {
           go.push(it);
           picked.current.set(it.id, it);
@@ -233,7 +234,7 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
       return;
     }
     setParams(prm);
-    document.title = cloudCopy.windowTitle(prm.provider);
+    document.title = windowCopy.windowTitle(prm.provider);
     const l = new WindowLink(prm.req, {
       onCancel: () => {
         for (const a of aborts.current.values()) a.abort();
@@ -244,7 +245,7 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
         const a = aborts.current.get(id);
         if (a) a.abort();
         else {
-          patchRow(id, { status: "stopped", note: cloudCopy.stopped });
+          patchRow(id, { status: "stopped", note: windowCopy.stopped });
           void checkComplete();
         }
       },
@@ -352,7 +353,7 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
   const privacy = provider && (
     <p className="ip-cw__privacy" data-testid="cloud-privacy">
       <ShieldIcon size={18} />
-      {params?.mode === "save" ? cloudCopy.savingPrivacy(provider) : cloudCopy.windowPrivacy(provider)}
+      {params?.mode === "save" ? windowCopy.savingPrivacy(provider) : windowCopy.windowPrivacy(provider)}
     </p>
   );
   const mark = provider && <ProviderMark provider={provider} size={56} />;
@@ -369,10 +370,10 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
       body = (
         <>
           {mark}
-          {h1(cloudCopy.lostTitle)}
-          <p className="ip-cw__text">{cloudCopy.lostBody}</p>
+          {h1(windowCopy.lostTitle)}
+          <p className="ip-cw__text">{windowCopy.lostBody}</p>
           <Button variant="outline" onClick={cancelAndClose}>
-            {cloudCopy.closeWindow}
+            {windowCopy.closeWindow}
           </Button>
         </>
       );
@@ -384,7 +385,7 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
           {h1(name)}
           {params?.mode === "save" && saveFile.current && <p className="ip-cw__text">{saveFile.current.name}</p>}
           <Button ref={primary} variant="primary" size="lg" className="ip-cw__btn" busy={!ready} disabled={!params} onClick={start} data-testid="cloud-open">
-            {provider ? cloudCopy.open(provider) : ""}
+            {provider ? windowCopy.open(provider) : ""}
           </Button>
           {privacy}
         </>
@@ -398,14 +399,14 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
           {view.phase === "signing" ? (
             <>
               <Button variant="primary" size="lg" className="ip-cw__btn" busy disabled>
-                {cloudCopy.signingIn}
+                {windowCopy.signingIn}
               </Button>
-              <p className="ip-cw__text">{provider === "google" ? cloudCopy.finishInGoogle : `Finish in the ${name} window.`}</p>
+              <p className="ip-cw__text">{provider === "google" ? windowCopy.finishInGoogle : `Finish in the ${name} window.`}</p>
             </>
           ) : (
             <p role="status" className="flex items-center gap-2">
               <span className="ip-busy-ring text-brand" aria-hidden="true" />
-              {view.phase === "connecting" ? cloudCopy.connecting : `Finish in the ${name} window.`}
+              {view.phase === "connecting" ? windowCopy.connecting : `Finish in the ${name} window.`}
             </p>
           )}
           {privacy}
@@ -427,28 +428,28 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
       const active = rows.filter((r) => r.status !== "skipped").length;
       body = (
         <>
-          {h1(cloudCopy.getting(rows.length || active))}
+          {h1(windowCopy.getting(rows.length || active))}
           <div className="ip-cw__rows" aria-busy={rows.some((r) => r.status === "downloading") || undefined}>
             {rows.map((r) => (
               <div key={r.id} className="ip-cw__row" data-testid="cloud-row-file">
                 <span className="ip-cw__name">{r.name}</span>
                 <span className={r.status === "skipped" || r.status === "failed" || r.status === "stopped" ? "ip-cw__meta ip-cw__meta--bad" : "ip-cw__meta"}>
-                  {r.status === "done" ? cloudCopy.done : r.note ?? cloudCopy.cardBytes(r.loaded, r.total)}
+                  {r.status === "done" ? windowCopy.done : r.note ?? transferCopy.cardBytes(r.loaded, r.total)}
                 </span>
                 {(r.status === "downloading" || r.status === "done") && (
-                  <ProgressBar label={cloudCopy.downloadingLabel(r.name)} value={r.total ? Math.round((r.loaded / r.total) * 100) : r.status === "done" ? 100 : 0} />
+                  <ProgressBar label={transferCopy.downloadingLabel(r.name)} value={r.total ? Math.round((r.loaded / r.total) * 100) : r.status === "done" ? 100 : 0} />
                 )}
                 {r.status === "failed" && picked.current.get(r.id) && (
                   <Button variant="line" size="sm" className="col-span-2 justify-self-start" onClick={() => void downloadOne(picked.current.get(r.id)!)}>
-                    {cloudCopy.retry}
+                    {transferCopy.retry}
                   </Button>
                 )}
               </div>
             ))}
           </div>
-          <p className="ip-cw__text">{cloudCopy.keepOpen}</p>
+          <p className="ip-cw__text">{windowCopy.keepOpen}</p>
           <Button variant="outline" onClick={cancelAndClose}>
-            {cloudCopy.cancel}
+            {transferCopy.cancel}
           </Button>
         </>
       );
@@ -460,8 +461,8 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
           <span className="ip-cw__tick">
             <CheckIcon size={28} />
           </span>
-          {h1(cloudCopy.addedTo(params?.tool ?? "BerryPDF"))}
-          <p className="ip-cw__text">{canClose ? cloudCopy.canClose : cloudCopy.closesItself}</p>
+          {h1(windowCopy.addedTo(params?.tool ?? "BerryPDF"))}
+          <p className="ip-cw__text">{canClose ? windowCopy.canClose : windowCopy.closesItself}</p>
         </>
       );
       break;
@@ -469,7 +470,7 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
       body = (
         <>
           {mark}
-          {provider && h1(cloudCopy.savingTitle(provider))}
+          {provider && h1(windowCopy.savingTitle(provider))}
           <div className="ip-cw__rows">
             <div className="ip-cw__row">
               <span className="ip-cw__name">{view.name}</span>
@@ -487,8 +488,8 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
           <span className="ip-cw__tick">
             <CheckIcon size={28} />
           </span>
-          {provider && h1(cloudCopy.savedTitle(provider))}
-          <p className="ip-cw__text">{canClose ? cloudCopy.canClose : cloudCopy.closesItself}</p>
+          {provider && h1(windowCopy.savedTitle(provider))}
+          <p className="ip-cw__text">{canClose ? windowCopy.canClose : windowCopy.closesItself}</p>
         </>
       );
       break;
@@ -497,8 +498,8 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
       body = (
         <>
           {mark}
-          {h1(view.k === "denied" ? cloudCopy.deniedTitle : provider ? cloudCopy.unreachableTitle(provider) : "")}
-          <p className="ip-cw__text">{view.k === "denied" ? cloudCopy.deniedWindowBody : cloudCopy.unreachableWindowBody}</p>
+          {h1(view.k === "denied" ? windowCopy.deniedTitle : provider ? windowCopy.unreachableTitle(provider) : "")}
+          <p className="ip-cw__text">{view.k === "denied" ? windowCopy.deniedWindowBody : windowCopy.unreachableWindowBody}</p>
           <Button
             variant="primary"
             size="lg"
@@ -508,7 +509,7 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
               start();
             }}
           >
-            {cloudCopy.tryAgain}
+            {transferCopy.tryAgain}
           </Button>
         </>
       );
@@ -522,7 +523,7 @@ export function CloudWindow({ route }: { route: CloudRoute }) {
         <BerryMark size={26} />
         <span>BerryPDF</span>
         {name && <span className="ip-cw__sub">· {name}</span>}
-        <button type="button" className="mp-iconbtn mp-iconbtn--plain ip-cw__close size-11" aria-label={cloudCopy.closeAria} title={cloudCopy.closeAria} onClick={cancelAndClose}>
+        <button type="button" className="mp-iconbtn mp-iconbtn--plain ip-cw__close size-11" aria-label={windowCopy.closeAria} title={windowCopy.closeAria} onClick={cancelAndClose}>
           <CloseIcon size={20} />
         </button>
       </header>

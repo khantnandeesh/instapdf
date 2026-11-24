@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openCloudWindow, popupFeatures } from "./client";
+import { openWindowNow } from "./opener";
 import { channelName, FIRST_CONTACT_MS, TOOL_LOST_MS, WINDOW_LOST_MS, wrap } from "./protocol";
 import { WindowLink } from "./window-link";
 
@@ -64,6 +65,34 @@ describe("openCloudWindow (tool tab)", () => {
     expect(fromTool).toEqual(expect.arrayContaining([{ t: "pong", from: "tool", req: REQ }, { t: "ack", from: "tool", req: REQ }]));
     expect(s.ended).toBe(true);
     win.close();
+  });
+
+  it("adopts a window opened in the click handler and replays what it said before the session started", async () => {
+    let url = "";
+    const opened = openWindowNow("mock", params, { Channel, open: (u) => ((url = u), {} as Window) })!;
+    expect(url).toContain(`/cloud/mock?req=${REQ}`);
+    const win = peer();
+    const fromTool: unknown[] = [];
+    win.onmessage = (e) => fromTool.push(e.data);
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    win.postMessage(wrap("window", REQ, { t: "progress", id: "f1", name: "alpha.pdf", loaded: 1, total: 4 }));
+    await tick();
+    expect(opened.buffered).toHaveLength(2);
+    const events = { onReady: vi.fn(), onProgress: vi.fn() };
+    const open = vi.fn();
+    const s = openCloudWindow("mock", params, events, { Channel, open, opened, hidden: () => false })!;
+    expect(open).not.toHaveBeenCalled();
+    expect(events.onReady).toHaveBeenCalledTimes(1);
+    expect(events.onProgress).toHaveBeenCalledWith("f1", "alpha.pdf", 1, 4);
+    win.postMessage(wrap("window", REQ, { t: "hb" }));
+    await vi.waitFor(() => expect(fromTool).toContainEqual({ t: "pong", from: "tool", req: REQ }));
+    s.cancel();
+    win.close();
+  });
+
+  it("openWindowNow closes its channel when the window is blocked", () => {
+    expect(openWindowNow("mock", params, { Channel, open: () => null })).toBeNull();
+    expect([...FakeChannel.all].some((c) => c.name === channelName(REQ))).toBe(false);
   });
 
   it("treats heartbeat silence as a closed window, but not while this tab is hidden", async () => {
