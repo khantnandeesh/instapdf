@@ -82,6 +82,6 @@ export async function annotationsOf(bytes: Uint8Array, pageNumber: number) {
 /** public/fonts/noto is generated (scripts/copy-fonts.mjs); makes it on a fresh checkout. */
 export function ensureNotoFonts(): URL {
   const dir = new URL("../../../public/fonts/noto/", import.meta.url);
-  if (!existsSync(new URL("manifest.json", dir))) execFileSync("node", [new URL("../../../scripts/copy-fonts.mjs", import.meta.url).pathname]);
+  if (!existsSync(new URL("cmap.json", dir))) execFileSync("node", [new URL("../../../scripts/copy-fonts.mjs", import.meta.url).pathname]);
   return dir;
 }

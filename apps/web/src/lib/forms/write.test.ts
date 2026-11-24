@@ -142,14 +142,46 @@ describe("applyForms: text outside WinAnsi (AC-232, G-1)", () => {
 
 describe("the download check and the writer agree (review)", () => {
   it("reports the same missing characters before download as the writer writes as ?", async () => {
-    const { missingInText } = await import("./coverage");
+    const { missingInForm } = await import("./coverage");
     const { fonts, fontkit } = await realFonts();
     const slices = (await fonts.manifest()).fonts;
     const formsRanges = JSON.parse(await readFile(new URL("../../../public/fonts/forms/noto-sans-forms.json", import.meta.url), "utf8")).ranges;
-    for (const value of ["Zoë Šťastná", "Šťastná\u2011Nováková", "Zoë 5\u202F000 ₹", "Ирина नम 😀", "नमस्ते 12", "5 ‰ €", "日本語 abc", "a\u{1F600}b"]) {
-      const { report } = await roundTrip(await fixture("form-basic.pdf"), (s) => setValue(s, s.fields.find((f) => f.name === "name")!.id, value).state, { fonts, fontkit });
-      expect([...report.missingGlyphs].sort(), value).toEqual([...missingInText(value, formsRanges, slices)].sort());
-    }
+    const cmaps = JSON.parse(await readFile(new URL("cmap.json", ensureNotoFonts()), "utf8"));
+    const check = async (label: string, change: (s: FormState) => FormState) => {
+      let before: FormState | undefined;
+      let after: FormState | undefined;
+      const { report } = await roundTrip(await fixture("form-basic.pdf"), (s) => ((before = s), (after = change(s))), { fonts, fontkit });
+      expect([...report.missingGlyphs].sort(), label).toEqual([...missingInForm(after, before, formsRanges, slices, cmaps)].sort());
+    };
+    const values = [
+      ...["Zoë Šťastná", "Šťastná\u2011Nováková", "Zoë 5\u202F000 ₹", "Ирина नम 😀", "नमस्ते 12", "5 ‰ €", "日本語 abc", "a\u{1F600}b"],
+      // A slice's unicode-range differs from its file: judged by the file's real characters.
+      ...["שלום-עולם", "नमस्ते\u200Bदुनिया", "नमस्ते \uA8E0", "ΑΒΓ\u03E2"],
+    ];
+    for (const value of values) await check(value, (s) => setValue(s, s.fields.find((f) => f.name === "name")!.id, value).state);
+    // Dropdown and list options drawn in an embedded font are cleaned and reported too.
+    await check("options", (s) => {
+      for (const name of ["colour", "days"]) {
+        const f = s.fields.find((x) => x.name === name)!;
+        s = updateField(s, f.id, { options: ["Ирина 😀", "Ελένη"], value: f.kind === "list" ? ["Ελένη"] : "Ирина 😀" });
+      }
+      return s;
+    });
+  });
+
+  it("draws options it can't print as ? but keeps the field's own options and value", async () => {
+    const { fonts, fontkit } = await realFonts();
+    const { bytes } = await roundTrip(
+      await fixture("form-basic.pdf"),
+      (s) => {
+        const f = s.fields.find((x) => x.name === "colour")!;
+        return updateField(s, f.id, { options: ["Ирина 😀", "Ελένη"], value: "Ирина 😀" });
+      },
+      { fonts, fontkit },
+    );
+    const dd = (await PDFDocument.load(bytes)).getForm().getDropdown("colour");
+    expect(dd.getOptions()).toEqual(["Ирина 😀", "Ελένη"]);
+    expect(dd.getSelected()).toEqual(["Ирина 😀"]);
   });
 });
 

@@ -8,12 +8,23 @@ import { missingChars } from "@/lib/editor/coverage";
 import { faceOf, type EditorFontManifest, type FontFileEntry } from "@/lib/editor/fonts";
 import { knownManifest, loadFontManifest } from "@/lib/editor/fonts-browser";
 import type { EditorObject, TextObj } from "@/lib/editor/model";
-import { missingInForm } from "@/lib/forms/coverage";
+import { changedTexts, drawnWithoutSlice, missingInForm, type SliceCmaps } from "@/lib/forms/coverage";
 import type { FormState } from "@/lib/forms/types";
 
 let ready: Promise<{ m: EditorFontManifest; fallback: FontFileEntry[] }> | null = null;
 let known: { m: EditorFontManifest; fallback: FontFileEntry[] } | null = null;
-let formsRanges: Promise<[number, number][]> | null = null;
+
+/** A JSON file of our own, fetched once; a failed or refused fetch is tried again next time. */
+function once<T>(url: string, pick: (j: unknown) => T, cache: { p: Promise<T> | null }): Promise<T> {
+  cache.p ??= fetch(url).then(async (r) => {
+    if (!r.ok) throw new Error(`${url}: ${r.status}`);
+    return pick(await r.json());
+  });
+  cache.p.catch(() => (cache.p = null));
+  return cache.p;
+}
+const formsCache: { p: Promise<[number, number][]> | null } = { p: null };
+const cmapCache: { p: Promise<SliceCmaps> | null } = { p: null };
 
 export function loadCoverage() {
   ready ??= Promise.all([
@@ -44,13 +55,16 @@ export async function missingInObjects(objects: readonly EditorObject[]): Promis
 
 /** Every character of changed form values that won't print (AC-232). */
 export async function missingInFormValues(state: FormState | undefined, original: FormState | null | undefined): Promise<string[]> {
-  if (!state || state === original) return [];
-  formsRanges ??= fetch("/fonts/forms/noto-sans-forms.json")
-    .then((r) => (r.ok ? (r.json() as Promise<{ ranges: [number, number][] }>) : { ranges: [] }))
-    .then((j) => j.ranges);
-  formsRanges.catch(() => (formsRanges = null));
-  const [ranges] = await Promise.all([formsRanges.catch(() => [] as [number, number][]), loadCoverage().catch(() => null)]);
-  return known ? missingInForm(state, original, ranges, known.fallback) : [];
+  const texts = changedTexts(state, original);
+  if (!texts.length) return [];
+  const [ranges] = await Promise.all([
+    once("/fonts/forms/noto-sans-forms.json", (j) => (j as { ranges: [number, number][] }).ranges, formsCache).catch(() => [] as [number, number][]),
+    loadCoverage().catch(() => null),
+  ]);
+  if (!known) return [];
+  // The slices' real character lists are only needed for text Helvetica and the forms font can't draw.
+  const cmaps = texts.every((t) => drawnWithoutSlice(t, ranges)) ? {} : await once("/fonts/noto/cmap.json", (j) => j as SliceCmaps, cmapCache).catch(() => ({}));
+  return missingInForm(state, original, ranges, known.fallback, cmaps);
 }
 
 export function useMissing(o: TextObj): string[] {

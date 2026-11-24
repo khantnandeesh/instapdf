@@ -46,17 +46,27 @@ export function bestSlice<T extends { ranges: [number, number][] }>(text: string
 
 const textOf = (f: FormField) => [...(Array.isArray(f.value) ? f.value : [f.value]), ...(f.kind === "dropdown" || f.kind === "list" ? f.options : [])].join("");
 
-/** Unique characters of one text that its field's font can't draw. */
-export function missingInText(text: string, formsRanges: [number, number][], slices: readonly FontFileEntry[]): string[] {
-  const forms: Has = (cp) => covers(formsRanges, cp);
+/** Each Noto slice file's real characters as ranges (public/fonts/noto/cmap.json). */
+export type SliceCmaps = Record<string, [number, number][]>;
+
+/** True when Helvetica or the forms font draws all of `text`: no slice is needed to judge it. */
+export function drawnWithoutSlice(text: string, formsRanges: [number, number][]): boolean {
   const total = [...text].length;
+  return drawnCount(text, winAnsiHas) === total || drawnCount(text, (cp) => covers(formsRanges, cp)) === total;
+}
+
+/**
+ * Unique characters of one text that its field's font can't draw. The slice is chosen by its
+ * unicode-range, as the writer does, then judged by what its file really has (`cmaps`).
+ */
+export function missingInText(text: string, formsRanges: [number, number][], slices: readonly FontFileEntry[], cmaps: SliceCmaps = {}): string[] {
+  const forms: Has = (cp) => covers(formsRanges, cp);
+  if (drawnWithoutSlice(text, formsRanges)) return [];
   let has: Has = winAnsiHas;
-  if (drawnCount(text, winAnsiHas) === total) return [];
-  if (drawnCount(text, forms) === total) return [];
   let most = drawnCount(text, winAnsiHas);
   const slice = bestSlice(text, slices);
-  // A slice's ranges, plus the spaces every slice file carries beyond them.
-  const candidates: Has[] = [forms, ...(slice ? [(cp: number) => cp === 0x20 || cp === 0xa0 || covers(slice.ranges, cp)] : [])];
+  const real = slice && (cmaps[slice.file] ?? slice.ranges);
+  const candidates: Has[] = [forms, ...(real ? [(cp: number) => covers(real, cp)] : [])];
   for (const c of candidates) {
     const n = drawnCount(text, c);
     if (n > most) {
@@ -68,15 +78,20 @@ export function missingInText(text: string, formsRanges: [number, number][], sli
 }
 
 /** Unique characters of changed or new fields' text that the field's font can't draw. */
-export function missingInForm(state: FormState | undefined, original: FormState | null | undefined, formsRanges: [number, number][], slices: readonly FontFileEntry[]): string[] {
+export function missingInForm(state: FormState | undefined, original: FormState | null | undefined, formsRanges: [number, number][], slices: readonly FontFileEntry[], cmaps: SliceCmaps = {}): string[] {
+  return changedTexts(state, original).flatMap((t) => missingInText(t, formsRanges, slices, cmaps)).filter((c, i, all) => all.indexOf(c) === i);
+}
+
+/** The text (values and options) of each changed or new text, dropdown and list field. */
+export function changedTexts(state: FormState | undefined, original: FormState | null | undefined): string[] {
   if (!state || state === original) return [];
   const before = new Map((original?.fields ?? []).map((f) => [f.id, f]));
-  const out = new Set<string>();
+  const out: string[] = [];
   for (const f of state.fields) {
     if (f.kind !== "text" && f.kind !== "dropdown" && f.kind !== "list") continue;
     const o = before.get(f.id);
     if (o && JSON.stringify([o.value, o.options]) === JSON.stringify([f.value, f.options])) continue;
-    missingInText(textOf(f), formsRanges, slices).forEach((c) => out.add(c));
+    out.push(textOf(f));
   }
-  return [...out];
+  return out;
 }

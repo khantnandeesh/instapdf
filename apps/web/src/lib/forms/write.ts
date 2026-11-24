@@ -708,8 +708,16 @@ function autoSize(f: FormField, font: PDFFont, widget: PDFWidgetAnnotation, bw: 
     if (f.kind === "text" && f.comb && f.maxLen) return font.widthOfTextAtSize("W", size) <= bounds.width / f.maxLen;
     return !text || font.widthOfTextAtSize(text, size) <= bounds.width - 2;
   };
-  for (let size = 12; size > 4; size -= 0.5) if (fits(size)) return size;
-  return 4;
+  // Fitting only gets easier as the size drops: binary-search the half-point steps from 4 to 12,
+  // so a long multi-line value is laid out about 4 times, not 16.
+  let lo = 8; // 4 pt, in half points: always used when nothing larger fits
+  let hi = 24;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (fits(mid / 2)) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo / 2;
 }
 
 async function refreshAppearance(doc: PDFDocument, field: PDFField, f: FormField, fonts: Fonts, pageOf: Map<string, { page: PDFPage; entry: FormPage }>) {
@@ -742,16 +750,20 @@ async function refreshAppearance(doc: PDFDocument, field: PDFField, f: FormField
   // Characters no font can draw are written as "?" (and reported), never as a blank box.
   // The value itself (V) stays as typed; only the appearance shows "?".
   let keepV: ReturnType<PDFDict["get"]> | undefined;
+  let keepOpts: { opt: ReturnType<PDFDict["get"]>; v: ReturnType<PDFDict["get"]>; i: ReturnType<PDFDict["get"]> } | undefined;
   if (field instanceof PDFTextField) {
     const v = field.getText();
     if (v && clean(v) !== v) {
       keepV = field.acroField.dict.get(N("V"));
       field.setText(clean(v));
     }
-  } else if (font === fonts.helvetica()) {
+  } else {
+    // Options are drawn cleaned too; the field's options and value are put back after drawing.
     const opts = field.getOptions();
     const cleaned = opts.map(clean);
     if (!same(opts, cleaned)) {
+      const d = field.acroField.dict;
+      keepOpts = { opt: d.get(N("Opt")), v: d.get(N("V")), i: d.get(N("I")) };
       const sel = field.getSelected().map(clean);
       field.setOptions(cleaned);
       if (sel.length) field.select(field instanceof PDFOptionList ? sel : sel[0]);
@@ -784,6 +796,13 @@ async function refreshAppearance(doc: PDFDocument, field: PDFField, f: FormField
   field.acroField.setDefaultAppearance(da);
   fonts.ensureDr(font);
   if (keepV) field.acroField.dict.set(N("V"), keepV);
+  if (keepOpts) {
+    const d = field.acroField.dict;
+    for (const [k, v] of [["Opt", keepOpts.opt], ["V", keepOpts.v], ["I", keepOpts.i]] as const) {
+      if (v) d.set(N(k), v);
+      else d.delete(N(k));
+    }
+  }
 }
 
 /** Signature field built by hand: pdf-lib has no signature creation. */
