@@ -17,6 +17,9 @@ const ENGINE_TYPES = {
   "berry_engine.js": JS,
   "berry_engine_shaping_bg.wasm": WASM,
   "berry_engine_shaping.js": JS,
+  // The font matcher (F24): loaded only when the editor needs a match.
+  "berry_fontmatch_bg.wasm": WASM,
+  "berry_fontmatch.js": JS,
 } as const;
 const PREFETCH_ENV = { "berry_engine.js": "ENGINE_JS_PATH", "berry_engine_bg.wasm": "ENGINE_WASM_PATH" } as const;
 // "br;q=0" refuses brotli: the patterns take a coding only when it is listed without q=0.

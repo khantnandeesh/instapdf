@@ -77,6 +77,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "berry-fontmatch-wasm"
+version = "0.1.0"
+dependencies = [
+ "berry-fontmatch",
+ "js-sys",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "berry-wasm"
 version = "0.1.0"
 dependencies = [

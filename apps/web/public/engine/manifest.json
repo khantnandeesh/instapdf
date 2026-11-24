@@ -6,10 +6,14 @@
     "berry_engine_bg.wasm": "2c6f70c8e71edaae27edb8b0adb7889becd830eb6287df3e68e7bd88132792bd",
     "berry_engine.js": "a2ce6372462ffe53b14a0d9d392ae0528b8207346218a4a0a0c05da6ef0d2efc",
     "berry_engine_shaping_bg.wasm": "78fc9f837c73a178861ce6541d57c10811849eb26e0898a777c2125cb46c26f9",
-    "berry_engine_shaping.js": "64cafc6a35dcdce51ce8dbe92fed4db1871d4fbeb76d0dff098ed0ff062e369c"
+    "berry_engine_shaping.js": "64cafc6a35dcdce51ce8dbe92fed4db1871d4fbeb76d0dff098ed0ff062e369c",
+    "berry_fontmatch_bg.wasm": "9a7635aa806572756331ad80c2925eda116fa6aae9e9cd1e4ae864a054f4cb86",
+    "berry_fontmatch.js": "d7dd14e493fd2cf1e8b71c14714e212db1e7aac70a3cd2d390a1f408f4818948"
   },
   "wasmGzipBytes": 788203,
   "wasmBytes": 2226963,
   "shapingWasmGzipBytes": 960649,
-  "shapingWasmBytes": 2665289
+  "shapingWasmBytes": 2665289,
+  "fontmatchWasmGzipBytes": 78076,
+  "fontmatchWasmBytes": 188044
 }
