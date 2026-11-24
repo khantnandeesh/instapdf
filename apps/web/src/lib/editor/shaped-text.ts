@@ -9,7 +9,7 @@
  */
 import type { BerryDocument, FontRequest } from "./berry-engine";
 import { blankPdf } from "./blank";
-import type { DeferShaped } from "./build";
+import { shapedLayers, type BuildInput, type BuildPass, type DeferShaped } from "./build";
 import { faceOf, filesFor, TEXT_FONTS, type EditorFontManifest } from "./fonts";
 import { printable, shapingFontsFor, type ShapedLine, type ShapingManifest } from "./shaping";
 
@@ -77,34 +77,45 @@ class Fonts {
 const request = (families: string[], bold: boolean, italic: boolean): FontRequest => ({ families, bold, italic });
 
 /**
- * Builds with complex-script lines drawn by the shaping engine. `build` is buildPdf with the
- * DeferShaped hook; returns its bytes when no line needed shaping.
+ * Builds with complex-script lines drawn by the shaping engine, in z-order passes (shapedLayers):
+ * pdf-lib draws layer k, the engine adds layer k's shaped lines, then layer k + 1, and so on.
+ * `build` is buildPdf on the given bytes with the DeferShaped hook and the pass.
  */
-export async function buildShaped(deps: ShapingDeps, build: (defer: DeferShaped) => Promise<Uint8Array>, password?: string): Promise<Uint8Array> {
+export async function buildShaped(
+  input: Pick<BuildInput, "bytes" | "objects">,
+  deps: ShapingDeps,
+  build: (bytes: Uint8Array, defer: DeferShaped, pass: BuildPass) => Promise<Uint8Array>,
+): Promise<Uint8Array> {
   const [engine, editor, shaping] = await Promise.all([deps.engine(), deps.editorManifest(), deps.shapingManifest()]);
   const fonts = new Fonts(deps, editor, shaping);
   const scratch = new engine.BerryDocument(blankPdf());
   const scratchFonts = new Set<string>();
+  const { layers, count } = shapedLayers(input);
   try {
-    const defer: DeferShaped = {
-      family: (id) => familyOf(id, deps.labels),
-      lines: [],
-      measure: async (text, o) => {
-        const line = printable(text, fonts.face(o), shaping);
-        await fonts.register(scratch, o, line, scratchFonts);
-        return scratch.shape(line, request([familyOf(o.font, deps.labels), "Noto Sans"], o.bold, o.italic), o.size).width;
-      },
-    };
-    const built = await build(defer);
-    if (!defer.lines.length) return built;
-    const doc = new engine.BerryDocument(built, password ?? null);
-    try {
-      const done = new Set<string>();
-      for (const line of defer.lines) await addLine(doc, fonts, line, done);
-      return doc.save().bytes;
-    } finally {
-      doc.free();
+    let bytes = input.bytes;
+    for (let layer = 0; layer < count; layer++) {
+      const defer: DeferShaped = {
+        family: (id) => familyOf(id, deps.labels),
+        lines: [],
+        measure: async (text, o) => {
+          const line = printable(text, fonts.face(o), shaping);
+          await fonts.register(scratch, o, line, scratchFonts);
+          return scratch.shape(line, request([familyOf(o.font, deps.labels), "Noto Sans"], o.bold, o.italic), o.size).width;
+        },
+      };
+      // The first pass decrypts (pdf-lib writes the file without encryption); later ones get plain bytes.
+      bytes = await build(bytes, defer, { layer, layers });
+      if (!defer.lines.length) continue;
+      const doc = new engine.BerryDocument(bytes);
+      try {
+        const done = new Set<string>();
+        for (const line of defer.lines) await addLine(doc, fonts, line, done);
+        bytes = doc.save().bytes;
+      } finally {
+        doc.free();
+      }
     }
+    return bytes;
   } finally {
     scratch.free();
   }

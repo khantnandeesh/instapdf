@@ -181,16 +181,40 @@ class TextFonts {
 }
 
 /** Builds the edited PDF. */
-export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: FontKit, shaped?: DeferShaped): Promise<Uint8Array> {
+/**
+ * Z-order layers when shaped lines are drawn by the engine (AC-224): an object's layer is the
+ * number of objects with shaped lines before it on its page. Layer k is drawn by pdf-lib, then
+ * the shaped lines of layer k by the engine, then layer k + 1, so an object added after a shaped
+ * line (a whiteout over it, say) prints over it, as on screen.
+ */
+export function shapedLayers(input: Pick<BuildInput, "objects">): { layers: Map<string, number>; count: number } {
+  const layers = new Map<string, number>();
+  const seen = new Map<string, number>();
+  let count = 1;
+  for (const o of input.objects) {
+    const k = seen.get(o.page) ?? 0;
+    layers.set(o.id, k);
+    count = Math.max(count, k + 1);
+    if (o.kind === "text" && o.lines.some(needsShaping)) seen.set(o.page, k + 1);
+  }
+  return { layers, count };
+}
+
+/** One z-order pass: draw only `layer`'s objects; pages are arranged in the first pass only. */
+export type BuildPass = { layer: number; layers: Map<string, number> };
+
+export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: FontKit, shaped?: DeferShaped, pass?: BuildPass): Promise<Uint8Array> {
   const probe = await PDFDocument.load(input.bytes, { ignoreEncryption: true, updateMetadata: false });
   const doc = probe.isEncrypted ? await PDFDocument.load(input.bytes, { password: input.password ?? "", updateMetadata: false }) : probe;
   if (fontkit) doc.registerFontkit(fontkit);
+  const arrange = !pass || pass.layer === 0;
+  const objects = pass ? input.objects.filter((o) => pass.layers.get(o.id) === pass.layer) : input.objects;
 
-  // ---- pages: order, copies, blanks, rotation ----
+  // ---- pages: order, copies, blanks, rotation (later passes get them arranged already) ----
   const source = doc.getPages();
   const used = new Set<number>();
-  const out: PDFPage[] = [];
-  for (const entry of input.pages) {
+  const out: PDFPage[] = arrange ? [] : source;
+  if (arrange) for (const entry of input.pages) {
     let page: PDFPage;
     if (entry.src == null) {
       page = PDFPage.create(doc);
@@ -204,15 +228,17 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
     }
     out.push(page);
   }
-  setPageOrder(doc, out);
-  out.forEach((page, i) => {
-    const entry = input.pages[i];
-    const rotation = totalRotation(entry);
-    if (entry.rotate || norm360(page.getRotation().angle) !== rotation) page.setRotation(degrees(rotation));
-  });
+  if (arrange) {
+    setPageOrder(doc, out);
+    out.forEach((page, i) => {
+      const entry = input.pages[i];
+      const rotation = totalRotation(entry);
+      if (entry.rotate || norm360(page.getRotation().angle) !== rotation) page.setRotation(degrees(rotation));
+    });
+  }
 
   // ---- objects ----
-  const needsFonts = input.objects.some((o) => o.kind === "text" || (o.kind === "signature" && o.sig.type === "typed"));
+  const needsFonts = objects.some((o) => o.kind === "text" || (o.kind === "signature" && o.sig.type === "typed"));
   const text = needsFonts ? new TextFonts(doc, fonts, await fonts.manifest()) : null;
   const images = new Map<string, Promise<PDFImage>>();
   const image = (id: string) => {
@@ -227,7 +253,7 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
   };
   const byPage = new Map(input.pages.map((p, i) => [p.id, i]));
 
-  for (const o of input.objects) {
+  for (const o of objects) {
     const i = byPage.get(o.page);
     if (i == null) continue;
     const page = out[i];

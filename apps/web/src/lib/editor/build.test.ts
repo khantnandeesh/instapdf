@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import fontkit from "@cantoo/fontkit";
 import { PDFArray, PDFDict, PDFDocument, PDFName, StandardFonts, degrees } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
-import { arrowHead, boxPoint, buildPdf, hexToRgb, quadPoints, toPdf, type BuildFonts, type DeferShaped } from "./build";
+import { arrowHead, boxPoint, buildPdf, hexToRgb, quadPoints, shapedLayers, toPdf, type BuildFonts, type DeferShaped } from "./build";
 import type { BerryDocument } from "./berry-engine";
 import { buildShaped, familyOf, type ShapingEngine } from "./shaped-text";
 import type { ShapingManifest } from "./shaping";
@@ -298,9 +298,11 @@ describe("complex-script text (AC-224)", () => {
     const objects: EditorObject[] = [
       { ...box, lines: ["Invoice 42", "مرحبا بالعالم", "नमस्ते दुनिया, धर्म और कार्य"], text: "", align: "right" },
     ];
+    const bytes = await source();
     const out = await buildShaped(
+      { bytes, objects },
       { engine: async () => engine, editorManifest: fonts.manifest, shapingManifest: async () => shaping.manifest, loadFace: fonts.load, loadUrl: shaping.load },
-      async (defer) => buildPdf({ bytes: await source(), pages, objects, assets: {} }, fonts, fontkit, defer),
+      (b, defer, pass) => buildPdf({ bytes: b, pages, objects, assets: {} }, fonts, fontkit, defer, pass),
     );
     const doc: BerryDocument = new engine.BerryDocument(out);
     try {
@@ -321,5 +323,37 @@ describe("complex-script text (AC-224)", () => {
       doc.free();
     }
     expect((await pdfText(out)).texts[0]).toContain("Invoice 42");
+  });
+
+  it("puts objects in z-order layers around shaped lines, per page", () => {
+    const t = (id: string, page: string, line: string) => ({ ...box, id, page, lines: [line], text: line, align: "left" }) as EditorObject;
+    const w = (id: string, page: string) => ({ kind: "whiteout", id, page, x: 0, y: 0, w: 10, h: 10, fill: "#ffffff", border: null, borderWidth: 0 }) as unknown as EditorObject;
+    const { layers, count } = shapedLayers({ objects: [w("a", "p0"), t("s1", "p0", "مرحبا"), w("b", "p0"), t("l", "p1", "Latin"), t("s2", "p0", "नमस्ते"), w("c", "p0"), w("d", "p1")] });
+    expect(Object.fromEntries(layers)).toEqual({ a: 0, s1: 0, b: 1, l: 0, s2: 1, c: 2, d: 0 });
+    expect(count).toBe(3);
+  });
+
+  it("draws an object added after a shaped line over it (z-order)", async () => {
+    const fonts = await nodeFonts();
+    const shaping = await nodeShapingFonts();
+    const engine = await shapingEngine();
+    const objects: EditorObject[] = [
+      { ...box, lines: ["مرحبا بالعالم"], text: "مرحبا بالعالم", align: "left" },
+      { kind: "whiteout", id: "w", page: "p0", x: 90, y: 190, w: 240, h: 40, fill: "#00ff00", border: null, borderWidth: 0 } as unknown as EditorObject,
+    ];
+    const out = await buildShaped(
+      { bytes: await source(), objects },
+      { engine: async () => engine, editorManifest: fonts.manifest, shapingManifest: async () => shaping.manifest, loadFace: fonts.load, loadUrl: shaping.load },
+      (b, defer, pass) => buildPdf({ bytes: b, pages, objects, assets: {} }, fonts, fontkit, defer, pass),
+    );
+    const { getDocument, OPS } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const task = getDocument({ data: out.slice(), verbosity: 0 });
+    const ops = await (await (await task.promise).getPage(1)).getOperatorList();
+    await task.destroy();
+    const last = (op: number) => ops.fnArray.lastIndexOf(op);
+    const green = ops.fnArray.findLastIndex((f, i) => f === OPS.setFillRGBColor && /^#00ff00$/i.test(String(ops.argsArray[i]?.[0])));
+    expect(last(OPS.showText)).toBeGreaterThan(0);
+    // The whiteout's fill comes after the Arabic text in the page's drawing order.
+    expect(green).toBeGreaterThan(last(OPS.showText));
   });
 });

@@ -84,6 +84,7 @@ scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: 
     if (wantsShaping(input)) {
       const { buildShaped } = await import("./shaped-text");
       out = await buildShaped(
+        input,
         {
           engine: () => {
             engine ??= shapingEngine();
@@ -100,8 +101,7 @@ scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: 
           loadUrl: bytes,
           labels: input.fonts?.labels,
         },
-        (defer) => buildPdf(input, withMore, fontkit, defer),
-        input.password,
+        (bytes, defer, pass) => buildPdf(pass.layer === 0 ? input : { ...input, bytes, password: undefined }, withMore, fontkit, defer, pass),
       );
     } else out = await buildPdf(input, withMore, fontkit);
     scope.postMessage({ id: msg.id, ok: true, bytes: out } satisfies BuildResponse, [out.buffer as ArrayBuffer]);
