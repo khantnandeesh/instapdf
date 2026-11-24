@@ -4,8 +4,10 @@
  * file alone. Rules it keeps:
  * - transform and opacity only; every tween clears them at the end (no inline transform is left to make
  *   a containing block for fixed descendants) except an exit's end state, which the caller removes;
- * - one gsap.matchMedia() context: under prefers-reduced-motion every preset is a 120ms fade or instant,
+ * - one gsap.matchMedia() query: under prefers-reduced-motion every preset is a 120ms fade or instant,
  *   and flipping the OS setting mid-session reverts running tweens (pending exits then resolve);
+ * - only running animations are referenced: each is in `live` until it completes or is interrupted, so
+ *   a finished tween never keeps its targets (detached DOM, Flip states of removed tiles) alive;
  * - overwrite: "auto", so a new call on an element retargets from where it is; nothing queues.
  */
 import { gsap } from "gsap";
@@ -24,21 +26,46 @@ export const NOTICE =
 
 type Vars = gsap.TweenVars;
 
-let ctx: gsap.Context | undefined;
 let reduced = false;
 const pending = new Set<() => void>();
 
+/**
+ * The animations that are running (or waiting on a delay). They are not created in the matchMedia
+ * context: a context keeps every animation added to it for its whole life, and this one lives as long as
+ * the page. Each one leaves this set when it completes or is interrupted (killed, overwritten, reverted).
+ */
+const live = new Set<gsap.core.Animation>();
+
+/** How many animations are running: 0 once everything has settled. */
+export const liveCount = () => live.size;
+
+/**
+ * Registers a running animation and drops it when it completes or is interrupted, keeping any callback it
+ * already has. The callbacks go on the returned animation itself (Flip.from hands its vars' callbacks to an
+ * inner tween), so every kind of ending is seen.
+ */
+function track<A extends gsap.core.Animation>(a: A): A {
+  if (a.progress() >= 1) return a;
+  live.add(a);
+  for (const type of ["onComplete", "onInterrupt"] as const) {
+    const prev = a.eventCallback(type);
+    a.eventCallback(type, (...args: unknown[]) => {
+      live.delete(a);
+      prev?.apply(a, args);
+    });
+  }
+  return a;
+}
+
 gsap.matchMedia().add({ full: "(prefers-reduced-motion: no-preference)", reduced: "(prefers-reduced-motion: reduce)" }, (c) => {
-  ctx = c;
   reduced = !!c.conditions?.reduced;
-  // The setting flipped: this context's tweens revert (inline styles cleared); finish any exit waiting on one.
+  // The setting flipped: running tweens revert (inline styles cleared); finish any exit waiting on one.
   return () => {
+    for (const a of [...live]) a.revert();
+    live.clear();
     for (const done of [...pending]) done();
   };
 });
-
-/** Runs `make` inside the matchMedia context, so its tweens revert when the setting flips. */
-const inCtx = <T>(make: () => T): T => (ctx ? ctx.add(make) : make());
 
 /** Under reduced motion these are instant; the rest become a 120ms fade (motion.md §3). */
 const INSTANT_WHEN_REDUCED = new Set<Preset>(["card", "list", "reorder", "filter", "tick", "swap"]);
@@ -107,7 +134,7 @@ export function enter(el: HTMLElement | HTMLElement[], p: Preset): void {
   // Stagger only what is in view, at most 10, and land by the 400ms cap; the rest arrive with the last one.
   const inView = els.filter((e) => e.getBoundingClientRect().top < innerHeight).slice(0, 10);
   const each = Math.min(STAGGER.each, STAGGER.max / Math.max(1, inView.length - 1), (CAP - duration) / Math.max(1, inView.length - 1));
-  inCtx(() =>
+  track(
     gsap.fromTo(els, start, {
       opacity: 1,
       x: 0,
@@ -135,7 +162,7 @@ export function exit(el: HTMLElement, p: Preset): Promise<void> {
       resolve();
     };
     pending.add(done);
-    inCtx(() => gsap.to(el, { ...to, ease: EASE.in.gsap, overwrite: "auto", onComplete: done, onInterrupt: done }));
+    track(gsap.to(el, { ...to, ease: EASE.in.gsap, overwrite: "auto", onComplete: done, onInterrupt: done }));
   });
 }
 
@@ -156,7 +183,7 @@ export function flip(container: HTMLElement, mutate: () => void, p: Preset): voi
   if (before.length > 40) {
     // Too many moving things shimmer: crossfade the list instead (motion.md rule 7).
     mutate();
-    inCtx(() => gsap.fromTo(container, { opacity: 0 }, { opacity: 1, duration: DUR.micro, ease: EASE.out.gsap, overwrite: "auto", clearProps: "opacity" }));
+    track(gsap.fromTo(container, { opacity: 0 }, { opacity: 1, duration: DUR.micro, ease: EASE.out.gsap, overwrite: "auto", clearProps: "opacity" }));
     return;
   }
   const state = Flip.getState(before, { simple: true });
@@ -164,7 +191,8 @@ export function flip(container: HTMLElement, mutate: () => void, p: Preset): voi
   const after = flipTargets(container).filter(inViewport);
   // A CSS entrance on a re-inserted item would fight the move: GSAP owns these items now.
   for (const el of after) for (const a of el.getAnimations()) if (a instanceof CSSAnimation) a.finish();
-  running = inCtx(() =>
+  const end = () => void (running = undefined);
+  running = track(
     Flip.from(state, {
       targets: after,
       duration: DUR.quick,
@@ -177,7 +205,8 @@ export function flip(container: HTMLElement, mutate: () => void, p: Preset): voi
         const { duration, opacity, scale = 1 } = FROM[p];
         return gsap.fromTo(els, { opacity, scale }, { opacity: 1, scale: 1, duration, ease: EASE.out.gsap, clearProps: "transform,opacity" });
       },
-      onComplete: () => void (running = undefined),
+      onComplete: end,
+      onInterrupt: end,
     }),
   );
 }
@@ -186,10 +215,8 @@ export function swap(outEl: HTMLElement, inEl: HTMLElement, p: Preset): void {
   const from = pick(FROM, p);
   if (!from) return;
   const { duration, ...start } = from;
-  inCtx(() => {
-    gsap.fromTo(outEl, { opacity: 1 }, { opacity: 0, duration: DUR.micro, ease: EASE.in.gsap, overwrite: "auto", clearProps: "opacity" });
-    gsap.fromTo(inEl, start, { opacity: 1, scale: 1, y: 0, duration, ease: ease(p), overwrite: "auto", clearProps: "transform,opacity" });
-  });
+  track(gsap.fromTo(outEl, { opacity: 1 }, { opacity: 0, duration: DUR.micro, ease: EASE.in.gsap, overwrite: "auto", clearProps: "opacity" }));
+  track(gsap.fromTo(inEl, start, { opacity: 1, scale: 1, y: 0, duration, ease: ease(p), overwrite: "auto", clearProps: "transform,opacity" }));
 }
 
 export function kill(el: HTMLElement): void {
