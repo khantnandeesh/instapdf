@@ -9,7 +9,7 @@ export const catalogueCopy = {
   clear: "Clear search",
   readyOnly: "Only ready tools",
   /** Phones, beside the search in the sticky bar; the switch is still named "Only ready tools". */
-  readyOnlyShort: "Ready only",
+  readyOnlyShort: "Only ready",
   jumpLabel: "Jump to a category",
   recentTitle: "Recently used",
   recentClear: "Clear",

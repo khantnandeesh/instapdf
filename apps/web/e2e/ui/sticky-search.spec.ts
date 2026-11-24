@@ -80,3 +80,12 @@ test("F2 H-7 focus order is kept: search, then the ready-only filter, then the c
   await page.keyboard.press("Tab");
   await expect(page.getByRole("navigation", { name: "Jump to a category" }).getByRole("link").first()).toBeFocused();
 });
+
+test("the ready-only switch's visible text is part of its accessible name on every width (WCAG 2.5.3)", async ({ page }) => {
+  await page.goto("/");
+  const sw = page.getByRole("switch", { name: "Only ready tools" });
+  await expect(sw).toBeVisible();
+  const visible = (await sw.locator("xpath=..").innerText()).trim();
+  expect(visible.length).toBeGreaterThan(0);
+  expect("Only ready tools".toLowerCase()).toContain(visible.toLowerCase());
+});
