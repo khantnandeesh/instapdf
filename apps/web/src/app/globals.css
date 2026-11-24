@@ -452,10 +452,23 @@
     padding: 10px 10px 0;
     background: transparent;
   }
+  /* The glass sits on ::before, not on the div: backdrop-filter (like filter, transform, contain)
+     would make the div the containing block of position:fixed descendants (the All tools menu
+     panel and its scrim), pinning them to the pill instead of the viewport. */
   .mp-header > div {
+    position: relative;
+    isolation: isolate;
     height: calc(100% - 10px);
     padding-inline: 22px;
     border-radius: 999px;
+  }
+  .mp-header > div::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
     border: 1px solid rgba(255, 255, 255, 0.7);
     background: color-mix(in srgb, var(--surface) 55%, transparent);
     -webkit-backdrop-filter: blur(18px) saturate(1.7);
@@ -463,12 +476,12 @@
     box-shadow: 0 10px 30px -16px rgba(140, 30, 60, 0.35);
   }
   @media (prefers-reduced-transparency: reduce) {
-    .mp-header > div {
+    .mp-header > div::before {
       background: var(--surface);
     }
   }
   @media (forced-colors: active) {
-    .mp-header > div {
+    .mp-header > div::before {
       border-color: CanvasText;
     }
   }
