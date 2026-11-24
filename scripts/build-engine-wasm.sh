@@ -30,8 +30,9 @@ rm -rf berry-wasm/pkg
 # shaping, which the editor loads only when someone edits Hindi, Arabic or similar text.
 cargo "+$RUST_VERSION" build -p berry-wasm --target wasm32-unknown-unknown --release --locked
 wasm-bindgen target/wasm32-unknown-unknown/release/berry_wasm.wasm --out-dir berry-wasm/pkg --target web --out-name berry_engine
-cargo "+$RUST_VERSION" build -p berry-wasm --features shaping --target wasm32-unknown-unknown --release --locked
-wasm-bindgen target/wasm32-unknown-unknown/release/berry_wasm.wasm --out-dir berry-wasm/pkg --target web --out-name berry_engine_shaping
+# Built for size (profile wasm-shaping in crates/Cargo.toml) to stay inside the budget.
+cargo "+$RUST_VERSION" build -p berry-wasm --features shaping --target wasm32-unknown-unknown --profile wasm-shaping --locked
+wasm-bindgen target/wasm32-unknown-unknown/wasm-shaping/berry_wasm.wasm --out-dir berry-wasm/pkg --target web --out-name berry_engine_shaping
 node berry-wasm/smoke.mjs
 BERRY_ENGINE=berry_engine_shaping node berry-wasm/smoke.mjs
 

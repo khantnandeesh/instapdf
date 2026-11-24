@@ -14,3 +14,17 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+# The shaping module downloads lazily, only when someone edits Hindi, Arabic or similar text, and
+# must fit the 1 MB gzip budget, so it is built for size. The default module stays at "s".
+[profile.wasm-shaping]
+inherits = "release"
+
+[profile.wasm-shaping.package.berry-engine]
+opt-level = "z"
+
+[profile.wasm-shaping.package.rustybuzz]
+opt-level = "z"
+
+[profile.wasm-shaping.package.ttf-parser]
+opt-level = "z"

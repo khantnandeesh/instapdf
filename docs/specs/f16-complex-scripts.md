@@ -124,7 +124,71 @@ may name script families. Nothing else changes.
 | 208, 209 | Pass | `ac208_reuse_page_words`, `ac209_embedded_font_shapes_when_it_can` |
 | 210 | Pass | `ac210_missing_glyphs_names_script_family` |
 | 212 | Pass | `ac212_legacy_hindi_font_is_read_only` |
-| 213 | Pass | Two modules (lead, 2026-11-24): default `berry_engine` 723,957 → 763,446 bytes gzip (+39 KB, for reading Hindi and Arabic right), complex-script lines read-only with `needs-shaping`; `berry_engine_shaping` 977,933 bytes gzip, loaded only to edit them. Shaper alone: rustybuzz 234 KB gzip, HarfRust 0.16 309 KB (it would also add a second read-fonts version). |
+| 213 | Pass | (Sizes at the time; see §7 for the current ones.) Two modules (lead, 2026-11-24): default `berry_engine` 723,957 → 763,446 bytes gzip (+39 KB, for reading Hindi and Arabic right), complex-script lines read-only with `needs-shaping`; `berry_engine_shaping` 977,933 bytes gzip, loaded only to edit them. Shaper alone: rustybuzz 234 KB gzip, HarfRust 0.16 309 KB (it would also add a second read-fonts version). |
 | 214 | Pass | all earlier engine tests and the 18 earlier oracle cases unchanged |
 | 215 | Pass | `/mnt/project-files/designs/complex-scripts/side-by-side-append.png`: the reference breaks every conjunct and the Arabic line; ours is shaped and reads right |
 
+
+## 7. New text: `shape()` and `addText()` (2026-11-24)
+
+The editor's added text boxes draw Hindi and Arabic through the engine instead of pdf-lib, which
+cannot shape them (it showed "Won't print"). The API (`berry-engine.d.ts`) was approved by the lead
+with these choices: indices are UTF-16 code units, colour is sRGB 0–255 like `Run.color`, and errors
+keep the `kind` union. Both modules have both calls; the default one throws `needs-shaping` for text
+that needs the shaper, so the editor loads the shaping module only for such boxes.
+
+- One line per call. The line is split into bidi runs (`unicode-bidi`), then into words and blanks.
+  A word takes the registered face that ranks best for the request and draws it; punctuation, digits
+  and spaces keep the face before them when it has them. The request is the box's family, then the
+  open families of the text's scripts, then the box's other families.
+- Words are shaped with rustybuzz and embedded as subsets with ToUnicode (alias codes where one
+  glyph needs two texts) and a small Unicode `cmap`, so readers can tell a mirrored bracket.
+- A word whose glyphs alone would not read as typed gets `/ActualText`. Left to right, that covers
+  every word with a glyph that maps to nothing (PDFium reads such glyphs as U+FFFE); the span also
+  covers the space after the word, because PDFium drops a space after a word that ends in a
+  zero-advance glyph (a reph). Right to left, the glyph mappings are written so that no ActualText is
+  needed where possible, as for edits (PDFium reverses right-to-left ActualText).
+- Right-to-left words with numbers or Latin inside a left-to-right line ("Invoice فاتورة 2024")
+  look the same drawn as several logical orders, so that whole stretch gets one ActualText span.
+- A bracket right to left maps to the shape it shows ("«" drawn for "»"): PDFium always mirrors when
+  it reorders, and our reader mirrors when the embedded cmap confirms the shape.
+- The new content stream is appended after the page's own content, which is wrapped in `q … Q`.
+  The page is read back: the old glyphs must be unchanged, every new glyph where it was laid out,
+  and the new line must read as typed, or the edit is rolled back.
+- `addFont` also takes WOFF 1.0 (the Fontsource files the web app ships), with the unpacked size
+  checked before each table is inflated. Several slices of one family are all kept.
+
+### Acceptance criteria
+
+- **AC-216 (P0)** `addText` draws Hindi and Arabic lines that the engine reads back exactly as typed,
+  after saving and reopening; Arabic lines read `rtl`.
+- **AC-217 (P0)** PDFium reads every added line as typed (copy and search work), including spaces
+  after Hindi words, mirrored brackets in Arabic and mixed Latin with Hindi.
+- **AC-218 (P0)** Pixels outside `EditResult.changed` are identical, and text already on the page is
+  unchanged, also when the page's content leaves a scale or colour set.
+- **AC-219 (P0)** `shape()` widths match what `addText` draws (right alignment: `x = right - width`
+  puts the line's right edge at `right` ±1 pt).
+- **AC-220 (P0)** With no registered face for a character, both calls throw `missing-glyphs` naming
+  the box's family first and then the script's open families; nothing changes.
+- **AC-221 (P0)** The default module draws Latin text and throws `needs-shaping` for complex text.
+- **AC-222 (P1)** An added Hindi line can be edited again with `replaceRange`.
+- **AC-223 (P0)** Both modules stay under the 1 MB gzip budget.
+- **AC-224 (P0)** Side by side with the reference, adding the same Arabic and Hindi lines: ours is shaped,
+  joined and copies right.
+
+### Results
+
+| AC | Result | Evidence |
+|---|---|---|
+| 216, 219, 221, 222 | Pass | `crates/berry-engine/tests/add_text.rs` (both builds) and `smoke.mjs` (both modules) |
+| 217, 218 | Pass | oracle cases `add-*` in `manifest.json`: 6 of 6, including pixels outside `changed` and Arabic words with numbers in a Latin line. One PDFium quirk stays: in `مُحَمَّدٌ:` it reads the final tanween after the colon (`مُحَمَّد:ٌ`); the engine reads it right and the rendering is right. |
+| 220 | Pass | `missing_script_fonts_are_named`, `bad_input_changes_nothing` |
+| 223 | Pass | default `berry_engine` 763,446 → 786,575 bytes gzip, now capped by a test and in CI so it cannot grow past 792 KB; `berry_engine_shaping` 977,933 → 958,683 bytes gzip (973,218 with Node's zlib, which the web test uses), now built with `opt-level = "z"` for the engine, rustybuzz and ttf-parser (profile `wasm-shaping`). That module reads pages about 15% slower than the default one, which stays at `"s"`. |
+| 224 | Pending | needs a browser session and a reference task slot |
+
+Known limit: a very short line with as many Latin as Arabic letters (for example "x ب 2") can read
+back in the other direction, so `addText` refuses it with `verify` and nothing changes.
+
+Also fixed on the way: replacing a Hindi word that ends in a reph (संपूर्ण) kept the following space in
+place instead of moving it with the rest of the line, so the line read "रा शि". Glyphs that start
+where the replaced word ends now move with the rest of the line.
