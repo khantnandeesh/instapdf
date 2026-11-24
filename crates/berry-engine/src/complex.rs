@@ -782,7 +782,33 @@ impl Engine {
                     }
                 }
             }
-            sibling_font.insert(*fi, self.sibling_font(id, if f.two_byte { 2 } else { 1 }, map, &widths, backup)?);
+            // A sibling already on the page is used again: as it is when it reads these codes as
+            // typed and declares their widths, or, when this session made it, with the new codes
+            // added (one sibling per font, not one per edit). Otherwise a new one is made.
+            let family: Vec<usize> = (0..pc.fonts.len())
+                .filter(|&j| pc.fonts[j].object_id.is_some_and(|o| o == id || self.same_font_but_mapping(id, o)))
+                .collect();
+            let reads = |j: usize, all: bool| {
+                let s = &pc.fonts[j];
+                map.iter().all(|(c, t)| match s.reader_unicode(*c) {
+                    Some(r) => r == *t,
+                    None => !all,
+                }) && (!all || widths.iter().all(|(c, _)| s.declares_width(*c)))
+            };
+            let fid = |j: usize| pc.fonts[j].object_id.unwrap_or(id);
+            let as_is = family.iter().copied().find(|&j| j != *fi && reads(j, true));
+            let extend = family.iter().copied().find(|&j| self.made_here(fid(j)) && reads(j, false));
+            let width = if f.two_byte { 2 } else { 1 };
+            let sib = match (as_is, extend) {
+                (Some(j), _) => fid(j),
+                (None, Some(j)) => {
+                    let s = &pc.fonts[j];
+                    let widths: Vec<(u32, f64)> = widths.iter().copied().filter(|(c, _)| !s.declares_width(*c)).collect();
+                    self.sibling_font(id, width, map, &widths, Some(fid(j)), backup)?
+                }
+                (None, None) => self.sibling_font(id, width, map, &widths, None, backup)?,
+            };
+            sibling_font.insert(*fi, sib);
         }
         let mut names: HashMap<GlyphFont, Vec<u8>> = HashMap::new();
         names.insert(GlyphFont::Page(state.font), state.font_res.clone());

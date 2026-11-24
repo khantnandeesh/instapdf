@@ -125,9 +125,19 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
     oracle case `plain-arabic-number-unmapped`, "2500" → "3750" on scripts-plain.pdf, whose
     subset has no width for "3"). pdf.js drops the space between the line and the sibling's
     digits ("تجريبي.2024"), as it does at any change of font and direction there; PDFium and
-    copy and paste keep it. Each such edit makes a new sibling (reusing one is a follow-up), and
-    a second digit edit at the end of the same line is refused for now (the engine reads the
-    line back with the sibling runs out of order).
+    copy and paste keep it. It also drops the space between two numbers typed in separate edits
+    ("2024 3" reads "20243" in pdf.js; PDFium reads it as typed).
+  - A sibling is used again rather than made per edit: one already on the page that maps the
+    codes as typed (and declares their widths) is used as it is, and one this session made gets
+    the new codes added to its ToUnicode (and widths to its CIDFont copy), since only text this
+    session drew uses it. A sibling in a file saved earlier that lacks a code is left as it was
+    (other text may draw with it) and a new one is made. Only fonts of the edited page are
+    looked at. Tests: `second_number_at_line_end_reuses_the_sibling`,
+    `digits_on_two_lines_share_one_sibling`, `a_saved_sibling_is_reused_only_as_it_is`.
+  - More numbers at the end of the same line ("2024" then " 3") are kept: the read-back orders
+    numbers separated by spaces in a right-to-left line right to left, as UAX #9 does (N1:
+    numbers count as right-to-left for the neutrals between them), unless left-to-right letters
+    lead into them ("abc 12 34" stays one left-to-right run).
   Tests: crates/berry-engine/tests/font_mapping.rs, and pdfium and pdf.js read-back in
   apps/web/src/lib/editor/mixed-direction.test.ts.
 - Lines already drawn with ActualText spans (Chrome and LibreOffice Arabic) are not covered by

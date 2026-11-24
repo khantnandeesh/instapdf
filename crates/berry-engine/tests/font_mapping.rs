@@ -165,3 +165,116 @@ fn sibling_inside_a_right_to_left_line_is_refused() {
     assert!(matches!(err, Error::Verify { reason: "text-mismatch", .. }), "{err:?}");
     assert_eq!(texts(&e.page_text(0).unwrap()), texts(&p));
 }
+
+/// The siblings among page 1's fonts: fonts other than the Arabic one with the same descriptor.
+fn siblings_of(doc: &Document) -> Vec<(ObjectId, String)> {
+    let (font, _) = arabic_font(doc);
+    let desc = |id: ObjectId| {
+        let d = doc.get_dictionary(id).ok()?;
+        let cid = d.get(b"DescendantFonts").ok()?.as_array().ok()?.first()?.as_reference().ok()?;
+        doc.get_dictionary(cid).ok()?.get(b"FontDescriptor").ok().cloned()
+    };
+    let want = desc(font);
+    other_to_unicode(doc, font).into_iter().filter(|(id, _)| desc(*id) == want).collect()
+}
+
+fn entries(cmap: &str) -> Vec<&str> {
+    cmap.lines().filter(|l| l.starts_with('<') && l.contains("> <") && *l != "<0000> <FFFF>").collect()
+}
+
+/// Edits in a row on one engine: each must be kept and read as typed.
+fn edits(bytes: Vec<u8>, steps: &[(&str, &str)]) -> (Engine, Vec<u8>) {
+    let mut e = engine(bytes);
+    for (starts, tail) in steps {
+        let p = e.page_text(0).unwrap();
+        let id = line_id(&p, starts);
+        let want = format!("{}{tail}", p.lines[id].text);
+        let r = e.replace_line(0, id, &want).unwrap_or_else(|err| panic!("{tail:?}: {err:?}"));
+        assert!(texts(&r.page).contains(&want), "{:?}", texts(&r.page));
+    }
+    let out = e.save().unwrap().0;
+    assert!(!out.windows(11).any(|w| w == b"/ActualText"));
+    (e, out)
+}
+
+/// A second number typed at the end of the same line reads as typed (not "7 2024": numbers in
+/// a right-to-left line are ordered right to left), and draws through the same sibling, whose
+/// ToUnicode gains the new digit.
+#[test]
+fn second_number_at_line_end_reuses_the_sibling() {
+    // "3": a digit the subset draws but neither maps nor gives a width (the sibling's CIDFont
+    // gains it); "5": one it maps, drawn through the sibling with the rest of its word.
+    for (second, line, added) in [
+        (" 3", "مرحبا بالعالم، هذا نص تجريبي. 2024 3", Some("> <0033>")),
+        ("5", "مرحبا بالعالم، هذا نص تجريبي. 20245", Some("> <0035>")),
+        (" 2024", "مرحبا بالعالم، هذا نص تجريبي. 2024 2024", None),
+    ] {
+        let (_, out) = edits(read("scripts-plain.pdf"), &[("مرحبا", " 2024"), ("مرحبا", second)]);
+        let doc = Document::load_mem(&out).unwrap();
+        let sib = siblings_of(&doc);
+        assert_eq!(sib.len(), 1, "{second:?}: {sib:?}");
+        let got = entries(&sib[0].1);
+        let first = ["<0072> <0030>", "<0074> <0032>", "<0076> <0034>"];
+        assert!(first.iter().all(|e| got.contains(e)), "{second:?}: {got:?}");
+        let new: Vec<&&str> = got.iter().filter(|e| !first.contains(e)).collect();
+        match added {
+            Some(text) => {
+                assert!(new.len() == 1 && new[0].ends_with(text), "{second:?}: {got:?}");
+                // The sibling's CIDFont declares the width of each digit it draws.
+                let d = doc.get_dictionary(sib[0].0).unwrap();
+                let cid = d.get(b"DescendantFonts").unwrap().as_array().unwrap()[0].as_reference().unwrap();
+                let w = doc.get_dictionary(cid).unwrap().get(b"W").unwrap().as_array().unwrap().clone();
+                let code = i64::from_str_radix(&new[0][1..5], 16).unwrap();
+                let declared = |c: i64| w.windows(2).any(|p| p[0].as_i64().ok() == Some(c) && p[1].as_array().is_ok());
+                assert!(declared(0x76) && (second != " 3" || declared(code)), "{second:?}: {w:?}");
+            }
+            None => assert!(new.is_empty() && got.len() == 3, "{second:?}: {got:?}"),
+        }
+        assert!(texts(&engine(out).page_text(0).unwrap()).contains(&line.to_string()));
+    }
+}
+
+/// Digits typed on two lines go through one sibling, and a number after the "77." that ends a
+/// line reads after it.
+#[test]
+fn digits_on_two_lines_share_one_sibling() {
+    let (_, out) = edits(read("scripts-plain.pdf"), &[("مرحبا", " 2024"), ("المبلغ", " 4")]);
+    let doc = Document::load_mem(&out).unwrap();
+    assert_eq!(siblings_of(&doc).len(), 1);
+    let p = engine(out).page_text(0).unwrap();
+    assert!(texts(&p).contains(&"المبلغ الإجمالي 2500 ريال للفاتورة رقم 77. 4".to_string()), "{:?}", texts(&p));
+}
+
+/// In a file saved earlier, a sibling that already reads the new digits is used as it is; one
+/// that lacks a digit is left as it was (it was not made in this session, so other text may
+/// draw with it) and a new sibling is made.
+#[test]
+fn a_saved_sibling_is_reused_only_as_it_is() {
+    let (_, saved) = edits(read("scripts-plain.pdf"), &[("مرحبا", " 2024")]);
+    let before = siblings_of(&Document::load_mem(&saved).unwrap());
+    let (_, out) = edits(saved.clone(), &[("المبلغ", " 2042")]);
+    assert_eq!(siblings_of(&Document::load_mem(&out).unwrap()), before);
+
+    let (_, out) = edits(saved, &[("المبلغ", " 3")]);
+    let after = siblings_of(&Document::load_mem(&out).unwrap());
+    assert_eq!(after.len(), 2, "{after:?}");
+    assert!(after.contains(&before[0]), "the saved sibling changed");
+}
+
+/// A refused edit leaves the sibling it would have extended as it was.
+#[test]
+fn a_refused_edit_leaves_the_sibling_as_it_was() {
+    let mut e = engine(read("scripts-plain.pdf"));
+    let p = e.page_text(0).unwrap();
+    let id = line_id(&p, "مرحبا");
+    let want = format!("{} 2024", p.lines[id].text);
+    e.replace_line(0, id, &want).unwrap();
+    let saved = Document::load_mem(&e.save().unwrap().0).unwrap();
+    let p = e.page_text(0).unwrap();
+    let id = line_id(&p, "المبلغ");
+    let err = e.replace_line(0, id, &p.lines[id].text.replace("2500", "3750")).unwrap_err();
+    assert!(matches!(err, Error::Verify { reason: "text-mismatch", .. }), "{err:?}");
+    assert_eq!(texts(&e.page_text(0).unwrap()), texts(&p));
+    let out = Document::load_mem(&e.save().unwrap().0).unwrap();
+    assert_eq!(siblings_of(&out), siblings_of(&saved));
+}

@@ -111,3 +111,31 @@ describe("mixed-direction edits in an Arabic line (scripts-plain.pdf)", () => {
     });
   }
 });
+
+/**
+ * A second number typed at the end of the same Arabic line: kept, drawn through the sibling font
+ * the first one made, and read as typed by both readers ("2024 3", not "3 2024").
+ */
+describe("two digit edits in a row at the end of an Arabic line (scripts-plain.pdf)", () => {
+  for (const tails of [[" 2024", " 3"], [" 2024", "5"], [" 24", " 2024"]] as const) {
+    it(`${tails.map((t) => JSON.stringify(t)).join(" then ")}: read back as typed by pdfium and pdf.js`, async () => {
+      const { BerryDocument } = await engine();
+      const doc = new BerryDocument(new Uint8Array(readFileSync(corpus("scripts-plain.pdf"))));
+      try {
+        doc.addFont("Noto Naskh Arabic", false, false, new Uint8Array(readFileSync(corpus("fonts/NotoNaskhArabic-Regular.ttf"))));
+        let want = "";
+        for (const tail of tails) {
+          const page = doc.pageText(0);
+          const id = page.lines.findIndex((l) => l.text.startsWith("مرحبا"));
+          want = page.lines[id].text + tail;
+          expect(doc.replaceLine(0, id, want).page.lines.map((l) => l.text)).toContain(want);
+        }
+        const bytes = doc.save().bytes;
+        if (pdfium) expect(pdfiumText(bytes)).toContain(want);
+        expect(squash(await pdfjsText(bytes))).toContain(squash(want));
+      } finally {
+        doc.free();
+      }
+    });
+  }
+});
