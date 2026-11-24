@@ -70,6 +70,13 @@ def run_case(case, args):
     else:
         cmd = [args.berry, "replace", src, out, "1", case["find"], case["replace"], "--fonts", fonts]
     proc = subprocess.run(cmd, capture_output=True, text=True)
+    if "refused" in case:
+        # An edit the engine must refuse, leaving no output. The error kind is part of the match,
+        # so a save read-back failure ("Save { reason: ... }") can't pass as an expected refusal.
+        want = f'Verify {{ reason: "{case["refused"]}"'
+        if proc.returncode == 0:
+            return [f"engine made the edit; expected it refused ({case['refused']})"]
+        return [] if want in proc.stderr else [f"engine failed otherwise: {proc.stderr.strip()}"]
     if proc.returncode != 0:
         return [f"engine failed: {proc.stderr.strip()}"]
     report = json.loads(proc.stdout)

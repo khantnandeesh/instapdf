@@ -90,8 +90,32 @@ const concat = (...parts: Uint8Array[]) => {
 };
 const equal = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((x, i) => x === b[i]);
 const padded = (pw: Uint8Array) => concat(pw.subarray(0, 32), PAD.subarray(0, 32 - Math.min(32, pw.length)));
-/** R2 to R4 passwords are bytes in PDFDocEncoding: Latin-1 is close enough for a check. */
-const latin1 = (s: string) => Uint8Array.from(s, (c) => c.charCodeAt(0) & 255);
+/** PDFDocEncoding codes that differ from Latin-1 (ISO 32000-2 Annex D): code → Unicode. */
+const PDFDOC_SPECIAL: Record<number, number> = {
+  0x18: 0x02d8, 0x19: 0x02c7, 0x1a: 0x02c6, 0x1b: 0x02d9, 0x1c: 0x02dd, 0x1d: 0x02db, 0x1e: 0x02da, 0x1f: 0x02dc,
+  0x80: 0x2022, 0x81: 0x2020, 0x82: 0x2021, 0x83: 0x2026, 0x84: 0x2014, 0x85: 0x2013, 0x86: 0x0192, 0x87: 0x2044,
+  0x88: 0x2039, 0x89: 0x203a, 0x8a: 0x2212, 0x8b: 0x2030, 0x8c: 0x201e, 0x8d: 0x201c, 0x8e: 0x201d, 0x8f: 0x2018,
+  0x90: 0x2019, 0x91: 0x201a, 0x92: 0x2122, 0x93: 0xfb01, 0x94: 0xfb02, 0x95: 0x0141, 0x96: 0x0152, 0x97: 0x0160,
+  0x98: 0x0178, 0x99: 0x017d, 0x9a: 0x0131, 0x9b: 0x0142, 0x9c: 0x0153, 0x9d: 0x0161, 0x9e: 0x017e, 0xa0: 0x20ac,
+};
+const FROM_UNICODE = new Map(Object.entries(PDFDOC_SPECIAL).map(([code, cp]) => [cp, Number(code)]));
+
+/**
+ * R2 to R4 passwords are bytes in PDFDocEncoding. Null when a character has no code there (it
+ * can't be the password: truncating it to a byte could match a different one). U+00AD (soft
+ * hyphen) has none: 0xAD is undefined in PDFDocEncoding.
+ */
+export function pdfDocBytes(s: string): Uint8Array | null {
+  const out: number[] = [];
+  for (const ch of s) {
+    const cp = ch.codePointAt(0)!;
+    const special = FROM_UNICODE.get(cp);
+    if (special !== undefined) out.push(special);
+    else if (cp <= 0xff && !(cp >= 0x18 && cp <= 0x1f) && !(cp >= 0x7f && cp <= 0xa0) && cp !== 0xad) out.push(cp);
+    else return null;
+  }
+  return Uint8Array.from(out);
+}
 const xorKey = (key: Uint8Array, i: number) => key.map((b) => b ^ i);
 
 // ---- R2 to R4 (RC4 / AES-128) ----
@@ -156,8 +180,12 @@ export async function passwordKind(e: EncryptInfo, password: string): Promise<Pa
     if (equal(await hash2B(e, pw, e.u.subarray(32, 40), new Uint8Array()), e.u.subarray(0, 32))) return "user";
     return null;
   }
-  const pw = latin1(password);
-  if (isOwnerLegacy(e, pw)) return "owner";
-  if (isUserLegacy(e, pw)) return "user";
+  // PDFDocEncoding first (the standard), then the UTF-8 bytes, as qpdf also tries: some tools
+  // write a non-Latin password that way.
+  const doc = pdfDocBytes(password);
+  const raw = new TextEncoder().encode(password);
+  const tries = [doc, doc && equal(doc, raw) ? null : raw].filter((x): x is Uint8Array => !!x);
+  for (const pw of tries) if (isOwnerLegacy(e, pw)) return "owner";
+  for (const pw of tries) if (isUserLegacy(e, pw)) return "user";
   return null;
 }

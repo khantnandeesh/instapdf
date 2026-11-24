@@ -61,7 +61,7 @@ export type ToolDef = { id: ToolId; key: string; hint: string; icon: ReactNode }
 export const TOOLS: ToolDef[] = [
   { id: "select", key: "V", hint: "Click to select, drag to move", icon: <SelectBold size={22} /> },
   { id: "edit", key: "E", hint: "Click a line to change its words", icon: <EditTextBold size={22} /> },
-  { id: "text", key: "T", hint: "Click to type, drag for a box", icon: <TextBold size={22} /> },
+  { id: "text", key: "T", hint: "Click to type, drag for a box · Esc to stop", icon: <TextBold size={22} /> },
   { id: "sign", key: "S", hint: "Sign or add initials", icon: <SignBold size={22} /> },
   { id: "form", key: "F", hint: "Add form fields, or find them with Detect", icon: <TextFieldIcon size={22} /> },
   { id: "mark", key: "H", hint: "Drag across words to mark them", icon: <MarkBold size={22} /> },
@@ -324,7 +324,6 @@ export function DownloadButton({ compact }: { compact?: boolean }) {
 
 export function TopBar({ wide, fileMenu, onClose }: { wide: boolean; fileMenu: MenuEntry[]; onClose: () => void }) {
   const ctl = useCtl();
-  const selecting = useStore(ctl.store, (s) => s.selection.length > 0);
   return (
     <header className="ed-top ed-glass" data-region="top">
       {wide ? (
@@ -340,7 +339,7 @@ export function TopBar({ wide, fileMenu, onClose }: { wide: boolean; fileMenu: M
         <h2 className="truncate">{ctl.rt.name}</h2>
         <CaretDownBold size={12} className="shrink-0" />
       </MenuButton>
-      <div className="ed-top__slot">{wide && !selecting && <ToolOptions />}</div>
+      <div className="ed-top__slot">{wide && <ToolOptions />}</div>
       <FieldsChipSlot />
       <UndoRedo />
       {wide && <PrivacyChip />}

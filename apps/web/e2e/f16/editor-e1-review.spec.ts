@@ -67,8 +67,16 @@ async function tool(page: Page, key: string) {
 async function clickPage(page: Page, n: number, fx: number, fy: number) {
   const el = page.getByTestId(`page-${n}`);
   await el.scrollIntoViewIfNeeded();
-  const b = (await el.boundingBox())!;
-  await page.mouse.click(b.x + b.width * fx, b.y + Math.min(b.height * fy, page.viewportSize()!.height - b.y - 180));
+  let b = (await el.boundingBox())!;
+  // Pages open at fit width and can be taller than the window: bring the point into view first.
+  const vh = page.viewportSize()!.height;
+  const y = b.y + b.height * fy;
+  if (y > vh - 180 || y < 100) {
+    await page.getByTestId("canvas").evaluate((c, d) => c.scrollBy(0, d), y - vh / 2);
+    await page.waitForTimeout(150);
+    b = (await el.boundingBox())!;
+  }
+  await page.mouse.click(b.x + b.width * fx, b.y + b.height * fy);
 }
 
 async function addText(page: Page, text: string, fy = 0.3) {
@@ -347,6 +355,8 @@ test("review #9 #10: off-screen page and thumbnail canvases are zeroed, and the 
     }) as typeof document.createElement;
   });
   await open(page, { name: "forty.pdf", mimeType: "application/pdf", buffer: await numbered(40) });
+  // The pages panel opens by default only on screens 1600 px and wider (M12).
+  if (info.project.name === "desktop" && !(await page.getByTestId("thumbs").isVisible())) await page.getByRole("button", { name: "Pages panel" }).click();
   const leaked = () =>
     page.evaluate(() =>
       (window as unknown as { __rasters: HTMLCanvasElement[] }).__rasters.filter(
