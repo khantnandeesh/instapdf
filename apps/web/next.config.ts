@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import engine from "./public/engine/manifest.json";
 import { ACCEPTS_BR, ACCEPTS_GZIP } from "./src/lib/editor/accept-encoding";
 import { contentSecurityPolicy, securityHeaders } from "./src/lib/security/csp";
+import { FONT_LIBRARY_PATHS, fontsOrigin } from "./scripts/font-library/origin.mjs";
 
 /**
  * The editor engine from content-hashed paths (/engine/<sha16>/<file>, see
@@ -33,7 +34,9 @@ const engineFiles = (Object.keys(ENGINE_TYPES) as (keyof typeof ENGINE_TYPES)[])
  * files are the in-app copy in public/fonts/lib; with it (set at build, e.g.
  * https://storage.googleapis.com/<bucket>) the same paths are passed through to the bucket.
  */
-const FONTS_ORIGIN = (process.env.FONTS_ORIGIN ?? "").replace(/\/+$/, "");
+const FONTS_ORIGIN = fontsOrigin(process.env.FONTS_ORIGIN);
+// Only the library's own, fully spelled-out paths are passed through, never the whole bucket.
+const FONT_PATHS = FONT_LIBRARY_PATHS;
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -52,7 +55,7 @@ const nextConfig: NextConfig = {
         { source, has: [GZIP], destination: `/engine/${file}.gz` },
         { source, destination: `/engine/${file}` },
       ]),
-      afterFiles: FONTS_ORIGIN ? [{ source: "/fonts/lib/:path*", destination: `${FONTS_ORIGIN}/:path*` }] : [],
+      afterFiles: FONTS_ORIGIN ? FONT_PATHS.map((p) => ({ source: `/fonts/lib/${p.source}`, destination: `${FONTS_ORIGIN}/${p.destination}` })) : [],
       fallback: [],
     };
   },

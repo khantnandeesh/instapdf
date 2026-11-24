@@ -33,7 +33,7 @@ async function tapPage(page: Page, fx: number, fy: number) {
   await page.mouse.click(b.x + b.width * fx, b.y + b.height * fy);
 }
 
-test("slow 3G: the first page and Add text work before the engine; a line clicked early opens when it's ready", async ({ page }, info) => {
+test("slow 3G: the first page and Add text work before the engine; a line clicked early opens when it's ready", { tag: "@serial" }, async ({ page }, info) => {
   test.setTimeout(300_000);
   await dataSaver(page);
   await throttle(page);
@@ -96,7 +96,7 @@ test("slow 3G: the first page and Add text work before the engine; a line clicke
   await expect(again.getByTestId("editor-shell")).toHaveAttribute("data-engine-cached", "true");
 });
 
-test("slow 3G: the landing fetches pdf.js and its workers on idle before the engine, so the first page after a pick needs no download", async ({ page }, info) => {
+test("slow 3G: the landing fetches pdf.js and its workers on idle before the engine, so the first page after a pick needs no download", { tag: "@serial" }, async ({ page }, info) => {
   test.setTimeout(300_000);
   await throttle(page);
   const order: string[] = [];
@@ -128,7 +128,7 @@ test("slow 3G: the landing fetches pdf.js and its workers on idle before the eng
   expect(tFirstPage).toBeLessThan(6000);
 });
 
-test("slow 3G: the landing prefetches the engine on idle, from hashed paths, unless Data Saver is on", async ({ browser }) => {
+test("slow 3G: the landing prefetches the engine on idle, from hashed paths, unless Data Saver is on", { tag: "@serial" }, async ({ browser }) => {
   test.setTimeout(240_000);
   const run = async (saver: boolean) => {
     const context = await browser.newContext({ ...test.info().project.use });

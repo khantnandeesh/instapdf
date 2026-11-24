@@ -4,12 +4,15 @@
  * font menu searches, and the matching index.
  *
  *   node scripts/font-library/build-library.mjs --out <dir>
- *        [--source packages | catalogue] [--catalogue <catalogue.json>] [--families id,id] [--limit n]
- *        [--subsets latin,latin-ext] [--weights 400,700] [--clean]
+ *        [--source packages | npm | catalogue] [--catalogue <catalogue.json>] [--families id,id] [--limit n]
+ *        [--subsets latin,latin-ext] [--weights 400,700] [--min-families n] [--clean]
  *
  * --source packages (default) reads the @fontsource packages installed in this app: the small
- * library that development, tests and CI use. --source catalogue downloads every family of a
- * catalogue written by crawl.mjs, one request a second per host. --subsets and --weights keep
+ * library that development, tests and CI use. --source npm builds every family of a catalogue
+ * written by crawl.mjs from that family's @fontsource package on the npm registry (one archive a
+ * family, checked against the registry's sha512, one request a second): the full library the
+ * publish workflow uploads. --source catalogue reads the same catalogue file by file from its CDN
+ * (slow; for single families). --min-families fails the build when fewer families come out. --subsets and --weights keep
  * only those slices and weights (the copy shipped inside the app stays small); --clean empties
  * <out> first.
  *
@@ -25,8 +28,10 @@
  *   licences/<id>.txt
  */
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { lstatSync } from "node:fs";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { faceId, faceKey, familyRow, fontFileName, gate, parseUnicodeRange, printSubset } from "./lib.mjs";
@@ -38,33 +43,53 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function args() {
   const a = process.argv.slice(2);
   const get = (k) => (a.includes(k) ? a[a.indexOf(k) + 1] : undefined);
-  return { out: get("--out"), source: get("--source") ?? "packages", catalogue: get("--catalogue"), families: get("--families")?.split(","), limit: Number(get("--limit") ?? 0), subsets: get("--subsets")?.split(","), weights: get("--weights")?.split(",").map(Number), clean: a.includes("--clean") };
+  return { out: get("--out"), source: get("--source") ?? "packages", catalogue: get("--catalogue"), families: get("--families")?.split(","), limit: Number(get("--limit") ?? 0), subsets: get("--subsets")?.split(","), weights: get("--weights")?.split(",").map(Number), minFamilies: Number(get("--min-families") ?? 0), clean: a.includes("--clean") };
 }
 
-/** Installed @fontsource packages as a source: { entry, unicode, defSubset, read(subset, weight, style), licence() }. */
+/**
+ * One unpacked @fontsource package as a source: { entry, unicode, defSubset, read(subset, weight, style), licence() }.
+ * Null (with the reason logged) when the package's own metadata does not pass the licence gate.
+ */
+async function packageDir(dir, id) {
+  // Plain files only: a link inside a downloaded package must never be followed and published.
+  const plain = (f) => {
+    try {
+      return lstatSync(f).isFile();
+    } catch {
+      return false;
+    }
+  };
+  const text = async (f) => {
+    if (!plain(f)) throw new Error(`${f.slice(dir.length + 1)} is missing or not a plain file`);
+    return readFile(f, "utf8");
+  };
+  const meta = JSON.parse(await text(join(dir, "metadata.json")));
+  const g = gate({ ...meta, id, family: meta.family, license: meta.license?.type ?? meta.license }, "fontsource");
+  if (!g.ok) {
+    console.error(`skip ${id}: ${g.reason}`);
+    return null;
+  }
+  return {
+    entry: g.entry,
+    defSubset: meta.defSubset,
+    unicode: JSON.parse(await text(join(dir, "unicode.json"))),
+    read: async (subset, weight, style) => {
+      const f = join(dir, "files", `${id}-${subset}-${weight}-${style}.woff`);
+      return plain(f) ? readFile(f) : null;
+    },
+    licence: () => text(join(dir, "LICENSE")),
+  };
+}
+
+/** Installed @fontsource packages as sources. */
 async function packageSource(only) {
   // The app's own node_modules: with pnpm each package resolves into a folder of its own.
   const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "node_modules", "@fontsource");
   const out = [];
   for (const id of (await readdir(root)).sort()) {
     if (only && !only.includes(id)) continue;
-    const dir = join(root, id);
-    const meta = JSON.parse(await readFile(join(dir, "metadata.json"), "utf8"));
-    const g = gate({ ...meta, id: meta.id ?? id, family: meta.family, license: meta.license?.type ?? meta.license }, "fontsource");
-    if (!g.ok) {
-      console.error(`skip ${id}: ${g.reason}`);
-      continue;
-    }
-    out.push({
-      entry: g.entry,
-      defSubset: meta.defSubset,
-      unicode: JSON.parse(await readFile(join(dir, "unicode.json"), "utf8")),
-      read: async (subset, weight, style) => {
-        const f = join(dir, "files", `${id}-${subset}-${weight}-${style}.woff`);
-        return existsSync(f) ? readFile(f) : null;
-      },
-      licence: () => readFile(join(dir, "LICENSE"), "utf8"),
-    });
+    const src = await packageDir(join(root, id), id);
+    if (src) out.push(src);
   }
   return out;
 }
@@ -80,6 +105,51 @@ async function polite(url) {
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
+}
+
+const REGISTRY = "https://registry.npmjs.org";
+
+/**
+ * A catalogue from crawl.mjs as sources, each family read from its @fontsource package on the
+ * npm registry. A package is downloaded when its turn comes (prepare), checked against the
+ * registry's sha512, unpacked into a folder of its own, and removed again (done). A family whose
+ * package is missing, fails the check or does not pass the licence gate is skipped.
+ */
+async function npmSource(path, only, limit) {
+  let entries = JSON.parse(await readFile(path, "utf8"));
+  if (only) entries = entries.filter((e) => only.includes(e.id));
+  if (limit) entries = entries.slice(0, limit);
+  return entries.map((listed) => {
+    const src = { entry: listed, unicode: {}, defSubset: undefined, read: async () => null, licence: async () => "" };
+    let dir;
+    src.prepare = async () => {
+      const meta = JSON.parse((await polite(`${REGISTRY}/@fontsource/${listed.id}/latest`)) ?? "null");
+      const tarball = meta?.dist?.tarball;
+      const integrity = meta?.dist?.integrity;
+      // Only the registry itself, and only with a sha512 to check the archive against.
+      if (typeof tarball !== "string" || !tarball.startsWith(`${REGISTRY}/@fontsource/${listed.id}/-/`) || typeof integrity !== "string" || !integrity.startsWith("sha512-")) {
+        console.error(`skip ${listed.id}: no package on the registry`);
+        return false;
+      }
+      const tgz = await polite(tarball);
+      if (!tgz || `sha512-${createHash("sha512").update(tgz).digest("base64")}` !== integrity) {
+        console.error(`skip ${listed.id}: package does not match its checksum`);
+        return false;
+      }
+      dir = await mkdtemp(join(tmpdir(), "font-pkg-"));
+      await writeFile(join(dir, "pkg.tgz"), tgz);
+      // The archive is data: only font files, metadata and the licence are taken out of it, as plain files.
+      execFileSync("tar", ["-xzf", join(dir, "pkg.tgz"), "-C", dir, "--no-same-owner", "--no-same-permissions", "--wildcards", "package/files/*.woff", "package/metadata.json", "package/unicode.json", "package/LICENSE"], { stdio: ["ignore", "ignore", "pipe"] });
+      const unpacked = await packageDir(join(dir, "package"), listed.id);
+      if (!unpacked) return false;
+      Object.assign(src, unpacked);
+      return true;
+    };
+    src.done = async () => {
+      if (dir) await rm(dir, { recursive: true, force: true });
+    };
+    return src;
+  });
 }
 
 /** A catalogue from crawl.mjs as a source; files come from the catalogue's own CDN listing. */
@@ -120,10 +190,15 @@ async function loadMatcher() {
 async function main() {
   const opt = args();
   if (!opt.out) {
-    console.error("usage: build-library.mjs --out <dir> [--source packages|catalogue] [--catalogue file] [--families a,b] [--limit n] [--subsets a,b] [--weights 400,700] [--clean]");
+    console.error("usage: build-library.mjs --out <dir> [--source packages|npm|catalogue] [--catalogue file] [--families a,b] [--limit n] [--subsets a,b] [--weights 400,700] [--min-families n] [--clean]");
     process.exit(2);
   }
-  const sources = opt.source === "catalogue" ? await catalogueSource(opt.catalogue, opt.families, opt.limit) : await packageSource(opt.families);
+  const sources =
+    opt.source === "npm"
+      ? await npmSource(opt.catalogue, opt.families, opt.limit)
+      : opt.source === "catalogue"
+        ? await catalogueSource(opt.catalogue, opt.families, opt.limit)
+        : await packageSource(opt.families);
   const matcher = await loadMatcher();
   if (opt.clean) await rm(opt.out, { recursive: true, force: true });
   const put = async (rel, bytes) => {
@@ -134,9 +209,20 @@ async function main() {
   /** [face id, fingerprint] in index order. */
   const prints = [];
   let files = 0;
-  for (const src of sources) {
+  for (const [n, src] of sources.entries()) {
+    try {
+      await one(src);
+    } catch (e) {
+      // One bad package must not lose the other two thousand.
+      console.error(`skip ${src.entry.id}: ${e.message}`);
+    } finally {
+      await src.done?.();
+    }
+    if (n % 100 === 99) console.log(`font library: ${n + 1} of ${sources.length} families read`);
+  }
+  async function one(src) {
+    if ((await src.prepare?.()) === false) return;
     const { entry } = src;
-    await src.prepare?.();
     const faces = {};
     const forPrint = printSubset(entry, src.defSubset);
     for (const weight of entry.weights) {
@@ -172,7 +258,7 @@ async function main() {
     }
     if (!Object.keys(faces).length) {
       console.error(`skip ${entry.id}: no usable files`);
-      continue;
+      return;
     }
     const manifest = Buffer.from(JSON.stringify({ id: entry.id, family: entry.family, licence: entry.licence, faces }));
     const sha = sha256(manifest);
@@ -181,6 +267,7 @@ async function main() {
     rows.push(familyRow({ ...entry, weights: [...new Set(Object.keys(faces).map((k) => Number(k.split("-")[0])))], styles: [...new Set(Object.keys(faces).map((k) => k.split("-")[1]))] }, sha));
   }
 
+  if (rows.length < opt.minFamilies) throw new Error(`only ${rows.length} families built, ${opt.minFamilies} expected: refusing to write a shrunken library`);
   // The matching index, from the same Rust code the browser runs (its WebAssembly build).
   const features = Buffer.concat(prints.map(([, p]) => Buffer.from(p.coarse)));
   const faceIds = prints.map(([id]) => id);
