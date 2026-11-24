@@ -76,15 +76,16 @@ const TOOL_ICONS = [
 const UI_ICONS = {
   FileIcon: "file",
   FilesIcon: "files",
-  PlusIcon: "plus",
+  PlusIcon: "plus@bold",
   MinusIcon: "minus",
   RotateLeftIcon: "arrow-counter-clockwise",
   RotateRightIcon: "arrow-clockwise",
   ResetIcon: "arrow-u-up-left",
-  CloseIcon: "x",
+  // Bold, not duotone: the duotone x and check sit on a shaded square that reads as a box (owner 2026-11-24).
+  CloseIcon: "x@bold",
   EyeIcon: "eye",
   LockIcon: "lock-simple",
-  CheckIcon: "check",
+  CheckIcon: "check@bold",
   CheckCircleIcon: "check-circle",
   DownloadIcon: "download-simple",
   UploadIcon: "upload-simple",
@@ -106,7 +107,12 @@ const UI_ICONS = {
   LeafIcon: "leaf",
 };
 
-const iconFile = (n) => join(pkgDir, "assets", "duotone", `${n}-duotone.svg`);
+/** "name" is the duotone weight; "name@bold" picks another weight. */
+const iconFile = (n) => {
+  const [name, weight = "duotone"] = n.split("@");
+  return join(pkgDir, "assets", weight, `${name}-${weight}.svg`);
+};
+const iconLabel = (n) => (n.includes("@") ? n.replace("@", ", ") : `${n}, duotone`);
 const license = readFileSync(join(pkgDir, "LICENSE"), "utf8").trim();
 const camel = (name) => name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 const esc = (v) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -204,7 +210,7 @@ function Icon({ size = 20, children, ...rest }: IconProps & { children: React.Re
 
 export type IconComponent = (props: IconProps) => React.ReactElement;
 ${Object.entries(UI_ICONS)
-  .map(([comp, n]) => `\n/** Phosphor "${n}" (duotone). */\nexport const ${comp}: IconComponent = (p) => <Icon {...p}>${shapesOf(n)}</Icon>;`)
+  .map(([comp, n]) => `\n/** Phosphor ${iconLabel(n)}. */\nexport const ${comp}: IconComponent = (p) => <Icon {...p}>${shapesOf(n)}</Icon>;`)
   .join("\n")}
 `;
 

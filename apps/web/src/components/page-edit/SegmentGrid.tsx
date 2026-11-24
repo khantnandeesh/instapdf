@@ -246,7 +246,7 @@ export function SegmentGrid({
                   variant="soft"
                   tabIndex={tab}
                   data-no-drag=""
-                  className="absolute -top-2 -right-2 z-[2] bg-surface-raised shadow-menu max-lg:size-11"
+                  className="absolute -top-2 -right-2 z-[2] bg-surface-raised text-brand-strong shadow-menu transition-[background-color,color,transform] duration-(--dur-fast) hover:rotate-90 hover:bg-brand hover:text-white focus-visible:bg-brand focus-visible:text-white motion-reduce:hover:rotate-0 max-lg:size-11"
                   icon={<CloseIcon size={16} />}
                   onClick={() => onRemove(card.key)}
                 />
