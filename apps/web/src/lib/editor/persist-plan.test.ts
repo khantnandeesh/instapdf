@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { commit, createHistory, type History } from "./history";
 import type { DocState, EditorObject } from "./model";
-import { planSession, planSignature, restoreVersions, SAVED_STEPS, type SignatureLike } from "./persist-plan";
+import { planSession, planSignature, restoreVersions, SAVED_STEPS, writtenBy, type SignatureLike } from "./persist-plan";
 import { initialVersions, pushVersion, versionBytes, type VersionEntry } from "./versions";
 
 const img = (id: string, asset: string): EditorObject => ({ kind: "image", id, page: "p0", x: 0, y: 0, w: 10, h: 10, rot: 0, asset, opacity: 1 });
@@ -68,6 +68,36 @@ describe("planSession", () => {
     expect([...versionBytes(back, 0)!]).toEqual([1, 2, 3]);
     expect([...versionBytes(back, 1)!]).toEqual([1, 2, 3, 4]);
     expect([...versionBytes(back, 2)!]).toEqual([9, 9]);
+  });
+});
+
+describe("a reopened file", () => {
+  it("reuses the restored record's blobs: the next save writes only the new copy and drops the old", () => {
+    const original = new Uint8Array([1, 2, 3]);
+    let v: VersionEntry[] = initialVersions(original);
+    v = pushVersion(v, 0, new Uint8Array([7, 7, 7, 7]), false).versions;
+    let h: History = createHistory(doc(0));
+    h = commit(h, doc(1), { label: "Edit text", at: 1 });
+    const saved = planSession({ hash: "h", name: "f", history: h, versions: v, assets: {}, written: new Set(), keyOf: keyer(), sweep: true })!;
+    expect(saved.sweep).toBe(true);
+    // A new page: restore, then one more rewrite.
+    const blobs = new Map(saved.put.map(([k, b]) => [k, b as Uint8Array]));
+    let back = restoreVersions(saved.record, original, blobs)!;
+    const seen = writtenBy(saved.record, back);
+    const keys = new WeakMap(seen.keys);
+    let n = 0;
+    const keyOf = (b: Uint8Array) => keys.get(b) ?? (keys.set(b, `new${n++}`), `new${n - 1}`);
+    back = pushVersion(back, 1, new Uint8Array([8, 8]), false).versions;
+    h = commit(h, doc(2), { label: "Edit text", at: 5000 });
+    const next = planSession({ hash: "h", name: "f", history: h, versions: back, assets: {}, written: seen.written, keyOf })!;
+    // The restored copy keeps its key (not written again); only the newest copy is new.
+    expect(next.put.map(([k]) => k)).toEqual(["h/v/new0"]);
+    expect(next.record.blobs.sort()).toEqual([...saved.record.blobs, "h/v/new0"].sort());
+    expect(next.drop).toEqual([]);
+    expect(next.sweep).toBe(false);
+    // Without a restore (a fresh page), the first plan sweeps: what the earlier page left goes.
+    const fresh = planSession({ hash: "h", name: "f", history: h, versions: back, assets: {}, written: new Set(), keyOf: keyer(), sweep: true })!;
+    expect(fresh.sweep).toBe(true);
   });
 });
 

@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import engine from "./public/engine/manifest.json";
+import { ACCEPTS_BR, ACCEPTS_GZIP } from "./src/lib/editor/accept-encoding";
 import { contentSecurityPolicy, securityHeaders } from "./src/lib/security/csp";
 
 /**
@@ -9,12 +10,15 @@ import { contentSecurityPolicy, securityHeaders } from "./src/lib/security/csp";
  * Content-Encoding, so this is a rewrite to the static copy plus headers.
  */
 const ENGINE_TYPES = { "berry_engine_bg.wasm": "application/wasm", "berry_engine.js": "text/javascript; charset=utf-8" } as const;
-const BR = { type: "header" as const, key: "accept-encoding", value: ".*\\bbr\\b.*" };
-const GZIP = { type: "header" as const, key: "accept-encoding", value: ".*\\bgzip\\b.*" };
+// "br;q=0" refuses brotli: the patterns take a coding only when it is listed without q=0.
+const BR = { type: "header" as const, key: "accept-encoding", value: ACCEPTS_BR };
+const GZIP = { type: "header" as const, key: "accept-encoding", value: ACCEPTS_GZIP };
 const engineFiles = (Object.keys(ENGINE_TYPES) as (keyof typeof ENGINE_TYPES)[]).map((file) => ({ file, source: `/engine/${engine.files[file].slice(0, 16)}/${file}` }));
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Inlined at build: the site-wide prefetch (EnginePrefetch) needs only these two strings.
+  env: Object.fromEntries(engineFiles.map(({ file, source }) => [file === "berry_engine.js" ? "ENGINE_JS_PATH" : "ENGINE_WASM_PATH", source])),
   poweredByHeader: false,
   reactStrictMode: true,
   // next/image optimisation is unused, and sharp (LGPL-3.0 libvips) is deliberately not installed.

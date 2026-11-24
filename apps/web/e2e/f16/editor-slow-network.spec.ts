@@ -96,6 +96,38 @@ test("slow 3G: the first page and Add text work before the engine; a line clicke
   await expect(again.getByTestId("editor-shell")).toHaveAttribute("data-engine-cached", "true");
 });
 
+test("slow 3G: the landing fetches pdf.js and its workers on idle before the engine, so the first page after a pick needs no download", async ({ page }, info) => {
+  test.setTimeout(300_000);
+  await throttle(page);
+  const order: string[] = [];
+  const done = new Set<string>();
+  const kind = (u: string) => {
+    const p = new URL(u).pathname;
+    return /pdf\.worker/.test(p) ? "worker" : /pdf\.renderer/.test(p) ? "renderer" : p.startsWith("/engine/") && p.endsWith(".wasm") ? "engine" : null;
+  };
+  page.on("request", (r) => {
+    const k = kind(r.url());
+    if (k) order.push(k);
+  });
+  page.on("requestfinished", (r) => {
+    const k = kind(r.url());
+    if (k) done.add(k);
+  });
+  await page.goto("/edit-pdf", { timeout: 120_000 });
+  await expect(page.getByTestId("editor")).toHaveAttribute("data-hydrated", "true", { timeout: 120_000 });
+  // pdf.js's workers come first (the first page needs them), the engine after.
+  await expect.poll(() => done.has("worker") && done.has("renderer"), { timeout: 120_000 }).toBe(true);
+  expect(order.indexOf("worker")).toBeGreaterThanOrEqual(0);
+  if (order.includes("engine")) expect(order.indexOf("engine")).toBeGreaterThan(order.indexOf("worker"));
+  const t0 = Date.now();
+  await page.getByTestId("editor-input").setInputFiles(corpus("std14-reportlab.pdf"));
+  await expect(page.getByTestId("page-1")).toHaveAttribute("data-drawn", "true", { timeout: 120_000 });
+  const tFirstPage = Date.now() - t0;
+  info.annotations.push({ type: "slow-3g", description: `prefetched landing: first page ${tFirstPage} ms after the pick` });
+  console.log(`[slow-3g] prefetched landing: first page ${tFirstPage} ms after the pick`);
+  expect(tFirstPage).toBeLessThan(6000);
+});
+
 test("slow 3G: the landing prefetches the engine on idle, from hashed paths, unless Data Saver is on", async ({ browser }) => {
   test.setTimeout(240_000);
   const run = async (saver: boolean) => {
@@ -104,20 +136,23 @@ test("slow 3G: the landing prefetches the engine on idle, from hashed paths, unl
     if (saver) await dataSaver(page);
     await throttle(page);
     const engine: string[] = [];
+    const workers: string[] = [];
     page.on("request", (r) => {
       const p = new URL(r.url()).pathname;
       if (p.startsWith("/engine/")) engine.push(p);
+      if (/pdf\.(worker|renderer)/.test(p)) workers.push(p);
     });
     await page.goto("/edit-pdf", { timeout: 120_000 });
     await expect(page.getByTestId("editor")).toHaveAttribute("data-hydrated", "true", { timeout: 120_000 });
-    if (!saver) await expect.poll(() => engine.length, { timeout: 60_000 }).toBeGreaterThanOrEqual(2);
+    if (!saver) await expect.poll(() => engine.length, { timeout: 120_000 }).toBeGreaterThanOrEqual(2);
     else await page.waitForTimeout(6000);
     await context.close();
-    return engine;
+    return { engine, workers };
   };
   const normal = await run(false);
-  expect(normal.every((p) => /^\/engine\/[0-9a-f]{16}\/berry_engine(_bg\.wasm|\.js)$/.test(p)), normal.join(", ")).toBe(true);
-  expect(await run(true)).toEqual([]);
+  expect(normal.engine.every((p) => /^\/engine\/[0-9a-f]{16}\/berry_engine(_bg\.wasm|\.js)$/.test(p)), normal.engine.join(", ")).toBe(true);
+  // Data Saver: neither pdf.js's workers nor the engine before a file.
+  expect(await run(true)).toEqual({ engine: [], workers: [] });
 });
 
 test("home: the engine is fetched on intent on the Edit PDF link, never on load", async ({ page }) => {

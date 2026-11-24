@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { dropBelowEngine, minEngine, tail, createHistory, commit } from "./history";
 import type { DocState } from "./model";
-import { initialVersions, isPrefix, pushVersion, releaseBelow, versionBytes, versionsSize, type VersionEntry } from "./versions";
+import { initialVersions, pushVersion, releaseBelow, versionBytes, versionsSize, type VersionEntry } from "./versions";
 
 const bytes = (...n: number[]) => new Uint8Array(n);
 const fill = (n: number, v: number) => new Uint8Array(n).fill(v);
@@ -55,9 +55,27 @@ describe("engine byte versions", () => {
     expect(versionBytes(v, 0)).toBeNull();
   });
 
-  it("isPrefix spots a rewrite", () => {
-    expect(isPrefix(bytes(1, 2), bytes(1, 2, 3))).toBe(true);
-    expect(isPrefix(bytes(1, 2), bytes(1, 3, 3))).toBe(false);
+  it("never releases the shown version, so the edit can be undone even over the budget", () => {
+    // A 100-byte file, a budget of 50: each rewrite alone is over it.
+    let v = initialVersions(fill(100, 1));
+    let r = pushVersion(v, 0, fill(100, 2), false, 50);
+    v = r.versions;
+    r = pushVersion(v, 1, fill(100, 3), false, 50);
+    v = r.versions;
+    // Version 1 (shown when the edit was made) stays; undoing to it works.
+    expect(r.floor).toBeLessThanOrEqual(1);
+    expect(versionBytes(v, 1)?.[0]).toBe(2);
+    expect(versionBytes(v, 2)?.[0]).toBe(3);
+  });
+
+  it("doesn't count the original file against the budget", () => {
+    // The original is held by the page: one 100-byte rewrite fits a 100-byte budget with it kept.
+    let v = initialVersions(fill(100, 1));
+    v = pushVersion(v, 0, fill(100, 2), false, 100).versions;
+    const r = pushVersion(v, 1, fill(100, 3), false, 100);
+    expect(r.floor).toBe(0);
+    expect(versionBytes(r.versions, 0)?.[0]).toBe(1);
+    expect(versionBytes(r.versions, 1)?.[0]).toBe(2);
   });
 });
 

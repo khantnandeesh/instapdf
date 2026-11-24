@@ -213,3 +213,18 @@ test("if reopening after a save fails, the edit is dropped and earlier edits sti
   // And the editor keeps working.
   await editLine(page, "Fee", "Fee", "Fees");
 });
+
+test("the engine is served brotli or gzip by what the request accepts, and br;q=0 refuses brotli", async ({ request }) => {
+  const manifest = JSON.parse(await readFile("public/engine/manifest.json", "utf8")) as { files: Record<string, string>; wasmBytes: number };
+  const path = `/engine/${manifest.files["berry_engine_bg.wasm"]!.slice(0, 16)}/berry_engine_bg.wasm`;
+  const get = async (accept: string) => {
+    const res = await request.get(path, { headers: { "accept-encoding": accept } });
+    expect(res.status()).toBe(200);
+    expect(res.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
+    return res.headers()["content-encoding"] ?? "identity";
+  };
+  expect(await get("gzip, deflate, br")).toBe("br");
+  expect(await get("gzip, br;q=0")).toBe("gzip");
+  expect(await get("br;q=0, gzip;q=0")).toBe("identity");
+  expect(await get("identity")).toBe("identity");
+});

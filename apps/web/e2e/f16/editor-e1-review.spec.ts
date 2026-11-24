@@ -135,22 +135,97 @@ async function chip(page: Page, text: string) {
   if (page.viewportSize()!.width >= 1024) await expect(page.getByTestId("save-chip")).toHaveText(text);
 }
 
-test("review #4: a failed autosave says so quietly, leaves no stale record, and saves again later", async ({ page }) => {
+/** The saved record's history index, and every blob key stored for it beside the record's own list. */
+const stored = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<{ index: number; blobs: string[]; keys: string[] } | null>((resolve) => {
+        const r = indexedDB.open("berrypdf-editor");
+        r.onsuccess = () => {
+          const db = r.result;
+          if (!db.objectStoreNames.contains("sessions")) return resolve(null);
+          const tx = db.transaction(["sessions", "blobs"]);
+          const all = tx.objectStore("sessions").getAll();
+          const keys = tx.objectStore("blobs").getAllKeys();
+          tx.oncomplete = () => {
+            const rec = all.result[0] as { hash: string; history: { index: number }; blobs: string[] } | undefined;
+            db.close();
+            resolve(rec ? { index: rec.history.index, blobs: [...rec.blobs].sort(), keys: (keys.result as string[]).filter((k) => k.startsWith(`${rec.hash}/`)).sort() } : null);
+          };
+          tx.onerror = () => resolve(null);
+        };
+        r.onerror = () => resolve(null);
+      }),
+  );
+
+test("review #4 (2nd): a failed autosave says so quietly, keeps the last good record, and saves again later", async ({ page }) => {
   await instrument(page);
   await open(page);
   await addText(page, "Kept");
   await chip(page, "Saved");
-  await expect.poll(() => sessionCount(page)).toBe(1);
+  await expect.poll(async () => (await stored(page))?.index).toBe(1);
   await page.evaluate(() => ((window as unknown as { __failPut: boolean }).__failPut = true));
   await addText(page, "Not kept", 0.4);
   await expect(page.getByText("Changes aren’t being kept on this device right now.")).toBeVisible();
   await chip(page, "Not saved on device");
-  // The older record would restore the wrong state: it is gone.
-  await expect.poll(() => sessionCount(page)).toBe(0);
+  // The write failed as a whole: the last good record (1 change) is still there to restore.
+  await page.waitForTimeout(800);
+  expect((await stored(page))?.index).toBe(1);
   await page.evaluate(() => ((window as unknown as { __failPut: boolean }).__failPut = false));
   await addText(page, "Kept again", 0.5);
   await chip(page, "Saved");
-  await expect.poll(() => sessionCount(page)).toBe(1);
+  await expect.poll(async () => (await stored(page))?.index).toBe(3);
+});
+
+test("review #3 (2nd): reopening a file and saving again leaves no blobs behind, restored or not", async ({ page }) => {
+  // An existing-text edit makes a version copy (a blob); reopening gives the page new keys.
+  await page.goto("/edit-pdf");
+  const pick = async () => {
+    await page.goto("/edit-pdf");
+    await page.getByTestId("editor-input").setInputFiles(corpus("chrome-justified-mixed.pdf"));
+    await expect(page.getByTestId("editor")).toHaveAttribute("data-state", "open");
+  };
+  const editLine = async (containing: string, from: string, to: string) => {
+    const line = page.locator(`[data-testid="line"][data-text*="${containing}"]`).first();
+    const before = (await line.getAttribute("data-text"))!;
+    await line.click();
+    await page.getByTestId("line-input").fill(before.replace(from, to));
+    await page.getByTestId("line-input").press("Enter");
+    await expect(page.locator(`[data-testid="line"][data-text*="${before.replace(from, to)}"]`)).toHaveCount(1);
+  };
+  const clean = async (index: number) => {
+    await expect.poll(async () => (await stored(page))?.index, { timeout: 15_000 }).toBe(index);
+    const s = (await stored(page))!;
+    expect(s.keys, "every stored blob is one the record uses").toEqual(s.blobs);
+  };
+  await pick();
+  await editLine("is made between", "made", "signed");
+  await clean(1);
+  // A stray blob from an earlier page (say, one that closed mid-way) is swept by the next first write.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const r = indexedDB.open("berrypdf-editor");
+        r.onsuccess = () => {
+          const db = r.result;
+          const tx = db.transaction(["sessions", "blobs"], "readwrite");
+          const all = tx.objectStore("sessions").getAll();
+          all.onsuccess = () => tx.objectStore("blobs").put(new Uint8Array(8), `${(all.result[0] as { hash: string }).hash}/v/stray`);
+          tx.oncomplete = () => (db.close(), resolve());
+        };
+      }),
+  );
+  // Reopen and restore, then edit again: the restored blobs are reused, the stray one goes.
+  await pick();
+  await page.getByTestId("recovery").getByRole("button", { name: "Restore" }).click();
+  await expect(page.locator('[data-testid="line"][data-text*="is signed between"]')).toHaveCount(1);
+  await editLine("Fee", "Fee", "Fees");
+  await clean(2);
+  // Reopen and start fresh instead: the old record's blobs go too.
+  await pick();
+  await expect(page.getByTestId("recovery")).toBeVisible();
+  await editLine("is made between", "made", "agreed");
+  await clean(1);
 });
 
 test("review #14: an encrypted file is never kept on the device", async ({ page }) => {

@@ -19,7 +19,7 @@ import { screenDeltaToFrame, screenToFrame, displaySize } from "@/lib/editor/geo
 import * as H from "@/lib/editor/history";
 import { clampDelta, initialPages, isPristine, kindName, moveObject, newId, objectBounds, pageSize, totalRotation, type EditorObject, type PageEntry, type Pt } from "@/lib/editor/model";
 import { clearDevice, deleteSession, loadSession, sha256, storageAvailable, writeSession, type LoadedSession } from "@/lib/editor/persist";
-import { planSession, restoreVersions } from "@/lib/editor/persist-plan";
+import { planSession, restoreVersions, writtenBy } from "@/lib/editor/persist-plan";
 import { initialVersions } from "@/lib/editor/versions";
 import type { OpenedPdf } from "@/lib/pdf/pdfjs";
 import { assetsOf } from "@/lib/editor/asset-refs";
@@ -187,8 +187,11 @@ export function EditorShell(props: ShellProps) {
       if (!alive) return;
       const wide = matchMedia("(min-width: 1024px)").matches;
       const rt: Runtime = { name: props.name, password: props.password, hash: null, versions: initialVersions(props.bytes), pdf: props.pdf.doc, shown: 0, src, assets: {}, held: new Set(), clip: null, wasEncrypted: props.pdf.wasEncrypted };
-      // Owner-restricted (no modify): read-only until the owner password is entered (U-E9).
-      const store = createStore({ ...initialState(initialPages(src), wide), readOnly: props.pdf.denied.includes("modify") });
+      // Owner-restricted (no modify): read-only until the owner password is entered (U-E9). A file
+      // opened with its owner password is unlocked already.
+      const restricted = props.pdf.denied.includes("modify") && !(props.password && (await checkOwnerPassword(props.bytes.slice(), props.password).catch(() => false)));
+      if (!alive) return;
+      const store = createStore({ ...initialState(initialPages(src), wide), readOnly: restricted });
       made = createController(store, rt, { announce: say, toast: showToast });
       setCtl(made);
       say(`${props.name} opened, ${src.length} ${src.length === 1 ? "page" : "pages"}`);
@@ -287,7 +290,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   const unlockOwner = async (password: string) => {
     setOwnerBusy(true);
     try {
-      const ok = await checkOwnerPassword(original.slice(), password, rt.password ?? "");
+      const ok = await checkOwnerPassword(original.slice(), password);
       if (!ok) return setOwnerError("That isn’t the owner password.");
       setOwnerOpen(false);
       setOwnerError(undefined);
@@ -653,27 +656,31 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   }, [ctl, download]);
 
   // ---- autosave to this device (AC-45, AC-81) ----
-  // Each save writes a small record and only the blobs not written yet (persist-plan); a failed
-  // save drops the stale record, says so once, and tries again on the next change.
+  // Each save writes a small record and only the blobs not written yet (persist-plan). A failed
+  // save leaves the last good record as it was (the write is one transaction), says so once, and
+  // tries again later. `written` and the version keys are shared with restore, so a restored
+  // session reuses its blobs; the first write otherwise sweeps what an earlier page left.
   const recoveryRef = useRef(recovery);
   recoveryRef.current = recovery;
+  // `fresh`: this page hasn't written for the file yet. The device then still holds the saved
+  // record's blobs (a restore reuses them) and maybe strays, which the first write sweeps.
+  const persisted = useRef<{ written: Set<string>; keys: WeakMap<Uint8Array, string>; fresh: boolean }>(null);
+  persisted.current ??= { written: new Set(), keys: new WeakMap(), fresh: true };
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let last = store.get().history;
     let savingSince = 0;
     let warned = false;
-    const written = new Set<string>();
-    const keys = new WeakMap<Uint8Array, string>();
+    const p = persisted.current!;
+    const { written, keys } = p;
     const keyOf = (b: Uint8Array) => {
       let k = keys.get(b);
       if (!k) keys.set(b, (k = newId("v")));
       return k;
     };
     const blocked = () => !rt.hash || pdf.wasEncrypted;
-    const fail = async () => {
-      written.clear();
-      if (rt.hash) await deleteSession(rt.hash);
+    const fail = () => {
       store.set({ save: "off" });
       if (!warned) {
         warned = true;
@@ -687,15 +694,18 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       if (blocked()) return;
       const h = s.history;
       if (!h.entries.length || (h.index === 0 && isPristine(H.current(h)))) {
-        await deleteSession(rt.hash!);
         written.clear();
+        await deleteSession(rt.hash!);
+        p.fresh = false;
         store.set({ save: "idle" });
         return;
       }
-      const plan = planSession({ hash: rt.hash!, name: rt.name, history: h, versions: rt.versions, assets: plainAssets(rt.assets), written, keyOf });
+      const plan = planSession({ hash: rt.hash!, name: rt.name, history: h, versions: rt.versions, assets: plainAssets(rt.assets), written, keyOf, sweep: p.fresh });
+      // Too big to keep even the last step: the last good record stays.
       if (!plan) return fail();
       const ok = await writeSession(plan);
       if (!ok) return fail();
+      p.fresh = false;
       plan.put.forEach(([k]) => written.add(k));
       plan.drop.forEach((k) => written.delete(k));
       warned = false;
@@ -735,6 +745,14 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       // No wait for the engine: showVersion switches the view, and the engine opens the shown bytes.
       const versions = restoreVersions(s.record, original, s.blobs);
       if (!versions) throw new Error("blobs");
+      // Nothing written by this page yet: the record's blobs are what the device holds, so the
+      // next save reuses them. (After a write they were replaced: they are written again.)
+      const p = persisted.current!;
+      if (p.fresh) {
+        const seen = writtenBy(s.record, versions);
+        seen.written.forEach((k) => p.written.add(k));
+        seen.keys.forEach(([b, k]) => p.keys.set(b, k));
+      }
       for (const [id, a] of Object.entries(s.assets)) if (!rt.assets[id]) await addAsset(rt, a, id);
       rt.versions = versions;
       const h = s.record.history;

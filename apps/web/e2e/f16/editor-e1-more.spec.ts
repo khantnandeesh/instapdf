@@ -281,7 +281,10 @@ test("AC-46: every output passes qpdf's structural check, renders in pdfium and 
     "doc = pypdfium2.PdfDocument(sys.argv[1])",
     "for i in range(len(doc)):",
     "  bmp = doc[i].render(scale=0.5)",
-    "  if bmp.width < 10 or bmp.height < 10: probs.append(f'page {i + 1} rendered empty')",
+    // A blank render is a failure too: count pixels with any channel well off white.
+    "  buf, n, w, h, st = bytes(bmp.buffer), bmp.n_channels, bmp.width, bmp.height, bmp.stride",
+    "  ink = sum(1 for y in range(h) for x in range(0, w * n, n) if min(buf[y * st + x:y * st + x + min(n, 3)]) < 200)",
+    "  if w < 10 or h < 10 or ink < 50: probs.append(f'page {i + 1} rendered blank ({ink} inked pixels)')",
     "print('\\n'.join(probs))",
   ].join("\n");
   try {

@@ -28,8 +28,8 @@ export function warmBuild(): void {
 }
 
 /** True when `password` is the file's owner password (checked in the download worker). */
-export function checkOwnerPassword(bytes: Uint8Array, password: string, userPassword?: string): Promise<boolean> {
-  return request({ owner: { bytes, password, userPassword } }).then((r) => "owner" in r && r.owner);
+export function checkOwnerPassword(bytes: Uint8Array, password: string): Promise<boolean> {
+  return request({ owner: { bytes, password } }).then((r) => "owner" in r && r.owner);
 }
 
 export function buildInWorker(input: BuildInput): Promise<Uint8Array> {
@@ -40,7 +40,7 @@ export function buildInWorker(input: BuildInput): Promise<Uint8Array> {
 }
 
 type Ok = Extract<BuildResponse, { ok: true }>;
-type Body = { input: BuildInput } | { owner: { bytes: Uint8Array; password: string; userPassword?: string } };
+type Body = { input: BuildInput } | { owner: { bytes: Uint8Array; password: string } };
 
 function request(body: Body): Promise<Ok> {
   return new Promise((resolve, reject) => {

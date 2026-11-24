@@ -43,4 +43,10 @@ describe("engine artifact", () => {
     const api = readFileSync(new URL("../../../../../crates/berry-wasm/berry-engine.d.ts", import.meta.url), "utf8");
     expect(readFileSync(new URL("./berry-engine.d.ts", import.meta.url), "utf8")).toBe(api);
   });
+
+  it("inlines the same hashed paths for the site-wide prefetch (next.config env)", async () => {
+    const { default: config } = await import("../../../next.config");
+    const { ENGINE_JS, ENGINE_WASM } = await import("./engine-assets");
+    expect(config.env).toEqual({ ENGINE_JS_PATH: ENGINE_JS, ENGINE_WASM_PATH: ENGINE_WASM });
+  });
 });

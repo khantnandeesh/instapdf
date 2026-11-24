@@ -33,7 +33,12 @@ export type SessionRecord = {
   blobs: string[];
 };
 
-export type SessionPlan = { record: SessionRecord; put: [string, Uint8Array | Asset][]; drop: string[]; size: number };
+/**
+ * `sweep`: the first write of this page for the file. Every stored blob of the file that the new
+ * record doesn't use (left by an earlier page, whose keys aren't known here) is deleted with it,
+ * so reopening a file never strands old copies.
+ */
+export type SessionPlan = { record: SessionRecord; put: [string, Uint8Array | Asset][]; drop: string[]; size: number; sweep: boolean };
 
 /** Asset ids the objects of these states use. */
 export function assetIds(h: History): Set<string> {
@@ -58,6 +63,8 @@ export function planSession(input: {
   assets: Record<string, Asset>;
   written: ReadonlySet<string>;
   keyOf: (bytes: Uint8Array) => string;
+  /** Nothing is known about what is on the device for this file yet: sweep it (see SessionPlan). */
+  sweep?: boolean;
   now?: number;
   cap?: number;
   steps?: number;
@@ -113,7 +120,21 @@ function planFor(input: Parameters<typeof planSession>[0], h: History): SessionP
     put: [...blobs].filter(([k]) => !input.written.has(k)),
     drop: [...input.written].filter((k) => !blobs.has(k)),
     size,
+    sweep: !!input.sweep,
   };
+}
+
+/**
+ * What a restored record already has on the device: every blob key it uses, and the key of each
+ * version copy (so the next save reuses those blobs instead of writing them again).
+ */
+export function writtenBy(rec: SessionRecord, versions: readonly VersionEntry[]): { written: Set<string>; keys: [Uint8Array, string][] } {
+  const keys: [Uint8Array, string][] = [];
+  rec.versions.forEach((v, i) => {
+    const e = versions[i];
+    if (v && "blob" in v && e && "bytes" in e) keys.push([e.bytes, v.blob.slice(v.blob.lastIndexOf("/") + 1)]);
+  });
+  return { written: new Set(rec.blobs), keys };
 }
 
 /** Rebuilds the versions list from a record and its blobs (`original` is the reopened file). */
@@ -121,7 +142,7 @@ export function restoreVersions(rec: SessionRecord, original: Uint8Array, blobs:
   const out: VersionEntry[] = [];
   for (const v of rec.versions) {
     if (!v) out.push(null);
-    else if ("original" in v) out.push({ bytes: original });
+    else if ("original" in v) out.push({ bytes: original, held: true });
     else if ("length" in v) out.push({ length: v.length });
     else {
       const b = blobs.get(v.blob);

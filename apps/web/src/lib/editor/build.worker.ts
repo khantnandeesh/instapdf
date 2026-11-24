@@ -6,7 +6,7 @@
 import { buildPdf, type BuildInput } from "./build";
 import { FONT_BASE, type EditorFontManifest } from "./fonts";
 
-export type BuildRequest = { id: number; input: BuildInput } | { id: number; owner: { bytes: Uint8Array; password: string; userPassword?: string } };
+export type BuildRequest = { id: number; input: BuildInput } | { id: number; owner: { bytes: Uint8Array; password: string } };
 export type BuildResponse = { id: number; ok: true; bytes: Uint8Array } | { id: number; ok: true; owner: boolean } | { id: number; ok: false; message: string };
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
@@ -42,7 +42,7 @@ scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: 
   if ("warm" in msg) return;
   if ("owner" in msg) {
     const { isOwnerPassword } = await import("./owner");
-    const owner = await isOwnerPassword(msg.owner.bytes, msg.owner.password, msg.owner.userPassword);
+    const owner = await isOwnerPassword(msg.owner.bytes, msg.owner.password);
     scope.postMessage({ id: msg.id, ok: true, owner } satisfies BuildResponse);
     return;
   }

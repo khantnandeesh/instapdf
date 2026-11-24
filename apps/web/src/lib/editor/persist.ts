@@ -65,7 +65,10 @@ export async function storageAvailable(): Promise<boolean> {
   }
 }
 
-/** Writes a session plan in one transaction: new blobs, the record, and drops unused blobs. */
+/**
+ * Writes a session plan in one transaction: new blobs, the record, and drops unused blobs. A failed
+ * write changes nothing, so the last good record stays.
+ */
 export async function writeSession(plan: SessionPlan): Promise<boolean> {
   try {
     const d = await db();
@@ -73,6 +76,17 @@ export async function writeSession(plan: SessionPlan): Promise<boolean> {
       const tx = d.transaction(["sessions", "blobs"], "readwrite");
       const blobs = tx.objectStore("blobs");
       for (const [k, v] of plan.put) blobs.put(v, k);
+      if (plan.sweep) {
+        // Every blob of this file the record doesn't use goes (left by an earlier page).
+        const keep = new Set(plan.record.blobs);
+        const cur = blobs.openKeyCursor(IDBKeyRange.bound(`${plan.record.hash}/`, `${plan.record.hash}/\uffff`));
+        cur.onsuccess = () => {
+          const c = cur.result;
+          if (!c) return;
+          if (!keep.has(String(c.key))) blobs.delete(c.key);
+          c.continue();
+        };
+      }
       for (const k of plan.drop) blobs.delete(k);
       tx.objectStore("sessions").put(plan.record);
       tx.oncomplete = () => resolve();
@@ -109,8 +123,8 @@ export async function loadSession(hash: string): Promise<LoadedSession | null> {
   }
 }
 
-/** Deletes a session and its blobs. */
-export async function deleteSession(hash: string): Promise<void> {
+/** Deletes a session and its blobs. True when the device is known to hold nothing for it. */
+export async function deleteSession(hash: string): Promise<boolean> {
   try {
     const record = (await run("sessions", "readonly", (st) => st.get(hash))) as SessionRecord | undefined;
     const d = await db();
@@ -123,8 +137,9 @@ export async function deleteSession(hash: string): Promise<void> {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
+    return true;
   } catch {
-    // nothing stored
+    return false;
   }
 }
 

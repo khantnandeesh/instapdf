@@ -26,6 +26,9 @@ describe("imageSize", () => {
   it("returns null for a broken header", () => {
     expect(imageSize(new Uint8Array([0x89, 0x50, 0x4e, 0x47]), "image/png")).toBeNull();
     expect(imageSize(new Uint8Array([0xff, 0xd8, 0x00, 0x00, 0x00]), "image/jpeg")).toBeNull();
+    // A height of 0 (set later by a DNL marker) or a width of 0 is unreadable, not "0 pixels".
+    expect(imageSize(jpeg(1200, 0), "image/jpeg")).toBeNull();
+    expect(imageSize(jpeg(0, 900), "image/jpeg")).toBeNull();
   });
   it("flags a decompression bomb before decoding", () => {
     // A tiny PNG that declares 100 000 x 100 000 pixels.

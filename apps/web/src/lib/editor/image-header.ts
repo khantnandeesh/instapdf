@@ -40,7 +40,10 @@ function jpegSize(b: Uint8Array): ImageSize | null {
     if (len < 2) return null;
     if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
       if (i + 9 > b.length) return null;
-      return { width: u16(b, i + 7), height: u16(b, i + 5) };
+      const width = u16(b, i + 7);
+      const height = u16(b, i + 5);
+      // Height 0 means "given later" (a DNL marker): the size can't be known before decoding.
+      return width && height ? { width, height } : null;
     }
     i += 2 + len;
   }

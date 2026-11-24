@@ -66,6 +66,38 @@ test("QA P1: an owner-restricted file opens read-only, downloads unchanged, and 
   await expect(page.getByRole("group", { name: /Now editable/ })).toHaveCount(1);
 });
 
+test("review 2 #6: a restricted file opened with its owner password is editable; its open password doesn't unlock it", async ({ page }) => {
+  const doc = await Encryptable.create();
+  doc.addPage([595, 842]);
+  doc.encrypt({ userPassword: "open-me", ownerPassword: "own-me", algorithm: "AES-256", permissions: { printing: true, modifying: false } });
+  const file = { name: "both.pdf", mimeType: "application/pdf", buffer: Buffer.from(await doc.save({ useObjectStreams: false })) };
+  const pick = async (password: string) => {
+    await page.goto("/edit-pdf");
+    await page.getByTestId("editor-input").setInputFiles(file);
+    await page.getByLabel(/password/i).first().fill(password);
+    await page.getByRole("button", { name: "Unlock" }).click();
+    await expect(page.getByTestId("page-1")).toHaveAttribute("data-drawn", "true", { timeout: 15_000 });
+  };
+  // Opened with the owner password: nothing is locked.
+  await pick("own-me");
+  await expect(page.getByTestId("canvas")).toBeVisible();
+  await expect(page.getByTestId("owner-lock")).toHaveCount(0);
+  await typeText(page, "Owner edit");
+  await expect(page.getByRole("group", { name: /Owner edit/ })).toHaveCount(1);
+  // Opened with the open password: locked, and that password isn't taken as the owner's.
+  await pick("open-me");
+  const lock = page.getByTestId("owner-lock");
+  await expect(lock).toBeVisible();
+  await lock.getByRole("button", { name: "Enter owner password" }).click();
+  const dialog = page.getByRole("dialog", { name: /Owner password/ });
+  await dialog.getByPlaceholder("Owner password").fill("open-me");
+  await dialog.getByRole("button", { name: "Unlock" }).click();
+  await expect(dialog).toContainText("That isn’t the owner password.");
+  await dialog.getByPlaceholder("Owner password").fill("own-me");
+  await dialog.getByRole("button", { name: "Unlock" }).click();
+  await expect(lock).toHaveCount(0);
+});
+
 /** Two A4 pages with one A1 landscape page between them, and a 3000 pt wide strip at the end. */
 async function mixed(): Promise<Buffer> {
   const doc = await PDFDocument.create();

@@ -8,25 +8,16 @@
  * (`floor`). Versions no history state refers to any more are released too (`releaseBelow`).
  *
  * Indexes are stable (DocState.engine points into this list); a released version is `null`.
- * The newest version is always a full copy.
+ * The newest version is always a full copy, and so is the shown one until a newer edit is made.
+ * The original file (`held`) is kept by the page anyway, so it costs nothing against the budget.
  */
-export type VersionEntry = { bytes: Uint8Array } | { length: number } | null;
+export type VersionEntry = { bytes: Uint8Array; held?: true } | { length: number } | null;
 
 /** Full copies kept for undo, besides the newest version. */
 export const VERSION_COPY_BUDGET = 192 * 1024 * 1024;
 
-/** True when `before` is a prefix of `after`. Checks the length, then a spread sample of bytes. */
-export function isPrefix(before: Uint8Array, after: Uint8Array, samples = 4096): boolean {
-  if (after.length < before.length) return false;
-  const n = before.length;
-  if (!n) return true;
-  const step = Math.max(1, Math.floor(n / samples));
-  for (let i = 0; i < n; i += step) if (before[i] !== after[i]) return false;
-  for (let i = Math.max(0, n - 1024); i < n; i++) if (before[i] !== after[i]) return false;
-  return true;
-}
-
-export const initialVersions = (bytes: Uint8Array): VersionEntry[] => [{ bytes }];
+/** The original file: the page holds these bytes anyway, so releasing them frees nothing. */
+export const initialVersions = (bytes: Uint8Array): VersionEntry[] => [{ bytes, held: true }];
 
 /** The bytes of version `i` (a view into a newer copy for a length entry), or null if released. */
 export function versionBytes(v: readonly VersionEntry[], i: number): Uint8Array | null {
@@ -43,11 +34,15 @@ export function versionBytes(v: readonly VersionEntry[], i: number): Uint8Array 
 /** Bytes held in full copies. */
 export const versionsSize = (v: readonly VersionEntry[]) => v.reduce((n, e) => n + (e && "bytes" in e ? e.bytes.length : 0), 0);
 
+/** What a version costs against the budget: copies only this list holds. */
+const cost = (e: VersionEntry) => (e && "bytes" in e && !e.held ? e.bytes.length : 0);
+
 /**
  * Adds the result of an edit made on version `shown`. Versions after `shown` (a redo branch) are
  * dropped. `appended` is the engine's own check that the old bytes are a prefix of the new ones.
  * Returns the list, the new version's index, and `floor`: versions below it were released to
- * stay within `budget`.
+ * stay within `budget`. `shown` itself is never released, so the edit can always be undone once,
+ * even when that copy alone is over the budget.
  */
 export function pushVersion(v: readonly VersionEntry[], shown: number, after: Uint8Array, appended: boolean, budget = VERSION_COPY_BUDGET): { versions: VersionEntry[]; index: number; floor: number } {
   const prev = versionBytes(v, shown);
@@ -55,15 +50,16 @@ export function pushVersion(v: readonly VersionEntry[], shown: number, after: Ui
   const next = v.slice(0, shown + 1);
   // The copy that held `shown` may be in the dropped branch: keep `shown` as its own copy (earlier
   // length entries are prefixes of it, so they stay valid).
-  if (!(next[shown] && "bytes" in next[shown]!)) next[shown] = { bytes: prev.slice() };
+  const kept = next[shown];
+  if (!(kept && "bytes" in kept)) next[shown] = { bytes: prev.slice() };
   if (appended && after.length >= prev.length) next[shown] = { length: prev.length };
   next.push({ bytes: after });
   let floor = next.findIndex((e) => e !== null);
-  let total = versionsSize(next) - after.length;
+  let total = next.reduce((n, e, i) => n + (i < next.length - 1 ? cost(e) : 0), 0);
   while (total > budget) {
-    const k = next.findIndex((e, i) => i < next.length - 1 && !!e && "bytes" in e);
+    const k = next.findIndex((e, i) => i < shown && !!e && "bytes" in e);
     if (k < 0) break;
-    total -= (next[k] as { bytes: Uint8Array }).bytes.length;
+    total -= cost(next[k]);
     for (let i = 0; i <= k; i++) next[i] = null;
     floor = k + 1;
   }
