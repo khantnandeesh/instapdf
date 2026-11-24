@@ -13,7 +13,9 @@ import { ProviderMark } from "./ProviderMark";
  * white page, a jam bar with the percent, the name and "1.4 of 3.3 MB", and a Stop button.
  * A failed download keeps its card with Retry (no picker again, AC-150) and Remove.
  */
-export function CloudDownloads({ downloads, onStop, onRetry }: { downloads: CloudDownload[]; onStop: (key: string) => void; onRetry: (key: string) => void }) {
+export type CloudDownloadsProps = { downloads: CloudDownload[]; onStop: (key: string) => void; onRetry: (key: string) => void };
+
+export function CloudDownloads({ downloads, onStop, onRetry }: CloudDownloadsProps) {
   if (!downloads.length) return null;
   return (
     <div role="list" aria-label="Files on their way" className="ip-dl-list" data-testid="cloud-downloads">

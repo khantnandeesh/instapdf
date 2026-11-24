@@ -15,6 +15,9 @@ import { configuredProviders, SAVE_PROVIDERS, type CloudProvider } from "@/lib/c
 import { cloudCopy } from "../cloud/copy";
 import { SaveToCloud } from "../cloud/SaveToCloud";
 
+/** F23: a build-time constant (DefinePlugin), so builds without cloud sources drop that code. */
+const CLOUD_ON = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1";
+
 export function ResultCard({
   output,
   tool,
@@ -36,7 +39,7 @@ export function ResultCard({
   cloud?: { pushNotice: (n: Omit<FlowNoticeInput, "id">) => string; from: CloudProvider | null };
 }) {
   const [savedTo, setSavedTo] = useState<CloudProvider | null>(null);
-  const savable = cloud ? SAVE_PROVIDERS.filter((p) => configuredProviders().includes(p)) : [];
+  const savable = CLOUD_ON && cloud ? SAVE_PROVIDERS.filter((p) => configuredProviders().includes(p)) : [];
   const download = useRef<HTMLAnchorElement>(null);
   const isZip = output.type === "application/zip";
   // Created in an effect and revoked in its cleanup, so StrictMode's double
@@ -119,7 +122,7 @@ export function ResultCard({
                 Download
               </span>
             </a>
-            {cloud && savable.length > 0 && (
+            {CLOUD_ON && cloud && savable.length > 0 && (
               <SaveToCloud
                 file={file}
                 providers={savable}
@@ -147,7 +150,9 @@ export function ResultCard({
             <PrivacyNote
               runtime={tool.runtime}
               context="result"
-              text={savedTo ? cloudCopy.resultPrivacySaved(savedTo) : cloud?.from ? cloudCopy.resultPrivacy(cloud.from) : undefined}
+              text={
+                !CLOUD_ON ? undefined : savedTo ? cloudCopy.resultPrivacySaved(savedTo) : cloud?.from ? cloudCopy.resultPrivacy(cloud.from) : undefined
+              }
             />
             {output.wasEncrypted && <Notice tone="warning">{copy.resultUnencrypted}</Notice>}
           </div>

@@ -10,7 +10,7 @@ import { MenuButton, type MenuButtonHandle } from "../ui/Menu";
 import { CheckIcon, ChevronDownIcon } from "../ui/icons";
 import { cloudCopy } from "./copy";
 import { ProviderMark } from "./ProviderMark";
-import { cloudFootnote, providerItems } from "./SourceCaret";
+import { cloudFootnote, providerItems } from "./items";
 
 /**
  * Result screen "Save to Drive" (spec U-2 E5, AC-160 to AC-164, AC-169): a `line` split next to

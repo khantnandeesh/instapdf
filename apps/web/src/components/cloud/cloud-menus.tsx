@@ -7,7 +7,7 @@ import type { CloudProvider } from "@/lib/cloud/providers";
 import type { MenuEntry } from "../ui/Menu";
 import { DeviceIcon } from "../ui/icons";
 import { cloudCopy } from "./copy";
-import { providerItems } from "./SourceCaret";
+import { providerItems } from "./items";
 
 type Act = () => void;
 

@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import type { NextConfig } from "next";
 import { baseSecurityHeaders, CLOUD_COOP, contentSecurityPolicy, TOOL_PAGE_COOP } from "./src/lib/security/csp";
 
@@ -7,6 +8,18 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // next/image optimisation is unused, and sharp (LGPL-3.0 libvips) is deliberately not installed.
   images: { unoptimized: true },
+  // F23: always defined (empty when unset), so `process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"` folds to a
+  // constant at build time and builds without cloud sources ship none of its code (AC-120).
+  env: {
+    NEXT_PUBLIC_CLOUD_SOURCES: process.env.NEXT_PUBLIC_CLOUD_SOURCES ?? "",
+    NEXT_PUBLIC_CLOUD_MOCK: process.env.NEXT_PUBLIC_CLOUD_MOCK ?? "",
+  },
+  webpack(config, { webpack }) {
+    // F23 off (the default): tool pages get the no-op cloud module, so none of the cloud code ships.
+    if (process.env.NEXT_PUBLIC_CLOUD_SOURCES !== "1")
+      config.plugins.push(new webpack.NormalModuleReplacementPlugin(/[\\/]cloud[\\/]tool-cloud$/, join(__dirname, "src/components/cloud/tool-cloud.off.ts")));
+    return config;
+  },
   async headers() {
     return [
       { source: "/:path*", headers: baseSecurityHeaders },

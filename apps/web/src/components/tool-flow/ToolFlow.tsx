@@ -32,13 +32,14 @@ import { createVisibilityWatcher, ThumbContext } from "./Thumbnail";
 import { ToolIntro } from "./ToolIntro";
 import type { FlowApi, FlowContext, FlowState, LoadedFile, PageDecoration, PreviewItem, ProcessFn, ReadyFile, ToolOutput, WorkspaceContext } from "./types";
 import { LeaveGuard } from "./LeaveGuard";
-// F23 cloud sources: tiny on tool pages (provider SDKs load only in the /cloud/<provider> window).
-import { writeLast } from "@/lib/cloud/last-used";
-import { CloudDownloads } from "../cloud/CloudDownloads";
-import { CloudRow } from "../cloud/CloudRow";
-import { cloudOrigin, useCloudIntake } from "../cloud/useCloudIntake";
-import { cloudCopy } from "../cloud/copy";
-import { SourceCaret } from "../cloud/SourceCaret";
+// F23 cloud sources: small on tool pages (provider SDKs load only in the /cloud/<provider> window),
+// and compiled out entirely without NEXT_PUBLIC_CLOUD_SOURCES=1 (the inline env checks below).
+import type { ComponentType } from "react";
+import type { CloudDownloadsProps } from "../cloud/CloudDownloads";
+import type { CloudRowProps } from "../cloud/CloudRow";
+import type { SourceCaretProps } from "../cloud/SourceCaret";
+import { useCloud } from "../cloud/tool-cloud";
+
 
 // Never needed before a file is picked: separate chunks, prefetched once the page is idle.
 const lazyParts = {
@@ -57,6 +58,15 @@ const PasswordDialog = dynamic(() => lazyParts.password().then((m) => m.Password
 const OwnerPasswordDialog = dynamic(() => lazyParts.owner().then((m) => m.OwnerPasswordDialog), { ssr: false });
 const ReplaceFileDialog = dynamic(() => lazyParts.replace().then((m) => m.ReplaceFileDialog), { ssr: false });
 const PagePreviewDialog = dynamic(() => lazyParts.preview().then((m) => m.PagePreviewDialog), { ssr: false });
+
+const Nothing = () => null;
+// Without the flag, tool-cloud is swapped for its no-op twin (next.config.ts) and these never load.
+// The caret and the row are on the first screen: server-rendered. The download cards come later.
+const SourceCaret: ComponentType<SourceCaretProps> =
+  process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? dynamic(() => import("../cloud/SourceCaret").then((m) => m.SourceCaret)) : Nothing;
+const CloudRow: ComponentType<CloudRowProps> = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? dynamic(() => import("../cloud/CloudRow").then((m) => m.CloudRow)) : Nothing;
+const CloudDownloads: ComponentType<CloudDownloadsProps> =
+  process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? dynamic(() => import("../cloud/CloudDownloads").then((m) => m.CloudDownloads), { ssr: false }) : Nothing;
 
 type Phase = "idle" | "processing" | "done" | "error";
 
@@ -244,7 +254,7 @@ export function ToolFlow({
 
   // ---- F23 cloud sources: same intake as a local pick (late-bound: defined further down) ----
   const late = useRef<Pick<FlowApi, "pushNotice" | "dismissNotice"> & { intake: (f: File[], t: HTMLElement | null, o: { tag?: unknown; replace?: boolean }) => Promise<void> }>(null!);
-  const cloud = useCloudIntake({
+  const cloud = useCloud({
     tool,
     announce,
     sortIntake,
@@ -255,7 +265,7 @@ export function ToolFlow({
     problemsTitle: copy.problemsTitle,
   });
   const localPick = (f: File[], t: HTMLElement | null, opts?: { replace?: boolean }) => {
-    if (cloud.enabled) writeLast("device");
+    if (cloud.enabled) cloud.markLocal();
     void late.current.intake(f, t, opts ?? {});
   };
 
@@ -791,7 +801,7 @@ export function ToolFlow({
           onStartOver={startOver}
           onBack={backToOptions}
           announce={announce}
-          cloud={cloud.enabled ? { pushNotice, from: files.map((f) => cloudOrigin(f.source)).find(Boolean) ?? null } : undefined}
+          cloud={cloud.enabled ? { pushNotice, from: files.map((f) => cloud.originOf(f.source)).find(Boolean) ?? null } : undefined}
         />
       ) : (
         // Empty: the drop area (--ip-work-h, fits the first screen) beside the options panel, which grows
@@ -810,7 +820,7 @@ export function ToolFlow({
                   icon={<UploadIcon size={24} />}
                   onFiles={(f, t) => localPick(f, t)}
                   inputTestId="file-input"
-                  sources={cloud.enabled && <SourceCaret providers={cloud.providers} label={cloudCopy.caret(cloud.providers)} look="primary" onOpen={(p, t) => cloud.open(p, t)} />}
+                  sources={cloud.enabled && <SourceCaret providers={cloud.providers} look="primary" onOpen={(p, t) => cloud.open(p, t)} />}
                 />
                 {cloud.enabled && <CloudRow providers={cloud.providers} onOpen={(p, t) => cloud.open(p, t)} />}
                 <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copyOverrides?.pickerHint ?? copy.pickerHint}</p>
@@ -875,7 +885,7 @@ export function ToolFlow({
                         cloud.enabled && (
                           <SourceCaret
                             providers={cloud.providers}
-                            label={cloudCopy.caretToolbar(cloud.providers, !flow.multiFile)}
+                            replace={!flow.multiFile}
                             look="tool"
                             className={phoneAddMenu ? "max-sm:hidden" : undefined}
                             disabled={state === "processing"}

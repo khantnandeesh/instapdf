@@ -12,7 +12,9 @@ import { ProviderMark } from "./ProviderMark";
  * last used provider first and shows its name (cloud.css), so nothing shifts after hydration.
  * The `title` (a tooltip, no layout) is set after mount.
  */
-export function CloudRow({ providers, onOpen }: { providers: readonly CloudProvider[]; onOpen: (p: CloudProvider, trigger: HTMLElement) => void }) {
+export type CloudRowProps = { providers: readonly CloudProvider[]; onOpen: (p: CloudProvider, trigger: HTMLElement) => void };
+
+export function CloudRow({ providers, onOpen }: CloudRowProps) {
   const [last, setLast] = useState<CloudProvider | null>(null);
   useEffect(() => setLast(readLast(providers)), [providers]);
   if (!providers.length) return null;

@@ -7,8 +7,7 @@ import type { FlowApi, LoadedFile, ProcessFn, WorkspaceContext } from "@/compone
 import { cx } from "@/components/ui/cx";
 import { ChevronDownIcon, PlusIcon } from "@/components/ui/icons";
 import type { MenuEntry } from "@/components/ui/Menu";
-import { addPagesEntries, phoneAddEntries } from "@/components/cloud/cloud-menus";
-import { cloudFootnote } from "@/components/cloud/SourceCaret";
+import { cloudMenus } from "@/components/cloud/tool-cloud";
 import type { CloudProvider } from "@/lib/cloud/providers";
 import {
   A4,
@@ -41,6 +40,7 @@ import { runInWorker } from "@/lib/pdf/worker-client";
 import { flowTool } from "@/tools/registry";
 import { mergeCopy as c } from "./copy";
 import { MergeOptions } from "./MergeOptions";
+
 
 const tool = flowTool("merge-pdf");
 
@@ -796,11 +796,18 @@ export function MergeTool() {
                 placement="bottom-end"
                 disabled={w.dimmed}
                 className={cx(toolbarButton, "-ms-1")}
-                items={addPagesEntries(w.api.cloudProviders, { fromFile: { label: c.fromFile, onSelect: () => openPagesPicker(null) }, blank: { label: c.blankPage, onSelect: toolbarBlank } }, (p) =>
-                  cloudPages(p, "add-pages-menu"),
-                )}
-                footnote={w.api.cloudProviders.length ? cloudFootnote() : undefined}
-                popupClassName={w.api.cloudProviders.length ? "ip-menu-wide" : undefined}
+                items={
+                  cloudMenus
+                    ? cloudMenus.addPagesEntries(w.api.cloudProviders, { fromFile: { label: c.fromFile, onSelect: () => openPagesPicker(null) }, blank: { label: c.blankPage, onSelect: toolbarBlank } }, (p) =>
+                        cloudPages(p, "add-pages-menu"),
+                      )
+                    : [
+                        { id: "from-file", label: c.fromFile, onSelect: () => openPagesPicker(null) },
+                        { id: "blank", label: c.blankPage, onSelect: toolbarBlank },
+                      ]
+                }
+                footnote={cloudMenus && w.api.cloudProviders.length ? cloudMenus.cloudFootnote() : undefined}
+                popupClassName={cloudMenus && w.api.cloudProviders.length ? "ip-menu-wide" : undefined}
                 data-testid="add-pages-menu"
               >
                 <span>{c.addPages}</span>
@@ -814,13 +821,21 @@ export function MergeTool() {
                 placement="bottom-end"
                 disabled={w.dimmed}
                 className={phoneAddButton}
-                items={phoneAddEntries(
-                  w.api.cloudProviders,
-                  { files: { label: c.addFilesItem, onSelect: () => w.api.openPicker() }, fromFile: { label: c.fromFile, onSelect: () => openPagesPicker(null) }, blank: { label: c.blankPage, onSelect: toolbarBlank } },
-                  (p) => w.api.openCloud(p, document.querySelector<HTMLElement>("[data-testid=add-menu]")),
-                  (p) => cloudPages(p, "add-menu"),
-                )}
-                footnote={w.api.cloudProviders.length ? cloudFootnote() : undefined}
+                items={
+                  cloudMenus
+                    ? cloudMenus.phoneAddEntries(
+                        w.api.cloudProviders,
+                        { files: { label: c.addFilesItem, onSelect: () => w.api.openPicker() }, fromFile: { label: c.fromFile, onSelect: () => openPagesPicker(null) }, blank: { label: c.blankPage, onSelect: toolbarBlank } },
+                        (p) => w.api.openCloud(p, document.querySelector<HTMLElement>("[data-testid=add-menu]")),
+                        (p) => cloudPages(p, "add-menu"),
+                      )
+                    : [
+                        { id: "files", label: c.addFilesItem, onSelect: () => w.api.openPicker() },
+                        { id: "from-file", label: c.fromFile, onSelect: () => openPagesPicker(null) },
+                        { id: "blank", label: c.blankPage, onSelect: toolbarBlank },
+                      ]
+                }
+                footnote={cloudMenus && w.api.cloudProviders.length ? cloudMenus.cloudFootnote() : undefined}
                 presentation={w.api.cloudProviders.length ? "auto" : "popover"}
                 data-testid="add-menu"
               >

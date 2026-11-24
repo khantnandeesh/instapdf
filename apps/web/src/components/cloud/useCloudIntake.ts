@@ -58,8 +58,10 @@ type Deps = {
 
 const providers = configuredProviders();
 /** Where each cloud file came from (for the result's privacy line, AC-131). */
-const origin = new WeakMap<Blob, CloudProvider>();
-export const cloudOrigin = (b: Blob) => origin.get(b);
+let originMap: WeakMap<Blob, CloudProvider> | undefined;
+const origins = () => (originMap ??= new WeakMap());
+const originOf = (b: Blob) => origins().get(b);
+const markLocal = () => writeLast("device");
 
 export function useCloudIntake(deps: Deps) {
   const d = useRef(deps);
@@ -207,7 +209,7 @@ export function useCloudIntake(deps: Deps) {
                 s.order.push(id);
                 update((prev) => [...prev, { key, id, req, name: file.name, provider, loaded: file.size, total: file.size, status: "arrived", resolved: false }]);
               }
-              if (ok.has(file)) origin.set(file, provider);
+              if (ok.has(file)) origins().set(file, provider);
               update((prev) =>
                 prev.map((e) => (e.key === key ? { ...e, status: "arrived", loaded: e.total || file.size, file: ok.has(file) ? file : undefined, resolved: true } : e)),
               );
@@ -307,6 +309,10 @@ export function useCloudIntake(deps: Deps) {
     statusText: pending && first ? cloudCopy.status(pending, first.provider) : null,
     stop,
     retry,
+    /** Where a file came from (the result's privacy line, AC-131). */
+    originOf,
+    /** A local pick: "This device" becomes the last used source (U-12). */
+    markLocal,
   };
 }
 
