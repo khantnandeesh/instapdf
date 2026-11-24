@@ -169,6 +169,49 @@ describe("the download check and the writer agree (review)", () => {
     });
   });
 
+  it("keeps code/label options, a stored code and a dropdown that isn't editable (review)", async () => {
+    const { fonts, fontkit } = await realFonts();
+    const src = await PDFDocument.load(await fixture("form-basic.pdf"));
+    const form = src.getForm();
+    const pairs = () => src.context.obj([src.context.obj([PDFHexString.fromText("ru"), PDFHexString.fromText("Ирина 😀")]), src.context.obj([PDFHexString.fromText("el"), PDFHexString.fromText("Ελένη")])]);
+    for (const name of ["colour", "days"]) {
+      const d = form.getField(name).acroField.dict;
+      d.set(PDFName.of("Opt"), pairs());
+      d.set(PDFName.of("V"), PDFHexString.fromText("ru"));
+      d.delete(PDFName.of("I"));
+    }
+    const optBefore = (n: string) => String(form.getField(n).acroField.dict.lookup(PDFName.of("Opt")));
+    const before = { colour: optBefore("colour"), days: optBefore("days") };
+    const { bytes, report } = await roundTrip(
+      await src.save(),
+      (s) => {
+        for (const name of ["colour", "days"]) {
+          const f = s.fields.find((x) => x.name === name)!;
+          s = updateField(s, f.id, { style: { ...f.style, fontSize: 9 } });
+        }
+        return s;
+      },
+      { fonts, fontkit },
+    );
+    expect(report.missingGlyphs).toContain("😀");
+    const out = (await PDFDocument.load(bytes)).getForm();
+    expect(out.getDropdown("colour").isEditable()).toBe(false);
+    expect(out.getOptionList("days").isMultiselect()).toBe(form.getOptionList("days").isMultiselect());
+    for (const n of ["colour", "days"] as const) {
+      expect(String(out.getField(n).acroField.dict.lookup(PDFName.of("Opt")))).toBe(before[n]);
+      expect(out.getField(n).acroField.dict.lookup(PDFName.of("V"), PDFHexString).decodeText()).toBe("ru");
+    }
+  });
+
+  it("reports and draws as ? an editable dropdown's own text it can't print (review)", async () => {
+    const { fonts, fontkit } = await realFonts();
+    const { bytes, report } = await roundTrip(await fixture("form-extra.pdf"), (s) => setValue(s, s.fields.find((f) => f.name === "city")!.id, "Ирина 😀").state, { fonts, fontkit });
+    expect(report.missingGlyphs).toEqual(["😀"]);
+    const dd = (await PDFDocument.load(bytes)).getForm().getDropdown("city");
+    expect(dd.getSelected()).toEqual(["Ирина 😀"]);
+    expect(dd.getOptions()).toEqual(["Pune", "Delhi", "Chennai"]);
+  });
+
   it("draws options it can't print as ? but keeps the field's own options and value", async () => {
     const { fonts, fontkit } = await realFonts();
     const { bytes } = await roundTrip(

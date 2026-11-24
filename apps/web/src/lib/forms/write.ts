@@ -22,6 +22,7 @@ import {
   PDFOptionList,
   PDFRadioGroup,
   PDFRef,
+  PDFString,
   PDFTextField,
   PDFWidgetAnnotation,
   layoutMultilineText,
@@ -32,6 +33,7 @@ import {
   type PDFDocument,
   type PDFField,
   type PDFFont,
+  type PDFObject,
   type PDFPage,
 } from "@cantoo/pdf-lib";
 import { pageTurn, toPdfRect, type PdfRect } from "./frame";
@@ -758,15 +760,48 @@ async function refreshAppearance(doc: PDFDocument, field: PDFField, f: FormField
       field.setText(clean(v));
     }
   } else {
-    // Options are drawn cleaned too; the field's options and value are put back after drawing.
-    const opts = field.getOptions();
-    const cleaned = opts.map(clean);
-    if (!same(opts, cleaned)) {
-      const d = field.acroField.dict;
+    // Options and the value are drawn cleaned too, then the field's own Opt, V and I are put back.
+    // Written straight into the dictionary: pdf-lib's select() would refuse a stored export code
+    // or turn on editing or multi-select to fit the value.
+    const d = field.acroField.dict;
+    const ctx = doc.context;
+    const textOf = (o: PDFObject | undefined) => (o instanceof PDFString || o instanceof PDFHexString ? o.decodeText() : null);
+    let changed = false;
+    const cleanObj = (o: PDFObject | undefined): PDFObject => {
+      const t = textOf(o);
+      if (t === null) return o ?? PDFHexString.fromText("");
+      const c = clean(t);
+      if (c === t) return o!;
+      changed = true;
+      return PDFHexString.fromText(c);
+    };
+    const opt = d.lookup(N("Opt"));
+    const exportCodes = new Set<string>();
+    const cleanedOpt =
+      opt instanceof PDFArray
+        ? opt.asArray().map((o) => {
+            const e = o instanceof PDFRef ? ctx.lookup(o) : o;
+            if (e instanceof PDFArray && e.size() >= 2) {
+              const code = e.lookup(0);
+              const t = textOf(code);
+              if (t !== null) exportCodes.add(t);
+              return ctx.obj([code ?? PDFHexString.fromText(""), cleanObj(e.lookup(1))]);
+            }
+            return cleanObj(e);
+          })
+        : null;
+    // The value: a stored export code stays; text (an option's own text, or an editable
+    // dropdown's typed text) is drawn cleaned.
+    const cleanValue = (o: PDFObject | undefined) => {
+      const t = textOf(o);
+      return t !== null && exportCodes.has(t) ? o! : cleanObj(o);
+    };
+    const v = d.lookup(N("V"));
+    const cleanedV = v instanceof PDFArray ? ctx.obj(v.asArray().map((x) => cleanValue(x instanceof PDFRef ? ctx.lookup(x) : x))) : v ? cleanValue(v) : undefined;
+    if (changed) {
       keepOpts = { opt: d.get(N("Opt")), v: d.get(N("V")), i: d.get(N("I")) };
-      const sel = field.getSelected().map(clean);
-      field.setOptions(cleaned);
-      if (sel.length) field.select(field instanceof PDFOptionList ? sel : sel[0]);
+      if (cleanedOpt) d.set(N("Opt"), ctx.obj(cleanedOpt));
+      if (cleanedV) d.set(N("V"), cleanedV);
     }
   }
   const name = fonts.drName(font);
