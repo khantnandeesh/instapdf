@@ -19,6 +19,7 @@
     "@cantoo/pdf-lib": "2.11.1",
     "@fontsource-variable/fredoka": "5.3.0",
     "fflate": "0.8.2",
+    "gsap": "3.15.1",
     "next": "15.5.29",
     "pdfjs-dist": "^6.5.438",
     "react": "19.1.0",

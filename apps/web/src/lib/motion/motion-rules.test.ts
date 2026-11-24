@@ -211,10 +211,11 @@ describe("motion rules (docs/design/motion.md §4)", () => {
     const bad = CODE.filter((f) => /from\s+["']gsap(\/[\w/]+)?["']|import\(\s*["']gsap/.test(f.text) && f.path !== "lib/motion/engine.ts").map((f) => f.path);
     expect(bad).toEqual([]);
     // And lib/motion's public files never pull it in statically.
-    for (const f of ["lib/motion/index.ts", "lib/motion/load.ts", "lib/motion/react.ts"]) {
+    for (const f of ["lib/motion/index.ts", "lib/motion/flow.ts", "lib/motion/state.ts", "lib/motion/load.ts", "lib/motion/react.ts"]) {
       const text = CODE.find((c) => c.path === f)?.text ?? "";
       expect(text, f).not.toMatch(/["']gsap/);
-      expect(text, f).not.toMatch(/import\s+[^(]*["']\.\/engine["']/);
+      // A type-only import is erased; a value import would pull the engine into that file's chunk.
+      expect(text, f).not.toMatch(/^import\s+(?!type\b)[^\n(]*["']\.\/engine["']/m);
     }
   });
 

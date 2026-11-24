@@ -145,7 +145,7 @@ describe("findViolations", () => {
   });
 
   it("accepts a reviewed exception only for that package and that exact license", () => {
-    const exceptions = { "data-pkg": { license: "CC-BY-4.0", reason: "data" } };
+    const exceptions = { "data-pkg": { license: "CC-BY-4.0", reason: "data", note: "data" } };
     expect(findViolations([pkg("data-pkg", "CC-BY-4.0")], { exceptions })).toEqual([]);
     expect(findViolations([pkg("data-pkg", "CC-BY-SA-4.0")], { exceptions })).toHaveLength(1);
     expect(findViolations([pkg("other", "CC-BY-4.0")], { exceptions })).toHaveLength(1);
@@ -154,6 +154,7 @@ describe("findViolations", () => {
   it("the shipped exception list stays short and documented", () => {
     for (const [name, ex] of Object.entries(EXCEPTIONS)) {
       expect(ex.reason.length, name).toBeGreaterThan(20);
+      expect(ex.note.length, name).toBeGreaterThan(20);
       expect(/GPL/.test(ex.license), name).toBe(false);
     }
   });

@@ -45,7 +45,7 @@ export default function LicensesPage() {
         <p className="text-muted">
           This list is generated from the site&apos;s production dependencies each time it is built ({packages.length} packages). Some are used only to build the
           site or to run its server and are never sent to your browser. We only use software under permissive licenses (MIT, Apache 2.0, BSD, ISC, MPL 2.0 and
-          similar); the build stops if anything else appears.
+          similar); the build stops if anything else appears, unless it is a reviewed exception, marked as such below.
         </p>
         <EntryList entries={packages} testId="license-packages" />
       </Section>
@@ -87,7 +87,7 @@ function EntryList({ entries, testId }: { entries: NoticeEntry[]; testId: string
             <p className="break-words text-muted">Author: {e.author.replace(/\s*<[^>]*>/, "")}</p>
           ) : null}
           {e.hasNotice && <p className="text-muted">Includes a NOTICE file, reproduced in the full notices.</p>}
-          {e.exception && <p className="text-muted">Data, not program code: used under its attribution license.</p>}
+          {e.exception && <p className="text-muted">{e.exception}</p>}
         </li>
       ))}
     </ul>

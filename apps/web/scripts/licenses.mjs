@@ -303,7 +303,7 @@ mkdirSync(join(root, ".generated"), { recursive: true });
 const summary = entries.map(({ texts, ...e }) => ({
   ...e,
   hasNotice: texts.some((t) => /^notice/i.test(t.file)),
-  exception: e.kind === "package" && EXCEPTIONS[e.name] ? EXCEPTIONS[e.name].reason : null,
+  exception: e.kind === "package" && EXCEPTIONS[e.name] ? EXCEPTIONS[e.name].note : null,
 }));
 writeFileSync(join(root, ".generated", "licenses.json"), JSON.stringify({ entries: summary }, null, 1) + "\n");
 writeFileSync(join(root, "public", "third-party-notices.txt"), noticesText(entries));

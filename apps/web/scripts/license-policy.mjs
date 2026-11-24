@@ -47,15 +47,22 @@ export function isFontOnlyPackage(name, files, pkg = {}) {
 }
 
 /**
- * Named, reviewed exceptions: package name → the exact license expression accepted for it
- * and why. Anything else outside the allow-list fails the build.
- * @type {Record<string, { license: string; reason: string }>}
+ * Named, reviewed exceptions: package name → the exact license expression accepted for it,
+ * why, and the line /licenses shows for it (`note`). Anything else outside the allow-list fails the build.
+ * @type {Record<string, { license: string; reason: string; note: string }>}
  */
 export const EXCEPTIONS = {
   "caniuse-lite": {
     license: "CC-BY-4.0",
     reason:
       "Browser-support data table required by Next.js (build tooling), not program code. CC BY 4.0 only asks for attribution, which /licenses gives. Needs owner sign-off.",
+    note: "Data, not program code: used under its attribution license.",
+  },
+  gsap: {
+    license: "Standard 'no charge' license: https://gsap.com/standard-license.",
+    reason:
+      "Owner-approved exception (2026-11-24) for UI motion only: core + Flip, pinned, lazy-loaded behind src/lib/motion (docs/design/motion.md §2). Proprietary, not OSI; free for commercial use. GreenSock's notice stays in the shipped chunk. Re-confirm the terms (Webflow or counsel, in writing) before any paid tier ships, and on every version bump.",
+    note: "Not open source: used, with the owner's approval, for interface animation only, under GreenSock's no-charge Standard License.",
   },
 };
 

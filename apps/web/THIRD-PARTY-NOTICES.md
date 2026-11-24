@@ -139,6 +139,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## GSAP (interface motion) — licence exception
+
+- Package: `gsap` 3.15.1 (pinned exactly; we ship the core and the Flip plugin only)
+- Copyright 2026, GreenSock. All rights reserved. GreenSock is part of Webflow.
+- License: GSAP Standard "No Charge" License (npm `license` field: `Standard 'no charge' license: https://gsap.com/standard-license.`), https://gsap.com/standard-license. Text as fetched on 2026-11-24 (effective 30 Apr 2025, modified 30 May 2025) is kept with the design evidence (`designs/motion/gsap-standard-license-2026-11-24.txt`).
+- Not open source and not on CLAUDE.md rule 3's allow-list: an owner-approved exception (2026-11-24) for UI motion only, listed in `EXCEPTIONS` in `scripts/license-policy.mjs` with that exact licence string, so any other non-permissive package still fails the build.
+- Use: interface animation behind `src/lib/motion` (`engine.ts` is the only file that imports it), in a lazy chunk that is never part of a page's first load. GreenSock's copyright notice stays at the top of the shipped chunk (§III of the licence).
+- Conditions to keep: no use in a tool that lets people build visual animations without code; Webflow may amend the terms for later releases, so re-read the licence on every version bump; **before any paid tier, paywall or paid API ships**, confirm in writing (Webflow or counsel) that charging users is fine under the then-current terms, or swap the engine (a one-file change, `src/lib/motion/engine.ts`). See `docs/design/motion.md` §2.
+
 ## BerryPDF design system artwork
 
 - The berry mark, berry loader, blossom, leaf, vine, jam-drip, waves and gingham drawings in `src/components/berry/Berry.tsx` and `src/app/globals.css` come from the owner's BerryPDF design system (commissioned for this product).

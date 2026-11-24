@@ -6,6 +6,7 @@ import { buildToolIndex } from "@/components/catalogue/toolIndex";
 import { siteCopy } from "@/components/site/copy";
 import { CloudPrepaintScript } from "@/components/site/CloudPrepaintScript";
 import { EnginePrefetch } from "@/components/site/EnginePrefetch";
+import { MotionPrime } from "@/components/site/MotionPrime";
 import { RecentPrepaintScript } from "@/components/site/RecentPrepaintScript";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
@@ -55,6 +56,7 @@ export default function RootLayout({
           <SiteFooter />
         </ToolIndexProvider>
         <EnginePrefetch />
+        <MotionPrime />
       </body>
     </html>
   );
