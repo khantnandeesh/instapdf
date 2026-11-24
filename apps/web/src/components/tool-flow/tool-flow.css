@@ -93,3 +93,9 @@ body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard::after {
 body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard {
   scale: 1.02;
 }
+
+/* The processing card (motion.md T11): anti-flicker, it appears only once a job has run 300ms (fast jobs
+   never show it), then fades up 8px in 200ms. The dock's progress bar carries the state from frame 0. */
+.ip-wait-in {
+  animation: mp-fade-up var(--motion-quick) var(--ease-out) 300ms backwards;
+}

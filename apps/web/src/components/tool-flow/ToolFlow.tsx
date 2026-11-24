@@ -34,6 +34,7 @@ import { createVisibilityWatcher, ThumbContext } from "./Thumbnail";
 import { ToolIntro } from "./ToolIntro";
 import type { FlowApi, FlowContext, FlowState, LoadedFile, PageDecoration, PreviewItem, ProcessFn, ReadyFile, ToolOutput, WorkspaceContext } from "./types";
 import { onIntent } from "./intent";
+import { exit, settle } from "@/lib/motion";
 // F23 cloud sources: the caret, the row and the hub on tool pages (everything else is the cloud chunk,
 // ui.ts, fetched on intent), compiled out entirely without them (every use sits behind the flag).
 import { CloudCaret, CloudRow, useCloud } from "../cloud/tool-cloud";
@@ -239,6 +240,7 @@ export function ToolFlow({
   const intakeTrigger = useRef<HTMLElement | null>(null);
   const progressBox = useRef<HTMLDivElement>(null);
   const retryButton = useRef<HTMLButtonElement>(null);
+  const workArea = useRef<HTMLDivElement>(null);
   const abort = useRef<AbortController | null>(null);
   const phoneAddMenuRef = useRef(phoneAddMenu);
   phoneAddMenuRef.current = phoneAddMenu;
@@ -569,6 +571,9 @@ export function ToolFlow({
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       if (controller.signal.aborted) return;
       setProgress(1);
+      // The work area fades out (120ms, inert at once) and the result card rises in its place (T12).
+      await exit(workArea.current, "result");
+      if (controller.signal.aborted) return settle(workArea.current);
       setOutput(out);
       for (const w of out.warnings ?? []) pushNotice({ tone: "warning", title: w });
       setPhase("done");
@@ -853,7 +858,7 @@ export function ToolFlow({
         // with its options. When the panel runs past the fold the page scrolls (never the panel), the drop
         // area stays in view (sticky) and the primary stays pinned at the bottom of the screen.
         // Loaded: the pages take the full width down to the compact bottom bar.
-        <div className={state === "empty" ? "lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]" : undefined}>
+        <div ref={workArea} className={state === "empty" ? "lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]" : undefined}>
           <section aria-label="Your files" className={state === "empty" ? "min-w-0 lg:sticky lg:top-[calc(var(--ip-header-h)+16px)]" : "min-w-0"}>
             {state === "empty" ? (
               <DropCard>
@@ -971,7 +976,7 @@ export function ToolFlow({
                   // Decorative; the dock's progress bar and status carry the state for assistive tech.
                   <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[11]" data-testid="processing-loader">
                     <div className="sticky top-[calc(var(--ip-header-h)+120px)] flex justify-center pt-16">
-                      <div className="mp-loading rounded-panel border-[1.5px] border-sand bg-surface-raised px-8 pt-5 pb-4 shadow-card">
+                      <div className="mp-loading ip-wait-in rounded-panel border-[1.5px] border-sand bg-surface-raised px-8 pt-5 pb-4 shadow-card">
                         <BerryLoader size="md" />
                         <span className="tabular-nums">{copy.progress(flow.progressLabel, Math.round(progress * 100))}</span>
                       </div>

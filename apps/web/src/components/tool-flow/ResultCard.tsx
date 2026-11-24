@@ -1,6 +1,8 @@
 "use client";
 import "@/components/berry/berry-loader.css";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { exit } from "@/lib/motion";
+import { swap } from "@/lib/motion/flow";
 import { formatBytes } from "@/lib/pdf/naming";
 import { openPdf } from "@/lib/pdf/pdfjs";
 import { renderPage } from "@/lib/pdf/thumbnails";
@@ -76,12 +78,25 @@ export function ResultCard({
       download.current?.focus({ preventScroll: true });
     }
   }, [url]);
+  // Download success (motion.md T13): the download starts on the click; the arrow turns into a tick
+  // (200ms, the one other overshoot) and back after 2.4s (120ms). The button stays enabled throughout.
   const [downloaded, setDownloaded] = useState(false);
+  const arrow = useRef<HTMLSpanElement>(null);
+  const tick = useRef<HTMLSpanElement>(null);
+  const shownTick = useRef(false);
   useEffect(() => {
+    if (downloaded !== shownTick.current) {
+      shownTick.current = downloaded;
+      if (downloaded) swap(arrow.current, tick.current, "tick");
+      else swap(tick.current, arrow.current, "swap");
+    }
     if (!downloaded) return;
-    const t = setTimeout(() => setDownloaded(false), 1500);
+    const t = setTimeout(() => setDownloaded(false), 2400);
     return () => clearTimeout(t);
   }, [downloaded]);
+  // Start over and Back to options fade the card out first (120ms, inert at once; T12, T14).
+  const card = useRef<HTMLElement>(null);
+  const leave = (then: () => void) => () => void exit(card.current, "result").then(then);
 
   const file = useMemo(() => new File([output.blob], output.name, { type: output.type }), [output]);
   const [canShare, setCanShare] = useState(false);
@@ -100,7 +115,7 @@ export function ResultCard({
   return (
     // BerryPDF Panel: one centred white panel (20px radius, sand outline, soft pink shadow);
     // Download is the single berry action. A leaf-green tick says "done" (success, not category).
-    <section aria-labelledby={titleId} className="mp-panel mp-pop-in mx-auto w-full max-w-[760px] p-5 sm:p-10" data-testid="result">
+    <section ref={card} aria-labelledby={titleId} className="mp-panel mp-pop-in mx-auto w-full max-w-[760px] p-5 sm:p-10" data-testid="result">
       <h2 id={titleId} className="flex items-center gap-3 font-display text-[22px] leading-[1.2] font-semibold text-ink-black">
         <span className="mp-tick-in grid size-10 place-items-center rounded-full bg-[var(--mp-alert-ok-bg)] text-leaf">
           <CheckIcon size={24} />
@@ -132,7 +147,15 @@ export function ResultCard({
               className={buttonClasses("primary", "lg", "max-sm:w-full")}
             >
               <span className="inline-flex items-center gap-2">
-                {downloaded ? <CheckIcon /> : <DownloadIcon />}
+                {/* Both icons share one cell; CSS shows one, lib/motion crossfades them. */}
+                <span className="grid *:col-start-1 *:row-start-1">
+                  <span ref={arrow} className={downloaded ? "opacity-0" : undefined}>
+                    <DownloadIcon />
+                  </span>
+                  <span ref={tick} className={downloaded ? undefined : "opacity-0"}>
+                    <CheckIcon />
+                  </span>
+                </span>
                 Download
               </span>
             </a>
@@ -196,10 +219,10 @@ export function ResultCard({
         </div>
       </div>
       <div className="mt-[30px] flex flex-col gap-2 border-t-[1.5px] border-sand pt-5 sm:flex-row sm:items-center sm:justify-between">
-        <Button variant="ghost" onClick={onStartOver} className="max-sm:w-full">
+        <Button variant="ghost" onClick={leave(onStartOver)} className="max-sm:w-full">
           Start over
         </Button>
-        <button type="button" onClick={onBack} className="h-11 rounded-sm px-2 font-display text-[16px] font-medium text-brand-strong underline-offset-4 hover:underline max-sm:w-full">
+        <button type="button" onClick={leave(onBack)} className="h-11 rounded-sm px-2 font-display text-[16px] font-medium text-brand-strong underline-offset-4 hover:underline max-sm:w-full">
           Back to options
         </button>
       </div>

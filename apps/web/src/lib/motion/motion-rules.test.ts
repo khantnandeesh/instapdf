@@ -162,7 +162,8 @@ describe("motion rules (docs/design/motion.md §4)", () => {
           const tokens = part.split(/\s+(?![^(]*\))/);
           const name = tokens.find((t) => /^[a-z][\w-]*$/i.test(t) && /-/.test(t) && !/^(ease|linear|step|cubic)/.test(t) && !isTime(t));
           if (name && (LOOPS.has(name) || LONG_ONCE.has(name))) continue;
-          if (d.at.includes(".ip-tooltip")) continue; // a hover delay before a 120ms fade (S9)
+          // Waits, not motion: a hover delay before a 120ms fade (S9); the 300ms anti-flicker wait of the processing card (T11).
+          if (d.at.includes(".ip-tooltip") || d.at.includes(".ip-wait-in")) continue;
           const times = tokens.filter(isTime).map(ms);
           if (times.some((t) => t === null)) continue;
           const [dur = 0, delay = 0] = times as number[];
