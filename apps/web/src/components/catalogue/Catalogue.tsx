@@ -193,8 +193,10 @@ export function Catalogue() {
             label={copy.readyOnly}
             shortLabel={copy.readyOnlyShort}
             // The ground is transparent (owner), so the label carries its own pill like the search field and
-            // chips do.
-            className="shrink-0 rounded-pill border-[1.5px] border-sand bg-surface-raised ps-4 pe-1.5 lg:absolute lg:start-[calc(50%+290px)] lg:bottom-[calc(100%+14px)]"
+            // chips do. From 1024 px it sits in the search row, above the z-10 strip (which gets a Canvas ground
+            // in forced colours) and below the header (z 20); nowrap keeps the pill one line at 1024 px with a
+            // classic scroll bar.
+            className="shrink-0 rounded-pill border-[1.5px] border-sand bg-surface-raised ps-4 pe-1.5 lg:absolute lg:z-[11] lg:start-[calc(50%+290px)] lg:whitespace-nowrap lg:bottom-[calc(100%+14px)]"
             checked={readyOnly}
             onChange={(v) => {
               userChanged.current = true;

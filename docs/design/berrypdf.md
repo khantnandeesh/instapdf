@@ -165,7 +165,7 @@ Owner, 2026-11-24 (screen recording of Merge's options box scrolling inside the 
 
 ### Sticky surfaces
 
-A surface that pins (the site header, the home search bar, a tools row, the dock's primary) uses `position: sticky` and never changes size or jumps when it pins. It matches the page: the header is the glass pill; everything else pinned is either transparent (the home search bar) or the same surface as the panel it belongs to (the dock's primary on white, the tools row on cream). No extra boxes, widths or shadows appear only because something is stuck.
+A surface that pins (the site header, the home search bar, a tools row, the dock's primary) uses `position: sticky` and never jumps when it pins; the one size change is the home search field, which grows a little when pinned (owner, 2026-11-24; see "Sticky search and filter bars"). It matches the page: the header is the glass pill; everything else pinned is either transparent (the home search bar) or the same surface as the panel it belongs to (the dock's primary on white, the tools row on cream). No extra boxes or shadows appear only because something is stuck.
 
 ### Enforced in CI
 

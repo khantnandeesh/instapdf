@@ -94,11 +94,11 @@ test("the ready-only switch's visible text is part of its accessible name on eve
 test("only the search pins: the filter and the jump chips scroll away, and the pinned search is centred and a bit wider", async ({ page }) => {
   await page.goto("/");
   const search = page.getByRole("searchbox");
-  const vw = page.viewportSize()!.width;
+  const vw = await page.evaluate(() => document.documentElement.clientWidth);
   const rest = (await search.boundingBox())!;
   expect(Math.abs(rest.x + rest.width / 2 - vw / 2), "the search is centred at rest").toBeLessThanOrEqual(1);
 
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight * 0.5));
+  await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight * 0.5, behavior: "instant" }));
   await expect(bar(page)).toHaveAttribute("data-stuck", "");
   const hb = await headerBottom(page);
   // The filter and the chips are above the header now (scrolled away), not pinned below it.
@@ -118,10 +118,28 @@ test("only the search pins: the filter and the jump chips scroll away, and the p
 test("the strip beside the pinned search lets clicks through to the cards", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "needs room beside the field");
   await page.goto("/");
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight * 0.5));
+  await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight * 0.5, behavior: "instant" }));
   await expect(bar(page)).toHaveAttribute("data-stuck", "");
   const b = (await bar(page).boundingBox())!;
   const s = (await page.getByRole("searchbox").boundingBox())!;
   const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest("[data-testid=catalogue-bar]") === null, [Math.max(b.x + 4, s.x - 60), b.y + b.height / 2]);
   expect(hit, "a point beside the field is not taken by the bar").toBe(true);
 });
+
+for (const forced of [false, true]) {
+  test(`the ready-only switch is visible and takes clicks at rest${forced ? " (forced colours)" : ""}`, async ({ page }) => {
+    if (forced) await page.emulateMedia({ forcedColors: "active" });
+    await page.goto("/");
+    const sw = page.getByRole("switch", { name: "Only ready tools" });
+    await sw.scrollIntoViewIfNeeded();
+    // Nothing (the transparent search strip, or its Canvas ground in forced colours) is painted over it.
+    const onTop = await sw.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return !!h && (h === el || !!h.closest("label")?.contains(el));
+    });
+    expect(onTop, "the switch is the topmost thing at its centre").toBe(true);
+    const box = (await sw.locator("xpath=..").boundingBox())!;
+    expect(box.height, "the filter pill stays on one line").toBeLessThan(56);
+  });
+}
