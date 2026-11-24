@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { usePresence } from "@/lib/motion/react";
 import { clearRecent } from "@/lib/recent-tools";
 import { matchTools } from "@/lib/catalogue/search";
 import { catalogueCopy as copy } from "../catalogue/copy";
@@ -13,7 +14,6 @@ import { useRecentTools } from "../catalogue/useRecentTools";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { cx } from "../ui/cx";
-import { Dialog } from "../ui/Dialog";
 import { ChevronDownIcon, CloseIcon } from "../ui/icons";
 import { IconButton } from "../ui/IconButton";
 import { LiveRegion } from "../ui/LiveRegion";
@@ -22,6 +22,13 @@ import { SearchField } from "../ui/SearchField";
 import { siteCopy } from "./copy";
 
 const DESKTOP = "(min-width: 768px)";
+/**
+ * The phone menu's full-screen dialog is its own chunk, out of every page's first load (the site
+ * header is on all of them). Phones fetch it right after hydration, so it is there before the first
+ * tap; a desktop fetches it only if a narrow window opens the menu.
+ */
+const loadDialog = () => import("../ui/Dialog");
+const Dialog = lazy(() => loadDialog().then((m) => ({ default: m.Dialog })));
 const MENU_ID = "tool-menu";
 const RESULTS_ID = "tool-menu-results";
 
@@ -51,11 +58,22 @@ export function ToolMenu() {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const scrimRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  // The panel and its scrim stay while they leave (fade + 4px up, 120ms; motion.md S6). Focus has
+  // already gone back to the trigger, and they are inert from the first frame of the exit.
+  const panelShown = usePresence(open && mode === "panel", [
+    [panelRef, "panel"],
+    [scrimRef, "overlay"],
+  ]);
 
   useEffect(() => {
     const mq = window.matchMedia(DESKTOP);
-    const update = () => setDesktop(mq.matches);
+    const update = () => {
+      setDesktop(mq.matches);
+      if (!mq.matches) void loadDialog();
+    };
     update();
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
@@ -190,11 +208,12 @@ export function ToolMenu() {
         </Link>
       </noscript>
 
-      {open && mode === "panel" && (
+      {panelShown && mode === "panel" && (
         <>
           {/* The page behind is dimmed and blurred; clicking it closes the panel. */}
-          <div aria-hidden="true" className="mp-menu-backdrop fixed" style={{ top }} onClick={() => close(true)} data-testid="tool-menu-scrim" />
+          <div ref={scrimRef} aria-hidden="true" className="mp-menu-backdrop fixed" style={{ top }} onClick={() => close(true)} data-testid="tool-menu-scrim" />
           <div
+            ref={panelRef}
             id={MENU_ID}
             className="mp-menu-panel fixed overflow-y-auto overscroll-contain"
             data-ip-scroll="overlay"
@@ -206,18 +225,20 @@ export function ToolMenu() {
         </>
       )}
       {mode === "dialog" && (
-        <Dialog
-          open={open}
-          onClose={() => close(false)}
-          title={copy.title}
-          variant="fullscreen"
-          initialFocusRef={focusSearch ? searchRef : undefined}
-          returnFocusRef={triggerRef}
-        >
-          <div id={MENU_ID} data-testid="tool-menu" className="px-4 pb-[calc(24px+env(safe-area-inset-bottom))]">
-            {content}
-          </div>
-        </Dialog>
+        <Suspense>
+          <Dialog
+            open={open}
+            onClose={() => close(false)}
+            title={copy.title}
+            variant="fullscreen"
+            initialFocusRef={focusSearch ? searchRef : undefined}
+            returnFocusRef={triggerRef}
+          >
+            <div id={MENU_ID} data-testid="tool-menu" className="px-4 pb-[calc(24px+env(safe-area-inset-bottom))]">
+              {content}
+            </div>
+          </Dialog>
+        </Suspense>
       )}
     </div>
   );

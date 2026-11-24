@@ -510,6 +510,7 @@
   .mp-menu[popover] {
     transform-origin: top left;
     opacity: 0;
+    pointer-events: none;
     transition:
       opacity var(--motion-micro) var(--ease-in),
       display var(--motion-micro) allow-discrete,
@@ -517,6 +518,7 @@
   }
   .mp-menu[popover]:popover-open {
     opacity: 1;
+    pointer-events: auto;
     transition:
       opacity var(--motion-quick) var(--ease-out),
       transform var(--motion-quick) var(--ease-out);
@@ -1317,11 +1319,11 @@
     animation: ip-shake 240ms linear;
   }
   .ip-fade-in {
-    animation: ip-fade-in var(--dur-base) ease-out both;
+    animation: mp-fade-in var(--dur-base) ease-out both;
   }
   .ip-tooltip {
     /* 120ms fade after a 300ms hover delay (motion.md S9); the delay is a wait, not motion. */
-    animation: ip-fade-in var(--motion-micro) var(--ease-out) 300ms both;
+    animation: mp-fade-in var(--motion-micro) var(--ease-out) 300ms both;
   }
 }
 
@@ -1346,11 +1348,7 @@
     transform: translateX(4px);
   }
 }
-@keyframes ip-fade-in {
-  from {
-    opacity: 0;
-  }
-}
+
 
 /* ---- First paint (docs/design/motion.md S1, S2, T1, T7, T12): CSS keyframes, so nothing waits for
    JavaScript; lib/motion (GSAP, lazy) takes over interactions after hydration. Transform and opacity
@@ -1407,21 +1405,6 @@
     animation: mp-ring-once 2.4s ease-in-out 400ms 1;
     transition: opacity var(--motion-quick) var(--ease-out);
   }
-  /* Hover: the ring fades in (T2). A file dragged over the window: the card swells to 1.02 and its ring
-     turns solid within 120ms, from the first dragenter frame (T3). */
-  .mp-dropcard {
-    transition: scale var(--motion-micro) var(--ease-out);
-  }
-  .mp-dropcard:hover::after,
-  body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard::after {
-    opacity: 1;
-  }
-  body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard {
-    scale: 1.02;
-  }
-  body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard::after {
-    transition-duration: var(--motion-micro);
-  }
   /* The floating selection bar rises in. */
   .mp-rise-in {
     animation: mp-pop-in var(--motion-quick) var(--ease-out) both;
@@ -1476,6 +1459,24 @@
   *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* A dialog that is leaving (Dialog.tsx, motion.md S11): closed, so focus and the page are back and it
+   takes no clicks, but kept painted in the top layer, where it was, while lib/motion fades it. Browsers
+   without the discrete overlay transition close it at once. */
+@supports (overlay: auto) {
+  dialog[data-leaving] {
+    position: fixed;
+    inset-block: 0;
+    pointer-events: none;
+    transition:
+      display var(--motion-quick) allow-discrete,
+      overlay var(--motion-quick) allow-discrete;
+  }
+  dialog[data-leaving]::backdrop {
+    opacity: 0;
+    transition: opacity var(--motion-quick) var(--ease-in);
   }
 }
 

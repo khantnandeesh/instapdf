@@ -31,10 +31,6 @@
     background: var(--mp-backdrop);
     backdrop-filter: blur(8px);
     animation: mp-backdrop-in var(--motion-quick) var(--ease-out);
-    transition: opacity var(--motion-quick) var(--ease-in);
-  }
-  :is(.mp-modal, .mp-sheet)[data-leaving]::backdrop {
-    opacity: 0;
   }
 }
 @keyframes mp-sheet-in {

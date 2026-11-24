@@ -80,3 +80,16 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
 [data-quiet-focus]:focus-visible {
   outline: none;
 }
+
+/* The drop card (motion.md T2, T3): hover fades its ring in; a file dragged over the window swells it
+   to 1.02 and turns the ring solid within 120ms, from the first dragenter frame. */
+.mp-dropcard {
+  transition: scale var(--motion-micro) var(--ease-out);
+}
+.mp-dropcard:hover::after,
+body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard::after {
+  opacity: 1;
+}
+body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard {
+  scale: 1.02;
+}

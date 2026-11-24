@@ -27,13 +27,12 @@ import { DropOverlay } from "./DropOverlay";
 import { FilePicker, type FilePickerHandle } from "./FilePicker";
 import { LimitsNote, PrivacyNote } from "./notes";
 import { NoticeStack, type FlowNotice } from "./NoticeStack";
-import { OwnerPermissionNotice } from "./OwnerPassword";
+import { OwnerPermissionNotice } from "./OwnerPermissionNotice";
 import type { PageActionsRenderer } from "./PageGrid";
 import type { PreviewTarget } from "./PagePreviewDialog";
 import { createVisibilityWatcher, ThumbContext } from "./Thumbnail";
 import { ToolIntro } from "./ToolIntro";
 import type { FlowApi, FlowContext, FlowState, LoadedFile, PageDecoration, PreviewItem, ProcessFn, ReadyFile, ToolOutput, WorkspaceContext } from "./types";
-import { LeaveGuard } from "./LeaveGuard";
 import { onIntent } from "./intent";
 // F23 cloud sources: the caret, the row and the hub on tool pages (everything else is the cloud chunk,
 // ui.ts, fetched on intent), compiled out entirely without them (every use sits behind the flag).
@@ -48,6 +47,9 @@ const lazyParts = {
   preview: () => import("./PagePreviewDialog"),
   pageGrid: () => import("./PageGrid"),
   fileGrid: () => import("./FileGrid"),
+  // Only needed once files are in (the leave prompt, the options sheet): out of the first load.
+  leave: () => import("./LeaveGuard"),
+  dialog: () => import("../ui/Dialog"),
 };
 const loadLazyParts = () => void Promise.all(Object.values(lazyParts).map((load) => load())).catch(() => {});
 const PageGrid = dynamic(() => lazyParts.pageGrid().then((m) => m.PageGrid), { ssr: false });
@@ -57,6 +59,7 @@ const PasswordDialog = dynamic(() => lazyParts.password().then((m) => m.Password
 const OwnerPasswordDialog = dynamic(() => lazyParts.owner().then((m) => m.OwnerPasswordDialog), { ssr: false });
 const ReplaceFileDialog = dynamic(() => lazyParts.replace().then((m) => m.ReplaceFileDialog), { ssr: false });
 const PagePreviewDialog = dynamic(() => lazyParts.preview().then((m) => m.PagePreviewDialog), { ssr: false });
+const LeaveGuard = dynamic(() => lazyParts.leave().then((m) => m.LeaveGuard), { ssr: false });
 
 /*
  * F23 cloud sources: every check is `process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"` written out, a

@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
+import { exit, motionReady, settle } from "@/lib/motion";
 import { cx } from "./cx";
 // Styles: ./dialog.css (modal and sheet) is imported by the screens that open them (ToolFlow, ControlDock, the
 // editor), so it stays off pages whose only dialog is the full-screen menu.
@@ -61,17 +62,36 @@ export function Dialog({
   const descId = useId();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  // The content stays while the dialog leaves (motion.md S7, S11, S13).
+  const [shown, setShown] = useState(open);
+  if (open && !shown) setShown(true);
+  const body = open || shown;
 
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
+    // What fades on close: the panel; for the full-screen variant only its content, so its opaque
+    // ground never shows the page through it (S7).
+    const parts = () => (variant === "fullscreen" ? (Array.from(dialog.children).filter((c) => c.tagName !== "H2") as HTMLElement[]) : [dialog]);
     if (open && !dialog.open) {
+      dialog.removeAttribute("data-leaving");
+      parts().forEach(settle);
       opener.current = document.activeElement as HTMLElement | null;
       dialog.showModal();
       const target = initialFocusRef?.current ?? (variant === "fullscreen" ? titleRef.current : null);
       if (target) requestAnimationFrame(() => target.focus());
     } else if (!open && dialog.open) {
+      // Closed at once (focus returns now, the page is usable now); globals.css keeps a leaving dialog
+      // painted in the top layer while lib/motion fades it, then it is gone. No engine yet: instant.
+      const leaving = motionReady();
+      if (leaving) dialog.setAttribute("data-leaving", "");
       dialog.close();
+      void Promise.all(leaving ? parts().map((el) => exit(el, variant === "default" ? "dialog" : variant === "sheet" ? "sheet" : "overlay")) : []).then(() => {
+        if (dialog.open) return; // reopened meanwhile
+        dialog.removeAttribute("data-leaving");
+        settle(dialog);
+        setShown(false);
+      });
       const back = returnFocusRef?.current ?? opener.current;
       // <body> means nothing had focus when the dialog opened (e.g. the picker that started
       // the intake had already unmounted), so use the fallback instead of dropping focus.
@@ -134,7 +154,7 @@ export function Dialog({
         className,
       )}
     >
-      {open && variant === "fullscreen" && (
+      {body && variant === "fullscreen" && (
         <>
           <h2 id={titleId} ref={titleRef} tabIndex={-1} className="sr-only">
             {title}
@@ -142,7 +162,7 @@ export function Dialog({
           {children}
         </>
       )}
-      {open && variant === "sheet" && (
+      {body && variant === "sheet" && (
         <div className="flex max-h-(--ip-sheet-max-h) flex-col">
           <div className="flex shrink-0 flex-col items-stretch border-b-[1.5px] border-sand px-4 py-2.5">
             <div className="flex items-center justify-between gap-3">
@@ -158,7 +178,7 @@ export function Dialog({
           {footer && <div className="flex shrink-0 flex-wrap gap-2 border-t-[1.5px] border-sand px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">{footer}</div>}
         </div>
       )}
-      {open && variant === "default" && (
+      {body && variant === "default" && (
         // The modal's one scroll region (only used when it is taller than the screen). A dialog with a long list
         // (the page picker) caps the list instead, so this never scrolls around a second scroller.
         <div className="flex max-h-[calc(100dvh-32px)] flex-col gap-4 overflow-y-auto overscroll-contain px-6 pt-5 pb-5" data-ip-scroll="overlay">

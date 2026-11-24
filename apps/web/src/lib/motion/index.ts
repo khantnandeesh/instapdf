@@ -28,6 +28,18 @@ export function exit(el: El, preset: Preset): Promise<void> {
   return el && m ? m.exit(el, preset) : Promise.resolve();
 }
 
+/**
+ * beforetoggle listener for a popover whose close fades in CSS (menus, motion.md S8): it is inert and
+ * hidden from assistive tech from the first frame of the close, and back when it opens.
+ */
+export function popoverLeaving(e: Event): void {
+  const el = e.currentTarget as HTMLElement;
+  const closing = (e as ToggleEvent).newState === "closed";
+  el.inert = closing;
+  if (closing) el.setAttribute("aria-hidden", "true");
+  else el.removeAttribute("aria-hidden");
+}
+
 /** Stops any motion on `el` and clears what an exit left on it (inline opacity/transform, inert, aria-hidden). */
 export function settle(el: El): void {
   if (!el) return;
