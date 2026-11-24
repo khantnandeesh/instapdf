@@ -56,13 +56,11 @@ const OwnerPasswordDialog = dynamic(() => lazyParts.owner().then((m) => m.OwnerP
 const ReplaceFileDialog = dynamic(() => lazyParts.replace().then((m) => m.ReplaceFileDialog), { ssr: false });
 const PagePreviewDialog = dynamic(() => lazyParts.preview().then((m) => m.PagePreviewDialog), { ssr: false });
 
-/**
- * F23 cloud sources: a build-time constant, so builds without them drop every branch below. Where a
- * dropped branch would still leave a trace (an object spread, a JSX child, a reshaped condition) the
- * check is written out instead, so the bundler folds it before minifying and flag-off builds compile
- * to main's exact code.
+/*
+ * F23 cloud sources: every check is `process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"` written out, a
+ * build-time constant the bundler folds before minifying, so builds without them compile to main's
+ * exact code (each branch is shaped so that its off side is main's expression).
  */
-const CLOUD = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1";
 
 type Phase = "idle" | "processing" | "done" | "error";
 
@@ -249,10 +247,10 @@ export function ToolFlow({
   }, [toolbarAdd]);
 
   // ---- F23 cloud sources: same intake as a local pick (its inputs are set further down) ----
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- CLOUD is a build-time constant: the same call on every render
-  const cloud = CLOUD ? useCloud() : null;
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- the flag is a build-time constant: the same call on every render
+  const cloud = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? useCloud() : null;
   // The download cards come with the cloud chunk (here before any download starts).
-  const CloudCards = CLOUD ? cloud!.ui?.CloudDownloads : undefined;
+  const CloudCards = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? cloud!.ui?.CloudDownloads : undefined;
 
   // ---- derived -------------------------------------------------------------
   const readyFiles = files.filter(isReady);
@@ -268,7 +266,7 @@ export function ToolFlow({
             ? "empty"
             : lockedFiles.length
               ? "password"
-              : files.some((f) => f.status === "loading") || (CLOUD && !!cloud!.s.busy)
+              : (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? files.some((f) => f.status === "loading") || !!cloud!.s.busy : files.some((f) => f.status === "loading"))
                 ? "loading"
                 : "ready";
   const totalPages = readyFiles.reduce((s, f) => s + f.pageCount, 0);
@@ -282,7 +280,7 @@ export function ToolFlow({
     state === "empty"
       ? (copyOverrides?.statusEmpty ?? copy.statusEmpty)
       : state === "loading"
-        ? ((CLOUD && cloud!.s.busy) || copy.statusLoading)
+        ? process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? cloud!.s.busy || copy.statusLoading : copy.statusLoading
         : state === "password"
           ? copy.statusPassword
           : ownerBlocked.length
@@ -495,7 +493,7 @@ export function ToolFlow({
     [announce, beforeIntake, copyOverrides?.errorType, flow, flushProblems, loadFile, onFilesAdded, pushNotice, removeFile, sortIntake, updateFiles],
   );
 
-  if (CLOUD) cloud!.deps = { tool, announce, intake, pushNotice, dismissNotice, sortIntake, errorType: copyOverrides?.errorType, files };
+  if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1") cloud!.deps = { tool, announce, intake, pushNotice, dismissNotice, sortIntake, errorType: copyOverrides?.errorType, files };
 
   // ---- password queue ------------------------------------------------------
   const currentLocked = lockedFiles[0];

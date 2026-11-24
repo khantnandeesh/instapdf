@@ -55,8 +55,8 @@ export function Notice({
       className={cx(
         "text-sm",
         kind === "alert" ? cx("mp-alert", tone === "danger" && "mp-alert--danger", (tone === "info" || tone === "warning") && "mp-alert--info") : "mp-callout items-start",
-        inline !== null && "ip-notice-inline",
-        className,
+        // Written out so that builds without cloud sources fold this to main's `className`.
+        process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && inline !== null ? cx("ip-notice-inline", className) : className,
       )}
     >
       {/* F23 reads `icon` and `node` only behind the build flag, written out: builds without cloud sources compile to main's code. */}
@@ -71,22 +71,40 @@ export function Notice({
       <div className="min-w-0 flex-1 break-words">
         {title && <p className="font-semibold">{title}</p>}
         {children && <div className={cx(kind === "alert" && title && "font-normal")}>{children}</div>}
-        {action && inline === null && (
-          <Button size="sm" variant="outline" className="mt-2" onClick={action.onClick}>
-            {action.label}
-          </Button>
-        )}
+        {action &&
+          (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && inline !== null ? null : (
+            <Button size="sm" variant="outline" className="mt-2" onClick={action.onClick}>
+              {action.label}
+            </Button>
+          ))}
       </div>
-      {inline}
-      {onDismiss && (
-        <button
-          type="button"
-          aria-label={title ? `Dismiss: ${title}` : "Dismiss"}
-          className={kind === "alert" ? "mp-alert__close" : "mp-iconbtn mp-iconbtn--plain -my-1 -me-1 size-[30px]"}
-          onClick={onDismiss}
-        >
-          <CloseIcon size={18} />
-        </button>
+      {/* F23: the action goes before the close. The close is written out twice so that builds without cloud
+          sources keep main's children exactly (the second branch is main's code). */}
+      {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
+        <>
+          {inline}
+          {onDismiss && (
+            <button
+              type="button"
+              aria-label={title ? `Dismiss: ${title}` : "Dismiss"}
+              className={kind === "alert" ? "mp-alert__close" : "mp-iconbtn mp-iconbtn--plain -my-1 -me-1 size-[30px]"}
+              onClick={onDismiss}
+            >
+              <CloseIcon size={18} />
+            </button>
+          )}
+        </>
+      ) : (
+        onDismiss && (
+          <button
+            type="button"
+            aria-label={title ? `Dismiss: ${title}` : "Dismiss"}
+            className={kind === "alert" ? "mp-alert__close" : "mp-iconbtn mp-iconbtn--plain -my-1 -me-1 size-[30px]"}
+            onClick={onDismiss}
+          >
+            <CloseIcon size={18} />
+          </button>
+        )
       )}
     </div>
   );

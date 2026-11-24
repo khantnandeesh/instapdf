@@ -14,8 +14,10 @@ import { PrivacyNote } from "./notes";
 import type { ToolOutput } from "./types";
 import { cloudUi, loadCloud } from "../cloud/tool-cloud";
 
-/** F23: a build-time constant (DefinePlugin), so builds without cloud sources drop that code. */
-const CLOUD_ON = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1";
+/*
+ * F23: every check is `process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"` written out (a build-time constant),
+ * shaped so that builds without cloud sources fold to main's exact code.
+ */
 
 /**
  * F23: the cloud chunk for the result (Save to cloud), and the privacy line when a cloud is involved.
@@ -49,9 +51,9 @@ export function ResultCard({
   announce: (message: string) => void;
 }) {
   // F23: the privacy line when the files came from a cloud or a copy went to one.
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- CLOUD_ON is a build-time constant: the same call on every render
-  const cloud = CLOUD_ON ? useResultCloud() : null;
-  const SaveToCloud = CLOUD_ON ? cloud!.ui?.SaveToCloud : undefined;
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- the flag is a build-time constant: the same call on every render
+  const cloud = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? useResultCloud() : null;
+  const SaveToCloud = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? cloud!.ui?.SaveToCloud : undefined;
   const download = useRef<HTMLAnchorElement>(null);
   const isZip = output.type === "application/zip";
   // Created in an effect and revoked in its cleanup, so StrictMode's double
@@ -134,22 +136,41 @@ export function ResultCard({
                 Download
               </span>
             </a>
-            {CLOUD_ON && SaveToCloud && <SaveToCloud file={file} toolName={tool.flow.title} announce={announce} onSaved={cloud!.setLine} />}
-            {canShare && (
-              <Button
-                variant="line"
-                className="self-center max-sm:w-full"
-                iconStart={<ShareIcon size={16} />}
-                onClick={() => {
-                  navigator.share({ files: [file] }).catch(() => {});
-                }}
-              >
-                Share
-              </Button>
+            {/* F23: Save to cloud before Share. Share is written out twice so that builds without cloud sources
+                keep main's children exactly (the second branch is main's code). */}
+            {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
+              <>
+                {SaveToCloud && <SaveToCloud file={file} toolName={tool.flow.title} announce={announce} onSaved={cloud!.setLine} />}
+                {canShare && (
+                  <Button
+                    variant="line"
+                    className="self-center max-sm:w-full"
+                    iconStart={<ShareIcon size={16} />}
+                    onClick={() => {
+                      navigator.share({ files: [file] }).catch(() => {});
+                    }}
+                  >
+                    Share
+                  </Button>
+                )}
+              </>
+            ) : (
+              canShare && (
+                <Button
+                  variant="line"
+                  className="self-center max-sm:w-full"
+                  iconStart={<ShareIcon size={16} />}
+                  onClick={() => {
+                    navigator.share({ files: [file] }).catch(() => {});
+                  }}
+                >
+                  Share
+                </Button>
+              )
             )}
           </div>
           <div className="flex flex-col gap-2">
-            {CLOUD_ON && tool.runtime === "client" && cloud!.line ? (
+            {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && tool.runtime === "client" && cloud!.line ? (
               // F23: the privacy line names the cloud the files came from or went to (PrivacyNote's look).
               <p className="flex items-center gap-2 text-sm text-ink" data-testid="privacy-result">
                 <ShieldIcon size={18} className="shrink-0 text-brand-strong" />
