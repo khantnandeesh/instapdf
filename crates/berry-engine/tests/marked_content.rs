@@ -176,13 +176,18 @@ fn property_keywords_survive_a_rewrite() {
 }
 
 #[test]
-fn empty_actualtext_reads_as_nothing() {
+fn glyphs_under_empty_actualtext_stay_on_the_page() {
+    // A hyphenation hyphen marked as reading nothing: it reads as drawn, so editing the word next
+    // to it cannot delete it unseen.
     let pdf = build("BT /F1 12 Tf 72 700 Td (exam) Tj /Span <</ActualText <FEFF>>> BDC (-) Tj EMC ( more) Tj ET", |_, _| {});
     let mut e = Engine::open(pdf.clone(), None).unwrap();
-    assert_eq!(texts(&mut e), ["exam more"]);
-    let (after, reopened, _) = edit(pdf, "more", None, "less").unwrap();
-    assert_eq!(after, ["exam less"]);
-    assert_eq!(reopened, ["exam less"]);
+    assert_eq!(texts(&mut e), ["exam- more"]);
+    let (after, reopened, content) = edit(pdf.clone(), "exam", None, "exan").unwrap();
+    assert_eq!(after, ["exan- more"]);
+    assert_eq!(reopened, ["exan- more"]);
+    assert!(content.contains("(-)"), "{content}");
+    let (after, _, _) = edit(pdf, "more", None, "less").unwrap();
+    assert_eq!(after, ["exam- less"]);
 }
 
 #[test]
@@ -327,6 +332,30 @@ mod shaping {
                 e.add_font("Noto Naskh Arabic", false, false, read("fonts/NotoNaskhArabic-Regular.ttf"));
                 let (after, _, _) = edit_engine(&mut e, "هذا", None, w).unwrap_or_else(|x| panic!("{f} {w}: {x:?}"));
                 assert!(after.iter().any(|l| l.contains(w)), "{f} {w}: {after:?}");
+            }
+        }
+    }
+
+    /// Whether the saved page wraps `word` in ActualText (written as a UTF-16 hex string).
+    fn wrapped(e: &mut Engine, word: &str) -> bool {
+        let (out, _) = e.save().unwrap();
+        let doc = Document::load_mem(&out).unwrap();
+        let content = String::from_utf8_lossy(&doc.get_page_content(doc.get_pages()[&1])).to_string();
+        let hex: String = word.encode_utf16().map(|u| format!("{u:04X}")).collect();
+        content.contains(&format!("<FEFF{hex}>"))
+    }
+
+    #[test]
+    fn a_bare_word_after_a_vowelled_one_needs_no_actualtext() {
+        // PDFium reverses right-to-left ActualText, so the second word must read from its glyphs.
+        for f in ["scripts-chrome.pdf", "scripts-libreoffice.pdf"] {
+            for (w1, w2) in [("مُحَمَّدٌ", "محمد"), ("سَلَّمَ", "سلم"), ("نِبت", "نبت")] {
+                let mut e = Engine::open(read(f), None).unwrap();
+                e.add_font("Noto Naskh Arabic", false, false, read("fonts/NotoNaskhArabic-Regular.ttf"));
+                edit_engine(&mut e, "هذا", None, w1).unwrap_or_else(|x| panic!("{f} {w1}: {x:?}"));
+                let (after, _, _) = edit_engine(&mut e, "مرحبا", None, w2).unwrap_or_else(|x| panic!("{f} {w2}: {x:?}"));
+                assert!(after.iter().any(|l| l.starts_with(&format!("{w2} "))), "{f}: {after:?}");
+                assert!(!wrapped(&mut e, w2), "{f}: {w2} after {w1} is wrapped in ActualText");
             }
         }
     }

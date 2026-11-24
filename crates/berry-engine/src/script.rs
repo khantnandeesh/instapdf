@@ -54,6 +54,46 @@ pub fn is_any_mark(ch: char) -> bool {
     is_mark(ch) || in_ranges(SPACING_MARKS, ch)
 }
 
+/// Canonical combining class of the Arabic and Hebrew marks; other marks sort as "above" (230).
+fn combining_class(ch: char) -> u8 {
+    match ch as u32 {
+        0x05B0..=0x05B9 => (ch as u32 - 0x05B0 + 10) as u8,
+        0x05BA => 19,
+        0x05BB..=0x05BD => (ch as u32 - 0x05BB + 20) as u8,
+        0x05BF => 23,
+        0x05C1 => 24,
+        0x05C2 => 25,
+        0x05C5 | 0x0655 | 0x0656 | 0x065C | 0x065F => 220,
+        0x05C7 => 18,
+        0x064B..=0x0652 => (ch as u32 - 0x064B + 27) as u8,
+        0x0670 => 35,
+        _ => 230,
+    }
+}
+
+/// Puts each run of stacked right-to-left marks (harakat, Hebrew points) in canonical order,
+/// so text read in drawing order compares equal to the same text typed. Other scripts are
+/// left as they are.
+pub fn canonical_marks(text: &str) -> String {
+    let mut out: Vec<char> = text.chars().collect();
+    let rtl_mark = |c: char| is_mark(c) && is_rtl_script_mark(c);
+    let mut i = 0;
+    while i < out.len() {
+        if !rtl_mark(out[i]) {
+            i += 1;
+            continue;
+        }
+        let j = (i..out.len()).find(|&k| !rtl_mark(out[k])).unwrap_or(out.len());
+        out[i..j].sort_by_key(|&c| combining_class(c));
+        i = j;
+    }
+    out.into_iter().collect()
+}
+
+fn is_rtl_script_mark(ch: char) -> bool {
+    matches!(ch as u32, 0x0591..=0x05C7 | 0x0610..=0x061A | 0x064B..=0x065F | 0x0670 | 0x06D6..=0x06ED)
+}
+
 pub fn script(ch: char) -> Script {
     let c = ch as u32;
     match SCRIPTS.binary_search_by(|&(a, b, _)| {

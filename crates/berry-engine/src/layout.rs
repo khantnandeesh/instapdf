@@ -191,8 +191,10 @@ fn clusters(pc: &PageContent) -> Vec<Cluster> {
             continue;
         }
         match g.span {
-            Some(s) => by_span.entry(s).or_default().push(gi),
-            None => loose.push(gi),
+            // An empty ActualText (often a hyphenation hyphen) reads its glyphs as drawn: hiding
+            // them would let an edit of the next character delete them unseen.
+            Some(s) if !pc.spans[s].text.is_empty() => by_span.entry(s).or_default().push(gi),
+            _ => loose.push(gi),
         }
     }
     let mut out: Vec<Cluster> = Vec::new();
@@ -282,6 +284,7 @@ fn clusters(pc: &PageContent) -> Vec<Cluster> {
                 c.glyphs.sort_unstable();
                 if !c.actual {
                     c.text.push_str(&g.text);
+                    c.text = script::canonical_marks(&c.text);
                 }
                 c.extend(pc);
             }
@@ -542,17 +545,7 @@ fn build_line(pc: &PageContent, id: usize, clusters: Vec<&Cluster>) -> Line {
     // Visual units, with virtual spaces for positioning gaps.
     let mut units: Vec<Unit> = Vec::new();
     let mut prev_end: Option<f64> = None;
-    // Glyphs under an empty ActualText read as nothing: they ride with a neighbouring character.
-    let mut silent: Vec<usize> = Vec::new();
     for c in &clusters {
-        if c.actual && c.text.is_empty() {
-            match units.iter_mut().rev().find(|u| u.start.is_some()) {
-                Some(u) => u.glyphs.extend(&c.glyphs),
-                None => silent.extend(&c.glyphs),
-            }
-            prev_end = Some(prev_end.map_or(c.u1, |p: f64| p.max(c.u1)));
-            continue;
-        }
         if let Some(pe) = prev_end {
             let prev_space = units.last().map(|u| u.text.ends_with(char::is_whitespace)).unwrap_or(true);
             if c.u0 - pe > SPACE_GAP * c.size && !prev_space && !c.text.starts_with(char::is_whitespace) {
@@ -560,15 +553,8 @@ fn build_line(pc: &PageContent, id: usize, clusters: Vec<&Cluster>) -> Line {
             }
         }
         let text = if c.text.is_empty() { "\u{fffd}".to_string() } else { c.text.clone() };
-        let mut glyphs = std::mem::take(&mut silent);
-        glyphs.extend(&c.glyphs);
-        units.push(Unit { text, actual: c.actual, glyphs, start: Some(c.start(pc)), u0: c.u0, u1: c.u1 });
+        units.push(Unit { text, actual: c.actual, glyphs: c.glyphs.clone(), start: Some(c.start(pc)), u0: c.u0, u1: c.u1 });
         prev_end = Some(prev_end.map_or(c.u1, |p: f64| p.max(c.u1)));
-    }
-    if units.is_empty() {
-        // Only empty ActualText on the line: keep it selectable as one unknown character.
-        let c = clusters[0];
-        units.push(Unit { text: "\u{fffd}".into(), actual: true, glyphs: silent, start: Some(c.start(pc)), u0: c.u0, u1: c.u1 });
     }
     let size = clusters[0].size;
     if units.iter().any(|u| u.text.chars().any(script::is_indic)) {

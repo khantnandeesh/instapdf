@@ -330,8 +330,6 @@ impl Engine {
         let mut pieces: Vec<Piece> = Vec::new();
         let mut missing = String::new();
         let mut request: Option<FontRequest> = None;
-        // ToUnicode texts this edit gives registered-face glyphs, on top of those already written.
-        let mut face_texts: HashMap<(usize, u16), String> = HashMap::new();
         let base = if rtl { unicode_bidi::Level::rtl() } else { unicode_bidi::Level::ltr() };
         let info = unicode_bidi::BidiInfo::new(&segment, Some(base));
         let mut runs: Vec<(std::ops::Range<usize>, bool)> = Vec::new();
@@ -373,7 +371,7 @@ impl Engine {
                 }
                 // Whether readers get the word from the glyphs' own Unicode mappings. Right-to-left
                 // words skip ActualText when they can: PDFium reverses right-to-left ActualText.
-                let folded = script::fold_presentation(part);
+                let folded = script::canonical_marks(&script::fold_presentation(part));
                 let plain_ok = |glyphs: &[NewGlyph]| plain_reading(&pc, glyphs, run_rtl) == folded;
                 let word = |glyphs: Vec<NewGlyph>, face| {
                     let actual = !plain_ok(&glyphs) || (spans_on_line && !run_rtl);
@@ -407,22 +405,13 @@ impl Engine {
                         let glyphs = shaped
                             .iter()
                             .zip(texts)
-                            .map(|(g, t)| {
-                                // A glyph keeps the text first written for it; if this word needs
-                                // another, the word reads wrong plainly and gets ActualText.
-                                let written = self.embeds[f].as_ref().and_then(|e| e.text_of(g.gid)).map(str::to_string);
-                                let text = written.or_else(|| face_texts.get(&(f, g.gid)).cloned()).unwrap_or_else(|| {
-                                    face_texts.insert((f, g.gid), t.clone());
-                                    t
-                                });
-                                NewGlyph {
-                                    font: GlyphFont::Face(f),
-                                    code: g.gid as u32,
-                                    text,
-                                    adv: g.advance * state.tfs,
-                                    x_off: g.x_offset * state.tfs,
-                                    y_off: g.y_offset * state.tfs,
-                                }
+                            .map(|(g, t)| NewGlyph {
+                                font: GlyphFont::Face(f),
+                                code: g.gid as u32,
+                                text: t,
+                                adv: g.advance * state.tfs,
+                                x_off: g.x_offset * state.tfs,
+                                y_off: g.y_offset * state.tfs,
                             })
                             .collect();
                         pieces.push(word(glyphs, Some(f)));
@@ -484,7 +473,7 @@ impl Engine {
             let reads = probe.and_then(|g| new_lines.iter().find(|l| l.glyphs.contains(&g))).map(|l| l.text.clone());
             // Nothing left to probe: the whole line was deleted, which is right when nothing visible was asked for.
             let gone = probe.is_none() && expected.trim().is_empty();
-            if !gone && reads.as_deref() != Some(expected.as_str()) {
+            if !gone && reads.as_deref().map(script::canonical_marks) != Some(script::canonical_marks(&expected)) {
                 return Err(Error::Verify {
                     message: format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
                 });
@@ -613,7 +602,7 @@ impl Engine {
                     }
                     GlyphFont::Face(f) => {
                         let embed = self.embeds[f].as_ref().expect("embedded above");
-                        let cid = embed.remap.get(g.code as u16).unwrap_or(0);
+                        let cid = embed.code_for(g.code as u16, &g.text);
                         let w = face_width(&self.faces[f].data, g.code as u16) / 1000.0;
                         (cid.to_be_bytes().to_vec(), cid as u32, w * tfs + state.tc, Some(face_font[&f]))
                     }
@@ -647,13 +636,16 @@ fn plain_reading(pc: &PageContent, glyphs: &[NewGlyph], rtl: bool) -> String {
         .iter()
         .map(|g| match g.font {
             GlyphFont::Page(fi) => pc.fonts[fi].reader_unicode(g.code).unwrap_or_else(|| "\u{FFFD}".into()),
+            // PDFium reads a right-to-left glyph mapped to nothing as U+FFFE: such a word
+            // needs ActualText.
+            GlyphFont::Face(_) if rtl && g.text.is_empty() => "\u{FFFD}".into(),
             GlyphFont::Face(_) => g.text.clone(),
         })
         .collect();
     if rtl {
         parts.reverse();
     }
-    script::fold_presentation(&parts.concat())
+    script::canonical_marks(&script::fold_presentation(&parts.concat()))
 }
 
 /// A space between new words: the style font's own space glyph, else an empty advance.

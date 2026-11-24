@@ -40,6 +40,9 @@ codebase that runs as WebAssembly in the browser and natively for the consented 
    rustybuzz (`shape.rs`). New words get `/ActualText` where their glyphs alone would not read
    right. Reading (`layout.rs`) rebuilds logical order from ActualText, or from glyph order with
    the Indic and inverse-bidi rules in `script.rs`; the spec is `docs/specs/f16-complex-scripts.md`.
+   A registered-face glyph keeps the first ToUnicode text written for it; the same glyph
+   needed with another text (a letter with and without its harakat) gets an alias code past
+   the font's glyph ids, mapped through a CIDToGIDMap, so both words read from their glyphs.
    On either path, an edit that touches an `/ActualText` span (a ligature, replaced text)
    rewrites the whole span with its real characters and removes the span. Its other
    properties, such as a tagged PDF's `/MCID`, stay; a named property list holding more than

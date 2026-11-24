@@ -154,13 +154,23 @@ pub(crate) struct Embed {
     pub(crate) remap: GlyphRemapper,
     /// New glyph id → (text for ToUnicode, glyph id in the full font).
     chars: BTreeMap<u16, (String, u16)>,
+    /// Extra codes for a glyph already written with another text (a letter with and without
+    /// its harakat): code → (text, glyph id in the full font). They start at `alias_base`, past
+    /// every glyph id, and reach their glyph through a CIDToGIDMap.
+    aliases: BTreeMap<u16, (String, u16)>,
+    alias_base: u16,
+    /// The CIDToGIDMap stream, once there are aliases.
+    cid_map: Option<ObjectId>,
 }
 
 impl Embed {
-    /// The ToUnicode text already written for a glyph of the full font.
-    #[cfg(feature = "shaping")]
-    pub(crate) fn text_of(&self, gid: u16) -> Option<&str> {
-        self.chars.get(&self.remap.get(gid)?).map(|(t, _)| t.as_str())
+    /// The code that draws a glyph of the full font and reads as `text`.
+    pub(crate) fn code_for(&self, gid: u16, text: &str) -> u16 {
+        let Some(n) = self.remap.get(gid) else { return 0 };
+        match self.chars.get(&n) {
+            Some((t, _)) if t != text => self.aliases.iter().find(|(_, (t, g))| *g == gid && t == text).map_or(n, |(c, _)| *c),
+            _ => n,
+        }
     }
 }
 
@@ -887,8 +897,8 @@ impl Engine {
                     let res = self.font_resource(page_id, pc, anchor_source, font_id, backup)?;
                     let embed = self.embeds[*face].as_ref().unwrap();
                     let mut bytes = Vec::new();
-                    for g in gids {
-                        let n = embed.remap.get(*g).unwrap_or(0);
+                    for (g, c) in gids.iter().zip(text.chars()) {
+                        let n = embed.code_for(*g, c.encode_utf8(&mut [0; 4]));
                         bytes.extend_from_slice(&n.to_be_bytes());
                     }
                     seg_items.push(Item::Font(res, state.tfs));
@@ -1186,6 +1196,7 @@ impl Engine {
                 }
                 let mut remap = GlyphRemapper::new();
                 remap.remap(0);
+                let glyph_count = ttf_parser::Face::parse(&face.data, 0).map(|f| f.number_of_glyphs()).unwrap_or(u16::MAX);
                 Embed {
                     type0: ids[0],
                     cid: ids[1],
@@ -1194,14 +1205,29 @@ impl Engine {
                     to_unicode: ids[4],
                     remap,
                     chars: BTreeMap::new(),
+                    aliases: BTreeMap::new(),
+                    alias_base: glyph_count,
+                    cid_map: None,
                 }
             }
         };
-        // The first text written for a glyph stays: earlier edits read through it. Words whose
-        // glyphs would need a different text are wrapped in ActualText instead.
+        // The first text written for a glyph stays (earlier edits read through it); the same
+        // glyph with another text gets an alias code of its own.
         for (g, text) in glyphs {
             let n = embed.remap.remap(*g);
-            embed.chars.entry(n).or_insert_with(|| (text.clone(), *g));
+            match embed.chars.get(&n) {
+                None => {
+                    embed.chars.insert(n, (text.clone(), *g));
+                }
+                Some((t, _)) if t != text => {
+                    if !embed.aliases.values().any(|(t, a)| a == g && t == text) {
+                        let code = embed.alias_base as u32 + embed.aliases.len() as u32;
+                        let code = u16::try_from(code).map_err(|_| err("too many glyph aliases".into()))?;
+                        embed.aliases.insert(code, (text.clone(), *g));
+                    }
+                }
+                Some(_) => {}
+            }
         }
         let parsed = ttf_parser::Face::parse(&face.data, 0).map_err(|e| err(e.to_string()))?;
         let upem = parsed.units_per_em() as f64;
@@ -1276,7 +1302,7 @@ impl Engine {
         self.doc.objects.insert(embed.desc, Object::Dictionary(desc));
 
         let mut w: Vec<Object> = Vec::new();
-        for (new, (_, old)) in &embed.chars {
+        for (new, (_, old)) in embed.chars.iter().chain(&embed.aliases) {
             // Whole numbers: several readers parse CID widths as integers, and the
             // line shift is computed from the same rounded value.
             let adv = (parsed.glyph_hor_advance(ttf_parser::GlyphId(*old)).unwrap_or(0) as f64 * k).round();
@@ -1295,7 +1321,33 @@ impl Engine {
         cid.set("FontDescriptor", Object::Reference(embed.desc));
         cid.set("DW", 1000);
         cid.set("W", Object::Array(w));
-        cid.set("CIDToGIDMap", Object::Name(b"Identity".to_vec()));
+        if embed.aliases.is_empty() {
+            cid.set("CIDToGIDMap", Object::Name(b"Identity".to_vec()));
+        } else {
+            // Identity up to the aliases, then each alias to its glyph in the subset.
+            let last = *embed.aliases.keys().next_back().unwrap() as usize;
+            let mut map: Vec<u8> = Vec::with_capacity(2 * (last + 1));
+            for c in 0..=last {
+                let gid = match embed.aliases.get(&(c as u16)) {
+                    Some((_, g)) => embed.remap.get(*g).unwrap_or(0),
+                    None if c < embed.alias_base as usize => c as u16,
+                    None => 0,
+                };
+                map.extend_from_slice(&gid.to_be_bytes());
+            }
+            let mut st = Stream::new(Dictionary::new(), map);
+            let _ = st.compress();
+            let map_id = match embed.cid_map {
+                Some(id) => {
+                    self.touch(id, backup);
+                    id
+                }
+                None => self.add_object(Object::Null, backup),
+            };
+            self.doc.objects.insert(map_id, Object::Stream(st));
+            embed.cid_map = Some(map_id);
+            cid.set("CIDToGIDMap", Object::Reference(map_id));
+        }
         self.doc.objects.insert(embed.cid, Object::Dictionary(cid));
 
         let mut cmap = String::from(
@@ -1303,7 +1355,8 @@ impl Engine {
         );
         // A glyph with no text of its own (the second glyph of a cluster, a dot) maps to <0000>,
         // as Chrome writes it, so readers do not show its code as a character.
-        let entries: Vec<(u16, &String)> = embed.chars.iter().filter(|(n, _)| **n != 0).map(|(n, (t, _))| (*n, t)).collect();
+        let entries: Vec<(u16, &String)> =
+            embed.chars.iter().chain(&embed.aliases).filter(|(n, _)| **n != 0).map(|(n, (t, _))| (*n, t)).collect();
         for chunk in entries.chunks(100) {
             cmap.push_str(&format!("{} beginbfchar\n", chunk.len()));
             for (n, t) in chunk {
