@@ -89,6 +89,8 @@ pub struct ShowState {
     pub scale: f64,
     /// Text rise (`Ts`) in text space units.
     pub rise: f64,
+    /// Page-space displacement of one text-space unit of rise.
+    pub rise_dir: (f64, f64),
 }
 
 #[derive(Clone, Debug)]
@@ -479,6 +481,11 @@ impl<'a> Interp<'a> {
                         tw: gs.tw,
                         scale: tm.then(&gs.ctm).x_scale(),
                         rise: gs.trise,
+                        rise_dir: {
+                            let m = tm.then(&gs.ctm);
+                            let (o, y) = (m.apply(0.0, 0.0), m.apply(0.0, 1.0));
+                            (y.0 - o.0, y.1 - o.1)
+                        },
                     };
                     match (kind, op.operands.last()) {
                         (ShowKind::TJ, Some(Operand::Array(items))) => {

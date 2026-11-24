@@ -144,30 +144,30 @@ pub struct SaveReport {
 }
 
 #[derive(Clone)]
-struct Embed {
+pub(crate) struct Embed {
     type0: ObjectId,
     cid: ObjectId,
     desc: ObjectId,
     file: ObjectId,
     to_unicode: ObjectId,
-    remap: GlyphRemapper,
-    /// New glyph id → (character, glyph id in the full font).
-    chars: BTreeMap<u16, (char, u16)>,
+    pub(crate) remap: GlyphRemapper,
+    /// New glyph id → (text for ToUnicode, glyph id in the full font).
+    chars: BTreeMap<u16, (String, u16)>,
 }
 
 pub struct Engine {
     orig: Vec<u8>,
-    doc: Document,
-    pages: Vec<ObjectId>,
-    cache: FontCache,
-    dirty: BTreeSet<ObjectId>,
-    faces: Vec<Face>,
-    embeds: Vec<Option<Embed>>,
-    edited_pages: BTreeSet<usize>,
+    pub(crate) doc: Document,
+    pub(crate) pages: Vec<ObjectId>,
+    pub(crate) cache: FontCache,
+    pub(crate) dirty: BTreeSet<ObjectId>,
+    pub(crate) faces: Vec<Face>,
+    pub(crate) embeds: Vec<Option<Embed>>,
+    pub(crate) edited_pages: BTreeSet<usize>,
 }
 
 /// One planned piece of new text.
-enum Seg {
+pub(crate) enum Seg {
     /// Bytes in the anchor operator's own font.
     Orig { bytes: Vec<u8>, text: String, width_em: f64, spaces: usize },
     /// Bytes in a fallback face.
@@ -176,22 +176,35 @@ enum Seg {
     Gap { width_em: f64 },
 }
 
-enum Item {
+#[derive(Clone)]
+pub(crate) enum Item {
     Bytes(Vec<u8>),
     Kern(f64),
     Font(Vec<u8>, f64),
     Td(f64),
+    /// Set the text rise (`Ts`), in text space units.
+    Rise(f64),
+    /// Open `/Span <</ActualText …>> BDC` with this text.
+    BeginSpan(String),
+    EndSpan,
 }
 
-struct Plan {
-    removed: HashSet<usize>,
-    want: HashMap<usize, f64>,
-    anchor: usize,
-    after: bool,
-    segs: Vec<Seg>,
+pub(crate) struct Plan {
+    pub(crate) removed: HashSet<usize>,
+    pub(crate) want: HashMap<usize, f64>,
+    pub(crate) anchor: usize,
+    pub(crate) after: bool,
+    pub(crate) segs: Vec<Seg>,
+    /// Where the new text starts along the baseline, relative to the anchor glyph's origin.
+    pub(crate) insert_at: f64,
+    /// Operators to delete: (stream, operator), e.g. the BDC/EMC of removed ActualText spans.
+    pub(crate) drop_ops: Vec<(usize, usize)>,
 }
 
-fn limit(reason: &'static str) -> Error {
+/// Engine state saved before an edit: next object id, dirty objects, embedded faces.
+pub(crate) type Snapshot = (u32, BTreeSet<ObjectId>, Vec<Option<Embed>>);
+
+pub(crate) fn limit(reason: &'static str) -> Error {
     Error::Unsupported { reason: reason.to_string() }
 }
 
@@ -225,7 +238,7 @@ fn fmt_kern(v: f64) -> String {
     }
 }
 
-fn new_stream(data: Vec<u8>) -> Stream {
+pub(crate) fn new_stream(data: Vec<u8>) -> Stream {
     let mut s = Stream::new(Dictionary::new(), data);
     let _ = s.compress();
     s
@@ -302,7 +315,7 @@ impl Engine {
         }
     }
 
-    fn describe(&self, page: usize, pc: &PageContent, lines: Vec<Line>, paragraphs: Vec<Paragraph>) -> PageText {
+    pub(crate) fn describe(&self, page: usize, pc: &PageContent, lines: Vec<Line>, paragraphs: Vec<Paragraph>) -> PageText {
         let page_id = self.pages[page];
         let read_box = |key: &[u8]| -> Option<[f64; 4]> {
             let a = self.inherited(page_id, key)?.as_array().ok()?;
@@ -499,6 +512,9 @@ impl Engine {
             let page_text = self.page_text(page)?;
             return Ok(EditResult { page: page_text, changed: Vec::new(), substitutions: Vec::new(), shift: 0.0 });
         }
+        if crate::complex::needs_complex(line, &inserted) {
+            return self.edit_complex(page, page_id, pc, lines, line_id, a, b, inserted);
+        }
 
         // 2. Positions along the baseline.
         let ang = pc.glyphs[line.glyphs[0]].angle;
@@ -608,7 +624,15 @@ impl Engine {
             };
         }
         let shift = new_width - (pos(b) - pos(a));
-        let mut plan = Plan { removed: HashSet::new(), want: HashMap::new(), anchor, after: after_anchor, segs };
+        let mut plan = Plan {
+            removed: HashSet::new(),
+            want: HashMap::new(),
+            anchor,
+            after: after_anchor,
+            segs,
+            insert_at: 0.0,
+            drop_ops: Vec::new(),
+        };
         plan.removed.extend(line.chars[a..b].iter().flat_map(|c| c.glyphs.iter().copied()));
         for g in line.chars[b..n].iter().flat_map(|c| c.glyphs.iter().copied()) {
             plan.want.insert(g, shift);
@@ -626,20 +650,7 @@ impl Engine {
         let (after, touched) = match outcome {
             Ok(v) => v,
             Err(e) => {
-                for (id, old) in backup.into_iter().rev() {
-                    match old {
-                        Some(o) => {
-                            self.doc.objects.insert(id, o);
-                        }
-                        None => {
-                            self.doc.objects.remove(&id);
-                        }
-                    }
-                }
-                self.doc.max_id = snapshot.0;
-                self.dirty = snapshot.1;
-                self.embeds = snapshot.2;
-                self.cache.clear();
+                self.rollback(backup, snapshot);
                 return Err(e);
             }
         };
@@ -696,6 +707,24 @@ impl Engine {
         count
     }
 
+    /// Undoes a failed edit: restores every object it changed and the engine state before it.
+    pub(crate) fn rollback(&mut self, backup: Vec<(ObjectId, Option<Object>)>, snapshot: Snapshot) {
+        for (id, old) in backup.into_iter().rev() {
+            match old {
+                Some(o) => {
+                    self.doc.objects.insert(id, o);
+                }
+                None => {
+                    self.doc.objects.remove(&id);
+                }
+            }
+        }
+        self.doc.max_id = snapshot.0;
+        self.dirty = snapshot.1;
+        self.embeds = snapshot.2;
+        self.cache.clear();
+    }
+
     fn touch(&mut self, id: ObjectId, backup: &mut Vec<(ObjectId, Option<Object>)>) {
         if !backup.iter().any(|(b, _)| *b == id) {
             backup.push((id, self.doc.objects.get(&id).cloned()));
@@ -711,7 +740,7 @@ impl Engine {
     }
 
     /// Rewrites the affected show operators and commits the new streams to the document.
-    fn apply(
+    pub(crate) fn apply(
         &mut self,
         page_id: ObjectId,
         pc: &PageContent,
@@ -735,7 +764,8 @@ impl Engine {
                 }
                 Seg::Gap { width_em } => seg_items.push(Item::Kern(-width_em * 1000.0)),
                 Seg::Fallback { face, gids, text, .. } => {
-                    let font_id = self.embed(*face, gids, text, backup)?;
+                    let pairs: Vec<(u16, String)> = gids.iter().zip(text.chars()).map(|(g, c)| (*g, c.to_string())).collect();
+                    let font_id = self.embed(*face, &pairs, backup)?;
                     let res = self.font_resource(page_id, pc, anchor_source, font_id, backup)?;
                     let embed = self.embeds[*face].as_ref().unwrap();
                     let mut bytes = Vec::new();
@@ -767,7 +797,21 @@ impl Engine {
                 })
                 .sum()
         };
+        self.apply_items(page_id, pc, plan, &seg_items, inserted_width, backup)
+    }
 
+    /// Rewrites the streams that hold affected glyphs, with `items` as the new text at the
+    /// anchor, and commits them.
+    pub(crate) fn apply_items(
+        &mut self,
+        page_id: ObjectId,
+        pc: &PageContent,
+        plan: &Plan,
+        seg_items: &[Item],
+        inserted_width: f64,
+        backup: &mut Vec<(ObjectId, Option<Object>)>,
+    ) -> Result<()> {
+        let anchor_source = pc.glyphs[plan.anchor].source;
         // Rewrite each stream that holds affected glyphs.
         let mut touched: BTreeSet<usize> = BTreeSet::new();
         touched.insert(anchor_source);
@@ -780,6 +824,12 @@ impl Engine {
             let reps = rewrite_source(pc, si, plan, if si == anchor_source { ins.take() } else { None }, inserted_width);
             if !reps.is_empty() {
                 splices.insert(si, reps);
+            }
+        }
+        for &(si, oi) in &plan.drop_ops {
+            let reps = splices.entry(si).or_default();
+            if !reps.iter().any(|(o, _)| *o == oi) {
+                reps.push((oi, Vec::new()));
             }
         }
 
@@ -975,7 +1025,7 @@ impl Engine {
         Ok(name)
     }
 
-    fn font_resource(
+    pub(crate) fn font_resource(
         &mut self,
         page_id: ObjectId,
         pc: &PageContent,
@@ -1000,11 +1050,11 @@ impl Engine {
     }
 
     /// Embeds (or extends) the subset of a fallback face and returns its Type 0 font object.
-    fn embed(
+    /// `glyphs` are (glyph id in the face, text for ToUnicode); empty text adds no mapping.
+    pub(crate) fn embed(
         &mut self,
         face_index: usize,
-        gids: &[u16],
-        text: &str,
+        glyphs: &[(u16, String)],
         backup: &mut Vec<(ObjectId, Option<Object>)>,
     ) -> Result<ObjectId> {
         let err = |m: String| Error::Unsupported { reason: m };
@@ -1029,9 +1079,12 @@ impl Engine {
                 }
             }
         };
-        for (g, ch) in gids.iter().zip(text.chars()) {
+        for (g, text) in glyphs {
             let n = embed.remap.remap(*g);
-            embed.chars.entry(n).or_insert((ch, *g));
+            let slot = embed.chars.entry(n).or_insert((String::new(), *g));
+            if slot.0.is_empty() {
+                slot.0 = text.clone();
+            }
         }
         let parsed = ttf_parser::Face::parse(&face.data, 0).map_err(|e| err(e.to_string()))?;
         let upem = parsed.units_per_em() as f64;
@@ -1131,12 +1184,14 @@ impl Engine {
         let mut cmap = String::from(
             "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n",
         );
-        let entries: Vec<(u16, char)> = embed.chars.iter().map(|(n, (c, _))| (*n, *c)).collect();
+        // A glyph with no text of its own (the second glyph of a cluster, a dot) maps to <0000>,
+        // as Chrome writes it, so readers do not show its code as a character.
+        let entries: Vec<(u16, &String)> = embed.chars.iter().filter(|(n, _)| **n != 0).map(|(n, (t, _))| (*n, t)).collect();
         for chunk in entries.chunks(100) {
             cmap.push_str(&format!("{} beginbfchar\n", chunk.len()));
-            for (n, c) in chunk {
-                let mut units = [0u16; 2];
-                let hex: String = c.encode_utf16(&mut units).iter().map(|u| format!("{u:04X}")).collect();
+            for (n, t) in chunk {
+                let hex: String =
+                    if t.is_empty() { "0000".into() } else { t.encode_utf16().map(|u| format!("{u:04X}")).collect() };
                 cmap.push_str(&format!("<{n:04X}> <{hex}>\n"));
             }
             cmap.push_str("endbfchar\n");
@@ -1247,7 +1302,7 @@ fn same_object(a: &Object, b: &Object) -> bool {
 }
 
 /// The text state of the show operator that draws a glyph.
-fn show_state(pc: &PageContent, glyph: usize) -> Option<&ShowState> {
+pub(crate) fn show_state(pc: &PageContent, glyph: usize) -> Option<&ShowState> {
     let g = &pc.glyphs[glyph];
     pc.sources[g.source].events.iter().find_map(|e| match e {
         TextEvent::Show { state, glyphs, .. } if glyphs.contains(&glyph) => Some(state),
@@ -1292,7 +1347,7 @@ fn splice_range(data: &[u8], ops: &[content::Op], reps: &[(usize, Vec<u8>)], seg
 #[allow(unused_assignments)] // `changed` is set inside the fix-up macros
 /// Walks one stream's text events and returns replacement bytes for the show operators that
 /// must change. `insert` carries the new text when this stream holds the anchor glyph.
-fn rewrite_source(
+pub(crate) fn rewrite_source(
     pc: &PageContent,
     si: usize,
     plan: &Plan,
@@ -1354,15 +1409,8 @@ fn rewrite_source(
         macro_rules! place_insert {
             () => {{
                 if let Some(it) = insert.take() {
-                    fix!(0.0);
-                    for item in it {
-                        items.push(match item {
-                            Item::Bytes(b) => Item::Bytes(b.clone()),
-                            Item::Kern(k) => Item::Kern(*k),
-                            Item::Font(n, s) => Item::Font(n.clone(), *s),
-                            Item::Td(t) => Item::Td(*t),
-                        });
-                    }
+                    fix!(plan.insert_at);
+                    items.extend(it.cloned());
                     cur += inserted_width;
                     fresh = false;
                     changed = true;
@@ -1476,6 +1524,25 @@ fn serialize(kind: ShowKind, op: &content::Op, items: Vec<Item>) -> Vec<u8> {
                 fmt_name(&name, &mut out);
                 out.extend_from_slice(format!(" {} Tf", fmt_num(size)).as_bytes());
                 parts.push(out);
+            }
+            Item::Rise(r) => {
+                flush(&mut group, &mut parts);
+                parts.push(format!("{} Ts", fmt_kern(r)).into_bytes());
+            }
+            Item::BeginSpan(text) => {
+                flush(&mut group, &mut parts);
+                let mut out = b"/Span <</ActualText ".to_vec();
+                let mut utf16 = vec![0xFE, 0xFF];
+                for u in text.encode_utf16() {
+                    utf16.extend_from_slice(&u.to_be_bytes());
+                }
+                fmt_string(&utf16, &mut out);
+                out.extend_from_slice(b">> BDC");
+                parts.push(out);
+            }
+            Item::EndSpan => {
+                flush(&mut group, &mut parts);
+                parts.push(b"EMC".to_vec());
             }
             other => group.push(other),
         }

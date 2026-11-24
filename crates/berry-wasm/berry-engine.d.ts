@@ -13,8 +13,13 @@
  * Pages and lines are zero-based. Line ids are only valid until the next edit on that page:
  * every edit returns the page's fresh text.
  *
+ * Complex scripts (Devanagari and the other Indic scripts, Arabic, Hebrew): line text is in
+ * logical (reading) order, whatever order the file stores it in. Edits in a line with such text
+ * rewrite whole words, shaped by the engine, so typing inside a word re-shapes the word.
+ * Right-to-left lines keep their right edge; `shift` is then negative when the text grows.
+ *
  * Not in this version (planned): add text and other objects, style changes on existing text,
- * move and delete, paragraph reflow, complex-script shaping. Phase E1 tools keep using pdf-lib.
+ * move and delete, paragraph reflow. Phase E1 tools keep using pdf-lib.
  */
 
 export interface Rect { x0: number; y0: number; x1: number; y1: number }
@@ -64,10 +69,14 @@ export interface Line {
   /** Baseline direction in degrees, 0 = left to right. */
   angle: number;
   size: number;
+  /** Reading direction: "rtl" for Arabic and Hebrew lines. Align and place the caret by it. */
+  direction: "ltr" | "rtl";
   runs: Run[];
   words: Word[];
   editable: boolean;
-  read_only_reason?: "vertical-text" | "unsupported-encoding" | "invisible-text";
+  /** Why the line is not editable. "legacy-font-encoding": a pre-Unicode Hindi font (Kruti Dev
+   * and similar) that draws Devanagari from Latin codes, so the file holds no real text. */
+  read_only_reason?: "vertical-text" | "unsupported-encoding" | "invisible-text" | "legacy-font-encoding";
   /** Index into PageText.paragraphs. */
   paragraph: number;
 }
@@ -120,6 +129,8 @@ export interface SaveReport {
   pages_edited: number[];
 }
 
+/** Families best first: the original family, then (for Hindi, Arabic and other scripts) the
+ * script's open family, e.g. "Noto Sans Devanagari" or "Noto Naskh Arabic", then Latin stand-ins. */
 export interface FontRequest { families: string[]; bold: boolean; italic: boolean }
 
 /** What every method throws. Nothing is changed when an edit throws. */

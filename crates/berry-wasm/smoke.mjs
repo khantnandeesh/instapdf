@@ -38,4 +38,14 @@ assert.ok(report.original_preserved && report.objects_written === 1);
 assert.deepEqual(bytes.subarray(0, pdf.length), pdf);
 const again = new BerryDocument(bytes);
 assert.match(again.pageText(0).lines[1].text, /is signed between/);
+// Hindi and Arabic: logical text, direction, and a shaped word edit (the embedded font shapes).
+const scripts = new BerryDocument(new Uint8Array(readFileSync(new URL("../../tests/parity/editor/scripts-plain.pdf", here))));
+const sp = scripts.pageText(0);
+const hindi = sp.lines.findIndex((l) => l.text === "कुल राशि का भुगतान समय पर किया गया।");
+assert.ok(hindi >= 0 && sp.lines[hindi].direction === "ltr");
+assert.ok(sp.lines.some((l) => l.direction === "rtl" && l.text === "مرحبا بالعالم، هذا نص تجريبي."));
+const shaped = scripts.replaceRange(0, hindi, 0, 3, "संपूर्ण");
+assert.equal(shaped.substitutions.length, 0);
+assert.ok(shaped.page.lines.some((l) => l.text === "संपूर्ण राशि का भुगतान समय पर किया गया।"));
+
 console.log(`wasm smoke ok: ${pdf.length} → ${bytes.length} bytes, save ${ms.toFixed(1)} ms`);

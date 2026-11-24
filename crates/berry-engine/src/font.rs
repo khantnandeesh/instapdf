@@ -699,6 +699,15 @@ impl PdfFont {
         None
     }
 
+    /// The text other readers get for a code: the ToUnicode entry when the font has a ToUnicode
+    /// map (codes missing from it read as their raw values elsewhere), else [`Self::unicode`].
+    pub fn reader_unicode(&self, code: u32) -> Option<String> {
+        if self.to_unicode.is_empty() {
+            return self.unicode(code);
+        }
+        self.to_unicode.get(&code).filter(|t| !t.is_empty() && !t.contains('\u{0}')).cloned()
+    }
+
     /// For a Type 0 font without ToUnicode: reverse the embedded cmap (GID → Unicode).
     fn type0_unicode_from_program(&self, code: u32) -> Option<String> {
         let gid = self.gid_for(code)?;
@@ -775,6 +784,28 @@ impl PdfFont {
             }
         }
         None
+    }
+
+    /// The CID that draws a glyph of the embedded program, for Type 0 fonts.
+    pub fn cid_for_gid(&self, gid: u16) -> Option<u32> {
+        if !self.two_byte || !self.cmap_supported {
+            return None;
+        }
+        if let Some(m) = &self.cff_cid_to_gid {
+            return m.iter().find(|(_, g)| **g == gid).map(|(c, _)| *c as u32);
+        }
+        match &self.cid_to_gid {
+            Some(m) => m.iter().position(|&g| g == gid).map(|p| p as u32),
+            None => Some(gid as u32),
+        }
+    }
+
+    /// The embedded TrueType program, when the font has one.
+    pub fn truetype_program(&self) -> Option<&[u8]> {
+        match &self.program {
+            Program::TrueType(d) => Some(d),
+            _ => None,
+        }
     }
 
     /// Glyph index in the embedded program for a code (TrueType and CID fonts).

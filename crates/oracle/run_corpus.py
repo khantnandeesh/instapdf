@@ -57,7 +57,9 @@ def page_text(doc, index):
 def run_case(case, args):
     src = os.path.join(CORPUS, case["file"])
     out = os.path.join(args.out, case["id"] + ".pdf")
-    cmd = [args.berry, "replace", src, out, "1", case["find"], case["replace"], "--fonts", args.fonts]
+    # A case can name its own font folder in the corpus (the open fonts its scripts need).
+    fonts = os.path.join(CORPUS, case["fonts"]) if case.get("fonts") else args.fonts
+    cmd = [args.berry, "replace", src, out, "1", case["find"], case["replace"], "--fonts", fonts]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         return [f"engine failed: {proc.stderr.strip()}"]

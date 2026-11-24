@@ -128,9 +128,15 @@ struct Cluster {
 
 impl Cluster {
     fn new(pc: &PageContent, glyphs: Vec<usize>, text: String, actual: bool) -> Cluster {
+        // The base is the widest glyph that draws a letter (dots and marks can sit off the
+        // baseline), else the widest glyph.
+        let letter = |g: &usize| !mark_like(&pc.glyphs[*g].text);
+        let widest = |a: &&usize, b: &&usize| pc.glyphs[**a].width.total_cmp(&pc.glyphs[**b].width).then(b.cmp(a));
         let base = *glyphs
             .iter()
-            .max_by(|a, b| pc.glyphs[**a].width.total_cmp(&pc.glyphs[**b].width).then(b.cmp(a)))
+            .filter(|g| letter(g))
+            .max_by(widest)
+            .or_else(|| glyphs.iter().max_by(widest))
             .expect("a cluster has a glyph");
         let g = &pc.glyphs[base];
         let (_, v) = rot(g.origin, -g.angle);

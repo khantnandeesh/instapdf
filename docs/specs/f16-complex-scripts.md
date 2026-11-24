@@ -62,8 +62,13 @@ source that is exact:
    Devanagari, Noto Naskh or Sans Arabic), shaped with rustybuzz and subset-embedded like other fallbacks.
 If none can draw a word the edit fails with `missing-glyphs`, naming the script family to fetch.
 
-Glyph offsets become `TJ` adjustments and `Ts` rise (restored after). Each new word is wrapped in
-`/Span <</ActualText (…)>> BDC … EMC`, and the ActualText spans of removed clusters are deleted with them.
+Glyph offsets become `TJ` adjustments and `Ts` rise (restored after). A new word is wrapped in
+`/Span <</ActualText (…)>> BDC … EMC` when its glyphs' own Unicode mappings would not read as the word
+(Devanagari reordering, conjuncts) or the line already uses ActualText; the ActualText spans of removed
+clusters are deleted with them. Right-to-left words avoid ActualText when they can, because PDFium (Chrome's
+viewer) reverses right-to-left ActualText: they are drawn so that each glyph maps to its own letter (dotted
+Arabic letters stay whole, `ccmp` off), and a registered face, whose ToUnicode map the engine writes, is
+preferred over an embedded font whose map lacks the new glyphs.
 Left-to-right lines keep their start and grow to the right; right-to-left lines keep their right edge and grow
 to the left. The usual check then runs: the page is read again, every untouched glyph must be unchanged
 (code, font, size, colour, position ±0.05 pt), every new glyph must sit where planned, and the edited line must
@@ -83,8 +88,10 @@ may name script families. Nothing else changes.
 - **AC-203 (P0)** Replacing a Hindi word (कुल → संपूर्ण) gives a correctly shaped word: the rendered edited region
   matches HarfBuzz's rendering of the same word in the same font (pixel diff under threshold), and no glyph is
   missing or `.notdef`.
-- **AC-204 (P0)** After any edit, PDFium's text for the edited line and the engine's own reading both equal the
-  requested text (copy and search work).
+- **AC-204 (P0)** After any edit, the engine's own reading of the edited line equals the requested text, and
+  PDFium's text contains the new words as typed (copy and search work). PDFium's reading of the untouched
+  words is whatever it was before: it already misreads Chrome and LibreOffice Hindi and Arabic and
+  Word-style Hindi (रािश), so whole-line equality in PDFium is not a criterion.
 - **AC-205 (P0)** Replacing an Arabic word renders joined, right to left, with the line's right edge unchanged.
 - **AC-206 (P0)** Editing a number inside an Arabic line (2500 → 3750) keeps it left to right in the right place.
 - **AC-207 (P0)** Everything outside the edited words is unchanged: same glyphs at the same positions (±0.05 pt)
@@ -92,7 +99,8 @@ may name script families. Nothing else changes.
 - **AC-208 (P1)** When the new words already appear on the page in the same font, the edit uses the original
   font's glyphs and reports no substitution.
 - **AC-209 (P1)** When the embedded font has its layout tables and covers the text (`scripts-plain.pdf`), new
-  words are shaped with it and no fallback font is added.
+  words are shaped with it and no fallback font is added. For a right-to-left word this also needs the
+  font's ToUnicode map to cover the new glyphs (see §4); otherwise the same family is used as a registered face.
 - **AC-210 (P0)** When no font can draw the new text, the edit fails with `missing-glyphs` and the request lists the
   same family first, then the script's Noto family.
 - **AC-211 (P0)** Inserting inside a word (भुगतान → भुगतानों) re-shapes the whole word.
@@ -102,3 +110,20 @@ may name script families. Nothing else changes.
 - **AC-214 (P0)** Existing Latin edits are unchanged: every earlier engine test and the PDFium oracle stay green.
 - **AC-215 (P0)** Side by side with the reference on the same file and edits (§1), BerryPDF's output reads
   correctly and is correctly shaped where the reference's is broken.
+
+## 6. Results (2026-11-24)
+
+| AC | Result | Evidence |
+|---|---|---|
+| 200, 201, 202 | Pass | `crates/berry-engine/tests/complex.rs` `ac200_201_202_reading`: all three fixtures |
+| 203, 211 | Pass | `ac203_hindi_word_replace`, `ac211_insert_inside_word`; `crates/oracle/check_shaping.py`: engine glyph ids equal HarfBuzz's for संपूर्ण, भुगतानों, धन्यवाद |
+| 204 | Pass | engine: every edit test reads the line back; PDFium: 10 oracle cases in `manifest.json` (`plain-*`, `chrome-*`, `lo-*`) |
+| 205, 206 | Pass | `ac205_arabic_word_replace_keeps_right_edge` (right edge within 0.5 pt), `ac206_number_in_arabic_line` |
+| 207 | Pass | the engine's own glyph check on every edit; oracle: no pixel changes outside `changed` on all 10 cases |
+| 208, 209 | Pass | `ac208_reuse_page_words`, `ac209_embedded_font_shapes_when_it_can` |
+| 210 | Pass | `ac210_missing_glyphs_names_script_family` |
+| 212 | Pass | `ac212_legacy_hindi_font_is_read_only` |
+| 213 | Pass, near the limit | 721,152 → 961,813 bytes gzip (+240,661) with wasm-bindgen 0.2.130. Shaper alone: rustybuzz 234 KB gzip, HarfRust 0.16 309 KB (it would also add a second read-fonts version). Next step: a second module loaded only for complex-script edits. |
+| 214 | Pass | all earlier engine tests and the 18 earlier oracle cases unchanged |
+| 215 | Pass | `/mnt/project-files/designs/complex-scripts/side-by-side-append.png`: the reference breaks every conjunct and the Arabic line; ours is shaped and reads right |
+
