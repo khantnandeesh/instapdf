@@ -552,7 +552,7 @@ Tool behaviour common to all tools:
   - marker swatches: Yellow #ffe14d, Green #7cf09a, Blue #7cd3ff, Pink #ff9ad5, Orange #ffb35c
   - plus **Custom** (native `<input type="color">`)
   - each swatch has a name (`aria-label`), and the selected one shows a check mark (not colour alone)
-- **Fonts (E1).** Arimo (stand-in for Arial/Helvetica, Apache-2.0), Tinos (Times, Apache-2.0), Cousine (Courier, Apache-2.0), Carlito (Calibri, OFL), Caladea (Cambria, OFL). Each is self-hosted, lazy-loaded per family on first use, and embedded as a subset of the **same file** used for the preview (AC-91). The family menu shows each name in its own face, with the stand-in in muted text ("Arimo · Arial").
+- **Fonts (E1).** Arimo (stand-in for Arial/Helvetica), Tinos (Times), Cousine (Courier), Carlito (Calibri) and Caladea (Cambria), all SIL OFL 1.1 (Arimo, Tinos and Cousine ship as OFL-1.1 in @fontsource 5.3.0). Each is self-hosted, lazy-loaded per family on first use, and embedded as a subset of the **same file** used for the preview (AC-91). The family menu shows each name in its own face, with the stand-in in muted text ("Arimo · Arial").
 
 ### U-E4. Tool options, selection and properties
 

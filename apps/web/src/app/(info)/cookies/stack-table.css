@@ -1,0 +1,38 @@
+/*
+ * Only the cookies page has a data table (kept out of the site-wide stylesheet, e2e/f2/home.spec.ts AC-55).
+ * Below 640 px it stacks instead of scrolling sideways (docs/design/berrypdf.md "Scrolling"): each row
+ * becomes a block and each cell shows its column name (data-label) above its value.
+ */
+@media (max-width: 639px) {
+  .ip-stack-table,
+  .ip-stack-table tbody,
+  .ip-stack-table tr,
+  .ip-stack-table td {
+    display: block;
+    width: 100%;
+  }
+  .ip-stack-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .ip-stack-table tr {
+    padding-block: 8px;
+    border-bottom: 1px solid var(--ip-border);
+  }
+  .ip-stack-table td {
+    border: 0;
+    padding-block: 4px;
+  }
+  .ip-stack-table td[data-label]::before {
+    /* Screen readers already hear the column header; the alt text "" keeps them from hearing it twice. */
+    content: attr(data-label);
+    content: attr(data-label) / "";
+    display: block;
+    font-weight: 700;
+    color: var(--ink);
+  }
+}

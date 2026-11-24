@@ -26,16 +26,10 @@ const MENU_ID = "tool-menu";
 const RESULTS_ID = "tool-menu-results";
 
 type Mode = "panel" | "dialog";
-type Anchor = { top: number; left: number; width: number };
-
-/** BerryPDF Menu: opens directly under its trigger, left-aligned, kept inside the viewport. */
-function anchorFor(trigger: HTMLElement | null): Anchor {
-  const vw = document.documentElement.clientWidth;
-  const width = Math.min(1140, vw - 30);
-  const r = trigger?.getBoundingClientRect();
-  const top = Math.max(8, (r?.bottom ?? 0) + 4);
-  const left = Math.max(15, Math.min(r?.left ?? 15, vw - width - 15));
-  return { top, left, width };
+/** The panel hangs from the bottom edge of the header bar, full width (owner 2026-11-24). */
+function panelTop(trigger: HTMLElement | null): number {
+  const header = trigger?.closest("header");
+  return Math.max(0, Math.round(header?.getBoundingClientRect().bottom ?? 64));
 }
 
 const isTyping = (t: EventTarget | null) =>
@@ -53,7 +47,7 @@ export function ToolMenu() {
   const [desktop, setDesktop] = useState<boolean | null>(null);
   const [focusSearch, setFocusSearch] = useState(true);
   const [query, setQuery] = useState("");
-  const [anchor, setAnchor] = useState<Anchor>({ top: 60, left: 15, width: 1140 });
+  const [top, setTop] = useState(72);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -69,7 +63,7 @@ export function ToolMenu() {
 
   const openMenu = useCallback((focus: "search" | "title") => {
     setMode(window.matchMedia(DESKTOP).matches ? "panel" : "dialog");
-    setAnchor(anchorFor(triggerRef.current));
+    setTop(panelTop(triggerRef.current));
     setFocusSearch(focus === "search");
     setQuery("");
     setOpen(true);
@@ -97,10 +91,10 @@ export function ToolMenu() {
     else header.removeAttribute("data-menu-open");
   }, [open, mode]);
 
-  // Keep the panel under its trigger while the page scrolls or resizes.
+  // Keep the panel under the bar while the page scrolls or resizes.
   useEffect(() => {
     if (!open || mode !== "panel") return;
-    const update = () => setAnchor(anchorFor(triggerRef.current));
+    const update = () => setTop(panelTop(triggerRef.current));
     window.addEventListener("scroll", update, { passive: true });
     window.addEventListener("resize", update);
     return () => {
@@ -198,15 +192,16 @@ export function ToolMenu() {
 
       {open && mode === "panel" && (
         <>
-          {/* BerryPDF Menu has no dimming: an invisible layer below the header catches the outside click. */}
-          <div aria-hidden="true" className="fixed inset-x-0 bottom-0" style={{ top: Math.max(0, anchor.top - 4) }} onClick={() => close(true)} data-testid="tool-menu-scrim" />
+          {/* The page behind is dimmed and blurred; clicking it closes the panel. */}
+          <div aria-hidden="true" className="mp-menu-backdrop fixed" style={{ top }} onClick={() => close(true)} data-testid="tool-menu-scrim" />
           <div
             id={MENU_ID}
-            className="mp-menu fixed overflow-y-auto overscroll-contain"
-            style={{ top: anchor.top, left: anchor.left, width: anchor.width, maxHeight: `calc(100dvh - ${anchor.top}px - 24px)` }}
+            className="mp-menu-panel fixed overflow-y-auto overscroll-contain"
+            data-ip-scroll="overlay"
+            style={{ top, maxHeight: `calc(100dvh - ${top}px - 24px)` }}
             data-testid="tool-menu"
           >
-            <div className="relative px-5 pt-5 pb-4">{content}</div>
+            <div className="relative mx-auto max-w-[1280px] px-6 pt-6 pb-5 lg:px-8">{content}</div>
           </div>
         </>
       )}
@@ -259,6 +254,19 @@ function MenuContent({
     return () => clearTimeout(t);
   }, [matches.length, searching]);
 
+  const recentStrip = (layout: "inline" | "stacked") => (
+    <RecentStrip
+      items={recent}
+      idPrefix="menu"
+      level={2}
+      inline={layout === "inline"}
+      onClear={() => {
+        clearRecent();
+        setLive(copy.recentCleared);
+        searchRef.current?.focus();
+      }}
+    />
+  );
   const firstLink = () => resultsRef.current?.querySelector<HTMLAnchorElement>("a[href]") ?? null;
   const closeButton = <IconButton label={siteCopy.menuClose} icon={<CloseIcon />} tooltip={false} onClick={onClose} data-testid="tool-menu-close" />;
 
@@ -288,9 +296,10 @@ function MenuContent({
     >
       <LiveRegion message={live} />
       {mode === "panel" ? (
-        <div className="flex items-center gap-4 pe-14">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pe-14">
           {search}
           {count}
+          {!searching && recentStrip("inline")}
         </div>
       ) : (
         <div className="sticky top-0 z-10 -mx-4 bg-surface-raised px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-2 shadow-[0_1.5px_0_var(--sand)]">
@@ -302,20 +311,7 @@ function MenuContent({
         </div>
       )}
 
-      {!searching && recent.length > 0 && (
-        <div className="mt-4 pb-2">
-          <RecentStrip
-            items={recent}
-            idPrefix="menu"
-            level={2}
-            onClear={() => {
-              clearRecent();
-              setLive(copy.recentCleared);
-              searchRef.current?.focus();
-            }}
-          />
-        </div>
-      )}
+      {mode === "dialog" && !searching && recent.length > 0 && <div className="mt-4 pb-2">{recentStrip("stacked")}</div>}
 
       <div ref={resultsRef} id={RESULTS_ID}>
         {groups.length === 0 ? (
@@ -333,17 +329,24 @@ function MenuContent({
             </Button>
           </div>
         ) : (
-          <nav aria-label={copy.title} className={cx("mt-4 gap-2 md:columns-3 xl:columns-4", mode === "panel" ? "-mx-5" : "-mx-4")}>
+          <nav aria-label={copy.title} className={cx("mt-4 md:columns-3 md:gap-6 lg:columns-4 xl:columns-5", mode === "panel" ? "-mx-5" : "-mx-4")}>
+            {/* Panel: balanced columns across the full width; a long group may continue in the next
+                column (rows never split, a heading never ends a column) so no column runs long. */}
             {groups.map((g) => (
-              <section key={g.id} aria-labelledby={`menu-cat-${g.id}`} className={cx("mb-4 break-inside-avoid", `ip-cat-${g.id}`)} data-testid="tool-menu-group">
+              <section
+                key={g.id}
+                aria-labelledby={`menu-cat-${g.id}`}
+                className={cx("mb-4", mode === "dialog" && "break-inside-avoid", `ip-cat-${g.id}`)}
+                data-testid="tool-menu-group"
+              >
                 {/* Category eyebrow: UPPERCASE in the category's text shade. */}
-                <h2 id={`menu-cat-${g.id}`} className="mp-eyebrow flex items-baseline gap-2 px-[15px] pt-1.5 pb-1">
+                <h2 id={`menu-cat-${g.id}`} className="mp-eyebrow flex break-after-avoid items-baseline gap-2 px-[15px] pt-1.5 pb-1">
                   {g.label}
                   <span className="text-sm text-muted normal-case tabular-nums">{g.items.length}</span>
                 </h2>
                 <ul>
                   {g.items.map((item) => (
-                    <li key={item.slug}>
+                    <li key={item.slug} className="break-inside-avoid">
                       <MenuEntry item={item} />
                     </li>
                   ))}
@@ -353,7 +356,7 @@ function MenuContent({
           </nav>
         )}
       </div>
-      {mode === "panel" && <div className="absolute top-4 end-4">{closeButton}</div>}
+      {mode === "panel" && <div className="absolute top-5 end-4 lg:end-6">{closeButton}</div>}
     </div>
   );
 }

@@ -56,7 +56,7 @@ test("a category jump lands below the pinned bar, not under it", async ({ page }
     .toBe(true);
 });
 
-test("the stuck shadow appears exactly when the bar pins, not while it is still moving", async ({ page }) => {
+test("the bar is marked stuck exactly when it pins, not while it is still moving", async ({ page }) => {
   await page.goto("/");
   const hb = await headerBottom(page);
   const restTop = (await bar(page).boundingBox())!.y + (await page.evaluate(() => window.scrollY));

@@ -1,4 +1,5 @@
 "use client";
+import "@/components/berry/berry-loader.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatBytes } from "@/lib/pdf/naming";
 import { openPdf } from "@/lib/pdf/pdfjs";

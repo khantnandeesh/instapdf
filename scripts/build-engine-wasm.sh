@@ -61,7 +61,9 @@ const manifest = {
     ["berry_engine_bg.wasm", "berry_engine.js", "berry_engine_shaping_bg.wasm", "berry_engine_shaping.js"].map((f) => [f, sha(f)]),
   ),
   wasmGzipBytes: Number(gz),
+  wasmBytes: readFileSync(`${out}/berry_engine_bg.wasm`).length,
   shapingWasmGzipBytes: Number(shapingGz),
+  shapingWasmBytes: readFileSync(`${out}/berry_engine_shaping_bg.wasm`).length,
 };
 writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 2) + "\n");
 ' "$out" "$RUST_VERSION" "$WASM_BINDGEN_VERSION" "$gzip_bytes" "$shaping_gzip_bytes"

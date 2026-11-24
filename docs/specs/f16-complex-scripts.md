@@ -124,7 +124,7 @@ may name script families. Nothing else changes.
 | 208, 209 | Pass | `ac208_reuse_page_words`, `ac209_embedded_font_shapes_when_it_can` |
 | 210 | Pass | `ac210_missing_glyphs_names_script_family` |
 | 212 | Pass | `ac212_legacy_hindi_font_is_read_only` |
-| 213 | Pass | Two modules (lead, 2026-11-24): default `berry_engine` 721,152 → 762,144 bytes gzip (+41 KB, for reading Hindi and Arabic right), complex-script lines read-only with `needs-shaping`; `berry_engine_shaping` 975,673 bytes gzip, loaded only to edit them. Shaper alone: rustybuzz 234 KB gzip, HarfRust 0.16 309 KB (it would also add a second read-fonts version). |
+| 213 | Pass | Two modules (lead, 2026-11-24): default `berry_engine` 723,957 → 763,446 bytes gzip (+39 KB, for reading Hindi and Arabic right), complex-script lines read-only with `needs-shaping`; `berry_engine_shaping` 977,933 bytes gzip, loaded only to edit them. Shaper alone: rustybuzz 234 KB gzip, HarfRust 0.16 309 KB (it would also add a second read-fonts version). |
 | 214 | Pass | all earlier engine tests and the 18 earlier oracle cases unchanged |
 | 215 | Pass | `/mnt/project-files/designs/complex-scripts/side-by-side-append.png`: the reference breaks every conjunct and the Arabic line; ours is shaped and reads right |
 

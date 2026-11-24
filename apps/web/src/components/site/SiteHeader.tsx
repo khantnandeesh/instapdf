@@ -4,10 +4,11 @@ import { Wordmark } from "./BrandMark";
 import { siteCopy } from "./copy";
 import { HeaderShortcuts } from "./HeaderShortcuts";
 import { ToolMenu } from "./ToolMenu";
+import "./site-header.css";
 
 /**
- * Site header on every page (spec F2 §3c, H-4), BerryPDF Header: a floating glass pill (owner 2026-11-24)
- * (pages.md). Logo (the berry mark + "BerryPDF" in Fredoka 600), the "All tools" pill chip
+ * Site header on every page (spec F2 §3c, H-4): a full-width frosted bar, 72px from 768px (owner
+ * 2026-11-24: edge to edge, not an inset pill). Logo (the berry mark + "BerryPDF" in Fredoka 600), the "All tools" pill chip
  * (cream with a sand outline), then up to 5 plain shortcuts (3 below 1024 px, none below 768 px).
  * Sticky, so the menu opens without scrolling back up (F2 AC-32/AC-38).
  */
@@ -15,9 +16,9 @@ export function SiteHeader() {
   const links = shortcutTools(5).map((t) => ({ slug: t.slug, name: t.name }));
   return (
     <header className="ip-site-header mp-header sticky top-0 z-(--ip-z-header) h-(--ip-header-h) data-[menu-open]:z-(--ip-z-header-open)">
-      <div className="mx-auto flex h-full max-w-[1170px] items-center gap-1 px-[15px]">
-        <Link href="/" aria-label={siteCopy.logoLabel} className="me-6 inline-flex items-center rounded-sm max-sm:me-2">
-          <Wordmark />
+      <div className="mx-auto flex h-full max-w-[1280px] items-center gap-1 px-4 md:gap-2 md:px-6 lg:px-8">
+        <Link href="/" aria-label={siteCopy.logoLabel} className="me-6 inline-flex items-center rounded-sm max-sm:me-2 lg:me-8">
+          <Wordmark className="md:text-[23px]" size={36} />
         </Link>
         <ToolMenu />
         <HeaderShortcuts links={links} />
