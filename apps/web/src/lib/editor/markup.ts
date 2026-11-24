@@ -26,13 +26,28 @@ export function nearestWord(words: FrameWord[], p: Pt, max = Infinity): number {
   return best;
 }
 
+/** Word `i` for a point on it; for a point in a gap beside it, its neighbour on that side when `later` says the word lies past the point. */
+function gapSnap(words: FrameWord[], i: number, p: Pt, later: boolean): number {
+  const w = words[i];
+  if (dist(w.box, p) === 0) return i;
+  const cx = w.box.x + w.box.w / 2;
+  const k = later ? (cx < p[0] ? i + 1 : i) : cx > p[0] ? i - 1 : i;
+  return words[k]?.line === w.line ? k : i;
+}
+
 export type MarkupSelection = { rects: Box[]; text: string; words: [number, number] };
 
 /** Words between two points (inclusive), one box per line, and their text. Null when no word is near. */
 export function selectWords(words: FrameWord[], a: Pt, b: Pt, max = 24): MarkupSelection | null {
-  const i = nearestWord(words, a, max);
-  const j = nearestWord(words, b, max);
+  let i = nearestWord(words, a, max);
+  let j = nearestWord(words, b, max);
   if (i < 0 || j < 0) return null;
+  // An end that falls in the gap between words takes only the words the drag actually crossed:
+  // the start snaps to the next word in the drag's direction, the end to the previous one.
+  const forward = i !== j ? i < j : b[0] >= a[0];
+  i = gapSnap(words, i, a, forward);
+  j = gapSnap(words, j, b, !forward);
+  if (forward ? i > j : j > i) return null;
   const [from, to] = i <= j ? [i, j] : [j, i];
   const rects: Box[] = [];
   const parts: string[] = [];

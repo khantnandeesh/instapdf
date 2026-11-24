@@ -10,6 +10,7 @@ import { callEngine } from "@/lib/editor/engine-client";
 import { cssFamily } from "@/lib/editor/fonts";
 import { ensureFace } from "@/lib/editor/fonts-browser";
 import { coveredBy, verticalOf, webFontFromProgram } from "@/lib/font-library/embedded-face";
+import { needsShaping } from "@/lib/editor/shaping";
 import { isClose } from "@/lib/font-library/match";
 import { matchFont } from "@/lib/font-library/match-client";
 
@@ -61,11 +62,15 @@ async function build(info: FontInfo, text: string, gen: number, prev: DocFace | 
   const { program } = await callEngine({ op: "program", font: info.object, chars });
   if (gen !== generation) return null;
   const asked = codePoints(chars);
-  const covered = program.format === "none" ? null : coveredBy(program);
+  // Hindi, Arabic and other scripts whose letters join: the embedded program has the glyphs but
+  // not the rules that join them, so the browser can't set such text with it. A library font
+  // that has the rules stands in, and nothing is marked as missing (the engine decides on save).
+  const joined = needsShaping(text);
+  const covered = program.format === "none" || joined ? null : coveredBy(program);
   // Asked again for new characters and the font has none of them: the font already made stays
   // (nothing new to draw), it only knows more about what it lacks.
   if (prev && [...asked].every((cp) => prev.asked.has(cp) || !covered?.has(cp))) return { ...prev, covered, asked };
-  const file = webFontFromProgram(program, info.family || "Embedded");
+  const file = joined ? null : webFontFromProgram(program, info.family || "Embedded");
   if (file) {
     const family = `bp-doc-${info.object}-${++serial}`;
     try {

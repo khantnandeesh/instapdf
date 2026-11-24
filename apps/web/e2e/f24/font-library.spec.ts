@@ -37,7 +37,15 @@ async function openMenu(page: Page) {
 }
 
 async function addText(page: Page, text: string, fy = 0.4) {
-  const b = (await page.getByTestId("page-1").boundingBox())!;
+  let b = (await page.getByTestId("page-1").boundingBox())!;
+  // The page can be taller than the window (wide layouts open at fit width): bring the spot into view.
+  const vh = page.viewportSize()!.height;
+  const y = b.y + b.height * fy;
+  if (y > vh - 120) {
+    await page.getByTestId("canvas").evaluate((c, d) => c.scrollBy(0, d), y - vh / 2);
+    await page.waitForTimeout(150);
+    b = (await page.getByTestId("page-1").boundingBox())!;
+  }
   await page.mouse.click(b.x + b.width * 0.3, b.y + b.height * fy);
   await page.keyboard.type(text);
   await page.keyboard.press("Escape");

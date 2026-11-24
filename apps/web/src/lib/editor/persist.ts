@@ -68,34 +68,62 @@ export async function storageAvailable(): Promise<boolean> {
 /**
  * Writes a session plan in one transaction: new blobs, the record, and drops unused blobs. A failed
  * write changes nothing, so the last good record stays.
+ *
+ * "stale": a blob the record needs and this page thinks is stored isn't there any more. Another
+ * tab with the same file swept it (its first write drops the file's blobs it doesn't know). The
+ * write is abandoned before anything changes; the caller forgets what it wrote and writes in full.
  */
-export async function writeSession(plan: SessionPlan): Promise<boolean> {
+export async function writeSession(plan: SessionPlan): Promise<"ok" | "stale" | "failed"> {
   try {
     const d = await db();
+    const putting = new Set(plan.put.map(([k]) => k));
+    const needed = [...plan.record.blobs, ...Object.values(plan.record.assets)].filter((k) => !putting.has(k));
+    let stale = false;
     await new Promise<void>((resolve, reject) => {
       const tx = d.transaction(["sessions", "blobs"], "readwrite");
       const blobs = tx.objectStore("blobs");
-      for (const [k, v] of plan.put) blobs.put(v, k);
-      if (plan.sweep) {
-        // Every blob of this file the record doesn't use goes (left by an earlier page).
-        const keep = new Set(plan.record.blobs);
-        const cur = blobs.openKeyCursor(IDBKeyRange.bound(`${plan.record.hash}/`, `${plan.record.hash}/\uffff`));
-        cur.onsuccess = () => {
-          const c = cur.result;
-          if (!c) return;
-          if (!keep.has(String(c.key))) blobs.delete(c.key);
-          c.continue();
+      const write = () => {
+        for (const [k, v] of plan.put) blobs.put(v, k);
+        if (plan.sweep) {
+          // Every blob of this file the record doesn't use goes (left by an earlier page).
+          const keep = new Set(plan.record.blobs);
+          const cur = blobs.openKeyCursor(IDBKeyRange.bound(`${plan.record.hash}/`, `${plan.record.hash}/\uffff`));
+          cur.onsuccess = () => {
+            const c = cur.result;
+            if (!c) return;
+            if (!keep.has(String(c.key))) blobs.delete(c.key);
+            c.continue();
+          };
+        }
+        for (const k of plan.drop) blobs.delete(k);
+        tx.objectStore("sessions").put(plan.record);
+      };
+      // Checked in the same transaction as the write, so no other tab can sweep in between.
+      let left = needed.length;
+      if (!left) write();
+      for (const k of needed) {
+        const req = blobs.getKey(k);
+        req.onsuccess = () => {
+          if (stale) return;
+          if (req.result === undefined) {
+            stale = true;
+            tx.abort();
+            return;
+          }
+          if (--left === 0) write();
         };
       }
-      for (const k of plan.drop) blobs.delete(k);
-      tx.objectStore("sessions").put(plan.record);
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
+      // After our own abort, the requests still pending fail too: that is the stale case, not an error.
+      tx.onerror = (e) => {
+        if (stale) e.preventDefault();
+        else reject(tx.error);
+      };
+      tx.onabort = () => (stale ? resolve() : reject(tx.error));
     });
-    return true;
+    return stale ? "stale" : "ok";
   } catch {
-    return false;
+    return "failed";
   }
 }
 

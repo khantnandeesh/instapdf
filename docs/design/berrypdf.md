@@ -181,7 +181,7 @@ Owner, 2026-11-24 (screen recording of Merge's options box scrolling inside the 
 
 ### Sticky surfaces
 
-A surface that pins (the site header, the home search bar, a tools row, the dock's primary) uses `position: sticky` and never changes size or jumps when it pins. It matches the page: the header is the glass pill; everything else pinned is either transparent (the home search bar) or the same surface as the panel it belongs to (the dock's primary on white, the tools row on cream). No extra boxes, widths or shadows appear only because something is stuck.
+A surface that pins (the site header, the home search bar, a tools row, the dock's primary) uses `position: sticky` and never jumps when it pins; the one size change is the home search field, which grows a little when pinned (owner, 2026-11-24; see "Sticky search and filter bars"). It matches the page: the header is the glass pill; everything else pinned is either transparent (the home search bar) or the same surface as the panel it belongs to (the dock's primary on white, the tools row on cream). No extra boxes or shadows appear only because something is stuck.
 
 ### Enforced in CI
 
@@ -197,15 +197,15 @@ Sejda's tool pages have no inner scrollers at all: the page is the only scroller
 
 **Name:** a *sticky* element (CSS `position: sticky`), on a search box usually called a "sticky search bar" or "sticky filter bar". Owner, 2026-11-24: production sites do this and so do we.
 
-**Behaviour:** the bar sits in its normal place; as you scroll down it reaches the header and stays pinned right under it while the list scrolls; scrolling back up, it drops back into its place when its turn comes. It is **fully transparent**, pinned or not (owner, 2026-11-24): no ground, blur, border or shadow, so it never reads as a box of another width sitting on the grid paper. `data-stuck` is still set (tests, future use) but changes nothing visible.
+**Behaviour:** the bar sits in its normal place; as you scroll down it reaches the header and stays pinned right under it while the list scrolls; scrolling back up, it drops back into its place when its turn comes. **Only the search pins** (owner, 2026-11-24): filters and jump chips sit below it and scroll away with the content. Pinned, the field grows a little (home: 480 to 540 px, from 768 px wide, 200 ms ease-out, none under reduced motion) and stays centred. It is **fully transparent**, pinned or not (owner, 2026-11-24): no ground, blur, border or shadow, so it never reads as a box sitting on the grid paper, and the strip beside the field lets clicks through (`pointer-events: none` on the strip, `auto` on the field).
 
 **Rules (UX designer and UI engineer):**
-1. Any long list or grid the user filters or searches (the catalogue, the tools menu, file lists, future history/batch lists) keeps its search, filters and jump chips in a sticky bar. Short lists (one screen) don't need one.
+1. Any long list or grid the user searches (the catalogue, the tools menu, file lists, future history/batch lists) keeps its search in a sticky bar. Filters and jump chips don't pin. Short lists (one screen) don't need one.
 2. `sticky top-(--ip-header-h)` under the sticky site header; never `position: fixed` (fixed leaves a hole and needs JS).
-3. Keep it compact: one row on desktop (search, filter, chips may wrap to a second row), at most ~150px on phones (there the search and the filter share a row, the filter with a short visible label, its accessible name unchanged). Keep the spec's focus order (search, filter, chips). Anything else (headings, counts, recent strip) scrolls away.
+3. The search is centred on its own row. On the home page the filter sits right of it from 1024 px and leads the chip row below that (short visible label on phones, accessible name unchanged). Keep the spec's focus order (search, filter, chips). Everything but the search (filter, chips, headings, counts, recent strip) scrolls away.
 4. Stuck state comes from a 1px sentinel directly above the bar (any top margin goes on the sentinel, so stuck turns on exactly when the bar pins) and an IntersectionObserver (`data-stuck`), no scroll listeners. The bar's height goes to `--ip-catbar-h` and in-page anchors use `scroll-mt-[calc(var(--ip-header-h)+var(--ip-catbar-h,0px)+16px)]`, so a jump lands below the pinned bar, not under it.
 5. The pinned field is fully usable (typing, Escape, `/` shortcut) and nothing covers it; forced colours get a plain Canvas ground (system colours can't be trusted to keep the list readable behind a transparent bar).
-6. Tested by `apps/web/e2e/ui/sticky-search.spec.ts` (pins under the header, stuck state, usable while pinned, returns on the way up, jumps land below it). Copy that pattern for new sticky bars.
+6. Tested by `apps/web/e2e/ui/sticky-search.spec.ts` (pins under the header, stuck state, usable while pinned, returns on the way up, jumps land below it, only the search pins, centred and wider when pinned, clicks pass beside it). Copy that pattern for new sticky bars.
 
 ## Motion
 

@@ -8,7 +8,10 @@
  */
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { Asset } from "@/lib/editor/build";
-import { callEngine, describeEngineError, setEngineFileSize, type EngineError } from "@/lib/editor/engine-client";
+import { callEngine, describeEngineError, engineErrorLog, offersLineReplacement, openInShapingEngine, setEngineFileSize, type EngineError } from "@/lib/editor/engine-client";
+import { lineAt } from "@/lib/editor/line-hit";
+import { editorFontFor, lineReplacement } from "@/lib/editor/replace-line";
+import { ensureFace, measurer } from "@/lib/editor/fonts-browser";
 import * as H from "@/lib/editor/history";
 import {
   addObjects,
@@ -17,16 +20,43 @@ import {
   duplicatePage,
   insertBlankAfter,
   isPristine,
+  keepOnPage,
   kindName,
   movePage,
   objectsOn,
+  pageSize,
   reorderObjects,
   removeObjects,
   rotatePage,
   updateObjects,
   type DocState,
   type EditorObject,
+  type TextObj,
 } from "@/lib/editor/model";
+import { layoutText, textBoxSize } from "@/lib/editor/text-layout";
+
+/** Lays a text box out again at a new wrap width (used to wrap text at the page edge). */
+export function reflowText(t: TextObj, wrap: number): TextObj {
+  const m = measurer(t.font, t.size, t.bold, t.italic);
+  const lines = layoutText(t.text, wrap, m);
+  const box = textBoxSize(lines, wrap, t.size, m);
+  return { ...t, wrap, lines, w: box.w, h: box.h };
+}
+
+/** Keeps the objects `ids` of a state inside their pages (no object ends past a page edge). */
+export function onPage(s: DocState, ids: readonly string[]): DocState {
+  const want = new Set(ids);
+  let changed = false;
+  const objects = s.objects.map((o) => {
+    if (!want.has(o.id)) return o;
+    const entry = s.pages.find((p) => p.id === o.page);
+    if (!entry) return o;
+    const k = keepOnPage(o, pageSize(entry), reflowText);
+    if (k !== o) changed = true;
+    return k;
+  });
+  return changed ? { ...s, objects } : s;
+}
 import { referencedAssets } from "@/lib/editor/asset-refs";
 import { textAt, type TextItemLike } from "@/lib/editor/line-hit";
 import { releaseUnused } from "./assets";
@@ -156,14 +186,14 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     },
 
     add(objs: EditorObject[], label: string, select = true) {
-      apply(addObjects(state(), objs), label, { page: objs[0]?.page, targets: objs.map((o) => o.id), select: select ? objs.map((o) => o.id) : undefined });
+      apply(onPage(addObjects(state(), objs), objs.map((o) => o.id)), label, { page: objs[0]?.page, targets: objs.map((o) => o.id), select: select ? objs.map((o) => o.id) : undefined });
       store.set({ flash: { ids: objs.map((o) => o.id), key: Date.now() } });
     },
 
     update(ids: readonly string[], fn: (o: EditorObject) => EditorObject, label: string, key?: string) {
       if (!ids.length) return;
       const objs = objectsById(ids);
-      apply(updateObjects(state(), ids, fn), label, { page: objs[0]?.page, targets: [...ids], key });
+      apply(onPage(updateObjects(state(), ids, fn), ids), label, { page: objs[0]?.page, targets: [...ids], key });
     },
 
     remove(ids: readonly string[]) {
@@ -178,7 +208,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       if (!ids.length) return;
       const r = duplicateObjects(state(), ids, nextPage);
       if (!r.ids.length) return;
-      apply(r.state, `Duplicate ${nameOf(ids)}`, { page: objectsById(r.ids)[0]?.page ?? r.state.objects.find((o) => o.id === r.ids[0])?.page, targets: r.ids, select: r.ids });
+      apply(onPage(r.state, r.ids), `Duplicate ${nameOf(ids)}`, { page: objectsById(r.ids)[0]?.page ?? r.state.objects.find((o) => o.id === r.ids[0])?.page, targets: r.ids, select: r.ids });
       ui.announce(`Duplicated ${r.ids.length === 1 ? "it" : `${r.ids.length} objects`}`);
     },
 
@@ -269,7 +299,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     async showVersion(index: number) {
       const bytes = ctl.bytesOf(index);
       const copy = bytes.slice();
-      if (store.get().engineReady) await callEngine({ op: "open", bytes: copy }, [copy.buffer]);
+      if (store.get().engineReady) await callEngine({ op: "open", bytes: copy, shaping: store.get().shaping === "ready" }, [copy.buffer]);
       const opened = await openPdf(bytes.slice(), rt.password);
       if (!opened.ok) throw new Error("pdf.js");
       const prev = rt.pdf;
@@ -289,7 +319,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
           const shown = rt.shown;
           const copy = ctl.bytesOf(shown).slice();
           setEngineFileSize(copy.length);
-          await callEngine({ op: "open", bytes: copy }, [copy.buffer]);
+          await callEngine({ op: "open", bytes: copy, shaping: store.get().shaping === "ready" }, [copy.buffer]);
           if (shown === rt.shown) break;
         }
         store.set({ engineReady: true, fresh: {} });
@@ -328,6 +358,76 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       ui.announce("Getting text editing ready. The line opens when it is.");
     },
 
+    /**
+     * Reopens the shown bytes in the shaping build (downloading it, with its own progress ring),
+     * for a line marked "needs-shaping" or an edit that typed such text. The page texts are read
+     * again from it. Resolves false when the download failed (the default build stays open, and
+     * the pill offers Retry). Never prefetched: this is the only way the shaping files load.
+     */
+    shapingOpening: null as Promise<boolean> | null,
+    loadShaping(): Promise<boolean> {
+      if (store.get().shaping === "ready") return Promise.resolve(true);
+      ctl.shapingOpening ??= (async () => {
+        store.set({ shaping: "loading", engineReady: false });
+        try {
+          if (ctl.recovering) await ctl.recovering;
+          for (;;) {
+            const shown = rt.shown;
+            await openInShapingEngine(ctl.bytesOf(shown).slice());
+            if (shown === rt.shown) break;
+          }
+          ctl.failedText.clear();
+          store.set({ shaping: "ready", engineReady: true, fresh: {} });
+          ui.announce("Text editing for this script is ready.");
+          const edit = ctl.pendingEdit;
+          ctl.pendingEdit = null;
+          if (edit) void ctl.applyPendingEdit(edit);
+          return true;
+        } catch {
+          store.set({ shaping: "failed", engineReady: true });
+          if (ctl.pendingEdit) ui.announce("Your edit is kept. It is made once editing for this script loads.");
+          return false;
+        }
+      })().finally(() => (ctl.shapingOpening = null));
+      return ctl.shapingOpening;
+    },
+    /**
+     * An edit that typed Hindi, Arabic or similar into a line of the default build, waiting for
+     * the shaping build (kept across a failed download, made after Retry). `at` finds the same
+     * line in the shaping build's reading of the page.
+     */
+    pendingEdit: null as { src: number; at: [number, number]; text: string } | null,
+    /** Whether the waiting edit is for line `line` of page `src`. */
+    pendingOn(src: number, line: number): boolean {
+      const p = ctl.pendingEdit;
+      const lines = p && p.src === src ? store.get().texts[src]?.lines : undefined;
+      return !!lines && lineAt(lines, p!.at[0], p!.at[1]) === line;
+    },
+    /**
+     * Drops the waiting edit when its line is opened or edited again (or, with no line, on Esc),
+     * so a later Retry neither overwrites the newer edit nor makes a stale one.
+     */
+    dropPendingEdit(src?: number, line?: number) {
+      if (!ctl.pendingEdit) return;
+      if (src !== undefined && line !== undefined && !ctl.pendingOn(src, line)) return;
+      ctl.pendingEdit = null;
+      if (src === undefined) ui.announce("The edit waiting for this script is cancelled.");
+    },
+    async applyPendingEdit(edit: { src: number; at: [number, number]; text: string }) {
+      await ctl.ensureText(edit.src);
+      const page = store.get().texts[edit.src];
+      const i = page ? lineAt(page.lines, edit.at[0], edit.at[1]) : -1;
+      if (i < 0) return ui.toast({ text: "That line can’t be edited any more.", tone: "danger" });
+      store.set({ lineEdit: { src: edit.src, line: i, text: edit.text } });
+      await ctl.commitLine();
+    },
+    /** A click on a line that needs the shaping build: load it, then open that line for editing. */
+    wantShapedLine(src: number, at: [number, number]) {
+      store.set({ pendingLine: { src, at }, selection: [] });
+      ui.announce("Getting text editing ready for this script. The line opens when it is.");
+      void ctl.loadShaping();
+    },
+
     loadingText: new Set<number>(),
     failedText: new Set<number>(),
     async ensureText(src: number) {
@@ -363,7 +463,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       ctl.recovering ??= (async () => {
         try {
           const copy = ctl.bytesOf(rt.shown).slice();
-          await callEngine({ op: "open", bytes: copy }, [copy.buffer]);
+          await callEngine({ op: "open", bytes: copy, shaping: store.get().shaping === "ready" }, [copy.buffer]);
           store.set({ fresh: {} });
         } catch {
           ui.toast({ text: "The editor couldn’t restart. Download what you have, then reload the page.", tone: "danger" });
@@ -372,20 +472,22 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       return ctl.recovering;
     },
 
-    async commitLine() {
+    async commitLine(): Promise<void> {
       const s = store.get();
       const e = s.lineEdit;
       store.set({ lineEdit: null });
       if (!e || s.readOnly) return;
       const line = s.texts[e.src]?.lines[e.line];
       if (!line || line.text === e.text) return;
+      // A newer edit of the line an edit is waiting for: the newer one wins.
+      ctl.dropPendingEdit(e.src, e.line);
       store.set({ busy: "edit" });
       try {
         const { result, bytes, appended } = await ctl.replaceWithStandIn(e, s.texts[e.src]);
         const opened = await openPdf(bytes.slice(), rt.password);
         if (!opened.ok) {
           const back = ctl.bytesOf(rt.shown).slice();
-          await callEngine({ op: "open", bytes: back }, [back.buffer]).catch(() => {});
+          await callEngine({ op: "open", bytes: back, shaping: store.get().shaping === "ready" }, [back.buffer]).catch(() => {});
           ui.toast({ text: "That change couldn’t be shown, so it wasn’t made.", tone: "danger" });
           return;
         }
@@ -416,8 +518,19 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
           ui.announce(`${original} isn’t complete in this file. Using ${sub.substitute_font}.`);
         } else store.set({ fontNotice: null });
       } catch (err) {
+        // Typed Hindi, Arabic or similar into a line of the default build: load the shaping
+        // build, find the same line in its reading of the page, and make the same edit there.
+        if (isEngineError(err) && err.kind === "read-only" && err.reason === "needs-shaping" && store.get().shaping !== "ready") {
+          store.set({ busy: null });
+          // Kept until the shaping build is there: a failed download keeps it for Retry.
+          ctl.pendingEdit = { src: e.src, at: [(line.bbox.x0 + line.bbox.x1) / 2, (line.bbox.y0 + line.bbox.y1) / 2], text: e.text };
+          await ctl.loadShaping();
+          return;
+        }
         if (isEngineError(err)) {
-          ui.toast({ text: describeEngineError(err), tone: "danger" });
+          console.warn(engineErrorLog(err));
+          const action = offersLineReplacement(err) ? { label: "Replace with new text", run: () => void ctl.replaceLineWithText(e) } : undefined;
+          ui.toast({ text: describeEngineError(err), tone: "danger", action });
           if (err.kind === "crashed" || err.kind === "aborted" || err.kind === "internal") await ctl.recoverEngine();
         } else ui.toast({ text: "That change couldn’t be made.", tone: "danger" });
       } finally {
@@ -431,6 +544,39 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       ctl.standIns.clear();
       await callEngine({ op: "clearFonts" }).catch(() => {});
     },
+
+    /**
+     * Fallback for an edit the engine refused: cover the line with a whiteout and put a text box
+     * with the typed text in its place (same size, colour and baseline, the closest editor font).
+     */
+    async replaceLineWithText(edit: { src: number; line: number; text: string }) {
+      const s = store.get();
+      const page = s.texts[edit.src];
+      const line = page?.lines[edit.line];
+      const entry = state().pages.find((p) => p.src === edit.src);
+      if (!page || !line || !entry) return;
+      const face = editorFontFor(page.fonts[line.runs[0]?.font ?? -1]);
+      const size = line.runs[0]?.size ?? line.size;
+      try {
+        const metrics = await ensureFace(face.font, face.bold, face.italic, edit.text);
+        const others = page.lines.filter((_, i) => i !== edit.line).map((l) => l.bbox);
+        const objs = lineReplacement({ line, fonts: page.fonts, entry, text: edit.text, face, metrics, measure: measurer(face.font, size, face.bold, face.italic), others });
+        // The whiteout takes the page's colour behind the line (a tinted page stays tinted).
+        if (objs) objs[0].fill = ctl.samplers.get(entry.id)?.(objs[0]) ?? objs[0].fill;
+        if (!objs) {
+          ui.toast({ text: "This line can’t be replaced automatically. Use Whiteout and Text instead.", tone: "info" });
+          return;
+        }
+        ctl.add([...objs], "Replace line", false);
+        if (objs.overlaps) ui.toast({ text: "The new text runs into text below it. Shorten it, or move or resize the box.", tone: "info" });
+        else ui.announce("Line replaced with new text");
+      } catch {
+        ui.toast({ text: "The font for the new text couldn’t load. Please try again.", tone: "danger" });
+      }
+    },
+
+    /** Per page (by id): the dominant colour of the shown raster in a frame box (PageView registers it). */
+    samplers: new Map<string, (b: { x: number; y: number; w: number; h: number }) => string>(),
 
     /** Engine family name → the font id it was registered from. */
     standIns: new Map<string, string>(),
@@ -527,7 +673,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       const name = pdfOutputName(rt.name);
       return edited ? `${baseName(name)}-edited.pdf` : name;
     },
-    pristine: () => isPristine(state()),
+    pristine: () => isPristine(state(), store.get().forms.original ?? undefined),
     objectsOn: (pageId: string) => objectsOn(state(), pageId),
   };
   return ctl;
@@ -538,6 +684,7 @@ export const TOOL_NAMES: Record<ToolId, string> = {
   edit: "Edit text",
   text: "Text",
   sign: "Sign",
+  form: "Form",
   mark: "Mark",
   draw: "Draw",
   shapes: "Shapes",

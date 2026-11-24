@@ -10,7 +10,7 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { cx } from "@/components/ui/cx";
-import { constrain45, dragBox, handlesOf, canRotate, aspectLocked, hasBox, moveObject, newId, objectBounds, pageSize, resizeBox, rotationFor, totalRotation, clampDelta, rotatedCorners, LINE_HEIGHT, type Box, type EditorObject, type Handle, type PageEntry, type Pt, type TextObj } from "@/lib/editor/model";
+import { constrain45, dragBox, handlesOf, canRotate, aspectLocked, hasBox, moveObject, newId, objectBounds, pageSize, rotationFor, totalRotation, clampDelta, clampedResize, clampPoint, keepOnPage, rotatedCorners, LINE_HEIGHT, type Box, type EditorObject, type Handle, type PageEntry, type Pt, type TextObj } from "@/lib/editor/model";
 import { displaySize, rectToScreen, screenToFrame, toScreen, userRectToFrame } from "@/lib/editor/geometry";
 import { selectWords, dominantHex, type FrameWord } from "@/lib/editor/markup";
 import { snapMove, snapPoint } from "@/lib/editor/snap";
@@ -24,7 +24,8 @@ import { PropertiesPopover } from "./Properties";
 import { lineAt } from "@/lib/editor/line-hit";
 import { release, renderPage, swapCanvas } from "./render";
 import { shallowArray, useStore, type EditorState } from "./store";
-import { TOOL_NAMES } from "./controller";
+import { TOOL_NAMES, onPage, reflowText } from "./controller";
+import { FieldPopover, PageFields } from "@/tools/forms/EditorForms";
 
 type Gesture =
   | { type: "move"; ids: string[]; start: Pt; origin: EditorObject[]; moved: boolean; pointer: number }
@@ -68,6 +69,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
   const fresh = useStore(store, useCallback((s: EditorState) => (src != null ? !!s.fresh[src] : false), [src]));
   const rasterRev = useStore(store, useCallback((s: EditorState) => (src != null ? (s.rasterRev[src] ?? 0) : 0), [src]));
   const pdfRev = useStore(store, (s) => s.pdfRev);
+  const formsOn = useStore(store, (s) => !!H.current(s.history).forms);
   const lineEdit = useStore(store, useCallback((s: EditorState) => (src != null && s.lineEdit?.src === src && firstOfSrc ? s.lineEdit : null), [src, firstOfSrc]));
   const lineFlash = useStore(store, useCallback((s: EditorState) => (src != null && s.lineFlash?.src === src && firstOfSrc ? s.lineFlash : null), [src, firstOfSrc]));
   const flash = useStore(store, (s) => s.flash);
@@ -95,8 +97,10 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
 
   // A line clicked before the engine was ready opens as soon as the engine has read the page.
   const pending = useStore(store, useCallback((s: EditorState) => (src != null && firstOfSrc && s.pendingLine?.src === src ? s.pendingLine : null), [src, firstOfSrc]));
+  const shaping = useStore(store, (s) => s.shaping);
   useEffect(() => {
-    if (!pending || !engineReady) return;
+    // Waiting for the shaping build (or its Retry): the line opens once it's there.
+    if (!pending || !engineReady || shaping === "loading" || shaping === "failed") return;
     if (!fresh || !text) {
       if (src != null) void ctl.ensureText(src);
       return;
@@ -104,7 +108,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     const i = lineAt(text.lines, pending.at[0], pending.at[1]);
     store.set({ pendingLine: null, ...(i >= 0 ? { lineEdit: { src: pending.src, line: i, text: text.lines[i].text }, selection: [] } : {}) });
     if (i < 0) ctl.announce("That text can’t be edited.");
-  }, [pending, engineReady, fresh, text, src, ctl, store]);
+  }, [pending, engineReady, shaping, fresh, text, src, ctl, store]);
 
   useEffect(() => {
     if (visible && src != null && !fresh) void ctl.ensureText(src);
@@ -127,9 +131,9 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
       setDrawn("ok");
       return;
     }
-    const key = `${pdfRev}:${rasterRev}:${scale.toFixed(4)}:${rotation}:${retry}`;
+    const key = `${pdfRev}:${rasterRev}:${scale.toFixed(4)}:${rotation}:${retry}:${formsOn}`;
     if (drawnFor.current === key) return;
-    const job = renderPage(rt.pdf, src, scale, rotation, index);
+    const job = renderPage(rt.pdf, src, scale, rotation, index, formsOn);
     let live = true;
     void job.promise.then((canvas) => {
       if (!live) {
@@ -139,8 +143,10 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
       if (canvas === "failed") return setDrawn("failed");
       if (!canvas) return;
       drawnFor.current = key;
-      canvas.className = "ed-raster";
-      swapCanvas(holder, canvas); // swap only when ready: no blank flash
+      // Fades in only where nothing was shown yet; a re-render (zoom, edit) replaces the old
+      // bitmap, which stayed on screen stretched to the new size, in one frame: never a white flash.
+      canvas.className = holder.querySelector("canvas") ? "ed-raster" : "ed-raster ed-raster--in";
+      swapCanvas(holder, canvas);
       setDrawn("ok");
       ctl.startEngine(); // the first page is up: now the text engine may use the network
     });
@@ -148,7 +154,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
       live = false;
       job.cancel();
     };
-  }, [visible, src, rasterRev, pdfRev, scale, rotation, rt, index, retry, ctl]);
+  }, [visible, src, rasterRev, pdfRev, scale, rotation, rt, index, retry, ctl, formsOn]);
 
   // ---- coordinates ----
   const toFrame = useCallback(
@@ -211,6 +217,17 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     }
   };
 
+  // "Replace with new text" asks for the page colour behind a line.
+  const sampleRef = useRef(sampleColor);
+  sampleRef.current = sampleColor;
+  useEffect(() => {
+    const fn = (b: Box) => sampleRef.current(b);
+    ctl.samplers.set(entry.id, fn);
+    return () => {
+      if (ctl.samplers.get(entry.id) === fn) ctl.samplers.delete(entry.id);
+    };
+  }, [ctl, entry.id]);
+
   const createAt = (a: Pt, b: Pt, clicked: boolean, shift: boolean) => {
     const t = store.get().tool;
     const d = defaults();
@@ -234,24 +251,31 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     }
     if (t === "shapes") {
       const kind = d.shapes.shape;
+      const id = newId();
       if (kind === "line" || kind === "arrow") {
         const end: Pt = clicked ? [a[0] + 120, a[1]] : shift ? constrain45(a, b) : b;
-        ctl.add([{ kind: "line", id: newId(), page: entry.id, arrow: kind === "arrow", a, b: end, stroke: d.shapes.stroke, width: d.shapes.width }], `Add ${kind}`);
+        ctl.add([{ kind: "line", id, page: entry.id, arrow: kind === "arrow", a, b: end, stroke: d.shapes.stroke, width: d.shapes.width }], `Add ${kind}`);
       } else {
         const box = clicked ? { x: a[0] - 60, y: a[1] - 40, w: 120, h: 80 } : dragBox(a, b, shift);
-        ctl.add([{ kind: "shape", id: newId(), page: entry.id, shape: kind, ...box, rot: 0, stroke: d.shapes.stroke, fill: d.shapes.fill, width: d.shapes.width }], kind === "rect" ? "Add rectangle" : "Add ellipse");
+        ctl.add([{ kind: "shape", id, page: entry.id, shape: kind, ...box, rot: 0, stroke: d.shapes.stroke, fill: d.shapes.fill, width: d.shapes.width }], kind === "rect" ? "Add rectangle" : "Add ellipse");
       }
       ctl.announce(`${kind === "rect" ? "Rectangle" : kind === "ellipse" ? "Ellipse" : kind === "line" ? "Line" : "Arrow"} added on page ${index + 1}`);
+      focusObject(id);
       return;
     }
     if (t === "whiteout") {
       const box = clicked ? { x: a[0] - 60, y: a[1] - 12, w: 120, h: 24 } : dragBox(a, b);
       const fill = d.whiteout.fill === "page" ? sampleColor(box) : d.whiteout.fill;
-      ctl.add([{ kind: "whiteout", id: newId(), page: entry.id, ...box, fill, border: null, borderWidth: 0 }], "Add whiteout");
+      const id = newId();
+      ctl.add([{ kind: "whiteout", id, page: entry.id, ...box, fill, border: null, borderWidth: 0 }], "Add whiteout");
       ctl.announce(`Whiteout added on page ${index + 1}. It hides content but doesn't delete it.`);
       finishTool();
+      focusObject(id);
     }
   };
+
+  /** Keyboard focus on a new object, so arrows nudge it straight away (AC-82). */
+  const focusObject = (id: string) => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-obj-id="${id}"]`)?.focus({ preventScroll: true }));
 
   const placeAt = (p: Pt) => {
     const pl = store.get().placement;
@@ -294,7 +318,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     if (s.busy) return;
     const p = toFrame(e.clientX, e.clientY);
     const target = e.target as HTMLElement;
-    if (target.closest("textarea, input, [data-popover]")) return;
+    if (target.closest("textarea, input, select, [data-popover], .bf-field, .bf-proposal, .bf-draw")) return;
     const handle = target.closest<HTMLElement>("[data-handle]")?.dataset.handle;
     const objEl = target.closest<HTMLElement>("[data-obj-id]");
     const t = s.tool;
@@ -406,23 +430,26 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
           gs = sp.guides;
         }
         const keep = aspectLocked(g.origin) ? !shift : shift;
-        const b = resizeBox({ ...g.origin, rot: orot }, g.handle, q, keep);
+        // Never past the page edge (rotated boxes by their rotated bounds).
+        const b = clampedResize({ ...g.origin, rot: orot }, g.handle, q, keep, page);
         let next = { ...g.origin, ...b } as EditorObject;
         if (next.kind === "text") {
           const m = measurer(next.font, next.size, next.bold, next.italic);
           const lines = layoutText(next.text, b.w, m);
           next = { ...next, wrap: b.w, lines, h: textBoxSize(lines, b.w, next.size, m).h, y: g.origin.y };
+          next = keepOnPage(next, page, reflowText);
         }
         setDraft([next]);
         store.set({ guides: { page: entry.id, guides: gs }, readout: pointsLabel(b) });
       } else if (g.type === "rotate" && hasBox(g.origin)) {
         const rot = rotationFor(g.origin, p, shift);
-        setDraft([{ ...g.origin, rot } as EditorObject]);
+        setDraft([keepOnPage({ ...g.origin, rot } as EditorObject, page)]);
         store.set({ readout: `${Math.round(rot)}°` });
       } else if (g.type === "end" && g.origin.kind === "line") {
         const other = g.which === "a" ? g.origin.b : g.origin.a;
         let q = shift ? constrain45(other, p) : p;
         if (!alt && !shift) q = snapPoint(q, page, others([g.id]), threshold).p;
+        q = clampPoint(q, page);
         setDraft([{ ...g.origin, [g.which]: q }]);
       } else if (g.type === "create") {
         g.cur = p;
@@ -530,7 +557,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
       const next: TextObj = { ...cur, text: value, lines, w: box.w, h: box.h };
       if (isNew) {
         const s = store.get();
-        store.set({ history: H.replaceCurrent(s.history, { ...H.current(s.history), objects: H.current(s.history).objects.map((x) => (x.id === o.id ? next : x)) }) });
+        store.set({ history: H.replaceCurrent(s.history, onPage({ ...H.current(s.history), objects: H.current(s.history).objects.map((x) => (x.id === o.id ? next : x)) }, [o.id])) });
       } else if (cur.text !== value) ctl.update([o.id], () => next, "Edit text");
       ctl.announce(`Text on page ${index + 1}: ${value}`);
       requestAnimationFrame(() => (document.querySelector(`[data-obj-id="${o.id}"]`) as HTMLElement | null)?.focus({ preventScroll: true }));
@@ -584,10 +611,20 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
             editing={lineEdit}
             disabled={!!busy || !fresh}
             active={interactiveLines}
-            onEdit={(line, t) => store.set({ lineEdit: { src, line, text: t }, selection: [] })}
+            onEdit={(line, t) => {
+              const l = text.lines[line];
+              ctl.dropPendingEdit(src, line);
+              // A line the default build can't edit: load the shaping build, then open this line.
+              if (l?.read_only_reason === "needs-shaping") ctl.wantShapedLine(src, [(l.bbox.x0 + l.bbox.x1) / 2, (l.bbox.y0 + l.bbox.y1) / 2]);
+              else store.set({ lineEdit: { src, line, text: t }, selection: [] });
+            }}
             onChange={(t) => store.set((s) => ({ lineEdit: s.lineEdit ? { ...s.lineEdit, text: t } : null }))}
             onCommit={() => void ctl.commitLine()}
-            onCancel={() => store.set({ lineEdit: null })}
+            onCancel={() => {
+              const e = store.get().lineEdit;
+              if (e) ctl.dropPendingEdit(e.src, e.line);
+              store.set({ lineEdit: null });
+            }}
           />
         )}
         <div
@@ -621,6 +658,8 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
             <span key={i} aria-hidden="true" className={`ed-guide ed-guide--${g.axis}`} style={g.axis === "x" ? { left: g.at * scale, top: g.from * scale, height: (g.to - g.from) * scale } : { top: g.at * scale, left: g.from * scale, width: (g.to - g.from) * scale }} />
           ))}
           <div ref={marquee} aria-hidden="true" className="ed-marquee" />
+          {/* Fields above objects, as viewers draw widgets above page content. */}
+          <PageFields entry={entry} scale={scale} />
         </div>
         {readout && selectedHere.length + (draft?.["__new"]?.page === entry.id ? 1 : 0) > 0 && <Readout text={readout} objs={draft?.["__new"]?.page === entry.id ? [draft["__new"]] : selectedHere} entry={entry} scale={scale} />}
         {placement && (
@@ -631,6 +670,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
         {wide && selectedHere.length > 0 && !draft && !editing && (
           <PropertiesPopover objs={selectedHere} anchor={displayedBounds(unionBox(selectedHere.map(objectBounds)), entry, scale)} pageHeight={disp.height} />
         )}
+        <FieldPopover entry={entry} place={(b) => displayedBounds(b, entry, scale)} pageWidth={disp.width} pageHeight={disp.height} />
       </section>
     </div>
   );

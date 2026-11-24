@@ -1,0 +1,139 @@
+/* Form fields on the editor canvas (spec F16 U-F3). Editor-only look: never part of the output. */
+.bf-layer { position: absolute; inset: 0; pointer-events: none; }
+.bf-field, .bf-proposal { position: absolute; pointer-events: auto; box-sizing: border-box; }
+.bf-field { background: color-mix(in srgb, var(--blueberry) 8%, transparent); border-radius: 2px; }
+.bf-field:hover, .bf-field:focus-within { outline: 1px solid color-mix(in srgb, var(--blueberry) 40%, transparent); }
+.bf-layer[data-mode="edit"] .bf-field { outline: 1px solid color-mix(in srgb, var(--blueberry) 55%, transparent); cursor: move; }
+.bf-field[data-selected] { outline: 1.5px solid var(--blueberry); box-shadow: 0 0 0 2.5px #fff; }
+.bf-inner { position: absolute; display: flex; align-items: center; justify-content: center; }
+.bf-input { all: unset; box-sizing: border-box; width: 100%; height: 100%; padding: 0 0.2em; font-family: Arimo, Arial, sans-serif; line-height: 1.15; }
+textarea.bf-input { padding: 0.15em 0.2em; white-space: pre-wrap; overflow: hidden; resize: none; }
+.bf-input:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.bf-input[data-comb] { font-family: Cousine, "Courier New", monospace; }
+.bf-list { overflow: hidden; }
+.bf-hit { position: relative; width: 100%; height: 100%; display: grid; place-items: center; cursor: pointer; }
+@media (pointer: coarse) { .bf-hit::before { content: ""; position: absolute; inset: -10px; } }
+.bf-check { width: 70%; height: 70%; margin: 0; accent-color: var(--ink-black); cursor: pointer; }
+.bf-sign { all: unset; width: 100%; height: 100%; display: grid; place-items: center; color: var(--muted); font: 600 12px/1 Fredoka, sans-serif; border: 1px dashed color-mix(in srgb, var(--blueberry) 50%, transparent); cursor: pointer; }
+.bf-sign:focus-visible { outline: 2px solid var(--link); }
+.bf-tag { position: absolute; left: 0; top: -14px; font: 500 10px/12px Fredoka, sans-serif; color: var(--muted); white-space: nowrap; pointer-events: none; }
+.bf-req { position: absolute; top: -3px; right: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
+.bf-badge { position: absolute; top: -10px; left: -10px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; border: 0; background: var(--blueberry); color: #fff; font: 600 11px/20px Fredoka, sans-serif; cursor: pointer; box-shadow: 0 0 0 2px #fff; }
+.bf-proposal { border: 1.5px dashed var(--brand); background: color-mix(in srgb, var(--brand) 12%, transparent); border-radius: 2px; animation: bf-in 150ms ease-out both; }
+.bf-proposal:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.bf-pchips { position: absolute; top: -12px; right: -6px; display: flex; gap: 2px; }
+.bf-pchip { width: 20px; height: 20px; border-radius: 10px; border: 1px solid var(--border); background: #fff; display: grid; place-items: center; cursor: pointer; padding: 0; position: relative; }
+.bf-pchip::after { content: ""; position: absolute; inset: -2px; }
+@media (pointer: coarse) { .bf-pchip::after { inset: -12px; } }
+.bf-pchip svg { width: 12px; height: 12px; fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bf-pchip--yes { background: var(--leaf); border-color: var(--leaf); }
+.bf-pchip--yes svg { stroke: #fff; }
+@keyframes bf-in { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .bf-proposal { animation: none; } }
+/* Detect review pill (U-F5) */
+.bf-pill { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 6px 0 10px; background: #fff; border: 1.5px solid var(--sand); border-radius: 14px; box-shadow: 0 6px 20px rgb(58 42 46 / 0.12); font: 500 14px/1 Fredoka, sans-serif; color: var(--ink); animation: bf-in 150ms ease-out both; max-width: calc(100vw - 32px); }
+.bf-pill-text { white-space: nowrap; padding: 0 4px; }
+.bf-pill-btn { width: 32px; height: 32px; border: 0; border-radius: 10px; background: transparent; display: grid; place-items: center; cursor: pointer; }
+.bf-pill-btn:hover { background: var(--surface-soft); }
+.bf-pill-btn svg { width: 14px; height: 14px; fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bf-pill-soft, .bf-pill-main { height: 30px; padding: 0 12px; border-radius: 10px; font: 600 13px/1 Fredoka, sans-serif; cursor: pointer; border: 0; }
+.bf-pill-soft { background: var(--brand-soft); color: var(--brand-strong); }
+.bf-pill-main { background: var(--brand); color: #fff; box-shadow: 0 2px 0 var(--brand-strong); }
+.bf-pill :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.bf-ring { width: 18px; height: 18px; border-radius: 50%; background: conic-gradient(var(--brand) var(--p), var(--brand-tint) 0); mask: radial-gradient(circle, transparent 5px, #000 6px); transition: background 150ms; }
+/* Tab order panel (U-F6) */
+.bf-taborder { display: flex; flex-direction: column; gap: 12px; font: 400 13px/1.3 Fredoka, sans-serif; color: var(--ink); }
+.bf-sortbar { display: flex; gap: 4px; }
+.bf-sortbar button { flex: 1; height: 32px; border: 1.5px solid var(--border); border-radius: 10px; background: #fff; font: 500 13px/1 Fredoka, sans-serif; cursor: pointer; color: var(--ink); }
+.bf-sortbar button[aria-pressed="true"] { background: var(--tool-active-bg); color: var(--tool-active-ink); border-color: var(--tool-glow); }
+.bf-tabpage h3 { margin: 0 0 4px; font: 600 12px/1 Fredoka, sans-serif; color: var(--muted); }
+.bf-tabpage ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.bf-chip { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 8px; border: 1px solid var(--border); border-radius: 10px; background: #fff; cursor: grab; }
+.bf-chip:focus-visible { outline: 2px solid var(--link); }
+.bf-chip[data-held], .bf-chip[data-dragging] { background: var(--tool-active-bg); border-color: var(--tool-glow); }
+.bf-chip-n { min-width: 20px; height: 20px; border-radius: 10px; background: var(--blueberry); color: #fff; font: 600 11px/20px Fredoka, sans-serif; text-align: center; }
+.bf-chip-name { flex: 1; overflow-wrap: anywhere; }
+.bf-chip-kind { color: var(--muted); font-size: 11px; }
+/* Field properties popover (U-F4) */
+.bf-props { display: flex; flex-direction: column; gap: 8px; width: max-content; max-width: min(680px, calc(100vw - 32px)); padding: 8px; background: #fff; border: 1.5px solid var(--sand); border-radius: 14px; box-shadow: 0 6px 20px rgb(58 42 46 / 0.12); font: 400 13px/1.3 Fredoka, sans-serif; color: var(--ink); animation: bf-in 150ms ease-out both; }
+.bf-props-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.bf-props-actions { display: flex; gap: 6px; margin-left: auto; }
+.bf-props-row > .bf-prop--options { flex-basis: 100%; order: 1; }
+.bf-props-more { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 12px; padding-top: 8px; border-top: 1px solid var(--border); }
+.bf-prop { display: flex; align-items: center; gap: 6px; min-height: 32px; }
+.bf-prop--name { flex-wrap: wrap; }
+.bf-props-more .bf-prop[role="radiogroup"] { grid-column: span 2; }
+.bf-props-more > .bf-act { justify-self: start; }
+.bf-prop--options { flex-direction: column; align-items: stretch; grid-column: 1 / -1; }
+.bf-prop-label { color: var(--muted); font-weight: 500; white-space: nowrap; }
+.bf-text { height: 30px; min-width: 0; width: 9.5em; padding: 0 8px; border: 1.5px solid var(--border); border-radius: 10px; background: #fff; font: 400 13px/1 Fredoka, sans-serif; color: var(--ink); }
+.bf-props-more .bf-text { width: 100%; }
+.bf-text[aria-invalid] { border-color: var(--brand); }
+.bf-text:focus-visible, .bf-color:focus-visible, .bf-toggle input:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+textarea.bf-options { height: auto; padding: 6px 8px; line-height: 1.4; resize: vertical; width: 100%; box-sizing: border-box; }
+.bf-color { width: 30px; height: 30px; padding: 2px; border: 1.5px solid var(--border); border-radius: 10px; background: #fff; cursor: pointer; }
+.bf-color[data-none] { background: repeating-linear-gradient(135deg, #fff 0 4px, var(--border) 4px 5px); }
+.bf-color[data-none]::-webkit-color-swatch { opacity: 0; }
+.bf-toggle { cursor: pointer; user-select: none; }
+.bf-toggle input { width: 16px; height: 16px; margin: 0; accent-color: var(--brand); cursor: inherit; }
+.bf-toggle[data-disabled] { opacity: 0.5; cursor: default; }
+.bf-step { width: 28px; height: 28px; border: 1.5px solid var(--border); border-radius: 9px; background: #fff; font: 600 15px/1 Fredoka, sans-serif; color: var(--ink); cursor: pointer; }
+.bf-step-value { min-width: 2.8em; text-align: center; font-variant-numeric: tabular-nums; }
+.bf-seg { height: 28px; padding: 0 8px; border: 1.5px solid var(--border); border-radius: 9px; background: #fff; font: 500 12px/1 Fredoka, sans-serif; color: var(--ink); cursor: pointer; }
+.bf-seg[aria-checked="true"] { background: var(--tool-active-bg); color: var(--tool-active-ink); border-color: var(--tool-glow); }
+.bf-act { height: 30px; padding: 0 10px; border: 0; border-radius: 10px; background: var(--surface-soft); font: 600 13px/1 Fredoka, sans-serif; color: var(--ink); cursor: pointer; white-space: nowrap; }
+.bf-act:hover { background: var(--brand-soft); }
+.bf-act[aria-expanded="true"] { background: var(--tool-active-bg); color: var(--tool-active-ink); }
+.bf-act--danger { color: var(--brand-strong); }
+.bf-link { border: 0; padding: 0 2px; background: none; font: 600 13px/1 Fredoka, sans-serif; color: var(--link); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.bf-note { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--ink); }
+.bf-hint { align-self: flex-start; height: 26px; padding: 0 10px; border: 1px dashed var(--border); border-radius: 13px; background: #fff; font: 500 12px/1 Fredoka, sans-serif; color: var(--muted); cursor: pointer; }
+.bf-props :is(button, .bf-step, .bf-seg):focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+@media (pointer: coarse) { .bf-act, .bf-text, .bf-step, .bf-seg, .bf-color { min-height: 40px; } }
+@media (prefers-reduced-motion: reduce) { .bf-props { animation: none; } }
+.bf-prop--tight { gap: 4px; }
+/* Form tool options (U-F2) and the fields chip (U-F1) */
+.bf-formopts { display: flex; align-items: center; gap: 8px; font: 500 13px/1 Fredoka, sans-serif; color: var(--ink); }
+.bf-kinds { display: flex; gap: 2px; padding: 2px; border-radius: 12px; background: var(--surface-soft); }
+.bf-kind { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--ink); cursor: pointer; transition: background 120ms, color 120ms; }
+.bf-kind:hover { background: #fff; }
+.bf-kind[aria-checked="true"] { background: var(--tool-active-bg); color: var(--tool-active-ink); box-shadow: inset 0 0 0 1.5px var(--tool-glow); }
+.bf-divider { width: 1px; height: 22px; background: var(--border); }
+.bf-optbtn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; font: 600 13px/1 Fredoka, sans-serif; color: var(--ink); cursor: pointer; white-space: nowrap; }
+.bf-optbtn:hover { background: var(--surface-soft); }
+.bf-optbtn[aria-pressed="true"] { background: var(--tool-active-bg); color: var(--tool-active-ink); }
+.bf-kind:focus-visible, .bf-optbtn:focus-visible, .bf-fieldschip:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+/* Phones and tablets: the kinds take the first row, Detect and Tab order the second (nothing clips). */
+@media (max-width: 1023px) { .bf-formopts { flex-wrap: wrap; justify-content: center; row-gap: 6px; } .bf-formopts .bf-divider { flex-basis: 100%; height: 0; width: 0; margin: 0; border: 0; } }
+@media (pointer: coarse) { .bf-kind, .bf-optbtn { min-width: 40px; height: 40px; } }
+.bf-fieldschip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border: 1.5px solid var(--border); border-radius: 14px; background: #fff; font: 500 12px/1 Fredoka, sans-serif; color: var(--ink); cursor: pointer; white-space: nowrap; transition: background 150ms, border-color 150ms; }
+.bf-fieldschip:hover { background: var(--surface-soft); }
+.bf-fieldschip[data-warn] { border-color: var(--brand); color: var(--brand-strong); background: var(--brand-soft); }
+@media (prefers-reduced-motion: reduce) { .bf-kind, .bf-fieldschip { transition: none; } }
+
+/* Editor wiring (U-F2 to U-F6). */
+.bf-draw { position: absolute; inset: 0; cursor: crosshair; touch-action: none; pointer-events: auto; }
+/* Placing, drawing and marking go over fields; every other tool still fills them (AC-248). */
+.ed-overlay--place .bf-field, .ed-overlay--draw .bf-field, .ed-overlay--mark .bf-field, .ed-overlay--shapes .bf-field, .ed-overlay--whiteout .bf-field { pointer-events: none; }
+.bf-drag { position: absolute; border: 1.5px dashed var(--blueberry); background: color-mix(in srgb, var(--blueberry) 10%, transparent); border-radius: 2px; pointer-events: none; }
+.bf-layer[data-mode="edit"] .bf-field { touch-action: none; }
+.bf-layer[data-mode="edit"] .bf-inner { pointer-events: none; }
+/* Names show on the field being pointed at or selected, so tags never cover the page's own text. */
+.bf-tag { opacity: 0; transition: opacity 120ms; }
+.bf-field:hover .bf-tag, .bf-field[data-selected] .bf-tag { opacity: 1; }
+.bf-field:has(.bf-badge) .bf-tag { visibility: hidden; }
+
+.bf-resize { position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; border-radius: 3px; background: #fff; border: 1.5px solid var(--blueberry); cursor: nwse-resize; }
+.bf-resize::after { content: ""; position: absolute; inset: -6px; }
+@media (pointer: coarse) { .bf-resize::after { inset: -14px; } }
+.bf-popover { position: absolute; z-index: 30; animation: bf-in 150ms ease-out both; }
+.bf-pill-dock { position: absolute; left: 50%; bottom: 72px; transform: translateX(-50%); z-index: 25; max-width: calc(100% - 32px); }
+.bf-empty { margin: 12px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+@media (prefers-reduced-motion: reduce) { .bf-popover { animation: none; } }
+.bf-pill-soft, .bf-pill-main { white-space: nowrap; }
+@media (max-width: 1023px) {
+  /* Phones: the review pill sits under the top bar, clear of the options strip and the dock. */
+  .bf-pill-dock { top: 76px; bottom: auto; }
+  /* The Form tool's options take two rows in the strip. */
+  .ed-strip:has(.bf-formopts) { height: auto; padding-block: 6px; }
+}

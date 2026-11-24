@@ -5,9 +5,18 @@
  */
 import { buildPdf, type BuildInput } from "./build";
 import { FONT_BASE, USER_FILE, fontUrl, type EditorFontManifest } from "./fonts";
+import { needsShaping, SHAPING_MANIFEST, type ShapingManifest } from "./shaping";
+import type { FormState } from "@/lib/forms/types";
 
-export type BuildRequest = { id: number; input: BuildInput } | { id: number; owner: { bytes: Uint8Array; password: string } };
-export type BuildResponse = { id: number; ok: true; bytes: Uint8Array } | { id: number; ok: true; owner: boolean } | { id: number; ok: false; message: string };
+export type BuildRequest =
+  | { id: number; input: BuildInput }
+  | { id: number; owner: { bytes: Uint8Array; password: string } }
+  | { id: number; forms: { bytes: Uint8Array; password?: string } };
+export type BuildResponse =
+  | { id: number; ok: true; bytes: Uint8Array }
+  | { id: number; ok: true; owner: boolean }
+  | { id: number; ok: true; forms: FormState; xfa: boolean }
+  | { id: number; ok: false; message: string };
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -37,6 +46,22 @@ const fonts = {
   },
 };
 
+/** Hindi, Arabic and similar added text: drawn by the shaping engine (loaded only for it, AC-224). */
+const wantsShaping = (input: BuildInput) => input.objects.some((o) => o.kind === "text" && o.lines.some(needsShaping));
+
+async function shapingEngine() {
+  const { ENGINE_SHAPING_JS, ENGINE_SHAPING_WASM } = await import("./engine-assets");
+  const origin = scope.location.origin;
+  const mod = (await import(/* webpackIgnore: true */ new URL(ENGINE_SHAPING_JS, origin).href)) as {
+    default: (opts: { module_or_path: string }) => Promise<unknown>;
+    BerryDocument: import("./shaped-text").ShapingEngine["BerryDocument"];
+  };
+  await mod.default({ module_or_path: new URL(ENGINE_SHAPING_WASM, origin).href });
+  return mod;
+}
+let engine: ReturnType<typeof shapingEngine> | null = null;
+let shapingFonts: Promise<ShapingManifest> | null = null;
+
 scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: true }>) => {
   const msg = event.data;
   if ("warm" in msg) return;
@@ -44,6 +69,16 @@ scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: 
     const { isOwnerPassword } = await import("./owner");
     const owner = await isOwnerPassword(msg.owner.bytes, msg.owner.password);
     scope.postMessage({ id: msg.id, ok: true, owner } satisfies BuildResponse);
+    return;
+  }
+  if ("forms" in msg) {
+    try {
+      const { readFormFromBytes } = await import("@/lib/forms/read");
+      const r = await readFormFromBytes(msg.forms.bytes, msg.forms.password);
+      scope.postMessage({ id: msg.id, ok: true, forms: r.form, xfa: r.xfa } satisfies BuildResponse);
+    } catch (error) {
+      scope.postMessage({ id: msg.id, ok: false, message: error instanceof Error ? error.message : String(error) } satisfies BuildResponse);
+    }
     return;
   }
   try {
@@ -62,7 +97,31 @@ scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: 
           },
         }
       : fonts;
-    const out = await buildPdf(msg.input, withMore, fontkit);
+    const input = msg.input;
+    let out: Uint8Array;
+    if (wantsShaping(input)) {
+      const { buildShaped } = await import("./shaped-text");
+      out = await buildShaped(
+        input,
+        {
+          engine: () => {
+            engine ??= shapingEngine();
+            engine.catch(() => (engine = null));
+            return engine;
+          },
+          editorManifest: withMore.manifest,
+          shapingManifest: () => {
+            shapingFonts ??= json<ShapingManifest>(SHAPING_MANIFEST);
+            shapingFonts.catch(() => (shapingFonts = null));
+            return shapingFonts;
+          },
+          loadFace: withMore.load,
+          loadUrl: bytes,
+          labels: input.fonts?.labels,
+        },
+        (bytes, defer, pass) => buildPdf(pass.layer === 0 ? input : { ...input, bytes, password: undefined }, withMore, fontkit, defer, pass),
+      );
+    } else out = await buildPdf(input, withMore, fontkit);
     scope.postMessage({ id: msg.id, ok: true, bytes: out } satisfies BuildResponse, [out.buffer as ArrayBuffer]);
   } catch (error) {
     // Logged locally only, without file content.

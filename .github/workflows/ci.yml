@@ -22,6 +22,11 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # qpdf's syntax check (via pikepdf, MPL-2.0) for the forms output tests (F16 AC-247).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet pikepdf==10.18.2
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

@@ -15,6 +15,7 @@
  */
 import {
   LineCapStyle,
+  PDFDict,
   PDFDocument,
   PDFHexString,
   PDFName,
@@ -42,10 +43,12 @@ import {
   type PDFRef,
   LineJoinStyle,
 } from "@cantoo/pdf-lib";
+import type { FormState } from "@/lib/forms/types";
 import { covers, faceOf, type EditorFontManifest, type FaceEntry } from "./fonts";
 import { norm360, pageSize, totalRotation, type EditorObject, type InkObj, type MarkupObj, type PageEntry, type Pt } from "./model";
 import { alignOffset, baselineOffset } from "./text-layout";
-import { arrowHead, boxPoint, hexToRgb, quadPoints, svgPolyline, toPdf, typedSignatureSize } from "./draw-math";
+import { color255, needsShaping, type ShapedLine } from "./shaping";
+import { arrowHead, boxPoint, fitTypedSize, hexToRgb, quadPoints, svgPolyline, toPdf, typedSignatureSize } from "./draw-math";
 
 export { arrowHead, boxPoint, hexToRgb, quadPoints, svgPolyline, toPdf, typedSignatureSize };
 
@@ -59,8 +62,10 @@ export type BuildInput = {
   pages: PageEntry[];
   objects: EditorObject[];
   assets: Record<string, Asset>;
+  /** Form fields (lib/forms): the form now and as it was read from the file. Absent: left as is. */
+  forms?: { state: FormState; original: FormState };
   /** Library and user faces the objects use (fonts-browser fontsForBuild), and the user's own font bytes. */
-  fonts?: { faces: EditorFontManifest["faces"]; bytes: Record<string, Uint8Array> };
+  fonts?: { faces: EditorFontManifest["faces"]; bytes: Record<string, Uint8Array>; labels?: Record<string, string> };
 };
 
 /** Font files on this device: the editor faces, and the Noto fallback for other scripts. */
@@ -72,6 +77,18 @@ export type BuildFonts = {
 };
 
 const color = (hex: string) => rgb(...hexToRgb(hex));
+
+/**
+ * Added text that needs shaping (Hindi, Arabic and similar, AC-224) is left for the shaping
+ * engine: buildPdf measures each line with `measure` (the engine's shape() width), draws only its
+ * underline, and pushes where the line goes to `lines`. The caller then draws them with addText.
+ */
+export type DeferShaped = {
+  measure: (text: string, o: { font: string; bold: boolean; italic: boolean; size: number }) => Promise<number> | number;
+  /** The family name the engine knows the box's face by. */
+  family: (font: string) => string;
+  lines: ShapedLine[];
+};
 
 type FontKit = Parameters<PDFDocument["registerFontkit"]>[0];
 
@@ -168,38 +185,76 @@ class TextFonts {
 }
 
 /** Builds the edited PDF. */
-export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: FontKit): Promise<Uint8Array> {
+/**
+ * Z-order layers when shaped lines are drawn by the engine (AC-224): on each page, a new layer
+ * starts at the first object pdf-lib draws after an object with shaped lines. Layer k is drawn
+ * by pdf-lib, then the shaped lines of layer k by the engine, then layer k + 1, so an object added
+ * after a shaped line (a whiteout over it, say) prints over it, as on screen. Shaped boxes with no
+ * other object between them share a layer, so they take one engine pass (their plain lines, if
+ * any, are drawn by pdf-lib under all of that layer's shaped lines).
+ */
+export function shapedLayers(input: Pick<BuildInput, "objects">): { layers: Map<string, number>; count: number } {
+  const layers = new Map<string, number>();
+  const at = new Map<string, { k: number; shaped: boolean }>();
+  let count = 1;
+  for (const o of input.objects) {
+    const p = at.get(o.page) ?? { k: 0, shaped: false };
+    const shaped = o.kind === "text" && o.lines.some(needsShaping);
+    // pdf-lib draws this one after shaped lines: it opens the next layer.
+    if (!shaped && p.shaped) p.k++;
+    p.shaped = shaped;
+    at.set(o.page, p);
+    layers.set(o.id, p.k);
+    count = Math.max(count, p.k + 1);
+  }
+  return { layers, count };
+}
+
+/** One z-order pass: draw only `layer`'s objects; pages are arranged in the first pass only. */
+export type BuildPass = { layer: number; layers: Map<string, number>; /** The last pdf-lib pass: forms are written here. */ last: boolean };
+
+export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: FontKit, shaped?: DeferShaped, pass?: BuildPass): Promise<Uint8Array> {
   const probe = await PDFDocument.load(input.bytes, { ignoreEncryption: true, updateMetadata: false });
   const doc = probe.isEncrypted ? await PDFDocument.load(input.bytes, { password: input.password ?? "", updateMetadata: false }) : probe;
   if (fontkit) doc.registerFontkit(fontkit);
+  const arrange = !pass || pass.layer === 0;
+  const objects = pass ? input.objects.filter((o) => pass.layers.get(o.id) === pass.layer) : input.objects;
 
-  // ---- pages: order, copies, blanks, rotation ----
+  // ---- pages: order, copies, blanks, rotation (later passes get them arranged already) ----
   const source = doc.getPages();
-  const used = new Set<number>();
-  const out: PDFPage[] = [];
-  for (const entry of input.pages) {
+  // Each source page object goes to one entry: the original (id p<src>) when it is still there,
+  // else the first copy. The others are copies. So a copy moved before its original never takes
+  // the original's widgets (their /P and the form model both point at the original).
+  const ids = new Set(input.pages.map((p) => p.id));
+  const owner = new Map<number, string>();
+  for (const e of input.pages) if (e.src != null && !owner.has(e.src)) owner.set(e.src, ids.has(`p${e.src}`) ? `p${e.src}` : e.id);
+  const out: PDFPage[] = arrange ? [] : source;
+  if (arrange) for (const entry of input.pages) {
     let page: PDFPage;
     if (entry.src == null) {
       page = PDFPage.create(doc);
       const { w, h } = pageSize(entry);
       page.setSize(w, h);
-    } else if (!used.has(entry.src)) {
-      used.add(entry.src);
+    } else if (owner.get(entry.src) === entry.id) {
       page = source[entry.src];
     } else {
       [page] = await doc.copyPages(doc, [entry.src]);
+      // The copy's widgets would be fields outside the form; the form model adds this page's own.
+      if (input.forms) dropWidgets(page);
     }
     out.push(page);
   }
-  setPageOrder(doc, out);
-  out.forEach((page, i) => {
-    const entry = input.pages[i];
-    const rotation = totalRotation(entry);
-    if (entry.rotate || norm360(page.getRotation().angle) !== rotation) page.setRotation(degrees(rotation));
-  });
+  if (arrange) {
+    setPageOrder(doc, out);
+    out.forEach((page, i) => {
+      const entry = input.pages[i];
+      const rotation = totalRotation(entry);
+      if (entry.rotate || norm360(page.getRotation().angle) !== rotation) page.setRotation(degrees(rotation));
+    });
+  }
 
   // ---- objects ----
-  const needsFonts = input.objects.some((o) => o.kind === "text" || (o.kind === "signature" && o.sig.type === "typed"));
+  const needsFonts = objects.some((o) => o.kind === "text" || (o.kind === "signature" && o.sig.type === "typed"));
   const text = needsFonts ? new TextFonts(doc, fonts, await fonts.manifest()) : null;
   const images = new Map<string, Promise<PDFImage>>();
   const image = (id: string) => {
@@ -214,7 +269,7 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
   };
   const byPage = new Map(input.pages.map((p, i) => [p.id, i]));
 
-  for (const o of input.objects) {
+  for (const o of objects) {
     const i = byPage.get(o.page);
     if (i == null) continue;
     const page = out[i];
@@ -259,10 +314,15 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
         for (let li = 0; li < o.lines.length; li++) {
           const line = o.lines[li];
           if (!line) continue;
-          const lw = await text!.width(face, line, o.size);
+          const defer = !!shaped && needsShaping(line);
+          const lw = defer ? await shaped.measure(line, o) : await text!.width(face, line, o.size);
           const lx = alignOffset(o.align, o.w, lw);
           const base = baselineOffset(face, o.size, li);
-          await text!.draw(page, entry, face, line, boxPoint(o, o.rot, lx, base), o.size, o.color, o.rot);
+          if (defer) {
+            // Right alignment is x = right − width, so the line ends at the box's right edge.
+            const [x, y] = toPdf(entry, boxPoint(o, o.rot, lx, base));
+            shaped.lines.push({ page: i, text: line, font: o.font, families: [shaped.family(o.font), "Noto Sans"], bold: o.bold, italic: o.italic, size: o.size, x, y, angle: -o.rot, color: color255(hexToRgb(o.color)) });
+          } else await text!.draw(page, entry, face, line, boxPoint(o, o.rot, lx, base), o.size, o.color, o.rot);
           if (o.underline) {
             const t = Math.max(0.5, o.size * 0.06);
             const a = toPdf(entry, boxPoint(o, o.rot, lx, base + o.size * 0.12));
@@ -286,7 +346,8 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
           page.drawImage(img, { x, y, width: o.w, height: o.h, rotate: degrees(-o.rot) });
         } else if (sig.type === "typed") {
           const face = text!.face(sig.face, false, false);
-          const size = typedSignatureSize(o.h, face);
+          const full = typedSignatureSize(o.h, face);
+          const size = fitTypedSize(full, await text!.width(face, sig.text, full), o.w);
           const tw = await text!.width(face, sig.text, size);
           const base = (o.h - (face.ascent + face.descent) * size) / 2 + face.ascent * size;
           await text!.draw(page, entry, face, sig.text, boxPoint(o, o.rot, (o.w - tw) / 2, base), size, o.color, o.rot);
@@ -309,9 +370,27 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
     }
   }
 
+  // ---- form fields (F16 E3): only when the form changed, so an untouched form stays as it was ----
+  // Once, in the last pdf-lib pass (pages are arranged by then); the engine's shaped lines after
+  // it are an incremental update that keeps the form as written.
+  if (input.forms && input.forms.state !== input.forms.original && (!pass || pass.last)) {
+    const { applyForms } = await import("@/lib/forms/write");
+    await applyForms(doc, out, input.pages, input.forms.state, input.forms.original, { fonts: fonts.fallback, fontkit });
+  }
+
   doc.setProducer(PRODUCER);
   doc.setModificationDate(new Date());
   return doc.save();
+}
+
+/** Removes widget annotations from a copied page (see the page copy above). */
+function dropWidgets(page: PDFPage) {
+  const annots = page.node.Annots();
+  if (!annots) return;
+  for (let i = annots.size() - 1; i >= 0; i--) {
+    const a = annots.lookup(i);
+    if (a instanceof PDFDict && a.get(PDFName.of("Subtype")) === PDFName.of("Widget")) annots.remove(i);
+  }
 }
 
 /**

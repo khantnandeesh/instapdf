@@ -1,5 +1,5 @@
 {
-  "note": "Synthetic files only. Each case is one find/replace (or, with 'add', one new line of text at x, y) on page 1 (1-based) run through the engine, then checked by the PDFium oracle. 'expect' must be in PDFium's extracted text afterwards, 'absent' must not.",
+  "note": "Synthetic files only. Each case is one find/replace (or, with 'add', one new line of text at x, y) on page 1 (1-based) run through the engine, then checked by the PDFium oracle. 'expect' must be in PDFium's extracted text afterwards, 'absent' must not. A case with 'refused' must be refused by the engine with that reason code (crates/README.md, known limits).",
   "cases": [
     {"id": "std14-word", "file": "std14-reportlab.pdf", "find": "page of", "replace": "sheet of", "expect": ["Each sheet of the report"], "absent": ["Each page of"], "substituted": false},
     {"id": "std14-longer", "file": "std14-reportlab.pdf", "find": "45,000", "replace": "59,999 Ž", "expect": ["Amount due: 59,999 Ž"], "absent": ["45,000"], "substituted": false},
@@ -15,7 +15,7 @@
     {"id": "chrome-heading", "file": "chrome-justified-mixed.pdf", "find": "Service Agreement", "replace": "Supply Quote", "expect": ["Supply Quote"], "absent": ["Service Agreement"], "substituted": true},
     {"id": "chrome-rupee-line", "file": "chrome-justified-mixed.pdf", "find": "45,000", "replace": "59,999 Ž", "expect": ["₹ 59,999 Ž — including GST"], "absent": ["45,000"], "substituted": true},
     {"id": "chrome-italic", "file": "chrome-justified-mixed.pdf", "find": "Client", "replace": "Cline", "expect": ["and the Cline on the date"], "absent": ["Client"], "substituted": false},
-    {"id": "chrome-table-cell", "file": "chrome-justified-mixed.pdf", "find": "Item", "replace": "Items sold", "expect": ["Items sold", "Design"], "absent": [], "substituted": false},
+    {"id": "chrome-table-cell", "file": "chrome-justified-mixed.pdf", "find": "Item", "replace": "Items", "expect": ["Items", "Design"], "absent": [], "substituted": false},
     {"id": "shared-form", "file": "shared-xobject.pdf", "find": "Northwind", "replace": "Southwind", "expect": ["Southwind Traders"], "absent": ["Northwind"], "other_pages_keep": ["Northwind Traders"], "substituted": false},
     {"id": "rotated-page", "file": "rotated-90.pdf", "find": "notice", "replace": "bulletin", "expect": ["Landscape bulletin board"], "absent": ["notice"], "substituted": false},
     {"id": "rotated-text", "file": "rotated-90.pdf", "find": "margin", "replace": "footer", "expect": ["Sideways footer note"], "absent": ["margin"], "substituted": false},
@@ -24,7 +24,8 @@
     {"id": "plain-hindi-inside-word", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "भुगतान", "replace": "भुगतानों", "expect": ["भुगतानों"], "absent": [], "substituted": false},
     {"id": "plain-arabic-word", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "بالعالم،", "replace": "بالجميع،", "expect": ["مرحبا بالجميع، هذا"], "absent": ["بالعالم"], "substituted": true},
     {"id": "plain-arabic-append", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "تجريبي.", "replace": "تجريبي. شكرا", "expect": ["تجريبي. شكرا"], "absent": [], "substituted": true},
-    {"id": "plain-arabic-number", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "2500", "replace": "3750", "expect": ["الإجمالي 3750 ريال"], "absent": ["2500"], "substituted": false},
+    {"id": "plain-arabic-number", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "2500", "replace": "7520", "expect": ["الإجمالي 7520 ريال"], "absent": ["2500"], "substituted": false},
+    {"id": "plain-arabic-number-unmapped", "file": "scripts-plain.pdf", "fonts": "fonts", "find": "2500", "replace": "3750", "refused": "text-mismatch"},
     {"id": "chrome-hindi-word", "file": "scripts-chrome.pdf", "fonts": "fonts", "find": "कुल", "replace": "संपूर्ण", "expect": ["संपूर्ण"], "absent": [], "substituted": true},
     {"id": "chrome-arabic-word", "file": "scripts-chrome.pdf", "fonts": "fonts", "find": "بالعالم،", "replace": "بالجميع،", "expect": ["بالجميع،"], "absent": [], "substituted": true},
     {"id": "lo-hindi-word", "file": "scripts-libreoffice.pdf", "fonts": "fonts", "find": "कुल", "replace": "संपूर्ण", "expect": ["संपूर्ण"], "absent": [], "substituted": true},

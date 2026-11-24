@@ -1000,17 +1000,23 @@ impl PdfFont {
     /// `seen` holds codes already shown with this font on the page. They are known to render,
     /// so they win ties and stand in when the program cannot be checked.
     pub fn encode(&self, ch: char, seen: &HashSet<u32>) -> Option<u32> {
+        self.encode_text(ch.encode_utf8(&mut [0u8; 4]), seen)
+    }
+
+    /// Like [`Self::encode`], for a code whose text is `target`: one character, or several
+    /// for a ligature glyph ("fi" in a TeX font).
+    pub fn encode_text(&self, target: &str, seen: &HashSet<u32>) -> Option<u32> {
         if self.kind == FontKind::Type0 && !self.cmap_supported {
             return None;
         }
         let mut candidates: Vec<u32> = Vec::new();
-        let mut buf = [0u8; 4];
-        let target: &str = ch.encode_utf8(&mut buf);
+        let mut one = target.chars();
+        let single = one.next().filter(|_| one.next().is_none());
         if self.two_byte {
             candidates.extend(self.to_unicode.iter().filter(|(_, t)| t.as_str() == target).map(|(c, _)| *c));
             if self.to_unicode.is_empty() {
                 // No ToUnicode: go through the embedded Unicode cmap.
-                if let Program::TrueType(data) = &self.program {
+                if let (Program::TrueType(data), Some(ch)) = (&self.program, single) {
                     if let Ok(face) = ttf_parser::Face::parse(data, 0) {
                         if let Some(g) = face.glyph_index(ch) {
                             let cid = match &self.cid_to_gid {

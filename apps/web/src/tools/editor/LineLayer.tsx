@@ -53,7 +53,8 @@ export function LineLayer({
   const list = useRef<HTMLDivElement>(null);
   const refocus = useRef(false);
   const [active, setActive] = useState(-1);
-  const editable = text.lines.map((l, i) => (l.editable && l.text.trim() ? i : -1)).filter((i) => i >= 0);
+  // Lines that need the shaping build (Hindi, Arabic…) are listed too: picking one loads it.
+  const editable = text.lines.map((l, i) => ((l.editable || l.read_only_reason === "needs-shaping") && l.text.trim() ? i : -1)).filter((i) => i >= 0);
   const [seen, setSeen] = useState(text);
   if (seen !== text) {
     setSeen(text);
@@ -153,13 +154,7 @@ export function LineLayer({
         } else if (o.cy < mid) paperTop = Math.max(paperTop, Math.min(bottom - box.top, box.height / 2 - 1));
       });
     }
-    // The box itself (its ring and its paper) draws back from a neighbour's text, as far as its
-    // own padding and a little of its height allow; the text keeps its place and may overhang.
-    const give = (box.height - b.thickness) / 2 + b.thickness * 0.2;
-    const top = Math.max(0, Math.min(paperTop, give));
-    const bottom = Math.max(0, Math.min(paperBottom, give));
-    const fitted = { ...box, top: box.top + top, height: box.height - top - bottom };
-    return { box: fitted, start, length: b.length, maxWidth: displaySize(view, rotation, scale).width - box.left - 2, paperInset: { top: Math.max(0, paperTop - top), bottom: Math.max(0, paperBottom - bottom) }, hintBelow: below };
+    return { box, start, length: b.length, maxWidth: displaySize(view, rotation, scale).width - box.left - 2, paperInset: { top: Math.max(0, paperTop), bottom: Math.max(0, paperBottom) }, hintBelow: below };
   };
 
   return (
@@ -186,6 +181,7 @@ export function LineLayer({
               aria-selected={active === i}
               data-testid="line"
               data-text={line.text}
+              data-needs-shaping={line.read_only_reason === "needs-shaping" || undefined}
               className={cx("ed-line absolute cursor-text rounded-[3px]", active === i && "ed-line--active", disabled && "ed-line--busy")}
               style={geometryOf(i)}
               onPointerEnter={() => interactive && !disabled && warm(i)}

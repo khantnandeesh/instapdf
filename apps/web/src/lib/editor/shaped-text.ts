@@ -1,0 +1,128 @@
+/**
+ * Draws added Hindi, Arabic and other complex-script lines with the shaping engine (AC-224), in
+ * the download worker. Loaded (with the engine and the script fonts) only when a text box holds
+ * such text; Latin-only downloads never fetch any of it.
+ *
+ * Flow: register fonts in a scratch document (a blank page) to measure lines with shape(), let
+ * buildPdf lay out and skip them (DeferShaped), then open the built bytes in the engine, call
+ * addText once per line and save.
+ */
+import type { BerryDocument, FontRequest } from "./berry-engine";
+import { blankPdf } from "./blank";
+import { shapedLayers, type BuildInput, type BuildPass, type DeferShaped } from "./build";
+import { faceOf, filesFor, TEXT_FONTS, type EditorFontManifest } from "./fonts";
+import { printable, shapingFontsFor, type ShapedLine, type ShapingManifest } from "./shaping";
+
+export type ShapingEngine = { BerryDocument: new (bytes: Uint8Array, password?: string | null) => BerryDocument };
+
+export type ShapingDeps = {
+  engine: () => Promise<ShapingEngine>;
+  editorManifest: () => Promise<EditorFontManifest>;
+  shapingManifest: () => Promise<ShapingManifest>;
+  /** Editor face file (by name) and shaping font (by URL) bytes. */
+  loadFace: (file: string) => Promise<Uint8Array>;
+  loadUrl: (url: string) => Promise<Uint8Array>;
+  /** Family names of library and user fonts, by font id. */
+  labels?: Record<string, string>;
+};
+
+/**
+ * The family name a face is registered under, which the engine also names the embedded font by:
+ * its label, e.g. "Arimo" or the name inside a font the person added (`labels`, from the page).
+ */
+export const familyOf = (id: string, labels?: Record<string, string>) => labels?.[id] ?? TEXT_FONTS.find((f) => f.id === id)?.label ?? id;
+
+type Style = { font: string; bold: boolean; italic: boolean };
+
+/** Registers fonts on documents, each file read once. */
+class Fonts {
+  private cache = new Map<string, Promise<Uint8Array>>();
+  constructor(
+    private deps: ShapingDeps,
+    private editor: EditorFontManifest,
+    readonly shaping: ShapingManifest,
+  ) {}
+
+  private get(key: string, load: () => Promise<Uint8Array>) {
+    let p = this.cache.get(key);
+    if (!p) this.cache.set(key, (p = load()));
+    return p;
+  }
+
+  face(s: Style) {
+    const face = faceOf(this.editor, s.font, s.bold, s.italic);
+    if (!face) throw new Error(`No font ${s.font}`);
+    return face;
+  }
+
+  /** Adds what `text` in style `s` needs: the box's face files, then the script fonts (in that style, so the engine finds them). */
+  async register(doc: BerryDocument, s: Style, text: string, done: Set<string>) {
+    const face = this.face(s);
+    const family = familyOf(s.font, this.deps.labels);
+    for (const file of filesFor(face, text)) {
+      const key = `${family}|${s.bold}|${s.italic}|${file}`;
+      if (done.has(key)) continue;
+      done.add(key);
+      doc.addFont(family, s.bold, s.italic, await this.get(file, () => this.deps.loadFace(file)));
+    }
+    for (const f of shapingFontsFor(this.shaping, text)) {
+      const key = `${f.family}|${s.bold}|${s.italic}|${f.url}`;
+      if (done.has(key)) continue;
+      done.add(key);
+      doc.addFont(f.family, s.bold, s.italic, await this.get(f.url, () => this.deps.loadUrl(f.url)));
+    }
+  }
+}
+
+const request = (families: string[], bold: boolean, italic: boolean): FontRequest => ({ families, bold, italic });
+
+/**
+ * Builds with complex-script lines drawn by the shaping engine, in z-order passes (shapedLayers):
+ * pdf-lib draws layer k, the engine adds layer k's shaped lines, then layer k + 1, and so on.
+ * `build` is buildPdf on the given bytes with the DeferShaped hook and the pass.
+ */
+export async function buildShaped(
+  input: Pick<BuildInput, "bytes" | "objects">,
+  deps: ShapingDeps,
+  build: (bytes: Uint8Array, defer: DeferShaped, pass: BuildPass) => Promise<Uint8Array>,
+): Promise<Uint8Array> {
+  const [engine, editor, shaping] = await Promise.all([deps.engine(), deps.editorManifest(), deps.shapingManifest()]);
+  const fonts = new Fonts(deps, editor, shaping);
+  const scratch = new engine.BerryDocument(blankPdf());
+  const scratchFonts = new Set<string>();
+  const { layers, count } = shapedLayers(input);
+  try {
+    let bytes = input.bytes;
+    for (let layer = 0; layer < count; layer++) {
+      const defer: DeferShaped = {
+        family: (id) => familyOf(id, deps.labels),
+        lines: [],
+        measure: async (text, o) => {
+          const line = printable(text, fonts.face(o), shaping);
+          await fonts.register(scratch, o, line, scratchFonts);
+          return scratch.shape(line, request([familyOf(o.font, deps.labels), "Noto Sans"], o.bold, o.italic), o.size).width;
+        },
+      };
+      // The first pass decrypts (pdf-lib writes the file without encryption); later ones get plain bytes.
+      bytes = await build(bytes, defer, { layer, layers, last: layer === count - 1 });
+      if (!defer.lines.length) continue;
+      const doc = new engine.BerryDocument(bytes);
+      try {
+        const done = new Set<string>();
+        for (const line of defer.lines) await addLine(doc, fonts, line, done);
+        bytes = doc.save().bytes;
+      } finally {
+        doc.free();
+      }
+    }
+    return bytes;
+  } finally {
+    scratch.free();
+  }
+}
+
+async function addLine(doc: BerryDocument, fonts: Fonts, line: ShapedLine, done: Set<string>) {
+  const text = printable(line.text, fonts.face(line), fonts.shaping);
+  await fonts.register(doc, line, text, done);
+  doc.addText(line.page, text, request(line.families, line.bold, line.italic), line.size, line.x, line.y, line.angle, line.color);
+}

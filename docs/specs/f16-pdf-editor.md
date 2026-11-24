@@ -287,6 +287,44 @@ Engine support for reading and editing existing Hindi and Arabic lines is specif
 - **AC-37 (P1)** Tab order can be set by rows, columns or custom drag, and the output's widget order follows it.
 - **AC-38 (P2)** (improvement) "Detect fields" proposes fields on underscore lines and boxes on **all pages**; on a page that already has fields it proposes only the new ones (no duplicates, no error); the user accepts or rejects each.
 - **AC-39 (P1)** Form fields and annotations can be added on `rotated-90.pdf` (the reference refuses).
+
+#### Forms detail (E3 forms slice, 2026-11-24). Each refines the AC in brackets
+Reference behaviour these beat (`f16-reference-live-checks.md` §4, recording 1:50–2:24): detection uploads the file and runs on the page in view only, refuses pages that already have fields, turns a signature line into a plain text field and names fields with a random suffix; the signature box comes with a blocking warning; fields cannot go on rotated pages.
+
+Second live run (2026-11-24, one task, our `apps/web/tests/fixtures/forms/detect-mix.pdf`; screenshots in project files `designs/editor-forms/sejda-detect/`): detection took about 17 s behind a server "Analyzing your document" overlay and reported "Detected 13 form fields on page 1"; pages 2 and 3 were never looked at. The 13 kinds were right (4 text, a box row, a multi-line box, a 3-button radio group named from its question, 2 checkboxes, 2 lines), but the placement and settings were not:
+- Text fields for drawn lines, underscores and dotted leaders were thin slivers about 6 pt tall **below** the line, not on it.
+- The signature and date fields under their lines **covered the labels** "Signature" and "Date", and the signature line became a plain text field again.
+- The row of 6 PIN boxes became an ordinary text field: "divide into boxes" was off and still showed the default 8, with max length 20.
+- No field got a tooltip, and every name had a random suffix (`full_name_2u3c`, `member_type_1c8p`).
+
+Fill
+- **AC-230 (P0)** [AC-34] Every field type in an existing AcroForm is read with its full name, kind, value, default, options, flags and each widget's page and box: text (single line, multiline, comb, max length), dropdown (editable or not), list (single or multi-select), radio group (export value per button), checkbox, signature and push button (shown, not editable). Fields from inherited parents (`Parent`/`Kids`) are read as one field.
+- **AC-231 (P0)** [AC-34] Filled values are written as `V` with a fresh appearance stream for each changed field, so pdf.js and PDFium show them without relying on `NeedAppearances`. Fields the user did not touch keep their original appearance byte for byte.
+- **AC-232 (P1)** [AC-34] (improvement) Values outside WinAnsi (for example "Zoë Šťastná", "Ирина", "₹ 5,000") show correctly in the output appearance: the field's font is an embedded open font that covers them, never "?" or a blank box.
+  - Note (code review, 24 Nov): one AcroForm field draws with one font, and the Noto files are split by script, so a single value that mixes scripts no one file covers (for example "Ирина Smith") still shows "?" for one script and is reported as missing glyphs. Follow-up: a hand-drawn appearance that switches fonts per run.
+- **AC-233 (P1)** [AC-34] Read-only fields cannot be changed. Max length is enforced while typing. A required field left empty is flagged inline before download, without blocking it.
+
+Create and edit
+- **AC-234 (P1)** [AC-35] Each new field kind gives the right AcroForm structure: text `Tx` (multiline, comb with N boxes, max length), dropdown `Ch` combo, list `Ch` (multi-select), radio `Btn` group with one widget per option and its own export value, checkbox `Btn` with export value `Yes`, signature `Sig`. Properties: name, tooltip (`TU`), default value, required, read-only, font size (auto or fixed), alignment, text colour, border colour and width, background colour.
+- **AC-235 (P1)** [AC-36] (improvement) Field names are checked as they are typed: an inline note flags a duplicate or a name with a dot, and suggests the next free name (`full_name_2`). "Repeat on all pages" makes one field with one widget per page, so a value typed once shows on every page.
+- **AC-236 (P1)** [AC-35] Editing an existing field (rename, move, resize, new options) keeps its value and its other widgets. Deleting a field removes it from the AcroForm and every widget from its page.
+- **AC-237 (P1)** [AC-63] (improvement) A new signature field has its own appearance (a dashed border and a "Sign here" label in the field), which pdf.js and PDFium both draw. No warning dialog is shown.
+- **AC-238 (P1)** [AC-39] (improvement) Fields can be added on pages turned 90°, 180° and 270° and on pages whose crop box does not start at 0,0. Each lands where it was drawn and its text reads upright for the reader (`MK /R` matches the page turn).
+- **AC-239 (P1)** [AC-37] Tab order offers sort by rows, sort by columns, restore original and custom order. The output's `/Annots` order on each page follows it, `/Tabs` is `/R` or `/C` for the two sorts, and the AcroForm `/Fields` list follows the same order.
+
+Detect fields
+- **AC-240 (P1)** [AC-38, AC-77] Detect fields runs on **every page** in the browser: no network request is made, the code loads only when Detect is used (its own worker chunk, so the editor's first load does not grow), progress shows page n of N, and it can be cancelled. On a desktop it takes under 0.5 s per page.
+- **AC-241 (P1)** [AC-77] On `report-form-3p.pdf` it proposes exactly 7 fields, all on page 2: text fields `full_name`, `email_address`, `phone`, `date_of_birth` sitting on their lines, checkboxes `i_agree_to_the_terms` and `send_me_updates` over their boxes (overlap ≥ 80%), and a **signature** field `signature`. Each field's tooltip is its label. Pages 1 and 3 get none.
+- **AC-242 (P1)** [AC-38] (improvement) It finds, on `detect-mix.pdf`: drawn lines, underscore runs (`_____`), dotted leaders (`.......`), empty boxes (multi-line when tall), a row of equal boxes as one **comb** field with max length equal to the number of boxes, check squares and `☐`, and circles as one **radio group** named from its question. A date label gives a tooltip with the date format.
+- **AC-243 (P1)** [AC-38] (improvement) No proposals on separators that span the text column, underlined words, table cells that hold text, or page borders (`detect-mix.pdf` page 2 has all four).
+- **AC-244 (P1)** [AC-38] (improvement) On a page that already has fields it proposes only new ones: a proposal overlapping an existing widget is dropped, and nothing blocks. The result line says how many fields were found on how many pages.
+- **AC-245 (P2)** [AC-38] (improvement) Scanned pages with no text layer still get lines and boxes, named by kind (`text_1`, `checkbox_1`).
+- **AC-246 (P1)** [AC-38] Proposals show as outlines the user accepts or rejects one by one or all at once. Accepting is one undo step and makes normal fields.
+
+Output
+- **AC-247 (P0)** [AC-46] Every output from fill, create and detect passes qpdf's check (via pikepdf) and draws its fields in pdf.js with appearance streams.
+
+Build note: the field model, reader, writer, tab order and detection live in `apps/web/src/lib/forms/` and depend only on pdf-lib and pdfjs-dist. Field boxes use the editor's page frame (points, origin at the top-left of the unrotated visible page box, y down, keyed by page id), and `applyForms` is the one call the editor's download build makes after drawing objects.
 - **AC-40 (P2)** `xfa-only.pdf` shows a banner explaining limited support and does not crash.
 
 ### Pages
@@ -344,7 +382,7 @@ Engine support for reading and editing existing Hindi and Arabic lines is specif
 - **AC-50 (P1)** Motion respects `prefers-reduced-motion`.
 
 ### Performance
-- **AC-51 (P1)** The editor engine (WASM) is not downloaded until the editor opens a file; editor route JS (excluding WASM) ≤ 250 KB gzip.
+- **AC-51 (P1)** The editor engine (WASM) never blocks the landing page: it is not part of first load, and it is fetched only at low priority, after the landing has loaded and the browser is idle (U-E13), or when a file is picked. With Data Saver on or on a 2g connection it waits for the pick or for intent (hovering or focusing the picker). The landing's first-load JS stays within the 150 KB tool budget, and the editor chunk (JS excluding pdf.js, fonts and WASM) is ≤ 250 KB gzip. *(Revised after the E1 eval: the idle prefetch is by design, so Edit text is ready when the user reaches it.)*
 - **AC-52 (P1)** Lighthouse mobile performance ≥ 90 on the editor's empty state.
 
 ## 10. Improvements (research step)
@@ -865,3 +903,57 @@ Numbered after the recording ACs (53–73) and the live-check ACs (74–84). The
 3. **Focus mode and the site header.** The editor covers the site header while a file is open (the berry mark in the top bar links home). The thread fixing the shared tool layout should confirm that this doesn't conflict with its header rules.
 4. **AC-6 vs AC-90.** AC-6 (1.5 s, `para-times.pdf`) and AC-90 (< 1 s, 10 pages) overlap. The suggestion is to keep both: AC-6 as P0 parity, AC-90 as the "beat it" target.
 5. **Signature faces.** Choose the 8 OFL handwriting families (candidates to check per font: Caveat, Dancing Script, Great Vibes, Homemade Apple (Apache-2.0), Kalam, Sacramento, Satisfy (Apache-2.0), Yellowtail (Apache-2.0)). Each one's licence must be confirmed before it's added.
+
+## UI (phase E3 forms slice)
+
+Designed 2026-11-24 in the forms thread. It builds on the E1 contract above: same rail, popover, context strip, snapping, undo and motion rules. Logic lives in `apps/web/src/lib/forms/`; the components go in `apps/web/src/tools/forms/` and plug into the editor shell after #25.
+
+### U-F1. Entry points
+- **Form tool** (Phosphor `textbox`, key **F**): its own rail slot between Sign and Mark (lead's decision, 2026-11-24), which makes the rail 11 slots. On phones it lives in the **More** sheet, not the priority dock, since creating fields on a phone is rare and filling needs no tool.
+- **Filling never needs the Form tool.** With any tool, clicking a field of the file types into it (text, dropdown, list), toggles it (checkbox, radio) or opens the Sign dialog (signature field, which places the signature inside the field box). **Tab** and Shift+Tab move between fields in tab order, across pages.
+- When the file has fields, a one-line chip in the top bar reads "12 fields" and opens a "Next empty field" jump. When required fields are empty at Download, the chip turns to "2 required empty". Download still goes ahead; the chip is a nudge, not a block (AC-233).
+
+### U-F2. Form tool options (top-bar slot, or the context strip below 1024)
+`SegmentedControl` of kinds (icons with tooltips): Text `textbox`, Multi-line `text-align-left`, Checkbox `check-square`, Radio `radio-button`, Dropdown `caret-circle-down`, List `list-bullets`, Signature `signature`. Then a divider and two buttons: **Detect** (`sparkle`) and **Tab order** (`list-numbers`).
+- Create gesture: drag a box. A click without a drag gives the kind's default size (`defaultSize` in model.ts) centred on the click. Radio: each click while the new group is selected adds a button to the same group. Shift+click starts a new group.
+- The tool stays armed (forms are repetitive). Escape returns to Select.
+- While the Form tool is active, every field shows its outline and name tag (10 px, muted). Outside it, fields show only the light fill.
+
+### U-F3. Field look on the canvas (editor only, never saved)
+- Fill: `--blueberry` at 8% (a light blue), with a 1 px `--blueberry` 40% outline on hover. Required fields carry a 6 px berry dot at the top-right corner (not colour alone: it has a "Required" tooltip and an `aria-required`).
+- Proposed fields (Detect): a 1.5 px dashed `--brand` outline, a 12% fill, and a small ✓ / ✕ pair at the top-right (24 px hit area, 44 px on coarse pointers).
+- The first time a file with fields opens, an inline toast says "Field shading shows in the editor only". It shows once per device, never in a modal (AC-65).
+
+### U-F4. Field properties popover (selected field, Form tool or Select)
+| Kind | Popover controls (in order) | ⋯ menu |
+|---|---|---|
+| Text | Name (inline field), Required, Size (auto / −field+), Colour, Delete | Tooltip, Default value, Max length, Comb (N boxes, with N = max length), Multi-line, Align, Border, Background, Read-only, Repeat on all pages, Duplicate |
+| Checkbox | Name, Required, Delete | Export value, Checked by default, Border, Background, Read-only, Repeat on all pages, Duplicate |
+| Radio | Group name, This button's value, Add button, Delete | Required, Selected by default, Border, Background, Read-only |
+| Dropdown / List | Name, Options (opens a small list editor: one per line, drag to reorder, default marked with a radio), Delete | Editable (dropdown), Multi-select (list), Size, Colour, Required, Read-only, Tooltip, Duplicate |
+| Signature | Name, Required, Delete | Tooltip, Repeat on all pages, Duplicate |
+- The name field checks as the user types (`checkName`). A duplicate, a dot or an empty name shows a one-line note under the field with the suggested name as a button ("Use full_name_2"). The note uses no colour alone: it has a ⚠ icon and text (AC-235).
+- A multi-line hint: when a single-line text field is drawn taller than 2.5 lines of its font size, a quiet chip offers "Make multi-line".
+
+### U-F5. Detect fields flow (AC-240, AC-244, AC-246)
+1. Detect asks nothing. It runs at once on every page, and the button turns into a jam-progress ring with "Page n of N" and a ✕ that cancels. The editor stays usable: pages scroll and nothing is locked.
+2. Results arrive per page, and outlines fade in (150 ms) as each page finishes.
+3. A **review pill** floats above the view pill. It reads "13 fields on 2 pages", with ‹ › to step through proposals (scrolling to each and focusing its ✓), then **Add all** (berry) and **Discard**. Enter on a focused proposal accepts it and Delete rejects it.
+4. Accepting one, or Add all, is one undo step and turns the proposals into normal fields (now selected and editable). When none are found, the pill says "No new fields found" and fades after 3 s.
+5. On pages that already have fields, only new proposals appear. The pill counts only those (AC-244).
+
+### U-F6. Tab order panel (AC-239)
+- It opens as the side panel's third segment, **Pages | Objects | Tab order**, so it never covers the page. On phones it's a sheet.
+- Buttons: **Rows**, **Columns** and **Original**. Under them is a list of chips grouped by page (name, kind icon and number), draggable, with keyboard support: Space picks a chip up, arrows move it, and Space drops it.
+- **While the panel is open, every field on the canvas shows its number in a badge.** Clicking fields in sequence renumbers them from the one clicked ("click to set order"). This beats a list-only dialog: the order is visible where the fields are.
+
+### U-F7. Phone (390 × 844)
+The Form tool is reached from More. Its options become the context strip: 4 kinds plus ⋯, with Detect and Tab order inside ⋯. The review pill is full width above the dock. Properties use the existing bottom sheet. No control is wider than the viewport (AC-98).
+
+### U-F8. UI acceptance criteria
+- **AC-248 (P0)** Fields of an opened file can be filled with any tool active: typing into text fields, picking in dropdowns and lists, and toggling checkboxes and radios. Tab and Shift+Tab follow the tab order across pages. The download carries the values (AC-231).
+- **AC-249 (P1)** With the Form tool, a drag creates the chosen kind at the dragged box, and a click creates the default size. The field is selected with its properties popover open, and Delete, nudge keys, duplicate, snapping and undo work as for other objects.
+- **AC-250 (P1)** The Detect review pill shows the count, steps through proposals, and accepts or discards one or all. Accept all is one undo step. Cancel during the run stops it and leaves no proposals.
+- **AC-251 (P1)** With the Tab order panel open, every field shows its number on the canvas, and dragging a chip in the list renumbers the badges at once.
+- **AC-253 (P0)** The 11-slot rail fits the first screen at 1366×657 with no scroll (spacing tightens on short screens; Form keeps its place), asserted in the viewport-fit e2e with a screenshot. At 390×844 the dock keeps its E1 count and Form is in More.
+- **AC-252 (P1)** Field shading, outlines, name tags, badges and proposal outlines never appear in the downloaded file (render diff of an untouched page area against the source).

@@ -349,6 +349,20 @@ export function LineEditBox({
   }
   const [r, g, b] = line.runs[0]?.color ?? [17, 17, 17];
   const info = text.fonts[first];
+  // The ring and the paper are painted inside the box, over the line's own band only: where a
+  // neighbouring line's text reaches into the box they stop short of it and that side stays open.
+  // The ring is thinner on small text.
+  const w = fontSize < 11 ? 1 : 2;
+  const band = Math.max(0, box.height - paperInset.top - paperInset.bottom);
+  const brand = "linear-gradient(var(--color-brand), var(--color-brand))";
+  const paperFill = `linear-gradient(${paperColor ?? "#ffffff"}, ${paperColor ?? "#ffffff"})`;
+  const layers: [image: string, position: string, size: string][] = [
+    [brand, `0 ${paperInset.top}px`, `${w}px ${band}px`],
+    [brand, `100% ${paperInset.top}px`, `${w}px ${band}px`],
+    ...(paperInset.top > 0 ? [] : ([[brand, "0 0", `100% ${w}px`]] as [string, string, string][])),
+    ...(paperInset.bottom > 0 ? [] : ([[brand, "0 100%", `100% ${w}px`]] as [string, string, string][])),
+    [paperFill, `0 ${paperInset.top}px`, `100% ${band}px`],
+  ];
   const type: CSSProperties = {
     minWidth: box.transform ? "100%" : box.width,
     maxWidth: box.transform ? "100%" : Math.max(box.width, maxWidth),
@@ -366,11 +380,10 @@ export function LineEditBox({
       ? {
           color: `rgb(${r} ${g} ${b})`,
           caretColor: `rgb(${r} ${g} ${b})`,
-          // The paper covers the line's own band only: never a neighbouring line's text.
-          backgroundImage: `linear-gradient(${paperColor ?? "#ffffff"}, ${paperColor ?? "#ffffff"})`,
+          backgroundImage: layers.map((l) => l[0]).join(", "),
           backgroundRepeat: "no-repeat",
-          backgroundPosition: `0 ${paperInset.top}px`,
-          backgroundSize: `100% ${Math.max(0, box.height - paperInset.top - paperInset.bottom)}px`,
+          backgroundPosition: layers.map((l) => l[1]).join(", "),
+          backgroundSize: layers.map((l) => l[2]).join(", "),
         }
       : null),
     ...fit,
@@ -417,7 +430,8 @@ export function LineEditBox({
         data-face={firstFace ? firstFace.kind : first in faces ? "none" : "pending"}
         data-faces={fontIds.map((i) => faces[i]?.kind ?? (i in faces ? "none" : "pending")).join(" ")}
         data-missing={missing?.chars.join("") ?? ""}
-        className={cx("ed-input absolute left-0 top-0 rounded-[4px] outline-2 outline-brand", settling && "ed-input--settling")}
+        data-open={[paperInset.top > 0 && "top", paperInset.bottom > 0 && "bottom"].filter(Boolean).join(" ")}
+        className={cx("ed-input absolute left-0 top-0 rounded-[4px]", settling && "ed-input--settling")}
         style={type}
         onInput={(e) => {
           touched.current = true;

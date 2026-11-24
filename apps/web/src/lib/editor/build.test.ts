@@ -3,11 +3,16 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import fontkit from "@cantoo/fontkit";
 import { PDFArray, PDFDict, PDFDocument, PDFName, StandardFonts, degrees } from "@cantoo/pdf-lib";
-import { describe, expect, it } from "vitest";
-import { arrowHead, boxPoint, buildPdf, hexToRgb, quadPoints, toPdf, type BuildFonts } from "./build";
+import { describe, expect, it, vi } from "vitest";
+import { arrowHead, boxPoint, buildPdf, hexToRgb, quadPoints, shapedLayers, toPdf, type BuildFonts, type DeferShaped } from "./build";
+import type { BerryDocument } from "./berry-engine";
+import { buildShaped, familyOf, type ShapingEngine } from "./shaped-text";
+import type { ShapingManifest } from "./shaping";
 import config from "./fonts.json";
 import type { EditorFontManifest } from "./fonts";
-import { initialPages, type EditorObject, type PageEntry } from "./model";
+import { addField, createField, setValue } from "@/lib/forms/model";
+import { readFormFromBytes } from "@/lib/forms/read";
+import { duplicatePage, initialPages, type DocState, type EditorObject, type PageEntry } from "./model";
 import { baselineOffset } from "./text-layout";
 
 const require = createRequire(import.meta.url);
@@ -235,5 +240,234 @@ describe("buildPdf", () => {
     const { texts } = await pdfText(out);
     expect(texts[0]).not.toContain("only on the copy");
     expect(texts[1]).toContain("only on the copy");
+  });
+  it("with no form, a copy moved before its original keeps content, annotations and objects on the right pages", async () => {
+    const fonts = await nodeFonts();
+    const src = await PDFDocument.load(await source());
+    // A link annotation on page 1 that every copy should carry.
+    const link = src.context.obj({ Type: "Annot", Subtype: "Link", Rect: [50, 50, 150, 80], Border: [0, 0, 0] });
+    src.getPage(0).node.set(PDFName.of("Annots"), src.context.obj([src.context.register(link)]));
+    const bytes = await src.save();
+    const pages = initialPages(Array.from({ length: 3 }, (_, i) => ({ view: [0, 0, 600, 800] as [number, number, number, number], rotate: i === 2 ? 90 : 0 })));
+    const copy: PageEntry = { ...pages[0], id: "copy", rotate: 90 };
+    const order = [copy, pages[1], pages[0]];
+    const objects: EditorObject[] = [
+      { kind: "shape", id: "on-copy", page: "copy", shape: "rect", x: 10, y: 10, w: 50, h: 50, rot: 0, stroke: "#000000", fill: "#ff0000", width: 1 },
+      { kind: "shape", id: "on-original", page: "p0", shape: "rect", x: 10, y: 10, w: 50, h: 50, rot: 0, stroke: "#000000", fill: "#0000ff", width: 1 },
+    ];
+    const out = await buildPdf({ bytes, pages: order, objects, assets: {} }, fonts, fontkit);
+    const doc = await PDFDocument.load(out);
+    expect(doc.getPageCount()).toBe(3);
+    expect(doc.getPages().map((p) => p.getRotation().angle)).toEqual([90, 0, 0]);
+    const { texts } = await pdfText(out);
+    expect(texts).toEqual([expect.stringContaining("Original page 1"), expect.stringContaining("Original page 2"), expect.stringContaining("Original page 1")]);
+    const links = (i: number) => (doc.getPage(i).node.lookup(PDFName.of("Annots"), PDFArray)?.size() ?? 0);
+    expect([links(0), links(1), links(2)]).toEqual([1, 0, 1]);
+    // Each copy got only its own object: red on page 1, blue on page 3.
+    const fills = async (i: number) => {
+      const c = doc.getPage(i).node.Contents();
+      const raw = c instanceof PDFArray ? c.asArray().map((r) => doc.context.lookup(r)) : [c];
+      const { decodePDFRawStream } = await import("@cantoo/pdf-lib");
+      return raw.map((x) => new TextDecoder().decode(decodePDFRawStream(x as never).decode())).join("\n");
+    };
+    expect(await fills(0)).toMatch(/1 0 0 rg/);
+    expect(await fills(0)).not.toMatch(/0 0 1 rg/);
+    expect(await fills(2)).toMatch(/0 0 1 rg/);
+    expect(await fills(2)).not.toMatch(/1 0 0 rg/);
+  });
+
+  it("writes form changes with page actions: filled values, new fields, and widgets on a duplicated page (F16 E3)", async () => {
+    const fonts = await nodeFonts();
+    const src = await PDFDocument.create();
+    for (let i = 0; i < 2; i++) src.addPage([600, 800]);
+    const tf = src.getForm().createTextField("name");
+    tf.addToPage(src.getPage(0), { x: 50, y: 700, width: 200, height: 20 });
+    const bytes = await src.save();
+    const { form } = await readFormFromBytes(bytes);
+    const pages = initialPages(Array.from({ length: 2 }, () => ({ view: [0, 0, 600, 800] as [number, number, number, number], rotate: 0 })));
+    let doc: DocState = { pages, objects: [], engine: 0, forms: form };
+    doc = duplicatePage(doc, "p0").state;
+    const copy = doc.pages[1];
+    expect(copy.src).toBe(0);
+    let state = doc.forms!;
+    expect(state.fields[0].widgets.map((w) => w.page)).toEqual(["p0", copy.id]);
+    state = setValue(state, state.fields[0].id, "Ada").state;
+    const box = createField(state, { kind: "checkbox", page: "p1", box: { x: 40, y: 40, w: 14, h: 14 } });
+    state = addField(state, box);
+    // Reverse the order too: widgets follow their pages.
+    const order = [doc.pages[2], doc.pages[1], doc.pages[0]];
+    const out = await buildPdf({ bytes, pages: order, objects: [], assets: {}, forms: { state, original: form } }, fonts, fontkit);
+    const back = await PDFDocument.load(out);
+    const f = back.getForm();
+    expect(f.getTextField("name").getText()).toBe("Ada");
+    expect(f.getCheckBox(box.name).isChecked()).toBe(false);
+    const widgets = f.getTextField("name").acroField.getWidgets();
+    expect(widgets).toHaveLength(2);
+    const outPages = back.getPages();
+    const onPage = (i: number) => (outPages[i].node.Annots()?.asArray() ?? []).length;
+    // Page order out: p1 (checkbox), the copy (name), p0 (name). No stray widgets from the copy.
+    expect([onPage(0), onPage(1), onPage(2)]).toEqual([1, 1, 1]);
+    const pRefs = widgets.map((w) => w.P());
+    expect(new Set(pRefs.map(String)).size).toBe(2);
+    expect(pRefs.every((r) => outPages.some((p) => p.ref === r))).toBe(true);
+  });
+});
+
+// ---- complex scripts (AC-224) -------------------------------------------------------------------
+
+/** The shaping build of the engine, straight from public/engine (copied there by the engine build). */
+async function shapingEngine(): Promise<ShapingEngine> {
+  const dir = new URL("../../../public/engine/", import.meta.url);
+  const mod = (await import(/* @vite-ignore */ new URL("berry_engine_shaping.js", dir).href)) as ShapingEngine & { initSync: (o: { module: BufferSource }) => unknown };
+  mod.initSync({ module: await readFile(new URL("berry_engine_shaping_bg.wasm", dir)) });
+  return mod;
+}
+
+/** The shaping fonts the way scripts/copy-fonts.mjs lists them, read from node_modules. */
+async function nodeShapingFonts(): Promise<{ manifest: ShapingManifest; load: (url: string) => Promise<Uint8Array> }> {
+  const list = [
+    { family: "Noto Naskh Arabic", pkg: "noto-naskh-arabic", key: "arabic" },
+    { family: "Noto Sans Devanagari", pkg: "noto-sans", key: "devanagari" },
+    { family: "Noto Sans", pkg: "noto-sans", key: "latin" },
+  ];
+  const where = new Map<string, string>();
+  const fonts = [];
+  for (const { family, pkg, key } of list) {
+    const root = dirname(require.resolve(`@fontsource/${pkg}/package.json`));
+    const unicode = JSON.parse(await readFile(join(root, "unicode.json"), "utf8"));
+    const url = `/fonts/x/${pkg}-${key}-400-normal.woff`;
+    where.set(url, join(root, "files", `${pkg}-${key}-400-normal.woff`));
+    fonts.push({ family, url, ranges: parse(unicode[key]) });
+  }
+  return { manifest: { fonts }, load: async (u) => new Uint8Array(await readFile(where.get(u)!)) };
+}
+
+describe("complex-script text (AC-224)", () => {
+  const pages = initialPages([{ view: [0, 0, 600, 800], rotate: 0 }]);
+  const box = { kind: "text", id: "t", page: "p0", x: 100, y: 200, wrap: null, w: 200, h: 40, rot: 0, font: "arimo", size: 14, bold: false, italic: false, underline: false, color: "#c80000" } as const;
+
+  it("leaves lines that need shaping to the engine, placed by their shaped width", async () => {
+    const fonts = await nodeFonts();
+    const objects: EditorObject[] = [{ ...box, lines: ["Total: 5", "مرحبا بالعالم"], text: "Total: 5\nمرحبا بالعالم", align: "right" }];
+    const defer: DeferShaped = { measure: () => 50, family: familyOf, lines: [] };
+    const out = await buildPdf({ bytes: await source(), pages, objects, assets: {} }, fonts, fontkit, defer);
+    const { texts } = await pdfText(out);
+    expect(texts[0]).toContain("Total: 5");
+    expect(texts[0]).not.toMatch(/[\u0600-\u06ff]/);
+    expect(defer.lines).toHaveLength(1);
+    const face = fonts.manifestValue.faces.arimo["400-normal"];
+    const [line] = defer.lines;
+    expect(line).toMatchObject({ page: 0, text: "مرحبا بالعالم", font: "arimo", families: ["Arimo", "Noto Sans"], size: 14, angle: -0, color: [200, 0, 0] });
+    // Right aligned: x = right − width.
+    expect(line.x).toBeCloseTo(100 + 200 - 50, 5);
+    expect(line.y).toBeCloseTo(800 - 200 - baselineOffset(face, 14, 1), 5);
+  });
+
+  it("draws Arabic and Hindi with the shaping engine, as real text in reading order", async () => {
+    const fonts = await nodeFonts();
+    const shaping = await nodeShapingFonts();
+    const engine = await shapingEngine();
+    const objects: EditorObject[] = [
+      { ...box, lines: ["Invoice 42", "مرحبا بالعالم", "नमस्ते दुनिया, धर्म और कार्य"], text: "", align: "right" },
+    ];
+    const bytes = await source();
+    const out = await buildShaped(
+      { bytes, objects },
+      { engine: async () => engine, editorManifest: fonts.manifest, shapingManifest: async () => shaping.manifest, loadFace: fonts.load, loadUrl: shaping.load },
+      (b, defer, pass) => buildPdf({ bytes: b, pages, objects, assets: {} }, fonts, fontkit, defer, pass),
+    );
+    const doc: BerryDocument = new engine.BerryDocument(out);
+    try {
+      const lines = doc.pageText(0).lines;
+      const arabic = lines.find((l) => l.text.includes("مرحبا"));
+      const hindi = lines.find((l) => l.text.includes("नमस्ते"));
+      expect(arabic?.text).toBe("مرحبا بالعالم");
+      expect(arabic?.direction).toBe("rtl");
+      expect(hindi?.text).toBe("नमस्ते दुनिया, धर्म और कार्य");
+      // Both end at the box's right edge (x = right − shaped width).
+      expect(arabic!.bbox.x1).toBeCloseTo(300, 0);
+      expect(hindi!.bbox.x1).toBeCloseTo(300, 0);
+      expect(arabic!.runs[0].color).toEqual([200, 0, 0]);
+      const families = doc.pageText(0).fonts.map((f) => f.name).join(" ");
+      expect(families).toMatch(/Naskh/);
+      expect(families).toMatch(/Devanagari/);
+    } finally {
+      doc.free();
+    }
+    expect((await pdfText(out)).texts[0]).toContain("Invoice 42");
+  });
+
+  const t = (id: string, page: string, line: string) => ({ ...box, id, page, lines: [line], text: line, align: "left" }) as EditorObject;
+  const w = (id: string, page: string) => ({ kind: "whiteout", id, page, x: 0, y: 0, w: 10, h: 10, fill: "#ffffff", border: null, borderWidth: 0 }) as unknown as EditorObject;
+  it("puts objects in z-order layers around shaped lines, per page", () => {
+    const { layers, count } = shapedLayers({ objects: [w("a", "p0"), t("s1", "p0", "مرحبا"), w("b", "p0"), t("l", "p1", "Latin"), t("s2", "p0", "नमस्ते"), w("c", "p0"), w("d", "p1")] });
+    expect(Object.fromEntries(layers)).toEqual({ a: 0, s1: 0, b: 1, l: 0, s2: 1, c: 2, d: 0 });
+    expect(count).toBe(3);
+  });
+
+  it("puts shaped boxes with nothing between them in one engine pass", () => {
+    const { layers, count } = shapedLayers({ objects: [t("s1", "p0", "مرحبا"), t("s2", "p0", "नमस्ते"), w("a", "p0"), t("s3", "p0", "مرحبا"), t("s4", "p0", "مرحبا")] });
+    expect(Object.fromEntries(layers)).toEqual({ s1: 0, s2: 0, a: 1, s3: 1, s4: 1 });
+    expect(count).toBe(2);
+  });
+
+  it("writes a filled form once, in the last pdf-lib pass, and keeps it through the engine passes", async () => {
+    const { pagesOf, readForm } = await import("@/lib/forms/read");
+    const { setValue } = await import("@/lib/forms/model");
+    const forms = await import("@/lib/forms/write");
+    const bytes = new Uint8Array(await readFile(new URL("../../../tests/fixtures/forms/form-basic.pdf", import.meta.url)));
+    const src = await PDFDocument.load(bytes);
+    const original = readForm(src, pagesOf(src));
+    const state = setValue(original, original.fields.find((f) => f.name === "name")!.id, "Asha Verma").state;
+    const formPages = initialPages(src.getPages().map((p) => ({ view: [0, 0, p.getWidth(), p.getHeight()] as [number, number, number, number], rotate: 0 })));
+    const fonts = await nodeFonts();
+    const shaping = await nodeShapingFonts();
+    const engine = await shapingEngine();
+    // Two layers: pdf-lib, the engine's Arabic line, pdf-lib again, then the engine.
+    const objects: EditorObject[] = [
+      { ...box, lines: ["مرحبا بالعالم"], text: "مرحبا بالعالم", align: "left" },
+      { kind: "whiteout", id: "w", page: "p0", x: 400, y: 700, w: 20, h: 20, fill: "#00ff00", border: null, borderWidth: 0 } as unknown as EditorObject,
+      { ...box, id: "t2", y: 600, lines: ["नमस्ते"], text: "नमस्ते", align: "left" },
+    ];
+    const spy = vi.spyOn(forms, "applyForms");
+    const passes: number[] = [];
+    const out = await buildShaped(
+      { bytes, objects },
+      { engine: async () => engine, editorManifest: fonts.manifest, shapingManifest: async () => shaping.manifest, loadFace: fonts.load, loadUrl: shaping.load },
+      (b, defer, pass) => {
+        passes.push(pass.layer);
+        return buildPdf({ bytes: b, pages: formPages, objects, assets: {}, forms: { state, original } }, fonts, fontkit, defer, pass);
+      },
+    );
+    expect(passes).toEqual([0, 1]);
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+    const back = readForm(await PDFDocument.load(out));
+    expect(back.fields.find((f) => f.name === "name")!.value).toBe("Asha Verma");
+    expect((await pdfText(out)).texts[0].replace(/\s+/g, "")).toContain("नमस्ते");
+  });
+
+  it("draws an object added after a shaped line over it (z-order)", async () => {
+    const fonts = await nodeFonts();
+    const shaping = await nodeShapingFonts();
+    const engine = await shapingEngine();
+    const objects: EditorObject[] = [
+      { ...box, lines: ["مرحبا بالعالم"], text: "مرحبا بالعالم", align: "left" },
+      { kind: "whiteout", id: "w", page: "p0", x: 90, y: 190, w: 240, h: 40, fill: "#00ff00", border: null, borderWidth: 0 } as unknown as EditorObject,
+    ];
+    const out = await buildShaped(
+      { bytes: await source(), objects },
+      { engine: async () => engine, editorManifest: fonts.manifest, shapingManifest: async () => shaping.manifest, loadFace: fonts.load, loadUrl: shaping.load },
+      (b, defer, pass) => buildPdf({ bytes: b, pages, objects, assets: {} }, fonts, fontkit, defer, pass),
+    );
+    const { getDocument, OPS } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const task = getDocument({ data: out.slice(), verbosity: 0 });
+    const ops = await (await (await task.promise).getPage(1)).getOperatorList();
+    await task.destroy();
+    const last = (op: number) => ops.fnArray.lastIndexOf(op);
+    const green = ops.fnArray.findLastIndex((f, i) => f === OPS.setFillRGBColor && /^#00ff00$/i.test(String(ops.argsArray[i]?.[0])));
+    expect(last(OPS.showText)).toBeGreaterThan(0);
+    // The whiteout's fill comes after the Arabic text in the page's drawing order.
+    expect(green).toBeGreaterThan(last(OPS.showText));
   });
 });

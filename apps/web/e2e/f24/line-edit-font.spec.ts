@@ -87,11 +87,13 @@ for (const [file, text, faces] of SAME_PLACE) {
     const input = await edit(page, line);
     await expect(input).toHaveAttribute("data-faces", faces);
     await expect(input).not.toHaveClass(/ed-input--settling/);
-    // Only the text is compared: the caret, the outline and the pointer are taken away.
+    // Only the text is compared: the caret, the ring and the pointer are taken away.
     await input.evaluate((el: HTMLElement) => {
       el.style.caretColor = "transparent";
-      el.style.outline = "none";
-      el.style.boxShadow = "none";
+      // (the ring is the first background layers; the paper is the last)
+      el.style.backgroundImage = el.style.backgroundImage.split("), ").slice(-1)[0]!;
+      el.style.backgroundPosition = el.style.backgroundPosition.split(", ").slice(-1)[0]!;
+      el.style.backgroundSize = el.style.backgroundSize.split(", ").slice(-1)[0]!;
     });
     await page.mouse.move(2, 2);
     const during = await ink(page, await page.screenshot({ clip }));
@@ -109,13 +111,13 @@ for (const [file, text, faces] of SAME_PLACE) {
   });
 }
 
-test("the paper under the edit box never covers the line below it (tight leading)", async ({ page }, info) => {
-  test.skip(info.project.name !== "desktop", "pixels are compared at one size");
+test("nothing of the edit box (paper, ring) covers the line below it, at any size (tight leading)", async ({ page }) => {
   await open(page, "chrome-justified-mixed.pdf");
   const next = lineWith(page, "and it stays in force");
   const nb = (await next.boundingBox())!;
-  // The lower two thirds of the next line: its own letters, clear of the edited line's descenders.
-  const clip = { x: Math.floor(nb.x) + 4, y: Math.floor(nb.y + nb.height * 0.35), width: Math.ceil(nb.width) - 8, height: Math.floor(nb.height * 0.6) };
+  // The next line's own text box: the line's hit area less its padding (15% of the text's height, 2px at least).
+  const pad = Math.max(2, (nb.height * 0.15) / 1.3);
+  const clip = { x: Math.floor(nb.x), y: Math.ceil(nb.y + pad) + 1, width: Math.ceil(nb.width), height: Math.floor(nb.height - 2 * pad) - 2 };
   await page.mouse.move(2, 2);
   let shot = await page.screenshot({ clip });
   await expect(async () => {
@@ -126,14 +128,15 @@ test("the paper under the edit box never covers the line below it (tight leading
     expect(same).toBe(true);
   }).toPass({ timeout: 10_000 });
   const input = await edit(page, lineWith(page, "This agreement is made"));
-  await input.evaluate((el: HTMLElement) => {
-    el.style.caretColor = "transparent";
-    el.style.outline = "none";
-    el.style.boxShadow = "none";
-  });
+  // The box is left exactly as a person sees it, ring and all; only the blinking caret is hidden.
+  await input.evaluate((el: HTMLElement) => (el.style.caretColor = "transparent"));
   await page.mouse.move(2, 2);
+  await expect(input).not.toHaveClass(/ed-input--settling/);
   // Not one pixel of the line below changes while the line above it is open.
   expect((await page.screenshot({ clip })).equals(shot)).toBe(true);
+  // The ring is inside the box, and open on the side the next line's text reaches into.
+  await expect(input).toHaveAttribute("data-open", /bottom/);
+  expect(await input.evaluate((el) => [getComputedStyle(el).outlineStyle, getComputedStyle(el).boxShadow])).toEqual(["none", "none"]);
   // And the hint goes over the box here, because text lies right under it.
   await page.keyboard.press("End");
   await page.keyboard.type("ř");
