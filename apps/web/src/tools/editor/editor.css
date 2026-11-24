@@ -715,6 +715,10 @@
   border-radius: inherit;
   background: #fff;
 }
+/* Before its first raster a page is a paper-tinted box at its final size, never a white flash (E1). */
+.ed-page:not(:has(.ed-raster)) {
+  background: #f7f0ed; /* pages stay light in dark mode */
+}
 .ed-raster {
   display: block;
   width: 100%;
@@ -1675,6 +1679,33 @@
   }
   .ed-popover {
     animation: ed-pop-in 140ms var(--ease-out) both;
+  }
+  /* Anchored panels (E3): fade and lift in from the trigger, fade out (the panel stays in the top
+     layer while it fades; Pop keeps its content, inert and hidden). */
+  .ed-pop[popover] {
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity 100ms var(--ease-in),
+      display 100ms allow-discrete,
+      overlay 100ms allow-discrete;
+  }
+  .ed-pop[popover]:popover-open {
+    opacity: 1;
+    pointer-events: auto;
+    transition:
+      opacity 140ms var(--ease-out),
+      transform 140ms var(--ease-out);
+  }
+  @starting-style {
+    .ed-pop[popover]:popover-open {
+      opacity: 0;
+      transform: translateY(var(--motion-nudge)) scale(0.96);
+    }
+  }
+  /* The line-edit box appears by opacity only, so the text never seems to move (E4). */
+  .ed-input {
+    animation: ed-fade var(--motion-micro) var(--ease-out) both;
   }
   .ed-options,
   .ed-strip {
