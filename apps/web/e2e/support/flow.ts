@@ -55,6 +55,10 @@ export async function dropFixtures(page: Page, names: string[], events: ("dragen
 export async function run(page: Page) {
   await primary(page).click();
   await expect(flow(page)).toHaveAttribute("data-state", "done", { timeout: 30_000 });
+  // data-state flips to "done" a render before the result exists: ResultCard is a lazy chunk, so
+  // the first "done" commit shows nothing. Wait for the card itself, so a check that runs next
+  // (e.g. axe after settled()) sees its entrance animation instead of an empty flow.
+  await expect(page.getByTestId("result")).toBeVisible();
 }
 
 export async function bytesOf(download: Download) {
