@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openCloudWindow, popupFeatures } from "./client";
 import { openWindowNow } from "./opener";
-import { channelName, FIRST_CONTACT_MS, TOOL_LOST_MS, WINDOW_LOST_MS, wrap } from "./protocol";
+import { AWAY_FOCUSED_MS, channelName, FIRST_CONTACT_MS, SIGN_IN_AWAY_MS, TOOL_LOST_MS, WINDOW_LOST_MS, wrap } from "./protocol";
 import { WindowLink } from "./window-link";
 
 /**
@@ -136,6 +136,56 @@ describe("openCloudWindow (tool tab)", () => {
     win.close();
   });
 
+  it("a sign-in page gets at most SIGN_IN_AWAY_MS, whatever the window asks for", async () => {
+    const onClosed = vi.fn();
+    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => false });
+    const win = peer();
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    win.postMessage(wrap("window", REQ, { t: "away", ms: 10 * 60_000 }));
+    await tick();
+    vi.advanceTimersByTime(SIGN_IN_AWAY_MS + FIRST_CONTACT_MS + 1000);
+    expect(onClosed).toHaveBeenCalledWith("lost");
+    win.close();
+  });
+
+  it("while the window is away, this tab in front and focused for AWAY_FOCUSED_MS ends the wait (the window was closed on the sign-in page)", async () => {
+    let focused = true;
+    const onClosed = vi.fn();
+    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => focused });
+    const win = peer();
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    win.postMessage(wrap("window", REQ, { t: "away", ms: 60_000 }));
+    await tick();
+    vi.advanceTimersByTime(AWAY_FOCUSED_MS - 2000);
+    focused = false; // the person went back to the sign-in window: the count starts over
+    vi.advanceTimersByTime(5000);
+    focused = true;
+    vi.advanceTimersByTime(AWAY_FOCUSED_MS - 2000);
+    expect(onClosed).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(3000);
+    expect(onClosed).toHaveBeenCalledWith("lost");
+    win.close();
+  });
+
+  it("a window back from its sign-in ('ready') is no longer away: focus here does not end it", async () => {
+    const onClosed = vi.fn();
+    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false, focused: () => true });
+    const win = peer();
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    win.postMessage(wrap("window", REQ, { t: "away", ms: 60_000 }));
+    await tick();
+    vi.advanceTimersByTime(5000);
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    await tick();
+    for (let i = 0; i < 40; i++) {
+      win.postMessage(wrap("window", REQ, { t: "hb" }));
+      await tick();
+      vi.advanceTimersByTime(1000);
+    }
+    expect(onClosed).not.toHaveBeenCalled();
+    win.close();
+  });
+
   it("a cancel from the window ends the session quietly", async () => {
     const onClosed = vi.fn();
     openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false });
@@ -244,6 +294,21 @@ describe("WindowLink (cloud window)", () => {
       if (e.data.t === "done") tool.postMessage(wrap("tool", REQ, { t: "ack" }));
     };
     await expect(link.finish(2000)).resolves.toBe(true);
+    link.close();
+    tool.close();
+  });
+
+  it("finish() with no ack: false, and the tool counts as lost; a late ack brings it back and counts for the next finish()", async () => {
+    const onToolLost = vi.fn();
+    const onToolBack = vi.fn();
+    const link = new WindowLink(REQ, { onToolLost, onToolBack }, { Channel });
+    const tool = peer();
+    await expect(link.finish(20)).resolves.toBe(false);
+    expect(link.toolLost).toBe(true);
+    expect(onToolLost).toHaveBeenCalledTimes(1);
+    tool.postMessage(wrap("tool", REQ, { t: "ack" }));
+    await vi.waitFor(() => expect(onToolBack).toHaveBeenCalledTimes(1));
+    await expect(link.finish(20)).resolves.toBe(true);
     link.close();
     tool.close();
   });

@@ -8,7 +8,7 @@ import { CheckIcon, CloseIcon, ShieldIcon } from "@/components/ui/icons";
 import { LiveRegion } from "@/components/ui/LiveRegion";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { DownloadError, downloadFile, runPool } from "@/lib/cloud/download";
-import { parseWindowParams, type WindowParams } from "@/lib/cloud/protocol";
+import { parseWindowParams, SIGN_IN_AWAY_MS, type WindowParams } from "@/lib/cloud/protocol";
 import { providerName, type CloudProvider, type CloudRoute } from "@/lib/cloud/providers";
 import { WindowLink } from "@/lib/cloud/window-link";
 import { transferCopy } from "../transfer-copy";
@@ -73,6 +73,8 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
   viewRef.current = view;
   /** Files the tool tab stopped: never downloaded, or dropped if one is under way (AC-136). */
   const stopped = useRef(new Set<string>());
+  /** Waiting for the tool tab's ack before saying "Added". */
+  const completing = useRef(false);
   const rowsRef = useRef<Row[]>([]);
   const link = useRef<WindowLink | null>(null);
   const adapter = useRef<Adapter | null>(null);
@@ -109,14 +111,21 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
 
   // ---- downloads ---------------------------------------------------------------------------------
   const checkComplete = useCallback(async () => {
-    if (finished.current) return;
+    if (finished.current || completing.current) return;
     const rs = rowsRef.current;
     if (!rs.length || rs.some((r) => r.status === "downloading" || r.status === "failed")) return;
     // The tool tab is not answering: nothing is "added" until it does (onToolBack checks again).
     if (link.current?.toolLost) return;
+    // "Added" only once the tool tab says it has everything (its ack). No ack: the files may have gone
+    // nowhere (the tab was closed or reloaded), so the rows stay under the lost-tool banner, and
+    // onToolBack tries again if the tab answers.
+    completing.current = true;
+    const acked = await link.current?.finish();
+    completing.current = false;
+    if (finished.current) return;
+    if (!acked) return setToolLost(true);
     finished.current = true;
     setView({ k: "done" });
-    await link.current?.finish();
     link.current?.close();
     closeSoon();
   }, [closeSoon]);
@@ -334,7 +343,7 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
           frameWait.current = resolve;
           setView({ k: "frame", spec, title });
         }),
-      leaving: () => l.away(10 * 60 * 1000),
+      leaving: () => l.away(SIGN_IN_AWAY_MS),
       mockPick: () =>
         new Promise<Picked[] | "cancel">((resolve, reject) => {
           mockResolve.current = (r) => {

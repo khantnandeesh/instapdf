@@ -9,7 +9,10 @@ import type { Adapter, AdapterCtx } from "./types";
 export const MOCK_TOKEN = "MOCK-TOKEN-F23";
 export const MOCK_LOG_KEY = "berrypdf:cloud-mock-log";
 const FOLDER_KEY = "berrypdf:cloud-mock-folder";
-/** Set to "1" (by a test) to sign in like OneDrive: a full-page redirect to /cloud/mock#code=…&state=… and back. */
+/**
+ * Set (by a test) to sign in like OneDrive: "1" is a full-page redirect to /cloud/mock#code=…&state=…
+ * and back; "hold" leaves for a page that never comes back (a sign-in page the person closes).
+ */
 export const MOCK_REDIRECT_KEY = "berrypdf:cloud-mock-redirect";
 const SIGNED_KEY = "berrypdf:cloud-mock-signed";
 const RETURN_KEY = "berrypdf:cloud-mock-return";
@@ -64,14 +67,14 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
   let token: string | null = null;
   /** Redirect sign-in mode: the first pick or save leaves for the sign-in page, then comes back here. */
   const signIn = async () => {
-    let on = false;
+    let mode: string | null = null;
     try {
-      on = localStorage.getItem(MOCK_REDIRECT_KEY) === "1";
+      mode = localStorage.getItem(MOCK_REDIRECT_KEY);
     } catch {}
-    if (!on || session.get(SIGNED_KEY) === "1") return;
+    if ((mode !== "1" && mode !== "hold") || session.get(SIGNED_KEY) === "1") return;
     session.set(RETURN_KEY, location.href);
     ctx.leaving();
-    location.assign(`/cloud/mock#code=MOCK&state=${ctx.params.req}`);
+    location.assign(mode === "hold" ? "/" : `/cloud/mock#code=MOCK&state=${ctx.params.req}`);
     await new Promise(() => {}); // the page navigates away
   };
   writeLog((l) => l.requests.push({ provider: ctx.params.provider, multiple: ctx.params.multiple, accept: ctx.params.accept, mode: ctx.params.mode ?? "pick" }));

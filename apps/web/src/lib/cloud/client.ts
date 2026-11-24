@@ -8,7 +8,7 @@
  * its timers are throttled there, and it re-checks once visible).
  */
 import { openWindowNow, popupFeatures, type OpenedWindow, type WindowParams } from "./opener";
-import { FIRST_CONTACT_MS, parseFromWindow, wrap, WINDOW_LOST_MS, type ErrorCode, type FromTool, type SkipReason } from "./protocol";
+import { AWAY_FOCUSED_MS, FIRST_CONTACT_MS, parseFromWindow, SIGN_IN_AWAY_MS, wrap, WINDOW_LOST_MS, type ErrorCode, type FromTool, type SkipReason } from "./protocol";
 import type { CloudRoute } from "./providers";
 
 export type SessionEvents = {
@@ -44,6 +44,8 @@ type Deps = {
   Channel?: typeof BroadcastChannel;
   now?: () => number;
   hidden?: () => boolean;
+  /** This tab is in front and has focus. */
+  focused?: () => boolean;
   setInterval?: (fn: () => void, ms: number) => unknown;
   clearInterval?: (h: unknown) => void;
   /** The window was already opened in the click handler (opener.ts): adopt its channel. */
@@ -55,6 +57,7 @@ export { popupFeatures };
 export function openCloudWindow(route: CloudRoute, params: WindowParams, events: SessionEvents, deps: Deps = {}): CloudSession | null {
   const now = deps.now ?? (() => Date.now());
   const hidden = deps.hidden ?? (() => typeof document !== "undefined" && document.visibilityState === "hidden");
+  const focused = deps.focused ?? (() => typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus());
   const setI = deps.setInterval ?? ((fn: () => void, ms: number) => setInterval(fn, ms));
   const clearI = deps.clearInterval ?? ((h: unknown) => clearInterval(h as ReturnType<typeof setInterval>));
   const opened = deps.opened ?? openWindowNow(route, params, deps);
@@ -65,6 +68,9 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
   let ready = false;
   let contacted = false;
   let lastSeen = now();
+  // Away on a sign-in page: since when this tab has been in front and focused (null: not now).
+  let away = false;
+  let focusedSince: number | null = null;
   // Save mode: kept until the session ends, and sent on every "ready": a window back from a
   // full-page sign-in (OneDrive) is a new page that has not seen it (it ignores a repeat).
   let saveFile: File | null = null;
@@ -95,6 +101,7 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
     switch (m.t) {
       case "ready":
         ready = true;
+        away = false;
         events.onReady?.();
         if (saveFile) post({ t: "save", file: saveFile });
         break;
@@ -103,8 +110,10 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
         break;
       case "away":
         // A full-page sign-in: silence is expected until the window comes back (it sends "ready" again).
-        lastSeen = now() + m.ms;
+        lastSeen = now() + Math.min(m.ms, SIGN_IN_AWAY_MS);
         contacted = false;
+        away = true;
+        focusedSince = null;
         break;
       case "progress":
         events.onProgress?.(m.id, m.name, m.loaded, m.total);
@@ -143,7 +152,18 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
   for (const e of buffered.splice(0)) onMessage(e);
 
   const timer = setI(() => {
-    if (ended || hidden()) return;
+    if (ended) return;
+    if (away) {
+      // Back here for AWAY_FOCUSED_MS while the window says nothing: it was closed on the sign-in page.
+      if (!focused()) focusedSince = null;
+      else if (focusedSince === null) focusedSince = now();
+      else if (now() - focusedSince >= AWAY_FOCUSED_MS) {
+        end();
+        events.onClosed?.("lost");
+        return;
+      }
+    }
+    if (hidden()) return;
     const limit = contacted ? WINDOW_LOST_MS : FIRST_CONTACT_MS;
     if (now() > lastSeen && now() - lastSeen > limit) {
       end();

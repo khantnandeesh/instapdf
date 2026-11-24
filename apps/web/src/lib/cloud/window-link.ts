@@ -26,6 +26,7 @@ export class WindowLink {
   private isAway = false;
   private lost = false;
   private ackWaiters: (() => void)[] = [];
+  private acked = false;
   private now: () => number;
 
   constructor(
@@ -64,10 +65,21 @@ export class WindowLink {
     if (!this.finished || m.t === "cancel") this.channel.postMessage(wrap("window", this.req, m));
   }
 
-  /** Every file handed over: tell the tool and wait for its ack (or `timeoutMs`). */
-  finish(timeoutMs = 1500): Promise<boolean> {
+  /**
+   * Every file handed over: tell the tool and wait for its ack. No ack within `timeoutMs`: false,
+   * and the tool counts as lost (onToolBack once it answers again). An ack that came late still
+   * counts the next time.
+   */
+  finish(timeoutMs = 3000): Promise<boolean> {
     return new Promise((resolve) => {
-      const t = setTimeout(() => resolve(false), timeoutMs);
+      if (this.acked) return resolve(true);
+      const t = setTimeout(() => {
+        if (!this.lost) {
+          this.lost = true;
+          this.events.onToolLost?.();
+        }
+        resolve(false);
+      }, timeoutMs);
       this.ackWaiters.push(() => {
         clearTimeout(t);
         resolve(true);
@@ -123,6 +135,7 @@ export class WindowLink {
     }
     switch (m.t) {
       case "ack":
+        this.acked = true;
         this.ackWaiters.splice(0).forEach((f) => f());
         break;
       case "cancel":
