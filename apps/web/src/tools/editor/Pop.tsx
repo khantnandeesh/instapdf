@@ -57,7 +57,10 @@ export function Pop({
       if (isOpen) {
         place();
         onOpen?.();
-        requestAnimationFrame(() => (p.querySelector<HTMLElement>("[data-autofocus], [aria-checked=true], button, input, [tabindex='0']"))?.focus());
+        // On a touch screen a focused text field would raise the keyboard over the panel: the
+        // first control takes the focus instead.
+        const touch = matchMedia("(pointer: coarse)").matches;
+        requestAnimationFrame(() => p.querySelector<HTMLElement>(touch ? "[aria-checked=true], [aria-selected=true], button, [tabindex='0']" : "[data-autofocus], [aria-checked=true], button, input, [tabindex='0']")?.focus({ preventScroll: true }));
       }
     };
     p.addEventListener("toggle", onToggle);

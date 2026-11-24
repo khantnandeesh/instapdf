@@ -77,7 +77,7 @@ export const spaced = (name: string) => name.replace(/([a-z])(Sans|Serif|Mono|Sl
 const docLabel = (d: DocFont) => [spaced(d.info.family || familyOfFont(d.info.name)), styleWords(d.info.bold, d.info.italic)].filter(Boolean).join(" ");
 
 /** The body of the font menu. `reference`: the document font (PostScript name) being replaced. */
-export function FontMenuBody({ value, onPick, reference }: { value: string; onPick: (id: string) => void; reference?: string }) {
+export function FontMenuBody({ value, onPick, reference, ownLast }: { value: string; onPick: (id: string) => void; reference?: string; ownLast?: boolean }) {
   const ctl = useCtl();
   const fonts = useFontState();
   const list = useRef<HTMLDivElement>(null);
@@ -155,7 +155,7 @@ export function FontMenuBody({ value, onPick, reference }: { value: string; onPi
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search fonts"
         aria-label="Search fonts"
-        className="ed-fonts__search"
+        className="ed-field ed-fonts__search"
         data-autofocus
         data-testid="font-search"
         autoComplete="off"
@@ -222,6 +222,8 @@ export function FontMenuBody({ value, onPick, reference }: { value: string; onPi
           </Section>
         )}
         {empty && <p className="ed-fonts__msg">No font with that name.</p>}
+        {/* On a phone the notice has no room for this action: it closes the list instead. */}
+        {ownLast && !q && row("own", null, <span className="ed-fonts__act">Use your own font</span>, undefined, () => file.current?.click(), "font-own")}
         <div ref={more} aria-hidden="true" />
       </div>
       <input
@@ -254,18 +256,22 @@ function familyKeyOf(reference: string, doc: readonly DocFont[]): string | undef
 export function FontNotice() {
   const ctl = useCtl();
   const n = useStore(ctl.store, (s) => s.fontNotice);
+  const wide = useStore(ctl.store, (s) => s.wide);
   const file = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState("");
   useEffect(() => setMessage(""), [n?.key]);
   if (!n) return null;
   return (
     <div key={n.key} className="ed-toast ed-toast--font ed-glass" data-testid="font-notice">
-      <span>{message || `${n.original} isn’t complete in this file. Using ${n.standIn}.`}</span>
+      <span title={`${n.original} isn’t complete in this file. Using ${n.standIn}.`}>
+        {message || (wide ? `${n.original} isn’t complete in this file. Using ${n.standIn}.` : `Using ${n.standIn} for missing characters`)}
+      </span>
       <Pop label="Change font" title="Change font" className="ed-toast__act ed-toast__act--pop" testId="font-change" trigger="Change" panelClassName="ed-fonts-pop">
         {(close) => (
           <FontMenuBody
             value={n.standInId}
             reference={n.fontName}
+            ownLast={!wide}
             onPick={(id) => {
               close();
               void ctl.changeStandIn(id);
@@ -273,22 +279,26 @@ export function FontNotice() {
           />
         )}
       </Pop>
-      <button type="button" className="ed-toast__act" data-testid="font-own" onClick={() => file.current?.click()}>
-        Use your own font
-      </button>
-      <input
-        ref={file}
-        type="file"
-        accept={USER_FONT_ACCEPT}
-        hidden
-        data-testid="font-own-file"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          e.target.value = "";
-          if (!f) return;
-          void addUserFontFile(f).then((out) => ("error" in out ? setMessage(out.error) : void ctl.changeStandIn(out.id)));
-        }}
-      />
+      {wide && (
+        <>
+          <button type="button" className="ed-toast__act" data-testid="font-own" onClick={() => file.current?.click()}>
+            Use your own font
+          </button>
+          <input
+            ref={file}
+            type="file"
+            accept={USER_FONT_ACCEPT}
+            hidden
+            data-testid="font-own-file"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (!f) return;
+              void addUserFontFile(f).then((out) => ("error" in out ? setMessage(out.error) : void ctl.changeStandIn(out.id)));
+            }}
+          />
+        </>
+      )}
       <button type="button" className="ed-toast__x" aria-label="Dismiss" onClick={() => ctl.store.set({ fontNotice: null })}>
         <CloseBold size={14} />
       </button>

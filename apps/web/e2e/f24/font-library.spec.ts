@@ -160,6 +160,22 @@ test.describe("font library (desktop)", () => {
     expect(seen.sent).toEqual([]);
   });
 
+  test("a character no font here can draw is refused with a plain message, and nothing changes", async ({ page }) => {
+    await open(page);
+    await page.getByTestId("canvas").focus();
+    await page.keyboard.press("e");
+    const line = page.getByTestId("line").nth(1);
+    await expect(line).toBeVisible({ timeout: 30_000 });
+    const before = (await line.getAttribute("data-text"))!;
+    await line.click();
+    // A private-use code point: no document font and no library font has it.
+    await page.getByTestId("line-input").fill(`${before} \uE123`);
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("editor-notice")).toContainText("This font has no", { timeout: 30_000 });
+    await expect(page.getByTestId("font-notice")).toHaveCount(0);
+    await expect(page.getByTestId("line").nth(1)).toHaveAttribute("data-text", before);
+  });
+
   test("AC-294: your own font file is used and embedded without leaving the device; a file that isn't a font is refused", async ({ page }) => {
     const seen = watch(page);
     await open(page);
@@ -202,6 +218,36 @@ test.describe("font library (desktop)", () => {
     // AC-271: each family's licence text is published beside it.
     expect((await request.get(`/fonts/lib/licences/${families[0].i}.txt`)).ok()).toBe(true);
   });
+});
+
+test("on a phone the stand-in notice is one short row, with your own font inside Change", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "phone layout");
+  await open(page);
+  await page.getByTestId("dock-more").click();
+  await page.getByRole("button", { name: /Edit text/ }).first().click();
+  // A tool without options shows no empty strip.
+  await expect(page.getByTestId("context-strip")).toBeHidden();
+  const line = page.getByTestId("line").nth(1);
+  await expect(line).toBeVisible({ timeout: 30_000 });
+  const before = (await line.getAttribute("data-text"))!;
+  await line.click();
+  await page.getByTestId("line-input").fill(`${before} QXZ`);
+  await page.keyboard.press("Enter");
+  const notice = page.getByTestId("font-notice");
+  await expect(notice).toContainText("Using Tinos for missing characters", { timeout: 30_000 });
+  const box = (await notice.boundingBox())!;
+  expect(box.height).toBeLessThanOrEqual(52);
+  expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  // It sits clear of the tool dock.
+  const dock = (await page.getByTestId("dock").boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(dock.y);
+  await expect(notice.getByTestId("font-own")).toHaveCount(0);
+  await notice.getByTestId("font-change").click();
+  const menu = page.getByTestId("font-menu");
+  await expect(menu.getByRole("group", { name: "Closest matches" })).toBeVisible();
+  // No keyboard over the list: the search field is not focused on a touch screen.
+  await expect(page.getByTestId("font-search")).not.toBeFocused();
+  await expect(menu.getByTestId("font-own")).toHaveText("Use your own font");
 });
 
 test("the font menu fits a phone screen", async ({ page, isMobile }) => {
