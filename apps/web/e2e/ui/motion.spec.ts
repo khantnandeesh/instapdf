@@ -145,7 +145,9 @@ async function armExitWatch(page: Page, kind: "tool-menu" | "dialog" | "menu") {
         );
       }
       if (kind === "dialog")
-        return !!document.querySelector("dialog[open], dialog[data-leaving]");
+        return [...document.querySelectorAll("dialog")].some(
+          (d) => d.open || getComputedStyle(d).display !== "none",
+        );
       return (
         !!target &&
         target.isConnected &&
@@ -161,10 +163,14 @@ async function armExitWatch(page: Page, kind: "tool-menu" | "dialog" | "menu") {
         requestAnimationFrame(() =>
           requestAnimationFrame(() => {
             w.exitWatch!.afterFrame = shown();
-            const poll = () =>
-              shown()
-                ? requestAnimationFrame(poll)
-                : (w.exitWatch!.goneAfter = performance.now() - t0);
+            // goneAfter is the last frame it was still shown: the first frame without it comes one
+            // (possibly slow, under test load) frame later.
+            let last = performance.now() - t0;
+            const poll = () => {
+              if (!shown()) return void (w.exitWatch!.goneAfter = last);
+              last = performance.now() - t0;
+              requestAnimationFrame(poll);
+            };
             poll();
           }),
         );
@@ -198,7 +204,10 @@ async function expectExit(page: Page, what: string) {
     r.afterFrame,
     `${what} is still shown the frame after Escape (it exits, not vanishes)`,
   ).toBe(true);
-  expect(r.goneAfter, `${what} is gone within 250ms`).toBeLessThanOrEqual(250);
+  expect(
+    r.goneAfter,
+    `${what} is gone within 250ms (last frame shown)`,
+  ).toBeLessThanOrEqual(250);
 }
 
 async function openMerge(page: Page) {

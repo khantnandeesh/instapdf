@@ -81,6 +81,7 @@ export function Dialog({
     const parts = () => (variant === "fullscreen" ? (Array.from(dialog.children).filter((c) => c.tagName !== "H2") as HTMLElement[]) : [dialog]);
     if (open && !dialog.open) {
       dialog.removeAttribute("data-leaving");
+      settle(dialog);
       parts().forEach(settle);
       opener.current = document.activeElement as HTMLElement | null;
       dialog.showModal();
@@ -90,12 +91,17 @@ export function Dialog({
       // Closed at once (focus returns now, the page is usable now); globals.css keeps a leaving dialog
       // painted in the top layer while lib/motion fades it, then it is gone. No engine yet: instant.
       const leaving = motionReady();
-      if (leaving) dialog.setAttribute("data-leaving", "");
+      if (leaving) {
+        // The whole dialog leaves the a11y tree and takes no input while it is still painted.
+        dialog.setAttribute("data-leaving", "");
+        dialog.setAttribute("aria-hidden", "true");
+        dialog.inert = true;
+      }
       dialog.close();
       void Promise.all(leaving ? parts().map((el) => exit(el, variant === "default" ? "dialog" : variant === "sheet" ? "sheet" : "overlay")) : []).then(() => {
         if (dialog.open) return; // reopened meanwhile
-        dialog.removeAttribute("data-leaving");
-        settle(dialog);
+        // data-leaving, inert and aria-hidden stay until the next opening: the top-layer hold (display,
+        // overlay) may end a frame after the fade, and the dialog must stay out of the a11y tree till then.
         setShown(false);
       });
       const back = returnFocusRef?.current ?? opener.current;
