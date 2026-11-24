@@ -191,6 +191,10 @@ struct Plan {
     segs: Vec<Seg>,
 }
 
+fn limit(reason: &'static str) -> Error {
+    Error::Unsupported { reason: reason.to_string() }
+}
+
 fn deref<'a>(doc: &'a Document, o: &'a Object) -> &'a Object {
     doc.dereference(o).map(|(_, o)| o).unwrap_or(o)
 }
@@ -351,7 +355,7 @@ impl Engine {
     /// Text of a page: lines with runs, words, fonts and positions, and paragraphs.
     pub fn page_text(&mut self, page: usize) -> Result<PageText> {
         let page_id = self.page_id(page)?;
-        let pc = interp::interpret_page(&self.doc, &mut self.cache, page_id);
+        let pc = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
         let (lines, paragraphs) = layout::group(&pc);
         Ok(self.describe(page, &pc, lines, paragraphs))
     }
@@ -383,23 +387,46 @@ impl Engine {
 
     /// Replaces characters `[start, end)` of a line with `text`.
     pub fn replace_range(&mut self, page: usize, line: usize, start: usize, end: usize, text: &str) -> Result<EditResult> {
-        let current = self.page_text(page)?;
-        let l = current.lines.get(line).ok_or(Error::BadLine)?;
-        let chars: Vec<char> = l.text.chars().collect();
-        if start > end || end > chars.len() {
+        let page_id = self.page_id(page)?;
+        let pc = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
+        let (lines, _) = layout::group(&pc);
+        let l = lines.get(line).ok_or(Error::BadLine)?;
+        if start > end || end > l.text.chars().count() {
             return Err(Error::BadLine);
         }
-        let mut new: String = chars[..start].iter().collect();
-        new.push_str(text);
-        new.extend(chars[end..].iter());
-        self.replace_line(page, line, &new)
+        // Map character offsets to line characters, widening to whole glyphs (ligatures) and
+        // keeping the part of a widened glyph that lies outside the range.
+        let mut a = l.chars.len();
+        let mut b = l.chars.len();
+        let mut lead = String::new();
+        let mut tail = String::new();
+        let mut off = 0;
+        for (i, c) in l.chars.iter().enumerate() {
+            let len = c.text.chars().count();
+            if a == l.chars.len() && start < off + len.max(1) && (start < off + len || len == 0) {
+                a = i;
+                lead = c.text.chars().take(start - off).collect();
+            }
+            if end <= off && b == l.chars.len() {
+                b = i;
+            } else if end > off && end < off + len && b == l.chars.len() {
+                b = i + 1;
+                tail = c.text.chars().skip(end - off).collect();
+            }
+            off += len;
+        }
+        if start == end && a > b {
+            a = b;
+        }
+        let inserted = format!("{lead}{text}{tail}");
+        self.edit_span(page, page_id, pc, lines, line, a, b, inserted)
     }
 
     /// Replaces a line's text. Only the characters that differ are rewritten; the rest of the
     /// line shifts by the change in width and nothing else on the page moves.
     pub fn replace_line(&mut self, page: usize, line_id: usize, new_text: &str) -> Result<EditResult> {
         let page_id = self.page_id(page)?;
-        let pc = interp::interpret_page(&self.doc, &mut self.cache, page_id);
+        let pc = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
         let (lines, _) = layout::group(&pc);
         let line = lines.get(line_id).ok_or(Error::BadLine)?;
         if let Some(r) = line.read_only_reason {
@@ -441,6 +468,33 @@ impl Engine {
         let before: usize = old.iter().filter(|(_, i)| *i < a).count();
         let inserted: String =
             new[before.min(new.len())..new.len().saturating_sub(after).max(before.min(new.len()))].iter().collect();
+        self.edit_span(page, page_id, pc, lines, line_id, a, b, inserted)
+    }
+
+    /// Replaces line characters `[a, b)` with `inserted`.
+    #[allow(clippy::too_many_arguments)]
+    fn edit_span(
+        &mut self,
+        page: usize,
+        page_id: ObjectId,
+        pc: PageContent,
+        lines: Vec<Line>,
+        line_id: usize,
+        a: usize,
+        b: usize,
+        inserted: String,
+    ) -> Result<EditResult> {
+        let line = lines.get(line_id).ok_or(Error::BadLine)?;
+        if let Some(r) = line.read_only_reason {
+            return Err(Error::ReadOnly { reason: r.to_string() });
+        }
+        let n = line.chars.len();
+        if a > b || b > n {
+            return Err(Error::BadLine);
+        }
+        if pc.incomplete {
+            return Err(Error::Unsupported { reason: "undecodable-content".into() });
+        }
         if a == b && inserted.is_empty() {
             let page_text = self.page_text(page)?;
             return Ok(EditResult { page: page_text, changed: Vec::new(), substitutions: Vec::new(), shift: 0.0 });
@@ -512,7 +566,10 @@ impl Engine {
             let gid = face.glyph(ch).expect("pick checked coverage");
             let w = ttf_parser::Face::parse(&face.data, 0)
                 .ok()
-                .and_then(|f| f.glyph_hor_advance(ttf_parser::GlyphId(gid)).map(|w| w as f64 / f.units_per_em() as f64))
+                .and_then(|f| {
+                    f.glyph_hor_advance(ttf_parser::GlyphId(gid))
+                        .map(|w| (w as f64 * 1000.0 / f.units_per_em() as f64).round() / 1000.0)
+                })
                 .unwrap_or(0.5);
             let name =
                 format!("{}{}{}", face.family, if face.bold { " Bold" } else { "" }, if face.italic { " Italic" } else { "" });
@@ -568,12 +625,12 @@ impl Engine {
         let snapshot = (self.doc.max_id, self.dirty.clone(), self.embeds.clone());
         let mut backup: Vec<(ObjectId, Option<Object>)> = Vec::new();
         let outcome = self.apply(page_id, &pc, &plan, &state, &mut backup).and_then(|()| {
-            let after = interp::interpret_page(&self.doc, &mut self.cache, page_id);
-            check_edit(&pc, &after, &plan, ang)?;
-            Ok(after)
+            let after = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
+            let touched = check_edit(&pc, &after, &plan, ang)?;
+            Ok((after, touched))
         });
-        let after = match outcome {
-            Ok(after) => after,
+        let (after, touched) = match outcome {
+            Ok(v) => v,
             Err(e) => {
                 for (id, old) in backup.into_iter().rev() {
                     match old {
@@ -595,20 +652,54 @@ impl Engine {
         self.edited_pages.insert(page);
 
         let (lines, paragraphs) = layout::group(&after);
-        // The edited line now covers the old extent shifted by the change.
-        let mut changed = vec![old_box];
-        let (ox, oy) = (shift * ang.cos(), shift * ang.sin());
-        changed.push(Rect {
-            x0: old_box.x0 + ox.min(0.0),
-            y0: old_box.y0 + oy.min(0.0),
-            x1: old_box.x1 + ox.max(0.0),
-            y1: old_box.y1 + oy.max(0.0),
-        });
-        let union = changed.iter().copied().reduce(|x, y| x.union(&y)).unwrap();
-        // Fallback fonts may be a little taller than the original.
+        // Everything that may look different: the old line, and every new or moved glyph in the
+        // result, with its full advance (spacing included) and room for taller fallback fonts.
+        let mut union = old_box;
+        for &gi in &touched {
+            union = union.union(&layout::glyph_rect(&after, &after.glyphs[gi]));
+        }
         let pad = line.size * 0.35;
         let changed = vec![Rect { x0: union.x0 - 1.0, y0: union.y0 - pad, x1: union.x1 + 1.0, y1: union.y1 + pad }];
         Ok(EditResult { page: self.describe(page, &after, lines, paragraphs), changed, substitutions, shift })
+    }
+
+    /// How many pages can draw this Form XObject: through their own or inherited resources,
+    /// or through forms those resources hold. A form in a resource dictionary that several
+    /// pages share must be copied before it is edited.
+    fn pages_reaching(&self, form: ObjectId) -> usize {
+        let mut count = 0;
+        for &page in &self.pages {
+            let mut stack: Vec<&Dictionary> = interp::page_resources(&self.doc, page);
+            let mut seen: HashSet<ObjectId> = HashSet::new();
+            let mut found = false;
+            while let Some(res) = stack.pop() {
+                let Some(xobjects) = res.get(b"XObject").ok().and_then(|o| deref(&self.doc, o).as_dict().ok()) else {
+                    continue;
+                };
+                for (_, v) in xobjects.iter() {
+                    let Ok(id) = v.as_reference() else { continue };
+                    if id == form {
+                        found = true;
+                        break;
+                    }
+                    if seen.len() < 10_000 && seen.insert(id) {
+                        if let Ok(Object::Stream(st)) = self.doc.get_object(id) {
+                            if let Some(r) = st.dict.get(b"Resources").ok().and_then(|o| deref(&self.doc, o).as_dict().ok()) {
+                                stack.push(r);
+                            }
+                        }
+                    }
+                }
+                if found {
+                    break;
+                }
+            }
+            count += found as usize;
+            if count > 1 {
+                break;
+            }
+        }
+        count
     }
 
     fn touch(&mut self, id: ObjectId, backup: &mut Vec<(ObjectId, Option<Object>)>) {
@@ -705,7 +796,7 @@ impl Engine {
             let SourceKind::Form(form_id) = src.kind else { continue };
             let data = splice(&src.data, &src.ops, &splices[&si]);
             let invocations = pc.sources.iter().filter(|s| s.kind == src.kind).count();
-            let shared = invocations > 1 || count_refs(&self.doc, form_id) > 1;
+            let shared = invocations > 1 || count_refs(&self.doc, form_id) > 1 || self.pages_reaching(form_id) > 1;
             if !shared {
                 self.touch(form_id, backup);
                 let stream = self
@@ -1022,9 +1113,11 @@ impl Engine {
 
         let mut w: Vec<Object> = Vec::new();
         for (new, (_, old)) in &embed.chars {
-            let adv = parsed.glyph_hor_advance(ttf_parser::GlyphId(*old)).unwrap_or(0) as f64 * k;
+            // Whole numbers: several readers parse CID widths as integers, and the
+            // line shift is computed from the same rounded value.
+            let adv = (parsed.glyph_hor_advance(ttf_parser::GlyphId(*old)).unwrap_or(0) as f64 * k).round();
             w.push(Object::Integer(*new as i64));
-            w.push(Object::Array(vec![Object::Real(adv as f32)]));
+            w.push(Object::Array(vec![Object::Integer(adv as i64)]));
         }
         let mut info = Dictionary::new();
         info.set("Registry", Object::string_literal("Adobe"));
@@ -1124,8 +1217,8 @@ impl Engine {
         }
         let mut cache = FontCache::default();
         for &p in &self.edited_pages {
-            let mine = interp::interpret_page(&self.doc, &mut self.cache, self.pages[p]);
-            let theirs = interp::interpret_page(&reread, &mut cache, reread_pages[p]);
+            let mine = interp::interpret_page(&self.doc, &mut self.cache, self.pages[p]).map_err(limit)?;
+            let theirs = interp::interpret_page(&reread, &mut cache, reread_pages[p]).map_err(limit)?;
             let text = |pc: &PageContent| layout::group(pc).0.into_iter().map(|l| l.text).collect::<Vec<_>>();
             if text(&mine) != text(&theirs) {
                 return Err(Error::Verify { message: format!("page {} reads differently after saving", p + 1) });
@@ -1153,7 +1246,7 @@ fn same_object(a: &Object, b: &Object) -> bool {
                 d
             };
             strip(&x.dict) == strip(&y.dict)
-                && (x.content == y.content || x.get_plain_content().ok() == y.get_plain_content().ok())
+                && (x.content == y.content || matches!((x.get_plain_content(), y.get_plain_content()), (Ok(p), Ok(q)) if p == q))
         }
         _ => a == b,
     }
@@ -1400,7 +1493,10 @@ fn serialize(kind: ShowKind, op: &content::Op, items: Vec<Item>) -> Vec<u8> {
 /// Compares the page before and after an edit: every glyph we did not remove must be the same
 /// glyph in the same font, size and colour, at its old position plus its planned shift, and
 /// the new glyphs must sit where the old text started.
-fn check_edit(before: &PageContent, after: &PageContent, plan: &Plan, angle: f64) -> Result<()> {
+/// Returns the indices (in `after`) of glyphs that are new or moved.
+// `!(x <= tol)` is deliberate: it also rejects NaN.
+#[allow(clippy::neg_cmp_op_on_partial_ord)]
+fn check_edit(before: &PageContent, after: &PageContent, plan: &Plan, angle: f64) -> Result<Vec<usize>> {
     let fail = |m: String| Err(Error::Verify { message: m });
     let inserted: usize = plan
         .segs
@@ -1424,15 +1520,35 @@ fn check_edit(before: &PageContent, after: &PageContent, plan: &Plan, angle: f64
         return fail(format!("expected {} glyphs after the edit, found {}", kept + inserted, after.glyphs.len()));
     }
     let (dx, dy) = (angle.cos(), angle.sin());
+    let anchor = &before.glyphs[plan.anchor];
+    let mut touched: Vec<usize> = Vec::new();
     let mut j = 0;
-    let check_inserted = |j: &mut usize, start: Option<(f64, f64)>| -> Result<()> {
+    let check_inserted = |j: &mut usize, start: Option<(f64, f64)>, touched: &mut Vec<usize>| -> Result<()> {
         let mut text = String::new();
+        let mut prev: Option<(f64, f64)> = None;
         for k in 0..inserted {
             let g = &after.glyphs[*j + k];
+            touched.push(*j + k);
             text.push_str(&g.text);
+            if !g.origin.0.is_finite() || !g.origin.1.is_finite() {
+                return Err(Error::Verify { message: "new text has no valid position".into() });
+            }
+            // New glyphs take the anchor's size, colour and rendering mode.
+            if (g.size - anchor.size).abs() > 1e-6 || g.color != anchor.color || g.render_mode != anchor.render_mode {
+                return Err(Error::Verify { message: format!("new glyph {:?} has the wrong style", g.text) });
+            }
+            // And they stay on the baseline.
+            if let Some(p) = prev {
+                // (Negative character spacing may legitimately move them backwards.)
+                let off = -(g.origin.0 - p.0) * dy + (g.origin.1 - p.1) * dx;
+                if !(off.abs() <= POSITION_TOLERANCE) {
+                    return Err(Error::Verify { message: format!("new glyph {:?} is out of line", g.text) });
+                }
+            }
+            prev = Some(g.origin);
             if k == 0 {
                 if let Some(s) = start {
-                    if (g.origin.0 - s.0).hypot(g.origin.1 - s.1) > POSITION_TOLERANCE {
+                    if !((g.origin.0 - s.0).hypot(g.origin.1 - s.1) <= POSITION_TOLERANCE) {
                         return Err(Error::Verify { message: "new text does not start where the old text did".into() });
                     }
                 }
@@ -1447,7 +1563,7 @@ fn check_edit(before: &PageContent, after: &PageContent, plan: &Plan, angle: f64
     let same_font = |a: &PdfFont, b: &PdfFont| a.object_id == b.object_id && a.base_font == b.base_font;
     for (i, g) in before.glyphs.iter().enumerate() {
         if i == plan.anchor && !plan.after {
-            check_inserted(&mut j, Some(g.origin))?;
+            check_inserted(&mut j, Some(g.origin), &mut touched)?;
         }
         if !plan.removed.contains(&i) {
             let h = &after.glyphs[j];
@@ -1462,15 +1578,18 @@ fn check_edit(before: &PageContent, after: &PageContent, plan: &Plan, angle: f64
             {
                 return fail(format!("glyph {i} ({:?}) changed", g.text));
             }
-            if moved > POSITION_TOLERANCE {
+            if !(moved <= POSITION_TOLERANCE) {
                 return fail(format!("glyph {i} ({:?}) is {moved:.3} pt from where it should be", g.text));
+            }
+            if want != 0.0 {
+                touched.push(j);
             }
             j += 1;
         }
         if i == plan.anchor && plan.after {
             let end = (g.origin.0 + g.advance * dx, g.origin.1 + g.advance * dy);
-            check_inserted(&mut j, if plan.removed.contains(&i) { None } else { Some(end) })?;
+            check_inserted(&mut j, if plan.removed.contains(&i) { None } else { Some(end) }, &mut touched)?;
         }
     }
-    Ok(())
+    Ok(touched)
 }

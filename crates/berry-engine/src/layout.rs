@@ -89,6 +89,17 @@ fn glyph_box(pc: &PageContent, g: &Glyph) -> Rect {
     Rect::from_points(&pts)
 }
 
+/// A glyph's box including its full advance (character and word spacing), in page space.
+pub fn glyph_rect(pc: &PageContent, g: &Glyph) -> Rect {
+    let f = &pc.fonts[g.font];
+    let (u, v) = rot(g.origin, -g.angle);
+    let lo = v + f.descent.min(0.0) / 1000.0 * g.size;
+    let hi = v + f.ascent.max(0.0) / 1000.0 * g.size;
+    let (u0, u1) = (u.min(u + g.advance).min(u + g.width), u.max(u + g.advance).max(u + g.width));
+    let pts: Vec<(f64, f64)> = [(u0, lo), (u1, lo), (u0, hi), (u1, hi)].iter().map(|&p| rot(p, g.angle)).collect();
+    Rect::from_points(&pts)
+}
+
 fn boxes(pc: &PageContent, chars: &[LineChar]) -> Option<Rect> {
     chars.iter().filter_map(|c| c.glyph).map(|g| glyph_box(pc, &pc.glyphs[g])).reduce(|a, b| a.union(&b))
 }

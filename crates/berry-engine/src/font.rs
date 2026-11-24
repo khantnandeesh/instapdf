@@ -66,6 +66,8 @@ pub struct PdfFont {
     /// CIDFontType0 with a CID-keyed CFF: CID → GID.
     cff_cid_to_gid: Option<HashMap<u16, u16>>,
     symbolic_truetype: bool,
+    /// Glyph id → Unicode from the embedded cmap, built on first use.
+    reverse_cmap: std::cell::OnceCell<HashMap<u16, char>>,
 }
 
 /// Family name without the `ABCDEF+` subset prefix.
@@ -100,7 +102,7 @@ fn get_dict<'a>(doc: &'a Document, d: &'a Dictionary, key: &[u8]) -> Option<&'a 
 
 fn get_stream_data(doc: &Document, d: &Dictionary, key: &[u8]) -> Option<Vec<u8>> {
     match get(doc, d, key)? {
-        Object::Stream(s) => s.get_plain_content().ok(),
+        Object::Stream(s) => s.get_plain_content_with_limit(crate::interp::MAX_STREAM_BYTES).ok(),
         _ => None,
     }
 }
@@ -170,6 +172,10 @@ fn std14_width(font: Std14, glyph: &str) -> Option<f64> {
 }
 
 /// Parses a ToUnicode CMap into code → text.
+/// Cap on entries in a ToUnicode or `/W` table. Real fonts have at most 65,536 codes; hostile
+/// ones repeat ranges to exhaust memory.
+const MAX_MAP_ENTRIES: usize = 1 << 17;
+
 fn parse_to_unicode(data: &[u8]) -> HashMap<u32, String> {
     use content::Operand;
     fn code(b: &[u8]) -> u32 {
@@ -196,7 +202,7 @@ fn parse_to_unicode(data: &[u8]) -> HashMap<u32, String> {
             for tri in op.operands.chunks(3) {
                 let (Some(lo), Some(hi)) = (tri.first().and_then(strs), tri.get(1).and_then(strs)) else { continue };
                 let (lo, hi) = (code(&lo), code(&hi));
-                if hi < lo || hi - lo > 0xFFFF {
+                if hi < lo || hi - lo > 0xFFFF || map.len() > MAX_MAP_ENTRIES {
                     continue;
                 }
                 match tri.get(2) {
@@ -295,7 +301,11 @@ fn type1_glyph_names(data: &[u8], len1: usize) -> HashSet<String> {
                 q += 1;
             }
             names.insert(name);
-            p = q + 1 + n;
+            let next = q.saturating_add(1).saturating_add(n);
+            if next <= p {
+                break;
+            }
+            p = next;
         } else if plain[p..].starts_with(b"end") {
             break;
         } else {
@@ -355,6 +365,7 @@ impl PdfFont {
             program: Program::None,
             cff_cid_to_gid: None,
             symbolic_truetype: false,
+            reverse_cmap: std::cell::OnceCell::new(),
         };
         if let Some(data) = get_stream_data(doc, dict, b"ToUnicode") {
             font.to_unicode = parse_to_unicode(&data);
@@ -387,7 +398,7 @@ impl PdfFont {
         } else if let Some(Object::Stream(s)) = get(doc, desc, b"FontFile3") {
             self.embedded = true;
             let sub = s.dict.get(b"Subtype").ok().and_then(|o| o.as_name().ok()).unwrap_or(b"").to_vec();
-            self.program = match s.get_plain_content() {
+            self.program = match s.get_plain_content_with_limit(crate::interp::MAX_STREAM_BYTES) {
                 Err(_) => Program::Unreadable,
                 Ok(data) if sub == b"OpenType" => match ttf_parser::RawFace::parse(&data, 0) {
                     Ok(raw) => match raw.table(ttf_parser::Tag::from_bytes(b"CFF ")) {
@@ -401,7 +412,7 @@ impl PdfFont {
         } else if let Some(Object::Stream(s)) = get(doc, desc, b"FontFile") {
             self.embedded = true;
             let len1 = s.dict.get(b"Length1").ok().map(|o| deref(doc, o)).and_then(|o| o.as_i64().ok()).unwrap_or(0);
-            self.program = match s.get_plain_content() {
+            self.program = match s.get_plain_content_with_limit(crate::interp::MAX_STREAM_BYTES) {
                 Ok(data) => {
                     let names = type1_glyph_names(&data, len1.max(0) as usize);
                     if names.is_empty() {
@@ -574,12 +585,14 @@ impl PdfFont {
                 let mut i = 0;
                 while i < w.len() {
                     let Ok(c0) = deref(doc, &w[i]).as_float() else { break };
-                    let c0 = c0 as u32;
+                    let c0 = (c0.max(0.0) as u32).min(0xFFFF);
                     match w.get(i + 1).map(|o| deref(doc, o)) {
                         Some(Object::Array(list)) => {
                             for (k, o) in list.iter().enumerate() {
                                 if let Ok(v) = deref(doc, o).as_float() {
-                                    map.insert(c0 + k as u32, v as f64);
+                                    if c0 as usize + k <= 0xFFFF && map.len() < MAX_MAP_ENTRIES {
+                                        map.insert(c0 + k as u32, v as f64);
+                                    }
                                 }
                             }
                             i += 2;
@@ -589,7 +602,8 @@ impl PdfFont {
                                 break;
                             };
                             let c1 = c1 as u32;
-                            if c1 >= c0 && c1 - c0 <= 0xFFFF {
+                            let c1 = c1.min(0xFFFF);
+                            if c1 >= c0 && map.len() + ((c1 - c0) as usize) < MAX_MAP_ENTRIES {
                                 for c in c0..=c1 {
                                     map.insert(c, v as f64);
                                 }
@@ -601,7 +615,7 @@ impl PdfFont {
                 }
             }
             if let Some(Object::Stream(s)) = get(doc, cid, b"CIDToGIDMap") {
-                if let Ok(data) = s.get_plain_content() {
+                if let Ok(data) = s.get_plain_content_with_limit(crate::interp::MAX_STREAM_BYTES) {
                     self.cid_to_gid =
                         Some(data.chunks(2).filter(|c| c.len() == 2).map(|c| (c[0] as u16) << 8 | c[1] as u16).collect());
                 }
@@ -687,25 +701,25 @@ impl PdfFont {
 
     /// For a Type 0 font without ToUnicode: reverse the embedded cmap (GID → Unicode).
     fn type0_unicode_from_program(&self, code: u32) -> Option<String> {
-        let Program::TrueType(data) = &self.program else { return None };
         let gid = self.gid_for(code)?;
-        let face = ttf_parser::Face::parse(data, 0).ok()?;
-        let cmap = face.tables().cmap?;
-        let mut found = None;
-        for st in cmap.subtables {
-            if !st.is_unicode() {
-                continue;
-            }
-            st.codepoints(|cp| {
-                if found.is_none() && st.glyph_index(cp) == Some(ttf_parser::GlyphId(gid)) {
-                    found = char::from_u32(cp);
+        let rev = self.reverse_cmap.get_or_init(|| {
+            let mut rev = HashMap::new();
+            let Program::TrueType(data) = &self.program else { return rev };
+            let Ok(face) = ttf_parser::Face::parse(data, 0) else { return rev };
+            let Some(cmap) = face.tables().cmap else { return rev };
+            for st in cmap.subtables {
+                if !st.is_unicode() {
+                    continue;
                 }
-            });
-            if found.is_some() {
-                break;
+                st.codepoints(|cp| {
+                    if let (Some(g), Some(c)) = (st.glyph_index(cp), char::from_u32(cp)) {
+                        rev.entry(g.0).or_insert(c);
+                    }
+                });
             }
-        }
-        found.map(String::from)
+            rev
+        });
+        rev.get(&gid).map(|c| c.to_string())
     }
 
     fn simple_truetype_gid(&self, face: &ttf_parser::Face, code: u32) -> Option<u16> {
@@ -794,7 +808,13 @@ impl PdfFont {
                 if self.two_byte {
                     None
                 } else {
-                    Some(name().is_some())
+                    // The viewer draws a standard-14 face: the glyph must be in it.
+                    let std = std14(strip_subset_prefix(&self.base_font).0);
+                    Some(match (name(), std) {
+                        (Some(n), Some(f)) => std14_width(f, n).is_some(),
+                        (Some(_), None) => true,
+                        (None, _) => false,
+                    })
                 }
             }
             Program::Unreadable => None,
@@ -825,6 +845,59 @@ impl PdfFont {
                 let drawn = cff.outline(ttf_parser::GlyphId(gid), &mut b).is_ok() && b.0;
                 Some(drawn || blank)
             }
+        }
+    }
+
+    /// The advance the font program itself gives a code, in 1/1000 em, when we can read it.
+    fn program_advance(&self, code: u32) -> Option<f64> {
+        match &self.program {
+            Program::TrueType(data) => {
+                let face = ttf_parser::Face::parse(data, 0).ok()?;
+                let gid = if self.two_byte { self.gid_for(code)? } else { self.simple_truetype_gid(&face, code)? };
+                let adv = face.glyph_hor_advance(ttf_parser::GlyphId(gid))? as f64;
+                Some(adv * 1000.0 / face.units_per_em() as f64)
+            }
+            Program::Cff(data) => {
+                let cff = ttf_parser::cff::Table::parse(data)?;
+                let gid = if self.two_byte {
+                    self.gid_for(code)?
+                } else {
+                    cff.glyph_index_by_name(self.names.get(code as usize)?.as_deref()?)?.0
+                };
+                let scale = cff.matrix().sx as f64 * 1000.0;
+                Some(cff.glyph_width(ttf_parser::GlyphId(gid))? as f64 * scale)
+            }
+            Program::None if !self.two_byte => {
+                let std = std14(strip_subset_prefix(&self.base_font).0)?;
+                std14_width(std, self.names.get(code as usize)?.as_deref()?)
+            }
+            _ => None,
+        }
+    }
+
+    /// The PDF gives this code a real advance: an explicit, non-zero width that agrees with the
+    /// font program when we can read it. Producers often write widths only for the codes they
+    /// used, so a code nobody showed yet may draw with a zero or default advance and overprint.
+    fn width_is_real(&self, code: u32) -> bool {
+        let declared = match &self.widths {
+            Widths::Simple { first, widths, .. } => {
+                if code < *first {
+                    return false;
+                }
+                match widths.get((code - first) as usize) {
+                    Some(w) => *w,
+                    None => return false,
+                }
+            }
+            Widths::Cid { map, default } => map.get(&code).copied().unwrap_or(*default),
+        };
+        if declared <= 0.0 {
+            return false;
+        }
+        match self.program_advance(code) {
+            Some(prog) => (declared - prog).abs() <= prog.abs() * 0.02 + 2.0,
+            // Type 0 without a readable advance: trust only an explicit /W entry.
+            None => !matches!(&self.widths, Widths::Cid { map, .. } if !map.contains_key(&code)),
         }
     }
 
@@ -863,8 +936,8 @@ impl PdfFont {
             .filter_map(|code| match (seen.contains(&code), self.has_glyph(code)) {
                 (_, Some(false)) => None,
                 (true, _) => Some((0u8, code)),
-                (false, Some(true)) => Some((1u8, code)),
-                (false, None) => None,
+                (false, Some(true)) if self.width_is_real(code) => Some((1u8, code)),
+                (false, _) => None,
             })
             .min()
             .map(|(_, c)| c)

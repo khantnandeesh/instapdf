@@ -10,6 +10,13 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 const MAX_FORM_DEPTH: usize = 12;
+/// Work limits per page. Real pages stay far below them; hostile files (form XObject fan-out,
+/// decompression bombs) hit them and are refused instead of hanging the tab.
+pub const MAX_FORM_INVOCATIONS: usize = 4_000;
+pub const MAX_OPS: usize = 2_000_000;
+pub const MAX_GLYPHS: usize = 1_000_000;
+/// Largest decoded content or font stream we accept, in bytes.
+pub const MAX_STREAM_BYTES: usize = 128 << 20;
 
 /// One drawn character code.
 #[derive(Clone, Debug)]
@@ -112,7 +119,13 @@ pub struct PageContent {
     pub sources: Vec<Source>,
     /// The page's content streams in order; `sources[0].data` is their concatenation.
     pub segments: Vec<Segment>,
+    /// A content stream could not be decoded and is missing from `sources[0]`. Such a page is
+    /// read-only: rewriting it would drop that stream.
+    pub incomplete: bool,
 }
+
+/// A form XObject's decoded bytes and parsed operators, cached per object.
+type ParsedForm = (Rc<Vec<u8>>, Rc<Vec<Op>>);
 
 /// Fonts are loaded once per document.
 #[derive(Default)]
@@ -255,18 +268,25 @@ fn color_space_of(doc: &Document, resources: &[&Dictionary], name: &[u8]) -> Col
 }
 
 /// Reads the page's content streams and joins them with a newline, as the PDF spec defines.
-pub fn page_content_bytes(doc: &Document, page_id: ObjectId) -> (Vec<u8>, Vec<Segment>) {
+pub fn page_content_bytes(doc: &Document, page_id: ObjectId) -> (Vec<u8>, Vec<Segment>, bool) {
     let mut data = Vec::new();
     let mut segments = Vec::new();
+    let mut incomplete = false;
     for id in doc.get_page_contents(page_id) {
-        let Ok(stream) = doc.get_object(id).and_then(Object::as_stream) else { continue };
-        let Ok(bytes) = stream.get_plain_content() else { continue };
+        let bytes = doc
+            .get_object(id)
+            .and_then(Object::as_stream)
+            .and_then(|s| s.get_plain_content_with_limit(MAX_STREAM_BYTES.saturating_sub(data.len())));
+        let Ok(bytes) = bytes else {
+            incomplete = true;
+            continue;
+        };
         let start = data.len();
         data.extend_from_slice(&bytes);
         segments.push(Segment { id, start, end: data.len() });
         data.push(b'\n');
     }
-    (data, segments)
+    (data, segments, incomplete)
 }
 
 struct Interp<'a> {
@@ -275,6 +295,11 @@ struct Interp<'a> {
     out: PageContent,
     font_index: HashMap<usize, usize>,
     form_stack: Vec<ObjectId>,
+    /// Parsed forms, so a form drawn many times is decoded once.
+    forms: HashMap<ObjectId, ParsedForm>,
+    invocations: usize,
+    ops_seen: usize,
+    over_budget: Option<&'static str>,
 }
 
 impl<'a> Interp<'a> {
@@ -345,6 +370,16 @@ impl<'a> Interp<'a> {
         let mut events: Vec<TextEvent> = Vec::new();
 
         for (i, op) in ops.iter().enumerate() {
+            self.ops_seen += 1;
+            if self.ops_seen > MAX_OPS {
+                self.over_budget = Some("too-many-operators");
+            }
+            if self.out.glyphs.len() > MAX_GLYPHS {
+                self.over_budget = Some("too-many-glyphs");
+            }
+            if self.over_budget.is_some() {
+                break;
+            }
             let n = |k: usize| op.num(k);
             match op.name.as_slice() {
                 b"q" => stack.push(gs.clone()),
@@ -467,7 +502,21 @@ impl<'a> Interp<'a> {
                     if !is_form || self.form_stack.len() >= MAX_FORM_DEPTH || self.form_stack.contains(&id) {
                         continue;
                     }
-                    let Ok(data) = stream.get_plain_content() else { continue };
+                    self.invocations += 1;
+                    if self.invocations > MAX_FORM_INVOCATIONS {
+                        self.over_budget = Some("too-many-form-invocations");
+                        break;
+                    }
+                    let (data, parsed) = match self.forms.get(&id) {
+                        Some(f) => f.clone(),
+                        None => {
+                            let Ok(data) = stream.get_plain_content_with_limit(MAX_STREAM_BYTES) else { continue };
+                            let parsed = Rc::new(content::parse(&data));
+                            let f = (Rc::new(data), parsed);
+                            self.forms.insert(id, f.clone());
+                            f
+                        }
+                    };
                     let matrix = match stream.dict.get(b"Matrix").ok().map(|o| deref(self.doc, o)) {
                         Some(Object::Array(a)) if a.len() == 6 => {
                             let v: Vec<f64> =
@@ -480,11 +529,10 @@ impl<'a> Interp<'a> {
                     let mut res: Vec<&'a Dictionary> = Vec::new();
                     res.extend(own);
                     res.extend_from_slice(resources);
-                    let parsed = content::parse(&data);
                     self.out.sources.push(Source {
                         kind: SourceKind::Form(id),
-                        data: Rc::new(data),
-                        ops: Rc::new(parsed),
+                        data,
+                        ops: parsed,
                         events: Vec::new(),
                         invoked_by: Some((source, i, name.to_vec())),
                     });
@@ -511,9 +559,11 @@ pub fn decode_with_offsets<'b>(font: &PdfFont, bytes: &'b [u8]) -> impl Iterator
 }
 
 /// Interprets a page and returns every glyph and the text events of each stream.
-pub fn interpret_page(doc: &Document, cache: &mut FontCache, page_id: ObjectId) -> PageContent {
-    let (data, segments) = page_content_bytes(doc, page_id);
-    interpret_bytes(doc, cache, page_id, data, segments)
+pub fn interpret_page(doc: &Document, cache: &mut FontCache, page_id: ObjectId) -> Result<PageContent, &'static str> {
+    let (data, segments, incomplete) = page_content_bytes(doc, page_id);
+    let mut pc = interpret_bytes(doc, cache, page_id, data, segments)?;
+    pc.incomplete = incomplete;
+    Ok(pc)
 }
 
 /// Same as [`interpret_page`] but with the page content supplied by the caller. The editor uses
@@ -524,15 +574,19 @@ pub fn interpret_bytes(
     page_id: ObjectId,
     data: Vec<u8>,
     segments: Vec<Segment>,
-) -> PageContent {
+) -> Result<PageContent, &'static str> {
     let ops = content::parse(&data);
     let resources = page_resources(doc, page_id);
     let mut it = Interp {
         doc,
         cache,
-        out: PageContent { glyphs: Vec::new(), fonts: Vec::new(), sources: Vec::new(), segments },
+        out: PageContent { glyphs: Vec::new(), fonts: Vec::new(), sources: Vec::new(), segments, incomplete: false },
         font_index: HashMap::new(),
         form_stack: Vec::new(),
+        forms: HashMap::new(),
+        invocations: 0,
+        ops_seen: 0,
+        over_budget: None,
     };
     it.out.sources.push(Source {
         kind: SourceKind::Page,
@@ -542,5 +596,8 @@ pub fn interpret_bytes(
         invoked_by: None,
     });
     it.run(0, &resources, Matrix::IDENTITY);
-    it.out
+    match it.over_budget {
+        Some(reason) => Err(reason),
+        None => Ok(it.out),
+    }
 }

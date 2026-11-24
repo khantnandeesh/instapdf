@@ -57,9 +57,14 @@ fn is_delim(b: u8) -> bool {
     matches!(b, b'(' | b')' | b'<' | b'>' | b'[' | b']' | b'{' | b'}' | b'/' | b'%')
 }
 
+/// Deeper array or dictionary nesting than this is treated as junk (no real stream needs it,
+/// and unbounded recursion would overflow the stack on hostile input).
+const MAX_NESTING: usize = 32;
+
 struct Lexer<'a> {
     d: &'a [u8],
     p: usize,
+    depth: usize,
 }
 
 enum Tok {
@@ -208,12 +213,17 @@ impl<'a> Lexer<'a> {
             }
             b'<' if self.d.get(self.p + 1) == Some(&b'<') => {
                 self.p += 2;
+                if self.depth >= MAX_NESTING {
+                    return Tok::Operand(Operand::Other);
+                }
+                self.depth += 1;
                 loop {
                     match self.next() {
                         Tok::DictEnd | Tok::Eof => break,
                         _ => {}
                     }
                 }
+                self.depth -= 1;
                 Tok::Operand(Operand::Other)
             }
             b'<' => {
@@ -230,6 +240,10 @@ impl<'a> Lexer<'a> {
             }
             b'[' => {
                 self.p += 1;
+                if self.depth >= MAX_NESTING {
+                    return Tok::Operand(Operand::Other);
+                }
+                self.depth += 1;
                 let mut items = Vec::new();
                 loop {
                     match self.next() {
@@ -239,6 +253,7 @@ impl<'a> Lexer<'a> {
                         Tok::Keyword(_) | Tok::DictEnd => {}
                     }
                 }
+                self.depth -= 1;
                 Tok::Operand(Operand::Array(items))
             }
             b']' => {
@@ -269,8 +284,11 @@ impl<'a> Lexer<'a> {
 }
 
 fn parse_num(txt: &str) -> f64 {
+    // Out-of-range numbers (e.g. 400 digits) would overflow to infinity in matrix products and
+    // poison every position. No real page needs coordinates beyond a billion units.
+    let finite = |v: f64| if v.is_finite() { v.clamp(-1e9, 1e9) } else { 0.0 };
     if let Ok(v) = txt.parse::<f64>() {
-        return v;
+        return finite(v);
     }
     // Tolerate junk such as "--5" or "1.2.3" the way viewers do: read the longest valid prefix.
     let mut end = 0;
@@ -290,7 +308,7 @@ fn parse_num(txt: &str) -> f64 {
         }
         end = i + 1;
     }
-    txt[..end].parse::<f64>().unwrap_or(0.0)
+    finite(txt[..end].parse::<f64>().unwrap_or(0.0))
 }
 
 /// Finds the end of inline image data that starts at `p` (just after `ID` and one whitespace).
@@ -312,7 +330,7 @@ fn inline_image_end(d: &[u8], p: usize) -> usize {
 
 /// Splits a content stream into operators. Never fails: unknown bytes are skipped.
 pub fn parse(data: &[u8]) -> Vec<Op> {
-    let mut lx = Lexer { d: data, p: 0 };
+    let mut lx = Lexer { d: data, p: 0, depth: 0 };
     let mut ops = Vec::new();
     let mut operands: Vec<Operand> = Vec::new();
     let mut start: Option<usize> = None;
@@ -448,6 +466,20 @@ mod tests {
         let ops = parse(b"/P <</MCID 0 /X [1 2]>> BDC % note (\n(a) Tj EMC");
         assert_eq!(ops.len(), 3);
         assert_eq!(ops[0].operands.len(), 2);
+    }
+
+    #[test]
+    fn hostile_input_is_bounded() {
+        let mut deep = vec![b'['; 300_000];
+        deep.extend_from_slice(b" (x) Tj");
+        // Unclosed arrays swallow the rest, as in viewers. What matters is that it returns.
+        let _ = parse(&deep);
+        let mut dicts = b"<<".repeat(100_000);
+        dicts.extend_from_slice(b" Q");
+        let _ = parse(&dicts);
+        let big = format!("{} 0 Td", "9".repeat(400));
+        assert_eq!(parse(big.as_bytes())[0].num(0), 0.0);
+        assert_eq!(parse(b"2000000000000 0 Td")[0].num(0), 1e9);
     }
 
     #[test]

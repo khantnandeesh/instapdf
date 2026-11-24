@@ -45,9 +45,15 @@ cargo build -p berry-cli && python3 oracle/run_corpus.py   # PDFium oracle over 
 cargo build -p berry-wasm --target wasm32-unknown-unknown --release
 wasm-bindgen target/wasm32-unknown-unknown/release/berry_wasm.wasm --out-dir berry-wasm/pkg --target web --out-name berry_engine
 node berry-wasm/smoke.mjs
+FUZZ_N=1500 FUZZ_OUT=/tmp/fz cargo test --release --test fuzz -- --nocapture   # random content streams
 ```
 
-The oracle needs `pypdfium2`, `pikepdf`, `pillow` and the Liberation, Carlito and Caladea fonts.
+The tests and the oracle need the Liberation, Carlito and Caladea fonts; the oracle also needs
+`pypdfium2`, `pikepdf` and `pillow`.
+
+Hostile files are bounded: 32 levels of array/dictionary nesting, 2,000,000 operators, 1,000,000
+glyphs, 4,000 form invocations, 128 MB per decoded stream and 131,072 entries per width or
+ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
 
 ## Known limits (next steps)
 
@@ -60,7 +66,10 @@ The oracle needs `pypdfium2`, `pikepdf`, `pillow` and the Liberation, Carlito an
 - Fake-bold text drawn twice reads as doubled characters.
 - No width-fitting (`Tz`) of substitute fonts yet (AC-11e), and no style changes, move or delete
   of existing text (AC-12, AC-13).
-- The WebAssembly module is about 0.8 MB gzip. It is loaded only when the editor opens a file.
+- A line that grows past the next column is not flagged yet, and `/ActualText` spans are not updated.
+- Saving holds the original and the new file in memory together (about 2x the file size).
+- Owner-password permission flags are not enforced; that is a product decision for the editor.
+- The WebAssembly module is about 0.72 MB gzip. It is loaded only when the editor opens a file.
 
 ## Licences
 
