@@ -74,6 +74,8 @@ jobs:
             echo "${m}_bg.wasm: $size bytes gzip"
             test "$size" -le 1000000
           done
+          # The default module loads on every editor visit: it must not grow (see engine-manifest.test.ts).
+          test "$(gzip -9 -c berry-wasm/pkg/berry_engine_bg.wasm | wc -c)" -le 792277
       - name: PDFium oracle over the editor corpus
         run: |
           pip install --quiet pypdfium2==5.14.0 pikepdf==10.18.2 pillow==13.0.0 uharfbuzz==0.57.0

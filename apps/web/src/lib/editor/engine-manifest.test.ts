@@ -49,6 +49,14 @@ describe("engine artifact", () => {
     }
   });
 
+  // The default module loads on every editor visit, so it must not grow: new features go into the
+  // lazily loaded shaping module. Raising this cap needs the lead's OK (measured as the build
+  // script does, `gzip -9`, recorded in manifest.json; Node's zlib reads about 1% higher).
+  it("keeps the default module at its size (792,277 bytes gzip)", () => {
+    expect(manifest.wasmGzipBytes).toBeLessThanOrEqual(792_277);
+    expect(gzipSync(read("berry_engine_bg.wasm"), { level: 9 }).length).toBeLessThanOrEqual(802_568);
+  });
+
   it("ships the engine's typed API unchanged", () => {
     const api = readFileSync(new URL("../../../../../crates/berry-wasm/berry-engine.d.ts", import.meta.url), "utf8");
     expect(readFileSync(new URL("./berry-engine.d.ts", import.meta.url), "utf8")).toBe(api);
