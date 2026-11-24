@@ -1,0 +1,23 @@
+{
+  "note": "Synthetic files only. Each case is one find/replace on page 1 (1-based) run through the engine, then checked by the PDFium oracle. 'expect' must be in PDFium's extracted text afterwards, 'absent' must not.",
+  "cases": [
+    {"id": "std14-word", "file": "std14-reportlab.pdf", "find": "page of", "replace": "sheet of", "expect": ["Each sheet of the report"], "absent": ["Each page of"], "substituted": false},
+    {"id": "std14-longer", "file": "std14-reportlab.pdf", "find": "45,000", "replace": "59,999 Ž", "expect": ["Amount due: 59,999 Ž"], "absent": ["45,000"], "substituted": false},
+    {"id": "std14-missing-glyph", "file": "std14-reportlab.pdf", "find": "45,000", "replace": "₹ 59,999", "expect": ["₹ 59,999"], "absent": ["45,000"], "substituted": true},
+    {"id": "std14-delete", "file": "std14-reportlab.pdf", "find": " twice", "replace": "", "expect": ["was checked before"], "absent": ["twice"], "substituted": false},
+    {"id": "std14-mono", "file": "std14-reportlab.pdf", "find": "ZEBRA", "replace": "OKAPI-22", "expect": ["REF-7731-OKAPI-22"], "absent": ["ZEBRA"], "substituted": false},
+    {"id": "lo-reuse-subset", "file": "libreoffice-memo.pdf", "find": "thirty", "replace": "tithe", "expect": ["at tithe minutes"], "absent": ["thirty"], "substituted": false},
+    {"id": "lo-missing-glyph", "file": "libreoffice-memo.pdf", "find": "Friday", "replace": "Monday", "expect": ["moves to Monday at"], "absent": ["Friday"], "substituted": true},
+    {"id": "lo-rupee", "file": "libreoffice-memo.pdf", "find": "fee receipt", "replace": "(₹ 5,000 fee)", "expect": ["(₹ 5,000 fee)"], "absent": ["receipt"], "substituted": true},
+    {"id": "lo-bold-reuse", "file": "libreoffice-memo.pdf", "find": "signed", "replace": "designed", "expect": ["the designed copies"], "absent": [], "substituted": false},
+    {"id": "lo-bold-run", "file": "libreoffice-memo.pdf", "find": "signed", "replace": "pressed", "expect": ["the pressed copies"], "absent": ["signed"], "substituted": true},
+    {"id": "chrome-justified", "file": "chrome-justified-mixed.pdf", "find": "made", "replace": "signed", "expect": ["is signed between the Provider and the Client"], "absent": ["is made"], "substituted": false},
+    {"id": "chrome-heading", "file": "chrome-justified-mixed.pdf", "find": "Service Agreement", "replace": "Supply Quote", "expect": ["Supply Quote"], "absent": ["Service Agreement"], "substituted": true},
+    {"id": "chrome-rupee-line", "file": "chrome-justified-mixed.pdf", "find": "45,000", "replace": "59,999 Ž", "expect": ["₹ 59,999 Ž — including GST"], "absent": ["45,000"], "substituted": true},
+    {"id": "chrome-italic", "file": "chrome-justified-mixed.pdf", "find": "Client", "replace": "Cline", "expect": ["and the Cline on the date"], "absent": ["Client"], "substituted": false},
+    {"id": "chrome-table-cell", "file": "chrome-justified-mixed.pdf", "find": "Item", "replace": "Items sold", "expect": ["Items sold", "Design"], "absent": [], "substituted": false},
+    {"id": "shared-form", "file": "shared-xobject.pdf", "find": "Northwind", "replace": "Southwind", "expect": ["Southwind Traders"], "absent": ["Northwind"], "other_pages_keep": ["Northwind Traders"], "substituted": false},
+    {"id": "rotated-page", "file": "rotated-90.pdf", "find": "notice", "replace": "bulletin", "expect": ["Landscape bulletin board"], "absent": ["notice"], "substituted": false},
+    {"id": "rotated-text", "file": "rotated-90.pdf", "find": "margin", "replace": "footer", "expect": ["Sideways footer note"], "absent": ["margin"], "substituted": false}
+  ]
+}
