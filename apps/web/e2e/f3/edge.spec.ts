@@ -383,12 +383,11 @@ test.describe("375 px touch: move buttons instead of drag", () => {
 test.describe("dark mode", () => {
   test.use({ colorScheme: "dark" });
 
-  test("AC-74: dark mode: no serious or critical axe violations on the Merge page in every state", async ({ page }) => {
+  test("AC-74: OS dark mode: the light BerryPDF palette stays and axe finds no serious or critical violations in every state", async ({ page }) => {
     await openMerge(page);
-    // Prove the dark tokens are actually in effect.
-    const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    const [r, g, b] = bg.match(/\d+/g)!.map(Number);
-    expect(r + g + b, `body background ${bg} should be dark`).toBeLessThan(200);
+    // BerryPDF defines no dark theme yet (docs/design/berrypdf.md "Dark mode"): an OS dark preference keeps the light grid paper.
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(255, 253, 251)");
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("light");
     await expectNoSeriousAxeViolations(page, "dark: empty");
     await pickMerge(page, "alpha.pdf", "bravo.pdf", "charlie.png");
     await expectNoSeriousAxeViolations(page, "dark: files view");

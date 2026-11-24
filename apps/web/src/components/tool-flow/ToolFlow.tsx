@@ -748,7 +748,7 @@ export function ToolFlow({
               // BerryPDF working mode: plain seed-cream, no decoration. A sticky row of editing tools
               // (blueberry EditorToolbar look, Tabs for the view) above the pink page trays.
               <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 sm:px-5">
-                <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] items-center gap-3 rounded-t-panel bg-cream px-3 sm:-mx-5 sm:gap-4 sm:px-5">
+                <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] items-center gap-4 rounded-t-panel bg-cream px-3 sm:-mx-5 sm:px-5">
                   {showViewToggle && (
                     <SegmentedControl
                       look="tabs"

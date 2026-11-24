@@ -1383,10 +1383,9 @@
   /* Merge: file cards and page trays rise in like tool tiles (30ms apart, capped at 300ms). Once the
      grid has settled the delay drops, so a card or tile that moves (React re-inserts it) rises
      straight into its new place: quiet feedback for a reorder. */
-  /* Fill "backwards" only: once done, no animation stays on the tile (a filling transform would make
-     each tile a stacking context, and the next tile would cover the insert point in the gap). */
   .mp-rise-tiles > [role="listitem"] {
-    animation: mp-rise-in 360ms var(--ease-enter) backwards;
+    position: relative;
+    animation: mp-tile-rise 360ms var(--ease-enter) backwards;
   }
   .mp-rise-tiles > [role="listitem"]:nth-child(2) { animation-delay: 30ms; }
   .mp-rise-tiles > [role="listitem"]:nth-child(3) { animation-delay: 60ms; }
@@ -1406,6 +1405,14 @@
   /* Rendered page thumbnails ease in (fade + settle from 98%). */
   .mp-thumb-in {
     animation: mp-thumb-in 300ms var(--ease-enter) both;
+  }
+}
+/* Like mp-rise-in, but moving the tile with `top` (it is position: relative) instead of a transform:
+   no stacking context and no transformed geometry, so its controls measure exactly 44px while it rises. */
+@keyframes mp-tile-rise {
+  from {
+    opacity: 0;
+    top: 12px;
   }
 }
 @keyframes mp-rise-in {

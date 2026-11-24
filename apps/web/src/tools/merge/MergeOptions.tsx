@@ -39,7 +39,7 @@ function TocIcon({ kind }: { kind: TocMode }) {
 /** One option group: the title as a BerryPDF step (a soft berry disc with its number). */
 function Group({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
-    <section aria-label={title} className="flex flex-col gap-3 border-sand max-lg:border-b-[1.5px] max-lg:pb-4 max-lg:last:border-b-0">
+    <div className="flex flex-col gap-3 border-sand max-lg:border-b-[1.5px] max-lg:pb-4 max-lg:last:border-b-0">
       <h3 className="mp-step text-[17px]">
         <span className="mp-step__n size-[26px] text-[14px]" aria-hidden="true">
           {n}
@@ -47,7 +47,7 @@ function Group({ n, title, children }: { n: number; title: string; children: Rea
         {title}
       </h3>
       {children}
-    </section>
+    </div>
   );
 }
 
