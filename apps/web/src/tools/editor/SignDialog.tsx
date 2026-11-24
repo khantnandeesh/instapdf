@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { cx } from "@/components/ui/cx";
-import { svgPolyline } from "@/lib/editor/build";
+import { svgPolyline } from "@/lib/editor/draw-math";
 import { SIGN_FACES, cssFamily } from "@/lib/editor/fonts";
 import { cssFont, ensureFace, measurer } from "@/lib/editor/fonts-browser";
 import { newId, type Pt, type SigSource } from "@/lib/editor/model";

@@ -6,7 +6,7 @@
  * Text is drawn with the same font file and the same baselines as the output (AC-91).
  */
 import { memo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { arrowHead, svgPolyline, typedSignatureSize } from "@/lib/editor/build";
+import { arrowHead, svgPolyline, typedSignatureSize } from "@/lib/editor/draw-math";
 import { cssFamily, faceOf } from "@/lib/editor/fonts";
 import { cssFont, ensureFace, knownManifest } from "@/lib/editor/fonts-browser";
 import { objectBounds, objectLabel, type EditorObject, type Pt, type SignatureObj, type TextObj } from "@/lib/editor/model";
