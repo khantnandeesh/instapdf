@@ -112,6 +112,8 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
     if (finished.current) return;
     const rs = rowsRef.current;
     if (!rs.length || rs.some((r) => r.status === "downloading" || r.status === "failed")) return;
+    // The tool tab is not answering: nothing is "added" until it does (onToolBack checks again).
+    if (link.current?.toolLost) return;
     finished.current = true;
     setView({ k: "done" });
     await link.current?.finish();
@@ -314,6 +316,7 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
       onToolBack: () => {
         setToolLost(false);
         if (viewRef.current.k === "lost") setView({ k: "before" });
+        else void checkComplete();
       },
     });
     link.current = l;

@@ -1,7 +1,7 @@
 /**
  * F23 cloud sources, PR #32 review fixes (mock provider): a full-page sign-in in the window (pick
  * and save), a stopped file that was still waiting its turn, and Google's own documents.
- * Spec: docs/specs/f23-cloud-pickers.md (AC-136, AC-141, AC-160).
+ * Spec: docs/specs/f23-cloud-pickers.md (AC-136, AC-141, AC-160, AC-168).
  */
 import { expect, test, type Page } from "@playwright/test";
 import { cards, closed, downloadResult, flow, mockLog, mockPick, needsCloud, openRotate, openWindow, pickReady, reachPicker, rowButton, run, sha256, tiles } from "./support";
@@ -82,4 +82,20 @@ test("AC-141: Google's own documents arrive as PDFs; one too large to export is 
   await expect(page.getByTestId("notice").filter({ hasText: "Big plan.pdf is too large for Google Drive to turn into a PDF." })).toBeVisible();
   await closed(win);
   expect((await mockLog(page))!.downloads).toEqual(expect.arrayContaining(["Plan.pdf", "Big plan.pdf"]));
+});
+
+test("AC-168: the tool tab goes away mid-download: a banner over the downloads, and the window never says Added", async ({ page }) => {
+  const win = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  // Three slow files, two at a time: still downloading when the window notices (TOOL_LOST_MS).
+  await mockPick(win, ["alpha.pdf", "bravo.pdf", "echo.pdf"], { slow: "*" });
+  const bar = win.getByRole("progressbar");
+  await expect(bar.first()).toBeVisible();
+  await page.close({ runBeforeUnload: false });
+  await expect(win.getByTestId("cloud-lost-banner")).toBeVisible({ timeout: 6000 });
+  await expect(win.getByRole("heading", { name: "This window lost its tool" })).toHaveCount(0);
+  // Every file downloaded (the rows keep a full bar).
+  await expect(win.locator('[role=progressbar][aria-valuenow="100"]')).toHaveCount(3, { timeout: 20_000 });
+  await win.waitForTimeout(1000);
+  await expect(win.getByTestId("cloud-window")).not.toHaveAttribute("data-view", "done");
+  await expect(win.getByTestId("cloud-lost-banner")).toBeVisible();
 });
