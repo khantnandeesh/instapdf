@@ -76,6 +76,19 @@ describe("qpdf-made files, every revision", () => {
     expect(await passwordKind(info, "op3n")).toBe("user");
   });
 
+  it("r4aes-utf8: a password PDFDocEncoding can't hold is tried as its UTF-8 bytes, as qpdf writes it", async () => {
+    const info = (await encryptInfo(qpdf("r4aes-utf8")))!;
+    expect(pdfDocBytes("\u0121-Own")).toBeNull();
+    expect(await passwordKind(info, "\u0121-Own")).toBe("owner");
+    expect(await passwordKind(info, "\u0120-Own")).toBeNull();
+    expect(await passwordKind(info, "op3n")).toBe("user");
+  });
+
+  it("rejects a soft hyphen, which PDFDocEncoding leaves undefined", () => {
+    expect(pdfDocBytes("\u00ad")).toBeNull();
+    expect(pdfDocBytes("a\u00adb")).toBeNull();
+  });
+
   it("R2-R4: a character with no PDFDocEncoding code is never truncated into a match", async () => {
     // "€" is 0xA0 in PDFDocEncoding; U+20A0 truncated to a byte would also be 0xA0.
     const info = (await encryptInfo(qpdf("r4aes")))!;
@@ -91,6 +104,7 @@ describe("validEncrypt", () => {
   const base: EncryptInfo = { r: 3, length: 16, o: new Uint8Array(32), u: new Uint8Array(32), p: -4, id: new Uint8Array(16), encryptMetadata: true };
   it("accepts the shapes each revision needs", () => {
     expect(validEncrypt(base, "/Standard", 2)).toBe(true);
+    expect(validEncrypt(base, "/Standard", 2, 128)).toBe(true);
     expect(validEncrypt({ ...base, r: 2, length: 5 }, "/Standard", 1)).toBe(true);
     expect(validEncrypt({ ...base, r: 6, o: new Uint8Array(48), u: new Uint8Array(48) }, "/Standard", 5)).toBe(true);
   });
@@ -103,6 +117,8 @@ describe("validEncrypt", () => {
     expect(validEncrypt({ ...base, id: new Uint8Array() }, "/Standard", 2)).toBe(false);
     expect(validEncrypt({ ...base, length: 64 }, "/Standard", 2)).toBe(false);
     expect(validEncrypt({ ...base, p: 1.5 }, "/Standard", 2)).toBe(false);
+    expect(validEncrypt(base, "/Standard", 2, 100)).toBe(false);
+    expect(validEncrypt(base, "/Standard", 2, 128.5)).toBe(false);
     expect(validEncrypt({ ...base, r: 6, u: new Uint8Array(32), o: new Uint8Array(48) }, "/Standard", 5)).toBe(false);
   });
   it("a file whose /Encrypt has the wrong shape is not checked", async () => {

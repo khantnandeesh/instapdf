@@ -102,7 +102,8 @@ const FROM_UNICODE = new Map(Object.entries(PDFDOC_SPECIAL).map(([code, cp]) => 
 
 /**
  * R2 to R4 passwords are bytes in PDFDocEncoding. Null when a character has no code there (it
- * can't be the password: truncating it to a byte could match a different one).
+ * can't be the password: truncating it to a byte could match a different one). U+00AD (soft
+ * hyphen) has none: 0xAD is undefined in PDFDocEncoding.
  */
 export function pdfDocBytes(s: string): Uint8Array | null {
   const out: number[] = [];
@@ -110,7 +111,7 @@ export function pdfDocBytes(s: string): Uint8Array | null {
     const cp = ch.codePointAt(0)!;
     const special = FROM_UNICODE.get(cp);
     if (special !== undefined) out.push(special);
-    else if (cp <= 0xff && !(cp >= 0x18 && cp <= 0x1f) && !(cp >= 0x7f && cp <= 0xa0)) out.push(cp);
+    else if (cp <= 0xff && !(cp >= 0x18 && cp <= 0x1f) && !(cp >= 0x7f && cp <= 0xa0) && cp !== 0xad) out.push(cp);
     else return null;
   }
   return Uint8Array.from(out);
@@ -179,9 +180,12 @@ export async function passwordKind(e: EncryptInfo, password: string): Promise<Pa
     if (equal(await hash2B(e, pw, e.u.subarray(32, 40), new Uint8Array()), e.u.subarray(0, 32))) return "user";
     return null;
   }
-  const pw = pdfDocBytes(password);
-  if (!pw) return null;
-  if (isOwnerLegacy(e, pw)) return "owner";
-  if (isUserLegacy(e, pw)) return "user";
+  // PDFDocEncoding first (the standard), then the UTF-8 bytes, as qpdf also tries: some tools
+  // write a non-Latin password that way.
+  const doc = pdfDocBytes(password);
+  const raw = new TextEncoder().encode(password);
+  const tries = [doc, doc && equal(doc, raw) ? null : raw].filter((x): x is Uint8Array => !!x);
+  for (const pw of tries) if (isOwnerLegacy(e, pw)) return "owner";
+  for (const pw of tries) if (isUserLegacy(e, pw)) return "user";
   return null;
 }

@@ -34,3 +34,11 @@ for name, c in cases.items():
 pdf = pikepdf.new()
 pdf.add_blank_page(page_size=(200, 200))
 pdf.save(f"{out}/r4aes-latin1.pdf", encryption=pikepdf.Encryption(owner="Owné-r", user="op3n", allow=pikepdf.Permissions(modify_other=False), R=4, aes=True), static_id=True)
+
+# A password with a character PDFDocEncoding lacks ("ġ-Own"): qpdf would write its UTF-8 bytes
+# (C4 A1 ...). pikepdf refuses such passwords at R4, so write those bytes through the
+# PDFDocEncoding string that has them ("\u00c4\u00a1-Own"). pdf-password.ts tries the UTF-8
+# bytes after the PDFDocEncoding ones.
+pdf = pikepdf.new()
+pdf.add_blank_page(page_size=(200, 200))
+pdf.save(f"{out}/r4aes-utf8.pdf", encryption=pikepdf.Encryption(owner="\u00c4\u00a1-Own", user="op3n", allow=pikepdf.Permissions(modify_other=False), R=4, aes=True), static_id=True)

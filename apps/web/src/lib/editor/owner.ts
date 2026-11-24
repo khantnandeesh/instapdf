@@ -28,16 +28,19 @@ export async function encryptInfo(bytes: Uint8Array): Promise<EncryptInfo | null
   const meta = dict.lookup(PDFName.of("EncryptMetadata"));
   const info: EncryptInfo = { r, length: Math.floor((num("Length") ?? (num("V") === 4 ? 128 : 40)) / 8), o, u, p, id, encryptMetadata: !(meta instanceof PDFBool && !meta.asBoolean()) };
   const filter = dict.lookup(PDFName.of("Filter"));
-  return filter instanceof PDFName && validEncrypt(info, filter.asString(), num("V")) ? info : null;
+  return filter instanceof PDFName && validEncrypt(info, filter.asString(), num("V"), num("Length")) ? info : null;
 }
 
 /**
  * The /Encrypt dictionary has the shape its revision needs (ISO 32000-2 §7.6.4), so no check reads
  * past an entry or runs on nonsense: the Standard handler, a known R and V, O and U of their
- * lengths, a key length of 40 to 128 bits in whole bytes, an integer P, and a file ID for R2-R4.
+ * lengths, a key length of 40 to 128 bits in whole bytes (a /Length that isn't a multiple of 8 is
+ * refused), an integer P, and a file ID for R2-R4.
  */
-export function validEncrypt(e: EncryptInfo, filter: string, v: number | undefined): boolean {
+export function validEncrypt(e: EncryptInfo, filter: string, v: number | undefined, lengthBits?: number): boolean {
   if (filter !== "/Standard" || !Number.isInteger(e.r) || !Number.isInteger(e.p)) return false;
+  // /Length is in bits, in whole bytes.
+  if (lengthBits !== undefined && (!Number.isInteger(lengthBits) || lengthBits % 8 !== 0)) return false;
   if (e.r >= 5) return e.r <= 6 && (v === 5 || v === undefined) && e.o.length >= 48 && e.u.length >= 48;
   if (e.r < 2 || (v !== undefined && ![1, 2, 4].includes(v))) return false;
   if (e.o.length < 32 || e.u.length < (e.r === 2 ? 32 : 16) || !e.id.length) return false;
