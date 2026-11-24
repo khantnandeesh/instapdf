@@ -4,8 +4,7 @@
  * renders at a time, canvases capped at 16.7 megapixels (iOS limit) (U-E5).
  */
 import type { PDFDocumentProxy, PDFPageProxy, PageViewport, RenderTask } from "pdfjs-dist";
-
-const MAX_PIXELS = 16_700_000;
+import { MAX_CANVAS_PIXELS as MAX_PIXELS } from "@/lib/editor/open-zoom";
 
 type Job = { run: () => Promise<void>; priority: number; cancelled: boolean };
 const queue: Job[] = [];

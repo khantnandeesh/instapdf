@@ -106,11 +106,11 @@ test.describe("desktop", () => {
     });
   }
 
-  test("M12: very wide screens are capped at 200%, so a line stays a readable length", async ({ page }) => {
+  test("M12: very wide screens are capped, so the page stays crisp and a line a readable length", async ({ page }) => {
     await page.setViewportSize({ width: 2560, height: 1300 });
     await open(page);
-    // report-form-3p.pdf is Letter (612 pt): 200% is 1,632 px.
-    expect((await page.getByTestId("page-1").boundingBox())!.width).toBeLessThanOrEqual(1640);
+    // report-form-3p.pdf is A4: capped at about 217% (lib/editor/open-zoom), about 1,720 px wide.
+    expect((await page.getByTestId("page-1").boundingBox())!.width).toBeLessThanOrEqual(1760);
   });
 });
 
