@@ -12,6 +12,8 @@ import { cx } from "@/components/ui/cx";
 import * as H from "@/lib/editor/history";
 import { objectLabel, totalRotation, type PageEntry } from "@/lib/editor/model";
 import { displaySize } from "@/lib/editor/geometry";
+import { TabOrderTab } from "@/tools/forms/EditorForms";
+import { TabOrderIcon } from "@/tools/forms/icons";
 import { pageActions } from "./Chrome";
 import { useCtl } from "./context";
 import { HistoryBold, ListBold, MoreBold, PagesBold } from "./icons";
@@ -22,12 +24,17 @@ const THUMB_W = 112;
 
 export function SidePanel({ onGo, onPicked, sheet }: { onGo: (i: number) => void; onPicked?: () => void; sheet?: boolean }) {
   const ctl = useCtl();
-  const tab = useStore(ctl.store, (s) => s.panelTab);
-  const tabs = [
+  const hasForm = useStore(ctl.store, (s) => !!H.current(s.history).forms?.fields.length);
+  const picked = useStore(ctl.store, (s) => s.panelTab);
+  const tab = picked === "fields" && !hasForm ? "pages" : picked;
+  const all = [
     { id: "pages", label: "Pages", icon: <PagesBold size={16} /> },
     { id: "objects", label: "Objects", icon: <ListBold size={16} /> },
+    { id: "fields", label: "Tab order", icon: <TabOrderIcon size={16} /> },
     { id: "history", label: "History", icon: <HistoryBold size={16} /> },
   ] as const;
+  // Tab order shows once the file has fields (U-F6); phones get it as a sheet from the Form tool.
+  const tabs = all.filter((t) => t.id !== "fields" || (hasForm && !sheet));
   return (
     <div className={cx("ed-side", sheet && "ed-side--sheet")}>
       <div role="tablist" aria-label="Panel" className="ed-tabs">
@@ -62,6 +69,7 @@ export function SidePanel({ onGo, onPicked, sheet }: { onGo: (i: number) => void
         {tab === "pages" && <Thumbs onGo={(i) => (onGo(i), onPicked?.())} sheet={sheet} />}
         {tab === "objects" && <Objects onPicked={onPicked} />}
         {tab === "history" && <HistoryList />}
+        {tab === "fields" && <TabOrderTab />}
       </div>
     </div>
   );

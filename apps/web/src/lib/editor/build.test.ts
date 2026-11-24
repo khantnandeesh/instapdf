@@ -7,7 +7,9 @@ import { describe, expect, it } from "vitest";
 import { arrowHead, boxPoint, buildPdf, hexToRgb, quadPoints, toPdf, type BuildFonts } from "./build";
 import config from "./fonts.json";
 import type { EditorFontManifest } from "./fonts";
-import { initialPages, type EditorObject, type PageEntry } from "./model";
+import { addField, createField, setValue } from "@/lib/forms/model";
+import { readFormFromBytes } from "@/lib/forms/read";
+import { duplicatePage, initialPages, type DocState, type EditorObject, type PageEntry } from "./model";
 import { baselineOffset } from "./text-layout";
 
 const require = createRequire(import.meta.url);
@@ -235,5 +237,75 @@ describe("buildPdf", () => {
     const { texts } = await pdfText(out);
     expect(texts[0]).not.toContain("only on the copy");
     expect(texts[1]).toContain("only on the copy");
+  });
+  it("with no form, a copy moved before its original keeps content, annotations and objects on the right pages", async () => {
+    const fonts = await nodeFonts();
+    const src = await PDFDocument.load(await source());
+    // A link annotation on page 1 that every copy should carry.
+    const link = src.context.obj({ Type: "Annot", Subtype: "Link", Rect: [50, 50, 150, 80], Border: [0, 0, 0] });
+    src.getPage(0).node.set(PDFName.of("Annots"), src.context.obj([src.context.register(link)]));
+    const bytes = await src.save();
+    const pages = initialPages(Array.from({ length: 3 }, (_, i) => ({ view: [0, 0, 600, 800] as [number, number, number, number], rotate: i === 2 ? 90 : 0 })));
+    const copy: PageEntry = { ...pages[0], id: "copy", rotate: 90 };
+    const order = [copy, pages[1], pages[0]];
+    const objects: EditorObject[] = [
+      { kind: "shape", id: "on-copy", page: "copy", shape: "rect", x: 10, y: 10, w: 50, h: 50, rot: 0, stroke: "#000000", fill: "#ff0000", width: 1 },
+      { kind: "shape", id: "on-original", page: "p0", shape: "rect", x: 10, y: 10, w: 50, h: 50, rot: 0, stroke: "#000000", fill: "#0000ff", width: 1 },
+    ];
+    const out = await buildPdf({ bytes, pages: order, objects, assets: {} }, fonts, fontkit);
+    const doc = await PDFDocument.load(out);
+    expect(doc.getPageCount()).toBe(3);
+    expect(doc.getPages().map((p) => p.getRotation().angle)).toEqual([90, 0, 0]);
+    const { texts } = await pdfText(out);
+    expect(texts).toEqual([expect.stringContaining("Original page 1"), expect.stringContaining("Original page 2"), expect.stringContaining("Original page 1")]);
+    const links = (i: number) => (doc.getPage(i).node.lookup(PDFName.of("Annots"), PDFArray)?.size() ?? 0);
+    expect([links(0), links(1), links(2)]).toEqual([1, 0, 1]);
+    // Each copy got only its own object: red on page 1, blue on page 3.
+    const fills = async (i: number) => {
+      const c = doc.getPage(i).node.Contents();
+      const raw = c instanceof PDFArray ? c.asArray().map((r) => doc.context.lookup(r)) : [c];
+      const { decodePDFRawStream } = await import("@cantoo/pdf-lib");
+      return raw.map((x) => new TextDecoder().decode(decodePDFRawStream(x as never).decode())).join("\n");
+    };
+    expect(await fills(0)).toMatch(/1 0 0 rg/);
+    expect(await fills(0)).not.toMatch(/0 0 1 rg/);
+    expect(await fills(2)).toMatch(/0 0 1 rg/);
+    expect(await fills(2)).not.toMatch(/1 0 0 rg/);
+  });
+
+  it("writes form changes with page actions: filled values, new fields, and widgets on a duplicated page (F16 E3)", async () => {
+    const fonts = await nodeFonts();
+    const src = await PDFDocument.create();
+    for (let i = 0; i < 2; i++) src.addPage([600, 800]);
+    const tf = src.getForm().createTextField("name");
+    tf.addToPage(src.getPage(0), { x: 50, y: 700, width: 200, height: 20 });
+    const bytes = await src.save();
+    const { form } = await readFormFromBytes(bytes);
+    const pages = initialPages(Array.from({ length: 2 }, () => ({ view: [0, 0, 600, 800] as [number, number, number, number], rotate: 0 })));
+    let doc: DocState = { pages, objects: [], engine: 0, forms: form };
+    doc = duplicatePage(doc, "p0").state;
+    const copy = doc.pages[1];
+    expect(copy.src).toBe(0);
+    let state = doc.forms!;
+    expect(state.fields[0].widgets.map((w) => w.page)).toEqual(["p0", copy.id]);
+    state = setValue(state, state.fields[0].id, "Ada").state;
+    const box = createField(state, { kind: "checkbox", page: "p1", box: { x: 40, y: 40, w: 14, h: 14 } });
+    state = addField(state, box);
+    // Reverse the order too: widgets follow their pages.
+    const order = [doc.pages[2], doc.pages[1], doc.pages[0]];
+    const out = await buildPdf({ bytes, pages: order, objects: [], assets: {}, forms: { state, original: form } }, fonts, fontkit);
+    const back = await PDFDocument.load(out);
+    const f = back.getForm();
+    expect(f.getTextField("name").getText()).toBe("Ada");
+    expect(f.getCheckBox(box.name).isChecked()).toBe(false);
+    const widgets = f.getTextField("name").acroField.getWidgets();
+    expect(widgets).toHaveLength(2);
+    const outPages = back.getPages();
+    const onPage = (i: number) => (outPages[i].node.Annots()?.asArray() ?? []).length;
+    // Page order out: p1 (checkbox), the copy (name), p0 (name). No stray widgets from the copy.
+    expect([onPage(0), onPage(1), onPage(2)]).toEqual([1, 1, 1]);
+    const pRefs = widgets.map((w) => w.P());
+    expect(new Set(pRefs.map(String)).size).toBe(2);
+    expect(pRefs.every((r) => outPages.some((p) => p.ref === r))).toBe(true);
   });
 });
