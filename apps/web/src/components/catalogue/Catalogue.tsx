@@ -160,7 +160,7 @@ export function Catalogue() {
         {/* Sticky search bar (design rule "Sticky search and filter bars"): the search and
             the jump chips scroll with the page until they reach the header, then stay pinned under it
             while the list scrolls, and drop back into place on the way up. A sentinel just above it
-            tells when it is stuck, which adds the soft shadow. */}
+            tells when it is stuck (data-stuck). The bar itself is fully transparent (owner, 2026-11-24). */}
         <div ref={stickSentinel} aria-hidden="true" className="mt-6 h-px" />
         <div ref={stickBar} data-stuck={stuck ? "" : undefined} className="ip-sticky-bar sticky top-(--ip-header-h) z-10 -mx-[15px] px-[15px] pb-2" data-testid="catalogue-bar">
           {/* Phones: search and the filter share one row (short label) so the pinned bar stays compact. */}
@@ -182,7 +182,9 @@ export function Catalogue() {
               id="ready-only"
               label={copy.readyOnly}
               shortLabel={copy.readyOnlyShort}
-              className="shrink-0"
+              // The bar is transparent (owner), so the label carries its own pill like the search field and
+              // chips do: cards scrolling under it never sit behind its text.
+              className="shrink-0 rounded-pill border-[1.5px] border-sand bg-surface-raised ps-4 pe-1.5"
               checked={readyOnly}
               onChange={(v) => {
                 userChanged.current = true;
@@ -194,7 +196,7 @@ export function Catalogue() {
 
           {!searching && (
             // Inline padding offset by negative margins keeps edge chips' focus outlines inside the scroller.
-            <nav aria-label={copy.jumpLabel} className="ip-scroll-x -mx-1.5 mt-4 px-1.5">
+            <nav aria-label={copy.jumpLabel} className="ip-scroll-x -mx-1.5 mt-4 px-1.5" data-ip-scroll="chips">
               <ul className="flex gap-2 py-1.5 max-lg:flex-nowrap lg:flex-wrap lg:justify-center">
                 {groups.map((g) => (
                   <li key={g.id} className="shrink-0">

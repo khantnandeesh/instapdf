@@ -22,7 +22,7 @@ export function NoticeStack({ notices, onDismiss }: { notices: FlowNotice[]; onD
         if (e.key === "Escape" && expanded) setExpanded(false);
       }}
     >
-      <div className="pointer-events-auto flex max-h-[60dvh] w-[min(520px,calc(100vw-32px))] flex-col items-stretch gap-2 overflow-y-auto">
+      <div className="pointer-events-auto flex max-h-[60dvh] w-[min(520px,calc(100vw-32px))] flex-col items-stretch gap-2 overflow-y-auto" data-ip-scroll="overlay">
         {visible.map((n) => (
           <TimedNotice key={n.id} notice={n} onDismiss={() => onDismiss(n.id)} />
         ))}
