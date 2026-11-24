@@ -1,4 +1,5 @@
 "use client";
+import "./editor.css";
 /**
  * Edit PDF (beta): change existing text, line by line (F16, a small subset of phase E1/E2).
  *

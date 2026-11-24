@@ -2,10 +2,15 @@
  * Processing jobs that run inside the processing Web Worker
  * (`processing.worker.ts`). Kept free of worker globals so they are unit tested.
  *
- * Memory: inputs arrive as Blobs (no copy on the main thread) and are read one
- * at a time; each output is handed off (single PDF) or streamed into the ZIP
- * before the next input is read, so at most one input and one output are held.
+ * Memory: inputs arrive as Blobs (no copy on the main thread). Rotate reads
+ * them one at a time and hands each output off (single PDF) or streams it into
+ * the ZIP before reading the next, so one input and one output are held. Merge
+ * builds one output: each source is parsed at its first use and released after
+ * its last page is copied (see merge.ts), so only the sources still to come
+ * stay parsed next to the growing output.
  */
+export { USER_ERROR } from "./user-error";
+import { mergePdf, type MergeEnv, type MergeInput } from "./merge";
 import { pdfOutputName, uniqueNames } from "./naming";
 import { rotatePdf } from "./rotate";
 import { createZipWriter } from "./zip";
@@ -19,7 +24,9 @@ export type RotateJob = {
   zipName: string;
 };
 
-export type Job = RotateJob;
+export type MergeJob = { kind: "merge"; name: string } & MergeInput;
+
+export type Job = RotateJob | MergeJob;
 
 export type JobOutput = {
   name: string;
@@ -31,15 +38,37 @@ export type JobOutput = {
   entries?: { name: string; pageCount: number }[];
   /** True when any input was encrypted (the output never is). */
   wasEncrypted: boolean;
+  /** Non-blocking notes for the user about the result. */
+  warnings?: string[];
 };
 
-export type ProgressFn = (fraction: number) => void;
+/** `phase` "fonts" = a font download (indeterminate); "pages" = back to the fraction. */
+export type ProgressFn = (fraction: number, phase?: "fonts" | "pages") => void;
 
-export async function runJob(job: Job, onProgress: ProgressFn): Promise<JobOutput> {
+/** What only the worker can provide (font fetches, browser image decoding). Absent in unit tests unless stubbed. */
+export type JobEnv = Omit<MergeEnv, "onPhase">;
+
+export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {}): Promise<JobOutput> {
   switch (job.kind) {
     case "rotate":
       return runRotate(job, onProgress);
+    case "merge":
+      return runMerge(job, onProgress, env);
   }
+}
+
+async function runMerge(job: MergeJob, onProgress: ProgressFn, env: JobEnv): Promise<JobOutput> {
+  let phase: "fonts" | "pages" = "pages";
+  let last = 0;
+  const r = await mergePdf(job, { ...env, onPhase: (p) => onProgress(last, (phase = p)) }, (f) => onProgress((last = f), phase));
+  return {
+    name: job.name,
+    type: "application/pdf",
+    blob: new Blob([r.bytes as Uint8Array<ArrayBuffer>], { type: "application/pdf" }),
+    pageCount: r.pageCount,
+    wasEncrypted: r.wasEncrypted,
+    warnings: r.warnings,
+  };
 }
 
 async function runRotate(job: RotateJob, onProgress: ProgressFn): Promise<JobOutput> {

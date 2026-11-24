@@ -13,6 +13,7 @@ export function Switch({
   checked,
   onChange,
   className,
+  describedBy,
 }: {
   id: string;
   label: string;
@@ -20,6 +21,7 @@ export function Switch({
   checked: boolean;
   onChange: (checked: boolean) => void;
   className?: string;
+  describedBy?: string;
 }) {
   return (
     <label htmlFor={id} className={cx("relative inline-flex min-h-11 cursor-pointer items-center gap-3 text-[16px] leading-6 text-ink select-none", className)}>
@@ -27,6 +29,7 @@ export function Switch({
         id={id}
         type="checkbox"
         role="switch"
+        aria-describedby={describedBy}
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
         className="peer absolute inset-0 z-10 m-0 size-full cursor-pointer appearance-none opacity-0"

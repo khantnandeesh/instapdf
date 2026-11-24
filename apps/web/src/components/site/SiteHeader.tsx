@@ -6,8 +6,8 @@ import { HeaderShortcuts } from "./HeaderShortcuts";
 import { ToolMenu } from "./ToolMenu";
 
 /**
- * Site header on every page (spec F2 §3c, H-4), BerryPDF Header: a white bar with a thin sand line
- * under it (pages.md). Logo (the berry mark + "BerryPDF" in Fredoka 600), the "All tools" pill chip
+ * Site header on every page (spec F2 §3c, H-4), BerryPDF Header: a floating glass pill (owner 2026-11-24)
+ * (pages.md). Logo (the berry mark + "BerryPDF" in Fredoka 600), the "All tools" pill chip
  * (cream with a sand outline), then up to 5 plain shortcuts (3 below 1024 px, none below 768 px).
  * Sticky, so the menu opens without scrolling back up (F2 AC-32/AC-38).
  */

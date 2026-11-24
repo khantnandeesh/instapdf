@@ -1,11 +1,15 @@
 "use client";
+import "./tool-flow.css";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { setHandoff, takeHandoff } from "@/lib/pdf/handoff";
 import { openPdf, readPageSizes, type OpenedPdf } from "@/lib/pdf/pdfjs";
 import { ThumbnailRenderer } from "@/lib/pdf/thumbnails";
+import { USER_ERROR } from "@/lib/pdf/user-error";
 import { disposeWorker } from "@/lib/pdf/worker-client";
 import { acceptAttribute, fitsPageBudget, screenFiles } from "@/lib/pdf/validation";
+import { exceedsPixelCap, imageFormatOfName, imagePageSize, probeImage, sniffFormat } from "@/lib/pdf/images";
 import { continueTargets, type FlowTool } from "@/tools/registry";
 import { Button } from "../ui/Button";
 import { BerryLoader } from "../berry/Berry";
@@ -17,20 +21,34 @@ import { ControlDock, DockStatus, ProcessError, ProcessingBar } from "./ControlD
 import { copy } from "./copy";
 import { DropCard } from "./DropCard";
 import { DropOverlay } from "./DropOverlay";
-import { FileGrid } from "./FileGrid";
 import { FilePicker, type FilePickerHandle } from "./FilePicker";
 import { LimitsNote, PrivacyNote } from "./notes";
 import { NoticeStack, type FlowNotice } from "./NoticeStack";
-import { OwnerPasswordDialog, OwnerPermissionNotice } from "./OwnerPassword";
-import { PageGrid, type PageActionsRenderer } from "./PageGrid";
-import { PagePreviewDialog } from "./PagePreviewDialog";
-import { PasswordDialog } from "./PasswordDialog";
-import { ReplaceFileDialog } from "./ReplaceFileDialog";
-import { ResultCard } from "./ResultCard";
+import { OwnerPermissionNotice } from "./OwnerPassword";
+import type { PageActionsRenderer } from "./PageGrid";
+import type { PreviewTarget } from "./PagePreviewDialog";
 import { createVisibilityWatcher, ThumbContext } from "./Thumbnail";
 import { ToolIntro } from "./ToolIntro";
-import type { FlowContext, FlowState, LoadedFile, PageDecoration, ProcessFn, ReadyFile, ToolOutput } from "./types";
+import type { FlowApi, FlowContext, FlowState, LoadedFile, PageDecoration, PreviewItem, ProcessFn, ReadyFile, ToolOutput, WorkspaceContext } from "./types";
 import { LeaveGuard } from "./LeaveGuard";
+
+// Never needed before a file is picked: separate chunks, prefetched once the page is idle.
+const lazyParts = {
+  result: () => import("./ResultCard"),
+  password: () => import("./PasswordDialog"),
+  owner: () => import("./OwnerPassword"),
+  replace: () => import("./ReplaceFileDialog"),
+  preview: () => import("./PagePreviewDialog"),
+  pageGrid: () => import("./PageGrid"),
+  fileGrid: () => import("./FileGrid"),
+};
+const PageGrid = dynamic(() => lazyParts.pageGrid().then((m) => m.PageGrid), { ssr: false });
+const FileGrid = dynamic(() => lazyParts.fileGrid().then((m) => m.FileGrid), { ssr: false });
+const ResultCard = dynamic(() => lazyParts.result().then((m) => m.ResultCard), { ssr: false });
+const PasswordDialog = dynamic(() => lazyParts.password().then((m) => m.PasswordDialog), { ssr: false });
+const OwnerPasswordDialog = dynamic(() => lazyParts.owner().then((m) => m.OwnerPasswordDialog), { ssr: false });
+const ReplaceFileDialog = dynamic(() => lazyParts.replace().then((m) => m.ReplaceFileDialog), { ssr: false });
+const PagePreviewDialog = dynamic(() => lazyParts.preview().then((m) => m.PagePreviewDialog), { ssr: false });
 
 type Phase = "idle" | "processing" | "done" | "error";
 
@@ -62,9 +80,71 @@ export type ToolFlowProps = {
   process: ProcessFn;
   /** Called on Start over so the tool clears its own option state. */
   onReset?: () => void;
+
+  // ---- extension points (spec F3 M-11 #1). Rotate uses none of them. ----
+  /** Replaces the built-in file and page grids. */
+  renderWorkspace?: (ctx: WorkspaceContext) => ReactNode;
+  /** Toolbar items after the view toggle (and before the size slider). */
+  toolbarStart?: (ctx: WorkspaceContext) => ReactNode;
+  /** Toolbar items after "Add files". */
+  toolbarEnd?: (ctx: WorkspaceContext) => ReactNode;
+  /** Orders each batch before it is read (Merge: natural name order). */
+  sortIntake?: (files: File[]) => File[];
+  /** Called right after a batch is accepted, before any file is parsed. `tag` is what `api.intake` was given. */
+  onFilesAdded?: (entries: LoadedFile[], tag: unknown) => void;
+  /** Called at the start of every intake, before the file count is checked. */
+  beforeIntake?: () => void;
+  /** Show the empty state even though files are held (e.g. kept only for an undo). */
+  workspaceEmpty?: boolean;
+  /** Status text in the ready state (default "{pages} pages · {files} files"). */
+  readyStatus?: () => string;
+  /** Show the view toggle from one file (Merge) instead of two. */
+  viewToggleFromOneFile?: boolean;
+  /** Below 640 px, the toolbar's Add files shows only its icon. */
+  compactAddFiles?: boolean;
+  /** Merge's own wording for the empty state and the wrong-type error. */
+  copyOverrides?: { pickerButton?: string; pickerHint?: string; limits?: string; limitsFull?: string; statusEmpty?: string; errorType?: (name: string) => string };
+  /** Chip on the Options button below 1024 px ("2 changed"), for `optionsDensity: "full"`. */
+  optionsBadge?: string;
+  /** Receives the flow API (for keyboard handlers outside render). */
+  apiRef?: { current: FlowApi | null };
+  /** Called after every change to the file list (status, pages, removal). */
+  onFilesChange?: (files: LoadedFile[]) => void;
+  /**
+   * Loads an inspector for each PDF (lazily, so it is not in the first load):
+   * `scan` reads the raw file in a worker, `notice` looks at the
+   * opened document; a returned sentence is shown as a non-blocking notice
+   * (Merge: properties the output will not keep).
+   */
+  inspectPdf?: () => Promise<PdfInspector>;
 };
 
-export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions, onPageKey, readyNote, canRun, process, onReset }: ToolFlowProps) {
+export function ToolFlow({
+  tool,
+  renderOptions,
+  decoratePage,
+  renderPageActions,
+  onPageKey,
+  readyNote,
+  canRun,
+  process,
+  onReset,
+  renderWorkspace,
+  toolbarStart,
+  toolbarEnd,
+  sortIntake,
+  onFilesAdded,
+  beforeIntake,
+  workspaceEmpty,
+  readyStatus,
+  viewToggleFromOneFile,
+  compactAddFiles,
+  copyOverrides,
+  optionsBadge,
+  apiRef,
+  onFilesChange,
+  inspectPdf,
+}: ToolFlowProps) {
   const flow = tool.flow;
   const router = useRouter();
   const statusId = useId();
@@ -83,6 +163,9 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
   phaseRef.current = phase;
   const [output, setOutput] = useState<ToolOutput | null>(null);
   const [progress, setProgress] = useState(0);
+  const [progressPhase, setProgressPhase] = useState<"fonts" | "pages" | undefined>();
+  /** A processing error meant for the user (the job said what to do), shown instead of the generic one. */
+  const [processMessage, setProcessMessage] = useState<string | null>(null);
   const [notices, setNotices] = useState<FlowNotice[]>([]);
   const [message, setMessage] = useState("");
   const announce = useCallback((m: string) => setMessage((prev) => (prev === m ? `${m} ` : m)), []);
@@ -90,7 +173,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
   const [thumbSize, setThumbSize] = useState(THUMB_DEFAULT);
   const [renderSize, setRenderSize] = useState(160);
   const [dragging, setDragging] = useState(false);
-  const [preview, setPreview] = useState<{ fileId: string; index: number } | null>(null);
+  const [preview, setPreview] = useState<{ items: PreviewItem[]; at: number } | null>(null);
   const [pw, setPw] = useState<{ error?: string; busy: boolean; attempt: number }>({ busy: false, attempt: 0 });
   const [pendingReplace, setPendingReplace] = useState<File[] | null>(null);
   const [ownerFor, setOwnerFor] = useState<string | null>(null);
@@ -100,6 +183,12 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
   const docs = useRef(new Map<string, OpenedPdf>());
   const renderer = useMemo(() => (typeof window === "undefined" ? null : new ThumbnailRenderer()), []);
   const [watcher, setWatcher] = useState<ReturnType<typeof createVisibilityWatcher> | null>(null);
+  useEffect(() => {
+    const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
+    const go = () => void Promise.all(Object.values(lazyParts).map((load) => load())).catch(() => {});
+    if (idle) idle(go);
+    else setTimeout(go, 1000);
+  }, []);
   // Set once listeners (drop, paste, hand-off) are live: tests wait for data-hydrated.
   // From 1024 px the pages scroll inside their own area (fold fit), so thumbnails are watched
   // against that area; below, the page itself scrolls and the viewport is the root.
@@ -135,16 +224,29 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
   const readyFiles = files.filter(isReady);
   const lockedFiles = files.filter((f) => f.status === "locked");
   const state: FlowState =
-    phase === "processing" ? "processing" : phase === "done" ? "done" : phase === "error" ? "error" : files.length === 0 ? "empty" : lockedFiles.length ? "password" : files.some((f) => f.status === "loading") ? "loading" : "ready";
+    phase === "processing"
+      ? "processing"
+      : phase === "done"
+        ? "done"
+        : phase === "error"
+          ? "error"
+          : files.length === 0 || (workspaceEmpty && !files.some((f) => f.status !== "ready"))
+            ? "empty"
+            : lockedFiles.length
+              ? "password"
+              : files.some((f) => f.status === "loading")
+                ? "loading"
+                : "ready";
   const totalPages = readyFiles.reduce((s, f) => s + f.pageCount, 0);
   const ownerBlocked = readyFiles.filter((f) => flow.requiredPermissions.some((p) => f.denied.includes(p)));
   const runCheck = canRun?.() ?? true;
   const canPrimary = (state === "ready" || state === "error") && readyFiles.length > 0 && ownerBlocked.length === 0 && runCheck === true;
-  const view = files.length > 1 ? (viewChoice ?? flow.defaultView) : "pages";
+  const showViewToggle = files.length > 1 || (!!viewToggleFromOneFile && files.length > 0);
+  const view = showViewToggle ? (viewChoice ?? flow.defaultView) : "pages";
   const optionsDisabled = !(state === "ready" || state === "error");
   const statusText =
     state === "empty"
-      ? copy.statusEmpty
+      ? (copyOverrides?.statusEmpty ?? copy.statusEmpty)
       : state === "loading"
         ? copy.statusLoading
         : state === "password"
@@ -153,10 +255,14 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
             ? copy.statusOwner
             : typeof runCheck === "string"
               ? runCheck
-              : copy.statusReady(totalPages, readyFiles.length);
+              : (readyStatus?.() ?? copy.statusReady(totalPages, readyFiles.length));
 
   // ---- notices -------------------------------------------------------------
-  const pushNotice = useCallback((n: Omit<FlowNotice, "id">) => setNotices((prev) => [...prev, { ...n, id: `n${++fileSeq}` }]), []);
+  const pushNotice = useCallback((n: Omit<FlowNotice, "id">) => {
+    const id = `n${++fileSeq}`;
+    setNotices((prev) => [...prev, { ...n, id }]);
+    return id;
+  }, []);
   const dismissNotice = useCallback((id: string) => setNotices((prev) => prev.filter((n) => n.id !== id)), []);
 
   // ---- file lifecycle ------------------------------------------------------
@@ -189,6 +295,38 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
       } catch {
         bytes = new Uint8Array(0);
       }
+      if (imageFormatOfName(entry.name)) {
+        // Pictures (Merge): sizes from the header, no decode; each image (or TIFF frame) is one A4 page.
+        const format = sniffFormat(bytes);
+        let frames: { width: number; height: number }[] | null = null;
+        let tooLarge = false;
+        if (format === "tiff") {
+          // Walked in the TIFF worker with a time limit: a hostile file can never hang this tab.
+          const r = await (await import("@/lib/pdf/tiff-client")).probeTiff(entry.source);
+          if ("frames" in r) frames = r.frames;
+          else tooLarge = r.problem === "tooLarge";
+        } else if (format) {
+          const probe = probeImage(bytes);
+          frames = probe ? [probe] : null;
+        }
+        if (!filesRef.current.some((f) => f.id === id)) return "gone";
+        const reject = (message: string) => {
+          problems.push(message);
+          removeFile(id);
+          return "rejected" as const;
+        };
+        if (tooLarge) return reject(copy.errorPixels(entry.name));
+        if (!format || !frames?.length) return reject(copy.errorImage(entry.name));
+        if (frames.some((f) => exceedsPixelCap(f.width, f.height))) return reject(copy.errorPixels(entry.name));
+        const otherPages = filesRef.current.filter((f) => f.id !== id).reduce((sum, f) => sum + f.pageCount, 0);
+        if (!fitsPageBudget(otherPages, frames.length, flow.maxTotalPages)) return reject(copy.errorPages(entry.name, flow.maxTotalPages));
+        renderer?.registerImage(id, entry.source, format, frames);
+        patchFile(id, { status: "ready", kind: "image", pageCount: frames.length, pages: frames.map((f) => imagePageSize(f.width, f.height)) });
+        announce(copy.fileReady(entry.name, frames.length));
+        return "ok";
+      }
+      const inspector = inspectPdf ? await inspectPdf().catch(() => null) : null;
+      const scanned = inspector?.scan(entry.source); // in a worker, in parallel with pdf.js
       const result = await openPdf(bytes, password);
       if (!filesRef.current.some((f) => f.id === id)) {
         if (result.ok) void result.pdf.task.destroy();
@@ -231,9 +369,14 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
       renderer?.register(id, pdf.doc);
       patchFile(id, { status: "ready", pages });
       announce(copy.fileReady(entry.name, pdf.pageCount));
+      if (inspector)
+        void Promise.resolve(scanned)
+          .then((markers) => inspector.notice(entry.name, pdf.doc, markers))
+          .then((note) => note && filesRef.current.some((f) => f.id === id) && pushNotice({ tone: "warning", title: note, sticky: true }))
+          .catch(() => {});
       return "ok";
     },
-    [announce, flow.maxTotalPages, patchFile, removeFile, renderer],
+    [announce, flow.maxTotalPages, inspectPdf, patchFile, pushNotice, removeFile, renderer],
   );
 
   const flushProblems = useCallback(
@@ -259,9 +402,11 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
   }, [focusToolbarTick]);
 
   const intake = useCallback(
-    async (incoming: File[], trigger: HTMLElement | null, opts: { replace?: boolean } = {}) => {
+    async (incomingRaw: File[], trigger: HTMLElement | null, opts: { replace?: boolean; tag?: unknown } = {}) => {
       if (phaseRef.current === "processing" || phaseRef.current === "done") return;
-      if (!incoming.length) return;
+      if (!incomingRaw.length) return;
+      const incoming = sortIntake ? sortIntake(incomingRaw) : incomingRaw;
+      beforeIntake?.();
       if (!flow.multiFile && filesRef.current.length > 0 && !opts.replace) {
         setPendingReplace(incoming);
         return;
@@ -270,7 +415,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
       intakeTrigger.current = trigger;
       if (phaseRef.current === "error") setPhase("idle");
       // Info notices last until the next intake; errors stay until dismissed.
-      setNotices((prev) => prev.filter((n) => n.tone === "danger"));
+      setNotices((prev) => prev.filter((n) => n.tone === "danger" || n.sticky));
 
       const screened = screenFiles(
         incoming,
@@ -280,7 +425,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
       );
       const mb = (bytes: number) => Math.round(bytes / 1024 / 1024);
       const problems = screened.rejected.map((r) =>
-        r.reason === "type" ? copy.errorType(r.name) : r.reason === "size" ? copy.errorSize(r.name, mb(flow.maxFileBytes)) : copy.errorTotal(r.name, mb(flow.maxTotalBytes)),
+        r.reason === "type" ? (copyOverrides?.errorType ?? copy.errorType)(r.name) : r.reason === "size" ? copy.errorSize(r.name, mb(flow.maxFileBytes)) : copy.errorTotal(r.name, mb(flow.maxTotalBytes)),
       );
       if (screened.overCount.length) pushNotice({ tone: "warning", title: copy.errorCount(flow.maxFiles), items: screened.overCount.map((n) => `Not loaded: ${n}`) });
 
@@ -294,18 +439,21 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
         pages: null,
         wasEncrypted: false,
         denied: [],
+        kind: imageFormatOfName(file.name) ? "image" : "pdf",
+        lastModified: file.lastModified ?? 0,
       }));
       if (!entries.length) {
         flushProblems(problems);
         return;
       }
       updateFiles((prev) => [...prev, ...entries]);
+      onFilesAdded?.(entries, opts.tag);
       if (trigger) setFocusToolbarTick((n) => n + 1);
       announce(copy.readingCount(entries.length));
       for (const e of entries) await loadFile(e.id, undefined, problems);
       flushProblems(problems);
     },
-    [announce, flow, flushProblems, loadFile, pushNotice, removeFile, updateFiles],
+    [announce, beforeIntake, copyOverrides?.errorType, flow, flushProblems, loadFile, onFilesAdded, pushNotice, removeFile, sortIntake, updateFiles],
   );
 
   // ---- password queue ------------------------------------------------------
@@ -360,24 +508,31 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
     const controller = new AbortController();
     abort.current = controller;
     setProgress(0);
+    setProgressPhase(undefined);
     setPhase("processing");
     announce(tool.flow.progressLabel);
     const started = performance.now();
     try {
-      const out = await process(ready, controller.signal, (v) => setProgress(v));
+      const out = await process(ready, controller.signal, (v, ph) => {
+        setProgress(v);
+        setProgressPhase(ph);
+      });
       const wait = MIN_PROCESSING_MS - (performance.now() - started);
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       if (controller.signal.aborted) return;
       setProgress(1);
       setOutput(out);
+      for (const w of out.warnings ?? []) pushNotice({ tone: "warning", title: w });
       setPhase("done");
       announce(copy.resultTitle(out.type === "application/zip"));
     } catch (error) {
       if (controller.signal.aborted) return;
-      console.error(`[${tool.slug}] processing failed:`, error instanceof Error ? error.message : "unknown error");
+      const message = error instanceof Error ? error.message : "unknown error";
+      console.error(`[${tool.slug}] processing failed:`, message.startsWith(USER_ERROR) ? "user-facing error" : message);
+      setProcessMessage(message.startsWith(USER_ERROR) ? message.slice(USER_ERROR.length) : null);
       setPhase("error");
     }
-  }, [announce, process, tool.flow.progressLabel, tool.slug]);
+  }, [announce, process, pushNotice, tool.flow.progressLabel, tool.slug]);
 
   // Move focus once the processing bar or the error panel has been committed
   // (a requestAnimationFrame can run before React commits under load).
@@ -528,10 +683,42 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
     return () => clearTimeout(t);
   }, [thumbSize]);
 
+  // A layout effect, not a passive one: a tool that mirrors the file list (Merge's cards) updates in
+  // the same task, before paint. With useEffect the flow committed its new state first (e.g. "ready"
+  // after Skip on a locked file) while the tool still rendered the removed file's card for a frame.
+  useLayoutEffect(() => {
+    onFilesChange?.(files);
+  }, [files, onFilesChange]);
+
+  // ---- API for tools with their own workspace -------------------------------
+  const api = useMemo<FlowApi>(
+    () => ({
+      intake: (f, trigger, tag) => intake(f, trigger, { tag }),
+      removeFiles: (ids) => ids.forEach(removeFile),
+      pushNotice,
+      dismissNotice,
+      announce,
+      openPreview: (items, at) => setPreview({ items, at }),
+      setView: (v) => setViewChoice(v),
+      openPicker: () => picker.current?.open(),
+      fallbackFocus,
+    }),
+    [announce, dismissNotice, fallbackFocus, intake, pushNotice, removeFile],
+  );
+  if (apiRef) apiRef.current = api;
+
   // ---- render ----------------------------------------------------------------
   const ctx: FlowContext = { files, readyFiles, state, disabled: optionsDisabled, announce };
+  const wctx: WorkspaceContext = { ...ctx, view, api, dimmed: state === "processing" };
   const decorate = decoratePage ?? (() => ({ pendingDelta: 0, inScope: false }));
-  const previewFile = preview ? readyFiles.find((f) => f.id === preview.fileId) : undefined;
+  const previewTarget: PreviewTarget | null = useMemo(() => {
+    if (!preview) return null;
+    const items = preview.items.flatMap((it) => {
+      const file = readyFiles.find((f) => f.id === it.fileId);
+      return file ? [{ file, index: it.index, rotation: it.rotation }] : [];
+    });
+    return items.length ? { items, at: Math.min(preview.at, items.length - 1) } : null;
+  }, [preview, readyFiles]);
   const accept = acceptAttribute(flow.accept);
   const ownerFile = ownerFor ? readyFiles.find((f) => f.id === ownerFor) : undefined;
 
@@ -568,13 +755,13 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
                   ref={picker}
                   accept={accept}
                   multiple={flow.multiFile}
-                  label={copy.pickerButton(flow.multiFile)}
+                  label={copyOverrides?.pickerButton ?? copy.pickerButton(flow.multiFile)}
                   icon={<UploadIcon size={24} />}
                   onFiles={(f, t) => void intake(f, t)}
                   inputTestId="file-input"
                 />
-                <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copy.pickerHint}</p>
-                <LimitsNote text={copy.limits(flow)} full={copy.limitsFull(flow)} />
+                <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copyOverrides?.pickerHint ?? copy.pickerHint}</p>
+                <LimitsNote text={copyOverrides?.limits ?? copy.limits(flow)} full={copyOverrides?.limitsFull ?? copy.limitsFull(flow)} />
                 <PrivacyNote runtime={tool.runtime} context="intro" />
               </DropCard>
             ) : (
@@ -585,18 +772,26 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
               // below 1024 px the page scrolls and the tools row sticks under the header.
               <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 sm:px-5 lg:flex lg:h-(--ip-pages-h) lg:flex-col">
                 <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] shrink-0 items-center gap-4 rounded-t-panel bg-cream px-3 sm:-mx-5 sm:px-5 lg:static">
-                  {files.length > 1 && (
+                  {showViewToggle && (
                     <SegmentedControl
                       look="tabs"
                       label="View"
                       value={view}
                       onChange={setViewChoice}
-                      options={[
-                        { value: "pages", label: "Pages" },
-                        { value: "files", label: "Files" },
-                      ]}
+                      options={
+                        flow.defaultView === "files"
+                          ? [
+                              { value: "files", label: "Files" },
+                              { value: "pages", label: "Pages" },
+                            ]
+                          : [
+                              { value: "pages", label: "Pages" },
+                              { value: "files", label: "Files" },
+                            ]
+                      }
                     />
                   )}
+                  {toolbarStart?.(wctx)}
                   {view === "pages" && (
                     <Slider
                       className="max-sm:hidden"
@@ -615,6 +810,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
                       accept={accept}
                       multiple={flow.multiFile}
                       label={flow.multiFile ? "Add files" : "Replace file"}
+                      compact={compactAddFiles}
                       variant="tool"
                       size="sm"
                       className="shadow-glow"
@@ -624,6 +820,7 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
                       inputTestId="file-input"
                     />
                   </span>
+                  {toolbarEnd?.(wctx)}
                 </div>
                 <div
                   ref={setScrollArea}
@@ -640,24 +837,27 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
                     />
                   ))}
                   <ThumbContext.Provider value={{ renderer, watch: watcher?.watch ?? null, renderSize: renderBucket(renderSize) }}>
-                    {view === "pages" ? (
+                    {renderWorkspace ? (
+                      renderWorkspace(wctx)
+                    ) : view === "pages" ? (
                       <PageGrid
                         files={files}
                         decorate={decorate}
                         renderActions={renderPageActions}
                         onPageKey={onPageKey}
                         onRemove={(f) => removeFile(f.id)}
-                        onOpen={(f, i) => setPreview({ fileId: f.id, index: i })}
+                        onOpen={(f, i) =>
+                          setPreview({ items: Array.from({ length: f.pageCount }, (_, k) => ({ fileId: f.id, index: k, rotation: decorate(f, k).pendingDelta })), at: i })
+                        }
                         dimmed={state === "processing"}
                       />
                     ) : (
                       <FileGrid files={files} onRemove={(f) => removeFile(f.id)} />
                     )}
                     <PagePreviewDialog
-                      target={previewFile && preview ? { file: previewFile, index: preview.index } : null}
+                      target={previewTarget}
                       renderer={renderer}
-                      rotationFor={(f, i) => decorate(f, i).pendingDelta}
-                      onNavigate={(i) => setPreview((p) => (p ? { ...p, index: i } : p))}
+                      onNavigate={(at) => setPreview((p) => (p ? { ...p, at } : p))}
                       onClose={() => setPreview(null)}
                       fallbackFocus={() => heading.current}
                     />
@@ -684,12 +884,35 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
             layout={state === "empty" ? "side" : "bar"}
             optionsDisabled={optionsDisabled}
             options={renderOptions(ctx)}
+            density={flow.optionsDensity}
+            sheet={{
+              title: `${tool.name} options`,
+              badge: optionsBadge,
+              footer: (close) => (
+                <>
+                  <Button variant="secondary" className="flex-1" onClick={close}>
+                    Done
+                  </Button>
+                  <Button
+                    variant="primary"
+                    className="flex-1"
+                    disabled={!canPrimary}
+                    onClick={() => {
+                      close();
+                      void run();
+                    }}
+                  >
+                    {flow.actionLabel}
+                  </Button>
+                </>
+              ),
+            }}
             status={<DockStatus id={statusId} text={statusText} extra={state === "ready" && runCheck === true ? readyNote : undefined} />}
             footer={
               state === "processing" ? (
-                <ProcessingBar ref={progressBox} label={flow.progressLabel} value={progress} />
+                <ProcessingBar ref={progressBox} label={flow.progressLabel} value={progress} phaseLabel={progressPhase === "fonts" ? copy.preparingFonts : undefined} />
               ) : state === "error" ? (
-                <ProcessError ref={retryButton} message={copy.errorProcess(flow.progressLabel)} onRetry={run} onStartOver={startOver} />
+                <ProcessError ref={retryButton} message={processMessage ?? copy.errorProcess(flow.progressLabel)} onRetry={run} onStartOver={startOver} />
               ) : (
                 primary
               )
@@ -739,6 +962,9 @@ export function ToolFlow({ tool, renderOptions, decoratePage, renderPageActions,
     </div>
   );
 }
+
+/** See `inspectPdf`. `scan` reads the file (off the main thread) for whatever `notice` needs. */
+export type PdfInspector = { scan: (file: Blob) => Promise<unknown>; notice: (name: string, doc: OpenedPdf["doc"], scanned: unknown) => Promise<string | null> };
 
 /** Re-render thumbnails only in steps, scaling with CSS in between. */
 function renderBucket(size: number): number {

@@ -423,6 +423,25 @@
   --color-prose: var(--mp-prose);
 }
 
+/*
+ * F3 Merge additions (docs/specs/f3-merge.md, M-2). Kept as their own block:
+ * no existing token value is changed here.
+ */
+:root {
+  --ip-on-paper-muted: #7a6468; /* text on a blank page thumbnail (BerryPDF muted; pages are always white) */
+  --ip-insert-size: 24px; /* visible insert-point circle; hit area is --ip-tap-min */
+  --ip-slot-bar: 3px; /* drop / insert indicator in the grid gap */
+  --ip-lift-scale: 1.03; /* dragged ghost */
+  --ip-selbar-h: 56px; /* floating selection bar */
+  --ip-z-drag: 35; /* drag ghost: above notices (30), below the drop overlay (40) */
+  --ip-z-selbar: 25; /* selection bar: above the dock (20), below notices (30) */
+  --ip-sheet-max-h: 85dvh; /* options bottom sheet below 1024px */
+}
+
+@theme inline {
+  --color-on-paper-muted: var(--ip-on-paper-muted);
+}
+
 /* Fold fit: dvh where supported (it follows mobile browser bars); 100vh above is the fallback. */
 @supports (height: 1dvh) {
   :root {

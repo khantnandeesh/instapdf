@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/licenses.mjs && next dev",
-    "build": "node scripts/licenses.mjs && next build && node scripts/csp-manifest.mjs",
-    "licenses": "node scripts/licenses.mjs",
+    "dev": "node scripts/copy-fonts.mjs && node scripts/licenses.mjs && next dev",
+    "build": "node scripts/copy-fonts.mjs && node scripts/licenses.mjs && next build && node scripts/csp-manifest.mjs",
+    "licenses": "node scripts/copy-fonts.mjs && node scripts/licenses.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -14,18 +14,25 @@
     "gen:icons": "node scripts/gen-tool-icons.mjs"
   },
   "dependencies": {
+    "@cantoo/fontkit": "2.0.12",
     "@cantoo/pdf-lib": "2.11.1",
     "@fontsource-variable/fredoka": "5.3.0",
     "fflate": "0.8.2",
     "next": "15.5.29",
-    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.5.438",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "utif": "3.1.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
     "@eslint/eslintrc": "^3",
+    "@fontsource/noto-sans": "5.3.0",
+    "@fontsource/noto-sans-hebrew": "5.3.0",
+    "@fontsource/noto-sans-jp": "5.3.1",
+    "@fontsource/noto-sans-kr": "5.3.1",
+    "@fontsource/noto-sans-sc": "5.3.1",
+    "@fontsource/noto-sans-thai": "5.3.0",
     "@phosphor-icons/core": "2.1.1",
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4",
@@ -34,6 +41,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.29",
+    "pdf-lib": "1.17.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^5.1.1"

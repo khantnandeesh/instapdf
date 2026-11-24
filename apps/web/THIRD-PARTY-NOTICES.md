@@ -142,3 +142,23 @@ SOFTWARE.
 ## BerryPDF design system artwork
 
 - The berry mark, berry loader, blossom, leaf, vine, jam-drip, waves and gingham drawings in `src/components/berry/Berry.tsx` and `src/app/globals.css` come from the owner's BerryPDF design system (commissioned for this product).
+
+## Merge (F3) components
+
+Licenses verified in the installed packages. The npm packages are also covered by the build-time scan; the Noto fonts are copied to `public/fonts/noto/` by `scripts/copy-fonts.mjs`, and the scan lists each family from its `OFL-<family>.txt`.
+
+| Component | Version | License | Where it runs |
+|---|---|---|---|
+| UTIF.js (`utif`) | 3.1.0 | MIT (Copyright (c) 2017 Photopea) | TIFF decoding, in workers only (thumbnails and merge); loaded lazily |
+| pako (dependency of UTIF.js) | 1.0.11 | MIT AND Zlib | with UTIF.js |
+| `@cantoo/fontkit` | 2.0.12 | MIT | processing worker, only when footer or contents text needs a non-WinAnsi glyph |
+| brotli, dfa, restructure, base64-js (dependencies of fontkit) | 1.3.3, 1.2.0, 3.0.2, 1.5.1 | MIT | with fontkit |
+| fflate (dependency of fontkit) | 0.8.3 | MIT (Copyright (c) 2026 Arjun Barrett) | with fontkit |
+| Noto Sans (`@fontsource/noto-sans`, build-time only) | 5.3.0 | SIL OFL 1.1; Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic) | `/fonts/noto/`, license in `OFL-noto-sans.txt` |
+| Noto Sans Hebrew (`@fontsource/noto-sans-hebrew`) | 5.3.0 | SIL OFL 1.1; Copyright 2024 The Noto Project Authors (https://github.com/notofonts/hebrew) | `OFL-noto-sans-hebrew.txt` |
+| Noto Sans Thai (`@fontsource/noto-sans-thai`) | 5.3.0 | SIL OFL 1.1; Copyright 2022 The Noto Project Authors (https://github.com/notofonts/thai) | `OFL-noto-sans-thai.txt` |
+| Noto Sans JP (`@fontsource/noto-sans-jp`) | 5.3.1 | SIL OFL 1.1; Copyright Google Inc. | `OFL-noto-sans-jp.txt` |
+| Noto Sans KR (`@fontsource/noto-sans-kr`) | 5.3.1 | SIL OFL 1.1; Copyright Google Inc. | `OFL-noto-sans-kr.txt` |
+| Noto Sans SC (`@fontsource/noto-sans-sc`) | 5.3.1 | SIL OFL 1.1; Copyright Google Inc. | `OFL-noto-sans-sc.txt` |
+
+The font slices are copied unmodified and fetched by the processing worker only when needed; the PDF output embeds subsets of them, as the OFL permits. Each family's license file is served next to its fonts (`/fonts/noto/OFL-<family>.txt`); its terms are the SIL Open Font License 1.1 text reproduced under Fredoka above.

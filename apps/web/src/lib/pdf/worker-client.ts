@@ -23,7 +23,10 @@ export function disposeWorker(): void {
 }
 
 /** Runs a job in the worker. Inputs are Blobs: posting them copies no bytes. */
-export function runInWorker(job: Job, { signal, onProgress }: { signal?: AbortSignal; onProgress?: (fraction: number) => void }): Promise<JobOutput> {
+export function runInWorker(
+  job: Job,
+  { signal, onProgress }: { signal?: AbortSignal; onProgress?: (fraction: number, phase?: "fonts" | "pages") => void },
+): Promise<JobOutput> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new DOMException("Aborted", "AbortError"));
     const w = getWorker();
@@ -39,7 +42,7 @@ export function runInWorker(job: Job, { signal, onProgress }: { signal?: AbortSi
     const onMessage = (event: MessageEvent<WorkerResponse>) => {
       const msg = event.data;
       if (msg.id !== id) return;
-      if (msg.type === "progress") onProgress?.(msg.value);
+      if (msg.type === "progress") onProgress?.(msg.value, msg.phase);
       else if (msg.type === "done") settle(() => resolve(msg.output));
       else fail(new Error(msg.message));
     };

@@ -3,7 +3,7 @@
  * `ref` is the matching Sejda slug, used only by the parity evaluator.
  * `runtime`: "client" = processed in the browser, nothing uploaded; "server" = processing worker.
  */
-import { pdfOutputName, zipName } from "../lib/pdf/naming";
+import { mergedName, pdfOutputName, zipName } from "../lib/pdf/naming";
 import type { ToolIconName } from "./tool-icon-names";
 
 export type ToolCategory =
@@ -142,6 +142,11 @@ const keywordsBySlug: Record<string, string[]> = {
 
 const MB = 1024 * 1024;
 const PDF_ONLY = { mime: ["application/pdf"], extensions: [".pdf"] };
+/** PDF plus images (spec F3 §0). TIFF is in: UTIF.js (MIT) was verified as the decoder (§8a decision 9). */
+const PDF_AND_IMAGES = {
+  mime: ["application/pdf", "image/jpeg", "image/png", "image/gif", "image/bmp", "image/webp", "image/tiff"],
+  extensions: [".pdf", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", ".tiff"],
+};
 
 /** Browser-tool defaults from the F1 spec (no free-tier gate for browser tools). */
 const clientPdfFlow = (
@@ -168,6 +173,21 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
   "rotate-pdf": {
     status: "beta",
     flow: clientPdfFlow("rotate-pdf", { title: "Rotate PDF", actionLabel: "Rotate PDF", progressLabel: "Rotating" }),
+  },
+  "merge-pdf": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "merge-pdf",
+      { title: "Merge PDF", actionLabel: "Merge PDFs", progressLabel: "Merging" },
+      {
+        accept: PDF_AND_IMAGES,
+        maxFiles: 50,
+        defaultView: "files",
+        optionsDensity: "full",
+        // Always one PDF, named after the first file in the output (spec F3 §6).
+        outputName: (inputs) => mergedName(inputs[0]),
+      },
+    ),
   },
 };
 

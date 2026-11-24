@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
 import { cx } from "./cx";
+import { IconButton } from "./IconButton";
+import { CloseIcon } from "./icons";
 
 export type DialogCloseReason = "escape" | "action";
 
@@ -23,6 +25,7 @@ export function Dialog({
   className,
   wide,
   variant = "default",
+  onCloseButton,
 }: {
   open: boolean;
   onClose: (reason: DialogCloseReason) => void;
@@ -42,7 +45,10 @@ export function Dialog({
    * under a visually hidden title, and focuses that title unless
    * `initialFocusRef` is set (no on-screen keyboard popping up on open).
    */
-  variant?: "default" | "fullscreen";
+  /** "sheet" (spec F3 M-4): anchored to the bottom, full width, max height --ip-sheet-max-h; body scrolls, header and footer stay. */
+  variant?: "default" | "fullscreen" | "sheet";
+  /** Sheet only: a close button in the header. */
+  onCloseButton?: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -109,7 +115,10 @@ export function Dialog({
       className={cx(
         variant === "fullscreen"
           ? "mp-modal-in m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto overscroll-contain border-0 bg-surface-raised p-0 text-ink backdrop:bg-transparent"
-          : cx(
+          : variant === "sheet"
+            ? // BerryPDF bottom sheet: white, 24px top corners, the modal's blurred berry backdrop; rises in (0.3s overshoot).
+              "mp-sheet mx-0 mt-auto mb-0 max-h-(--ip-sheet-max-h) w-screen max-w-none border-0 p-0"
+            : cx(
               // BerryPDF Modal: 380px, 24px corners with a 40px leaf corner, a pale-pink wave across the top,
               // one deep soft shadow on a blurred berry-tinted backdrop; rises 14px and pops in (0.3s overshoot).
               "mp-modal m-auto max-h-[calc(100dvh-32px)] p-0",
@@ -125,6 +134,21 @@ export function Dialog({
           </h2>
           {children}
         </>
+      )}
+      {open && variant === "sheet" && (
+        <div className="flex max-h-(--ip-sheet-max-h) flex-col">
+          <div className="flex shrink-0 flex-col items-stretch border-b-[1.5px] border-sand px-4 pt-2 pb-2">
+            <span aria-hidden="true" className="mx-auto mb-2 h-1.5 w-10 rounded-pill bg-sand" />
+            <div className="flex items-center justify-between gap-3">
+              <h2 id={titleId} className="text-tile-title text-ink-black">
+                {title}
+              </h2>
+              {onCloseButton && <IconButton label="Close" icon={<CloseIcon size={18} />} variant="soft" tooltip={false} onClick={onCloseButton} />}
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">{children}</div>
+          {footer && <div className="flex shrink-0 flex-wrap gap-2 border-t-[1.5px] border-sand px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">{footer}</div>}
+        </div>
       )}
       {open && variant === "default" && (
         <div className="flex flex-col gap-5 px-7 pt-[34px] pb-[26px]">

@@ -307,6 +307,45 @@ export const toolSeo: Record<string, ToolSeo> = {
 };
 
 export const seoContent: Record<string, ToolSeoContent> = {
+  "merge-pdf": {
+    howTo: "How to merge PDF files",
+    steps: [
+      { name: "Add your files", text: "Drop PDFs and images on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Put them in order", text: "Drag the files, or switch to Pages to move, rotate, remove or add single pages." },
+      { name: "Merge and save", text: "Pick any options, select Merge PDFs and download one combined PDF." },
+    ],
+    faq: [
+      {
+        q: "How do I combine PDF files into one?",
+        a: "Add the files, put them in the order you want, then select Merge PDFs and download the result. You get one PDF with every page in that order.",
+      },
+      {
+        q: "Can I change the order of pages, not just files?",
+        a: "Yes. The Pages view shows every page. Drag pages between files, rotate or remove them, or add blank pages and pages from another file.",
+      },
+      {
+        q: "Can I merge images with PDFs?",
+        a: "Yes. JPG, PNG, GIF, BMP, WebP and TIFF images become pages of the merged PDF, each centred on its own page.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. Merging runs in your browser, so your files stay on your device.",
+      },
+      {
+        q: "Are bookmarks and form fields kept?",
+        a: "Bookmarks are kept by default, and you can also add one per file or remove them. Form fields are kept, with repeated names renamed; you can also share, flatten or remove them.",
+      },
+      {
+        q: "Can I add a table of contents?",
+        a: "Yes. Choose a contents page with file names or document titles. It links to the first page of each file.",
+      },
+      {
+        q: "How many files can I merge at once?",
+        a: "Up to 50 files at a time, up to 100 MB each, 500 MB and 1,000 pages in total. It is free, with no sign-up and no watermark.",
+      },
+    ],
+    related: ["split-pdf", "organize-pdf", "combine-reorder-pdf", "compress-pdf", "jpg-to-pdf", "rotate-pdf"],
+  },
   "rotate-pdf": {
     howTo: "How to rotate a PDF",
     steps: [

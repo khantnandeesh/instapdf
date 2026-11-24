@@ -1,4 +1,5 @@
 "use client";
+import "./slider.css";
 import { useId } from "react";
 import { IconButton } from "./IconButton";
 import { MinusIcon, PlusIcon } from "./icons";

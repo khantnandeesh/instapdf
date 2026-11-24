@@ -34,7 +34,7 @@ test("AC-41: client-side navigation back to / shows the new entry at once", asyn
 });
 
 test("AC-42: coming-soon, placeholder and unknown pages do not change the stored list", async ({ page }) => {
-  for (const path of ["/merge-pdf", "/about", "/no-such-page"]) {
+  for (const path of ["/split-pdf", "/about", "/no-such-page"]) {
     await page.goto(path);
     await page.waitForTimeout(200);
     expect(await storedRecent(page), path).toBeNull();
@@ -43,7 +43,7 @@ test("AC-42: coming-soon, placeholder and unknown pages do not change the stored
 
 test("AC-43: unknown and planned slugs are skipped", async ({ page }) => {
   await page.goto("/");
-  await seedRecent(page, JSON.stringify(["no-such-tool", "merge-pdf", "rotate-pdf"]));
+  await seedRecent(page, JSON.stringify(["no-such-tool", "split-pdf", "rotate-pdf"]));
   await expect(homeRecent(page).getByRole("link")).toHaveCount(1);
   await expect(homeRecent(page).getByRole("link")).toHaveAttribute("href", "/rotate-pdf");
 });

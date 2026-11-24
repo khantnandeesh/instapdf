@@ -49,7 +49,7 @@ describe("pure rules", () => {
   });
 
   it("skips unknown and planned slugs, dedupes and shows at most 6 (AC-43)", () => {
-    expect(visibleRecent(["no-such-tool", "merge-pdf", "rotate-pdf"], usable)).toEqual(["rotate-pdf"]);
+    expect(visibleRecent(["no-such-tool", "split-pdf", "rotate-pdf"], usable)).toEqual(["rotate-pdf"]);
     expect(visibleRecent(["rotate-pdf", "rotate-pdf", "crop-pdf"], usable)).toEqual(["rotate-pdf", "crop-pdf"]);
     expect(visibleRecent(Array.from({ length: 10 }, () => "x"), () => true)).toEqual(["x"]);
     expect(visibleRecent(Array.from({ length: 10 }, (_, i) => `t${i}`), () => true)).toHaveLength(6);
@@ -181,8 +181,8 @@ describe("pre-paint script (H-10)", () => {
     const cases: [string | null, boolean][] = [
       [null, false],
       ["{oops", false],
-      ['["no-such-tool","merge-pdf","rotate-pdf"]', true],
-      ['["merge-pdf"]', false],
+      ['["no-such-tool","split-pdf","rotate-pdf"]', true],
+      ['["split-pdf"]', false],
       ['["rotate-pdf",1]', false],
     ];
     for (const [stored, expected] of cases) {

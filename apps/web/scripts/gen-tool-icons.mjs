@@ -76,15 +76,17 @@ const TOOL_ICONS = [
 const UI_ICONS = {
   FileIcon: "file",
   FilesIcon: "files",
-  PlusIcon: "plus",
-  MinusIcon: "minus",
-  RotateLeftIcon: "arrow-counter-clockwise",
-  RotateRightIcon: "arrow-clockwise",
-  ResetIcon: "arrow-u-up-left",
-  CloseIcon: "x",
+  PlusIcon: "plus@bold",
+  MinusIcon: "minus@bold",
+  RotateLeftIcon: "arrow-counter-clockwise@bold",
+  RotateRightIcon: "arrow-clockwise@bold",
+  ResetIcon: "arrow-u-up-left@bold",
+  // Bold, not duotone, for small controls (x, check, plus, minus, carets, arrows, rotate, enlarge): the duotone fill
+  // sits behind them as a shaded square or triangle that reads as a box (owner 2026-11-24).
+  CloseIcon: "x@bold",
   EyeIcon: "eye",
   LockIcon: "lock-simple",
-  CheckIcon: "check",
+  CheckIcon: "check@bold",
   CheckCircleIcon: "check-circle",
   DownloadIcon: "download-simple",
   UploadIcon: "upload-simple",
@@ -92,21 +94,26 @@ const UI_ICONS = {
   AlertIcon: "warning-circle",
   ErrorIcon: "x-circle",
   InfoIcon: "info",
-  EnlargeIcon: "arrows-out-simple",
-  ChevronLeftIcon: "caret-left",
-  ChevronRightIcon: "caret-right",
-  ChevronDownIcon: "caret-down",
+  EnlargeIcon: "arrows-out-simple@bold",
+  ChevronLeftIcon: "caret-left@bold",
+  ChevronRightIcon: "caret-right@bold",
+  ChevronDownIcon: "caret-down@bold",
   ShieldIcon: "shield-check",
   SearchIcon: "magnifying-glass",
   GridIcon: "squares-four",
   ClockIcon: "clock",
   DeviceIcon: "browser",
-  ArrowRightIcon: "arrow-right",
-  ArrowLeftIcon: "arrow-left",
+  ArrowRightIcon: "arrow-right@bold",
+  ArrowLeftIcon: "arrow-left@bold",
   LeafIcon: "leaf",
 };
 
-const iconFile = (n) => join(pkgDir, "assets", "duotone", `${n}-duotone.svg`);
+/** "name" is the duotone weight; "name@bold" picks another weight. */
+const iconFile = (n) => {
+  const [name, weight = "duotone"] = n.split("@");
+  return join(pkgDir, "assets", weight, `${name}-${weight}.svg`);
+};
+const iconLabel = (n) => (n.includes("@") ? n.replace("@", ", ") : `${n}, duotone`);
 const license = readFileSync(join(pkgDir, "LICENSE"), "utf8").trim();
 const camel = (name) => name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 const esc = (v) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -204,7 +211,7 @@ function Icon({ size = 20, children, ...rest }: IconProps & { children: React.Re
 
 export type IconComponent = (props: IconProps) => React.ReactElement;
 ${Object.entries(UI_ICONS)
-  .map(([comp, n]) => `\n/** Phosphor "${n}" (duotone). */\nexport const ${comp}: IconComponent = (p) => <Icon {...p}>${shapesOf(n)}</Icon>;`)
+  .map(([comp, n]) => `\n/** Phosphor ${iconLabel(n)}. */\nexport const ${comp}: IconComponent = (p) => <Icon {...p}>${shapesOf(n)}</Icon>;`)
   .join("\n")}
 `;
 
