@@ -56,10 +56,11 @@ describe("engine artifact", () => {
   // The default module loads on every editor visit, so it must not grow: new features go into the
   // lazily loaded shaping module. Raising this cap needs the lead's OK (measured as the build
   // script does, `gzip -9`, recorded in manifest.json; Node's zlib reads about 1% higher). It is
-  // 792,277 bytes; the cap leaves room for the few dozen bytes builds differ by between machines.
+  // 793,037 bytes; the cap leaves room for the few dozen bytes builds differ by between machines.
+  // Raised from 793,000 for #43 (clip-rectangle refusal and CFF fixes; owner's OK 2026-11-24).
   it("keeps the default module at its size (792 KB gzip)", () => {
-    expect(manifest.wasmGzipBytes).toBeLessThanOrEqual(793_000);
-    expect(gzipSync(read("berry_engine_bg.wasm"), { level: 9 }).length).toBeLessThanOrEqual(803_300);
+    expect(manifest.wasmGzipBytes).toBeLessThanOrEqual(793_400);
+    expect(gzipSync(read("berry_engine_bg.wasm"), { level: 9 }).length).toBeLessThanOrEqual(803_700);
   });
 
   // The font matcher loads only when a match is needed, and must stay a small download.
