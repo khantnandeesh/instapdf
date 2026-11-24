@@ -209,7 +209,8 @@ test("AC-17: a 1,001-page file is rejected with the 1,000-page cap", async ({ pa
   await expect(flow(page)).toHaveAttribute("data-state", "empty");
 });
 
-test("AC-18: 21 files load 20 and show the 20-file cap", async ({ page }) => {
+// A heavy load (21 files at once): with the other @serial tests on one worker, so no parallel load decides it.
+test("AC-18: 21 files load 20 and show the 20-file cap", { tag: "@serial" }, async ({ page }) => {
   await pick(page, ...Array(21).fill("three-pages.pdf"));
   await expect(page.getByRole("alert").filter({ hasText: "up to 20 files" })).toBeVisible();
   await expect(flow(page)).toHaveAttribute("data-state", "ready");

@@ -6,6 +6,8 @@ node_modules/
 __pycache__/
 apps/web/playwright-report/
 apps/web/test-results/
+apps/web/e2e-report.json
+apps/web/row.txt
 next-env.d.ts
 
 # Terraform

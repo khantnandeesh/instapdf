@@ -22,6 +22,15 @@ backlog → 1 Analyze → 2 Research → 3 Design → 4 Build → 5 Test → 6 R
 | 8 Evaluate | `parity-evaluator` (independent, never sees code or builder notes) | spec + Sejda URL + staging URL | `docs/evals/<feature>.md` with PASS/FAIL, a score per AC, the micro-comparison table (M1–M12 win/tie/lose with captures of both sites) and the gap list |
 | 9 Release | `devops-engineer` | PASS verdict | tag `v*`, prod deploy, backlog updated |
 
+### Reference (Sejda) runs: once per feature
+
+Step 8 needs the reference side only once per feature. The first evaluation runs the real Sejda tasks (at most 3 per hour, project-wide, booked with the lead) and keeps the evidence:
+
+- **Raw evidence** (Sejda's output files, screenshots, recordings, network logs) goes to `/mnt/project-files/evals-cache/<feature>/`, never into git: rule 1 in `CLAUDE.md` keeps Sejda assets out of the repo.
+- **In git**, `docs/evals/cache/<feature>/manifest.json` holds only our own text: the observations per check, timings, SHA-256 hashes of the outputs and the capture date.
+
+After a fix round (FAIL → 4 → 7 → 8), the re-evaluation re-runs **all of BerryPDF's side** on the new staging build (every AC and every micro-check, M1 to M12, at every size) against the cached Sejda evidence, and uses no Sejda tasks. The cache is good for 30 days. After that, or when the owner flags a Sejda change, or when a check needs reference behaviour the cache doesn't hold (a new AC, a fixture Sejda never saw), the next evaluation refreshes just those checks, with slots booked through the lead, and the eval says which check needed it. The pass bar is unchanged: re-evaluations compare against the same Sejda evidence, so no gate gets weaker. The owner's rule to compare Sejda in the browser when they give feedback still applies; reuse cached captures there when they already show the exact thing.
+
 Steps 6b and 8 judge what the screen looks like, not only whether each `AC-n` passes: a screen can meet every AC and still waste the space it has (the Merge page preview passed the UX and evaluator gates with a small page in a mostly empty modal, a decorative wave and oversized buttons).
 
 Every tool also passes the [SEO checklist](#seo-checklist-part-of-the-definition-of-done-for-every-tool) before step 8.
@@ -31,7 +40,7 @@ Every tool also passes the [SEO checklist](#seo-checklist-part-of-the-definition
 - **Branches:** `feat/<feature>`, `fix/<thing>`, `chore/<thing>`. Never push directly to `main` except for docs from the orchestrator.
 - **Commits:** Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `chore:`, `ci:`).
 - **PR:** one feature per PR. The body lists the `AC-n` items it covers and links the spec.
-- **CI gates (required):** lint, typecheck, unit tests, build, e2e on the preview.
+- **CI gates (required):** lint, typecheck, unit tests, build, e2e. The required check is `web`. See [CI](#ci-what-runs-where) for what runs where.
 - **Evaluator pass bar:** no micro-check (mission.md M1–M12) is a *lose* unless the owner waived it in writing; every P0 AC passes; at least 90% of all ACs pass; Lighthouse performance ≥ 90 on mobile; no critical a11y violations (axe); and, once the Q2 corpus exists, the tool runs over the real-world PDF corpus with zero crashes and its oracle checks green (`qpdf --check`, render diff, text equality).
 - **Design:** all UI follows the owner's BerryPDF system (`docs/design/berrypdf.md`): grid paper, one berry action on its lip, leaf-cornered tool cards coloured by berry category, Fredoka, Phosphor Duotone icons, berry motifs (floating berries, berry loader, jam progress; no vine), light only (dark mode pending the designer's definition). Owner overrides (2026-11-23): minimal text (only what a task needs; details go to tooltips or screen-reader text), quiet CSS motion (entrances ≤ 400ms, all off under reduced motion), no vine; sections separate by spacing. Deviations from BerryPDF are listed there with measured contrast.
 - **Competitor research:** adopt/skip decisions must not rest on unverified claims.
@@ -64,3 +73,17 @@ Strategy: `docs/seo/strategy.md`; keywords: `docs/seo/keyword-plan.md`. The auto
 - [ ] Budgets on a phone: ≤ 170 KB JS, LCP ≤ 2.5 s, CLS ≤ 0.1 *(automated)*; Lighthouse SEO = 100 and performance ≥ 90 mobile *(evaluator)*.
 - [ ] Rich Results Test shows WebApplication, BreadcrumbList, HowTo and FAQPage with no errors *(evaluator, once on a public URL)*.
 - [ ] Variant pages from the keyword plan that this tool enables are listed in the backlog.
+
+## CI: what runs where
+
+The planner (`apps/web/scripts/ci/plan.mjs`, job `plan` in `.github/workflows/ci.yml`) decides what each run tests:
+
+| Run | What runs |
+|---|---|
+| Pull request | Lint, typecheck, unit tests, build and JS budgets, always. Browser tests: only the specs the change can reach (`apps/web/scripts/ci/affected.mjs` follows imports from each spec and the routes its folder visits), plus the page-wide guards (`e2e/ui`, `e2e/seo`, `e2e/q1`, smoke). Anything it can't place, build config, the root layout and what it imports, and CI itself run the full suite. Engine (`crates/`) changes also run the editor specs. Docs-only PRs run no browser tests. To run everything on a PR, start CI on its branch with Run workflow in the Actions tab, or add the label `full-ci` before the next push. |
+| Merge to main | Nothing again when a green run of the PR tested this exact tree on the commit main was at, and that commit's own run is green: the staging deploy starts at once. Otherwise (main moved after the PR's last run, or the previous main run is red or still going) the full suite runs first. Runs on main are never cancelled. |
+| Nightly (02:30 IST) | The full suite on main, the safety net for the PR selection. The lead checks it. A red nightly run blocks other merges until it is fixed or the failing test has a named owner. No quarantining. |
+
+Browser tests are packed into machines by their measured time (`apps/web/e2e/timings.json`), about 3 minutes of tests each, with 3 Playwright workers (1 for `@serial`; 4 workers made two load-heavy tests time out). Refresh the timings from a nightly run's `e2e-timings-*` artifacts with `node apps/web/scripts/ci/timings.mjs <reports>`. A new spec folder needs its routes in `AREAS` in `affected.mjs` (a unit test fails until it has them).
+
+**Merging without a second run:** once review is clean, merge `origin/main` into the branch and push. When that run is green, merge right away. Main then has the same tree the PR tested, so nothing runs again and staging deploys at once. If main moved in between, the merge still works but runs the full suite before staging (about 6 more minutes).

@@ -51,4 +51,4 @@ The parity evaluator runs the same tasks with the same fixtures on Sejda and on 
 
 Feature annexes add tool-specific fixtures and measurements to these checks: the editor's is `docs/process/editor-micro-checks.md`.
 
-Sejda politeness still applies: at most 3 real tasks per hour, with outputs and captures cached in `docs/evals/cache/<feature>/` and reused.
+Sejda politeness still applies: at most 3 real tasks per hour. The reference side runs once per feature and is cached for 30 days: raw evidence in `/mnt/project-files/evals-cache/<feature>/` (never in git), our own notes, timings and output hashes in `docs/evals/cache/<feature>/manifest.json`. Re-evaluations after a fix round re-run all of BerryPDF's side against it (`docs/process/workflow.md`, "Reference (Sejda) runs").
