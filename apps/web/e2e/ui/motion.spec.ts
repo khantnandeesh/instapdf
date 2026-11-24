@@ -11,6 +11,11 @@
  *    gone within 250ms.
  * 6. No securitypolicyviolation event fires (every test).
  * 7. Nothing is animating on a tool page 5s after load (WCAG 2.2.2).
+ * 8. Each Escape exit puts focus back on the trigger, and the leaving part is inert and aria-hidden while
+ *    it is still painted (the All tools menu, a menu, a dialog).
+ * 9. Reopening mid-exit leaves the parts settled and interactive (Dialog; usePresence via the All tools panel),
+ *    and the panel's scrim keeps its own aria-hidden.
+ * 10. Focus never drops to <body> while the work area leaves for the result, and back (review S1, T12).
  */
 import { expect, test, type Page } from "@playwright/test";
 import { fx } from "../support/flow";
@@ -210,6 +215,50 @@ async function expectExit(page: Page, what: string) {
   ).toBeLessThanOrEqual(250);
 }
 
+/**
+ * Arms a watcher for the next Escape: one frame after the key, records whether the element `selector`
+ * finds is still painted, whether it (or an ancestor) is inert and aria-hidden, and where focus is.
+ */
+async function armLeaveWatch(page: Page, selector: string) {
+  await page.evaluate((selector) => {
+    const w = window as unknown as { leaveWatch?: Record<string, unknown> };
+    const el = document.querySelector<HTMLElement>(selector);
+    w.leaveWatch = undefined;
+    window.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key !== "Escape") return;
+        requestAnimationFrame(() => {
+          const cs = el && getComputedStyle(el);
+          w.leaveWatch = {
+            found: !!el,
+            painted: !!el && el.isConnected && cs!.display !== "none" && cs!.visibility !== "hidden" && Number(cs!.opacity) > 0,
+            inert: !!el?.closest("[inert]"),
+            hidden: !!el?.closest("[aria-hidden=true]"),
+            focusInside: !!el?.contains(document.activeElement),
+          };
+        });
+      },
+      { capture: true, once: true },
+    );
+  }, selector);
+}
+
+async function expectLeaving(page: Page, what: string) {
+  await expect.poll(() => page.evaluate(() => (window as unknown as { leaveWatch?: unknown }).leaveWatch), { message: `${what}: watched` }).toBeDefined();
+  const r = await page.evaluate(() => (window as unknown as { leaveWatch: Record<string, boolean> }).leaveWatch);
+  expect(r, `${what}, one frame after Escape`).toEqual({ found: true, painted: true, inert: true, hidden: true, focusInside: false });
+}
+
+/** What an exit can leave on an element (all empty once it is settled). */
+const leftovers = (page: Page, selector: string) =>
+  page.evaluate((selector) => {
+    const el = document.querySelector<HTMLElement>(selector);
+    return el && { opacity: el.style.opacity, transform: el.style.transform, inert: el.inert, ariaHidden: el.getAttribute("aria-hidden"), leaving: el.hasAttribute("data-leaving") };
+  }, selector);
+
+const SETTLED = { opacity: "", transform: "", inert: false, ariaHidden: null, leaving: false };
+
 async function openMerge(page: Page) {
   await page.goto("/merge-pdf");
   await expect(
@@ -404,6 +453,147 @@ for (const size of SIZES) {
       await armExitWatch(page, "dialog");
       await page.keyboard.press("Escape");
       await expectExit(page, "the preview dialog");
+    });
+
+    test("8: each Escape exit returns focus to the trigger; the leaving part is inert and aria-hidden while painted", async ({ page }) => {
+      const hits = watchEngine(page);
+      await page.goto("/");
+      await primeEngine(page, hits);
+      const allTools = page.getByTestId("all-tools-button").first();
+      await allTools.click();
+      await expect(page.getByTestId("tool-menu").first()).toBeVisible();
+      await page.waitForTimeout(400);
+      // Desktop: the panel (usePresence). Phone: the full-screen dialog (Dialog).
+      await armLeaveWatch(page, size.project === "desktop" ? "[data-testid=tool-menu]" : "dialog:has([data-testid=tool-menu])");
+      await page.keyboard.press("Escape");
+      await expectLeaving(page, "All tools");
+      await expect(allTools).toBeFocused();
+
+      await openMerge(page);
+      await primeEngine(page, hits);
+      await addMergeFiles(page);
+      const sort = page.getByTestId("sort-menu");
+      await sort.click();
+      await expect(page.getByRole("menu")).toBeVisible();
+      await page.waitForTimeout(300);
+      await armLeaveWatch(page, ".mp-menu[popover]:popover-open");
+      await page.keyboard.press("Escape");
+      await expectLeaving(page, "the Sort menu");
+      await expect(sort).toBeFocused();
+
+      if (size.project === "desktop") await page.getByTestId("file-card").first().hover();
+      const enlarge = page.getByRole("button", { name: "Enlarge alpha.pdf" });
+      await enlarge.click({ force: size.project !== "desktop" });
+      await expect(page.locator("dialog[open]")).toBeVisible();
+      await page.waitForTimeout(400);
+      await armLeaveWatch(page, "dialog[open]");
+      await page.keyboard.press("Escape");
+      await expectLeaving(page, "the preview dialog");
+      await expect(enlarge).toBeFocused();
+    });
+
+    test("9: reopening mid-exit leaves the parts settled and interactive", async ({ page }) => {
+      const hits = watchEngine(page);
+      await page.goto("/");
+      await primeEngine(page, hits);
+      if (size.project === "desktop") {
+        // usePresence: the All tools panel and its scrim, reopened two frames into their exit.
+        await page.getByTestId("all-tools-button").first().click();
+        await expect(page.getByTestId("tool-menu")).toBeVisible();
+        await page.waitForTimeout(400);
+        const midExit = await page.evaluate(async () => {
+          document.querySelector<HTMLButtonElement>("[data-testid=all-tools-button]")!.click();
+          const frame = () => new Promise((r) => requestAnimationFrame(r));
+          await frame();
+          await frame();
+          const panel = document.querySelector<HTMLElement>("[data-testid=tool-menu]");
+          const leaving = !!panel?.inert && (window as unknown as { __motionLive: number }).__motionLive > 0;
+          document.querySelector<HTMLButtonElement>("[data-testid=all-tools-button]")!.click();
+          return leaving;
+        });
+        expect(midExit, "the panel was mid-exit when it reopened").toBe(true);
+        await expect(page.getByTestId("tool-menu")).toBeVisible();
+        expect(await leftovers(page, "[data-testid=tool-menu]")).toEqual(SETTLED);
+        // The scrim keeps the aria-hidden its markup sets (review S2).
+        expect(await leftovers(page, "[data-testid=tool-menu-scrim]")).toEqual({ ...SETTLED, ariaHidden: "true" });
+        const search = page.getByTestId("tool-menu").getByRole("searchbox");
+        await search.fill("rot");
+        await expect(search).toHaveValue("rot");
+        await page.keyboard.press("Escape");
+        await expect(page.getByTestId("tool-menu")).toHaveCount(0);
+      }
+
+      // Dialog: the preview dialog, reopened two frames into its exit.
+      await openMerge(page);
+      await primeEngine(page, hits);
+      await addMergeFiles(page);
+      if (size.project === "desktop") await page.getByTestId("file-card").first().hover();
+      const enlarge = page.getByRole("button", { name: "Enlarge alpha.pdf" });
+      await enlarge.click({ force: size.project !== "desktop" });
+      await expect(page.locator("dialog[open]")).toBeVisible();
+      await page.waitForTimeout(400);
+      const midExit = await page.evaluate(async () => {
+        const d = document.querySelector<HTMLDialogElement>("dialog[open]")!;
+        d.dataset.probe = "";
+        // What Escape does (the dialog's cancel event), from script so the reopen lands mid-fade.
+        d.dispatchEvent(new Event("cancel", { cancelable: true }));
+        const frame = () => new Promise((r) => requestAnimationFrame(r));
+        await frame();
+        await frame();
+        const leaving = !d.open && d.hasAttribute("data-leaving") && (window as unknown as { __motionLive: number }).__motionLive > 0;
+        document.querySelector<HTMLButtonElement>("button[aria-label='Enlarge alpha.pdf']")!.click();
+        return leaving;
+      });
+      expect(midExit, "the dialog was mid-exit when it reopened").toBe(true);
+      const dialog = page.locator("dialog[data-probe]");
+      await expect(dialog).toHaveJSProperty("open", true);
+      await expect(page.getByRole("dialog")).toBeVisible();
+      expect(await leftovers(page, "dialog[data-probe]")).toEqual(SETTLED);
+      expect(await page.evaluate(() => getComputedStyle(document.querySelector("dialog[data-probe]")!).opacity)).toBe("1");
+      // Interactive: Escape closes it again and focus returns.
+      await page.keyboard.press("Escape");
+      await expect(page.locator("dialog[open]")).toHaveCount(0);
+      await expect(enlarge).toBeFocused();
+    });
+
+    test("10: focus never drops to <body> while the work area leaves for the result, and on Back to options", async ({ page }) => {
+      const hits = watchEngine(page);
+      await openMerge(page);
+      await primeEngine(page, hits);
+      await addMergeFiles(page);
+      // Samples where focus is on every frame, from the moment the progress bar has it.
+      await page.evaluate(() => {
+        const w = window as unknown as { focusTrail: string[] };
+        w.focusTrail = [];
+        const at = () => {
+          const a = document.activeElement as HTMLElement | null;
+          return !a || a === document.body ? "body" : (a.dataset.testid ?? a.tagName.toLowerCase());
+        };
+        let on = false;
+        const tick = () => {
+          const now = at();
+          on ||= now === "processing";
+          if (on && w.focusTrail.at(-1) !== now) w.focusTrail.push(now);
+          requestAnimationFrame(tick);
+        };
+        tick();
+      });
+      await page.getByTestId("primary-action").click();
+      const download = page.getByRole("link", { name: "Download" });
+      await expect(download).toBeFocused({ timeout: 30_000 });
+      const trail = await page.evaluate(() => (window as unknown as { focusTrail: string[] }).focusTrail);
+      expect(trail[0], "the progress bar had focus").toBe("processing");
+      expect(trail, "focus on the way to the result").not.toContain("body");
+      expect(trail.at(-1)).toBe("a");
+
+      // Back to options: the card leaves (inert) with focus on the tool heading, and the work area returns.
+      await page.evaluate(() => ((window as unknown as { focusTrail: string[] }).focusTrail = []));
+      await page.getByRole("button", { name: "Back to options" }).click();
+      await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
+      await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+      await expect.poll(() => page.evaluate(() => (window as unknown as { __motionLive: number }).__motionLive)).toBe(0);
+      expect(await page.evaluate(() => (window as unknown as { focusTrail: string[] }).focusTrail), "focus on Back to options").not.toContain("body");
+      expect(await strayTransforms(page), "after Back to options").toEqual([]);
     });
 
     for (const path of [
