@@ -12,10 +12,12 @@
 body:has([data-ip-dock="bar"]) .ip-site-footer {
   padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);
 }
-/* The desktop bottom bar rises in once a file is loaded (reduced motion: the global rule drops it). */
+/* The desktop bottom bar's content fades in where it ends up once a file is loaded (motion.md T5: no
+   movement, the primary is in its final place from the bar's first frame; reduced motion: the global
+   rule drops it). */
 @media (min-width: 1024px) {
   .mp-dock-bar {
-    animation: mp-fade-up 320ms var(--ease-enter) both;
+    animation: mp-fade-in var(--motion-micro) var(--ease-out) both;
   }
 }
 
@@ -66,10 +68,10 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
       --ip-pages-h: max(320px, calc(100dvh - var(--ip-header-h) - var(--ip-intro-h) - var(--ip-dock-actual, 88px) - var(--ip-fold-gap)));
     }
   }
+  /* The title drops to the compact size on the frame the files arrive, never animating font-size (T5). */
   .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) .mp-intro h1 {
     font-size: 26px;
     line-height: 32px;
-    transition: font-size var(--dur-move) var(--ease-standard);
   }
 }
 

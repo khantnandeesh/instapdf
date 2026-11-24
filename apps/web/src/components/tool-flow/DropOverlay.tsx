@@ -8,7 +8,7 @@ export function DropOverlay({ active, mode }: { active: boolean; mode: "add" | "
       data-testid="drop-overlay"
       data-active={active || undefined}
       className={cx(
-        "pointer-events-none fixed inset-0 z-40 bg-drop-overlay transition-opacity duration-(--dur-base)",
+        "pointer-events-none fixed inset-0 z-40 bg-drop-overlay transition-[opacity,visibility] duration-(--motion-micro)",
         active ? "visible opacity-100" : "invisible opacity-0",
       )}
     >

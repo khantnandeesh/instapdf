@@ -115,12 +115,21 @@
   --dur-fast: 0.15s; /* focus ring */
   --dur-base: 0.2s; /* hovers: card lift, fills, icon tilt */
   --dur-move: 0.3s; /* transforms: logo, modal in, switch */
-  --dur-slow: 0.5s; /* width changes (jam progress) */
-  --dur-attention: 1s;
   --dur-tool: 0.4s; /* editor toolbar colour changes */
   --dur-loader: 2.6s; /* one berry loader cycle */
   --dur-press: 0.04s; /* motion.md: the button press, 40ms */
   --dur-lift: 0.12s; /* motion.md: button lift, control press */
+
+  /* Motion system (docs/design/motion.md §3). lib/motion/tokens.ts mirrors these numbers (a unit
+     test checks they agree). Nothing runs longer than 400ms end to end, stagger included. */
+  --motion-instant: 0ms; /* reduced motion; direct manipulation (drag, pinch, handles) */
+  --motion-micro: 120ms; /* press, small swaps, exits of small things, reduced-motion fades */
+  --motion-quick: 200ms; /* menus, popovers, toasts, FLIP moves, overlays, thumbnails */
+  --motion-base: 320ms; /* dialogs, sheets, the result card */
+  --motion-stagger: 24ms; /* per item; the total delay is capped so a list is in by 400ms */
+  --motion-rise: 8px; /* enters: y +8 -> 0 (cards, dialogs, the result) */
+  --motion-nudge: 4px; /* popovers, menus, toasts, exits */
+  --motion-sheet: 32px; /* bottom sheets: y +32 -> 0 */
 
   --z-header: 899;
   --z-header-link: 900;
@@ -270,7 +279,10 @@
   --ease-progress-a: cubic-bezier(0.65, 0.815, 0.735, 0.395);
   --ease-progress-b: cubic-bezier(0.165, 0.84, 0.44, 1);
   --ease-loader: cubic-bezier(0.65, 0, 0.35, 1);
-  --ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1); /* the bundle's small overshoot: modal, switch */
+  --ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1); /* overshoot: only the result tick and the download tick (motion.md §3) */
+  --ease-out: cubic-bezier(0.215, 0.61, 0.355, 1); /* every enter (GSAP power3.out) */
+  --ease-in: cubic-bezier(0.55, 0.085, 0.68, 0.53); /* every exit (GSAP power2.in) */
+  --ease-move: cubic-bezier(0.455, 0.03, 0.515, 0.955); /* FLIP moves, the rail pill, reorder (GSAP power2.inOut) */
 
   /* One family everywhere: Fredoka, self-hosted with next/font (layout.tsx defines --font-fredoka).
      BerryPDF has no second font: the App styles ("ui") and code use it too. */

@@ -4,7 +4,8 @@
  * only; the home page's one dialog (the full-screen tool menu) needs none of it. Guarded by e2e/ui/modals.spec.ts.
  */
 @layer components {
-  /* Modal: plain white (no decoration), a 40px leaf corner, rises with a small overshoot. */
+  /* Modal: plain white (no decoration), a 40px leaf corner; rises 8px and settles from 98% in 320ms, no
+     overshoot (motion.md S11). lib/motion runs the exit; this CSS entrance is the fallback before it loads. */
   .mp-modal {
     position: relative;
     box-sizing: border-box;
@@ -14,25 +15,36 @@
       0 30px 70px rgba(58, 20, 30, 0.3),
       0 4px 12px rgba(58, 20, 30, 0.1);
     color: var(--ink);
-    animation: mp-modal-in var(--dur-move) var(--ease-pop);
+    animation: mp-pop-in var(--motion-base) var(--ease-out);
   }
-  /* Bottom sheet (Merge options below 1024px, the editor's sheets): white, 24px top corners; rises from the bottom. */
+  /* Bottom sheet (Merge options below 1024px, the editor's sheets): white, 24px top corners; rises 32px (S13). */
   .mp-sheet {
     box-sizing: border-box;
     border-radius: 24px 24px 0 0;
     background: var(--surface);
     color: var(--ink);
     box-shadow: 0 -12px 40px rgba(58, 20, 30, 0.18);
-    animation: mp-sheet-in var(--dur-move) var(--ease-pop);
+    animation: mp-sheet-in var(--motion-base) var(--ease-out);
   }
+  /* The backdrop fades (opacity; the blur itself is static) in 200ms, and out while the panel leaves. */
   :is(.mp-modal, .mp-sheet)::backdrop {
     background: var(--mp-backdrop);
     backdrop-filter: blur(8px);
+    animation: mp-backdrop-in var(--motion-quick) var(--ease-out);
+    transition: opacity var(--motion-quick) var(--ease-in);
+  }
+  :is(.mp-modal, .mp-sheet)[data-leaving]::backdrop {
+    opacity: 0;
   }
 }
 @keyframes mp-sheet-in {
   from {
-    transform: translateY(40px);
+    transform: translateY(var(--motion-sheet));
+    opacity: 0;
+  }
+}
+@keyframes mp-backdrop-in {
+  from {
     opacity: 0;
   }
 }

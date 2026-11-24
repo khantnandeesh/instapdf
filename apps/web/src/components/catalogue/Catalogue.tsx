@@ -179,7 +179,7 @@ export function Catalogue() {
             onEscape={() => updateQuery("")}
             placeholder={copy.searchPlaceholder}
             shortcutHint
-            className="pointer-events-auto w-full md:max-w-[480px] md:transition-[max-width] md:duration-200 md:ease-out motion-reduce:transition-none md:group-data-stuck:max-w-[540px]"
+            className="pointer-events-auto w-full md:max-w-[480px] md:group-data-stuck:max-w-[540px]"
           />
         </div>
         <LiveRegion message={live} />

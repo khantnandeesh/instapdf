@@ -199,7 +199,7 @@
     overflow-y: auto;
     padding: 8px;
     border-radius: 20px;
-    animation: mp-pop-in 300ms var(--ease-pop) both;
+    animation: mp-pop-in var(--motion-quick) var(--ease-out) both;
   }
   .mp-menu.ip-menu-sheet::backdrop {
     /* The berry scrim over the page above the dock only: the dock and its primary stay uncovered. */
@@ -420,7 +420,7 @@
     align-items: center;
     gap: 14px;
     text-align: center;
-    animation: mp-pop-in 380ms var(--ease-pop) both;
+    animation: mp-pop-in var(--motion-base) var(--ease-out) both;
   }
   .ip-cw__title {
     font: 600 24px/28px var(--font-display);
@@ -502,7 +502,7 @@
     border-radius: 999px;
     background: var(--mp-alert-ok-bg);
     color: var(--leaf);
-    animation: mp-pop-in 400ms var(--ease-pop) 160ms both;
+    animation: mp-tick-in var(--motion-quick) var(--ease-pop) 80ms both;
   }
   .ip-cw__ring {
     color: var(--brand);
