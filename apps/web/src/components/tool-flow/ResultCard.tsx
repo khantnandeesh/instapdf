@@ -12,9 +12,8 @@ import { CheckIcon, DownloadIcon, FilesIcon, ShareIcon, ShieldIcon } from "../ui
 import { Notice } from "../ui/Notice";
 import { copy } from "./copy";
 import { PrivacyNote } from "./notes";
-import type { FlowNoticeInput, ToolOutput } from "./types";
+import type { ToolOutput } from "./types";
 import type { SaveToCloudProps } from "../cloud/SaveToCloud";
-import type { CloudState } from "../cloud/tool-cloud";
 
 /** F23: a build-time constant (DefinePlugin), so builds without cloud sources drop that code. */
 const CLOUD_ON = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1";
@@ -30,7 +29,6 @@ export function ResultCard({
   onStartOver,
   onBack,
   announce,
-  cloud,
 }: {
   output: ToolOutput;
   tool: FlowTool;
@@ -39,12 +37,9 @@ export function ResultCard({
   onStartOver: () => void;
   onBack: () => void;
   announce: (message: string) => void;
-  /** F23: save to a cloud, and the inputs (the privacy line names a cloud any came from, AC-131). */
-  cloud?: { pushNotice: (n: Omit<FlowNoticeInput, "id">) => string; sources: Blob[]; state: CloudState };
 }) {
-  // F23: the privacy line once a copy went to a cloud (SaveToCloud words it).
+  // F23: the privacy line when the files came from a cloud or a copy went to one (SaveToCloud words it).
   const [savedLine, setSavedLine] = useState<string | null>(null);
-  const from = (CLOUD_ON && cloud?.sources.map((b) => cloud.state.origin?.(b)).find(Boolean)) || null;
   const download = useRef<HTMLAnchorElement>(null);
   const isZip = output.type === "application/zip";
   // Created in an effect and revoked in its cleanup, so StrictMode's double
@@ -127,16 +122,7 @@ export function ResultCard({
                 Download
               </span>
             </a>
-            {CLOUD_ON && SaveToCloud && cloud && (
-              <SaveToCloud
-                file={file}
-                preferred={from}
-                toolName={tool.flow.title}
-                pushNotice={cloud.pushNotice}
-                announce={announce}
-                onSaved={setSavedLine}
-              />
-            )}
+            {CLOUD_ON && SaveToCloud && <SaveToCloud file={file} toolName={tool.flow.title} announce={announce} onSaved={setSavedLine} />}
             {canShare && (
               <Button
                 variant="line"
@@ -151,11 +137,11 @@ export function ResultCard({
             )}
           </div>
           <div className="flex flex-col gap-2">
-            {CLOUD_ON && tool.runtime === "client" && (savedLine ?? (from && cloud?.state.privacy?.(from))) ? (
+            {CLOUD_ON && tool.runtime === "client" && savedLine ? (
               // F23: the privacy line names the cloud the files came from or went to (PrivacyNote's look).
               <p className="flex items-center gap-2 text-sm text-ink" data-testid="privacy-result">
                 <ShieldIcon size={18} className="shrink-0 text-brand-strong" />
-                {savedLine ?? (from && cloud?.state.privacy?.(from))}
+                {savedLine}
               </p>
             ) : (
               <PrivacyNote runtime={tool.runtime} context="result" />

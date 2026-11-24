@@ -47,14 +47,12 @@ const tool = flowTool("merge-pdf");
 const loadSegmentGrid = () => import("@/components/page-edit/SegmentGrid");
 const SegmentGrid = dynamic(() => loadSegmentGrid().then((m) => m.SegmentGrid), { ssr: false, loading: () => <div className="h-40" aria-hidden="true" /> });
 const ShortcutsHelp = dynamic(() => loadSegmentGrid().then((m) => m.ShortcutsHelp), { ssr: false });
-const loadMenu = () => import("@/components/ui/Menu");
+// F23: cloud builds load Merge's menus from the cloud chunk, whose MenuButton adds the providers to
+// the Add menus (cloud/merge-menus.tsx) and passes every other menu through. The bundler picks one
+// module at build time, so this costs nothing in either build.
+const loadMenu = (): Promise<typeof import("@/components/ui/Menu")> =>
+  import(process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? "@/components/cloud/ui" : "@/components/ui/Menu");
 const MenuButton = dynamic(() => loadMenu().then((m) => m.MenuButton), { ssr: false, loading: () => <span className="inline-block h-9 w-11" aria-hidden="true" /> });
-const CloudAddMenu =
-  process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
-    ? dynamic(() => import("@/components/cloud/ui").then((m) => m.CloudAddMenu), { ssr: false, loading: () => <span className="inline-block h-9 w-11" aria-hidden="true" /> })
-    : null;
-/** F23: with cloud sources, the Add menus regrouped with the providers (cloud/merge-menus.tsx; unchanged without any). */
-const AddMenu = (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && CloudAddMenu) || MenuButton;
 const loadPageGrid = () => import("@/components/page-edit/EditablePageGrid");
 const EditablePageGrid = dynamic(loadPageGrid, { ssr: false, loading: () => <div className="h-40" aria-hidden="true" /> });
 const loadDialogs = () => import("@/components/page-edit/dialogs");
@@ -789,7 +787,7 @@ export function MergeTool() {
           <>
             {/* ≥ 640 px: "Add pages" beside the flow's "Add files" (spec F3 M-3). */}
             <span className="contents max-sm:hidden">
-              <AddMenu
+              <MenuButton
                 label={c.addPages}
                 placement="bottom-end"
                 disabled={w.dimmed}
@@ -802,11 +800,11 @@ export function MergeTool() {
               >
                 <span>{c.addPages}</span>
                 <ChevronDownIcon size={16} />
-              </AddMenu>
+              </MenuButton>
             </span>
             {/* < 640 px: one "Add" menu replaces both (spec F3 M-3, eval G-2). */}
             <span className="contents sm:hidden">
-              <AddMenu
+              <MenuButton
                 label={c.add}
                 placement="bottom-end"
                 disabled={w.dimmed}
@@ -820,7 +818,7 @@ export function MergeTool() {
               >
                 <PlusIcon size={18} />
                 <span>{c.add}</span>
-              </AddMenu>
+              </MenuButton>
             </span>
           </>
         )}

@@ -1,5 +1,4 @@
 "use client";
-import "./cloud.css";
 import { useId } from "react";
 import { retryDownload, stopDownload } from "./intake-engine";
 import type { CloudDownload } from "./tool-cloud";

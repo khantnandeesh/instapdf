@@ -1,5 +1,4 @@
 "use client";
-import "./cloud.css";
 import { useRef } from "react";
 import { configuredProviders } from "@/lib/cloud/providers";
 import { MenuButton, type MenuButtonHandle } from "./CloudMenu";

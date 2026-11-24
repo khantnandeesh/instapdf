@@ -1,14 +1,19 @@
 "use client";
 /**
  * F23 cloud sources on tool pages: the only cloud code in a tool page's first-load JS, so it is kept
- * to a few lines of state. Everything else (the caret, the row, the cards, Merge's menus, Save to
- * cloud and the intake) is one chunk, ui.ts, fetched as the page hydrates. Those controls get the
- * page's CloudCtrl and open windows with it inside the click (intake-engine.ts openCloud).
+ * to a few lines of state. Everything else (the caret, the row, the cards, Save to cloud, Merge's
+ * menus and the intake) is one chunk, ui.ts, which the page's server-rendered cloud parts load as it
+ * hydrates. They hand this hub to the intake (intake-engine.ts attach), which opens each window
+ * inside its click.
+ *
+ * The cloud stylesheet comes in here, with the page's own CSS: the cloud chunk then has none, so
+ * the webpack runtime on every page keeps a single lazy stylesheet, as before F23.
  *
  * Builds without NEXT_PUBLIC_CLOUD_SOURCES=1 swap this module for tool-cloud.off.ts (next.config.ts)
  * and never call it (AC-120).
  */
-import { useEffect, useMemo, useState } from "react";
+import "./cloud.css";
+import { useEffect, useState } from "react";
 import type { CloudProvider } from "@/lib/cloud/providers";
 import type { FlowTool } from "@/tools/registry";
 import type { FlowNoticeInput } from "../tool-flow/types";
@@ -38,44 +43,31 @@ export type CloudDeps = {
   sortIntake?: (files: File[]) => File[];
   /** The tool's own words for a file of the wrong type. */
   errorType?: (name: string) => string;
+  /** The page's files (the result's privacy line names a cloud any came from, AC-131). */
+  files: readonly { source: Blob }[];
 };
 
 /** What the tool page shows of the cloud intake (set by the engine). */
 export type CloudState = {
   downloads: CloudDownload[];
-  pending: number;
-  statusText: string | null;
-  /** The result's privacy line for a file from a provider (AC-131). */
-  privacy: ((p: CloudProvider) => string) | null;
-  /** The provider a file came from, if it came from one. */
-  origin: ((file: Blob) => CloudProvider | undefined) | null;
+  /** "Getting 2 files from Dropbox…" while files are on their way; null otherwise. */
+  busy: string | null;
 };
-const IDLE: CloudState = { downloads: [], pending: 0, statusText: null, privacy: null, origin: null };
 
-/** One per tool page, stable for its life: the intake's state setter and inputs, and the intake once made. */
-export type CloudCtrl = {
+/** One per tool page, stable for its life: the intake's state and inputs, and the intake once made. */
+export type CloudHub = {
+  s: CloudState;
   set: (s: CloudState) => void;
   deps?: CloudDeps;
   intake?: Intake;
-  /** A local pick: "This device" becomes the last used source (set once ui.ts has loaded). */
-  local?: () => void;
 };
 
-/** A provider is configured in this build (public IDs, or the mock): a build-time constant. */
-export const cloudReady =
-  process.env.NEXT_PUBLIC_CLOUD_MOCK === "1" ||
-  process.env.NODE_ENV !== "production" ||
-  !!(process.env.NEXT_PUBLIC_DROPBOX_APP_KEY || process.env.NEXT_PUBLIC_ONEDRIVE_CLIENT_ID || (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && process.env.NEXT_PUBLIC_GOOGLE_API_KEY && process.env.NEXT_PUBLIC_GOOGLE_APP_ID));
-
-/** The page's cloud state (a new object only when the engine publishes) and its CloudCtrl (never changes). */
+/** The page's cloud hub: the same object for the page's life, with the latest state on `s`. */
 export function useCloud() {
-  const [state, setState] = useState(IDLE);
-  const [ctrl] = useState<CloudCtrl>(() => ({ set: setState }));
-  useEffect(() => {
-    // The dynamic() controls import the same chunk.
-    void import("./ui").then((m) => m.attach(ctrl));
-    // Close every window this tab opened when the tool goes away.
-    return () => ctrl.intake?.dispose();
-  }, [ctrl]);
-  return useMemo(() => ({ state, ctrl }), [state, ctrl]);
+  const [s, set] = useState<CloudState>({ downloads: [], busy: null });
+  const [hub] = useState<CloudHub>(() => ({ s, set }));
+  hub.s = s;
+  // Close every window this tab opened when the tool goes away.
+  useEffect(() => () => hub.intake?.dispose(), [hub]);
+  return hub;
 }

@@ -27,7 +27,7 @@ export function Notice({
   title?: string;
   children?: ReactNode;
   onDismiss?: () => void;
-  /** F23 adds `node` (a rendered action for the alert's row, before the close button) and `icon` (in place of the notice's own). */
+  /** F23 adds `node` (a rendered action in place of the button) and `icon` (in place of the notice's own); cloud/NoticeAction.tsx. */
   action?: { label: string; onClick: () => void; node?: ReactNode; icon?: ReactNode };
   look?: "alert" | "callout";
   className?: string;
@@ -47,19 +47,6 @@ export function Notice({
         : tone === "warning"
           ? AlertIcon
           : LeafIcon;
-  // F23 reads `node` and `icon` only behind the build flag, written out each time, and the close
-  // button is a thunk (inlined back): builds without cloud sources compile to main's exact code.
-  const close = () =>
-    onDismiss && (
-      <button
-        type="button"
-        aria-label={title ? `Dismiss: ${title}` : "Dismiss"}
-        className={kind === "alert" ? "mp-alert__close" : "mp-iconbtn mp-iconbtn--plain -my-1 -me-1 size-[30px]"}
-        onClick={onDismiss}
-      >
-        <CloseIcon size={18} />
-      </button>
-    );
   return (
     <div
       role={tone === "danger" || tone === "warning" ? "alert" : "status"}
@@ -69,6 +56,7 @@ export function Notice({
         className,
       )}
     >
+      {/* F23 reads `icon` and `node` only behind the build flag, written out: builds without cloud sources compile to main's code. */}
       {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && action?.icon ? (
         action.icon
       ) : (
@@ -80,19 +68,24 @@ export function Notice({
       <div className="min-w-0 flex-1 break-words">
         {title && <p className="font-semibold">{title}</p>}
         {children && <div className={cx(kind === "alert" && title && "font-normal")}>{children}</div>}
-        {action && !(process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && action.node) && (
-          <Button size="sm" variant="outline" className="mt-2" onClick={action.onClick}>
-            {action.label}
-          </Button>
-        )}
+        {action &&
+          (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && action.node ? (
+            action.node
+          ) : (
+            <Button size="sm" variant="outline" className="mt-2" onClick={action.onClick}>
+              {action.label}
+            </Button>
+          ))}
       </div>
-      {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && action?.node ? (
-        <>
-          {action.node}
-          {close()}
-        </>
-      ) : (
-        close()
+      {onDismiss && (
+        <button
+          type="button"
+          aria-label={title ? `Dismiss: ${title}` : "Dismiss"}
+          className={kind === "alert" ? "mp-alert__close" : "mp-iconbtn mp-iconbtn--plain -my-1 -me-1 size-[30px]"}
+          onClick={onDismiss}
+        >
+          <CloseIcon size={18} />
+        </button>
       )}
     </div>
   );

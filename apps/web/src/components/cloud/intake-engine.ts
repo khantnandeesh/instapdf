@@ -12,7 +12,7 @@ import { routeFor, type CloudProvider } from "@/lib/cloud/providers";
 import { copy } from "../tool-flow/copy";
 import { cloudCopy } from "./copy";
 import { busyIcon, cloudAction } from "./NoticeAction";
-import type { CloudCtrl, CloudDeps, CloudDownload, CloudOpenOptions } from "./tool-cloud";
+import type { CloudDeps, CloudDownload, CloudHub, CloudOpenOptions } from "./tool-cloud";
 import { transferCopy } from "./transfer-copy";
 
 type Entry = CloudDownload & { file?: File; resolved: boolean };
@@ -42,12 +42,27 @@ export type Begin = {
   again: () => void;
 };
 
-/** The tool page's CloudCtrl (one ToolFlow per page; tool-cloud.ts hands it over once this chunk loads). */
-let page: CloudCtrl | undefined;
-export function attach(ctrl: CloudCtrl) {
-  page = ctrl;
-  ctrl.local = () => writeLast("device");
+/** The tool page's hub (one ToolFlow per page; its cloud parts hand it over as they mount). */
+let page: CloudHub | undefined;
+let listening = false;
+export function attach(hub: CloudHub) {
+  page = hub;
+  if (listening) return;
+  listening = true;
+  // A pick from this device makes "This device" the last used source (U-12). Capture phase: before
+  // the picker's own handler empties the input.
+  document.addEventListener(
+    "change",
+    (e) => {
+      const t = e.target;
+      if (page && t instanceof HTMLInputElement && t.type === "file" && t.files?.length) writeLast("device");
+    },
+    true,
+  );
 }
+
+/** The tool page's inputs (once a cloud part has mounted). */
+export const pageDeps = () => page?.deps;
 
 /** Opens a provider's window: call it synchronously in the click (the browser allows a window only then). */
 export function openCloud(provider: CloudProvider, trigger: HTMLElement | null, opts: CloudOpenOptions = {}) {
@@ -58,12 +73,12 @@ export function openCloud(provider: CloudProvider, trigger: HTMLElement | null, 
 export const stopDownload = (key: string) => page?.intake?.stop(key);
 export const retryDownload = (key: string) => page?.intake?.retry(key);
 
-const privacy = (p: CloudProvider) => transferCopy.resultPrivacy(p);
 /** Where each cloud file came from (the result's privacy line, AC-131). */
 const origins = new WeakMap<Blob, CloudProvider>();
-const origin = (file: Blob) => origins.get(file);
+/** The provider any of the page's files came from, if one did. */
+export const cloudOrigin = () => page?.deps?.files.map((f) => origins.get(f.source)).find(Boolean) ?? null;
 
-export function createIntake(host: CloudCtrl) {
+export function createIntake(host: CloudHub) {
   const d = () => host.deps as CloudDeps;
   // The F1 intake's words for a skipped file, and for several problems at once.
   const describeSkip = (name: string, reason: "type" | "size") =>
@@ -73,10 +88,7 @@ export function createIntake(host: CloudCtrl) {
     const pending = entries.filter((e) => e.status !== "failed").length;
     host.set({
       downloads: entries.map(({ key, id, req, name, provider, status, loaded, total }) => ({ key, id, req, name, provider, status, loaded, total })),
-      pending,
-      statusText: pending && entries[0] ? transferCopy.status(pending, entries[0].provider) : null,
-      privacy,
-      origin,
+      busy: pending && entries[0] ? transferCopy.status(pending, entries[0].provider) : null,
     });
   };
   const update = (fn: (prev: Entry[]) => Entry[]) => {

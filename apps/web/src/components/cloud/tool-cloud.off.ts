@@ -2,4 +2,3 @@
 import type * as On from "./tool-cloud";
 
 export const useCloud = null as unknown as typeof On.useCloud;
-export const cloudReady = false;

@@ -2,14 +2,14 @@ import type { ReactNode } from "react";
 import { Button, buttonClasses } from "../ui/Button";
 
 /**
- * F23 notices bring their own action (Notice renders `action.node` on the alert's row, before the
- * close button), so the shared Notice stays as it was. A link opens in a new tab; `autoFocus` moves
- * focus to it when it is a direct result of the user's click (a blocked window).
+ * F23 notices bring their own action, rendered by Notice in place of its button and looking the
+ * same: a link (opens in a new tab) or a button that can take focus when it is a direct result of
+ * the user's click (`autoFocus`, a blocked window).
  */
 type Spec = { label: string; onClick?: () => void; href?: string; autoFocus?: boolean };
 
 export function cloudAction({ label, onClick, href, autoFocus }: Spec, icon?: ReactNode) {
-  const className = "-my-1 shrink-0 self-center";
+  const className = "mt-2";
   return {
     label,
     onClick: onClick ?? (() => {}),

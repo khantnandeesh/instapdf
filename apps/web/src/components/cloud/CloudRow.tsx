@@ -1,5 +1,4 @@
 "use client";
-import "./cloud.css";
 import { useEffect, useState } from "react";
 import { readLast } from "@/lib/cloud/last-used";
 import { configuredProviders, providerName, type CloudProvider } from "@/lib/cloud/providers";
