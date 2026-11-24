@@ -13,10 +13,14 @@ type PdfjsModule = typeof import("pdfjs-dist");
 let modulePromise: Promise<PdfjsModule> | null = null;
 let sharedWorker: PDFWorker | null = null;
 
+/** pdf.js's parsing and rendering workers (content-hashed static files, cached for a year). */
+export const workerUrls = () => [new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString(), new URL("pdfjs-dist/build/pdf.renderer.min.mjs", import.meta.url).toString()] as const;
+
 export function loadPdfjs(): Promise<PdfjsModule> {
   modulePromise ??= import("pdfjs-dist").then((pdfjs) => {
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
-    pdfjs.GlobalWorkerOptions.rendererSrc = new URL("pdfjs-dist/build/pdf.renderer.min.mjs", import.meta.url).toString();
+    const [worker, renderer] = workerUrls();
+    pdfjs.GlobalWorkerOptions.workerSrc = worker;
+    pdfjs.GlobalWorkerOptions.rendererSrc = renderer;
     return pdfjs;
   });
   modulePromise.catch(() => (modulePromise = null));

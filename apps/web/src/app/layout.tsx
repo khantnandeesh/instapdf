@@ -4,6 +4,7 @@ import { BerrySprite } from "@/components/berry/Berry";
 import { ToolIndexProvider } from "@/components/catalogue/ToolIndexProvider";
 import { buildToolIndex } from "@/components/catalogue/toolIndex";
 import { siteCopy } from "@/components/site/copy";
+import { EnginePrefetch } from "@/components/site/EnginePrefetch";
 import { RecentPrepaintScript } from "@/components/site/RecentPrepaintScript";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
@@ -51,6 +52,7 @@ export default function RootLayout({
           <div className="flex-1 pb-(--space-8)">{children}</div>
           <SiteFooter />
         </ToolIndexProvider>
+        <EnginePrefetch />
       </body>
     </html>
   );

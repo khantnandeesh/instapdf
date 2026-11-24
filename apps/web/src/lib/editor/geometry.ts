@@ -66,3 +66,39 @@ export function lineBox(bbox: Rect, lineAngle: number, pageBox: PageBox, rotatio
   const across = quarterTurns(angle) % 2 ? s.width : s.height;
   return { cx: s.left + s.width / 2, cy: s.top + s.height / 2, length: along, thickness: across, angle: quarterTurns(angle) * 90 };
 }
+
+/**
+ * A point on the displayed (rotated) page, in CSS px from its top-left, to the page frame in
+ * CSS px (unrotated, origin top-left). `w`/`h` are the unrotated page size in CSS px.
+ */
+export function screenToFrame(sx: number, sy: number, w: number, h: number, rotation: number): [number, number] {
+  switch (quarterTurns(rotation)) {
+    case 1:
+      return [sy, h - sx];
+    case 2:
+      return [w - sx, h - sy];
+    case 3:
+      return [w - sy, sx];
+    default:
+      return [sx, sy];
+  }
+}
+
+/** A movement on screen (CSS px) to a movement in the page frame (CSS px). */
+export function screenDeltaToFrame(dx: number, dy: number, rotation: number): [number, number] {
+  switch (quarterTurns(rotation)) {
+    case 1:
+      return [dy, -dx];
+    case 2:
+      return [-dx, -dy];
+    case 3:
+      return [-dy, dx];
+    default:
+      return [dx, dy];
+  }
+}
+
+/** A user-space rect (PDF points, y up) to a page-frame box (points, y down from the view's top-left). */
+export function userRectToFrame(r: Rect, view: PageBox): { x: number; y: number; w: number; h: number } {
+  return { x: Math.min(r.x0, r.x1) - view[0], y: view[3] - Math.max(r.y0, r.y1), w: Math.abs(r.x1 - r.x0), h: Math.abs(r.y1 - r.y0) };
+}
