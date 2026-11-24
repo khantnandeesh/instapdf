@@ -174,7 +174,7 @@ pub fn signature(g: &Glyph) -> [u8; SIG_LEN] {
         }
     }
     let mut out = [0u8; SIG_LEN];
-    for (i, pair) in cover.chunks_exact(2).enumerate() {
+    for (i, pair) in cover.as_chunks::<2>().0.iter().enumerate() {
         let q = |v: f32| (v.clamp(0.0, 1.0) * 15.0).round() as u8;
         out[i] = q(pair[0]) << 4 | q(pair[1]);
     }

@@ -134,7 +134,9 @@ pub fn coarse_distance(a: &[u8], b: &[u8]) -> Option<f32> {
 /// first, as (face, distance). `allow` filters faces, e.g. by script coverage.
 pub fn rank(target: &[u8], index: &[u8], top: usize, allow: &dyn Fn(usize) -> bool) -> Vec<(usize, f32)> {
     let mut out: Vec<(usize, f32)> = index
-        .chunks_exact(COARSE_LEN)
+        .as_chunks::<COARSE_LEN>()
+        .0
+        .iter()
         .enumerate()
         .filter(|(i, _)| allow(*i))
         .filter_map(|(i, face)| coarse_distance(target, face).map(|d| (i, d)))
@@ -202,7 +204,9 @@ pub fn encode_signatures(glyphs: &[(char, [u8; SIG_LEN])]) -> Vec<u8> {
 /// Reads what [`encode_signatures`] wrote. Trailing partial records and bad code points are dropped.
 pub fn decode_signatures(bytes: &[u8]) -> Vec<(char, [u8; SIG_LEN])> {
     bytes
-        .chunks_exact(4 + SIG_LEN)
+        .as_chunks::<{ 4 + SIG_LEN }>()
+        .0
+        .iter()
         .filter_map(|rec| {
             let c = char::from_u32(u32::from_le_bytes([rec[0], rec[1], rec[2], rec[3]]))?;
             let mut s = [0u8; SIG_LEN];
