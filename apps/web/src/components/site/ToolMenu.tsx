@@ -103,13 +103,14 @@ export function ToolMenu() {
     if (open && desktop !== null && desktop !== (mode === "panel")) close(true);
   }, [desktop, mode, open, close]);
 
-  // Raise the header above the tool page's dock and overlays while the panel is open.
+  // Raise the header above the tool page's dock and overlays while the panel is shown, its exit included,
+  // so the leaving panel fades above the dock rather than under it.
   useEffect(() => {
     const header = wrapperRef.current?.closest("header");
     if (!header) return;
-    if (open && mode === "panel") header.setAttribute("data-menu-open", "");
+    if (panelShown && mode === "panel") header.setAttribute("data-menu-open", "");
     else header.removeAttribute("data-menu-open");
-  }, [open, mode]);
+  }, [panelShown, mode]);
 
   // Keep the panel under the bar while the page scrolls or resizes.
   useEffect(() => {
