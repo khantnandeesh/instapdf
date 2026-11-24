@@ -366,3 +366,61 @@ resource "google_billing_budget" "monthly" {
     spend_basis       = "FORECASTED_SPEND"
   }
 }
+
+# ---------------------------------------------------------------------------
+# Fonts bucket: the open-licence font library (F24), public and read-only
+# ---------------------------------------------------------------------------
+# One bucket for staging and prod: the files are content-addressed and the same
+# for both. The site passes /fonts/lib/* through to it (apps/web/next.config.ts),
+# so browsers only ever talk to our own address. Same region as Cloud Run, so the
+# bucket -> Cloud Run hop is free; storage is about 3 GB (a few rupees a month).
+# Nothing a user uploads ever goes here: the only writer is the publish workflow.
+resource "google_storage_bucket" "fonts" {
+  name     = "${var.project_id}-fonts"
+  location = var.region
+
+  uniform_bucket_level_access = true
+  # Public on purpose (see the allUsers binding below).
+  public_access_prevention = "inherited"
+  force_destroy            = false
+
+  # Every object can be rebuilt from the catalogues; no paid 7-day copies.
+  soft_delete_policy {
+    retention_duration_seconds = 0
+  }
+
+  lifecycle_rule {
+    condition {
+      age = 1
+    }
+    action {
+      type = "AbortIncompleteMultipartUpload"
+    }
+  }
+}
+
+# Read objects by name; no listing (objectViewer on allUsers would allow it).
+resource "google_storage_bucket_iam_member" "fonts_public_read" {
+  bucket = google_storage_bucket.fonts.name
+  role   = "roles/storage.legacyObjectReader"
+  member = "allUsers"
+}
+
+# The publish workflow's identity: writes to this bucket and nothing else.
+resource "google_service_account" "fonts_publisher" {
+  account_id   = "gh-fonts-publish"
+  display_name = "GitHub Actions font library publisher"
+}
+
+resource "google_storage_bucket_iam_member" "fonts_publisher_write" {
+  bucket = google_storage_bucket.fonts.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.fonts_publisher.email}"
+}
+
+# Only workflows on main can act as the publisher (same rule as the staging deployer).
+resource "google_service_account_iam_member" "fonts_publisher_wif" {
+  service_account_id = google_service_account.fonts_publisher.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = local.deployer_principal["staging"]
+}

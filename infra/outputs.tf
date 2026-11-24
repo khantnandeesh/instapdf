@@ -27,3 +27,13 @@ output "jobs_buckets" {
   description = "Bucket for temporary job files, per environment."
   value       = { for env, b in google_storage_bucket.jobs : env => b.name }
 }
+
+output "fonts_bucket" {
+  description = "Public bucket of the font library. FONTS_ORIGIN is https://storage.googleapis.com/<this>."
+  value       = google_storage_bucket.fonts.name
+}
+
+output "fonts_publisher_sa_email" {
+  description = "Identity of the publish-fonts workflow."
+  value       = google_service_account.fonts_publisher.email
+}

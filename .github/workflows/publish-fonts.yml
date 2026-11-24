@@ -1,0 +1,88 @@
+name: Publish font library
+
+# Builds the full font library (every family of the open catalogues that passes the licence gate)
+# and uploads it to the fonts bucket. Run by hand from main; the next staging deploy then serves
+# the library from the bucket (deploy-staging.yml). See infra/README.md "Fonts bucket".
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Only the first N families (a trial run). Empty: all of them."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-fonts
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: ${{ github.ref == 'refs/heads/main' && vars.GCP_WIF_PROVIDER != '' && vars.GCP_PROJECT_ID != '' }}
+    runs-on: ubuntu-latest
+    # About two seconds a family (one request a second to the registry), 2,100 families.
+    timeout-minutes: 180
+    env:
+      BUCKET: ${{ vars.GCP_PROJECT_ID }}-fonts
+      LIMIT: ${{ inputs.limit }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The builder uses only Node's own modules and the matcher module committed in public/engine.
+      - name: Read the catalogues (licence gate)
+        working-directory: apps/web
+        run: node scripts/font-library/crawl.mjs --out "$RUNNER_TEMP/catalogue"
+
+      - name: Build the library
+        working-directory: apps/web
+        run: |
+          case "$LIMIT" in
+            "") extra=(--min-families 1500) ;;
+            *[!0-9]*) echo "limit must be a number" >&2; exit 2 ;;
+            *) extra=(--limit "$LIMIT") ;;
+          esac
+          node --no-warnings scripts/font-library/build-library.mjs \
+            --out "$RUNNER_TEMP/library" --source npm \
+            --catalogue "$RUNNER_TEMP/catalogue/catalogue.json" --clean "${extra[@]}" 2> "$RUNNER_TEMP/skipped.txt"
+          echo "Skipped: $(wc -l < "$RUNNER_TEMP/skipped.txt") lines (see the artifact)"
+          du -sh "$RUNNER_TEMP/library"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: font-library-report
+          path: |
+            ${{ runner.temp }}/catalogue/summary.json
+            ${{ runner.temp }}/catalogue/rejected.json
+            ${{ runner.temp }}/skipped.txt
+            ${{ runner.temp }}/library/manifest.json
+          retention-days: 30
+
+      - uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: gh-fonts-publish@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Content-addressed files first (a name never changes its bytes, so existing ones are left
+      # alone), manifest.json last: the site only ever sees a manifest whose files are all there.
+      - name: Upload
+        working-directory: ${{ runner.temp }}/library
+        run: |
+          forever="public, max-age=31536000, immutable"
+          gcloud storage cp --recursive --no-clobber --cache-control="$forever" fonts "gs://$BUCKET/"
+          gcloud storage cp --recursive --no-clobber --cache-control="$forever" --gzip-local=json families "gs://$BUCKET/"
+          gcloud storage cp --recursive --no-clobber --cache-control="$forever" --gzip-local=json index "gs://$BUCKET/"
+          gcloud storage cp --recursive --cache-control="public, max-age=86400" --content-type="text/plain; charset=utf-8" licences "gs://$BUCKET/"
+          gcloud storage cp --cache-control="public, max-age=300" manifest.json "gs://$BUCKET/manifest.json"
+
+      - name: Check what the site will read
+        run: |
+          curl -fsS "https://storage.googleapis.com/$BUCKET/manifest.json" | tee /dev/stderr | grep -q '"families"'

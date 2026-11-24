@@ -77,7 +77,14 @@ jobs:
         run: |
           image="${REGION}-docker.pkg.dev/${PROJECT_ID}/instapdf/web:${SHA}"
           echo "IMAGE=${image}" >> "$GITHUB_ENV"
-          docker build -f apps/web/Dockerfile -t "$image" .
+          # The fonts bucket serves the font library once the publish workflow has filled it
+          # (infra/README.md "Fonts bucket"). Until then the image carries the small in-app copy.
+          fonts=""
+          if curl -fsS --max-time 20 -o /dev/null "https://storage.googleapis.com/${PROJECT_ID}-fonts/manifest.json"; then
+            fonts="https://storage.googleapis.com/${PROJECT_ID}-fonts"
+          fi
+          echo "::notice::Font library: ${fonts:-in-app copy}"
+          docker build -f apps/web/Dockerfile --build-arg "FONTS_ORIGIN=${fonts}" -t "$image" .
           docker push "$image"
 
       - name: Deploy to Cloud Run

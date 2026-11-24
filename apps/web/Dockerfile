@@ -7,7 +7,10 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/web/package.json apps/web/
 RUN pnpm install --frozen-lockfile --filter web...
 COPY apps/web apps/web
-RUN pnpm --filter web build
+# Set (https://storage.googleapis.com/<bucket>) when the fonts bucket holds a library: /fonts/lib/*
+# is then passed through to it and no copy of the fonts is built into the image.
+ARG FONTS_ORIGIN=""
+RUN FONTS_ORIGIN="$FONTS_ORIGIN" pnpm --filter web build
 
 FROM mirror.gcr.io/library/node:22-alpine AS run
 WORKDIR /app
