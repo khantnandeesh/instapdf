@@ -162,6 +162,14 @@ export class BerryDocument {
         }
     }
     /**
+     * Objects numbered above this were made by this engine's own edits (a trust boundary).
+     * @returns {number}
+     */
+    madeAfter() {
+        const ret = wasm.berrydocument_madeAfter(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * Opens a PDF from its bytes.
      * @param {Uint8Array | number[]} bytes
      * @param {string | null} [password]
@@ -318,6 +326,13 @@ export class BerryDocument {
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
         }
+    }
+    /**
+     * Restores `madeAfter` after reopening the editor's own output; clamped to the document.
+     * @param {number} n
+     */
+    setMadeAfter(n) {
+        wasm.berrydocument_setMadeAfter(this.__wbg_ptr, n);
     }
     /**
      * Lays out one line of new text with the registered fonts.

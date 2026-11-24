@@ -128,16 +128,22 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
     copy and paste keep it. It also drops the space between two numbers typed in separate edits
     ("2024 3" reads "20243" in pdf.js; PDFium reads it as typed).
   - A sibling is used again rather than made per edit: one already on the page that maps the
-    codes as typed (and declares their widths) is used as it is, and one this session made gets
-    the new codes added to its ToUnicode (and widths to its CIDFont copy), since only text this
-    session drew uses it. A sibling in a file saved earlier that lacks a code is left as it was
-    (other text may draw with it) and a new one is made. Only fonts of the edited page are
-    looked at. Tests: `second_number_at_line_end_reuses_the_sibling`,
-    `digits_on_two_lines_share_one_sibling`, `a_saved_sibling_is_reused_only_as_it_is`.
-  - More numbers at the end of the same line ("2024" then " 3") are kept: the read-back orders
-    numbers separated by spaces in a right-to-left line right to left, as UAX #9 does (N1:
-    numbers count as right-to-left for the neutrals between them), unless left-to-right letters
-    lead into them ("abc 12 34" stays one left-to-right run).
+    codes as typed with the same widths is used as it is, and one this session made gets the
+    new codes added to its ToUnicode (and widths to its CIDFont copy), since only text this
+    session drew uses it. "This session" is `made_after` (`madeAfter` in the d.ts): objects
+    above it were made by the engine's own edits. The editor's worker reopens its output after
+    every edit, so it restores that value from its first open of the person's file
+    (`setMadeAfter`), for bytes it saved itself only (SHA-256 of each output). A sibling in a
+    file saved earlier that lacks a code is left as it was (other text may draw with it) and a
+    new one is made. Only fonts of the edited page are looked at. Tests in `font_mapping.rs`
+    (`second_number_at_line_end_reuses_the_sibling`, `reopened_output_keeps_extending_its_sibling`,
+    `a_lookalike_with_other_widths_is_not_reused` and others) and `mixed-direction.test.ts`.
+  - Numbers in a right-to-left line are read in logical order as UAX #9 orders them: numbers
+    separated by spaces right to left ("2024" then " 3" reads "2024 3", "10 - 12" reads as
+    typed; N1), unless left-to-right letters lead into them ("abc 12 34" stays one
+    left-to-right run), and a single plus or minus between European digits is part of the
+    number ("050-1234567", "2024-2025"; W4). Tests: `rtl_numbers.rs` on scripts-numbers.pdf
+    (tests/parity/editor/gen_scripts_numbers.py).
   Tests: crates/berry-engine/tests/font_mapping.rs, and pdfium and pdf.js read-back in
   apps/web/src/lib/editor/mixed-direction.test.ts.
 - Lines already drawn with ActualText spans (Chrome and LibreOffice Arabic) are not covered by

@@ -278,3 +278,127 @@ fn a_refused_edit_leaves_the_sibling_as_it_was() {
     let out = Document::load_mem(&e.save().unwrap().0).unwrap();
     assert_eq!(siblings_of(&out), siblings_of(&saved));
 }
+
+/// scripts-plain.pdf with one more font on page 1 that looks like a sibling of the Arabic font
+/// (same program, a ToUnicode for "0", "2" and "4") but whose CIDFont gives "4" another width
+/// and "2" and "0" none, with one glyph drawn in it.
+fn plain_with_a_lookalike() -> Vec<u8> {
+    let mut doc = Document::load_mem(&read("scripts-plain.pdf")).unwrap();
+    let (font, _) = arabic_font(&doc);
+    let mut dict = doc.get_dictionary(font).unwrap().clone();
+    let cid_id = dict.get(b"DescendantFonts").unwrap().as_array().unwrap()[0].as_reference().unwrap();
+    let mut cid = doc.get_dictionary(cid_id).unwrap().clone();
+    cid.set("W", Object::Array(vec![Object::Integer(0x76), Object::Array(vec![Object::Integer(559)])]));
+    let cid = doc.add_object(Object::Dictionary(cid));
+    let cmap = "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n3 beginbfchar\n<0072> <0030>\n<0074> <0032>\n<0076> <0034>\nendbfchar\nendcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n";
+    let tu = doc.add_object(Object::Stream(lopdf::Stream::new(lopdf::Dictionary::new(), cmap.as_bytes().to_vec())));
+    dict.set("DescendantFonts", Object::Array(vec![Object::Reference(cid)]));
+    dict.set("ToUnicode", Object::Reference(tu));
+    let zz = doc.add_object(Object::Dictionary(dict));
+    let page = *doc.get_pages().get(&1).unwrap();
+    let res = doc.get_page_resources(page).unwrap().0.unwrap().clone();
+    let mut fonts = res.get(b"Font").unwrap().as_dict().unwrap().clone();
+    fonts.set("Fzz", Object::Reference(zz));
+    let mut res = res;
+    res.set("Font", Object::Dictionary(fonts));
+    let draw = doc.add_object(Object::Stream(lopdf::Stream::new(
+        lopdf::Dictionary::new(),
+        b"BT /Fzz 10 Tf 40 40 Td <0072> Tj ET".to_vec(),
+    )));
+    let p = doc.get_dictionary_mut(page).unwrap();
+    p.set("Resources", Object::Dictionary(res));
+    let mut contents = match p.get(b"Contents").unwrap() {
+        Object::Array(a) => a.clone(),
+        o => vec![o.clone()],
+    };
+    contents.push(Object::Reference(draw));
+    p.set("Contents", Object::Array(contents));
+    let mut out = Vec::new();
+    doc.save_to(&mut out).unwrap();
+    out
+}
+
+/// A font with the same program and mapping but other widths is not reused: the digits would
+/// advance by the wrong amount. A new sibling draws them.
+#[test]
+fn a_lookalike_with_other_widths_is_not_reused() {
+    let bytes = plain_with_a_lookalike();
+    let before = siblings_of(&Document::load_mem(&bytes).unwrap());
+    assert_eq!(before.len(), 1, "the lookalike");
+    let (_, out) = edits(bytes, &[("مرحبا", " 2024")]);
+    let after = siblings_of(&Document::load_mem(&out).unwrap());
+    assert_eq!(after.len(), 2, "{after:?}");
+    assert!(after.contains(&before[0]), "the lookalike changed");
+}
+
+/// One edit after another, the way the editor works: save, reopen the output, restore
+/// `made_after` from the first open. The sibling the first edit made is extended, also after an
+/// undo (reopening an earlier output), and every saved file reads as typed.
+#[test]
+fn reopened_output_keeps_extending_its_sibling() {
+    let orig = read("scripts-plain.pdf");
+    let floor = engine(orig.clone()).made_after();
+    let step = |bytes: Vec<u8>, trusted: bool, tail: &str| -> Vec<u8> {
+        let mut e = engine(bytes);
+        if trusted {
+            e.set_made_after(floor);
+        }
+        let p = e.page_text(0).unwrap();
+        let id = line_id(&p, "مرحبا");
+        let want = format!("{}{tail}", p.lines[id].text);
+        e.replace_line(0, id, &want).unwrap_or_else(|err| panic!("{tail:?}: {err:?}"));
+        let out = e.save().unwrap().0;
+        assert!(texts(&engine(out.clone()).page_text(0).unwrap()).contains(&want), "{tail:?}");
+        out
+    };
+    let count = |b: &[u8]| siblings_of(&Document::load_mem(b).unwrap()).len();
+    let one = step(orig, true, " 2024");
+    let two = step(one.clone(), true, " 3");
+    assert_eq!(count(&two), 1);
+    // Undo the second edit, then two more.
+    let again = step(one.clone(), true, " 9");
+    assert_eq!(count(&again), 1);
+    let three = step(again, true, " 6");
+    assert_eq!(count(&three), 1);
+    let doc = Document::load_mem(&three).unwrap();
+    let ids: std::collections::BTreeSet<ObjectId> = doc.objects.keys().copied().collect();
+    assert_eq!(ids.len(), doc.objects.len());
+    // The same file opened afresh (saved by another session): its sibling is not extended.
+    let other = step(one, false, " 3");
+    assert_eq!(count(&other), 2);
+}
+
+/// `set_made_after` never trusts more than the document holds.
+#[test]
+fn made_after_is_clamped_to_the_document() {
+    let mut e = engine(read("scripts-plain.pdf"));
+    let max = e.made_after();
+    e.set_made_after(u32::MAX);
+    assert_eq!(e.made_after(), max);
+    e.set_made_after(3);
+    assert_eq!(e.made_after(), 3);
+}
+
+/// A preview that extends a sibling in place (a dry-run edit) leaves it as it was: the saved
+/// file is the same as without the preview.
+#[test]
+fn a_preview_leaves_the_sibling_as_it_was() {
+    let edited = |preview: bool| {
+        let mut e = engine(read("scripts-plain.pdf"));
+        let p = e.page_text(0).unwrap();
+        let id = line_id(&p, "مرحبا");
+        let want = format!("{} 2024", p.lines[id].text);
+        let r = e.replace_line(0, id, &want).unwrap();
+        let id = line_id(&r.page, "مرحبا");
+        if preview {
+            for tail in [" 3", " 2024 3", "5"] {
+                e.preview_line(0, id, &format!("{want}{tail}")).unwrap_or_else(|err| panic!("{tail:?}: {err:?}"));
+            }
+            let other = line_id(&r.page, "المبلغ");
+            let text = format!("{} 3", r.page.lines[other].text);
+            e.preview_line(0, other, &text).unwrap();
+        }
+        e.save().unwrap().0
+    };
+    assert_eq!(edited(true), edited(false));
+}

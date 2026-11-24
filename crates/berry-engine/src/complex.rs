@@ -788,12 +788,21 @@ impl Engine {
             let family: Vec<usize> = (0..pc.fonts.len())
                 .filter(|&j| pc.fonts[j].object_id.is_some_and(|o| o == id || self.same_font_but_mapping(id, o)))
                 .collect();
+            // Each code must advance as the font being drawn draws it: its own width, or the
+            // program's width added above for a code it leaves to `/DW`.
+            let expected = |c: u32| widths.iter().find(|(x, _)| *x == c).map_or_else(|| f.width(c), |(_, w)| *w);
+            let fits = |j: usize, c: u32| (pc.fonts[j].width(c) - expected(c)).abs() < 1e-3;
+            // `all`: maps every code as typed with its width. Else: maps none of them otherwise,
+            // and gives no other width than the expected one to a code it declares.
             let reads = |j: usize, all: bool| {
                 let s = &pc.fonts[j];
-                map.iter().all(|(c, t)| match s.reader_unicode(*c) {
-                    Some(r) => r == *t,
-                    None => !all,
-                }) && (!all || widths.iter().all(|(c, _)| s.declares_width(*c)))
+                map.iter().all(|(c, t)| {
+                    let text = match s.reader_unicode(*c) {
+                        Some(r) => r == *t,
+                        None => !all,
+                    };
+                    text && (fits(j, *c) || (!all && !s.declares_width(*c)))
+                })
             };
             let fid = |j: usize| pc.fonts[j].object_id.unwrap_or(id);
             let as_is = family.iter().copied().find(|&j| j != *fi && reads(j, true));
@@ -802,8 +811,8 @@ impl Engine {
             let sib = match (as_is, extend) {
                 (Some(j), _) => fid(j),
                 (None, Some(j)) => {
-                    let s = &pc.fonts[j];
-                    let widths: Vec<(u32, f64)> = widths.iter().copied().filter(|(c, _)| !s.declares_width(*c)).collect();
+                    let widths: Vec<(u32, f64)> =
+                        map.iter().filter(|(c, _)| !fits(j, *c)).map(|(c, _)| (*c, expected(*c))).collect();
                     self.sibling_font(id, width, map, &widths, Some(fid(j)), backup)?
                 }
                 (None, None) => self.sibling_font(id, width, map, &widths, None, backup)?,

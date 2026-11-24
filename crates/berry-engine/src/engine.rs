@@ -227,9 +227,9 @@ pub struct Engine {
     pub(crate) dry: bool,
     #[cfg(feature = "shaping")]
     pub(crate) preview: Option<crate::complex::LinePreview>,
-    /// The highest object number in the file as opened: objects above it were made by edits
-    /// kept in this session (a failed edit's are removed again).
-    #[cfg(feature = "shaping")]
+    /// Objects numbered above this were made by edits kept in this session (a failed edit's
+    /// are removed again): the file's highest object number when opened, or what
+    /// [`Engine::set_made_after`] restored.
     pub(crate) opened_max: u32,
 }
 
@@ -390,7 +390,6 @@ impl Engine {
             return Err(Error::Encrypted);
         }
         let pages: Vec<ObjectId> = doc.get_pages().into_values().collect();
-        #[cfg(feature = "shaping")]
         let opened_max = doc.max_id;
         Ok(Engine {
             orig: bytes,
@@ -405,9 +404,24 @@ impl Engine {
             dry: false,
             #[cfg(feature = "shaping")]
             preview: None,
-            #[cfg(feature = "shaping")]
             opened_max,
         })
+    }
+
+    /// The object number above which objects were made by this engine's own edits (a trust
+    /// boundary: see [`Engine::set_made_after`]).
+    pub fn made_after(&self) -> u32 {
+        self.opened_max
+    }
+
+    /// Restores [`Engine::made_after`] after the editor reopens its own output (it reopens the
+    /// saved bytes after every edit). Only the editor's worker calls it, with the value read
+    /// when it first opened the person's file, so a font this session made can be extended
+    /// again. It is clamped to the document's highest object number. Objects above it are
+    /// still only reused when they pass the engine's own checks (same font, widths and
+    /// mapping), so a wrong value can only miss a reuse or extend a sibling-shaped font.
+    pub fn set_made_after(&mut self, n: u32) {
+        self.opened_max = n.min(self.doc.max_id);
     }
 
     pub fn page_count(&self) -> usize {
