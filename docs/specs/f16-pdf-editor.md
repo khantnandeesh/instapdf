@@ -290,6 +290,12 @@ Priority: P0 = parity must-have; P1 = parity nice-to-have or key differentiator;
 #### Forms detail (E3 forms slice, 2026-11-24). Each refines the AC in brackets
 Reference behaviour these beat (`f16-reference-live-checks.md` §4, recording 1:50–2:24): detection uploads the file and runs on the page in view only, refuses pages that already have fields, turns a signature line into a plain text field and names fields with a random suffix; the signature box comes with a blocking warning; fields cannot go on rotated pages.
 
+Second live run (2026-11-24, one task, our `apps/web/tests/fixtures/forms/detect-mix.pdf`; screenshots in project files `designs/editor-forms/sejda-detect/`): detection took about 17 s behind a server "Analyzing your document" overlay and reported "Detected 13 form fields on page 1"; pages 2 and 3 were never looked at. The 13 kinds were right (4 text, a box row, a multi-line box, a 3-button radio group named from its question, 2 checkboxes, 2 lines), but the placement and settings were not:
+- Text fields for drawn lines, underscores and dotted leaders were thin slivers about 6 pt tall **below** the line, not on it.
+- The signature and date fields under their lines **covered the labels** "Signature" and "Date", and the signature line became a plain text field again.
+- The row of 6 PIN boxes became an ordinary text field: "divide into boxes" was off and still showed the default 8, with max length 20.
+- No field got a tooltip, and every name had a random suffix (`full_name_2u3c`, `member_type_1c8p`).
+
 Fill
 - **AC-230 (P0)** [AC-34] Every field type in an existing AcroForm is read with its full name, kind, value, default, options, flags and each widget's page and box: text (single line, multiline, comb, max length), dropdown (editable or not), list (single or multi-select), radio group (export value per button), checkbox, signature and push button (shown, not editable). Fields from inherited parents (`Parent`/`Kids`) are read as one field.
 - **AC-231 (P0)** [AC-34] Filled values are written as `V` with a fresh appearance stream for each changed field, so pdf.js and PDFium show them without relying on `NeedAppearances`. Fields the user did not touch keep their original appearance byte for byte.
