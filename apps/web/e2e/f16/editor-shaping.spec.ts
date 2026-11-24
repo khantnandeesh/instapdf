@@ -162,6 +162,36 @@ test("Hindi typed while the shaping download fails is kept, and made after Retry
   await expect(page.getByTestId("editor-notice")).toContainText("This font has no “न”", { timeout: 30_000 });
 });
 
+for (const how of ["Esc", "a newer edit of the line"] as const) {
+  test(`a waiting Hindi edit is dropped by ${how}, so Retry doesn't make it`, async ({ page }) => {
+    let fail = true;
+    await page.route("**/engine/*/berry_engine_shaping_bg.wasm", (route) => (fail ? route.fulfill({ status: 503, body: "" }) : route.continue()));
+    await open(page, "latex-type1c.pdf");
+    const line = () => page.locator('[data-testid="line"][data-text^="Left column"]').first();
+    await line().click();
+    await page.getByTestId("line-input").fill("Left column नमस्ते");
+    await page.getByTestId("line-input").press("Enter");
+    const pill = page.getByTestId("engine-progress");
+    await expect(pill).toContainText("Editing for this script didn’t load.", { timeout: 30_000 });
+    if (how === "Esc") {
+      await page.getByTestId("canvas").focus();
+      await page.keyboard.press("Escape");
+    } else {
+      await line().click();
+      await page.getByTestId("line-input").fill("Left column, again");
+      await page.getByTestId("line-input").press("Enter");
+      await expect(page.locator('[data-testid="line"][data-text^="Left column, again"]')).toHaveCount(1, { timeout: 30_000 });
+    }
+    fail = false;
+    await pill.getByRole("button", { name: "Retry" }).click();
+    await expect(page.getByTestId("editor-shell")).toHaveAttribute("data-shaping", "ready", { timeout: 30_000 });
+    // The dropped edit never reaches the shaping build (it would name "न" as missing).
+    await page.waitForTimeout(1500);
+    await expect(page.getByTestId("editor-notice")).toHaveCount(0);
+    if (how !== "Esc") await expect(page.locator('[data-testid="line"][data-text^="Left column, again"]')).toHaveCount(1);
+  });
+}
+
 // ---- added text (AC-224) ------------------------------------------------------------------------
 
 async function addTextAt(page: Page, text: string, fx: number, fy: number) {

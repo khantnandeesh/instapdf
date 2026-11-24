@@ -80,6 +80,38 @@ describe("shaping build", () => {
     expect(next.sent[2]).toMatchObject({ op: "text" });
   });
 
+  it("a clearFonts or addFont made while the new worker loads reaches it before the swap", async () => {
+    void client.callEngine({ op: "open", bytes: new Uint8Array(4) });
+    const first = w();
+    first.reply(progress("base", true, 100));
+    first.reply({ id: first.sent[0].id, ok: true, reply: { op: "open", pageCount: 1 } });
+    const add = client.callEngine({ op: "addFont", family: "Tinos", bold: false, italic: false, bytes: new Uint8Array(3) });
+    first.reply({ id: first.sent[1].id, ok: true, reply: { op: "addFont", ok: true } });
+    await add;
+    const up = client.openInShapingEngine(new Uint8Array(4));
+    const next = w();
+    // Meanwhile, in the old worker: the fonts are cleared and another one is registered.
+    const clear = client.callEngine({ op: "clearFonts" });
+    first.reply({ id: first.sent[2].id, ok: true, reply: { op: "clearFonts" } });
+    await clear;
+    const add2 = client.callEngine({ op: "addFont", family: "Cousine", bold: false, italic: false, bytes: new Uint8Array(3) });
+    first.reply({ id: first.sent[3].id, ok: true, reply: { op: "addFont", ok: true } });
+    await add2;
+    next.reply(progress("shaping", true, 100));
+    next.reply({ id: next.sent[0].id, ok: true, reply: { op: "open", pageCount: 1 } });
+    for (let i = 1; ; i++) {
+      await vi.waitFor(() => expect(next.sent.length).toBeGreaterThan(i));
+      const m = next.sent[i];
+      next.reply({ id: m.id, ok: true, reply: m.op === "addFont" ? { op: "addFont", ok: true } : { op: m.op } });
+      if (m.op === "addFont" && m.family === "Cousine") break;
+    }
+    await up;
+    const ops = next.sent.slice(1).map((m) => (m.op === "addFont" ? `add ${String(m.family)}` : m.op));
+    // Whatever was replayed before the clear is cleared; the font list ends as the old worker's.
+    expect(ops.slice(ops.lastIndexOf("clearFonts") + 1)).toEqual(["add Cousine"]);
+    expect(ops).not.toContain("add Tinos");
+  });
+
   it("a recovery open says which build it wants; closing the file returns to the default build", async () => {
     void client.callEngine({ op: "open", bytes: new Uint8Array(4), shaping: true });
     w().reply(progress("shaping", true, 100));

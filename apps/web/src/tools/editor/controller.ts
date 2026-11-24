@@ -397,6 +397,22 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
      * line in the shaping build's reading of the page.
      */
     pendingEdit: null as { src: number; at: [number, number]; text: string } | null,
+    /** Whether the waiting edit is for line `line` of page `src`. */
+    pendingOn(src: number, line: number): boolean {
+      const p = ctl.pendingEdit;
+      const lines = p && p.src === src ? store.get().texts[src]?.lines : undefined;
+      return !!lines && lineAt(lines, p!.at[0], p!.at[1]) === line;
+    },
+    /**
+     * Drops the waiting edit when its line is opened or edited again (or, with no line, on Esc),
+     * so a later Retry neither overwrites the newer edit nor makes a stale one.
+     */
+    dropPendingEdit(src?: number, line?: number) {
+      if (!ctl.pendingEdit) return;
+      if (src !== undefined && line !== undefined && !ctl.pendingOn(src, line)) return;
+      ctl.pendingEdit = null;
+      if (src === undefined) ui.announce("The edit waiting for this script is cancelled.");
+    },
     async applyPendingEdit(edit: { src: number; at: [number, number]; text: string }) {
       await ctl.ensureText(edit.src);
       const page = store.get().texts[edit.src];
@@ -463,6 +479,8 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       if (!e || s.readOnly) return;
       const line = s.texts[e.src]?.lines[e.line];
       if (!line || line.text === e.text) return;
+      // A newer edit of the line an edit is waiting for: the newer one wins.
+      ctl.dropPendingEdit(e.src, e.line);
       store.set({ busy: "edit" });
       try {
         const { result, bytes, appended } = await ctl.replaceWithStandIn(e, s.texts[e.src]);
@@ -534,7 +552,8 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       const size = line.runs[0]?.size ?? line.size;
       try {
         const metrics = await ensureFace(face.font, face.bold, face.italic, edit.text);
-        const objs = lineReplacement({ line, fonts: page.fonts, entry, text: edit.text, face, metrics, measure: measurer(face.font, size, face.bold, face.italic) });
+        const others = page.lines.filter((_, i) => i !== edit.line).map((l) => l.bbox);
+        const objs = lineReplacement({ line, fonts: page.fonts, entry, text: edit.text, face, metrics, measure: measurer(face.font, size, face.bold, face.italic), others });
         // The whiteout takes the page's colour behind the line (a tinted page stays tinted).
         if (objs) objs[0].fill = ctl.samplers.get(entry.id)?.(objs[0]) ?? objs[0].fill;
         if (!objs) {

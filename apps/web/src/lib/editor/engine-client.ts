@@ -57,6 +57,8 @@ let shapingActive = false;
 let candidate: Worker | null = null;
 /** Fonts registered with the engine (addFont), registered again in the shaping worker after a swap. */
 let fonts: { family: string; bold: boolean; italic: boolean; bytes: Uint8Array }[] = [];
+/** Counts clearFonts calls, so a font list replayed into a new worker can follow one sent meanwhile. */
+let clears = 0;
 const listeners = new Set<() => void>();
 function setStatus(next: Partial<EngineStatus>, variant: EngineVariant = "base") {
   if (variant === "base") status = { ...status, ...next };
@@ -181,9 +183,13 @@ function send<C extends Call>(call: C, transfer: Transferable[], target?: Worker
 }
 
 export async function callEngine<C extends Call>(call: C, transfer: Transferable[] = []): Promise<ReplyFor<C["op"]>> {
+  // Recorded before it is sent: a new worker still loading clears its fonts too (openInShapingEngine).
+  if (call.op === "clearFonts") {
+    fonts = [];
+    clears++;
+  }
   const reply = await send(call, transfer);
   if (call.op === "open") shapingActive = !!call.shaping;
-  else if (call.op === "clearFonts") fonts = [];
   else if (call.op === "addFont" && (reply as ReplyFor<"addFont">).ok) fonts.push({ family: call.family, bold: call.bold, italic: call.italic, bytes: call.bytes });
   return reply;
 }
@@ -200,7 +206,20 @@ export async function openInShapingEngine(bytes: Uint8Array): Promise<void> {
   candidate = next;
   try {
     await send({ op: "open", bytes, shaping: true }, [bytes.buffer as ArrayBuffer], next);
-    for (const f of fonts) await send({ op: "addFont", ...f, bytes: f.bytes.slice() }, [], next);
+    // Until the new worker has the font list as it stands: a clearFonts or addFont made in the
+    // old worker meanwhile is followed here. No await between the last check and the swap.
+    let seen = clears;
+    for (let done = 0; ; ) {
+      if (seen !== clears) {
+        seen = clears;
+        done = 0;
+        await send({ op: "clearFonts" }, [], next);
+        continue;
+      }
+      if (done >= fonts.length) break;
+      const f = fonts[done++];
+      await send({ op: "addFont", ...f, bytes: f.bytes.slice() }, [], next);
+    }
   } catch (err) {
     if (candidate === next) dropCandidate();
     throw err;

@@ -903,6 +903,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         return;
       }
       if (k === "Escape") {
+        ctl.dropPendingEdit();
         // Spec order: a placement is cancelled; else the selection goes first, then the tool
         // (unlock / back to Select). A sticky tool stays armed while only a selection is dropped.
         if (s.placement) {
