@@ -360,9 +360,7 @@ export function LineEditBox({
       span.style[key === "ml" ? "marginLeft" : key === "mr" ? "marginRight" : "letterSpacing"] = `${px}px`;
     };
     const wordOf = (offset: number) => words.find((w) => w.start <= offset && offset < w.end);
-    // An accent that the page draws over a letter, where the text has it beside the letter. Inside
-    // a word these are only ever a typesetter's accents; a backtick is, when the word is that
-    // much shorter on the page.
+    // An accent that the page draws over a letter, where the text has it beside the letter.
     const letter = (i: number) => /\p{L}/u.test(value[i] ?? "");
     for (const p of ps) {
       const t = p.span.textContent ?? "";
@@ -371,7 +369,9 @@ export function LineEditBox({
       const all = rect(word.start, word.end);
       const own = rect(p.from, p.from + 1);
       if (!all || !own) continue;
-      if (t === "`" && all.width - (word.bbox.x1 - word.bbox.x0) * scale < own.width * 0.6) continue;
+      // Only where the word is shorter on the page than its letters set side by side: an acute
+      // typed for an apostrophe ("d´une") stands beside its letters on the page too.
+      if (all.width - (word.bbox.x1 - word.bbox.x0) * scale < own.width * 0.35) continue;
       const before = p.from > word.start && letter(p.from - 1) ? (rect(p.from - 1, p.from)?.width ?? 0) : 0;
       const after = p.from + 1 < word.end && letter(p.from + 1) ? (rect(p.from + 1, p.from + 2)?.width ?? 0) : 0;
       // Glyphs read left to right, so an accent no wider than the letter before it sits on that
@@ -409,9 +409,12 @@ export function LineEditBox({
     const common = single.length > 1 ? single[single.length >> 1]! : 0;
     const spacing = Math.abs(common) > 0.5 && single.filter((v) => Math.abs(v - common) <= 0.5).length >= single.length * 0.8 ? common : 0;
     if (spacing) setFit({ word: spacing / scale });
+    // What is too small to set at one word is carried to the next, so it never adds up along the line.
+    let carry = 0;
     for (const m of moves) {
-      const px = m.px - spacing * m.spaces;
-      if (Math.abs(px) > 0.5) set(m.span, "ml", px + Number(m.span.dataset.ml ?? 0) * scale);
+      const px = m.px - spacing * m.spaces + carry;
+      carry = Math.abs(px) > 0.5 ? 0 : px;
+      if (!carry) set(m.span, "ml", px + Number(m.span.dataset.ml ?? 0) * scale);
     }
     return spacing ? "later" : "now";
   };
@@ -419,6 +422,13 @@ export function LineEditBox({
   const rescan = () => {
     const box = el.current;
     if (!box) return;
+    // An accent's part that was typed into is ordinary text again: it no longer sits over a letter.
+    for (const span of box.querySelectorAll<HTMLElement>("[data-mr]"))
+      if ((span.textContent ?? "").length !== 1) {
+        delete span.dataset.ml;
+        delete span.dataset.mr;
+        span.style.marginLeft = span.style.marginRight = "";
+      }
     const found = scan(box, facesRef.current, first);
     setInputWidth(box.offsetWidth);
     mark(found.ranges);

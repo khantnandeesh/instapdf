@@ -618,12 +618,29 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
      * italic part in the closest editor font of that style, at the line's sizes, colours and
      * baseline. One step to undo. A line the engine can't take out is covered with a whiteout.
      */
-    async replaceLineWithText(edit: { src: number; line: number; text: string }) {
+    replaceLineWithText(edit: { src: number; line: number; text: string }): Promise<void> {
+      // Download waits for it, as for a save: the file is never made halfway through.
+      const run = ctl.replaceLineNow(edit);
+      const all = (ctl.committing = Promise.all([ctl.committing, run]).then(() => undefined));
+      void all.finally(() => {
+        if (ctl.committing === all) ctl.committing = null;
+      });
+      return run;
+    },
+    async replaceLineNow(edit: { src: number; line: number; text: string }): Promise<void> {
       const s = store.get();
       const page = s.texts[edit.src];
       const line = page?.lines[edit.line];
       const entry = state().pages.find((p) => p.src === edit.src);
-      if (!page || !line || !entry || s.busy) return;
+      if (!page || !line || !entry || s.readOnly) return;
+      if (s.busy) {
+        ui.toast({ text: "Still working on the last change. Please try again in a moment.", tone: "info" });
+        return;
+      }
+      // Nothing else changes the file from here on (undo, another edit) until this is done.
+      store.set({ busy: "edit" });
+      const version = rt.shown;
+      let removed = false;
       try {
         const parts: RunPart[] = [];
         for (const run of line.runs) {
@@ -634,6 +651,8 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
           const face = editorFontFor(undefined);
           parts.push({ face, metrics: await ensureFace(face.font, false, false, edit.text), measure: measurer(face.font, line.size, false, false) });
         }
+        // The file is still the one the line was read from.
+        if (rt.shown !== version || store.get().texts[edit.src]?.lines[edit.line]?.text !== line.text) return;
         const others = page.lines.filter((_, i) => i !== edit.line).map((l) => l.bbox);
         const made = styledLineReplacement({ line, fonts: page.fonts, entry, text: edit.text, parts, others });
         if (!made) {
@@ -646,8 +665,6 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         const open = store.get().lineEdit;
         if (open && open.src === edit.src && open.line === edit.line) store.set({ lineEdit: null });
         // The old line leaves the file; where the engine can't take it out it is covered instead.
-        store.set({ busy: "edit" });
-        let removed = false;
         try {
           removed = await ctl.showEngineResult(edit.src, await callEngine({ op: "replace", page: edit.src, line: edit.line, text: "" }));
         } catch (err) {
@@ -655,8 +672,6 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
             console.warn(engineErrorLog(err));
             if (err.kind === "crashed" || err.kind === "aborted" || err.kind === "internal") await ctl.recoverEngine();
           }
-        } finally {
-          store.set({ busy: null });
         }
         const objs: EditorObject[] = removed ? made.texts : [made.whiteout, ...made.texts];
         if (objs.length) {
@@ -666,7 +681,11 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         if (made.overlaps) ui.toast({ text: "The new text runs into text below it. Shorten it, or move or resize the box.", tone: "info" });
         else ui.announce("Line replaced with new text");
       } catch {
-        ui.toast({ text: "The font for the new text couldn’t load. Please try again.", tone: "danger" });
+        // The line already left the file: that step is recorded, so Undo brings it back.
+        if (removed) apply({ ...state(), engine: rt.shown }, "Remove line", { page: entry.id });
+        ui.toast({ text: removed ? "The new text couldn’t be placed. Undo brings the line back." : "The font for the new text couldn’t load. Please try again.", tone: "danger" });
+      } finally {
+        store.set({ busy: null });
       }
     },
 

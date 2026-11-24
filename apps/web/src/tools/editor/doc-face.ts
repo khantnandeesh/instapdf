@@ -151,7 +151,8 @@ export function docFace(info: FontInfo, text: string, known?: DocFace | null, wa
   const fresh = have
     ? have.then((f) => (!f && deferred.has(key) && !warm ? again() : !f || [...codePoints(text)].every((cp) => f.asked.has(cp)) ? f : build(info, text, gen, f).catch(() => f)))
     : build(info, text, gen, null, warm ? () => deferred.add(key) : undefined);
-  faces.set(key, fresh.catch(() => null));
+  // A warm-up that failed (the engine was restarting) is no verdict on the font: a line asks again.
+  faces.set(key, fresh.catch(() => (warm && deferred.add(key), null)));
   return faces.get(key)!;
 }
 

@@ -22,7 +22,7 @@ const TWINS: [string, string][] = [
   ["times", "tinos"],
 ];
 /** Cuts of those families that are drawn to other widths. */
-const OTHER_WIDTHS = /narrow|condensed|compressed|black|rounded|math/;
+const OTHER_WIDTHS = /narrow|condensed|compressed|black|rounded|math|neue|light|thin|ultra|heavy|medium|semi|demi/;
 
 /** The library family with the same widths as the font called `name` ("ABCDEF+Arial-BoldMT", "Times New Roman"). */
 export function twinOf(name: string): string | undefined {

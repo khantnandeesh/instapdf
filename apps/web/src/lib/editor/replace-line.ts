@@ -156,10 +156,8 @@ export function runOfEach(line: Line, text: string): number[] {
   let tail = 0;
   while (tail < old.length - head && tail < text.length - head && old[old.length - 1 - tail] === text[text.length - 1 - tail]) tail++;
   const typed = runAt(head + tail === old.length ? Math.max(0, head - 1) : head);
-  return [...text].length === text.length
-    ? Array.from(text, (_, j) => (j < head ? runAt(j) : j >= text.length - tail ? runAt(j - (text.length - old.length)) : typed))
-    : // Characters outside the basic plane count twice above: such a line is set in one style.
-      Array.from(text, () => typed);
+  // One entry per UTF-16 unit, as the text is indexed everywhere else here.
+  return Array.from({ length: text.length }, (_, j) => (j < head ? runAt(j) : j >= text.length - tail ? runAt(j - (text.length - old.length)) : typed));
 }
 
 /**

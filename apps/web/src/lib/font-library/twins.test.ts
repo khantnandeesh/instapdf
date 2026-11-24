@@ -19,18 +19,16 @@ describe("metric twins (F24, AC-283)", () => {
     ["Courier New", "cousine"],
     ["Courier-Bold", "cousine"],
     ["Calibri", "carlito"],
-    ["Calibri-Light", "carlito"],
     ["Cambria", "caladea"],
     ["Georgia", "gelasio"],
     ["Segoe UI", "selawik"],
     ["LiberationSerif-Bold", "tinos"],
     ["Liberation Sans", "arimo"],
-    ["SegoeUI-Semibold", "selawik"],
   ])("%s has the twin %s", (name, twin) => {
     expect(twinOf(name)).toBe(twin);
   });
 
-  it.each(["Arial Narrow", "ArialNarrow-Bold", "Arial Black", "Helvetica-Condensed", "Liberation Sans Narrow", "Cambria Math", "Verdana", "Carlito", "Inter"])("%s has no twin", (name) => {
+  it.each(["Arial Narrow", "ArialNarrow-Bold", "Arial Black", "Helvetica-Condensed", "Liberation Sans Narrow", "Helvetica Neue", "Helvetica-Light", "Calibri-Light", "SegoeUI-Semibold", "Cambria Math", "Verdana", "Carlito", "Inter"])("%s has no twin", (name) => {
     expect(twinOf(name)).toBeUndefined();
   });
 
