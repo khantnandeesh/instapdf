@@ -4,6 +4,7 @@
  */
 import type { FamilyRow } from "./client";
 import { isClose, type FontMatch } from "./match";
+import { scriptFamilies } from "./scripts";
 
 /** Character sets whose fonts must be asked for by set: [first, last, the library's name for it]. */
 const SETS: [number, number, string][] = [
@@ -61,15 +62,19 @@ export type CandidateInput = {
   fallbacks: readonly (string | undefined)[];
   families: readonly FamilyRow[];
   kind: "serif" | "sans-serif" | "monospace";
+  /** The document font's name: tells an Arabic font's style (Naskh, Kufi, Nastaliq). */
+  name?: string;
   chars: string;
 };
 
 /**
  * Best first: the person's choice, the closest by shape, the family of the same name (when the
- * shapes don't say otherwise), the next closest by shape, our defaults, families of the same
- * kind that have the alphabet asked for, and last a same-named family the shapes disagreed with.
+ * shapes don't say otherwise), for another writing system the faces made for it in the font's
+ * own style (AC-288), the other families named, the next closest by shape, our defaults,
+ * families of the same kind that have the alphabet asked for, and last a same-named family the
+ * shapes disagreed with.
  */
-export function orderCandidates({ choice, matches, named, fallbacks, families, kind, chars }: CandidateInput): string[] {
+export function orderCandidates({ choice, matches, named, fallbacks, families, kind, name = "", chars }: CandidateInput): string[] {
   const out: string[] = [];
   const add = (id?: string) => id && !out.includes(id) && out.push(id);
   add(choice);
@@ -78,11 +83,15 @@ export function orderCandidates({ choice, matches, named, fallbacks, families, k
   // Inter that is drawn as a serif), the family of that name waits until after the fonts that
   // look like it.
   const agrees = (id?: string) => !matches.length || matches.some((m) => m.family === id && isClose(m));
+  if (agrees(named[0])) add(named[0]);
+  const sets = setsOf(chars);
+  // Letters of a script the shapes can't be compared in: a face made for it, serif for a serif
+  // and sans for a sans, and for Arabic in the hand the font's name tells.
+  for (const set of sets) if (!GENERAL.has(set)) for (const id of scriptFamilies(set, { kind, name }, families)) add(id);
   for (const id of named) if (agrees(id)) add(id);
   // Then the next closest by shape, so a character the closest lacks goes to the next closest.
   // A family made for another script (Noto Serif Telugu has Latin letters too) is not offered
   // for text that isn't in that script.
-  const sets = setsOf(chars);
   const rows = new Map(families.map((f) => [f.i, f]));
   const forOtherScript = (id: string) => rows.get(id)?.s.some((x) => !GENERAL.has(x) && !sets.includes(x)) ?? false;
   for (const m of matches) if (!forOtherScript(m.family)) add(m.family);

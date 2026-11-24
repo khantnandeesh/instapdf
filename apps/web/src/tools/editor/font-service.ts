@@ -11,6 +11,8 @@ import { ensureFace, knownManifest, registerUserFont, resolveFonts, userFontByte
 import { familyByName, foldName, loadLibrary, type Library } from "@/lib/font-library/client";
 import { orderCandidates } from "@/lib/font-library/candidates";
 import { MATCH_CHARS, type FontMatch } from "@/lib/font-library/match";
+import { LATIN_PROBE, SCRIPT_PROBE, scriptOf, scriptOrder } from "@/lib/font-library/scripts";
+import { withTwin } from "@/lib/font-library/twins";
 import { matchFont } from "@/lib/font-library/match-client";
 import { USER_FONT_ERROR, readLocalFamily, readUserFont, type AddedFont, type LocalFontData, type UserFontError } from "@/lib/font-library/user-fonts";
 
@@ -59,10 +61,43 @@ export function loadFontList(): void {
 /** How many of a document's fonts are matched, in the order the file lists them (a file with more is rare; the rest are listed without a match). */
 const MATCH_LIMIT = 100;
 
-async function matchOf(info: FontInfo): Promise<FontMatch[]> {
+const kindOf = (info: FontInfo | undefined) => (info?.monospace ? "monospace" : info?.serif ? "serif" : "sans-serif");
+
+async function byShape(info: FontInfo): Promise<FontMatch[]> {
   if (info.object == null) return [];
   const { program } = await callEngine({ op: "program", font: info.object, chars: MATCH_CHARS });
   return matchFont(program, 5);
+}
+
+/** How many faces of its script a font the shapes can't place is given. */
+const SCRIPT_FACES = 3;
+
+/**
+ * The library fonts closest to a document font: by shape, its metric twin first where it has
+ * one (AC-283), and for a font of another writing system (no Latin letters to compare) faces
+ * made for that script in the font's own style (AC-288).
+ */
+async function matchOf(info: FontInfo): Promise<FontMatch[]> {
+  const lib = state.library ?? (await loadLibrary().catch(() => null));
+  const shaped = await byShape(info).catch(() => [] as FontMatch[]);
+  const matches = withTwin(info, shaped, (id) => !lib || lib.byId.has(id));
+  if (!lib) return matches;
+  const weight = info.bold ? 700 : 400;
+  const named = (family: string, grade: FontMatch["grade"], distance = 0): FontMatch => ({ face: `${family}_${weight}_${info.italic ? "italic" : "normal"}`, family, weight, italic: info.italic, grade, distance, letters: 0 });
+  const sameName = familyByName(lib, info.family || info.name);
+  // A font made for another writing system: faces of that script, whatever its few Latin letters look like.
+  const set = info.object == null ? null : scriptOf((await callEngine({ op: "coverage", font: info.object, text: LATIN_PROBE + SCRIPT_PROBE.map(([, letters]) => letters).join("") }).catch(() => ({ covered: "" }))).covered);
+  if (set && set !== "greek" && set !== "cyrillic") {
+    const ids = scriptOrder(set, { kind: kindOf(info), name: info.name }, sameName?.i, matches.map((m) => m.family), lib.families);
+    return ids.slice(0, Math.max(SCRIPT_FACES, 1)).map((id, i) => matches.find((m) => m.family === id) ?? named(id, id === sameName?.i ? "close" : "loose", i));
+  }
+  if (matches.length) return matches;
+  // Too few letters to compare (a font we put there ourselves for a few characters): a library
+  // family of exactly this name is the one to offer.
+  if (sameName) return [named(sameName.i, "close")];
+  // Greek or Cyrillic only: our own font of its kind, which has both.
+  const fallback = set && TEXT_FONTS.find((f) => f.class === (info.monospace ? "mono" : info.serif ? "serif" : "sans"))?.id;
+  return fallback && lib.byId.get(fallback)?.s.includes(set!) ? [named(fallback, "loose")] : [];
 }
 
 /**
@@ -151,7 +186,8 @@ export async function standInCandidates(info: FontInfo | undefined, request: Fon
     named: request.families.map((name) => (lib ? familyByName(lib, name)?.i : TEXT_FONTS.find((f) => foldName(f.label) === foldName(name))?.id)),
     fallbacks: [TEXT_FONTS.find((f) => f.class === kind)?.id, "arimo"],
     families: lib?.families ?? [],
-    kind: kind === "mono" ? "monospace" : kind === "sans" ? "sans-serif" : "serif",
+    kind: kindOf(info),
+    name: info?.name,
     chars,
   });
 }

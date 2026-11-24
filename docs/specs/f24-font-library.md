@@ -92,7 +92,7 @@ Delivered and tested:
 
 Not in this PR:
 
-- AC-280 for added text placed on an existing line, AC-283 (twin table beyond the engine's own stand-in list), AC-285 (timing on a phone), AC-287 (x-height scaling), AC-288 (script-aware matching: the index holds Latin letters and digits only), AC-297 (keeping an uploaded font for later sessions).
+- AC-280 for added text placed on an existing line, AC-285 (timing on a phone), AC-287 (x-height scaling), AC-297 (keeping an uploaded font for later sessions). (AC-283 and AC-288 were built in the sixth PR, below.)
 - The engine takes TrueType outlines only for stand-ins: an OTF (CFF) font of your own works for added text but not yet for existing text.
 - The recognise-only tier, and a catalogue source for the GUST (TeX Gyre) and Bitstream Vera (DejaVu) families.
 
@@ -165,5 +165,30 @@ The evaluation of 2026-11-24 (`docs/evals/f24-font-library.md`) failed on four P
 
 - The edit box's outline is always a closed rectangle: on tightly set lines its top and bottom edges are drawn just inside the neighbouring lines' text instead of being left out (owner, 2026-11-24, from a screen recording). Sejda draws no outline round the line being edited.
 
-Still open from that evaluation: AC-296 (looking the PDF's own font up on the device), a character the embedded program has under a code the PDF's own table does not list shows as present in the box and is saved in a stand-in font (the notice after saving says so), two font objects per stand-in (one per slice), `/fonts/editor/*.woff` caching, and focus after a mouse-opened edit.
+### After the re-evaluation (sixth PR)
+
+The re-evaluation of 2026-11-24 on staging `f68ba1d` failed on AC-281, AC-301, AC-282 and AC-298, and AC-283 and AC-288 were not built. What changed, by its gap list:
+
+- **AC-281, AC-301 (gap 1).** Fonts for letters outside Latin are tried closest first: the document's own family when the library has it with the letter (Carlito stays Carlito for Greek and Cyrillic), then the matched family (Liberation Serif takes Tinos for Greek, Cyrillic and Hebrew), then the next closest by shape, and only then other families that have the alphabet. A built-in family (Latin only in the app's own copy) takes its other alphabets from the library's copy of the same family.
+- **AC-282 (gap 2).** Shapes come before names everywhere: a font that carries a library family's name but is drawn differently opens, saves and is listed with the font that looks like it, and the stand-in notice shows.
+- **AC-298 (gap 3).** A line opens exactly as the page has it when its text alone doesn't say where things go:
+  - Glyphs a TeX font names `ff`, `ffi` and `ffl` are read as those ligatures (they were dropped from the line's text and from its screen-reader label).
+  - Each word is set where the page has it: a gap the text has no characters for (a tab, dot leaders, the word gaps of a TeX line, justified text) goes before its word; letter spacing and a wider or narrower setting are spread between the word's letters. Where most single spaces are short by the same amount (justified text) that amount is the line's word spacing, so a space typed later is as wide as its neighbours.
+  - An accent drawn as a glyph of its own over a letter (TeX's `\'e`) stays over that letter. Which letter is read off the glyph order and widths; a dotless i or j takes the accent before it.
+  - Runs and words are placed by their own text: the engine counts a ligature as one character, which shifted a bold run or a word's start by one after "ti" or "ffi".
+  - Known limit: a wider setting (horizontal scaling) is shown as wider spacing of the same letter shapes; the saved file keeps the page's own scaling.
+- **AC-283 (P0), now built.** Arial and Helvetica take Arimo, Times and Times New Roman take Tinos, Courier and Courier New take Cousine, Calibri takes Carlito, Cambria takes Caladea and Georgia takes Gelasio: first in the menu ("Arimo · Same widths"), first as the stand-in, and at once in the edit box for a font the PDF only names (no matching, so nothing to wait for). A font the PDF carries gets its twin first only when its shapes agree with its name (AC-282 holds). Narrow, Condensed, Black, Rounded and Math cuts have no twin. **Segoe UI has none in the library yet**: its twin, Selawik, is not in the catalogue we crawl (Fontsource), so Segoe UI goes by shape; it is the one family of this criterion still open.
+- **AC-288 (P0), now built.** For Hindi, Arabic, Hebrew, Bengali, Tamil, Thai and the library's other scripts the faces offered are made for the script and in the font's own style: serif for a serif font and sans for a sans; for Arabic a Naskh, Kufi or Nastaliq face by the font's name (else Naskh for a serif and a plain sans otherwise). A document font in such a script, which the shape index (Latin letters and digits) cannot place, is listed with these faces as "Similar" instead of "No match yet"; its script is read off the letters it has. Shape matching inside a script is not built.
+- **"Replace with new text" (gap 4, micro-check M8).** The old line is taken out of the file by the engine (nothing is covered up, and copying or searching finds the text once), and the typed text is set in its place with each part's style: a bold word stays bold and an italic word italic, in its own size and colour, each stretch of one style a text box of its own on the line's baseline, all set smaller by the same amount (down to 60%) when the text is longer than the line. A text far too long goes in one box that wraps, as before; a line the engine cannot take out is covered with a whiteout, as before. One step to undo. The message says what will happen before it does ("Replacing it sets your text in Tinos."), and "The new text runs into text below it" is said only when the text wrapped or outgrew its room. Justified spacing is not kept (the new text is set at its natural spacing).
+- **Gap 5.** A font taken automatically for a missing letter is forgotten when the edit is given up with Escape.
+- **Gap 6.** Georgian, Tifinagh, Cherokee, Braille, Ogham and the other alphabets the library has are offered their families instead of "No font here has it".
+- **Gap 7.** The outline goes around a line that holds a raised footnote mark (it was drawn through the line's letters to spare the mark).
+- **Gap 8.** A message about the line being edited ("Your text is still in the box", "couldn't be saved") goes as soon as that line is saved or given up.
+- **Gap 9.** The fonts of a page are made ready in idle time after the page's text is read, and a font the PDF only names opens in its twin without matching, so the first line opened is drawn in its font at once. The warm-up loads nothing of the font library (AC-290 holds); a font that needs the closest library font by shape is still made on the first click.
+- **Gap 10.** The phone row reads "Missing: ř á k".
+- **Gap 11.** Courier is listed with Cousine (its twin). A font too small to compare by shape that carries a library family's exact name (a stand-in we embedded earlier) is listed with that family instead of "No match yet".
+
+Still open: Segoe UI's twin (above); AC-296; two font objects per stand-in (one per slice); `/fonts/editor/*.woff` caching; focus after a mouse-opened edit; horizontal scaling shown as spacing.
+
+Still open from the first evaluation: AC-296 (looking the PDF's own font up on the device), a character the embedded program has under a code the PDF's own table does not list shows as present in the box and is saved in a stand-in font (the notice after saving says so), two font objects per stand-in (one per slice), `/fonts/editor/*.woff` caching, and focus after a mouse-opened edit.
 

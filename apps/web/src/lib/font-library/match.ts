@@ -11,10 +11,13 @@ import { parseFaceId } from "./client";
 /** The characters a document font is asked for (the matcher's alphabet). */
 export const MATCH_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
-/** In words only: never shown as a number. "loose" matches are not offered as close. */
-export type Grade = "exact" | "very-close" | "close" | "loose";
+/**
+ * In words only: never shown as a number. "loose" matches are not offered as close. "twin": not
+ * compared by shape but known to be drawn to the same widths (twins.ts).
+ */
+export type Grade = "exact" | "very-close" | "close" | "loose" | "twin";
 const GRADES: Grade[] = ["exact", "very-close", "close", "loose"];
-export const GRADE_LABEL: Record<Grade, string> = { exact: "Exact", "very-close": "Very close", close: "Close", loose: "Similar" };
+export const GRADE_LABEL: Record<Grade, string> = { exact: "Exact", "very-close": "Very close", close: "Close", loose: "Similar", twin: "Same widths" };
 
 export type FontMatch = {
   /** Index face id, "<family>_<weight>_<style>". */

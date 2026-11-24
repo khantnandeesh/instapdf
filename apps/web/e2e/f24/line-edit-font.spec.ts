@@ -182,7 +182,7 @@ test("nothing of the edit box (paper, ring) covers the line below it, at any siz
       if (b) expect(b.y + b.height <= hb.y || b.y >= hb.y + hb.height).toBe(true);
     }
     expect(await page.getByTestId("line-missing-font").count()).toBeLessThanOrEqual(2);
-    await expect(hb0).toContainText("Not in ř");
+    await expect(hb0).toContainText("Missing: ř");
     // Picking a font there keeps the edit going.
     await page.getByTestId("line-missing-font").last().tap();
     await expect(input).toHaveCount(1);
@@ -272,7 +272,7 @@ test("a typed letter the font lacks is marked as typed, with fonts to draw it; p
   await expect(input).toHaveAttribute("data-missing", /ř/);
   const hint = page.getByTestId("line-missing");
   await expect(hint).toBeVisible();
-  await expect(hint).toContainText(/Not in (this font: )?ř/);
+  await expect(hint).toContainText(/(Not in this font|Missing): ř/);
   expect(await page.evaluate(() => (CSS.highlights.get("ed-miss")?.size ?? 0) > 0)).toBe(true);
   expect(await input.getAttribute("aria-describedby")).toBe(await hint.getAttribute("id"));
 
@@ -466,11 +466,137 @@ test("text typed past where the page clips its content is refused, kept in the b
   await page.keyboard.type(" shown");
   await notice.getByRole("button", { name: "Replace with new text" }).click();
   await expect(input).toHaveCount(0);
-  await expect(page.locator('[data-kind="text"]')).toContainText("and then the date shown");
-  await expect(page.locator('[data-kind="whiteout"]')).toHaveCount(1);
+  // M8: the old line leaves the file (nothing is covered up, so copying and searching find the
+  // text once), and each part keeps its style: the bold word bold, the italic word italic.
+  const boxes = page.locator('[data-kind="text"]');
+  await expect(boxes).toHaveCount(5);
+  await expect(boxes.last()).toContainText("and then the date shown");
+  await expect(page.locator('[data-kind="whiteout"]')).toHaveCount(0);
+  await expect(lineWith(page, "This agreement is made")).toHaveCount(0);
+  const styles = await boxes.evaluateAll((els) => els.map((el) => {
+    const t = el.querySelector("text")!;
+    return `${(t.textContent ?? "").trim().slice(0, 8)}|${Number(t.getAttribute("font-weight")) >= 600 ? "bold" : "regular"}|${t.getAttribute("font-style")}`;
+  }));
+  expect(styles).toEqual(["This agr|regular|normal", "Provider|bold|normal", "and the|regular|normal", "Client|regular|italic", "on the d|regular|normal"]);
+  // All five sit on one baseline and none runs past the page's edge.
+  const rects = await boxes.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON() as DOMRect));
+  const sheet = (await page.getByTestId("page-1").boundingBox())!;
+  for (const r of rects) expect(r.right).toBeLessThanOrEqual(sheet.x + sheet.width);
+  for (let i = 1; i < rects.length; i++) expect(rects[i]!.left).toBeGreaterThanOrEqual(rects[i - 1]!.right - 1);
   await page.waitForTimeout(500);
   expect(tries).toHaveLength(1);
   await expect(lineWith(page, "and then the date")).toHaveCount(0);
+  // The message about the open line went with the box.
+  await expect(notice).toHaveCount(0);
+  // One step back brings the line itself back and takes the boxes away.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(lineWith(page, "This agreement is made")).toHaveCount(1, { timeout: 15_000 });
+  await expect(boxes).toHaveCount(0);
+});
+
+test("gap 8: a message about the line being edited goes when the edit is given up", async ({ page }) => {
+  await open(page, "chrome-justified-mixed.pdf");
+  const input = await edit(page, lineWith(page, "This agreement is made"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" and then the date");
+  await page.keyboard.press("Enter");
+  const notice = page.getByTestId("editor-notice");
+  // What the action will do is said before it is done.
+  await expect(notice).toContainText("Your text is still in the box. Replacing it sets your text in Tinos.", { timeout: 30_000 });
+  await expect(input).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(input).toHaveCount(0);
+  await expect(notice).toHaveCount(0);
+});
+
+/** How far the end of the box's text is from where the line ends on the page (0: the text is as long as the line). */
+async function drift(page: Page, line: Locator) {
+  const at = (await line.boundingBox())!;
+  const words = await line.evaluate((el) => (el as HTMLElement).dataset.text ?? "");
+  const input = await edit(page, line);
+  await expect(input).toHaveAttribute("data-faces", /own|close/);
+  await page.waitForTimeout(300);
+  return input.evaluate(
+    (el, { left, right, text }) => {
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      const rects = [...r.getClientRects()].filter((x) => x.width > 0);
+      // The line's box on the page has the same margin on both sides of its text.
+      return { end: right - Math.max(...rects.map((x) => x.right)) - (Math.min(...rects.map((x) => x.left)) - left), text: el.textContent === text };
+    },
+    { left: at.x, right: at.x + at.width, text: words },
+  );
+}
+
+for (const [file, text, why] of [
+  ["latex-type1c.pdf", "nite sti", "ff and ffi ligatures, word gaps the text has no spaces for"],
+  ["latex-type1c.pdf", "1.2", "a tab gap and dot leaders"],
+  ["latex-type1c.pdf", "Spaced out words", "letter and word spacing"],
+  ["latex-type1c.pdf", "Wide scaled", "a wider setting"],
+  ["libreoffice-memo.pdf", "The meeting moves", "a ligature the engine counts as one character"],
+  ["libreoffice-memo.pdf", "Team memo", "a heading with a narrowed word gap"],
+] as const) {
+  test(`AC-298: a line opens as long as it is on the page: ${why}`, async ({ page }) => {
+    await open(page, file);
+    const d = await drift(page, lineWith(page, text));
+    expect(d.text).toBe(true);
+    expect(Math.abs(d.end)).toBeLessThanOrEqual(2);
+  });
+}
+
+test("AC-298: ligatures the text layer had no letters for are read and drawn (ff, ffi)", async ({ page }) => {
+  await open(page, "latex-type1c.pdf");
+  const line = lineWith(page, "nite sti");
+  await expect(line).toHaveAttribute("data-text", "The eﬀect of ﬁnite stiﬀness on the ﬂow is eﬃcient.");
+  const before = await line.screenshot();
+  const input = await edit(page, line);
+  await expect(input).toHaveText("The eﬀect of ﬁnite stiﬀness on the ﬂow is eﬃcient.");
+  await expect(input).toHaveAttribute("data-faces", /own/);
+  // As much ink in the box as on the page: no glyph is dropped when the line opens.
+  await page.mouse.move(2, 2);
+  const a = await ink(page, before);
+  const b = await ink(page, await input.screenshot());
+  expect(b.count).toBeGreaterThan(a.count * 0.9);
+});
+
+test("AC-298: an accent the page draws over its letter stays over it in the box", async ({ page }) => {
+  await open(page, "latex-type1c.pdf");
+  const input = await edit(page, lineWith(page, "cafe"));
+  const gap = await input.evaluate((el) => {
+    const span = [...el.querySelectorAll("span")].find((s) => s.textContent === "\u00B4")!;
+    const prev = span.previousElementSibling!.firstChild!;
+    const r = document.createRange();
+    r.setStart(prev, prev.nodeValue!.length - 1);
+    r.setEnd(prev, prev.nodeValue!.length);
+    const e = r.getBoundingClientRect();
+    const a = span.getBoundingClientRect();
+    // Centre of the accent against the centre of the letter before it.
+    return Math.abs((a.left + a.right) / 2 - (e.left + e.right) / 2);
+  });
+  expect(gap).toBeLessThanOrEqual(1.5);
+});
+
+test("gap 7: the ring goes around a line that holds a raised footnote mark, not through its letters", async ({ page }) => {
+  await open(page, "latex-type1c.pdf");
+  const input = await edit(page, lineWith(page, "A footnote mark"));
+  await expect(input).not.toHaveAttribute("data-inset", /top/);
+});
+
+test("AC-283: a font the PDF only names gets its metric twin, in the menu and in the edit box", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "the font menu is checked on the desktop layout");
+  await open(page, "std14-reportlab.pdf");
+  // The line opens in the twin at once, as long as it is on the page.
+  const mono = lineWith(page, "REF-7731-ZEBRA");
+  const d = await drift(page, mono);
+  expect(Math.abs(d.end)).toBeLessThanOrEqual(2);
+  await expect(page.getByTestId("line-input").locator("span").first()).toHaveCSS("font-family", /cousine/i);
+  await page.keyboard.press("Escape");
+  const picker = page.getByTestId("font-picker").first();
+  if (!(await picker.isVisible().catch(() => false))) await page.getByRole("button", { name: /^Text/ }).first().click();
+  await picker.click();
+  await expect(page.getByTestId("font-doc").filter({ hasText: "Courier" }).first()).toContainText("Cousine · Same widths", { timeout: 30_000 });
+  await expect(page.getByTestId("font-doc").filter({ hasText: "Helvetica" }).first()).toContainText("Arimo · Same widths");
+  await expect(page.getByTestId("font-doc").filter({ hasText: "Times" }).first()).toContainText("Tinos · Same widths");
 });
 
 test("a PDF's bare CFF font program becomes a font the browser loads, with the PDF's widths", async ({ page }) => {
