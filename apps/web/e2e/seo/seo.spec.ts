@@ -16,9 +16,9 @@ const PLANNED = tools.filter((t) => t.status === "planned").map((t) => `/${t.slu
 const STAGING_HOST = "web-staging-qzq5fa2g7q-uc.a.run.app";
 
 /** Performance budgets (docs/seo/strategy.md, "Performance budgets"), checked on the mobile project. */
-// Phone JS, KiB, counting link-preloaded scripts: 170 with and without cloud sources. Merge measured
-// 167.3 (off) and 169.6 (on) once the header logo stopped prefetching the home page; #32 had raised it
-// to 172 / 174 for F23.
+// Phone JS, KiB, counting link-preloaded scripts: 170 with and without cloud sources (#32 had raised it
+// to 172 / 174 for F23). Merge measured 158.7 (off) and 160.7 (on) once the header logo stopped
+// prefetching the home page and the flow's post-pick parts waited for intent (tool-flow/intent.ts).
 const BUDGET = { jsKB: 170, lcpMs: 2500, cls: 0.1 };
 
 type Ld = { "@graph": { "@type": string; [k: string]: unknown }[] };
