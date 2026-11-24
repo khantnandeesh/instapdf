@@ -104,7 +104,8 @@ test("closing the window on a sign-in page: the tool stops waiting once it has b
   test.setTimeout(60_000);
   await page.evaluate((k) => localStorage.setItem(k, "hold"), REDIRECT);
   const urls = visited(page);
-  const win = await openWindow(page, () => rowButton(page, "OneDrive").click());
+  // OneDrive starts by itself: the window may leave before it ever shows its own page.
+  const [win] = await Promise.all([page.context().waitForEvent("page"), rowButton(page, "OneDrive").click()]);
   // The window leaves for the "sign-in page", which never answers.
   await expect.poll(() => urls.some((u) => new URL(u).pathname === "/"), { timeout: 15_000 }).toBe(true);
   const waiting = page.getByTestId("notice").filter({ hasText: "Waiting for OneDrive" });
