@@ -182,20 +182,26 @@ class TextFonts {
 
 /** Builds the edited PDF. */
 /**
- * Z-order layers when shaped lines are drawn by the engine (AC-224): an object's layer is the
- * number of objects with shaped lines before it on its page. Layer k is drawn by pdf-lib, then
- * the shaped lines of layer k by the engine, then layer k + 1, so an object added after a shaped
- * line (a whiteout over it, say) prints over it, as on screen.
+ * Z-order layers when shaped lines are drawn by the engine (AC-224): on each page, a new layer
+ * starts at the first object pdf-lib draws after an object with shaped lines. Layer k is drawn
+ * by pdf-lib, then the shaped lines of layer k by the engine, then layer k + 1, so an object added
+ * after a shaped line (a whiteout over it, say) prints over it, as on screen. Shaped boxes with no
+ * other object between them share a layer, so they take one engine pass (their plain lines, if
+ * any, are drawn by pdf-lib under all of that layer's shaped lines).
  */
 export function shapedLayers(input: Pick<BuildInput, "objects">): { layers: Map<string, number>; count: number } {
   const layers = new Map<string, number>();
-  const seen = new Map<string, number>();
+  const at = new Map<string, { k: number; shaped: boolean }>();
   let count = 1;
   for (const o of input.objects) {
-    const k = seen.get(o.page) ?? 0;
-    layers.set(o.id, k);
-    count = Math.max(count, k + 1);
-    if (o.kind === "text" && o.lines.some(needsShaping)) seen.set(o.page, k + 1);
+    const p = at.get(o.page) ?? { k: 0, shaped: false };
+    const shaped = o.kind === "text" && o.lines.some(needsShaping);
+    // pdf-lib draws this one after shaped lines: it opens the next layer.
+    if (!shaped && p.shaped) p.k++;
+    p.shaped = shaped;
+    at.set(o.page, p);
+    layers.set(o.id, p.k);
+    count = Math.max(count, p.k + 1);
   }
   return { layers, count };
 }

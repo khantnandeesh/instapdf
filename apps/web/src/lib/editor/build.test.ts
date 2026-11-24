@@ -325,12 +325,18 @@ describe("complex-script text (AC-224)", () => {
     expect((await pdfText(out)).texts[0]).toContain("Invoice 42");
   });
 
+  const t = (id: string, page: string, line: string) => ({ ...box, id, page, lines: [line], text: line, align: "left" }) as EditorObject;
+  const w = (id: string, page: string) => ({ kind: "whiteout", id, page, x: 0, y: 0, w: 10, h: 10, fill: "#ffffff", border: null, borderWidth: 0 }) as unknown as EditorObject;
   it("puts objects in z-order layers around shaped lines, per page", () => {
-    const t = (id: string, page: string, line: string) => ({ ...box, id, page, lines: [line], text: line, align: "left" }) as EditorObject;
-    const w = (id: string, page: string) => ({ kind: "whiteout", id, page, x: 0, y: 0, w: 10, h: 10, fill: "#ffffff", border: null, borderWidth: 0 }) as unknown as EditorObject;
     const { layers, count } = shapedLayers({ objects: [w("a", "p0"), t("s1", "p0", "مرحبا"), w("b", "p0"), t("l", "p1", "Latin"), t("s2", "p0", "नमस्ते"), w("c", "p0"), w("d", "p1")] });
     expect(Object.fromEntries(layers)).toEqual({ a: 0, s1: 0, b: 1, l: 0, s2: 1, c: 2, d: 0 });
     expect(count).toBe(3);
+  });
+
+  it("puts shaped boxes with nothing between them in one engine pass", () => {
+    const { layers, count } = shapedLayers({ objects: [t("s1", "p0", "مرحبا"), t("s2", "p0", "नमस्ते"), w("a", "p0"), t("s3", "p0", "مرحبا"), t("s4", "p0", "مرحبا")] });
+    expect(Object.fromEntries(layers)).toEqual({ s1: 0, s2: 0, a: 1, s3: 1, s4: 1 });
+    expect(count).toBe(2);
   });
 
   it("draws an object added after a shaped line over it (z-order)", async () => {
