@@ -259,7 +259,7 @@ test("AC-80: the same file added twice is added, with a notice; another file sho
   expect(await cardNames(page)).toEqual(["alpha.pdf", "bravo.pdf"]);
 });
 
-test("AC-70 / F1 AC-18 adapted: 51 files load 50 and say so", async ({ page }) => {
+test("AC-70 / F1 AC-18 adapted: 51 files load 50 and say so", { tag: "@serial" }, async ({ page }) => {
   const bytes = await import("node:fs/promises").then((fs) => fs.readFile(fx("echo.pdf")));
   const files = Array.from({ length: 51 }, (_, i) => ({ name: `f${String(i + 1).padStart(2, "0")}.pdf`, mimeType: "application/pdf", buffer: bytes }));
   await page.getByTestId("file-input").setInputFiles(files);
