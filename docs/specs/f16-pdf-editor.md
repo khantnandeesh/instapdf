@@ -72,6 +72,21 @@ Let anyone change a PDF the way they expect a document editor to work: click tex
 - The preview draws edited text with a bundled web font (Caladea here), so what you see while typing is not necessarily the embedded subset.
 - Picking a file uploads it immediately (about 0.5 s to first page for a 44 KB file). Apply → completed took 3.7 s, and pick → downloaded took 13.6 s for the same file.
 
+### 2a-ter. Fidelity test on the reference (2026-11-24, one saved task, `assets/f16-pdf-editor/ref-08-fidelity-before-after.png`)
+
+On `chrome-justified-mixed.pdf` we made three edits: the heading "Service Agreement" → "Supply Quote" (letters missing from the subset), "made" → "signed" inside a justified line that has a bold word, and "45,000" → "59,999 Ž" on the ₹ line.
+
+| Check | Reference result |
+|---|---|
+| Missing glyphs in the heading | **Handled well.** It embedded a fresh subset of the same family (`Caladea-Bold`), so the heading looks right. Same-family re-subsetting is therefore **parity**, not an improvement for us. |
+| Untouched content | Lines 2–4 and the table are pixel-identical. Only the edited runs changed. |
+| Justified line | **Lost a space:** "the Provider" became "theProvider". Justification spacing is not preserved. |
+| ₹ line | **Wrong font.** It attributed the whole run "₹ 45,000 — including…" to the ₹ glyph's fallback font (Inter), so the run switched from serif to sans and no longer matches "Total amount due:". |
+| Speed | 0.67 s pick to first page; 3.7 s apply to file ready (server). |
+| Size | 44 KB → 52 KB (three new font subsets added). |
+
+Where we beat it: keep the justification gaps (re-insert spacing in the `TJ` array), and attribute a run's font from the majority of its glyphs, never from a fallback glyph (AC-11g).
+
 ### 2b. Limits and gates (reference)
 
 Free tier: 3 tasks/hour (each Apply is a task, with a countdown), 50 MB per file, 5 MB per image, single file per task, a page cap (crawl shows 50 and 200-page messages in different places), "Too many attempts" throttle. Paid: up to 500 MB, longer processing.
@@ -90,9 +105,21 @@ Free tier: 3 tasks/hour (each Apply is a task, with a countdown), 50 MB per file
 - Slow saves at busy times: "Taking longer than usual … up to 2 minutes".
 - Sends console logs and user agent with every task.
 
-### 2d. Competitors (summary; details in the research file)
+### 2d. Competitors (summary; measured details in `f16-competitor-micro.md`)
 
-Sejda, iLovePDF, Smallpdf, PDF24 and Adobe online all upload to a server. Smallpdf and Adobe keep existing-text editing behind Pro; PDF24 has none; PDFgear online has none (desktop only). Only Apryse WebViewer (commercial SDK, powers Xodo) edits paragraphs in the browser. **No free, browser-only product edits existing text with font matching and form creation.** That is the gap.
+Measured 2026-11-23 in real browsers. Adobe blocked automation, so it is not measured.
+
+- **iLovePDF, Smallpdf and Xodo all run the same commercial engine (Apryse WebViewer).** They are the only ones besides the reference that edit existing text. iLovePDF gives 1 free save, then shows a Premium wall. Smallpdf and Xodo let you edit, but block the download behind Pro.
+- **Two of the three still upload the file anyway.** iLovePDF uploads it on pick to make page images. Smallpdf uploads it in the background 1–3 s after pick.
+- **The Apryse editor:**
+  - Each page is one text box, and a stray Backspace deletes every line on the page.
+  - When a glyph is missing, it switches to Roboto and stays in Roboto for the rest of the typed text.
+  - It changes the text colour (gray to CMYK black).
+  - Reflowed text overlaps tables, and the on-screen wrap differs from the saved file.
+  - Arabic comes out reversed, and Devanagari vowel signs end up detached.
+  - It downloads about 8 MB, so it takes 3–9 s before you can edit.
+- **PDF24 and PDFgear can't edit existing text.** PDF24 saves added text as an image (not searchable). PDFgear's added text is invisible in Chrome's and poppler's renderers, and its session-recording script sent the PDF's text to a third party.
+- **Conclusion:** no product gives unlimited free saves of edited existing text, and none does it with the file staying on the device. That is the gap we fill.
 
 ## 3. Engine decision (revised 2026-11-23, supersedes the earlier "PDFium as edit engine" decision)
 
@@ -217,9 +244,10 @@ Priority: P0 = parity must-have; P1 = parity nice-to-have or key differentiator;
 - **AC-11 (P0)** Typing a character missing from a subset font (e.g. "Q" when absent) switches the run to the matched open font (Carlito for Calibri/Carlito) and shows an inline notice naming both fonts; the output renders the character.
 - **AC-11b (P0)** Fidelity guard: after any existing-text edit, every page region outside the edited runs renders pixel-identical to the input (PDFium and pdf.js render diff at 2×), including Type 3 text, images and vector art.
 - **AC-11c (P0)** Neighbours stay put: editing one word inside a `TJ` array does not move any other glyph on the line by more than 0.1 pt, unless reflow is on.
-- **AC-11d (P1)** (improvement) Same-family re-subset: when a subset lacks a glyph and the family is one we ship (Carlito, Caladea, Liberation, Noto) or a local font, the new text uses a fresh subset of that same family, and the run is visually indistinguishable from the original (glyph-shape diff below threshold).
+- **AC-11d (P0)** Same-family re-subset (parity, the reference does this): when a subset lacks a glyph and the family is one we ship (Carlito, Caladea, Liberation, Noto) or a local font, the new text uses a fresh subset of that same family, and the run is visually indistinguishable from the original (glyph-shape diff below threshold).
 - **AC-11e (P1)** (improvement) Substitute fonts are width-fitted (`Tz` within 90–110%) so the edited run keeps its original width when the text length is unchanged.
 - **AC-11f (P0)** On the micro-benchmark corpus (`docs/process/editor-micro-checks.md`, the editor annex to the M1–M11 checks in `docs/process/mission.md`), our existing-text edit fidelity score is at least the reference's on every file, and higher in total.
+- **AC-11g (P0)** (improvement) On `chrome-justified-mixed.pdf`, after "made" → "signed": the line keeps a visible gap before "Provider" (inter-word gap ≥ 50% of the original), and the "₹ … GST" run keeps Liberation Serif for every glyph except ₹ itself.
 - **AC-12 (P1)** Bold, italic, size, family and colour changes on an existing line are reflected in the output.
 - **AC-13 (P1)** Existing text can be moved by drag and deleted.
 - **AC-14 (P1)** (improvement) Paragraph mode: in `para-times.pdf`, inserting 12 words into line 1 reflows the paragraph inside its original left/right bounds; no line exceeds the right bound (text positions in output); the box grows downward and the line count increases.
