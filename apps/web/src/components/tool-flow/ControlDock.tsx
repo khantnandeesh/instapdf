@@ -107,24 +107,32 @@ export function ControlDock({
           side ? "lg:min-h-0 lg:flex-1 lg:flex-col lg:items-stretch" : "lg:mx-auto lg:max-w-[1216px] lg:gap-8",
         ].join(" ")}
       >
-        {inline && (
-          <fieldset
-            disabled={optionsDisabled}
-            // A "full" panel stays keyboard-reachable while every control in it is disabled (axe scrollable-region-focusable).
-            tabIndex={full && optionsDisabled ? 0 : undefined}
-            className={[
-              "min-w-0 sm:flex-1",
-              side ? "ip-dock-scroll lg:min-h-0 lg:flex-1 lg:overflow-y-auto" : "",
-              full ? "rounded-lg focus-visible:outline-focus max-lg:hidden" : "",
-            ].join(" ")}
-            data-testid="dock-options"
-          >
-            <legend className="sr-only">{label}</legend>
-            {/* No visible title (minimal text); kept for heading navigation. */}
-            <h2 className="sr-only">Options</h2>
-            {options}
-          </fieldset>
-        )}
+        {inline &&
+          (full ? (
+            // Side panel only (hidden below lg). The scrolling wrapper stays keyboard-reachable while every
+            // control in the disabled fieldset is (axe scrollable-region-focusable).
+            <div
+              tabIndex={optionsDisabled ? 0 : undefined}
+              className="ip-dock-scroll min-w-0 rounded-lg focus-visible:outline-focus max-lg:hidden lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+            >
+              <fieldset disabled={optionsDisabled} className="min-w-0" data-testid="dock-options">
+                <legend className="sr-only">{label}</legend>
+                <h2 className="sr-only">Options</h2>
+                {options}
+              </fieldset>
+            </div>
+          ) : (
+            <fieldset
+              disabled={optionsDisabled}
+              className={["min-w-0 sm:flex-1", side ? "ip-dock-scroll lg:min-h-0 lg:flex-1 lg:overflow-y-auto" : ""].join(" ")}
+              data-testid="dock-options"
+            >
+              <legend className="sr-only">{label}</legend>
+              {/* No visible title (minimal text); kept for heading navigation. */}
+              <h2 className="sr-only">Options</h2>
+              {options}
+            </fieldset>
+          ))}
         {sheetMode && (
           <Button
             ref={optionsButton}
@@ -160,6 +168,8 @@ export function ControlDock({
         <Dialog
           open={sheetOpen}
           variant="sheet"
+          // From 1024 px (bar layout) the sheet is a centred column rising from the bottom, not a full-width band.
+          className="lg:mx-auto lg:w-[min(720px,calc(100vw-32px))]"
           title={sheet.title}
           onClose={() => setSheetOpen(false)}
           onCloseButton={() => setSheetOpen(false)}

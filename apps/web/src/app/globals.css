@@ -1432,24 +1432,6 @@
   }
 }
 
-/* F3 Merge: iOS long-press callout and text selection off on draggable cards and tiles (M-11 #5). */
-.ip-no-callout {
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-/* F3 Merge: glow on newly inserted tiles, fades out (opacity only). */
-.ip-glow {
-  animation: ip-glow 1.2s ease-out both;
-}
-@keyframes ip-glow {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
 
 @keyframes ip-spin {
   to {
@@ -1524,24 +1506,6 @@
       mp-pop-in 380ms var(--ease-pop) both,
       mp-breathe 3.2s ease-in-out 400ms 1; /* breathes once: no motion past 5s (WCAG 2.2.2) */
   }
-  /* Merge: file cards and page trays rise in like tool tiles (30ms apart, capped at 300ms). Once the
-     grid has settled the delay drops, so a card or tile that moves (React re-inserts it) rises
-     straight into its new place: quiet feedback for a reorder. */
-  .mp-rise-tiles > [role="listitem"] {
-    position: relative;
-    animation: mp-tile-rise 360ms var(--ease-enter) backwards;
-  }
-  .mp-rise-tiles > [role="listitem"]:nth-child(2) { animation-delay: 30ms; }
-  .mp-rise-tiles > [role="listitem"]:nth-child(3) { animation-delay: 60ms; }
-  .mp-rise-tiles > [role="listitem"]:nth-child(4) { animation-delay: 90ms; }
-  .mp-rise-tiles > [role="listitem"]:nth-child(5) { animation-delay: 120ms; }
-  .mp-rise-tiles > [role="listitem"]:nth-child(6) { animation-delay: 150ms; }
-  .mp-rise-tiles > [role="listitem"]:nth-child(7) { animation-delay: 180ms; }
-  .mp-rise-tiles > [role="listitem"]:nth-child(8) { animation-delay: 210ms; }
-  .mp-rise-tiles > [role="listitem"]:nth-child(9) { animation-delay: 240ms; }
-  .mp-rise-tiles > [role="listitem"]:nth-child(10) { animation-delay: 270ms; }
-  .mp-rise-tiles > [role="listitem"]:nth-child(n + 11) { animation-delay: 300ms; }
-  .mp-rise-tiles[data-settled] > [role="listitem"] { animation-delay: 0ms; }
   /* The floating selection bar and the options sheet rise in. */
   .mp-rise-in {
     animation: mp-pop-in 300ms var(--ease-pop) both;
@@ -1549,14 +1513,6 @@
   /* Rendered page thumbnails ease in (fade + settle from 98%). */
   .mp-thumb-in {
     animation: mp-thumb-in 300ms var(--ease-enter) both;
-  }
-}
-/* Like mp-rise-in, but moving the tile with `top` (it is position: relative) instead of a transform:
-   no stacking context and no transformed geometry, so its controls measure exactly 44px while it rises. */
-@keyframes mp-tile-rise {
-  from {
-    opacity: 0;
-    top: 12px;
   }
 }
 @keyframes mp-rise-in {
@@ -1607,9 +1563,6 @@
   }
   .ip-spin {
     animation: ip-pulse 1.2s linear infinite !important;
-  }
-  .ip-glow {
-    display: none;
   }
 }
 

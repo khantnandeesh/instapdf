@@ -1,4 +1,5 @@
 "use client";
+import "./page-edit.css";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { pageBoxStyle } from "@/components/tool-flow/PageTile";
 import { PageThumb } from "@/components/tool-flow/Thumbnail";

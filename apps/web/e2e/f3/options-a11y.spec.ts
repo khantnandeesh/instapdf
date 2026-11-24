@@ -31,9 +31,12 @@ async function backTabTo(page: Page, target: ReturnType<Page["locator"]>, max = 
   await expect(target).toBeFocused();
 }
 
-/** Opens the options: inline at >= 1024 px, the bottom sheet below. */
+/**
+ * Opens the options. With files loaded the dock is the bottom bar (fold fit), so Merge's many
+ * options sit behind the Options button there at every width; inline only in the empty side panel.
+ */
 async function options(page: Page) {
-  if (!isDesktop(test.info().project.name)) {
+  if (await page.getByTestId("options-button").isVisible()) {
     await page.getByTestId("options-button").click();
     await expect(page.getByTestId("options-sheet")).toBeVisible();
     return page.getByTestId("options-sheet");
@@ -41,7 +44,7 @@ async function options(page: Page) {
   return page.getByTestId("merge-options");
 }
 async function closeOptions(page: Page) {
-  if (!isDesktop(test.info().project.name)) await page.getByRole("dialog").getByRole("button", { name: "Done" }).click();
+  if (await page.getByTestId("options-sheet").isVisible()) await page.getByRole("dialog").getByRole("button", { name: "Done" }).click();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -65,7 +68,7 @@ test("AC-42: options are remembered after a reload", async ({ page }) => {
   await panel.getByRole("radio", { name: /^(File names|Names)$/ }).click();
   await panel.getByRole("switch", { name: "Pad for double-sided printing" }).check();
   await closeOptions(page);
-  if (!isDesktop(test.info().project.name)) await expect(page.getByTestId("options-button")).toHaveAccessibleName("Options, 2 changed");
+  await expect(page.getByTestId("options-button")).toHaveAccessibleName("Options, 2 changed");
   await page.reload();
   await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
   await pickMerge(page, "alpha.pdf");
@@ -184,9 +187,16 @@ test("AC-73: the whole flow works with the keyboard alone", async ({ page }, inf
   await tabTo(page, dialog.getByTestId("picker-confirm"));
   await page.keyboard.press("Enter");
   await expect(dialog).toHaveCount(0);
-  // Set an option, run, download.
+  // Set an option (loaded: the bottom bar's Options button opens the sheet), run, download.
+  await tabTo(page, page.getByTestId("options-button"));
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("options-sheet")).toBeVisible();
   await tabTo(page, page.getByRole("switch", { name: "Pad for double-sided printing" }));
   await page.keyboard.press("Space");
+  await tabTo(page, page.getByRole("dialog").getByRole("button", { name: "Done" }));
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("options-sheet")).toBeHidden();
+  await expect(page.getByTestId("options-button")).toBeFocused();
   await tabTo(page, page.getByTestId("primary-action"));
   await page.keyboard.press("Enter");
   await expect(flow(page)).toHaveAttribute("data-state", "done", { timeout: 30_000 });
@@ -220,7 +230,7 @@ test("AC-74: no serious axe violations in the Merge states", async ({ page }) =>
   await expectNoSeriousAxeViolations(page, "page picker");
   await page.keyboard.press("Escape");
   await options(page);
-  await expectNoSeriousAxeViolations(page, isDesktop(test.info().project.name) ? "options in the dock" : "options sheet");
+  await expectNoSeriousAxeViolations(page, "options sheet");
 });
 
 test("AC-75: at 375 px no horizontal scroll, the primary is visible, actions are 44 px", async ({ page }) => {

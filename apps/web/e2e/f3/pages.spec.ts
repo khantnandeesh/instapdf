@@ -287,9 +287,10 @@ test("AC-35, AC-37: sorting in either view; the views never disagree", async ({ 
 test("AC-38: options are available in the pages view and apply", async ({ page }) => {
   await pickMerge(page, "alpha.pdf", "bravo.pdf");
   await showPages(page);
-  if (!isDesktop(test.info().project.name)) await page.getByTestId("options-button").click();
+  // Loaded: the bottom bar holds Merge's Options button at every width (fold fit).
+  await page.getByTestId("options-button").click();
   await page.getByRole("radio", { name: /File names|Names/ }).click();
-  if (!isDesktop(test.info().project.name)) await page.getByRole("dialog").getByRole("button", { name: "Done" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Done" }).click();
   const out = await texts(page);
   expect(out.doc.getPageCount()).toBe(6);
 });

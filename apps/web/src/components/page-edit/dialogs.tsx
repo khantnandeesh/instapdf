@@ -1,4 +1,5 @@
 "use client";
+import "./page-edit.css";
 /** Merge's dialogs (spec F3 M-4). Loaded on first open (next/dynamic), never on page load. */
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { pageBoxStyle } from "@/components/tool-flow/PageTile";

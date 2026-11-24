@@ -51,6 +51,21 @@ async function expectInViewport(page: Page, el: Locator, what: string) {
   expect(onTop, `${what}: not covered by another element`).toBe("");
 }
 
+/**
+ * Opens the bigger view of the first page. Tools on the shared page grid have a "Page 1 of N" tile
+ * button; Merge opens it from its file card (files view) or a page tile's More menu (pages view).
+ */
+async function openFirstPagePreview(page: Page) {
+  const pageButton = page.getByRole("button", { name: /^Page 1 of/ });
+  if (await pageButton.count()) return pageButton.first().click();
+  const card = page.getByTestId("card-main").first();
+  if (await card.isVisible()) return card.click();
+  const tile = page.getByTestId("page-tile").first();
+  await tile.hover();
+  await tile.getByTestId("tile-more").click();
+  await page.getByRole("menuitem", { name: "Enlarge" }).click();
+}
+
 async function open(page: Page, slug: string) {
   await page.goto(`/${slug}`);
   await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
@@ -82,12 +97,19 @@ for (const tool of usable) {
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded)");
         // Loaded: the options fold into the compact bottom bar and the pages get most of the screen.
         await expect(page.locator("[data-ip-dock]")).toHaveAttribute("data-ip-dock", "bar");
-        await expectInViewport(page, page.getByTestId("dock-options"), "options in the bottom bar");
+        // A tool with few options shows them in the bar; one with many (density "full", Merge) shows
+        // its Options button there, which opens them in a sheet.
+        await expectInViewport(page, page.locator("[data-ip-dock]").getByTestId("dock-options").or(page.getByTestId("options-button")), "options in the bottom bar");
+        // Tools with a Files / Pages view (Merge opens on files): the pages checks below run on the pages.
+        const pagesView = page.getByRole("radio", { name: "Pages", exact: true });
+        if (await pagesView.count()) await pagesView.click();
         const pages = page.getByTestId("pages-scroll");
         await expectInViewport(page, pages, "pages area");
         const box = (await pages.boundingBox())!;
         expect(box.width, "pages use the full content width").toBeGreaterThanOrEqual(Math.min(width, 1280) - 120);
         expect(box.height, "pages get at least half of the screen height").toBeGreaterThanOrEqual(height * 0.5 - 40);
+        // 60 pages overflow the area (wait for the grid to lay out, e.g. right after a view switch).
+        await expect.poll(() => pages.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
         await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
         await page.mouse.wheel(0, 3000);
         await expect.poll(() => pages.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
@@ -102,7 +124,7 @@ for (const tool of usable) {
         await expectInViewport(page, page.getByRole("button", { name: /Add files|Replace file/ }), "add files (loaded, pages scrolled)");
 
         // The bigger page view fits too: its buttons are on screen.
-        await page.getByRole("button", { name: /^Page 1 of/ }).click();
+        await openFirstPagePreview(page);
         await expectInViewport(page, page.getByRole("dialog").getByRole("button", { name: "Close" }), "Close in the page preview");
         await expectInViewport(page, page.getByRole("dialog").getByRole("button", { name: "Next" }), "Next in the page preview");
         await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
@@ -143,7 +165,7 @@ for (const tool of usable) {
         await page.getByTestId("file-input").setInputFiles(fx("sixty-pages.pdf"));
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded)");
-        await page.getByRole("button", { name: /^Page 1 of/ }).click();
+        await openFirstPagePreview(page);
         await expectInViewport(page, page.getByRole("dialog").getByRole("button", { name: "Close" }), "Close in the page preview");
         await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
