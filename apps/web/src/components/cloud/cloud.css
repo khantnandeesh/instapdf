@@ -48,6 +48,13 @@
     width: 36px;
     border-inline-start-color: color-mix(in srgb, var(--link) 45%, transparent);
   }
+  /* 640–1023 px: the caret must not push a full toolbar (Merge's pages view) past 768 px (scroll rule 6):
+     the Add files half drops its decorative plus. */
+  @media (min-width: 640px) and (max-width: 1023px) {
+    .ip-split--tool > .mp-btn--tool:first-child > svg:first-child {
+      display: none;
+    }
+  }
   @media (max-width: 639px) {
     .ip-split--tool .ip-split__caret.mp-btn--tool {
       width: 44px;
