@@ -5,6 +5,9 @@
 // family's license is copied next to them as OFL-<family>.txt).
 // The browser only fetches a slice when a run needs a
 // glyph Helvetica cannot show (spec F3 §8a decision 8).
+// It also writes cmap.json: each slice's real character list as ranges. A slice's
+// unicode-range (manifest.json) is a CSS hint and differs from what the file draws;
+// the form "won't print" check needs the real list, so it fetches this only then.
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
@@ -34,7 +37,19 @@ const packages = [
 
 await rm(outDir, { recursive: true, force: true });
 await mkdir(outDir, { recursive: true });
+const fontkit = require("@cantoo/fontkit");
+const charRanges = (bytes) => {
+  const cps = [...(fontkit.default ?? fontkit).create(bytes).characterSet].sort((a, b) => a - b);
+  const out = [];
+  for (const cp of cps) {
+    const last = out[out.length - 1];
+    if (last && last[1] === cp - 1) last[1] = cp;
+    else out.push([cp, cp]);
+  }
+  return out;
+};
 const fonts = [];
+const cmap = {};
 for (const { pkg, prefix, keys } of packages) {
   const root = dirname(require.resolve(`${pkg}/package.json`));
   const unicode = JSON.parse(await readFile(join(root, "unicode.json"), "utf8"));
@@ -43,11 +58,13 @@ for (const { pkg, prefix, keys } of packages) {
     const file = `${prefix}-${slice}-400-normal.woff`;
     await copyFile(join(root, "files", file), join(outDir, file));
     fonts.push({ file, ranges: parse(unicode[key]) });
+    cmap[file] = charRanges(await readFile(join(outDir, file)));
   }
   // Each family ships its own copy of its license (SIL OFL 1.1).
   await copyFile(join(root, "LICENSE"), join(outDir, `OFL-${prefix}.txt`));
 }
 await writeFile(join(outDir, "manifest.json"), JSON.stringify({ fonts }));
+await writeFile(join(outDir, "cmap.json"), JSON.stringify(cmap));
 console.log(`copy-fonts: ${fonts.length} Noto Sans slices from ${packages.length} families -> public/fonts/noto/`);
 
 // Fonts the shaping engine draws added Hindi, Arabic, Hebrew and Thai text with (AC-224), under

@@ -92,6 +92,7 @@ textarea.bf-options { height: auto; padding: 6px 8px; line-height: 1.4; resize: 
 @media (pointer: coarse) { .bf-act, .bf-text, .bf-step, .bf-seg, .bf-color { min-height: 40px; } }
 @media (prefers-reduced-motion: reduce) { .bf-props { animation: none; } }
 .bf-prop--tight { gap: 4px; }
+.bf-propgroup { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 /* Form tool options (U-F2) and the fields chip (U-F1) */
 .bf-formopts { display: flex; align-items: center; gap: 8px; font: 500 13px/1 Fredoka, sans-serif; color: var(--ink); }
 .bf-kinds { display: flex; gap: 2px; padding: 2px; border-radius: 12px; background: var(--surface-soft); }
@@ -118,7 +119,9 @@ textarea.bf-options { height: auto; padding: 6px 8px; line-height: 1.4; resize: 
 .bf-drag { position: absolute; border: 1.5px dashed var(--blueberry); background: color-mix(in srgb, var(--blueberry) 10%, transparent); border-radius: 2px; pointer-events: none; }
 .bf-layer[data-mode="edit"] .bf-field { touch-action: none; }
 .bf-layer[data-mode="edit"] .bf-inner { pointer-events: none; }
-/* Names show on the field being pointed at or selected, so tags never cover the page's own text. */
+/* Empty fields show their name inside (placeholder). Tags above show on the field being pointed at
+   or selected, so they never cover the page's own text (the label usually sits just above). */
+.bf-layer[data-mode="edit"] .bf-input::placeholder { color: var(--muted); opacity: 0.8; font-size: min(1em, 11px); }
 .bf-tag { opacity: 0; transition: opacity 120ms; }
 .bf-field:hover .bf-tag, .bf-field[data-selected] .bf-tag { opacity: 1; }
 .bf-field:has(.bf-badge) .bf-tag { visibility: hidden; }
@@ -137,3 +140,11 @@ textarea.bf-options { height: auto; padding: 6px 8px; line-height: 1.4; resize: 
   /* The Form tool's options take two rows in the strip. */
   .ed-strip:has(.bf-formopts) { height: auto; padding-block: 6px; }
 }
+
+/* Phone fill peek (G-15): what is typed into a small field, large, under the top bar. */
+.bf-peek { position: fixed; z-index: 40; left: 8px; right: 8px; top: calc(74px + env(safe-area-inset-top)); /* under the 56 px top bar at 10 px */ display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 14px; background: #fff; box-shadow: 0 6px 24px rgb(0 0 0 / 0.14); animation: bf-peek-in 160ms ease-out; }
+.bf-peek-name { flex: none; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px/1.2 Fredoka, sans-serif; color: var(--muted); }
+.bf-peek-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; color: var(--ink); }
+.bf-peek .bf-act { min-height: 44px; }
+@keyframes bf-peek-in { from { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .bf-peek { animation: none; } }

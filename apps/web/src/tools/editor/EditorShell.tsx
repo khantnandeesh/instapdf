@@ -5,7 +5,8 @@
  * separate chunk once the user shows intent (AC-86).
  */
 import { emptyForm } from "@/lib/forms/model";
-import { FormsChrome, fieldKey, loadForms, nudgeAfterDownload } from "@/tools/forms/EditorForms";
+import { fieldKey, fieldTab, loadForms, nudgeAfterDownload } from "@/tools/forms/core";
+import { FormsChrome } from "@/tools/forms/lazy";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
@@ -27,7 +28,7 @@ import { initialVersions } from "@/lib/editor/versions";
 import type { OpenedPdf } from "@/lib/pdf/pdfjs";
 import { assetsOf } from "@/lib/editor/asset-refs";
 import { listChars } from "@/lib/editor/coverage";
-import { missingInObjects } from "./coverage-browser";
+import { missingInFormValues, missingInObjects } from "./coverage-browser";
 import { addAsset, IMAGE_ACCEPT, imageError, imageFromFile, isImageFile, plainAssets, releaseAssets } from "./assets";
 import { EnginePill } from "./EngineProgress";
 import { fontLabel, resetDocFonts } from "./font-service";
@@ -258,7 +259,7 @@ export function EditorShell(props: ShellProps) {
         </EditorContext.Provider>
       ) : (
         <div className="ed-opening">
-          <header className="ed-top ed-glass">
+          <header className="ed-top ed-glass" role="group" aria-label="Document">
             <h2 className="ed-file truncate">{props.name}</h2>
           </header>
           <div className="grid flex-1 place-items-center">
@@ -660,13 +661,19 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   // ---- download (AC-44) ----
   const download = useCallback(
     async (name?: string, force = false) => {
+      if (store.get().busy === "save") return;
+      // A field property still being typed in the popover commits on blur: do that first.
+      const typing = document.activeElement;
+      if (typing instanceof HTMLElement && typing.closest(".bf-popover")) typing.blur();
       const s = store.get();
-      if (s.busy === "save") return;
       if (s.editing) store.set({ editing: null });
       if (s.lineEdit) await ctl.commitLine();
       // Added text with characters no font can print: say so before the file is made (AC-75).
       if (!force && !s.readOnly) {
-        const { chars, unchecked } = await missingInObjects(H.current(store.get().history).objects);
+        const now = H.current(store.get().history);
+        const [objs, form] = await Promise.all([missingInObjects(now.objects), missingInFormValues(now.forms, store.get().forms.original)]);
+        const chars = [...new Set([...objs.chars, ...form.chars])];
+        const unchecked = objs.unchecked || form.unchecked;
         if (chars.length || unchecked) return setMissingAsk({ chars, unchecked, name });
       }
       store.set({ busy: "save" });
@@ -887,6 +894,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         void download();
         return;
       }
+      if (fieldTab(ctl, e)) return e.preventDefault();
       if (typing(t)) return;
       if (fieldKey(ctl, e)) return e.preventDefault();
       if (mod && !e.altKey && (k === "z" || k === "Z")) {
