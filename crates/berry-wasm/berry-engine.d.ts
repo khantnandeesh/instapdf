@@ -5,7 +5,11 @@
  * server fallback. Load the module only after the editor has a file (AC-51).
  *
  * Coordinates are PDF user space: points, origin at the bottom-left of the unrotated page,
- * y up. Use `PageText.pageBox` and `rotation` (or the pdf.js viewport) to map to the screen.
+ * y up. Use `PageText.page_box` and `rotation` (or the pdf.js viewport) to map to the screen.
+ * Errors are thrown as `BerryError` objects. A bug that panics instead aborts the module
+ * (built with `panic = "abort"`): it surfaces as a `WebAssembly.RuntimeError`, after which
+ * the instance is unusable and the worker must load the module again.
+ *
  * Pages and lines are zero-based. Line ids are only valid until the next edit on that page:
  * every edit returns the page's fresh text.
  *

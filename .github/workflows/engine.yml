@@ -11,13 +11,17 @@ concurrency:
   group: engine-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   WASM_BINDGEN_VERSION: 0.2.130
 
 jobs:
   engine:
-    runs-on: ubuntu-latest
+    # Pinned image: the test fonts and their paths in the tests come from it.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     defaults:
       run:
@@ -62,7 +66,7 @@ jobs:
           test "$size" -le 1000000
       - name: PDFium oracle over the editor corpus
         run: |
-          pip install --quiet pypdfium2 pikepdf pillow
+          pip install --quiet pypdfium2==5.14.0 pikepdf==10.18.2 pillow==13.0.0.post1
           cargo build -p berry-cli --locked
           python3 oracle/run_corpus.py
       - uses: actions/upload-artifact@v4
