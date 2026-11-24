@@ -1,5 +1,6 @@
 "use client";
 import "@/components/berry/berry-loader.css";
+import "../ui/dialog.css";
 import "./tool-flow.css";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";

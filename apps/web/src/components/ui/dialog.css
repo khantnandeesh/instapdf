@@ -1,0 +1,60 @@
+/*
+ * Modal and sheet chrome (docs/design/berrypdf.md "Modals"). Component-local, never globals.css: imported by the
+ * screens that open a default modal or a sheet (ToolFlow, ControlDock, the editor), so it ships with tool routes
+ * only; the home page's one dialog (the full-screen tool menu) needs none of it. Guarded by e2e/ui/modals.spec.ts.
+ */
+@layer components {
+  /* Modal: plain white (no decoration), a 40px leaf corner, rises with a small overshoot. */
+  .mp-modal {
+    position: relative;
+    box-sizing: border-box;
+    border-radius: 24px 24px 40px 24px;
+    background: var(--surface);
+    box-shadow:
+      0 30px 70px rgba(58, 20, 30, 0.3),
+      0 4px 12px rgba(58, 20, 30, 0.1);
+    color: var(--ink);
+    animation: mp-modal-in var(--dur-move) var(--ease-pop);
+  }
+  /* Bottom sheet (Merge options below 1024px, the editor's sheets): white, 24px top corners; rises from the bottom. */
+  .mp-sheet {
+    box-sizing: border-box;
+    border-radius: 24px 24px 0 0;
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 -12px 40px rgba(58, 20, 30, 0.18);
+    animation: mp-sheet-in var(--dur-move) var(--ease-pop);
+  }
+  :is(.mp-modal, .mp-sheet)::backdrop {
+    background: var(--mp-backdrop);
+    backdrop-filter: blur(8px);
+  }
+}
+@keyframes mp-sheet-in {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+
+/* A small title: the content is what the dialog is about, not the heading. */
+.mp-modal__title {
+  margin: 0;
+  color: var(--ink-black);
+  font: 600 18px/1.35 var(--font-display);
+}
+
+/* Normal-size buttons: 15px, about 40px tall with the lip (cap 48px), as wide as their label. */
+.mp-modal .mp-btn:not(.mp-btn--plain) {
+  font-size: 15px;
+  line-height: 20px;
+  padding: 9px 16px;
+  border-radius: 12px;
+}
+
+/* On-theme focus: a 2px berry ring, keyboard only (:focus-visible), never after a pointer click.
+   Fields keep their own focus edge; a focus the page moved after a click stays quiet. */
+:is(.mp-modal, .mp-sheet) :focus-visible:not(.ip-field, [data-quiet-focus]) {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
