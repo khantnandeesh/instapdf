@@ -97,6 +97,36 @@ describe("lineReplacement", () => {
     expect(t.lines.length).toBeGreaterThan(1);
   });
 
+  it("grows the whiteout over the wrapped lines when nothing else is there", () => {
+    const text = "x".repeat(45); // 80% of the size is not enough, so it wraps
+    const [w, t] = lineReplacement({ line: line(), fonts: [font({})], entry, text, face: editorFontFor(font({})), metrics, measure })!;
+    expect(t.lines.length).toBeGreaterThan(1);
+    expect(t.size).toBeCloseTo(Math.floor(9.9626 * 8) / 10, 5);
+    expect(w.y).toBeLessThanOrEqual(t.y);
+    expect(w.y + w.h).toBeGreaterThanOrEqual(t.y + t.h);
+    expect(w.x + w.w).toBeGreaterThanOrEqual(t.x + t.w);
+  });
+
+  it("sets the text smaller, down to 60%, rather than whiting out the text below", () => {
+    const text = "x".repeat(45);
+    const below = { x0: 72, y0: 683, x1: 220, y1: 694 };
+    const [w, t] = lineReplacement({ line: line(), fonts: [font({})], entry, text, face: editorFontFor(font({})), metrics, measure, others: [below] })!;
+    expect(t.lines.length).toBe(1);
+    expect(t.size).toBeLessThan(9.9626 * 0.8);
+    expect(t.size).toBeGreaterThanOrEqual(Math.floor(9.9626 * 6) / 10);
+    // The whiteout stays on the line, clear of the text below.
+    expect(w.y + w.h).toBeLessThanOrEqual(792 - below.y1);
+  });
+
+  it("at 60% and still too long, wraps but leaves the text below uncovered", () => {
+    const text = "word ".repeat(30).trim();
+    const below = { x0: 72, y0: 683, x1: 220, y1: 694 };
+    const [w, t] = lineReplacement({ line: line(), fonts: [font({})], entry, text, face: editorFontFor(font({})), metrics, measure, others: [below] })!;
+    expect(t.lines.length).toBeGreaterThan(1);
+    expect(t.size).toBeCloseTo(Math.floor(9.9626 * 6) / 10, 5);
+    expect(w.y + w.h).toBeLessThanOrEqual(792 - below.y1);
+  });
+
   it("wraps at the page edge for a line that ends near it", () => {
     const near = line({ bbox: { x0: 400, y0: 697, x1: 600, y1: 708 }, origin: [400, 700] });
     const [, t] = lineReplacement({ line: near, fonts: [font({})], entry, text: "word ".repeat(60).trim(), face: editorFontFor(font({})), metrics, measure })!;
