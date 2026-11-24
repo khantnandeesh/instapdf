@@ -708,6 +708,14 @@ impl PdfFont {
         self.to_unicode.get(&code).filter(|t| !t.is_empty() && !t.contains('\u{0}')).cloned()
     }
 
+    /// True when the font's widths (`/Widths`, or `/W` of a Type 0 font) name the code.
+    pub fn declares_width(&self, code: u32) -> bool {
+        match &self.widths {
+            Widths::Simple { first, widths, .. } => code >= *first && ((code - first) as usize) < widths.len(),
+            Widths::Cid { map, .. } => map.contains_key(&code),
+        }
+    }
+
     /// For a Type 0 font without ToUnicode: reverse the embedded cmap (GID → Unicode).
     fn type0_unicode_from_program(&self, code: u32) -> Option<String> {
         let gid = self.gid_for(code)?;
