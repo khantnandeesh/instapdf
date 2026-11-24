@@ -1,7 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { setHandoff, takeHandoff } from "@/lib/pdf/handoff";
 import { openPdf, readPageSizes, type OpenedPdf } from "@/lib/pdf/pdfjs";
 import { ThumbnailRenderer } from "@/lib/pdf/thumbnails";
@@ -682,7 +682,10 @@ export function ToolFlow({
     return () => clearTimeout(t);
   }, [thumbSize]);
 
-  useEffect(() => {
+  // A layout effect, not a passive one: a tool that mirrors the file list (Merge's cards) updates in
+  // the same task, before paint. With useEffect the flow committed its new state first (e.g. "ready"
+  // after Skip on a locked file) while the tool still rendered the removed file's card for a frame.
+  useLayoutEffect(() => {
     onFilesChange?.(files);
   }, [files, onFilesChange]);
 
