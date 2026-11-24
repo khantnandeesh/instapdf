@@ -17,7 +17,8 @@ export type EngineRequest =
 export type EngineReply =
   | { op: "open"; pageCount: number }
   | { op: "text"; page: PageText }
-  | { op: "replace"; result: EditResult; bytes: Uint8Array }
+  /** `appended`: the output starts with the bytes before the edit (undo can keep just a length). */
+  | { op: "replace"; result: EditResult; bytes: Uint8Array; appended: boolean }
   | { op: "save"; bytes: Uint8Array };
 
 export type EngineResponse =
@@ -28,6 +29,8 @@ export type EngineResponse =
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 let engine: Promise<EngineModule> | null = null;
 let doc: BerryDocumentType | null = null;
+/** The bytes `doc` was opened from: an edit that fails after replaceLine is undone by reopening them. */
+let current: Uint8Array | null = null;
 
 function loadEngine(): Promise<EngineModule> {
   engine ??= (async () => {
@@ -45,17 +48,32 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
   if (req.op === "open") {
     doc?.free();
     doc = null;
+    current = null;
     doc = new BerryDocument(req.bytes);
+    current = req.bytes;
     return { op: "open", pageCount: doc.pageCount };
   }
   if (!doc) throw { kind: "internal", message: "No document" };
   if (req.op === "text") return { op: "text", page: doc.pageText(req.page) };
   if (req.op === "replace") {
-    const result = doc.replaceLine(req.page, req.line, req.text);
-    // The engine has no render of its own: the page is redrawn by pdf.js from the saved
-    // bytes (an incremental save: the original plus one appended revision).
-    const { bytes } = doc.save();
-    return { op: "replace", result, bytes };
+    const result = doc.replaceLine(req.page, req.line, req.text); // rolls back on its own errors
+    try {
+      // The engine has no render of its own: the page is redrawn by pdf.js from the saved
+      // bytes (an incremental save: the original plus one appended revision).
+      const { bytes, report } = doc.save();
+      const before = current!;
+      // Reopen from the output so the next save appends to it, and so undo states stay prefixes.
+      doc.free();
+      doc = new BerryDocument(bytes);
+      current = bytes.slice();
+      return { op: "replace", result, bytes, appended: report.original_preserved && bytes.length >= before.length };
+    } catch (error) {
+      // save() does not roll back: drop the edit the UI will report as not made.
+      doc.free();
+      doc = null;
+      if (current) doc = new BerryDocument(current);
+      throw error;
+    }
   }
   return { op: "save", bytes: doc.save().bytes };
 }

@@ -18,6 +18,14 @@ async function pageTexts(bytes: Uint8Array): Promise<string[]> {
   return out;
 }
 
+/** Serves the engine's JS glue with `patch` appended (it can wrap BerryDocument methods). */
+async function patchEngine(page: Page, patch: string) {
+  await page.route("**/engine/berry_engine.js", async (route) => {
+    const res = await route.fetch();
+    await route.fulfill({ response: res, body: `${await res.text()}\n${patch}` });
+  });
+}
+
 async function open(page: Page, file: string) {
   await page.goto("/edit-pdf");
   await page.getByTestId("editor-input").setInputFiles(corpus(file));
@@ -56,7 +64,7 @@ test("landing: noindex, Beta badge, no engine before a file, and no serious axe 
   expect(sitemap).not.toContain("/edit-pdf");
 });
 
-test("edits a line, undoes and redoes it, and downloads a PDF with the new text and without the old", async ({ page }) => {
+test("edits a line, undoes it, edits it again, and downloads a PDF with the new text and without the old", async ({ page }) => {
   const sent: string[] = [];
   page.on("request", (r) => {
     if (r.method() !== "GET") sent.push(`${r.method()} ${r.url()}`);
@@ -117,5 +125,57 @@ test("keyboard: one tab stop per page, arrows pick a line, Enter edits, Esc retu
   await expect(page.getByTestId("line-input")).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(list).toBeFocused();
+
+  // Enter commits and also returns focus to the page's line list.
+  await page.keyboard.press("Enter");
+  const input = page.getByTestId("line-input");
+  await expect(input).toBeFocused();
+  const before = await input.inputValue();
+  await input.fill(`${before} `);
+  await page.keyboard.press("Enter");
+  await expect(input).toHaveCount(0);
+  await expect(list).toBeFocused();
+  const active = await list.getAttribute("aria-activedescendant");
+  expect(active && (await page.locator(`#${active}`).count())).toBe(1);
   expect(violations, "the engine loads under the strict CSP").toEqual([]);
+});
+
+test("a page that crashes the engine is skipped with a notice, and the rest stays editable", async ({ page }) => {
+  await patchEngine(
+    page,
+    `const pt = BerryDocument.prototype.pageText;
+     BerryDocument.prototype.pageText = function (p) { if (p === 0) throw new WebAssembly.RuntimeError("test crash"); return pt.call(this, p); };`,
+  );
+  await open(page, "report-form-3p.pdf");
+  await expect(page.getByTestId("editor-notice")).toContainText("Page 1 can’t be edited");
+  await page.getByTestId("page-2").scrollIntoViewIfNeeded();
+  await expect(page.getByTestId("page-2").locator('[data-testid="line"]').first()).toBeVisible();
+  await expect(page.getByTestId("page-1").locator('[data-testid="line"]')).toHaveCount(0);
+  // The engine still edits after the restart.
+  const line = page.getByTestId("page-2").locator('[data-testid="line"]').first();
+  const text = (await line.getAttribute("data-text"))!;
+  await line.click();
+  await page.getByTestId("line-input").fill(`${text} `);
+  await page.getByTestId("line-input").press("Enter");
+  await expect(page.getByTestId("page-2").locator(`[data-testid="line"][data-text="${text} "]`)).toHaveCount(1);
+});
+
+test("a save that fails after an edit drops only that edit; Download keeps the earlier ones", async ({ page }) => {
+  await patchEngine(
+    page,
+    `const sv = BerryDocument.prototype.save; let n = 0;
+     BerryDocument.prototype.save = function () { n++; if (n === 2) throw { kind: "verify", message: "test" }; return sv.call(this); };`,
+  );
+  await open(page, "chrome-justified-mixed.pdf");
+  await editLine(page, "is made between", "made", "signed");
+  const cell = page.locator('[data-testid="line"][data-text="Item"]');
+  await cell.click();
+  await page.getByTestId("line-input").fill("Items sold");
+  await page.getByTestId("line-input").press("Enter");
+  await expect(page.getByTestId("editor-notice")).toContainText("wasn’t made");
+  await expect(cell).toHaveCount(1);
+  const [text] = await pageTexts((await download(page)).bytes);
+  expect(text).toContain("is signed between");
+  expect(text).not.toContain("Items sold");
+  expect(text).toContain("Item");
 });

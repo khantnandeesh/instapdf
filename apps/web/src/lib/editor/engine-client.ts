@@ -8,7 +8,14 @@
 import type { BerryError } from "./berry-engine";
 import type { EngineReply, EngineRequest, EngineResponse } from "./engine.worker";
 
-export type EngineError = BerryError | { kind: "crashed" } | { kind: "internal"; message: string };
+/**
+ * `crashed`: this call crashed the module or timed out; the worker is gone and the caller should
+ * reopen its last good bytes. `aborted`: another call crashed the worker while this one waited.
+ */
+export type EngineError = BerryError | { kind: "crashed" } | { kind: "aborted" } | { kind: "internal"; message: string };
+
+/** A call that takes longer is treated as a hang: the worker is terminated. */
+export const ENGINE_TIMEOUT_MS = 20_000;
 
 type DistributiveOmit<T, K extends keyof never> = T extends unknown ? Omit<T, K> : never;
 type Call = DistributiveOmit<EngineRequest, "id">;
@@ -16,18 +23,28 @@ type ReplyFor<O extends Call["op"]> = Extract<EngineReply, { op: O }>;
 
 let worker: Worker | null = null;
 let nextId = 1;
-const pending = new Map<number, { resolve: (r: EngineReply) => void; reject: (e: EngineError) => void }>();
+type Pending = { resolve: (r: EngineReply) => void; reject: (e: EngineError) => void; timer: ReturnType<typeof setTimeout> };
+const pending = new Map<number, Pending>();
 
-function failAll(error: EngineError) {
-  const all = [...pending.values()];
-  pending.clear();
-  for (const p of all) p.reject(error);
-}
-
+/** Terminates the worker. Calls still waiting are rejected with `aborted`. */
 export function disposeEngine(): void {
   worker?.terminate();
   worker = null;
-  failAll({ kind: "crashed" });
+  const all = [...pending.values()];
+  pending.clear();
+  for (const p of all) {
+    clearTimeout(p.timer);
+    p.reject({ kind: "aborted" });
+  }
+}
+
+/** Settles call `id` with `crashed` and drops the worker. */
+function crash(id: number) {
+  const p = pending.get(id);
+  pending.delete(id);
+  if (p) clearTimeout(p.timer);
+  disposeEngine();
+  p?.reject({ kind: "crashed" });
 }
 
 function getWorker(): Worker {
@@ -37,16 +54,18 @@ function getWorker(): Worker {
     const msg = event.data;
     const p = pending.get(msg.id);
     if (!p) return;
+    if (!msg.ok && msg.error.kind === "crashed") return crash(msg.id);
     pending.delete(msg.id);
+    clearTimeout(p.timer);
     if (msg.ok) p.resolve(msg.reply);
-    else {
-      if (msg.error.kind === "crashed") disposeEngine();
-      p.reject(msg.error);
-    }
+    else p.reject(msg.error);
   };
   w.onerror = (event) => {
     event.preventDefault();
-    if (worker === w) disposeEngine();
+    if (worker !== w) return;
+    const first = pending.keys().next();
+    if (first.done) disposeEngine();
+    else crash(first.value);
   };
   worker = w;
   return w;
@@ -55,7 +74,8 @@ function getWorker(): Worker {
 export function callEngine<C extends Call>(call: C, transfer: Transferable[] = []): Promise<ReplyFor<C["op"]>> {
   return new Promise((resolve, reject) => {
     const id = nextId++;
-    pending.set(id, { resolve: resolve as (r: EngineReply) => void, reject });
+    const timer = setTimeout(() => crash(id), ENGINE_TIMEOUT_MS);
+    pending.set(id, { resolve: resolve as (r: EngineReply) => void, reject, timer });
     getWorker().postMessage({ ...call, id } as EngineRequest, transfer);
   });
 }
@@ -73,6 +93,7 @@ export function describeEngineError(e: EngineError): string {
     case "parse":
       return "This file couldn’t be read as a PDF.";
     case "crashed":
+    case "aborted":
       return "The editor restarted. Please try that again.";
     case "verify":
     case "save":

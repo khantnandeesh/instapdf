@@ -4,8 +4,9 @@
  *
  * pdf.js draws the pages; berry-engine (WebAssembly in a Web Worker, loaded only once a file is
  * opened) reads each page's lines and rewrites them. After an edit the engine saves
- * incrementally (original bytes + one revision) and only the edited page is redrawn from those
- * bytes. Nothing leaves the device.
+ * incrementally (the previous bytes + one revision) and only the edited page is redrawn from
+ * those bytes. Page geometry (box and rotation) comes from pdf.js, which draws the canvas.
+ * Nothing leaves the device.
  */
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
@@ -19,21 +20,24 @@ import { IconButton } from "@/components/ui/IconButton";
 import { cx } from "@/components/ui/cx";
 import type { PageText, Rect } from "@/lib/editor/berry-engine";
 import { callEngine, describeEngineError, type EngineError } from "@/lib/editor/engine-client";
-import { displaySize, lineBox, rectToScreen } from "@/lib/editor/geometry";
+import { displaySize, lineBox, rectToScreen, type PageBox } from "@/lib/editor/geometry";
+import { pushUndo, undoBytes, type UndoEntry } from "@/lib/editor/undo";
 import { pdfOutputName } from "@/lib/pdf/naming";
-import { openPdf, readPageSizes, type PageSize } from "@/lib/pdf/pdfjs";
+import { openPdf } from "@/lib/pdf/pdfjs";
 import { CloseBold, DownloadBold, FileUpBold, UndoBold } from "./icons";
 
 const MAX_BYTES = 100 * 1024 * 1024;
 const MAX_PAGE_WIDTH = 880;
-const UNDO_DEPTH = 20;
 const MAX_DPR = 2;
+
+/** What pdf.js draws: the page's view box (CropBox ∩ MediaBox) and normalised /Rotate. */
+type PageGeo = { view: PageBox; rotate: number };
 
 type Doc = {
   name: string;
   bytes: Uint8Array;
   pdf: PDFDocumentProxy;
-  sizes: PageSize[];
+  geo: PageGeo[];
   /** CSS px per point, per page (fit width). */
   scales: number[];
 };
@@ -41,11 +45,28 @@ type Doc = {
 type Editing = { page: number; line: number; text: string };
 type Flash = { page: number; rects: Rect[]; key: number };
 
-const copyBytes = (b: Uint8Array) => b.slice();
-
 function isEngineError(e: unknown): e is EngineError {
   return !!e && typeof e === "object" && "kind" in e;
 }
+
+async function readGeometry(pdf: PDFDocumentProxy): Promise<PageGeo[]> {
+  const out: PageGeo[] = new Array(pdf.numPages);
+  const BATCH = 50;
+  for (let start = 0; start < pdf.numPages; start += BATCH) {
+    const end = Math.min(pdf.numPages, start + BATCH);
+    await Promise.all(
+      Array.from({ length: end - start }, async (_, k) => {
+        const page = await pdf.getPage(start + k + 1);
+        const [x0, y0, x1, y1] = page.view;
+        out[start + k] = { view: [x0, y0, x1, y1], rotate: page.rotate };
+        page.cleanup();
+      }),
+    );
+  }
+  return out;
+}
+
+const fitScales = (geo: PageGeo[], avail: number) => geo.map((g) => avail / displaySize(g.view, g.rotate, 1).width);
 
 export function EditorBeta() {
   const [doc, setDoc] = useState<Doc | null>(null);
@@ -55,13 +76,16 @@ export function EditorBeta() {
   const [editing, setEditing] = useState<Editing | null>(null);
   const [busy, setBusy] = useState<"open" | "edit" | "save" | null>(null);
   const [notice, setNotice] = useState<{ text: string; tone: "error" | "info"; key: number } | null>(null);
-  const [undo, setUndo] = useState<{ bytes: Uint8Array; page: number }[]>([]);
+  const [undo, setUndo] = useState<UndoEntry[]>([]);
   const [flash, setFlash] = useState<Flash | null>(null);
   const [dragging, setDragging] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   const docRef = useRef<Doc | null>(null);
   docRef.current = doc;
   const loadingText = useRef(new Set<number>());
+  /** Pages whose text crashed or failed in the engine: never asked again for this file. */
+  const failedPages = useRef(new Set<number>());
+  const recovering = useRef<Promise<void> | null>(null);
 
   const say = useCallback((text: string, tone: "error" | "info" = "error") => setNotice({ text, tone, key: Date.now() }), []);
 
@@ -79,42 +103,69 @@ export function EditorBeta() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [undo.length]);
 
-  /** Loads a page's lines from the engine (once per document state). */
-  const ensureText = useCallback(async (page: number) => {
-    if (loadingText.current.has(page)) return;
-    loadingText.current.add(page);
-    try {
-      const { page: text } = await callEngine({ op: "text", page });
-      setTexts((prev) => {
-        const next = [...prev];
-        next[page] = text;
-        return next;
-      });
-    } catch {
-      loadingText.current.delete(page);
+  /**
+   * Points pdf.js (and, unless `engine` is false, the engine) at `bytes`. Other pages' canvases
+   * are kept unless `redraw` names them.
+   */
+  const load = useCallback(async (name: string, bytes: Uint8Array, redraw: number[] | "all", engine = true) => {
+    if (engine) {
+      const copy = bytes.slice();
+      await callEngine({ op: "open", bytes: copy }, [copy.buffer]);
     }
-  }, []);
-
-  /** Points the engine and pdf.js at `bytes`. Other pages' canvases are kept unless `redraw` names them. */
-  const load = useCallback(async (name: string, bytes: Uint8Array, redraw: number[] | "all") => {
-    await callEngine({ op: "open", bytes: copyBytes(bytes) });
-    const opened = await openPdf(copyBytes(bytes));
+    const opened = await openPdf(bytes.slice());
     if (!opened.ok) throw (opened.reason === "corrupt" ? { kind: "parse", message: "pdf.js" } : { kind: "encrypted" }) satisfies EngineError;
     const pdf = opened.pdf.doc;
     const prev = docRef.current;
-    let sizes = prev?.sizes;
+    let geo = prev?.geo;
     let scales = prev?.scales;
-    if (redraw === "all" || !sizes || !scales) {
-      sizes = await readPageSizes(pdf);
-      const avail = Math.min(MAX_PAGE_WIDTH, (stage.current?.clientWidth ?? MAX_PAGE_WIDTH) - 2);
-      scales = sizes.map((s) => avail / s.width);
+    if (redraw === "all" || !geo || !scales) {
+      geo = await readGeometry(pdf);
+      scales = fitScales(geo, Math.min(MAX_PAGE_WIDTH, (stage.current?.clientWidth ?? MAX_PAGE_WIDTH) - 2));
     }
     loadingText.current.clear();
     setTexts([]);
-    setVersions((v) => (redraw === "all" ? sizes.map(() => 0) : v.map((n, i) => (redraw.includes(i) ? n + 1 : n))));
-    setDoc({ name, bytes, pdf, sizes, scales });
+    setVersions((v) => (redraw === "all" ? geo.map(() => 0) : v.map((n, i) => (redraw.includes(i) ? n + 1 : n))));
+    setDoc({ name, bytes, pdf, geo, scales });
     if (prev && prev.pdf !== pdf) setTimeout(() => void prev.pdf.loadingTask.destroy(), 2000);
   }, []);
+
+  /** After a crash or a timeout the worker is fresh: give it the last good bytes again (once at a time). */
+  const recover = useCallback((): Promise<void> => {
+    recovering.current ??= (async () => {
+      const d = docRef.current;
+      if (!d) return;
+      try {
+        await load(d.name, d.bytes, []);
+      } catch {
+        say("The editor couldn’t restart. Download what you have, then reload the page.");
+      }
+    })().finally(() => (recovering.current = null));
+    return recovering.current;
+  }, [load, say]);
+
+  /** Loads a page's lines from the engine (once per document state). */
+  const ensureText = useCallback(
+    async (page: number) => {
+      if (loadingText.current.has(page) || failedPages.current.has(page) || recovering.current) return;
+      loadingText.current.add(page);
+      try {
+        const { page: text } = await callEngine({ op: "text", page });
+        setTexts((prev) => {
+          const next = [...prev];
+          next[page] = text;
+          return next;
+        });
+      } catch (err) {
+        loadingText.current.delete(page);
+        // Another call crashed the worker: this page is retried after the reload.
+        if (isEngineError(err) && err.kind === "aborted") return;
+        failedPages.current.add(page);
+        say(`Page ${page + 1} can’t be edited.`);
+        if (isEngineError(err) && err.kind === "crashed") await recover();
+      }
+    },
+    [recover, say],
+  );
 
   const openFile = useCallback(
     async (file: File) => {
@@ -124,12 +175,15 @@ export function EditorBeta() {
       setBusy("open");
       setEditing(null);
       setUndo([]);
+      setFlash(null);
+      failedPages.current.clear();
       try {
         const bytes = new Uint8Array(await file.arrayBuffer());
         await load(file.name, bytes, "all");
         setNotice(null);
       } catch (e) {
-        say(isEngineError(e) ? describeEngineError(e) : "This file couldn’t be opened.");
+        if (isEngineError(e) && (e.kind === "crashed" || e.kind === "internal")) say("This file can’t be edited.");
+        else say(isEngineError(e) ? describeEngineError(e) : "This file couldn’t be opened.");
       } finally {
         setBusy(null);
       }
@@ -174,16 +228,28 @@ export function EditorBeta() {
     };
   }, [openFile]);
 
-  /** After a crash the worker is fresh: give it the last good bytes again. */
-  const recover = useCallback(async () => {
-    const d = docRef.current;
-    if (!d) return;
-    try {
-      await load(d.name, d.bytes, []);
-    } catch {
-      say("The editor couldn’t restart. Download what you have, then reload the page.");
-    }
-  }, [load, say]);
+  // Re-layout on resize or rotation: new fit-width scales, every page redrawn sharp.
+  const open = !!doc;
+  useEffect(() => {
+    const el = stage.current;
+    if (!open || !el) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const ro = new ResizeObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const d = docRef.current;
+        if (!d) return;
+        const scales = fitScales(d.geo, Math.min(MAX_PAGE_WIDTH, el.clientWidth - 2));
+        if (scales.every((s, i) => Math.abs(s - d.scales[i]) < 0.002)) return;
+        setDoc({ ...d, scales });
+      }, 150);
+    });
+    ro.observe(el);
+    return () => {
+      clearTimeout(timer);
+      ro.disconnect();
+    };
+  }, [open]);
 
   const commit = useCallback(async () => {
     const d = docRef.current;
@@ -194,22 +260,27 @@ export function EditorBeta() {
     if (!line || line.text === e.text) return;
     setBusy("edit");
     try {
+      // The worker rolls the engine back when the edit or its save fails, and reopens from
+      // the output when it succeeds, so pdf.js only needs the new bytes here.
       const { result, bytes } = await callEngine({ op: "replace", page: e.page, line: e.line, text: e.text });
-      setUndo((u) => [...u.slice(-(UNDO_DEPTH - 1)), { bytes: d.bytes, page: e.page }]);
-      await load(d.name, bytes, [e.page]);
-      // Fresh line ids for the edited page come with the result.
-      loadingText.current.add(e.page);
-      setTexts((prev) => {
-        const next = [...prev];
-        next[e.page] = result.page;
-        return next;
-      });
+      try {
+        await load(d.name, bytes, [e.page], false);
+      } catch {
+        // pdf.js can't read the engine's output: put the engine back on the bytes we show.
+        await load(d.name, d.bytes, [], true).catch(() => {});
+        say("That change couldn’t be shown, so it wasn’t made.");
+        return;
+      }
+      // Recorded only once the new bytes are on screen.
+      setUndo((u) => pushUndo(u, d.bytes, bytes, e.page));
+      // The worker reopened from the new bytes, so the page's lines are read again from there
+      // (load() cleared them) rather than taken from the result.
       setFlash({ page: e.page, rects: result.changed, key: Date.now() });
       if (result.substitutions.some((s) => !s.same_family)) say("Some characters use a similar font.", "info");
     } catch (err) {
       if (isEngineError(err)) {
         say(describeEngineError(err));
-        if (err.kind === "crashed") await recover();
+        if (err.kind === "crashed" || err.kind === "aborted") await recover();
       } else say("That change couldn’t be made.");
     } finally {
       setBusy(null);
@@ -223,15 +294,16 @@ export function EditorBeta() {
     setEditing(null);
     setBusy("edit");
     try {
-      await load(d.name, last.bytes, [last.page]);
+      await load(d.name, undoBytes(last, d.bytes).slice(), [last.page]);
       setUndo((u) => u.slice(0, -1));
       setFlash(null);
     } catch {
       say("Undo didn’t work. Please try again.");
+      await recover();
     } finally {
       setBusy(null);
     }
-  }, [busy, load, say, undo]);
+  }, [busy, load, recover, say, undo]);
 
   // Ctrl/Cmd+Z outside a text field.
   useEffect(() => {
@@ -262,7 +334,7 @@ export function EditorBeta() {
       setTimeout(() => URL.revokeObjectURL(url), 30_000);
     } catch (err) {
       say(isEngineError(err) ? describeEngineError(err) : "Saving didn’t work. Please try again.");
-      if (isEngineError(err) && err.kind === "crashed") await recover();
+      if (isEngineError(err) && (err.kind === "crashed" || err.kind === "aborted")) await recover();
     } finally {
       setBusy(null);
     }
@@ -296,12 +368,12 @@ export function EditorBeta() {
           </div>
           <NoticeLine notice={notice} />
           <div ref={stage} className="flex flex-col items-center gap-6 pb-10" data-busy={busy ?? undefined}>
-            {doc.sizes.map((size, i) => (
+            {doc.geo.map((geo, i) => (
               <PageView
                 key={i}
                 doc={doc}
                 index={i}
-                size={size}
+                geo={geo}
                 version={versions[i] ?? 0}
                 text={texts[i]}
                 editing={editing?.page === i ? editing : null}
@@ -368,7 +440,7 @@ function NoticeLine({ notice }: { notice: { text: string; tone: "error" | "info"
 type PageViewProps = {
   doc: Doc;
   index: number;
-  size: PageSize;
+  geo: PageGeo;
   version: number;
   text: PageText | undefined;
   editing: Editing | null;
@@ -381,15 +453,14 @@ type PageViewProps = {
   onCancel: () => void;
 };
 
-function PageView({ doc, index, size, version, text, editing, flash, disabled, onVisible, onEdit, onChange, onCommit, onCancel }: PageViewProps) {
+function PageView({ doc, index, geo, version, text, editing, flash, disabled, onVisible, onEdit, onChange, onCommit, onCancel }: PageViewProps) {
   const box = useRef<HTMLDivElement>(null);
   const holder = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [drawn, setDrawn] = useState(false);
   const scale = doc.scales[index];
-  const width = size.width * scale;
-  const height = size.height * scale;
-  const pdfForVersion = useRef<{ version: number; pdf: PDFDocumentProxy } | null>(null);
+  const { width, height } = displaySize(geo.view, geo.rotate, scale);
+  const drawnFor = useRef<string | null>(null);
 
   useEffect(() => {
     const el = box.current;
@@ -401,18 +472,21 @@ function PageView({ doc, index, size, version, text, editing, flash, disabled, o
 
   useEffect(() => {
     if (visible) onVisible(index);
-  }, [visible, text, index, onVisible]);
+  }, [visible, text, index, onVisible, doc]);
 
   // Draw when visible, and again when this page's version changes (from the current bytes).
   useEffect(() => {
     if (!visible) return;
-    if (pdfForVersion.current?.version === version) return;
-    pdfForVersion.current = { version, pdf: doc.pdf };
+    const key = `${version}@${scale.toFixed(4)}`;
+    if (drawnFor.current === key) return;
+    drawnFor.current = key;
     let cancelled = false;
     let task: { cancel: () => void } | null = null;
     void (async () => {
-      const page = await doc.pdf.getPage(index + 1);
+      let page: Awaited<ReturnType<PDFDocumentProxy["getPage"]>> | null = null;
       try {
+        // Inside the try: a close or document swap during the draw rejects here.
+        page = await doc.pdf.getPage(index + 1);
         const dpr = Math.min(MAX_DPR, window.devicePixelRatio || 1);
         const viewport = page.getViewport({ scale: scale * dpr });
         const canvas = document.createElement("canvas");
@@ -426,9 +500,9 @@ function PageView({ doc, index, size, version, text, editing, flash, disabled, o
         holder.current.replaceChildren(canvas); // swap only when ready: no blank flash
         setDrawn(true);
       } catch {
-        if (!cancelled) pdfForVersion.current = null;
+        if (!cancelled) drawnFor.current = null;
       } finally {
-        page.cleanup();
+        page?.cleanup();
       }
     })();
     return () => {
@@ -441,11 +515,11 @@ function PageView({ doc, index, size, version, text, editing, flash, disabled, o
     <section aria-label={`Page ${index + 1}`} className="w-full">
       <div ref={box} className={cx("ed-page relative mx-auto overflow-hidden rounded-[6px] bg-white shadow-card", drawn && "ed-page--drawn")} data-testid={`page-${index + 1}`} {...sizeStyle(width, height)}>
         <div ref={holder} aria-hidden="true" />
-        {text && <Lines page={index} text={text} scale={scale} editing={editing} disabled={disabled} onEdit={onEdit} onChange={onChange} onCommit={onCommit} onCancel={onCancel} />}
+        {text && <Lines page={index} geo={geo} text={text} scale={scale} editing={editing} disabled={disabled} onEdit={onEdit} onChange={onChange} onCommit={onCommit} onCancel={onCancel} />}
         {flash &&
           flash.rects.map((r, k) => {
             if (!text) return null;
-            const s = rectToScreen(r, text.page_box, text.rotation, scale);
+            const s = rectToScreen(r, geo.view, geo.rotate, scale);
             return <span key={`${flash.key}-${k}`} aria-hidden="true" className="ed-flash pointer-events-none absolute rounded-[3px]" {...posStyle(s.left - 2, s.top - 2, s.width + 4, s.height + 4)} />;
           })}
       </div>
@@ -455,7 +529,7 @@ function PageView({ doc, index, size, version, text, editing, flash, disabled, o
 
 /** Inline styles exist only client-side (after a file is opened), so server HTML stays style-free (CSP style-src 'self'). */
 function sizeStyle(width: number, height: number) {
-  return { style: { width, height, maxWidth: "100%" } };
+  return { style: { width, height } };
 }
 function posStyle(left: number, top: number, width: number, height: number) {
   return { style: { left, top, width, height } };
@@ -472,22 +546,23 @@ function fontFamilyOf(text: PageText, line: PageText["lines"][number]): string {
 let measureCtx: CanvasRenderingContext2D | null = null;
 
 /** The edit field: the line's box and size, widened to fit what is typed. */
-function inputStyle(text: PageText, line: PageText["lines"][number], value: string, scale: number, box: { left: number; top: number; width: number; height: number; transform?: string }) {
+function inputStyle(text: PageText, geo: PageGeo, line: PageText["lines"][number], value: string, scale: number, box: { left: number; top: number; width: number; height: number; transform?: string }) {
   const fontSize = line.size * scale;
   const fontFamily = fontFamilyOf(text, line);
   const font = text.fonts[line.runs[0]?.font ?? -1];
   measureCtx ??= document.createElement("canvas").getContext("2d");
   let width = box.width;
-  if (measureCtx) {
+  // Only an unturned field grows (to the right): a turned one would drift off its line, since
+  // it turns around its centre. A longer value scrolls inside the field.
+  if (measureCtx && !box.transform) {
     measureCtx.font = `${font?.italic ? "italic " : ""}${font?.bold ? "700 " : ""}${fontSize}px ${fontFamily}`;
-    width = Math.max(width, measureCtx.measureText(value).width + 12);
+    width = Math.max(width, measureCtx.measureText(value).width + 12, 120);
+    // Stay on the page (it clips).
+    width = Math.max(box.width, Math.min(width, displaySize(geo.view, geo.rotate, scale).width - box.left - 2));
   }
-  // Stay on the page (it clips); a longer value scrolls inside the field.
-  if (!box.transform) width = Math.min(width, displaySize(text.page_box, text.rotation, scale).width - box.left - 2);
   return {
     ...box,
     width,
-    minWidth: 120,
     fontSize,
     fontFamily,
     fontWeight: font?.bold ? 700 : 400,
@@ -498,11 +573,13 @@ function inputStyle(text: PageText, line: PageText["lines"][number], value: stri
 
 /**
  * The page's editable lines. Pointer: click a line. Keyboard: the page's line list is one tab
- * stop (a listbox); arrows pick a line, Enter edits it. One stop per page keeps tab order short
- * and avoids dozens of tiny, tightly stacked focus targets (WCAG 2.5.8).
+ * stop (a listbox); arrows pick a line, Enter edits it, so the tab order stays short. The line
+ * boxes are as big as the text they cover: as pointer targets they fall under WCAG 2.5.8's
+ * inline and essential exceptions, and the listbox is the keyboard equivalent.
  */
 function Lines({
   page,
+  geo,
   text,
   scale,
   editing,
@@ -513,6 +590,7 @@ function Lines({
   onCancel,
 }: {
   page: number;
+  geo: PageGeo;
   text: PageText;
   scale: number;
   editing: Editing | null;
@@ -527,6 +605,12 @@ function Lines({
   const refocus = useRef(false);
   const [active, setActive] = useState(-1);
   const editable = text.lines.map((l, i) => (l.editable && l.text.trim() ? i : -1)).filter((i) => i >= 0);
+  // Line ids change with every edit: keep the active index only if it is still an editable line.
+  const [seen, setSeen] = useState(text);
+  if (seen !== text) {
+    setSeen(text);
+    if (active >= 0 && !editable.includes(active)) setActive(editable[0] ?? -1);
+  }
 
   useEffect(() => {
     if (!editing && refocus.current) {
@@ -537,7 +621,7 @@ function Lines({
 
   const geometryOf = (i: number) => {
     const line = text.lines[i];
-    const b = lineBox(line.bbox, line.angle, text.page_box, text.rotation, scale);
+    const b = lineBox(line.bbox, line.angle, geo.view, geo.rotate, scale);
     const pad = Math.max(2, b.thickness * 0.15);
     return {
       left: b.cx - b.length / 2 - pad,
@@ -618,7 +702,7 @@ function Lines({
           aria-label={`Edit line: ${editLine.text}`}
           data-testid="line-input"
           className="ed-input absolute rounded-[4px] border-0 bg-white px-[2px] text-ink-black outline-2 outline-brand"
-          style={inputStyle(text, editLine, editing.text, scale, geometryOf(editing.line))}
+          style={inputStyle(text, geo, editLine, editing.text, scale, geometryOf(editing.line))}
           value={editing.text}
           onFocus={(e) => e.currentTarget.select()}
           onChange={(e) => onChange(e.target.value)}
