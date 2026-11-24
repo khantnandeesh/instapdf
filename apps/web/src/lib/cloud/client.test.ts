@@ -1,0 +1,167 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { openCloudWindow, popupFeatures } from "./client";
+import { channelName, FIRST_CONTACT_MS, TOOL_LOST_MS, WINDOW_LOST_MS, wrap } from "./protocol";
+import { WindowLink } from "./window-link";
+
+/**
+ * In-memory BroadcastChannel: delivers to every other instance of the same name, asynchronously,
+ * by reference (browsers clone File/Blob by reference too; Node's own channel cannot clone a File).
+ */
+class FakeChannel {
+  static all = new Set<FakeChannel>();
+  onmessage: ((e: MessageEvent) => void) | null = null;
+  closed = false;
+  constructor(readonly name: string) {
+    FakeChannel.all.add(this);
+  }
+  postMessage(data: unknown) {
+    if (this.closed) throw new Error("closed");
+    for (const c of FakeChannel.all) if (c !== this && c.name === this.name && !c.closed) queueMicrotask(() => c.onmessage?.({ data } as MessageEvent));
+  }
+  close() {
+    this.closed = true;
+    FakeChannel.all.delete(this);
+  }
+}
+const Channel = FakeChannel as unknown as typeof BroadcastChannel;
+let n = 0;
+let REQ = "";
+let params = { req: REQ, accept: [".pdf"], multiple: true, max: 100, tool: "Rotate PDF", provider: "google" as const };
+beforeEach(() => {
+  REQ = `6f1c2a8e-3b4d-4e5f-8a9b-${String(++n).padStart(12, "0")}`;
+  params = { ...params, req: REQ };
+});
+const peer = () => new FakeChannel(channelName(REQ));
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+describe("openCloudWindow (tool tab)", () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] }));
+  afterEach(() => vi.useRealTimers());
+
+  it("returns null and leaves nothing open when the browser blocks the window", () => {
+    const s = openCloudWindow("mock", params, {}, { Channel, open: () => null });
+    expect(s).toBeNull();
+  });
+
+  it("opens /cloud/<route> with the request, and hands validated files over", async () => {
+    let opened = "";
+    const files: string[] = [];
+    const events = { onFiles: (f: { file: File }[]) => files.push(...f.map((x) => x.file.name)), onDone: vi.fn(), onReady: vi.fn() };
+    const s = openCloudWindow("mock", params, events, { Channel, open: (u) => ((opened = u), {} as Window), hidden: () => false })!;
+    expect(opened).toContain(`/cloud/mock?req=${REQ}`);
+    const win = peer();
+    const fromTool: unknown[] = [];
+    win.onmessage = (e) => fromTool.push(e.data);
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    win.postMessage(wrap("window", "00000000-0000-4000-8000-000000000000", { t: "files", files: [{ id: "x", file: new File(["x"], "evil.pdf") }] }));
+    win.postMessage({ from: "window", req: REQ, t: "files", files: [{ id: "x", file: "not a file" }] });
+    win.postMessage(wrap("window", REQ, { t: "files", files: [{ id: "f1", file: new File(["%PDF"], "alpha.pdf") }] }));
+    win.postMessage(wrap("window", REQ, { t: "hb" }));
+    win.postMessage(wrap("window", REQ, { t: "done" }));
+    await vi.waitFor(() => expect(events.onDone).toHaveBeenCalled());
+    expect(events.onReady).toHaveBeenCalledTimes(1);
+    expect(files).toEqual(["alpha.pdf"]);
+    expect(fromTool).toEqual(expect.arrayContaining([{ t: "pong", from: "tool", req: REQ }, { t: "ack", from: "tool", req: REQ }]));
+    expect(s.ended).toBe(true);
+    win.close();
+  });
+
+  it("treats heartbeat silence as a closed window, but not while this tab is hidden", async () => {
+    let hidden = true;
+    const onClosed = vi.fn();
+    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => hidden });
+    const win = peer();
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    await vi.waitFor(() => expect(true).toBe(true));
+    await tick();
+    vi.advanceTimersByTime(WINDOW_LOST_MS * 3);
+    expect(onClosed).not.toHaveBeenCalled(); // hidden: timers are throttled, don't judge
+    hidden = false;
+    vi.advanceTimersByTime(WINDOW_LOST_MS + 600);
+    expect(onClosed).toHaveBeenCalledWith("lost");
+    win.close();
+  });
+
+  it("gives a loading window longer before the first message", () => {
+    const onClosed = vi.fn();
+    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false });
+    vi.advanceTimersByTime(WINDOW_LOST_MS + 1000);
+    expect(onClosed).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(FIRST_CONTACT_MS);
+    expect(onClosed).toHaveBeenCalledWith("lost");
+  });
+
+  it("a cancel from the window ends the session quietly", async () => {
+    const onClosed = vi.fn();
+    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false });
+    const win = peer();
+    win.postMessage(wrap("window", REQ, { t: "cancel" }));
+    await vi.waitFor(() => expect(onClosed).toHaveBeenCalledWith("cancel"));
+    win.close();
+  });
+
+  it("sends the file to save only after the window is ready", async () => {
+    const s = openCloudWindow("mock", { ...params, mode: "save" }, {}, { Channel, open: () => ({}) as Window, hidden: () => false })!;
+    const win = peer();
+    const got: { t: string; file?: File }[] = [];
+    win.onmessage = (e) => got.push(e.data);
+    const f = new File(["%PDF"], "out.pdf");
+    s.sendSave(f);
+    await tick();
+    expect(got.filter((m) => m.t === "save")).toEqual([]);
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    await vi.waitFor(() => expect(got.find((m) => m.t === "save")?.file?.name).toBe("out.pdf"));
+    s.dispose();
+    win.close();
+  });
+});
+
+describe("WindowLink (cloud window)", () => {
+  it("notices when the tool tab stops answering", () => {
+    let t = 0;
+    const onToolLost = vi.fn();
+    const link = new WindowLink(REQ, { onToolLost }, { Channel, now: () => t });
+    link.beat();
+    t = TOOL_LOST_MS + 1;
+    link.beat();
+    expect(onToolLost).toHaveBeenCalledTimes(1);
+    expect(link.toolLost).toBe(true);
+    link.close();
+  });
+
+  it("finish() resolves when the tool acks", async () => {
+    const link = new WindowLink(REQ, {}, { Channel });
+    const tool = peer();
+    tool.onmessage = (e) => {
+      if (e.data.t === "done") tool.postMessage(wrap("tool", REQ, { t: "ack" }));
+    };
+    await expect(link.finish(2000)).resolves.toBe(true);
+    link.close();
+    tool.close();
+  });
+
+  it("routes stop, retry and save from the tool; ignores other requests", async () => {
+    const onStop = vi.fn();
+    const onSave = vi.fn();
+    const link = new WindowLink(REQ, { onStop, onSave }, { Channel });
+    const tool = peer();
+    const other = new FakeChannel(channelName("00000000-0000-4000-8000-000000000000"));
+    other.postMessage(wrap("tool", "00000000-0000-4000-8000-000000000000", { t: "stop", id: "f1" }));
+    tool.postMessage(wrap("tool", "00000000-0000-4000-8000-000000000000", { t: "stop", id: "f1" }));
+    tool.postMessage(wrap("tool", REQ, { t: "stop", id: "f2" }));
+    tool.postMessage(wrap("tool", REQ, { t: "save", file: new File(["x"], "a.pdf") }));
+    await vi.waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onStop).toHaveBeenCalledTimes(1);
+    expect(onStop).toHaveBeenCalledWith("f2");
+    link.close();
+    tool.close();
+  });
+});
+
+describe("popupFeatures", () => {
+  it("a 480x640 popup on desktop, a plain tab on phones", () => {
+    expect(popupFeatures({ innerWidth: 1366, screenX: 0, screenY: 0, outerWidth: 1366, outerHeight: 768 })).toBe("popup,width=480,height=640,left=443,top=64");
+    expect(popupFeatures({ innerWidth: 390 })).toBe("");
+    expect(popupFeatures({ innerWidth: 1024, matchMedia: () => ({ matches: true }) })).toBe("");
+  });
+});
