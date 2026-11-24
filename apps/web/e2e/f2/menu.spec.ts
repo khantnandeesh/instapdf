@@ -83,7 +83,7 @@ test.describe("desktop menu (1366x900)", () => {
     await expect(menuSearch(page)).toBeFocused();
     await page.keyboard.type("split");
     const hrefs = await menuLinks(page).evaluateAll((as) => as.map((a) => a.getAttribute("href")));
-    for (const s of ["split-pdf", "split-by-bookmarks", "split-by-size", "split-by-text", "split-in-half"]) expect(hrefs).toContain(`/${s}`);
+    for (const s of ["split-pdf", "split-pdf-by-bookmarks", "split-pdf-by-size", "split-pdf-by-text", "split-pdf-in-half"]) expect(hrefs).toContain(`/${s}`);
     for (const s of ["merge-pdf", "rotate-pdf", "compress-pdf"]) expect(hrefs).not.toContain(`/${s}`);
     await menuSearch(page).fill("zzqx");
     await expect(page.getByTestId("tool-menu-no-results")).toContainText("No tools match");
@@ -184,7 +184,7 @@ test.describe("desktop menu (1366x900)", () => {
     await openMenu(page);
     await menuSearch(page).fill("&");
     const hrefs = await menuLinks(page).evaluateAll((as) => as.map((a) => a.getAttribute("href")));
-    expect(hrefs).toEqual(expect.arrayContaining(["/fill-sign", "/combine-reorder"]));
+    expect(hrefs).toEqual(expect.arrayContaining(["/sign-pdf", "/combine-reorder-pdf"]));
     for (const q of [".*", "(", "[", "\\", "<img src=x onerror=alert(1)>"]) {
       await menuSearch(page).fill(q);
       await expect(page.getByTestId("tool-menu-no-results"), q).toContainText(q);

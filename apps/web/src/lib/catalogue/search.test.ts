@@ -40,7 +40,7 @@ describe("matchTools", () => {
     const protect = matchTools(tools, "encrypt").find((m) => m.item.slug === "protect-pdf")!;
     expect(protect.keywordOnly).toBe(true);
     expect(protect.name ?? protect.summary).toBeUndefined();
-    const img = matchTools(tools, "jpg").find((m) => m.item.slug === "image-to-pdf")!;
+    const img = matchTools(tools, "jpg").find((m) => m.item.slug === "jpg-to-pdf")!;
     expect(img.name).toBeUndefined();
     expect(img.item.summary.slice(...img.summary!)).toBe("JPG");
   });

@@ -161,12 +161,12 @@ test.describe("catalogue", () => {
       "/merge-pdf",
       "/pdf-editor",
       "/compress-pdf",
-      "/delete-pages",
+      "/delete-pdf-pages",
       "/split-pdf",
       "/crop-pdf",
-      "/fill-sign",
+      "/sign-pdf",
       "/pdf-to-word",
-      "/extract-pages",
+      "/extract-pdf-pages",
     ]);
     const popY = (await popular.boundingBox())!.y;
     const firstCat = (await page.locator("[data-testid=category]").first().boundingBox())!.y;
@@ -216,7 +216,7 @@ test.describe("search", () => {
     await expect(page.getByLabel("Search tools", { exact: true }).first()).toBeAttached();
     await catalogueSearch(page).pressSequentially("split");
     const hrefs = await visibleNames(page);
-    for (const s of ["split-pdf", "split-by-bookmarks", "split-by-size", "split-by-text", "split-in-half"]) expect(hrefs).toContain(`/${s}`);
+    for (const s of ["split-pdf", "split-pdf-by-bookmarks", "split-pdf-by-size", "split-pdf-by-text", "split-pdf-in-half"]) expect(hrefs).toContain(`/${s}`);
     for (const s of ["merge-pdf", "rotate-pdf", "compress-pdf"]) expect(hrefs).not.toContain(`/${s}`);
   });
 
@@ -228,8 +228,8 @@ test.describe("search", () => {
   test("AC-17: keywords match", async ({ page }) => {
     const cases: [string, string[]][] = [
       ["encrypt", ["/protect-pdf"]],
-      ["jpg", ["/image-to-pdf", "/pdf-to-image"]],
-      ["combine", ["/merge-pdf", "/combine-reorder"]],
+      ["jpg", ["/jpg-to-pdf", "/pdf-to-jpg"]],
+      ["combine", ["/merge-pdf", "/combine-reorder-pdf"]],
       ["ppt", ["/pdf-to-ppt"]],
     ];
     for (const [q, expected] of cases) {
@@ -288,7 +288,7 @@ test.describe("search", () => {
     await openHydrated(page, "/?q=split");
     await expect(catalogueSearch(page)).toHaveValue("split");
     await expect(page.locator('[data-testid=category] a[href="/merge-pdf"]')).toHaveCount(0);
-    await expect(page.locator('[data-testid=category] a[href="/split-in-half"]')).toBeVisible();
+    await expect(page.locator('[data-testid=category] a[href="/split-pdf-in-half"]')).toBeVisible();
   });
 
   test("AC-62: the server HTML for /?q=split still holds every catalogue link", async ({ request }) => {
@@ -317,7 +317,7 @@ test.describe("search", () => {
       }
     }
     // `&` is a real hit: the "X & Y" tools.
-    expect(expectedHrefs("&")).toEqual(expect.arrayContaining(["/fill-sign", "/combine-reorder"]));
+    expect(expectedHrefs("&")).toEqual(expect.arrayContaining(["/sign-pdf", "/combine-reorder-pdf"]));
     expect(errors).toEqual([]);
   });
 
@@ -326,7 +326,7 @@ test.describe("search", () => {
     await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe("fill & sign");
     await page.reload();
     await expect(catalogueSearch(page)).toHaveValue("fill & sign");
-    expect(await visibleNames(page)).toEqual(["/fill-sign"]);
+    expect(await visibleNames(page)).toEqual(["/sign-pdf"]);
 
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));

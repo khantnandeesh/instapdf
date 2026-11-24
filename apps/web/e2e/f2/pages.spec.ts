@@ -29,10 +29,8 @@ test("AC-49: coming-soon and placeholder pages are noindex; home, usable tools a
     return page.locator('meta[name="robots"]').getAttribute("content").catch(() => null);
   };
   for (const path of ["/split-pdf", "/about", "/help", "/security"]) expect(await robots(path), path).toMatch(/noindex/);
-  for (const path of ["/", "/rotate-pdf", "/merge-pdf", "/privacy", "/terms", "/cookies", "/licenses"]) {
-    await page.goto(path);
-    await expect(page.locator('meta[name="robots"]'), path).toHaveCount(0);
-  }
+  // Indexable pages may carry an explicit "index" robots meta (SEO foundations), never noindex.
+  for (const path of ["/", "/rotate-pdf", "/merge-pdf", "/privacy", "/terms", "/cookies", "/licenses"]) expect(await robots(path), path).not.toMatch(/noindex/);
 });
 
 test("AC-49: every planned tool's coming-soon page carries noindex in the server HTML; / and usable tools do not", async ({ request }) => {
@@ -41,7 +39,7 @@ test("AC-49: every planned tool's coming-soon page carries noindex in the server
     expect(robotsMeta(await (await request.get(`/${t.slug}`)).text()), t.slug).toMatch(/content="[^"]*noindex/);
   }
   for (const path of ["/", ...usableTools.map((t) => `/${t.slug}`)]) {
-    expect(robotsMeta(await (await request.get(path)).text()), path).toBeNull();
+    expect(robotsMeta(await (await request.get(path)).text()) ?? "", path).not.toMatch(/noindex/);
   }
 });
 

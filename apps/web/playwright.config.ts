@@ -13,5 +13,6 @@ export default defineConfig({
   ],
   webServer: process.env.BASE_URL
     ? undefined
-    : { command: "pnpm start", url: baseURL, reuseExistingServer: true, timeout: 120_000 },
+    : // SITE_INDEXABLE=1: serve what prod serves (src/lib/seo/site.ts), so the SEO checks see indexable pages.
+      { command: "pnpm start", url: baseURL, reuseExistingServer: true, timeout: 120_000, env: { SITE_INDEXABLE: "1" } },
 });

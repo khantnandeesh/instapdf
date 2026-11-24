@@ -605,12 +605,25 @@ export function MergeTool() {
     return { name: out.name, type: out.type, blob: out.blob, size: out.blob.size, pageCount: out.pageCount, wasEncrypted: out.wasEncrypted, warnings: out.warnings };
   };
 
-  // Prefetch the workspace chunks once the page is idle, so the first pick never waits for them.
+  // Prefetch the workspace chunks at the first sign of intent (a pointer, key, focus or drag: the
+  // file chooser then hides the load) or after 4 s, so the first pick never waits for them and the
+  // first load stays within the phone JS budget (SEO checklist).
   useEffect(() => {
-    const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
-    const go = () => void Promise.all([loadSegmentGrid(), loadMenu()]).catch(() => {});
-    if (idle) idle(go);
-    else setTimeout(go, 1000);
+    const events = ["pointerdown", "keydown", "focusin", "dragenter"] as const;
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      stop();
+      void Promise.all([loadSegmentGrid(), loadMenu()]).catch(() => {});
+    };
+    const t = setTimeout(go, 4000);
+    const stop = () => {
+      clearTimeout(t);
+      for (const e of events) window.removeEventListener(e, go, true);
+    };
+    for (const e of events) window.addEventListener(e, go, true);
+    return stop;
   }, []);
 
   // Load the pages view chunk on idle once there is something to show.

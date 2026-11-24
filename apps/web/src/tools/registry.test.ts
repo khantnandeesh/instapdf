@@ -101,12 +101,12 @@ describe("catalogue fields (F2)", () => {
       "merge-pdf",
       "pdf-editor",
       "compress-pdf",
-      "delete-pages",
+      "delete-pdf-pages",
       "split-pdf",
       "crop-pdf",
-      "fill-sign",
+      "sign-pdf",
       "pdf-to-word",
-      "extract-pages",
+      "extract-pdf-pages",
     ]);
     const ranks = tools.filter((t) => t.popularRank !== undefined).map((t) => t.popularRank);
     expect(new Set(ranks).size).toBe(ranks.length);
