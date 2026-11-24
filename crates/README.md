@@ -104,6 +104,12 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
   ("تجريبي.!مرحبا بالعالم…"); PDFium reads it in place. Refusing these would also refuse plain
   Arabic word edits that need a registered face (AC-205), so they are kept;
   `apps/web/src/lib/editor/mixed-direction.test.ts` pins the limit.
+- A digit typed into an Arabic line is kept when the line's font maps that digit in its
+  ToUnicode (digits read in typed order in both readers). A digit the subset doesn't map (the
+  "3" in scripts-plain.pdf, whose subset maps only 0, 2, 5 and 7) would read as typed only
+  through ActualText, so the edit is refused (`text-mismatch`; oracle case
+  `plain-arabic-number-unmapped`, AC-206 on that file). Writing the new codes into the font's
+  ToUnicode would let both readers read them; not done yet.
 - Lines already drawn with ActualText spans (Chrome and LibreOffice Arabic) are not covered by
   the ActualText refusal: neither reader reads them by their glyphs before an edit either.
 - Vertical text, CID fonts with a non-Identity CMap and invisible (OCR) text are read-only.
