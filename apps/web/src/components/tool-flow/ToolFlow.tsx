@@ -572,6 +572,9 @@ export function ToolFlow({
       if (controller.signal.aborted) return;
       setProgress(1);
       // The work area fades out (120ms, inert at once) and the result card rises in its place (T12).
+      // Inert drops the focus it holds (the progress bar) to <body>: park it on the tool heading first,
+      // until the result card focuses Download.
+      if (workArea.current?.contains(document.activeElement)) heading.current?.focus({ preventScroll: true });
       await exit(workArea.current, "result");
       if (controller.signal.aborted) return settle(workArea.current);
       setOutput(out);
