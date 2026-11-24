@@ -171,7 +171,10 @@ for (const tool of usable) {
         // The result scrolls the page back to the top: wait for the result to settle.
         await expect(async () => expectInViewport(page, page.getByRole("link", { name: "Download" }), "Download (result)")).toPass({ timeout: 5_000 });
         // F23 (AC-169): with cloud sources on, the result's second action (Save to…) fits beside Download.
-        if (await page.getByTestId("save-main").count()) await expectInViewport(page, page.getByTestId("save-main"), "Save to cloud (result)");
+        if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1") {
+          await expect(page.getByTestId("save-main")).toBeVisible();
+          await expectInViewport(page, page.getByTestId("save-main"), "Save to cloud (result)");
+        }
       });
     }
 
@@ -204,7 +207,10 @@ for (const tool of usable) {
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "done", { timeout: 30_000 });
         await expect(async () => expectInViewport(page, page.getByRole("link", { name: "Download" }), "Download (result)")).toPass({ timeout: 5_000 });
         // F23 (AC-169): with cloud sources on, the result's second action (Save to…) fits beside Download.
-        if (await page.getByTestId("save-main").count()) await expectInViewport(page, page.getByTestId("save-main"), "Save to cloud (result)");
+        if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1") {
+          await expect(page.getByTestId("save-main")).toBeVisible();
+          await expectInViewport(page, page.getByTestId("save-main"), "Save to cloud (result)");
+        }
       });
     }
   });

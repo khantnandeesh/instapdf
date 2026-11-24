@@ -99,3 +99,33 @@ test("AC-168: the tool tab goes away mid-download: a banner over the downloads, 
   await expect(win.getByTestId("cloud-window")).not.toHaveAttribute("data-view", "done");
   await expect(win.getByTestId("cloud-lost-banner")).toBeVisible();
 });
+
+test("closing the window on a sign-in page: the tool stops waiting once it has been in front for a while", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.evaluate((k) => localStorage.setItem(k, "hold"), REDIRECT);
+  const urls = visited(page);
+  const win = await openWindow(page, () => rowButton(page, "OneDrive").click());
+  // The window leaves for the "sign-in page", which never answers.
+  await expect.poll(() => urls.some((u) => new URL(u).pathname === "/"), { timeout: 15_000 }).toBe(true);
+  const waiting = page.getByTestId("notice").filter({ hasText: "Waiting for OneDrive" });
+  await expect(waiting).toBeVisible();
+  await win.close();
+  await page.bringToFront();
+  // Well before the sign-in allowance (2 min) runs out: the tab in front, focused, about 15 s.
+  await expect(waiting).toHaveCount(0, { timeout: 25_000 });
+  await expect(rowButton(page, "OneDrive")).toBeEnabled();
+});
+
+test("AC-168: the tool tab closes just before the hand-off: no 'Added', the rows stay under the banner", async ({ page }) => {
+  const win = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  await reachPicker(win);
+  await win.getByTestId("mock-picker").getByRole("group").getByLabel("alpha.pdf", { exact: true }).check();
+  await page.close({ runBeforeUnload: false });
+  await win.getByRole("button", { name: "Pick", exact: true }).click();
+  // No ack comes back: the window keeps its rows and says it lost the tool.
+  await expect(win.getByTestId("cloud-lost-banner")).toBeVisible({ timeout: 8000 });
+  await expect(win.getByTestId("cloud-window")).not.toHaveAttribute("data-view", "done");
+  await win.waitForTimeout(1500);
+  await expect(win.getByTestId("cloud-window")).not.toHaveAttribute("data-view", "done");
+  expect(win.isClosed()).toBe(false);
+});

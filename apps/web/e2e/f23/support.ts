@@ -38,7 +38,8 @@ export async function closed(win: Page, timeout = 10_000) {
 export async function reachPicker(win: Page) {
   const open = win.getByTestId("cloud-open");
   const picker = win.getByTestId("mock-picker");
-  await expect(open.and(win.locator(":enabled")).or(picker)).toBeVisible();
+  // A busy Open button (aria-busy, still enabled) is a window that goes on by itself: wait for the picker.
+  await expect(open.and(win.locator(':enabled:not([aria-busy="true"])')).or(picker)).toBeVisible();
   if (!(await picker.isVisible())) await open.click();
   await expect(picker).toBeVisible();
 }
