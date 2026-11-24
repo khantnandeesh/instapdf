@@ -33,6 +33,8 @@ export function Notice({
   className?: string;
 }) {
   const kind = look ?? (tone === "danger" ? "alert" : "callout");
+  // F23: an action of its own (cloud/NoticeAction.tsx) sits on the notice's row, before the close (spec U-4).
+  const inline = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && action?.node ? action.node : null;
   const Icon =
     kind === "alert"
       ? tone === "success"
@@ -53,6 +55,7 @@ export function Notice({
       className={cx(
         "text-sm",
         kind === "alert" ? cx("mp-alert", tone === "danger" && "mp-alert--danger", (tone === "info" || tone === "warning") && "mp-alert--info") : "mp-callout items-start",
+        inline !== null && "ip-notice-inline",
         className,
       )}
     >
@@ -68,15 +71,13 @@ export function Notice({
       <div className="min-w-0 flex-1 break-words">
         {title && <p className="font-semibold">{title}</p>}
         {children && <div className={cx(kind === "alert" && title && "font-normal")}>{children}</div>}
-        {action &&
-          (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && action.node ? (
-            action.node
-          ) : (
-            <Button size="sm" variant="outline" className="mt-2" onClick={action.onClick}>
-              {action.label}
-            </Button>
-          ))}
+        {action && inline === null && (
+          <Button size="sm" variant="outline" className="mt-2" onClick={action.onClick}>
+            {action.label}
+          </Button>
+        )}
       </div>
+      {inline}
       {onDismiss && (
         <button
           type="button"
