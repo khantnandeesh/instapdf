@@ -90,3 +90,20 @@ textarea.bf-options { height: auto; padding: 6px 8px; line-height: 1.4; resize: 
 @media (pointer: coarse) { .bf-act, .bf-text, .bf-step, .bf-seg, .bf-color { min-height: 40px; } }
 @media (prefers-reduced-motion: reduce) { .bf-props { animation: none; } }
 .bf-prop--tight { gap: 4px; }
+/* Form tool options (U-F2) and the fields chip (U-F1) */
+.bf-formopts { display: flex; align-items: center; gap: 8px; font: 500 13px/1 Fredoka, sans-serif; color: var(--ink); }
+.bf-kinds { display: flex; gap: 2px; padding: 2px; border-radius: 12px; background: var(--surface-soft); }
+.bf-kind { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--ink); cursor: pointer; transition: background 120ms, color 120ms; }
+.bf-kind:hover { background: #fff; }
+.bf-kind[aria-checked="true"] { background: var(--tool-active-bg); color: var(--tool-active-ink); box-shadow: inset 0 0 0 1.5px var(--tool-glow); }
+.bf-divider { width: 1px; height: 22px; background: var(--border); }
+.bf-optbtn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; font: 600 13px/1 Fredoka, sans-serif; color: var(--ink); cursor: pointer; white-space: nowrap; }
+.bf-optbtn:hover { background: var(--surface-soft); }
+.bf-optbtn[aria-pressed="true"] { background: var(--tool-active-bg); color: var(--tool-active-ink); }
+.bf-kind:focus-visible, .bf-optbtn:focus-visible, .bf-fieldschip:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+@media (max-width: 1023px) { .bf-optbtn span { display: none; } .bf-optbtn { width: 34px; padding: 0; justify-content: center; } }
+@media (pointer: coarse) { .bf-kind, .bf-optbtn { min-width: 40px; height: 40px; } }
+.bf-fieldschip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border: 1.5px solid var(--border); border-radius: 14px; background: #fff; font: 500 12px/1 Fredoka, sans-serif; color: var(--ink); cursor: pointer; white-space: nowrap; transition: background 150ms, border-color 150ms; }
+.bf-fieldschip:hover { background: var(--surface-soft); }
+.bf-fieldschip[data-warn] { border-color: var(--brand); color: var(--brand-strong); background: var(--brand-soft); }
+@media (prefers-reduced-motion: reduce) { .bf-kind, .bf-fieldschip { transition: none; } }

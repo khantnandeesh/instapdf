@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkFieldName, propsFor, renameField, setCheckboxOn, setDefaultValue, setOptions, suggestsMultiline } from "./edit";
+import { checkFieldName, nextEmptyWidget, propsFor, renameField, setCheckboxOn, setDefaultValue, setOptions, suggestsMultiline } from "./edit";
 import { addField, createField, emptyForm, setValue, updateField } from "./model";
 import type { FormState } from "./types";
 
@@ -80,5 +80,22 @@ describe("field properties: what shows (U-F4)", () => {
     expect(propsFor("radio").main).toEqual(["name", "buttonValue", "addButton"]);
     expect(propsFor("signature").more).toEqual(["tooltip", "repeat", "duplicate"]);
     expect(propsFor("list").more).toContain("multiSelect");
+  });
+});
+
+describe("fields chip: next empty field (U-F1)", () => {
+  it("goes round the tab order, required first when nudging, skipping filled and read-only fields", () => {
+    let s = form();
+    s = setValue(s, id(s, "name"), "Asha").state;
+    s = updateField(s, id(s, "colour"), { readOnly: true });
+    s = updateField(s, id(s, "size"), { required: true });
+    const w = (n: string) => get(s, n).widgets[0].id;
+    expect(nextEmptyWidget(s)).toBe(w("agree"));
+    expect(nextEmptyWidget(s, w("agree"))).toBe(w("days"));
+    expect(nextEmptyWidget(s, w("address.town"))).toBe(w("agree"));
+    expect(nextEmptyWidget(s, null, true)).toBe(w("size"));
+    for (const n of ["agree", "days", "address.town"]) s = setValue(s, id(s, n), n === "days" ? ["Option 1"] : n === "agree" ? "Yes" : "x").state;
+    s = setValue(s, id(s, "size"), get(s, "size").widgets[0].on!).state;
+    expect(nextEmptyWidget(s)).toBeNull();
   });
 });

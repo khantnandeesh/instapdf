@@ -2,7 +2,7 @@
  * Property edits behind the field properties popover (U-F4, AC-234 to AC-236). Pure, like model.ts:
  * each returns a new state, so the editor can put it on its undo history.
  */
-import { setValue, updateField } from "./model";
+import { isEmptyValue, setValue, updateField } from "./model";
 import { checkName, renamedTo, type NameCheck } from "./names";
 import type { FormField, FormState, Widget } from "./types";
 
@@ -116,4 +116,23 @@ export function propsFor(kind: FormField["kind"]): { main: PropKey[]; more: Prop
     default:
       return { main: ["name"], more: ["tooltip", "readOnly"] };
   }
+}
+
+/**
+ * The next empty field in tab order after widget `after` (wrapping round), for the top-bar chip's
+ * "Next empty field" jump (U-F1). Required fields come first when `requiredFirst`. Read-only fields,
+ * buttons and signatures are skipped. Returns a widget id, or null when every field is filled.
+ */
+export function nextEmptyWidget(state: FormState, after: string | null = null, requiredFirst = false): string | null {
+  const byWidget = new Map(state.fields.flatMap((f) => f.widgets.map((w) => [w.id, f] as const)));
+  const fillable = (f: FormField) => !f.readOnly && f.kind !== "button" && f.kind !== "signature" && isEmptyValue(f.value);
+  const order = state.order.filter((w) => byWidget.has(w));
+  const start = after ? order.indexOf(after) + 1 : 0;
+  const ring = [...order.slice(start), ...order.slice(0, start)];
+  const pick = (want: (f: FormField) => boolean) => ring.find((w) => fillable(byWidget.get(w)!) && want(byWidget.get(w)!)) ?? null;
+  if (requiredFirst) {
+    const req = pick((f) => f.required);
+    if (req) return req;
+  }
+  return pick(() => true);
 }
