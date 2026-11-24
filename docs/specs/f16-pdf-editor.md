@@ -321,6 +321,19 @@ Priority: P0 = parity must-have; P1 = parity nice-to-have or key differentiator;
 - **AC-72 (P1)** Shapes: a single click places a default-size shape; a drag sets the size; Shift keeps the aspect ratio (or 45° for lines and arrows). Border width, border colour and fill colour can be set.
 - **AC-73 (P1)** The history panel lists each change with its type, page and time; any set of changes can be reverted at once, and the revert itself can be undone.
 
+### Live checks on the reference (2026-11-24, `f16-reference-live-checks.md`)
+- **AC-74 (P0)** (improvement) Clicking an existing Devanagari line never changes how it looks. The edit box shows the logical string (राशि, not रािश), rendered with the document's font where it covers the text and a shaped OFL Devanagari font where it does not. Until E4 ships, a Devanagari line opens read-only with a one-line hint, and the output never has detached vowel signs or lost word spaces (render diff vs a HarfBuzz reference on `report-form-3p.pdf` page 1).
+- **AC-75 (P0)** (improvement) When the original font can't draw a typed character (₹, or a capital missing from a subset), we never switch fonts silently. Replacement fonts are ranked by script coverage, class (serif, sans, mono, script) and width metrics, and the best match is preselected. For `font-coverage-1p.pdf`, typing "QZ" proposes a monospaced font first. Only the missing characters switch (AC-11g), an inline notice names both fonts, and "Keep original" is never offered when it would leave the line in a browser fallback font.
+- **AC-76 (P1)** (improvement) Find highlights the matched words, not whole lines. It shows "n of N" across all pages with next and previous. Replace all reports the total it replaced, can be undone in one step, and leaves no marks under edited lines.
+- **AC-77 (P1)** (improvement) Detect fields runs in the browser (no upload). On `report-form-3p.pdf` page 2 it finds the 4 blanks, the 2 boxes and the signature line, and makes the last one a **signature** field. Field names are readable and have no random suffix (`full_name`, then `full_name_2` if taken).
+- **AC-78 (P1)** (improvement) Text markup (highlight, underline, strike-out) works on lines that were edited, and a drag with a markup tool never moves an edited line.
+- **AC-79 (P1)** (improvement) Pages with edits can be rotated, zoomed and reordered, and every overlay keeps its place on the page.
+- **AC-80 (P2)** The thumbnails panel stays open while used (it is pinnable), its page counter follows scrolling, and thumbnails can be dragged to reorder (AC-42).
+- **AC-81 (P1)** (improvement) Recovery autosaves to this device (IndexedDB) within 2 s of each edit. Reopening the same file after a reload, crash or closed tab offers "Restore n edits" (AC-45). Nothing is ever sent to a server.
+- **AC-82 (P0)** Keyboard on a selected object: Delete and Backspace remove it; arrows nudge it 1 pt (10 pt with Shift); Ctrl/Cmd+C, V and D copy, paste and duplicate it; Ctrl/Cmd+Shift+Z and Ctrl+Y redo. Undo covers every change, moved text lines included (AC-43).
+- **AC-83 (P0)** (improvement) Phone layout at 390×844: no sideways page scroll, a bottom tool bar with an overflow menu, the page fitted to the width, and pinch zoom left on (no `user-scalable=0` and no `maximum-scale=1`).
+- **AC-84 (P1)** (improvement) Limits: there is no task limit per hour. Browser editing is limited only by the device: a 500-page or 200 MB file opens and edits, with a progress note if it is slow. There is no expiry, because nothing is stored on a server.
+
 ### Redaction (phase E4)
 - **AC-47 (P1)** (improvement) Redact: marking "ZEBRA-7731" and applying removes it from extracted text and from decompressed content streams; images under the area are cut; output is a full rewrite with no earlier revision.
 
@@ -369,9 +382,9 @@ Each phase is a separate backlog item that passes the full pipeline and evaluato
 | Phase | Scope | ACs | Key risk | Rough size |
 |---|---|---|---|---|
 | **E0 Engine spike** | `berry-engine` Rust crate: content-stream interpreter (glyph positions), run/line grouping, embedded-font coverage check, surgical show-text removal with `TJ` splitting, append block, same-family re-subset, WASM + native builds, fidelity guard. Run on the Parity Lab corpus against the reference | 11b, 11c, 11f (engine level) | Font edge cases (Type 3, no ToUnicode, CFF, vertical) | M (1–2 weeks) |
-| **E1 Editor core** | Editor shell, pdf.js render worker + lazy engine load, overlay model, op log, undo/redo, autosave/recovery, add text, image, whiteout, shapes, annotate, sign (type/draw/upload), page ops, download, mobile toolbar, snapping, placement preview, z-order | 1–8, 23–27, 31–32, 41, 43–46, 48–52, 54–58, 60, 64–87 | WASM size and two-engine alignment | L |
-| **E2 Edit existing text (line)** | Line edit via `berry-engine` text runs, font reuse + coverage check, OFL substitution + notice, document fonts menu, style changes, move/delete, find & replace, scan/Type3 fallbacks | 9–13, 17–19, 59 | Subset fonts, odd encodings | L |
-| **E3 Paragraphs, links, forms** | Paragraph detection + reflow inside box, toggle; links; form fill + create, tab order, repeat on pages, rotated pages, XFA banner, detect fields, stamps, attachments | 14–16, 28–30, 34–40, 42, 53, 61–63 | Paragraph detection quality across real files | L |
+| **E1 Editor core** | Editor shell, pdf.js render worker + lazy engine load, overlay model, op log, undo/redo, autosave/recovery, add text, image, whiteout, shapes, annotate, sign (type/draw/upload), page ops, download, mobile toolbar, snapping, placement preview, z-order | 1–8, 23–27, 31–32, 41, 43–46, 48–52, 54–58, 60, 64–73, 78–98 | WASM size and two-engine alignment | L |
+| **E2 Edit existing text (line)** | Line edit via `berry-engine` text runs, font reuse + coverage check, OFL substitution + notice, document fonts menu, style changes, move/delete, find & replace, scan/Type3 fallbacks | 9–13, 17–19, 59, 74–76 | Subset fonts, odd encodings | L |
+| **E3 Paragraphs, links, forms** | Paragraph detection + reflow inside box, toggle; links; form fill + create, tab order, repeat on pages, rotated pages, XFA banner, detect fields, stamps, attachments | 14–16, 28–30, 34–40, 42, 53, 61–63, 77 | Paragraph detection quality across real files | L |
 | **E4 Beyond parity** | True redaction, Devanagari/Arabic shaping (new + replace run), OCR scan-to-editable (tesseract.js, small docs), camera signature, local fonts | 20–22, 33, 47 | Shaping correctness, redaction completeness | M–L |
 
 E0 and E1 can run in parallel (E1 needs no engine). Parity with the reference is reached at the end of E3; E1 alone already beats it on privacy, limits, speed and mobile for the most common jobs (fill, sign, add text, whiteout, annotate).
@@ -414,7 +427,7 @@ Wireframes (SVG, open in a browser): `assets/f16-pdf-editor/ui/`
 
 Breakpoints are the F1 ones (`sm` 640, `md` 768, `lg` 1024, `xl` 1280). Design widths: 375/390 (phone), 768 (tablet), 1280 (desktop). The structural switch from dock to rail is at `lg` 1024.
 
-#### Landing (empty state): above the fold (AC-74)
+#### Landing (empty state): above the fold (AC-85)
 
 ```
 1280×720                                              390×844
@@ -523,22 +536,22 @@ Icons are Phosphor Duotone. The engineer adds the names to `TOOL_ICONS`/interfac
 | 2 | *(E2) Edit text* | `text-aa` | E | reserved slot, not rendered in E1 | – | – |
 | 3 | Text | `text-t` | T | family, size, bold, italic, underline, colour, align | Click on the page = new box with a caret at the click point. Drag = box with a fixed width (wraps). The default size follows the nearest text line on the page (pdf.js text items within 48 pt), else 12 pt. | 23, 60 |
 | 4 | Sign | `signature` | S | Signature / Initials | Opens the sign dialog (U-E7). Once there are saved ones, the tool options show them as chips: one tap arms the placement. | 31, 32, 55 |
-| 5 | Mark | `highlighter-circle` | H | Highlight / Underline / Strike-out (`SegmentedControl`), colour | Drag across text (snaps to word boundaries from the pdf.js text layer, live preview), then release = annotation. On a page without a text layer, drag = area highlight (AC-84). | 27, 64 |
+| 5 | Mark | `highlighter-circle` | H | Highlight / Underline / Strike-out (`SegmentedControl`), colour | Drag across text (snaps to word boundaries from the pdf.js text layer, live preview), then release = annotation. On a page without a text layer, drag = area highlight (AC-95). | 27, 64 |
 | 6 | Draw | `scribble-loop` (fallback `pencil-simple`) | P | Pen / Marker (marker = freehand highlight, 40% opacity, multiply), colour, width S/M/L (1, 2.5, 6 pt; marker 12 pt) | Pointer down, then draw. One stroke = one ink object. With a pen, touch never draws (it pans). Without a pen: one finger draws, two fingers pan/zoom. | 27, 63 |
 | 7 | Shapes | `shapes` | R | Rectangle / Ellipse / Line / Arrow, stroke colour, fill (none default), stroke width | Drag to draw. Shift = square / circle / 45°. A click without a drag = default 120×80 pt (lines 120 pt). | 26 |
-| 8 | Image | `image` | I | – | Opens the image picker at once (PNG, JPEG, WebP, GIF, SVG ≤ 25 MB). Also: **paste** an image (Ctrl/Cmd+V) or **drop** an image onto a page, which places it at the drop point (AC-82). It's placed at ≤ 50% of the page width, centred in the view, and selected. | 24, 62 |
-| 9 | Whiteout | `eraser` | W | colour: **Page colour** (default; sampled from the rendered page under the box, AC-86) or a swatch | Drag a rectangle. A click without a drag = 120×24 pt. The tool options show ⚠ "Hides content; doesn't delete it" (visible text, the AC-25 warning; the full explanation is in the tooltip). | 25, 66 |
+| 8 | Image | `image` | I | – | Opens the image picker at once (PNG, JPEG, WebP, GIF, SVG ≤ 25 MB). Also: **paste** an image (Ctrl/Cmd+V) or **drop** an image onto a page, which places it at the drop point (AC-93). It's placed at ≤ 50% of the page width, centred in the view, and selected. | 24, 62 |
+| 9 | Whiteout | `eraser` | W | colour: **Page colour** (default; sampled from the rendered page under the box, AC-97) or a swatch | Drag a rectangle. A click without a drag = 120×24 pt. The tool options show ⚠ "Hides content; doesn't delete it" (visible text, the AC-25 warning; the full explanation is in the tooltip). | 25, 66 |
 
 Tool behaviour common to all tools:
 - **Sticky or one-shot.** After creating an object, Text, Image, Sign and Whiteout return to Select with the new object selected (one-shot: the most common job is one placement). Mark, Draw and Shapes stay armed (repetitive). Double-clicking a tool locks it (a small lock badge shows on the icon); Escape unlocks.
 - **Clicking an existing object with any tool selects it** (tools only create on empty space). So the user never has to switch to Select to adjust something.
-- **Defaults are sticky per session.** Changing a property on a selected object also becomes that tool's default for the next object (AC-85).
+- **Defaults are sticky per session.** Changing a property on a selected object also becomes that tool's default for the next object (AC-96).
 - **Document colours.** These are content, not UI tokens, and live in the editor config:
   - ink swatches: Black #000000, Blue #1a49c7, Red #c8102e, Green #12805c, Purple #5b2a86
   - marker swatches: Yellow #ffe14d, Green #7cf09a, Blue #7cd3ff, Pink #ff9ad5, Orange #ffb35c
   - plus **Custom** (native `<input type="color">`)
   - each swatch has a name (`aria-label`), and the selected one shows a check mark (not colour alone)
-- **Fonts (E1).** Arimo (stand-in for Arial/Helvetica, Apache-2.0), Tinos (Times, Apache-2.0), Cousine (Courier, Apache-2.0), Carlito (Calibri, OFL), Caladea (Cambria, OFL). Each is self-hosted, lazy-loaded per family on first use, and embedded as a subset of the **same file** used for the preview (AC-80). The family menu shows each name in its own face, with the stand-in in muted text ("Arimo · Arial").
+- **Fonts (E1).** Arimo (stand-in for Arial/Helvetica, Apache-2.0), Tinos (Times, Apache-2.0), Cousine (Courier, Apache-2.0), Carlito (Calibri, OFL), Caladea (Cambria, OFL). Each is self-hosted, lazy-loaded per family on first use, and embedded as a subset of the **same file** used for the preview (AC-91). The family menu shows each name in its own face, with the stand-in in muted text ("Arimo · Arial").
 
 ### U-E4. Tool options, selection and properties
 
@@ -581,7 +594,7 @@ Tool behaviour common to all tools:
 
 Below 1024 the same controls appear in the **context strip** (the first 5 + ⋯), replacing the tool options while something is selected.
 
-Each property change is **one undo step** and applies live (AC-85). The size field accepts typed values from 4 to 400 pt and steps by 1 (Shift by 4).
+Each property change is **one undo step** and applies live (AC-96). The size field accepts typed values from 4 to 400 pt and steps by 1 (Shift by 4).
 
 ### U-E5. Pages: navigation and actions
 
@@ -622,7 +635,7 @@ Each property change is **one undo step** and applies live (AC-85). The size fie
 
 Wireframe 08. Desktop uses `Dialog` (reused; 440 px). Phones use a full-height `Sheet`.
 
-- **Signature | Initials** (`SegmentedControl`) at the top. Initials use a squarer pad and box (AC-76).
+- **Signature | Initials** (`SegmentedControl`) at the top. Initials use a squarer pad and box (AC-87).
 - **Saved on this device**: chips of saved items (tap = place; ✕ on each deletes it after an undo toast). This section is shown first when it isn't empty, so a returning user signs in 2 taps: Sign, then the chip.
 - **Type | Draw | Upload** (`SegmentedControl`):
   - **Type**: a name field (prefilled with the last name used), 8 OFL handwriting faces as fixed-size preview tiles (the selected tile gets a berry edge and a tick), and 5 ink swatches. The fonts load when the dialog opens; tiles show the name in Fredoka until their font arrives, at the same size.
@@ -634,7 +647,7 @@ Wireframe 08. Desktop uses `Dialog` (reused; 440 px). Phones use a full-height `
 
 ### U-E8. Download
 
-- **Download** is always enabled (AC-44), even with no edits (it then saves the original with `Producer` set to BerryPDF). Ctrl/Cmd+S downloads too (AC-82).
+- **Download** is always enabled (AC-44), even with no edits (it then saves the original with `Producer` set to BerryPDF). Ctrl/Cmd+S downloads too (AC-93).
 - The click builds the PDF in a worker (pdf-lib, then a qpdf-WASM pass, both lazy-loaded on the first Download intent: pointerenter or focus of the button).
   - Under 400 ms: no progress UI.
   - Over 400 ms: the button keeps its width and shows a jam fill inside its face with `aria-busy` and the progressbar semantics (`ProgressBar` pattern).
@@ -647,7 +660,7 @@ Wireframe 08. Desktop uses `Dialog` (reused; 440 px). Phones use a full-height `
 | State | What the user sees |
 |---|---|
 | Empty | Landing (U-E2), above the fold. |
-| Opening (pick → first page) | Focus mode opens in the same frame as the pick. The top bar shows the file name and the tools are already active. Page boxes appear at their real sizes as soon as `readPageSizes` resolves (sized placeholder trays with the small berry loader before that). Page 1 paints first; the rest render on visibility. Over 600 ms, a determinate thin jam line runs under the top bar (bytes read, then pages parsed). Target: page 1 visible < 1 s for a 10-page PDF (AC-79). |
+| Opening (pick → first page) | Focus mode opens in the same frame as the pick. The top bar shows the file name and the tools are already active. Page boxes appear at their real sizes as soon as `readPageSizes` resolves (sized placeholder trays with the small berry loader before that). Page 1 paints first; the rest render on visibility. Over 600 ms, a determinate thin jam line runs under the top bar (bytes read, then pages parsed). Target: page 1 visible < 1 s for a 10-page PDF (AC-90). |
 | Ready / editing | As laid out above. |
 | Password | F1 `PasswordDialog` over the landing (before focus mode). |
 | Owner-restricted (no modify) | F1 `OwnerPermissionNotice` with the owner-password path. The editor opens read-only until it is cleared: tools are disabled with the tooltip "Locked by the file's owner". |
@@ -668,7 +681,7 @@ Wireframe 08. Desktop uses `Dialog` (reused; 440 px). Phones use a full-height `
 2. Tool rail or dock: `role="toolbar"` `aria-label="Tools"`, `aria-orientation` vertical (rail) or horizontal (dock), roving tabindex, arrows move, Enter/Space picks. Each tool is a `button` with `aria-pressed` and an `aria-keyshortcuts` attribute.
 3. Side panel (`aside`, "Pages and objects"):
    - **Pages** is a `role="listbox"` of thumbnails ("Page 3 of 10").
-   - **Objects** is the **object list** (AC-78), grouped by page. Rows read "Text: Signed by A. Rao", "Signature", "Rectangle", "Highlight: quarterly total". Enter selects and focuses the object on the canvas; Delete deletes it.
+   - **Objects** is the **object list** (AC-89), grouped by page. Rows read "Text: Signed by A. Rao", "Signature", "Rectangle", "Highlight: quarterly total". Enter selects and focuses the object on the canvas; Delete deletes it.
 4. Canvas: `main`-like `region` "Document". Each page is a `region` labelled "Page n of N". The pdf.js text layer stays readable. Added objects are focusable elements (`tabindex="0"` on the current page, `-1` elsewhere) with `role="group"`, `aria-roledescription` (added text, signature, image, shape, highlight, drawing, whiteout) and an `aria-label` (the text content or a type + page). `aria-describedby` points to a hidden position line ("at 120, 340 pt, 160 by 40").
 5. View pill.
 6. Status chips.
@@ -681,7 +694,7 @@ Wireframe 08. Desktop uses `Dialog` (reused; 440 px). Phones use a full-height `
 | Esc | Leave text editing, then deselect, then unlock / return to Select |
 | Tab / Shift+Tab (in canvas) | Next / previous object on the page, then the popover |
 | Enter | Edit the focused text box; open the popover for others |
-| Arrows / Shift+Arrows | Nudge 1 pt / 10 pt (one undo step per burst, AC-77) |
+| Arrows / Shift+Arrows | Nudge 1 pt / 10 pt (one undo step per burst, AC-88) |
 | Delete / Backspace | Delete the selection |
 | Ctrl/Cmd+D, Ctrl/Cmd+C / V | Duplicate; copy/paste objects (paste of an image file places it) |
 | Ctrl/Cmd+Z, Shift+Z, Ctrl+Y | Undo, redo |
@@ -768,15 +781,15 @@ EditorTool (route component; landing = F1 pieces; dynamic-imports EditorShell)
 
 | Budget | Value | How |
 |---|---|---|
-| Route first-load JS (landing, gzip) | **≤ 150 kB** (AC-75; the SEO checklist's phone cap is 170 kB) | Landing = F1 pieces only. `EditorShell` + pdf.js + the store are `next/dynamic` chunks. |
+| Route first-load JS (landing, gzip) | **≤ 150 kB** (AC-86; the SEO checklist's phone cap is 170 kB) | Landing = F1 pieces only. `EditorShell` + pdf.js + the store are `next/dynamic` chunks. |
 | Editor chunk (JS, excluding pdf.js worker, fonts, WASM; gzip) | ≤ 250 kB (AC-51) | pdf-lib and qpdf-WASM load on Download intent; the sign dialog, its fonts and the draw pad on Sign; each text family on first use. |
 | Prefetch | On pointerenter/focus of Open PDF, on drag-enter, and on `requestIdleCallback` after LCP | So the chunk is usually cached by the time the file is picked. |
 | Pick → focus mode visible | ≤ 100 ms | The shell renders from cached JS. |
-| First page visible (10-page PDF, CI desktop) | **< 1 s** (AC-79) | Page 1 first at the visible scale; thumbnails after. |
+| First page visible (10-page PDF, CI desktop) | **< 1 s** (AC-90) | Page 1 first at the visible scale; thumbnails after. |
 | Tool switch / selection response | ≤ 50 ms (one frame + transition) | |
 | Drag/resize/draw | 60 fps; no long task > 50 ms during interaction | Transforms on rAF; commit to the store on pointerup. |
 | Download, `para-times.pdf` + 10 edits | < 3 s (AC-44); target < 1 s | Worker; qpdf pass only after pdf-lib. |
-| CLS | ≤ 0.01 landing → editing (AC-81) | Sized page boxes, fixed bars, overlays. |
+| CLS | ≤ 0.01 landing → editing (AC-92) | Sized page boxes, fixed bars, overlays. |
 | Lighthouse mobile (landing) | ≥ 90 performance, 100 SEO (AC-52) | |
 | Memory | Rendered canvases ≤ visible ± 1; thumbnails at 120 px × DPR | |
 
@@ -805,7 +818,7 @@ EditorTool (route component; landing = F1 pieces; dynamic-imports EditorShell)
 | AC-3 | `PrivacyChip` (top bar; File sheet + Download toast on phones) → popover with "Nothing leaves this device" + "How to check" link |
 | AC-4 | `DownloadButton`: no counters or limit copy anywhere |
 | AC-5 | Virtualised `Canvas` + `ThumbList`; big-file toast without a limit |
-| AC-6, AC-79 | Opening state (U-E9), performance budget (U-E13) |
+| AC-6, AC-90 | Opening state (U-E9), performance budget (U-E13) |
 | AC-7 | `ViewPill` zoom, Ctrl+wheel, pinch, PDF-point overlay layout (U-E5) |
 | AC-8 | `SidePanel` Pages / `PagesSheet` thumbnails |
 | AC-23 | Text tool + `TextBox` |
@@ -827,27 +840,27 @@ EditorTool (route component; landing = F1 pieces; dynamic-imports EditorShell)
 
 #### Acceptance criteria added in design (E1)
 
-Numbered after the recording ACs (53–73). The design draft's snapping criterion is covered by AC-64 and is not repeated here.
+Numbered after the recording ACs (53–73) and the live-check ACs (74–84). The design draft's snapping criterion is covered by AC-64 and is not repeated here.
 
-- **AC-74 (P0)** *(added in design)* At 1280×720, 1366×768, 1440×900 and 390×844, the editor landing shows the `h1` and the whole **Open PDF** button without scrolling, and nothing from the SEO guide sits above them.
-- **AC-75 (P1)** *(added in design)* The editor route's first-load JS (landing, gzip) is ≤ 150 kB. The editor shell, pdf.js and pdf-lib are not requested until the user shows intent (pointerenter/focus on Open PDF, a drag, or idle after LCP) or picks a file.
-- **AC-76 (P0)** *(added in design)* The Sign tool creates **initials** as well as signatures, by type, draw or upload; saved initials are listed separately from signatures and placed the same way.
-- **AC-77 (P1)** *(added in design)* With an added object focused: arrows move it 1 pt, Shift+arrows 10 pt, Delete/Backspace removes it, Ctrl/Cmd+D duplicates it and Escape deselects it; each change is announced in the live region and undoable (a burst of nudges is one step).
-- **AC-78 (P1)** *(added in design)* The Objects list shows every added object per page with an accessible name; choosing one scrolls to it and moves focus to it on the canvas.
-- **AC-79 (P1)** *(added in design)* Page 1 of a 10-page fixture (`ten-page.pdf`, add to fixtures) is visible < 1 s after picking, on the CI desktop profile.
-- **AC-80 (P1)** *(added in design)* Added text is drawn in the editor with the same font file that is embedded in the output (the output's font name for that run matches the family chosen in the editor).
-- **AC-81 (P1)** *(added in design)* CLS ≤ 0.01 from the landing through opening a file and the first page render; no control in the top bar, rail or dock moves when page content loads.
-- **AC-82 (P1)** *(added in design)* Pasting an image (Ctrl/Cmd+V) places it on the current page; dropping an image onto a page places it at the drop point; Ctrl/Cmd+S downloads.
-- **AC-83 (P1)** *(added in design)* Touch: with the Draw tool, one finger draws and two fingers pan/zoom; when a pen is used, touch input never draws.
-- **AC-84 (P2)** *(added in design)* The Mark tool on a page without a text layer (`scan.pdf`) creates an area highlight annotation instead of doing nothing.
-- **AC-85 (P1)** *(added in design)* Changing a property of a selected object applies live, is one undo step, and becomes that tool's default for the next object in the session.
-- **AC-86 (P2)** *(added in design)* Whiteout's default colour matches the page colour sampled under the box (within ΔE 2 on a tinted-page fixture).
-- **AC-87 (P1)** *(added in design)* At 320×568 and 390×844, no editor bar (top bar, context strip, dock) is wider than the viewport and none scrolls horizontally; the active tool is always visible (in the dock or as the More button's icon).
+- **AC-85 (P0)** *(added in design)* At 1280×720, 1366×768, 1440×900 and 390×844, the editor landing shows the `h1` and the whole **Open PDF** button without scrolling, and nothing from the SEO guide sits above them.
+- **AC-86 (P1)** *(added in design)* The editor route's first-load JS (landing, gzip) is ≤ 150 kB. The editor shell, pdf.js and pdf-lib are not requested until the user shows intent (pointerenter/focus on Open PDF, a drag, or idle after LCP) or picks a file.
+- **AC-87 (P0)** *(added in design)* The Sign tool creates **initials** as well as signatures, by type, draw or upload; saved initials are listed separately from signatures and placed the same way.
+- **AC-88 (P1)** *(added in design)* With an added object focused: arrows move it 1 pt, Shift+arrows 10 pt, Delete/Backspace removes it, Ctrl/Cmd+D duplicates it and Escape deselects it; each change is announced in the live region and undoable (a burst of nudges is one step).
+- **AC-89 (P1)** *(added in design)* The Objects list shows every added object per page with an accessible name; choosing one scrolls to it and moves focus to it on the canvas.
+- **AC-90 (P1)** *(added in design)* Page 1 of a 10-page fixture (`ten-page.pdf`, add to fixtures) is visible < 1 s after picking, on the CI desktop profile.
+- **AC-91 (P1)** *(added in design)* Added text is drawn in the editor with the same font file that is embedded in the output (the output's font name for that run matches the family chosen in the editor).
+- **AC-92 (P1)** *(added in design)* CLS ≤ 0.01 from the landing through opening a file and the first page render; no control in the top bar, rail or dock moves when page content loads.
+- **AC-93 (P1)** *(added in design)* Pasting an image (Ctrl/Cmd+V) places it on the current page; dropping an image onto a page places it at the drop point; Ctrl/Cmd+S downloads.
+- **AC-94 (P1)** *(added in design)* Touch: with the Draw tool, one finger draws and two fingers pan/zoom; when a pen is used, touch input never draws.
+- **AC-95 (P2)** *(added in design)* The Mark tool on a page without a text layer (`scan.pdf`) creates an area highlight annotation instead of doing nothing.
+- **AC-96 (P1)** *(added in design)* Changing a property of a selected object applies live, is one undo step, and becomes that tool's default for the next object in the session.
+- **AC-97 (P2)** *(added in design)* Whiteout's default colour matches the page colour sampled under the box (within ΔE 2 on a tinted-page fixture).
+- **AC-98 (P1)** *(added in design)* At 320×568 and 390×844, no editor bar (top bar, context strip, dock) is wider than the viewport and none scrolls horizontally; the active tool is always visible (in the dock or as the More button's icon).
 
 ### U-E16. Open questions
 
 1. **Phone paging.** §6 says "one page at a time with swipe" on phones. This design uses continuous vertical scroll at Fit width instead, because a horizontal swipe conflicts with drawing, dragging and marquee, and vertical scroll is what phone users expect from documents. Owner/orchestrator to confirm; §6 should be updated if accepted.
 2. **E2 entry point.** Should E2's existing-text editing be a separate **Edit text** tool (the reserved rail slot), or should it merge into **Text** (click existing text = edit, click empty = add, as in §2a-bis)? A merge saves a tool and a click; a separate tool makes E1 → E2 risk-free and avoids accidental edits. The slot stays reserved until E2 design decides.
 3. **Focus mode and the site header.** The editor covers the site header while a file is open (the berry mark in the top bar links home). The thread fixing the shared tool layout should confirm that this doesn't conflict with its header rules.
-4. **AC-6 vs AC-79.** AC-6 (1.5 s, `para-times.pdf`) and AC-79 (< 1 s, 10 pages) overlap. The suggestion is to keep both: AC-6 as P0 parity, AC-79 as the "beat it" target.
+4. **AC-6 vs AC-90.** AC-6 (1.5 s, `para-times.pdf`) and AC-90 (< 1 s, 10 pages) overlap. The suggestion is to keep both: AC-6 as P0 parity, AC-90 as the "beat it" target.
 5. **Signature faces.** Choose the 8 OFL handwriting families (candidates to check per font: Caveat, Dancing Script, Great Vibes, Homemade Apple (Apache-2.0), Kalam, Sacramento, Satisfy (Apache-2.0), Yellowtail (Apache-2.0)). Each one's licence must be confirmed before it's added.
