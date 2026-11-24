@@ -5,7 +5,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -79,9 +79,7 @@ export async function annotationsOf(bytes: Uint8Array, pageNumber: number) {
   }
 }
 
-/** public/fonts/noto is generated (scripts/copy-fonts.mjs); makes it on a fresh checkout. */
+/** public/fonts/noto, generated once before the tests by vitest.global-setup.ts. */
 export function ensureNotoFonts(): URL {
-  const dir = new URL("../../../public/fonts/noto/", import.meta.url);
-  if (!existsSync(new URL("cmap.json", dir))) execFileSync("node", [new URL("../../../scripts/copy-fonts.mjs", import.meta.url).pathname]);
-  return dir;
+  return new URL("../../../public/fonts/noto/", import.meta.url);
 }
