@@ -1,0 +1,15 @@
+[package]
+name = "berry-cli"
+description = "Command-line driver for berry-engine (tests, parity runs and the server fallback)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "berry"
+path = "src/main.rs"
+
+[dependencies]
+berry-engine = { path = "../berry-engine" }
+serde_json = "1"
