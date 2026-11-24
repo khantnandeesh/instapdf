@@ -77,6 +77,18 @@ test("keyboard: focus on the caret before the chunk stays on it after the real m
   await expect(page.getByRole("menuitem").first()).toBeFocused();
 });
 
+test("L-1: Merge's idle prefetch leaves the cloud chunk alone; a cloud control still fetches it", async ({ page }) => {
+  await page.goto("/merge-pdf");
+  await expect(rowButton(page, "Dropbox")).toBeVisible();
+  // Merge prefetches its workspace after 4 s of idle: none of it is the cloud chunk.
+  await page.waitForTimeout(6000);
+  await page.waitForLoadState("networkidle");
+  const before = await scripts(page);
+  // So the first intent still has it to fetch.
+  await rowButton(page, "Dropbox").hover();
+  await expect.poll(async () => (await scripts(page)).length).toBeGreaterThan(before.length);
+});
+
 test("Save to cloud speaks for itself on a page that never touched a cloud control (L-b)", async ({ page }) => {
   await pickReady(page, "alpha.pdf");
   await run(page);

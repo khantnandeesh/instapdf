@@ -69,8 +69,10 @@ export type CloudHub = {
   intake?: Intake;
   /** The cloud chunk, once here. */
   ui?: UI;
-  /** Fetches the cloud chunk (once) and redraws the page with it. */
+  /** Fetches the cloud chunk (once; loadCloud). */
   load: () => Promise<UI>;
+  /** Redraws the page (the cloud chunk is here). */
+  draw: () => void;
 };
 
 /** A blank window opened in the click before the cloud chunk was here: the intake sends it on. Null: blocked. */
@@ -78,12 +80,20 @@ export type PreOpened = { win: Window | null };
 
 const providers = buildProviders();
 
+/** The tool page's hub (one ToolFlow per page), for the parts that live outside it (Save to cloud, Merge's menus). */
+let current: CloudHub | undefined;
+export const pageHub = () => current;
+
 let ui: UI | undefined;
 let loading: Promise<UI> | undefined;
-/** Fetches the cloud chunk once (again after a failed fetch). */
+/** Fetches the cloud chunk once (again after a failed fetch), whoever asks for it, and redraws the tool page with it. */
 export const loadCloud = (): Promise<UI> =>
   (loading ??= import("./ui").then(
-    (m) => (ui = m),
+    (m) => {
+      ui = m;
+      current?.draw();
+      return m;
+    },
     (e: unknown) => {
       loading = undefined;
       throw e;
@@ -96,15 +106,11 @@ const offline = (hub: CloudHub, name: string) => hub.deps?.pushNotice({ tone: "i
 /** The cloud chunk if it is already here. */
 export const cloudUi = () => ui;
 
-/** The tool page's hub (one ToolFlow per page), for the parts that live outside it (Save to cloud, Merge's menus). */
-let current: CloudHub | undefined;
-export const pageHub = () => current;
-
 /** The page's cloud hub: the same object for the page's life, with the latest state on `s`. */
 export function useCloud() {
   const [s, set] = useState<CloudState>({ downloads: [], busy: null });
   const [, redraw] = useState(0);
-  const [hub] = useState<CloudHub>(() => ({ s, set, load: () => loadCloud().then((m) => (redraw(1), m)) }));
+  const [hub] = useState<CloudHub>(() => ({ s, set, load: loadCloud, draw: () => redraw(1) }));
   hub.s = s;
   hub.ui = ui;
   current = hub;
