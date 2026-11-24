@@ -1,4 +1,4 @@
-// Pre-compresses the editor engine (public/engine/: the default module and the one with shaping) with brotli (quality 11) and gzip (level 9),
+// Pre-compresses the editor engine (public/engine/: the default module, the one with shaping, and the font matcher) with brotli (quality 11) and gzip (level 9),
 // next to the originals, served by the engine rewrites in next.config.ts. Skips files already up to date.
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
@@ -11,7 +11,7 @@ const fresh = (src, out) => {
     return false;
   }
 };
-for (const name of ["berry_engine_bg.wasm", "berry_engine.js", "berry_engine_shaping_bg.wasm", "berry_engine_shaping.js"]) {
+for (const name of ["berry_engine_bg.wasm", "berry_engine.js", "berry_engine_shaping_bg.wasm", "berry_engine_shaping.js", "berry_fontmatch_bg.wasm", "berry_fontmatch.js"]) {
   const src = new URL(name, dir);
   const raw = readFileSync(src);
   const br = new URL(`${name}.br`, dir);

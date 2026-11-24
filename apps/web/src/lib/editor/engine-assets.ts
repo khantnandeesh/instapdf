@@ -5,7 +5,13 @@
  */
 import manifest from "../../../public/engine/manifest.json";
 
-export type EngineFile = "berry_engine.js" | "berry_engine_bg.wasm" | "berry_engine_shaping.js" | "berry_engine_shaping_bg.wasm";
+export type EngineFile =
+  | "berry_engine.js"
+  | "berry_engine_bg.wasm"
+  | "berry_engine_shaping.js"
+  | "berry_engine_shaping_bg.wasm"
+  | "berry_fontmatch.js"
+  | "berry_fontmatch_bg.wasm";
 
 /** The path segment for a file: the first 16 hex digits of its sha256. */
 export const shaOf = (file: EngineFile) => manifest.files[file].slice(0, 16);
@@ -24,3 +30,10 @@ export const ENGINE_WASM_BYTES: number = manifest.wasmBytes;
 export const ENGINE_SHAPING_JS = enginePath("berry_engine_shaping.js");
 export const ENGINE_SHAPING_WASM = enginePath("berry_engine_shaping_bg.wasm");
 export const ENGINE_SHAPING_WASM_BYTES: number = manifest.shapingWasmBytes;
+
+/**
+ * The font matcher (F24): fingerprints a document font and ranks the font library against it.
+ * Load it only when a match is needed; it is never prefetched.
+ */
+export const FONTMATCH_JS = enginePath("berry_fontmatch.js");
+export const FONTMATCH_WASM = enginePath("berry_fontmatch_bg.wasm");

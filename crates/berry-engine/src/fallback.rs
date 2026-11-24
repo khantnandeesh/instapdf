@@ -84,6 +84,30 @@ pub fn request_for(font: &PdfFont) -> FontRequest {
     FontRequest { families, bold: font.is_bold(), italic: font.is_italic() }
 }
 
+/// Open families for every complex script in `text`, best first, for a box whose font has the
+/// normalized family name `stem`.
+pub fn script_families_for_text(text: &str, stem: &str) -> Vec<&'static str> {
+    let serif =
+        ["serif", "times", "georgia", "garamond", "cambria", "tinos", "liberationserif", "book"].iter().any(|k| stem.contains(k))
+            && !stem.contains("sans");
+    let mut scripts: Vec<crate::script::Script> = Vec::new();
+    for c in text.chars() {
+        let sc = crate::script::script(c);
+        if crate::script::is_complex(c) && !scripts.contains(&sc) {
+            scripts.push(sc);
+        }
+    }
+    let mut out: Vec<&'static str> = Vec::new();
+    for sc in scripts {
+        for f in script_families(sc, serif, stem) {
+            if !out.contains(&f) {
+                out.push(f);
+            }
+        }
+    }
+    out
+}
+
 /// Open families for a script, best first, given the original font's look.
 fn script_families(sc: crate::script::Script, serif: bool, stem: &str) -> Vec<&'static str> {
     use crate::script::Script as S;

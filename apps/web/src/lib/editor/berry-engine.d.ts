@@ -45,6 +45,8 @@ export interface FontInfo {
   object: number | null;
   /** Open font families that can stand in for this font, best first. */
   stand_ins: string[];
+  /** False for a subset: some characters may be missing (check with coverage()). */
+  complete: boolean;
 }
 
 /** Consecutive characters of a line in one font, size and colour. */
@@ -144,6 +146,59 @@ export interface SaveReport {
  * script's open family, e.g. "Noto Sans Devanagari" or "Noto Naskh Arabic", then Latin stand-ins. */
 export interface FontRequest { families: string[]; bold: boolean; italic: boolean }
 
+/** One glyph of shaped text. Lengths in points at the requested size. */
+export interface ShapedGlyph {
+  gid: number;
+  /** UTF-16 index in the text where the glyph's cluster starts. */
+  cluster: number;
+  advance: number;
+  dx: number;
+  dy: number;
+}
+
+/** Consecutive glyphs of one registered font and direction. */
+export interface ShapedRun {
+  /** UTF-16 range [start, end) of the text. */
+  start: number;
+  end: number;
+  /** Empty for blanks no registered font draws (they still take a space's width). */
+  family: string;
+  bold: boolean;
+  italic: boolean;
+  direction: "ltr" | "rtl";
+  /** Points. */
+  width: number;
+  glyphs: ShapedGlyph[];
+}
+
+/** One line of text laid out with the registered fonts. */
+export interface ShapedText {
+  /** Paragraph direction, from the first strong character. */
+  direction: "ltr" | "rtl";
+  /** Points. */
+  width: number;
+  /** Points: the largest ascent and descent of the fonts used (descent is negative). */
+  ascent: number;
+  descent: number;
+  /** Visual order, left to right. */
+  runs: ShapedRun[];
+}
+
+/** A document font's embedded program, for matching it against the font library (F24). The
+ * matching runs in the separate berry_fontmatch module, never in the engine. */
+export interface FontProgram {
+  /** The embedded program as stored. Empty when format is "none". */
+  bytes: Uint8Array;
+  /** "truetype": a TrueType or OpenType file. "cff": a bare CFF table. "none": not embedded,
+   * Type 1 or Type 3, so only the widths below can be compared. */
+  format: "truetype" | "cff" | "none";
+  /** False for a subset. */
+  complete: boolean;
+  /** Each requested character the font draws: its glyph index in `bytes` (0 when format is
+   * "none") and its advance in 1/1000 em. */
+  glyphs: { cp: number; gid: number; width: number }[];
+}
+
 /** What every method throws. Nothing is changed when an edit throws. */
 export type BerryError =
   | { kind: "parse"; message: string }
@@ -172,12 +227,32 @@ export class BerryDocument {
    * embedded font program. Blank characters count as covered.
    */
   coverage(fontObject: number, text: string): Coverage;
+  /** The embedded program of a document font and where it keeps each character of `chars`.
+   * Throws bad-font for an unknown object. */
+  fontProgram(fontObject: number, chars: string): FontProgram;
   find(page: number, needle: string, matchCase: boolean): Match[];
   /** Sets a line's text. Only the characters that differ are rewritten. */
   replaceLine(page: number, line: number, text: string): EditResult;
   /** Replaces characters [start, end) of a line. */
   replaceRange(page: number, line: number, start: number, end: number, text: string): EditResult;
-  /** Registers an open-licensed TrueType font for characters the original font lacks. */
+  /**
+   * Lays out one line of new text with the registered fonts. The engine adds the open families
+   * of the text's scripts (e.g. "Noto Naskh Arabic") to `font.families` itself. Throws
+   * missing-glyphs when no registered font draws a character; the default module throws
+   * read-only "needs-shaping" for text that needs the shaping module (Indic, Arabic, Hebrew…).
+   */
+  shape(text: string, font: FontRequest, size: number): ShapedText;
+  /**
+   * Draws one line of new text in a content stream of its own. `x, y` is the left end of the
+   * baseline in PDF user space (for right alignment pass `right - shape(…).width`), `angle` is
+   * in degrees counter-clockwise, `color` is sRGB 0–255. Fonts are embedded as subsets with
+   * Unicode mappings. The page is read back and the edit rolled back unless the line reads as
+   * typed. Throws as shape() does; call once per line.
+   */
+  addText(page: number, text: string, font: FontRequest, size: number, x: number, y: number, angle: number,
+    color: [number, number, number]): EditResult;
+  /** Registers an open-licensed TrueType font (TTF or WOFF 1.0) for characters the original
+   * font lacks and for added text. */
   addFont(family: string, bold: boolean, italic: boolean, bytes: Uint8Array): boolean;
   /**
    * Returns the original bytes plus one appended revision, after reading the result back and

@@ -77,6 +77,28 @@ pub struct FontInfo {
     pub object: Option<u32>,
     /// Open fonts that can stand in for this one, best first.
     pub stand_ins: Vec<String>,
+    /// False for a subset: some characters may be missing.
+    pub complete: bool,
+}
+
+/// One character of a font program: its glyph index (0 when the program is not readable) and
+/// its advance in 1/1000 em.
+#[derive(Clone, Debug, Serialize)]
+pub struct ProgramGlyph {
+    pub cp: u32,
+    pub gid: u16,
+    pub width: f64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct FontProgram {
+    /// "truetype", "cff" (bare CFF) or "none" (not embedded, Type 1 or Type 3: widths only).
+    pub format: &'static str,
+    /// False for a subset.
+    pub complete: bool,
+    pub glyphs: Vec<ProgramGlyph>,
+    #[serde(skip)]
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -329,18 +351,29 @@ impl Engine {
         self.pages.len()
     }
 
-    /// Registers an open-licensed TrueType font the engine may embed for missing characters.
-    /// Returns false when the file is not a usable TrueType (glyf) font.
+    /// Registers an open-licensed TrueType font (or WOFF 1.0) the engine may embed for missing
+    /// characters and added text. Several files of one family and style (web font slices) are
+    /// all kept. Returns false when the file is not a usable TrueType (glyf) font.
     pub fn add_font(&mut self, family: &str, bold: bool, italic: bool, data: Vec<u8>) -> bool {
+        // Web fonts as served: WOFF 1.0 is unpacked to the TrueType file inside.
+        let data = if data.starts_with(b"wOFF") {
+            match crate::woff::unpack(&data) {
+                Some(d) => d,
+                None => return false,
+            }
+        } else {
+            data
+        };
         let ok = ttf_parser::Face::parse(&data, 0).map(|f| f.tables().glyf.is_some()).unwrap_or(false);
-        if ok && !self.faces.iter().any(|f| f.family == family && f.bold == bold && f.italic == italic) {
+        // Web fonts come in slices (Latin, Devanagari…) under one family: every slice is kept.
+        if ok && !self.faces.iter().any(|f| f.family == family && f.bold == bold && f.italic == italic && *f.data == data) {
             self.faces.push(Face { family: family.to_string(), bold, italic, data: Rc::new(data) });
             self.embeds.push(None);
         }
         ok
     }
 
-    fn page_id(&self, page: usize) -> Result<ObjectId> {
+    pub(crate) fn page_id(&self, page: usize) -> Result<ObjectId> {
         self.pages.get(page).copied().ok_or(Error::BadPage)
     }
 
@@ -369,6 +402,7 @@ impl Engine {
             monospace: f.is_monospace(),
             object: f.object_id.map(|i| i.0),
             stand_ins: fallback::request_for(f).families,
+            complete: !f.subset,
         }
     }
 
@@ -420,6 +454,24 @@ impl Engine {
             }
         }
         Ok(out)
+    }
+
+    /// The embedded program of a document font with where it keeps each character of `chars`,
+    /// for matching the font against the library (the matching itself is not in the engine).
+    pub fn font_program(&mut self, font_object: u32, chars: &str) -> Result<FontProgram> {
+        let id = self.doc.objects.keys().find(|k| k.0 == font_object).copied().ok_or(Error::BadFont)?;
+        let is_font = self.doc.get_dictionary(id).is_ok_and(|d| d.has_type(b"Font"));
+        let font = is_font.then(|| self.cache.get(&self.doc, &Object::Reference(id))).flatten().ok_or(Error::BadFont)?;
+        let none = HashSet::new();
+        let (format, bytes) = font.program_bytes().map(|(f, b)| (f, b.to_vec())).unwrap_or(("none", Vec::new()));
+        let glyphs = chars
+            .chars()
+            .filter_map(|ch| {
+                let code = font.encode(ch, &none)?;
+                Some(ProgramGlyph { cp: ch as u32, gid: font.program_gid(code).unwrap_or(0), width: font.width(code) })
+            })
+            .collect();
+        Ok(FontProgram { format, complete: !font.subset, glyphs, bytes })
     }
 
     /// Text of a page: lines with runs, words, fonts and positions, and paragraphs.
@@ -853,14 +905,14 @@ impl Engine {
         self.cache.clear();
     }
 
-    fn touch(&mut self, id: ObjectId, backup: &mut Vec<(ObjectId, Option<Object>)>) {
+    pub(crate) fn touch(&mut self, id: ObjectId, backup: &mut Vec<(ObjectId, Option<Object>)>) {
         if !backup.iter().any(|(b, _)| *b == id) {
             backup.push((id, self.doc.objects.get(&id).cloned()));
         }
         self.dirty.insert(id);
     }
 
-    fn add_object(&mut self, o: Object, backup: &mut Vec<(ObjectId, Option<Object>)>) -> ObjectId {
+    pub(crate) fn add_object(&mut self, o: Object, backup: &mut Vec<(ObjectId, Option<Object>)>) -> ObjectId {
         let id = self.doc.add_object(o);
         backup.push((id, None));
         self.dirty.insert(id);
@@ -1233,6 +1285,22 @@ impl Engine {
         let upem = parsed.units_per_em() as f64;
         let k = 1000.0 / upem;
         let subset = subsetter::subset(&face.data, 0, &embed.remap).map_err(|e| err(e.to_string()))?;
+        // A cmap for the characters the glyphs draw, so readers can tell a mirrored bracket
+        // (right-to-left text, which only the shaping build writes).
+        #[cfg(feature = "shaping")]
+        let drawn: Vec<(char, u16)> = embed
+            .chars
+            .iter()
+            .filter_map(|(&n, (text, g))| {
+                let mut cs = text.chars();
+                match (cs.next(), cs.next()) {
+                    (Some(c), None) if face.glyph(c) == Some(*g) => Some((c, n)),
+                    _ => None,
+                }
+            })
+            .collect();
+        #[cfg(feature = "shaping")]
+        let subset = crate::sfnt::with_cmap(&subset, &drawn).unwrap_or(subset);
 
         let ps_base: String = format!(
             "{}{}{}",
@@ -1641,6 +1709,16 @@ fn serialize(kind: ShowKind, op: &content::Op, items: Vec<Item>) -> Vec<u8> {
         }
         _ => {}
     }
+    let body = serialize_items(items);
+    if !body.is_empty() {
+        parts.push(body);
+    }
+    parts.join(&b' ')
+}
+
+/// Text-showing operators for these items (fonts, rises, spans, strings and kerns).
+pub(crate) fn serialize_items(items: Vec<Item>) -> Vec<u8> {
+    let mut parts: Vec<Vec<u8>> = Vec::new();
     let mut group: Vec<Item> = Vec::new();
     fn flush(group: &mut Vec<Item>, parts: &mut Vec<Vec<u8>>) {
         // Merge neighbours, drop empty strings and zero kerns.

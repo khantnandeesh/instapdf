@@ -174,6 +174,51 @@ function fontEntries() {
       texts: [{ file: label, text }],
     });
   }
+  // The font library's in-app copy (F24): one entry a family, with the licence text published
+  // beside its files (public/fonts/lib/licences/<id>.txt, written by scripts/font-library).
+  const lib = join(fontsDir, "lib");
+  if (existsSync(join(lib, "manifest.json"))) {
+    const manifest = JSON.parse(readFileSync(join(lib, "manifest.json"), "utf8"));
+    for (const row of JSON.parse(readFileSync(join(lib, manifest.families), "utf8"))) {
+      const file = join(lib, "licences", `${row.i}.txt`);
+      const text = existsSync(file) ? readFileSync(file, "utf8").trim() : "";
+      if (!text) {
+        console.error(`licenses: font library family ${row.i} has no licence text`);
+        process.exit(1);
+      }
+      entries.push({
+        kind: "font",
+        library: true,
+        name: `${row.n} (font library)`,
+        version: "self-hosted",
+        license: row.l,
+        copyright: copyrightLines(text),
+        author: null,
+        homepage: null,
+        texts: [{ file: `fonts/lib/licences/${row.i}.txt`, text }],
+      });
+    }
+  }
+  // The same library served from the fonts bucket: bundle.mjs wrote its family list. The licence
+  // texts are published beside the fonts, at /fonts/lib/licences/<id>.txt.
+  const listing = join(root, ".generated", "font-library.json");
+  if (!existsSync(join(lib, "manifest.json")) && existsSync(listing)) {
+    for (const row of JSON.parse(readFileSync(listing, "utf8"))) {
+      entries.push({
+        kind: "font",
+        library: true,
+        name: `${row.n} (font library)`,
+        version: "self-hosted",
+        license: row.l,
+        copyright: [],
+        author: null,
+        // The page links the family's name to its licence text.
+        homepage: `/fonts/lib/licences/${row.i}.txt`,
+        texts: [],
+        textAt: `/fonts/lib/licences/${row.i}.txt`,
+      });
+    }
+  }
   return entries;
 }
 
@@ -209,8 +254,13 @@ function noticesText(entries) {
     groups.get(key).who.push(who);
   };
   const missing = [];
+  const elsewhere = [];
   for (const e of entries) {
     const who = `${e.name} ${e.version}`;
+    if (e.textAt) {
+      elsewhere.push(`${e.name} (${e.license}): ${e.textAt}`);
+      continue;
+    }
     if (!e.texts.length) missing.push(`${who} (${e.license})${e.author ? `, author: ${e.author}` : ""}`);
     for (const t of e.texts) add(t.text, `${who} (${t.file})`);
   }
@@ -234,6 +284,9 @@ function noticesText(entries) {
       ...missing.map((m) => `* ${m}`),
       "",
     );
+  }
+  if (elsewhere.length) {
+    parts.push(rule, "Font library families. Each family's license text is published beside its", "font files, at the address shown.", rule, "", ...elsewhere.map((m) => `* ${m}`), "");
   }
   return parts.join("\n");
 }

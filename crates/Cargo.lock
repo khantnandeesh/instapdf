@@ -58,6 +58,7 @@ dependencies = [
 name = "berry-engine"
 version = "0.1.0"
 dependencies = [
+ "flate2",
  "lopdf",
  "rustybuzz",
  "serde",
@@ -65,6 +66,23 @@ dependencies = [
  "ttf-parser",
  "unicode-bidi",
  "unicode-bidi-mirroring",
+]
+
+[[package]]
+name = "berry-fontmatch"
+version = "0.1.0"
+dependencies = [
+ "berry-engine",
+ "ttf-parser",
+]
+
+[[package]]
+name = "berry-fontmatch-wasm"
+version = "0.1.0"
+dependencies = [
+ "berry-fontmatch",
+ "js-sys",
+ "wasm-bindgen",
 ]
 
 [[package]]

@@ -1,4 +1,5 @@
 "use client";
+import "@/components/ui/dialog.css";
 import "./editor.css";
 import "@/components/berry/berry-loader.css";
 /**

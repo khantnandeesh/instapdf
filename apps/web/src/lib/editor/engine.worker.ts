@@ -4,7 +4,7 @@
  * content-hashed paths) on the first message: an idle prefetch on /edit-pdf, or opening a file.
  * Bytes stay in memory on this device: the only fetches are the engine's own two same-origin files.
  */
-import type { BerryDocument as BerryDocumentType, BerryError, EditResult, PageText } from "./berry-engine";
+import type { BerryDocument as BerryDocumentType, BerryError, EditResult, FontInfo, FontProgram, PageText } from "./berry-engine";
 
 import { ENGINE_JS, ENGINE_WASM, ENGINE_WASM_BYTES } from "./engine-assets";
 import { countBody, type Progress } from "./engine-load";
@@ -17,7 +17,15 @@ export type EngineRequest =
   | { id: number; op: "open"; bytes: Uint8Array }
   | { id: number; op: "text"; page: number }
   | { id: number; op: "replace"; page: number; line: number; text: string }
-  | { id: number; op: "save" };
+  | { id: number; op: "save" }
+  /** Every font of the open document (F24). */
+  | { id: number; op: "fonts" }
+  /** A document font's embedded program, for the font matcher. */
+  | { id: number; op: "program"; font: number; chars: string }
+  /** Registers a font file the engine may use for characters a document font lacks. */
+  | { id: number; op: "addFont"; family: string; bold: boolean; italic: boolean; bytes: Uint8Array }
+  /** Forgets the registered fonts (the person chose another font for the same job). */
+  | { id: number; op: "clearFonts" };
 
 export type EngineReply =
   | { op: "load" }
@@ -25,7 +33,12 @@ export type EngineReply =
   | { op: "text"; page: PageText }
   /** `appended`: the output starts with the bytes before the edit (undo can keep just a length). */
   | { op: "replace"; result: EditResult; bytes: Uint8Array; appended: boolean }
-  | { op: "save"; bytes: Uint8Array };
+  | { op: "save"; bytes: Uint8Array }
+  | { op: "fonts"; fonts: FontInfo[] }
+  | { op: "program"; program: FontProgram }
+  /** `ok` false: the engine can't use this file (not TrueType outlines). */
+  | { op: "addFont"; ok: boolean }
+  | { op: "clearFonts" };
 
 export type EngineResponse =
   | { id: number; ok: true; reply: EngineReply }
@@ -39,6 +52,13 @@ let engine: Promise<EngineModule> | null = null;
 let doc: BerryDocumentType | null = null;
 /** The bytes `doc` was opened from: an edit that fails after replaceLine is undone by reopening them. */
 let current: Uint8Array | null = null;
+/** Fonts registered so far. A document is reopened after every edit, so they are added again each time. */
+let added: { family: string; bold: boolean; italic: boolean; bytes: Uint8Array }[] = [];
+function open(BerryDocument: EngineModule["BerryDocument"], bytes: Uint8Array): BerryDocumentType {
+  const d = new BerryDocument(bytes);
+  for (const f of added) d.addFont(f.family, f.bold, f.italic, f.bytes);
+  return d;
+}
 
 function loadEngine(priority: "low" | "high" = "high"): Promise<EngineModule> {
   engine ??= (async () => {
@@ -84,7 +104,7 @@ function dropDoc() {
 function rollback(BerryDocument: EngineModule["BerryDocument"], error: unknown): never {
   if (error instanceof WebAssembly.RuntimeError) throw error;
   dropDoc();
-  if (current) doc = new BerryDocument(current);
+  if (current) doc = open(BerryDocument, current);
   throw error;
 }
 
@@ -97,11 +117,26 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
   if (req.op === "open") {
     dropDoc();
     current = null;
-    doc = new BerryDocument(req.bytes);
+    doc = open(BerryDocument, req.bytes);
     current = req.bytes;
     return { op: "open", pageCount: doc.pageCount };
   }
+  if (req.op === "clearFonts") {
+    added = [];
+    if (doc && current) {
+      dropDoc();
+      doc = open(BerryDocument, current);
+    }
+    return { op: "clearFonts" };
+  }
   if (!doc) throw { kind: "internal", message: "No document" };
+  if (req.op === "fonts") return { op: "fonts", fonts: doc.fonts() };
+  if (req.op === "program") return { op: "program", program: doc.fontProgram(req.font, req.chars) };
+  if (req.op === "addFont") {
+    const ok = doc.addFont(req.family, req.bold, req.italic, req.bytes);
+    if (ok) added.push({ family: req.family, bold: req.bold, italic: req.italic, bytes: req.bytes });
+    return { op: "addFont", ok };
+  }
   if (req.op === "text") return { op: "text", page: doc.pageText(req.page) };
   if (req.op === "replace") {
     const result = doc.replaceLine(req.page, req.line, req.text); // rolls back on its own errors
@@ -118,7 +153,7 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
     try {
       // Reopen from the output so the next save appends to it, and undo states stay prefixes.
       dropDoc();
-      doc = new BerryDocument(saved.bytes);
+      doc = open(BerryDocument, saved.bytes);
       current = saved.bytes.slice();
     } catch (error) {
       return rollback(BerryDocument, error);
@@ -133,7 +168,7 @@ scope.onmessage = async (event: MessageEvent<EngineRequest>) => {
   const req = event.data;
   try {
     const reply = await handle(req);
-    const transfer = "bytes" in reply ? [reply.bytes.buffer as ArrayBuffer] : [];
+    const transfer = "bytes" in reply ? [reply.bytes.buffer as ArrayBuffer] : "program" in reply ? [reply.program.bytes.buffer as ArrayBuffer] : [];
     scope.postMessage({ id: req.id, ok: true, reply } satisfies EngineResponse, transfer);
   } catch (error) {
     let out: Extract<EngineResponse, { ok: false }>["error"];
