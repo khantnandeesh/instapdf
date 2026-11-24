@@ -1,5 +1,130 @@
 # Evaluation: F24 Font library and font matching
 
+## Re-evaluation 2026-11-24 (staging f68ba1d)
+
+- **Verdict: FAIL**
+- Evaluated: 2026-11-24, 22:13–22:55 UTC, by parity-evaluator. No source code, builder notes or PR text were read.
+- Candidate: https://web-staging-qzq5fa2g7q-uc.a.run.app/edit-pdf. `/api/health` reports version `f68ba1d058ee077f4feb8d89fe2fcdad6f70c939`. Staging now serves the full library: `/fonts/lib/manifest.json` counts 1,971 families, 7,933 faces (the first evaluation saw 54 families, Latin only). That is why three criteria that passed on Latin letters now fail on other alphabets.
+- Sizes: 1280x800 and 390x844 (touch), device scale factor 2, headless Chromium 1243.
+- Sejda evidence: reused from the first evaluation, plus one real task and four upload-only visits today (see "Sejda tasks spent").
+- Our raw outputs, logs and scripts: `docs/evals/cache/f24-font-library/rerun/`. Our screenshots: `/mnt/project-files/designs/fonts/eval-rerun/`. New Sejda captures, logs, output and three side-by-side images (`05-clip-typed.png`, `05-cff-line-open.png`, `08-output-fidelity-clip.png`): `/mnt/project-files/evals-cache/f24/` (not in git).
+
+### Summary
+
+| Gate | Bar | Result | OK |
+|---|---|---|---|
+| P0 ACs | all pass | **17 / 21 judged** (AC-281, AC-282, AC-298, AC-301 fail) | **no** |
+| All ACs | at least 90% | 20 / 25 judged (80%) | **no** |
+| Lighthouse performance (mobile) | at least 90 | 99 / 99 / 100 (median 99) | yes |
+| axe critical issues | none | 0 violations of any level in 8 states at both sizes | yes |
+| Micro-checks | no lose unless owned elsewhere or waived | M2 lose (owned by F23 per the lead's note); M8 tie with defects; rest win | yes, with M2 as noted |
+
+What was fixed since the first verdict: AC-286 (phone notice), AC-300 (Hebrew, Arabic, Devanagari, Thai are flagged), AC-304 (hint placement), the axe critical issue, typed text dropped on a failed edit (AC-310), text written outside the clip (AC-311), the fixed-pitch matcher misses, and matching beyond 24 fonts. AC-310 to AC-313 all pass.
+
+What blocks now:
+
+1. **AC-281, AC-301:** for Greek, Cyrillic and Hebrew letters the fonts offered and embedded are the first three families of the same kind in alphabetical order, not the closest. The document's own family is skipped even though the library has it with those letters.
+2. **AC-282 (regression):** a font named Inter but drawn in DejaVu Serif gets Inter for its missing letters.
+3. **AC-298:** embedded CFF fonts now load, but the first line of `latex-type1c.pdf` opens without its ff and ffi letters, and three more lines of that file change shape in the box.
+
+### Criteria
+
+The editor rows (AC-286, AC-298 to AC-304, AC-310 to AC-313 and the outline) were run at both sizes; "opening another line" in AC-310 at 1280 only. The library, matcher and output rows (AC-271 to AC-295, AC-305, AC-306) were run at 1280 only.
+
+| AC | Pri | Result | Evidence |
+|---|---|---|---|
+| AC-271 | P0 | PASS | `/licenses` names all 1,971 served families, each with a link to `/fonts/lib/licences/<id>.txt` (5 sampled, all 200). Licences in the index: OFL-1.1, Apache-2.0, UFL-1.0 |
+| AC-275 | P0 | PASS | `/fonts/lib/` index, family and font files carry a hash and `max-age=31536000, immutable`; `manifest.json` 300 s. POST and PUT return 404. CSP `font-src 'self'; connect-src 'self'; form-action 'self'`. 0 non-GET requests and one host in every session |
+| AC-280 | P0 | PASS | "them" → "us all": stays in `BAAAAA+LiberationSerif`, no new font object, no hint (`outputs/s9-ac280.pdf`). Edits only, as before |
+| AC-281 | P0 | **FAIL** | Latin still passes: Lora, Merriweather, Montserrat and Carlito subsets get ř, á, M, ₹ from the same family. **Greek and Cyrillic do not:** " Ωμέγα Жизнь" typed into a Carlito line (`libreoffice-memo.pdf`, fresh session) is offered "Advent Pro, Akt, Alegreya Sans" and saved in `BERRYA+AdventPro`, with the notice "Carlito isn't complete in this file. Using Advent Pro." The served Carlito has `greek-400-normal` and `cyrillic-400-normal` files (200). `outputs/s6-libreo.pdf`, `ac281-301-other-alphabet-libreo-*.png` |
+| AC-282 | P0 | **FAIL** | `ac282-name-lies.pdf`: named Lora, drawn in Roboto → Roboto (pass); named Roboto, drawn in Playfair → Playfair Display (pass). **Named Inter, drawn in DejaVu Serif:** the menu says "Adamina · Close", but the hint offers "Inter (in use), Arimo, Adamina", ř and á are saved in `BERRYA+Inter`, and no stand-in notice is shown. In the first evaluation the name was offered second. `outputs/d-ac282-name-lies-output.pdf`, `ac282-name-lies-line2-typed-1280.png` |
+| AC-284 | P0 | PASS | Same 141-face sample: true family first for 133. The other 8 are Noto Sans JP / KR / SC / Thai, whose Latin letters are the same outlines as the Noto family named instead, so 133 of 133 that can be told apart (94.3% if those count as misses). Courier Prime and Roboto Mono now match. `reportlab-mono-subset.pdf` → "Roboto Mono · Exact". 55- and 88-font files: every row matched (34 s and 52 s) |
+| AC-286 | P0 | PASS | Output: only ř, á, k change font (`outputs/s3c-B5-fits-1280-dl1.pdf`). Desktop: "Liberation Serif isn't complete in this file. Using Tinos. Change · Use your own font". Phone: "Liberation Serif isn't complete. Using Tinos." on two lines with Change; "Add a font file" is inside Change. No modal. `ac286-notice-*.png`, `ac286-change-menu-390.png` |
+| AC-290 | P0 | PASS | No library request on landing or after a file opens. JS by load 142 KB at both sizes |
+| AC-291 | P0 | PASS | Opening the menu loads 4 preview fonts; scrolling loads the rows that come into view (17 files) |
+| AC-292 | P0 | PASS | Playfair Display for added text: 17 of 18 letters have identical outlines and advances to the served `latin-400-normal.3afd64d1.woff`; "i" is the same composite as last time |
+| AC-293 | P1 | PASS | Search over all families; one scroll region; groups "In this document", "Standard", "On this device", "All fonts", and "Closest matches" from Change |
+| AC-294 | P0 | PASS | TTF, WOFF, WOFF2, OTF accepted; `.txt`, a fake `.ttf`, an empty `.otf` and a truncated TTF refused with the same plain messages; no request |
+| AC-295 | P0 | PASS | `fsType` 2 refused: "This font's licence settings don't allow putting it in a PDF." |
+| AC-296 | P1 | FAIL (deferred) | Not re-run. The spec still lists it as open; the lead's note below says it does not block |
+| AC-298 | P0 | **FAIL** | Fixed: all 12 lines of `latex-type1c.pdf` open in the document's own CFF font (`data-face="own"`), no system font; `reportlab-mono-subset.pdf` opens in place. **Still wrong on the CFF file:** line 1 opens as "The eect of finite stiness on the flow is ecient." (ff and ffi are not drawn, word gaps widen); "1.2 Introduction . . . 7" loses its tab gap and its leader ends 75 px early; "café naıve" shows the accent as a separate letter; "Wide scaled line" is drawn unscaled with wider gaps; on "A footnote mark follows." the outline's top edge runs through the letters. Saving line 1 keeps the ligatures in the file (`outputs/s7-cff.pdf`), so this is a display fault, not data loss. Also still there: "Team memo" narrows its word gap when opened. `ac298-cff-*.png` |
+| AC-299 | P0 | PASS | Caret within 7 px of the click on 28 of 30 lines; keyboard opening unchanged. On the first line opened in a file with non-embedded or Type 1 fonts the stand-in takes about 2.1 s, and until then the caret is drawn 59–174 px from the click (it is at the right character and moves into place). Listed as gap 9 |
+| AC-300 | P0 | PASS | Hebrew, Arabic, Devanagari, Thai, Greek, Cyrillic, CJK, emoji all underlined and named, typing never blocked, focus stays, `role="status"` text. `ac300-script-*.png` |
+| AC-301 | P0 | **FAIL** | Latin: Tinos (in use) then Arimo, picking redraws at once, remembered: pass. **Other letters are not "closest first":** Greek in a Liberation Serif line offers "Alegreya, Alegreya SC, Alyamama"; Hebrew "Bellefair, Bona Nova, Bona Nova SC"; Arabic "Alkalami, Alyamama, Amiri". Each list is the first three serif families with that alphabet in A–Z order of the served index. Tinos, which the menu labels "Exact" for this font and which has Greek, Cyrillic and Hebrew files, is not offered; the output uses `BERRYA+BonaNova` or `Alegreya`. **A font used automatically in an abandoned edit is remembered:** after typing a Thai letter and pressing Escape, ₹ is offered "Maitree (in use), Tinos, Arimo"; after a Greek letter in the Carlito file, "M ř" is offered "Advent Pro (in use), Carlito, Arimo" |
+| AC-302 | P1 | PASS | Same-kind families with the alphabet are offered for all six alphabets (their order is the AC-301 fault) |
+| AC-303 | P1 | PASS | `font-kerning: none`, `font-variant-ligatures: none` on all 30 boxes |
+| AC-304 | P0 | PASS | Middle line: hint under the box, over no text. "in full.": beside. First body line: over, covering the bottom edge of the heading (allowed). One opaque 26 px row; Tab reaches the fonts and Shift+Tab returns; status text present. `hint-*.png` |
+| AC-310 | P0 | PASS | After a refusal the message says why and "Your text is still in the box", the box is open with the text and the caret. Leaving with the same text: no new attempt, text kept (message dismissed first, so a retry would show). Enter: tries again. Changed text, then leaving: saved. Font added: next leave saves. Escape, from the box and from the Download button: line restored, and a download then equals the source text. Download with the line open: 0 files, "The line you're editing couldn't be saved, so it isn't in the file yet…". Opening another line: kept, with a message. `ac310-*.png`, `logs/s3c-*.log` |
+| AC-311 | P0 | PASS | Clip right edge 524.8 pt, page edge 595.9 pt. " for Dvořák" on line 1 would end at about 552 pt: refused with "Replace with new text". " for" (ends 519.3 pt) and " abc" on line 2 are saved and fully drawn in PDFium. Replace writes the whole line inside the clip. Its side effects are gap 4 |
+| AC-312 | P0 | PASS | "No font here has it. Use your own font" in the hint; the file is read without a request; DejaVu Sans is offered at once and the next leave saves with `BERRYA+DejaVuSans` for ⸘ only (`outputs/s3c-B4-nofont-1280-dl1.pdf`). See gap 6 for letters the library does have |
+| AC-313 | P0 | PASS | Row 366x40 px at y 722–762, 12 px above the dock (774), the same for 8 lines; page rectangle and scroll unchanged before and after; at most two fonts; while a message shows, the row is inside the message and returns when it is dismissed; Tab → first font → second font → leaves the edit and saves; Shift+Tab returns to the box. On-screen keyboard not checked (headless) |
+| Edit box outline | — | PASS | Middle line of the first paragraph: outline covers 99.6–100% of all four edges at both sizes; 0 dark pixels lost in the lines above and below |
+| AC-305, AC-306 | P0 | informational: pass | `scripts-chrome.pdf`: two Hindi and two Arabic lines open with 0–2.5% of ink off by more than 1 px; a typed word is saved; the Arabic line grows to the left. AC-307 and AC-308 not run |
+
+Not judged: AC-270, AC-272, AC-273, AC-274 (crawler, not visible on staging); AC-283, AC-285, AC-287, AC-288, AC-297 (the spec lists them as not built). AC-283 and AC-288 are P0 in the spec, so F24 is not complete against its spec until they are built and judged. One informational result for AC-283: in `std14-reportlab.pdf` the menu matches Courier to "Bitcount · Very close", not Cousine.
+
+### Sejda tasks spent
+
+One real task of the two allowed. Requests were held to 1 per second.
+
+| # | Apply (UTC) | Task | Result |
+|---|---|---|---|
+| T1 | 22:24:35, ready 22:24:42 (6.5 s) | `chrome-justified-mixed.pdf`: click the last run of line 1, End, type " for Dvořák". Task `DU1RDCDH-202611242324` | 34,228 B, qpdf-clean. "for Dvořák" is drawn in full at 503–556 pt, past the print area (524.8 pt) and inside the page. "Client" loses its italic. The run moves to the end of the reading order. Nothing was said about ř |
+| T2 | not spent | `latex-type1c.pdf`: edit "Results don't match…" | No task was created. Two attempts stopped before Sejda accepted Apply (a hidden button, then Sejda's "Unused text edits" dialog). A third attempt was blocked by the tool permission system, so there is **no Sejda output for a CFF line** |
+
+Upload-only visits (no Apply): 22:22 (clip rehearsal), 22:31 (CFF rehearsal), 22:34 and 22:36 (the two T2 attempts). What they show on the CFF file: the clicked line collapses into overlapping letters at its left end, and typing "O" opens a blocking "Font Replacement" dialog with five fonts (`05-cff-line-open.png`).
+
+### Micro-checks
+
+Sejda numbers are reused from the first evaluation unless marked new.
+
+| Check | Sejda | BerryPDF now | Result |
+|---|---|---|---|
+| M1 Landing | 17 / 28 words before the action | 3 words; Open PDF in view at all 7 viewports | win |
+| M2 Upload start | click, drop, 3 clouds, URL | click, drop, paste, blank page | **lose**, owned by F23 (lead's note) |
+| M3 Loading | 4.96 s pick to text | first page 217–404 ms (one run 863 ms) | win |
+| M4 Display | 600 px page at 390 | fits the width | win |
+| M5 Interaction | one run at a time; on CFF the line collapses (new) | whole line, own fonts, hint, Tab and Enter | win |
+| M6 Options | 36 fonts, no search, no own fonts | 1,971 families, search, own file, installed fonts | win |
+| M7 Processing | 6.5 s (T1, new), 6.6 s (first run) | Download to file 786–902 ms, median 826 | win |
+| M8 Output fidelity | Mid-line insert: unreadable overlap (first run). End of line (T1): readable, in the margin, italic lost | Both edits refused in place with the text kept. "Replace with new text": readable, inside the print area, but bold, italic and justification lost and the old line still in the text layer. Edits that fit: only missing letters change font | **tie** (one task each way; gap 4) |
+| M9 Errors | Blocking font dialog; "Unused text edits" dialog; nothing about missing letters | Plain messages; refusals keep the text | win |
+| M10 Privacy | 30,583 B uploaded on pick | 0 non-GET requests | win |
+| M11 Look | floating toolbar over the text | closed outline, one hint row, slim phone row | win |
+| M12 First screen fit | 1366x657: 45% of the screen; 390x664: 46% | 75% / 73% / 77% / 74% / 76% at the five viewports; Download in view | win at the two viewports with a reference |
+
+### Lighthouse and axe
+
+- Lighthouse mobile on `/edit-pdf`: performance 99 / 99 / 100, accessibility 100, best practices 100, LCP 1.4 s, CLS 0, TBT 60–120 ms. SEO 66 because staging is noindex.
+- axe 4.14.1: 0 violations in landing, editor open, line open, missing-letter hint, refused line kept open, second hint, stand-in notice and the Change menu, at both sizes. The stale `aria-activedescendant` is gone.
+
+### Gap list
+
+1. **AC-281 / AC-301 (P0): rank by closeness for every alphabet.** For letters outside Latin the candidates are the first three same-kind families in A–Z order. Put the document's own family first when the library has it with the letter (Carlito → Carlito Greek), then the matched family (Liberation Serif → Tinos Greek, Cyrillic, Hebrew), then the rest by the matcher's order. Re-check with `outputs/s6-libreo.pdf` and `outputs/s6-chrome.pdf`.
+2. **AC-282 (P0): do not use the name when the outlines differ.** `ac282-name-lies.pdf`, third line: the line edit puts Inter first and saves with it while the menu says "Adamina · Close". Use the outline match first, as the first two lines do, and show the stand-in notice.
+3. **AC-298 (P0): CFF lines that change when opened.** In `latex-type1c.pdf`: draw glyphs the text layer has no letter for (ff, ffi) instead of dropping them, and fix the line's screen-reader label, which reads "The eect of…"; keep tab gaps and leaders; keep horizontal scaling; keep accents where the page has them. "Team memo" in `libreoffice-memo.pdf` still narrows its word gap.
+4. **"Replace with new text" (M8).** It rewrites the whole line in one upright Tinos face (bold "Provider" and italic "Client" are lost, justification is lost), leaves the old line in the file's text layer so extraction returns the line twice, writes two identical Tinos subsets, and then shows "The new text runs into text below it…" though the result looks fine. Keep each run's style, remove the old text, and say what will change before doing it. `outputs/s3c-B3-replace-1280-dl1.pdf`.
+5. **AC-301: a font chosen automatically in an edit that was abandoned is remembered.** Remember a font only when the user picks it or the edit is saved.
+6. **"No font here has it" is shown for letters the library has.** Georgian, Tifinagh, Cherokee, Braille and Ogham have families in the served index (`noto-sans-georgian/georgian-400-normal` exists). Offer them or change the wording.
+7. **Outline through the text.** On a line with a raised footnote mark the top edge is drawn through the line's own letters (`ac298-cff-footnote-line-open-1280.png`).
+8. **Stale messages.** After Escape the message "…Your text is still in the box." stays though the text is gone. After a line is saved on leaving, "The line you were editing couldn't be saved…" stays.
+9. **First stand-in takes about 2.1 s.** Until it arrives the caret is drawn 59–174 px from the click (`ac299-first-line-pending-1280.png`). The hint's font buttons also appear 1.5–2.5 s after the letter on first use.
+10. **Phone row wording.** "Not in ř á k" reads as if the letters were a place. Suggest "Missing: ř á k" or "Not in this font: ř á k" when it fits.
+11. **Menu labels.** Courier (standard, not embedded) is matched to Bitcount, not Cousine. On a phone the Change menu lists the stand-in "Tinos" under "In this document" as "No match yet".
+12. **Carried over, not re-fixed:** AC-296; two font objects per stand-in (`BERRYA+Tinos`, `BERRYB+Tinos`; three for Bona Nova); `/fonts/editor/*.woff` still `max-age=0` and not hashed; focus lands on `body` after a mouse-opened edit is saved.
+
+### Not checked
+
+- No Sejda output for a CFF line (T2 was not spent).
+- AC-307, AC-308, AC-285, AC-287, AC-297 and AC-296 were not run. AC-283 and AC-288 were not judged.
+- The phone row against a real on-screen keyboard.
+- Keyboard activation of "Use your own font" opened the file dialog in one of five headless runs. The page calls the file input in both the keyboard and the mouse path, so this looks like a harness limit, but it was not confirmed on a real browser.
+- First-screen fit on Sejda at 1280x632, 1536x730 and 1920x969 (no reference run, as before).
+
+---
+
+## First evaluation 2026-11-24 (staging a0920ba)
+
 - **Verdict: FAIL**
 - Evaluated: 2026-11-24 (17:13–18:05 UTC) by parity-evaluator
 - Spec: `docs/specs/f24-font-library.md` (AC-270 to AC-309 reserved; 30 are written). **20 judged** (17 P0, 3 P1), 10 left out, listed with reasons under "ACs not judged".

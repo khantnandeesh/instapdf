@@ -626,12 +626,15 @@ impl Engine {
         // To show or compare the font, a code whose glyph is in the program is enough, also where
         // its declared width disagrees with the program's own (some subsetters write a wrong
         // advance table; readers go by the PDF's widths): every one-byte code counts as shown.
-        let shown: HashSet<u32> = (0..256).collect();
+        let none = HashSet::new();
+        let shown: HashSet<u32> = if font.two_byte { HashSet::new() } else { (0..256).collect() };
         let (format, bytes) = font.program_bytes().map(|(f, b)| (f, b.to_vec())).unwrap_or(("none", Vec::new()));
         let glyphs = chars
             .chars()
             .filter_map(|ch| {
-                let code = font.encode(ch, &shown).filter(|c| font.has_glyph(*c) == Some(true))?;
+                // The code new text would be written with comes first; the wider search is only for
+                // a font whose widths rule that one out.
+                let code = font.encode(ch, &none).or_else(|| font.encode(ch, &shown).filter(|c| font.has_glyph(*c) == Some(true)))?;
                 Some(ProgramGlyph { cp: ch as u32, gid: font.program_gid(code).unwrap_or(0), width: font.width(code) })
             })
             .collect();
