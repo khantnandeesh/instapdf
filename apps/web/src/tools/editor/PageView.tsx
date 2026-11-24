@@ -141,8 +141,10 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
       if (canvas === "failed") return setDrawn("failed");
       if (!canvas) return;
       drawnFor.current = key;
-      canvas.className = "ed-raster";
-      swapCanvas(holder, canvas); // swap only when ready: no blank flash
+      // Fades in only where nothing was shown yet; a re-render (zoom, edit) replaces the old
+      // bitmap, which stayed on screen stretched to the new size, in one frame: never a white flash.
+      canvas.className = holder.querySelector("canvas") ? "ed-raster" : "ed-raster ed-raster--in";
+      swapCanvas(holder, canvas);
       setDrawn("ok");
       ctl.startEngine(); // the first page is up: now the text engine may use the network
     });

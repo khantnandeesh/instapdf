@@ -1545,7 +1545,7 @@
   .ed-shell {
     animation: ed-fade 180ms ease-out both;
   }
-  .ed-raster,
+  .ed-raster--in,
   .ed-thumb__canvas {
     animation: ed-fade 260ms ease-out both;
   }

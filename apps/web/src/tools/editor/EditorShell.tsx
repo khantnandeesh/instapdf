@@ -437,11 +437,33 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   // Ctrl/Cmd + wheel zooms around the pointer; two fingers pinch-zoom and pan (AC-94).
   useEffect(() => {
     if (!scroller) return;
+    // Ctrl+wheel: while the wheel turns, the pages (bitmaps, text layer and objects together) are
+    // only scaled with a transform; the zoom is applied, and the pages re-rendered, once it rests.
+    let wheeling: { z: number; f: number; at: number; timer: number } | null = null;
+    const settle = () => {
+      if (!wheeling) return;
+      const { z, f, at } = wheeling;
+      wheeling = null;
+      // Dropped before the zoom is measured; the new layout comes in the same frame (no paint between).
+      if (column.current) column.current.style.transform = "";
+      if (Math.abs(f - 1) > 0.001) zoomTo(z * f, at);
+    };
     const wheel = (e: WheelEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
-      const r = scroller.getBoundingClientRect();
-      zoomTo(store.get().zoom * Math.exp(-e.deltaY * 0.0025), e.clientY - r.top);
+      const col = column.current;
+      if (!col) return;
+      if (!wheeling) {
+        const r = col.getBoundingClientRect();
+        // Pages are centred in the column, so they grow from its centre line; vertically, around the pointer.
+        col.style.transformOrigin = `${r.width / 2}px ${e.clientY - r.top}px`;
+        wheeling = { z: store.get().zoom, f: 1, at: e.clientY - scroller.getBoundingClientRect().top, timer: 0 };
+      }
+      const w = wheeling;
+      w.f = Math.max(MIN_ZOOM / w.z, Math.min(MAX_ZOOM / w.z, w.f * Math.exp(-e.deltaY * 0.0025)));
+      col.style.transform = `scale(${w.f})`;
+      clearTimeout(w.timer);
+      w.timer = window.setTimeout(settle, 160);
     };
     let pinch: { d: number; z: number; cx: number; cy: number; f: number } | null = null;
     const pts = (e: TouchEvent) => {
@@ -474,8 +496,8 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       if (!pinch || e.touches.length >= 2) return;
       const { z, f, cy } = pinch;
       pinch = null;
-      const col = column.current;
-      if (col) col.style.transform = "";
+      // Dropped before the zoom is measured; the new layout comes in the same frame (no paint between).
+      if (column.current) column.current.style.transform = "";
       if (Math.abs(f - 1) > 0.02) zoomTo(z * f, cy - scroller.getBoundingClientRect().top);
     };
     scroller.addEventListener("wheel", wheel, { passive: false });
@@ -484,6 +506,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     scroller.addEventListener("touchend", end);
     scroller.addEventListener("touchcancel", end);
     return () => {
+      if (wheeling) clearTimeout(wheeling.timer);
       scroller.removeEventListener("wheel", wheel);
       scroller.removeEventListener("touchstart", start);
       scroller.removeEventListener("touchmove", move);

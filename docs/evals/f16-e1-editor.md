@@ -166,6 +166,23 @@ Same two lines added with the Text tool on both sites: a Hindi sentence ("the fu
 
 Known limit: shaped lines are drawn after the other added objects, so an object added later that overlaps such a line sits under it instead of on top.
 
+## Zoom without a white flash (reported on staging)
+
+Zooming showed the page white for a moment on every re-render: each new bitmap faded in from opacity 0 over the white page. Now:
+
+- the current bitmap stays on screen, stretched to the new size, until the render at the new scale is drawn offscreen; then it is swapped in one frame (only a page's first appearance fades in);
+- Ctrl+wheel and pinch only scale the pages (bitmap, text layer and objects together) with a transform while the gesture goes on; the zoom is applied and the pages re-render once it rests (160 ms after the last wheel step);
+- only pages on screen plus about one screen are rendered, and a render made stale by a newer zoom is cancelled (unchanged).
+
+| Run | Screen frames recorded | Frames with page 1 near blank |
+|---|---|---|
+| Before (zoom buttons and Ctrl+wheel, `e2e/f16/editor-zoom-flash.spec.ts` with `ZOOM_FRAMES`) | 312 | 155 |
+| After, same steps | 343 | 0 |
+
+The e2e samples every animation frame at an ink spot of page 1 (canvas present, fully opaque, dark there) and fails on any blank frame; a second test checks that a line keeps its place on the page during and after a Ctrl+wheel zoom.
+
+Reference: Sejda's zoom (page toolbar button, one upload-only visit, no Apply, requests held to 1 per second) blanks the page to white, shows one black frame, then draws it at the new size. Strips and screenshots: `/mnt/project-files/designs/editor-e1/zoom-flash/` (`before-strip-zoom-in.png`, `after-strip-zoom-in.png`, `sejda-strip-zoom.png`, `sejda-strip-zoom-end.png`). With requests throttled, Sejda's blank period is longer than a normal visit would show, so only its order of frames is compared, not its timing.
+
 ## Where InstaPDF is better than Sejda
 
 - Nothing is uploaded: 0 B, checkable through the CSP. Sejda uploads on pick and allows 3 tasks per hour.
