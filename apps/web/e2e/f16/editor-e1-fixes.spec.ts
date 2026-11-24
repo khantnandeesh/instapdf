@@ -89,22 +89,39 @@ test.describe("desktop", () => {
     expect(hit).toBe("rot");
   });
 
-  test("M12: on a laptop screen the page opens filling the view's width", async ({ page }) => {
-    await page.setViewportSize({ width: 1366, height: 657 });
-    await open(page);
-    const p = (await page.getByTestId("page-1").boundingBox())!;
-    expect(p.width / 1366).toBeGreaterThan(0.8);
-    expect(p.x).toBeGreaterThanOrEqual(0);
-    expect(p.x + p.width).toBeLessThanOrEqual(1366);
-    // Very wide screens are capped.
+  // The page's width over the screen's, at the opening zoom (M12, the forms eval: the reference fills 83-92%).
+  for (const [width, height] of [
+    [1280, 720],
+    [1366, 657],
+    [1536, 864],
+    [1920, 1080],
+  ] as const) {
+    test(`M12: at ${width} px the page opens filling at least 83% of the screen's width`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await open(page);
+      const p = (await page.getByTestId("page-1").boundingBox())!;
+      expect(p.width / width).toBeGreaterThanOrEqual(0.83);
+      expect(p.x).toBeGreaterThanOrEqual(0);
+      expect(p.x + p.width).toBeLessThanOrEqual(width);
+    });
+  }
+
+  test("M12: very wide screens are capped at 200%, so a line stays a readable length", async ({ page }) => {
     await page.setViewportSize({ width: 2560, height: 1300 });
     await open(page);
-    expect((await page.getByTestId("page-1").boundingBox())!.width).toBeLessThan(1300);
+    // report-form-3p.pdf is Letter (612 pt): 200% is 1,632 px.
+    expect((await page.getByTestId("page-1").boundingBox())!.width).toBeLessThanOrEqual(1640);
   });
 });
 
 test.describe("touch", () => {
   test.beforeEach(({}, info) => test.skip(info.project.name !== "mobile", "touch layout"));
+
+  test("M12: on a phone the page opens filling the screen's width", async ({ page }) => {
+    await open(page);
+    const p = (await page.getByTestId("page-1").boundingBox())!;
+    expect(p.width / page.viewportSize()!.width).toBeGreaterThanOrEqual(0.93);
+  });
 
   test("AC-48: every handle, rotate included, has a hit area of at least 44 px", async ({ page }) => {
     await open(page);

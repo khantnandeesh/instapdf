@@ -81,8 +81,13 @@ const writeLocal = (k: string, v: string) => {
   }
 };
 
-/** Largest zoom the document opens at on desktop (fit width up to this). */
-const OPEN_ZOOM_CAP = 1.5;
+/**
+ * Largest zoom the document opens at on desktop (fit width up to this). 200%: a Letter or A4 page is
+ * then about 1,600 px wide, so it fills at least 83% of a 1920 px screen (M12), and at a device
+ * pixel ratio of 2 its canvas (about 14 MP) is still within render.ts's MAX_PIXELS, so it stays crisp.
+ * Wider screens keep that width, so a line of text stays a readable length.
+ */
+const OPEN_ZOOM_CAP = 2;
 const reducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function initialState(pages: PageEntry[], wide: boolean): EditorState {
@@ -414,7 +419,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     [store, fitZoom, scroller],
   );
   // First fit: fit width, so the page fills the view (M12). On very wide screens the zoom is
-  // capped, so a line of text stays a readable length.
+  // capped (OPEN_ZOOM_CAP), so a line of text stays a readable length.
   const fitted = useRef(false);
   useLayoutEffect(() => {
     if (!scroller || fitted.current) return;
