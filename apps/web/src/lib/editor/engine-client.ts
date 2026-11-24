@@ -5,10 +5,14 @@
  * or 2g), or opening a file. Its load progress is published for the "Edit text" ring.
  * After a crash (WebAssembly.RuntimeError: the instance is unusable) the worker is dropped
  * and the next call starts a fresh one; the caller reopens its last good bytes.
+ *
+ * The shaping build (complex scripts) loads in the same worker, only through `openInShapingEngine`
+ * (an "open" with `shaping`), never prefetched. Its download has a status of its own, for its own
+ * progress ring. Once a document is open in it, every later open uses it too (also after a crash).
  */
 import type { BerryError } from "./berry-engine";
-import { ENGINE_WASM_BYTES } from "./engine-assets";
-import type { EngineReply, EngineRequest, EngineResponse } from "./engine.worker";
+import { ENGINE_SHAPING_WASM_BYTES, ENGINE_WASM_BYTES } from "./engine-assets";
+import type { EngineReply, EngineRequest, EngineResponse, EngineVariant } from "./engine.worker";
 
 /**
  * `crashed`: this call crashed the module or timed out; the worker is gone and the caller should
@@ -35,18 +39,27 @@ type ReplyFor<O extends Call["op"]> = Extract<EngineReply, { op: O }>;
 
 let worker: Worker | null = null;
 let nextId = 1;
-type Pending = { resolve: (r: EngineReply) => void; reject: (e: EngineError) => void; timer: ReturnType<typeof setTimeout> | null; ms: number };
+/** `variant`: the build the call waits for; the watchdog starts once that build is compiled. */
+type Pending = { resolve: (r: EngineReply) => void; reject: (e: EngineError) => void; timer: ReturnType<typeof setTimeout> | null; ms: number; variant: EngineVariant };
 const pending = new Map<number, Pending>();
 
 /** Engine download and compile state (one per page). */
 export type EngineStatus = { state: "idle" | "loading" | "ready" | "failed"; loaded: number; total: number; cached?: boolean };
 let status: EngineStatus = { state: "idle", loaded: 0, total: ENGINE_WASM_BYTES };
+let shapingStatus: EngineStatus = { state: "idle", loaded: 0, total: ENGINE_SHAPING_WASM_BYTES };
+/** Opens go to the shaping build (set once a document opened there). */
+let shapingActive = false;
 const listeners = new Set<() => void>();
-function setStatus(next: Partial<EngineStatus>) {
-  status = { ...status, ...next };
+function setStatus(next: Partial<EngineStatus>, variant: EngineVariant = "base") {
+  if (variant === "base") status = { ...status, ...next };
+  else shapingStatus = { ...shapingStatus, ...next };
   listeners.forEach((l) => l());
 }
+const statusOf = (v: EngineVariant) => (v === "base" ? status : shapingStatus);
 export const getEngineStatus = () => status;
+/** Download and compile state of the shaping build. */
+export const getShapingStatus = () => shapingStatus;
+export const isShapingActive = () => shapingActive;
 export function subscribeEngine(l: () => void): () => void {
   listeners.add(l);
   return () => listeners.delete(l);
@@ -54,7 +67,7 @@ export function subscribeEngine(l: () => void): () => void {
 
 /** The hang watchdog runs only once the engine is compiled: a slow download isn't a hang. */
 function arm(id: number, p: Pending) {
-  if (p.timer || status.state !== "ready") return;
+  if (p.timer || statusOf(p.variant).state !== "ready") return;
   p.timer = setTimeout(() => crash(id), p.ms);
 }
 
@@ -70,6 +83,7 @@ export function disposeEngine(): void {
   }
   // The files stay in the HTTP cache: a new worker compiles them again without a download.
   if (status.state !== "failed") setStatus({ state: "idle", loaded: 0 });
+  if (shapingStatus.state !== "failed") setStatus({ state: "idle", loaded: 0 }, "shaping");
 }
 
 /** Settles call `id` with `crashed` and drops the worker. */
@@ -88,7 +102,7 @@ function getWorker(): Worker {
     const msg = event.data;
     if (worker !== w) return;
     if ("progress" in msg) {
-      setStatus({ state: msg.ready ? "ready" : "loading", loaded: msg.progress.loaded, total: msg.progress.total, ...(msg.ready ? { cached: !!msg.cached } : {}) });
+      setStatus({ state: msg.ready ? "ready" : "loading", loaded: msg.progress.loaded, total: msg.progress.total, ...(msg.ready ? { cached: !!msg.cached } : {}) }, msg.variant);
       if (msg.ready) pending.forEach((p, id) => arm(id, p));
       return;
     }
@@ -100,7 +114,7 @@ function getWorker(): Worker {
     if (msg.ok) p.resolve(msg.reply);
     else {
       // The download or compile failed (offline, server error): offer a retry.
-      if (status.state !== "ready") setStatus({ state: "failed" });
+      if (statusOf(p.variant).state !== "ready") setStatus({ state: "failed" }, p.variant);
       p.reject(msg.error);
     }
   };
@@ -118,13 +132,26 @@ function getWorker(): Worker {
 export function callEngine<C extends Call>(call: C, transfer: Transferable[] = []): Promise<ReplyFor<C["op"]>> {
   return new Promise((resolve, reject) => {
     const id = nextId++;
-    const p: Pending = { resolve: resolve as (r: EngineReply) => void, reject, timer: null, ms: engineTimeoutMs(call.op === "open" ? call.bytes.length : fileBytes) };
+    const shaping = shapingActive || (call.op === "open" && !!call.shaping);
+    const variant: EngineVariant = shaping && call.op !== "load" ? "shaping" : "base";
+    const p: Pending = { resolve: resolve as (r: EngineReply) => void, reject, timer: null, ms: engineTimeoutMs(call.op === "open" ? call.bytes.length : fileBytes), variant };
     pending.set(id, p);
     const w = getWorker();
-    if (status.state === "idle" || status.state === "failed") setStatus({ state: "loading", loaded: 0 });
+    const st = statusOf(variant).state;
+    if (st === "idle" || st === "failed") setStatus({ state: "loading", loaded: 0 }, variant);
     arm(id, p);
-    w.postMessage({ ...call, id } as EngineRequest, transfer);
+    w.postMessage({ ...call, ...(call.op === "open" && shaping ? { shaping: true } : {}), id } as EngineRequest, transfer);
   });
+}
+
+/**
+ * Reopens `bytes` in the shaping build (downloading it first, with progress in getShapingStatus).
+ * After it resolves every call uses the shaping build. On failure the open document is unchanged
+ * (still the default build) and the status is "failed": call again to retry.
+ */
+export async function openInShapingEngine(bytes: Uint8Array): Promise<void> {
+  await callEngine({ op: "open", bytes, shaping: true }, [bytes.buffer as ArrayBuffer]);
+  shapingActive = true;
 }
 
 /** Starts the engine download early (idle on /edit-pdf). Resolves when it's compiled; never throws. */

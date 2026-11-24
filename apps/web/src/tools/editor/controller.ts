@@ -8,7 +8,8 @@
  */
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { Asset } from "@/lib/editor/build";
-import { callEngine, describeEngineError, engineErrorLog, offersLineReplacement, setEngineFileSize, type EngineError } from "@/lib/editor/engine-client";
+import { callEngine, describeEngineError, engineErrorLog, offersLineReplacement, openInShapingEngine, setEngineFileSize, type EngineError } from "@/lib/editor/engine-client";
+import { lineAt } from "@/lib/editor/line-hit";
 import { editorFontFor, lineReplacement } from "@/lib/editor/replace-line";
 import { ensureFace, measurer } from "@/lib/editor/fonts-browser";
 import * as H from "@/lib/editor/history";
@@ -346,6 +347,42 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       ui.announce("Getting text editing ready. The line opens when it is.");
     },
 
+    /**
+     * Reopens the shown bytes in the shaping build (downloading it, with its own progress ring),
+     * for a line marked "needs-shaping" or an edit that typed such text. The page texts are read
+     * again from it. Resolves false when the download failed (the default build stays open, and
+     * the pill offers Retry). Never prefetched: this is the only way the shaping files load.
+     */
+    shapingOpening: null as Promise<boolean> | null,
+    loadShaping(): Promise<boolean> {
+      if (store.get().shaping === "ready") return Promise.resolve(true);
+      ctl.shapingOpening ??= (async () => {
+        store.set({ shaping: "loading", engineReady: false });
+        try {
+          if (ctl.recovering) await ctl.recovering;
+          for (;;) {
+            const shown = rt.shown;
+            await openInShapingEngine(ctl.bytesOf(shown).slice());
+            if (shown === rt.shown) break;
+          }
+          ctl.failedText.clear();
+          store.set({ shaping: "ready", engineReady: true, fresh: {} });
+          ui.announce("Text editing for this script is ready.");
+          return true;
+        } catch {
+          store.set({ shaping: "failed", engineReady: true });
+          return false;
+        }
+      })().finally(() => (ctl.shapingOpening = null));
+      return ctl.shapingOpening;
+    },
+    /** A click on a line that needs the shaping build: load it, then open that line for editing. */
+    wantShapedLine(src: number, at: [number, number]) {
+      store.set({ pendingLine: { src, at }, selection: [] });
+      ui.announce("Getting text editing ready for this script. The line opens when it is.");
+      void ctl.loadShaping();
+    },
+
     loadingText: new Set<number>(),
     failedText: new Set<number>(),
     async ensureText(src: number) {
@@ -390,7 +427,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       return ctl.recovering;
     },
 
-    async commitLine() {
+    async commitLine(): Promise<void> {
       const s = store.get();
       const e = s.lineEdit;
       store.set({ lineEdit: null });
@@ -427,6 +464,19 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         apply({ ...state(), engine: rt.shown }, "Edit text", { page: pageId });
         if (result.substitutions.some((x) => !x.same_family)) ui.toast({ text: "Some characters use a similar font.", tone: "info" });
       } catch (err) {
+        // Typed Hindi, Arabic or similar into a line of the default build: load the shaping
+        // build, find the same line in its reading of the page, and make the same edit there.
+        if (isEngineError(err) && err.kind === "read-only" && err.reason === "needs-shaping" && store.get().shaping !== "ready") {
+          store.set({ busy: null });
+          const at: [number, number] = [(line.bbox.x0 + line.bbox.x1) / 2, (line.bbox.y0 + line.bbox.y1) / 2];
+          if (!(await ctl.loadShaping())) return;
+          await ctl.ensureText(e.src);
+          const page = store.get().texts[e.src];
+          const i = page ? lineAt(page.lines, at[0], at[1]) : -1;
+          if (i < 0) return ui.toast({ text: describeEngineError(err), tone: "danger" });
+          store.set({ lineEdit: { src: e.src, line: i, text: e.text } });
+          return ctl.commitLine();
+        }
         if (isEngineError(err)) {
           console.warn(engineErrorLog(err));
           const action = offersLineReplacement(err) ? { label: "Replace with new text", run: () => void ctl.replaceLineWithText(e) } : undefined;

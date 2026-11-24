@@ -95,8 +95,10 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
 
   // A line clicked before the engine was ready opens as soon as the engine has read the page.
   const pending = useStore(store, useCallback((s: EditorState) => (src != null && firstOfSrc && s.pendingLine?.src === src ? s.pendingLine : null), [src, firstOfSrc]));
+  const shaping = useStore(store, (s) => s.shaping);
   useEffect(() => {
-    if (!pending || !engineReady) return;
+    // Waiting for the shaping build (or its Retry): the line opens once it's there.
+    if (!pending || !engineReady || shaping === "loading" || shaping === "failed") return;
     if (!fresh || !text) {
       if (src != null) void ctl.ensureText(src);
       return;
@@ -104,7 +106,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     const i = lineAt(text.lines, pending.at[0], pending.at[1]);
     store.set({ pendingLine: null, ...(i >= 0 ? { lineEdit: { src: pending.src, line: i, text: text.lines[i].text }, selection: [] } : {}) });
     if (i < 0) ctl.announce("That text can’t be edited.");
-  }, [pending, engineReady, fresh, text, src, ctl, store]);
+  }, [pending, engineReady, shaping, fresh, text, src, ctl, store]);
 
   useEffect(() => {
     if (visible && src != null && !fresh) void ctl.ensureText(src);
@@ -594,7 +596,12 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
             editing={lineEdit}
             disabled={!!busy || !fresh}
             active={interactiveLines}
-            onEdit={(line, t) => store.set({ lineEdit: { src, line, text: t }, selection: [] })}
+            onEdit={(line, t) => {
+              const l = text.lines[line];
+              // A line the default build can't edit: load the shaping build, then open this line.
+              if (l?.read_only_reason === "needs-shaping") ctl.wantShapedLine(src, [(l.bbox.x0 + l.bbox.x1) / 2, (l.bbox.y0 + l.bbox.y1) / 2]);
+              else store.set({ lineEdit: { src, line, text: t }, selection: [] });
+            }}
             onChange={(t) => store.set((s) => ({ lineEdit: s.lineEdit ? { ...s.lineEdit, text: t } : null }))}
             onCommit={() => void ctl.commitLine()}
             onCancel={() => store.set({ lineEdit: null })}

@@ -14,7 +14,7 @@ import { useLeaveGuard } from "@/components/tool-flow/useLeaveGuard";
 import { buildInWorker, checkOwnerPassword, disposeBuild } from "@/lib/editor/build-client";
 import { OwnerPasswordDialog, OwnerPermissionNotice } from "@/components/tool-flow/OwnerPassword";
 import type { Permission } from "@/tools/registry";
-import { disposeEngine, getEngineStatus, subscribeEngine } from "@/lib/editor/engine-client";
+import { disposeEngine, getEngineStatus, getShapingStatus, subscribeEngine } from "@/lib/editor/engine-client";
 import { screenDeltaToFrame, screenToFrame, displaySize } from "@/lib/editor/geometry";
 import * as H from "@/lib/editor/history";
 import { clampDelta, initialPages, isPristine, kindName, moveObject, newId, objectBounds, pageSize, totalRotation, type EditorObject, type PageEntry, type Pt } from "@/lib/editor/model";
@@ -101,6 +101,7 @@ function initialState(pages: PageEntry[], wide: boolean): EditorState {
     pdfRev: 0,
     engineReady: false,
     engineWanted: false,
+    shaping: "idle",
     pendingLine: null,
     lineEdit: null,
     busy: null,
@@ -139,6 +140,7 @@ export function EditorShell(props: ShellProps) {
       if (!el) return;
       const s = getEngineStatus();
       el.dataset.engine = s.state;
+      el.dataset.shaping = getShapingStatus().state;
       if (s.cached) el.dataset.engineCached = "true";
       else delete el.dataset.engineCached;
     };

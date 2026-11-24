@@ -69,6 +69,11 @@ export type EditorState = {
   engineReady: boolean;
   /** Someone asked for Edit text before the engine was ready: show its load progress. */
   engineWanted: boolean;
+  /**
+   * The shaping build (Hindi, Arabic…): "loading" after a click on a line that needs it (its ring
+   * shows), "failed" when that download failed (Retry), "ready" once the file is open in it.
+   */
+  shaping: "idle" | "loading" | "failed" | "ready";
   /** A click on existing text before the engine was ready (user space): edited once it is. */
   pendingLine: { src: number; at: [number, number] } | null;
   /** Line being edited (Edit text). */
