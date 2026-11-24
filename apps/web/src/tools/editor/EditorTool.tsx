@@ -8,12 +8,12 @@ import "@/components/berry/berry-loader.css";
  * pdf.js and the engine are separate chunks, fetched on intent (pointer or focus on Open PDF,
  * a drag, idle after load; the engine not on Data Saver or 2g) or on the pick itself. Picking a file opens focus mode at once.
  */
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState, type ComponentType } from "react";
 import { Floaties } from "@/components/berry/Berry";
 import { DropOverlay } from "@/components/tool-flow/DropOverlay";
 import { FilePicker, type FilePickerHandle } from "@/components/tool-flow/FilePicker";
 import { LimitsNote, PrivacyNote } from "@/components/tool-flow/notes";
-import { PasswordDialog } from "@/components/tool-flow/PasswordDialog";
 import { copy } from "@/components/tool-flow/copy";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -24,6 +24,9 @@ import { warmPdfjs } from "@/lib/pdf/pdfjs-warm";
 import { FilePlusBold, FileUpBold } from "./icons";
 import { prefetchEditorChunks } from "./idle-prefetch";
 import type { ShellProps } from "./EditorShell";
+
+// Only a locked PDF needs it: its own chunk, fetched after hydration, out of the first load.
+const PasswordDialog = dynamic(() => import("@/components/tool-flow/PasswordDialog").then((m) => m.PasswordDialog), { ssr: false });
 
 export const MAX_BYTES = 200 * 1024 * 1024;
 
