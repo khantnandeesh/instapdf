@@ -332,6 +332,15 @@ impl Engine {
     /// Registers an open-licensed TrueType font the engine may embed for missing characters.
     /// Returns false when the file is not a usable TrueType (glyf) font.
     pub fn add_font(&mut self, family: &str, bold: bool, italic: bool, data: Vec<u8>) -> bool {
+        // Web fonts as served: WOFF 1.0 is unpacked to the TrueType file inside.
+        let data = if data.starts_with(b"wOFF") {
+            match crate::woff::unpack(&data) {
+                Some(d) => d,
+                None => return false,
+            }
+        } else {
+            data
+        };
         let ok = ttf_parser::Face::parse(&data, 0).map(|f| f.tables().glyf.is_some()).unwrap_or(false);
         if ok && !self.faces.iter().any(|f| f.family == family && f.bold == bold && f.italic == italic) {
             self.faces.push(Face { family: family.to_string(), bold, italic, data: Rc::new(data) });
@@ -340,7 +349,7 @@ impl Engine {
         ok
     }
 
-    fn page_id(&self, page: usize) -> Result<ObjectId> {
+    pub(crate) fn page_id(&self, page: usize) -> Result<ObjectId> {
         self.pages.get(page).copied().ok_or(Error::BadPage)
     }
 
@@ -853,14 +862,14 @@ impl Engine {
         self.cache.clear();
     }
 
-    fn touch(&mut self, id: ObjectId, backup: &mut Vec<(ObjectId, Option<Object>)>) {
+    pub(crate) fn touch(&mut self, id: ObjectId, backup: &mut Vec<(ObjectId, Option<Object>)>) {
         if !backup.iter().any(|(b, _)| *b == id) {
             backup.push((id, self.doc.objects.get(&id).cloned()));
         }
         self.dirty.insert(id);
     }
 
-    fn add_object(&mut self, o: Object, backup: &mut Vec<(ObjectId, Option<Object>)>) -> ObjectId {
+    pub(crate) fn add_object(&mut self, o: Object, backup: &mut Vec<(ObjectId, Option<Object>)>) -> ObjectId {
         let id = self.doc.add_object(o);
         backup.push((id, None));
         self.dirty.insert(id);
@@ -1233,6 +1242,19 @@ impl Engine {
         let upem = parsed.units_per_em() as f64;
         let k = 1000.0 / upem;
         let subset = subsetter::subset(&face.data, 0, &embed.remap).map_err(|e| err(e.to_string()))?;
+        // A cmap for the characters the glyphs draw, so readers can tell a mirrored bracket.
+        let drawn: Vec<(char, u16)> = embed
+            .chars
+            .iter()
+            .filter_map(|(&n, (text, g))| {
+                let mut cs = text.chars();
+                match (cs.next(), cs.next()) {
+                    (Some(c), None) if face.glyph(c) == Some(*g) => Some((c, n)),
+                    _ => None,
+                }
+            })
+            .collect();
+        let subset = crate::sfnt::with_cmap(&subset, &drawn).unwrap_or(subset);
 
         let ps_base: String = format!(
             "{}{}{}",
@@ -1641,6 +1663,16 @@ fn serialize(kind: ShowKind, op: &content::Op, items: Vec<Item>) -> Vec<u8> {
         }
         _ => {}
     }
+    let body = serialize_items(items);
+    if !body.is_empty() {
+        parts.push(body);
+    }
+    parts.join(&b' ')
+}
+
+/// Text-showing operators for these items (fonts, rises, spans, strings and kerns).
+pub(crate) fn serialize_items(items: Vec<Item>) -> Vec<u8> {
+    let mut parts: Vec<Vec<u8>> = Vec::new();
     let mut group: Vec<Item> = Vec::new();
     fn flush(group: &mut Vec<Item>, parts: &mut Vec<Vec<u8>>) {
         // Merge neighbours, drop empty strings and zero kerns.

@@ -10,6 +10,8 @@ publish.workspace = true
 lopdf = { version = "0.47", default-features = false }
 ttf-parser = "0.25"
 subsetter = "0.2"
+# Same build lopdf already uses: unpacks WOFF 1.0 fonts passed to add_font.
+flate2 = "1.1"
 serde = { version = "1", features = ["derive"] }
 rustybuzz = { version = "0.20.1", optional = true }
 unicode-bidi = { version = "0.3.18", optional = true }

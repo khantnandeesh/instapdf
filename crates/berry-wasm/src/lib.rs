@@ -1,9 +1,11 @@
 //! JavaScript bindings. The typed interface is in `berry-engine.d.ts` next to this crate.
 //! Every method returns plain objects; failures throw the engine's error object (`{ kind, … }`).
 
+use berry_engine::fallback::FontRequest;
 use berry_engine::Engine;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 
 fn to_js<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
     let ser = serde_wasm_bindgen::Serializer::json_compatible();
@@ -12,6 +14,33 @@ fn to_js<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
 
 fn fail(e: berry_engine::Error) -> JsValue {
     to_js(&e).unwrap_or_else(|e| e)
+}
+
+fn bad(what: &str) -> JsValue {
+    JsValue::from_str(&format!("invalid {what}"))
+}
+
+/// `{ families: string[], bold?: boolean, italic?: boolean }`, read field by field (a serde
+/// deserializer would add to the module size).
+fn font_request(v: JsValue) -> Result<FontRequest, JsValue> {
+    let get = |k: &str| js_sys::Reflect::get(&v, &k.into()).map_err(|_| bad("font"));
+    let families = get("families")?.dyn_into::<js_sys::Array>().map_err(|_| bad("font.families"))?;
+    let families = families.iter().map(|f| f.as_string().ok_or_else(|| bad("font.families"))).collect::<Result<_, _>>()?;
+    Ok(FontRequest { families, bold: get("bold")?.is_truthy(), italic: get("italic")?.is_truthy() })
+}
+
+/// `[r, g, b]`, 0–255 each.
+fn rgb(v: JsValue) -> Result<[u8; 3], JsValue> {
+    let a = v.dyn_into::<js_sys::Array>().map_err(|_| bad("color"))?;
+    if a.length() != 3 {
+        return Err(bad("color"));
+    }
+    let mut out = [0u8; 3];
+    for (i, c) in out.iter_mut().enumerate() {
+        let x = a.get(i as u32).as_f64().ok_or_else(|| bad("color"))?;
+        *c = if x.is_finite() { x.round().clamp(0.0, 255.0) as u8 } else { 0 };
+    }
+    Ok(out)
 }
 
 #[wasm_bindgen]
@@ -59,6 +88,29 @@ impl BerryDocument {
     #[wasm_bindgen(js_name = replaceRange)]
     pub fn replace_range(&mut self, page: usize, line: usize, start: usize, end: usize, text: &str) -> Result<JsValue, JsValue> {
         to_js(&self.engine.replace_range(page, line, start, end, text).map_err(fail)?)
+    }
+
+    /// Lays out one line of new text with the registered fonts.
+    pub fn shape(&mut self, text: &str, font: JsValue, size: f64) -> Result<JsValue, JsValue> {
+        to_js(&self.engine.shape_text(text, &font_request(font)?, size).map_err(fail)?)
+    }
+
+    /// Draws one line of new text; `(x, y)` is the left end of its baseline.
+    #[wasm_bindgen(js_name = addText)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_text(
+        &mut self,
+        page: usize,
+        text: &str,
+        font: JsValue,
+        size: f64,
+        x: f64,
+        y: f64,
+        angle: f64,
+        color: JsValue,
+    ) -> Result<JsValue, JsValue> {
+        let (font, color) = (font_request(font)?, rgb(color)?);
+        to_js(&self.engine.add_text(page, text, &font, size, x, y, angle, color).map_err(fail)?)
     }
 
     #[wasm_bindgen(js_name = addFont)]

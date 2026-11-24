@@ -62,8 +62,9 @@ jobs:
           # Two modules: the default engine, and the full one with complex-script shaping.
           cargo build -p berry-wasm --target wasm32-unknown-unknown --release --locked
           wasm-bindgen target/wasm32-unknown-unknown/release/berry_wasm.wasm --out-dir berry-wasm/pkg --target web --out-name berry_engine
-          cargo build -p berry-wasm --features shaping --target wasm32-unknown-unknown --release --locked
-          wasm-bindgen target/wasm32-unknown-unknown/release/berry_wasm.wasm --out-dir berry-wasm/pkg --target web --out-name berry_engine_shaping
+          # Built for size (profile wasm-shaping in crates/Cargo.toml) to stay inside the budget.
+          cargo build -p berry-wasm --features shaping --target wasm32-unknown-unknown --profile wasm-shaping --locked
+          wasm-bindgen target/wasm32-unknown-unknown/wasm-shaping/berry_wasm.wasm --out-dir berry-wasm/pkg --target web --out-name berry_engine_shaping
       - name: WebAssembly smoke test and size budget
         run: |
           node berry-wasm/smoke.mjs
