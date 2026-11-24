@@ -40,6 +40,8 @@ async function typeInto(page: Page, startsWith: string, next: (before: string) =
   await line.click();
   const input = page.getByTestId("line-input");
   await expect(input).toBeFocused();
+  // The box is redrawn in the line's own font once that is known: type after it is.
+  await expect(input).not.toHaveAttribute("data-face", "pending");
   await input.fill(next(before));
   await input.press("Enter");
   return before;
