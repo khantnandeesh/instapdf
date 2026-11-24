@@ -1,5 +1,4 @@
 "use client";
-import "@/components/berry/floaties-empty.css";
 import "@/components/berry/berry-loader.css";
 import "./editor.css";
 /**

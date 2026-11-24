@@ -1,4 +1,3 @@
-import "@/components/berry/floaties-empty.css";
 import Link from "next/link";
 import { ToolCard } from "../catalogue/ToolCard";
 import { buildToolIndex } from "../catalogue/toolIndex";

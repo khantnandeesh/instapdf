@@ -1,4 +1,3 @@
-import "@/components/berry/floaties-empty.css";
 import type { ReactNode } from "react";
 import { Floaties, Sticker } from "../berry/Berry";
 
