@@ -280,6 +280,16 @@ describe("contents page", () => {
     // A name that fills the line gets no leader.
     expect(tocLeader(485, 500, 50)).toBeNull();
   });
+  it("G-4: a name cut to fit the line still gets a leader, wherever the number lands on the grid", () => {
+    const margin = 50;
+    for (let numX = 400; numX < 400 + TOC.dotPitch; numX += 0.1) {
+      for (let slack = 0; slack < TOC.dotPitch; slack += 0.1) {
+        // The widest a fitted name can be (drawToc's fit width), minus up to one pitch of rounding.
+        const titleEnd = numX - TOC.leaderGap * 2 - TOC.dotPitch * 4 - slack;
+        expect(tocLeader(titleEnd, numX, margin)).not.toBeNull();
+      }
+    }
+  });
 });
 
 describe("footer", () => {

@@ -35,6 +35,16 @@ describe("trackInputModality (eval G-7)", () => {
     doc.dispatchEvent(new Event("pointerdown"));
     expect(seen).toHaveLength(2);
   });
+  it("treats a file drop from the desktop as pointer input (no pointerdown fires)", () => {
+    const doc = new EventTarget();
+    const seen: InputModality[] = [];
+    const stop = trackInputModality((m) => seen.push(m), doc);
+    doc.dispatchEvent(new Event("drop"));
+    expect(seen).toEqual(["pointer"]);
+    stop();
+    doc.dispatchEvent(new Event("drop"));
+    expect(seen).toHaveLength(1);
+  });
 });
 
 describe("moveFocus (eval G-7)", () => {

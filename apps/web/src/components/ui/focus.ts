@@ -23,9 +23,12 @@ export function trackInputModality(onChange: (m: InputModality) => void, target:
     onChange("keyboard");
   };
   target.addEventListener("pointerdown", pointer, { capture: true });
+  // Dropping files from the desktop fires no pointerdown in the page, but it is a pointer action.
+  target.addEventListener("drop", pointer, { capture: true });
   target.addEventListener("keydown", keyboard, { capture: true });
   return () => {
     target.removeEventListener("pointerdown", pointer, { capture: true });
+    target.removeEventListener("drop", pointer, { capture: true });
     target.removeEventListener("keydown", keyboard, { capture: true });
   };
 }

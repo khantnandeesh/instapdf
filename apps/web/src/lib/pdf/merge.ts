@@ -178,7 +178,9 @@ function drawToc(pages: PDFPage[], size: PageSize, entries: TocEntry[], target: 
       const num = String(number);
       const numWidth = text.width(num, TOC.size);
       const numX = size.width - margin - numWidth;
-      const title = text.fit(entry.title, TOC.size, numX - margin - TOC.leaderGap * 2 - TOC.dotPitch * 2);
+      const title = text.fit(entry.title, TOC.size, numX - margin - TOC.leaderGap * 2 - TOC.dotPitch * 4);
+      // 4 pitches: snapping both ends to the dot grid can cost up to one pitch each, and the leader
+      // needs two, so a name cut to fit still gets its dots.
       text.draw(page, title, { x: margin, y, size: TOC.size, color: ink });
       text.draw(page, num, { x: numX, y, size: TOC.size, color: ink });
       // Vector dots (a round-capped dashed line), so the leader adds no text
