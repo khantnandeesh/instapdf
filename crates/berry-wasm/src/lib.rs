@@ -57,6 +57,18 @@ impl BerryDocument {
         Engine::open(bytes.to_vec(), password.as_deref()).map(|engine| BerryDocument { engine }).map_err(fail)
     }
 
+    /// Objects numbered above this were made by this engine's own edits (a trust boundary).
+    #[wasm_bindgen(js_name = madeAfter)]
+    pub fn made_after(&self) -> u32 {
+        self.engine.made_after()
+    }
+
+    /// Restores `madeAfter` after reopening the editor's own output; clamped to the document.
+    #[wasm_bindgen(js_name = setMadeAfter)]
+    pub fn set_made_after(&mut self, n: u32) {
+        self.engine.set_made_after(n)
+    }
+
     #[wasm_bindgen(getter, js_name = pageCount)]
     pub fn page_count(&self) -> usize {
         self.engine.page_count()

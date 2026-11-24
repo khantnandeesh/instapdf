@@ -12,6 +12,7 @@ import type { BerryDocument as BerryDocumentType, BerryError, EditResult, FontIn
 
 import { ENGINE_JS, ENGINE_SHAPING_JS, ENGINE_SHAPING_WASM, ENGINE_SHAPING_WASM_BYTES, ENGINE_WASM, ENGINE_WASM_BYTES } from "./engine-assets";
 import { countBody, type Progress } from "./engine-load";
+import { MadeAfterTrust, fingerprint } from "./engine-trust";
 
 type EngineModule = { default: (opts: { module_or_path: Response | Promise<Response> }) => Promise<unknown>; BerryDocument: typeof BerryDocumentType };
 
@@ -70,8 +71,11 @@ let doc: BerryDocumentType | null = null;
 let current: Uint8Array | null = null;
 /** Fonts registered so far. A document is reopened after every edit, so they are added again each time. */
 let added: { family: string; bold: boolean; italic: boolean; bytes: Uint8Array }[] = [];
-function open(BerryDocument: EngineModule["BerryDocument"], bytes: Uint8Array): BerryDocumentType {
+/** Restores BerryDocument.madeAfter when the worker reopens bytes it saved (engine-trust.ts). */
+const trust = new MadeAfterTrust();
+function open(BerryDocument: EngineModule["BerryDocument"], bytes: Uint8Array, print = fingerprint(bytes)): BerryDocumentType {
   const d = new BerryDocument(bytes);
+  trust.restore(print, d);
   for (const f of added) d.addFont(f.family, f.bold, f.italic, f.bytes);
   return d;
 }
@@ -137,7 +141,10 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
     dropDoc();
     current = null;
     active = variant;
-    doc = open(BerryDocument, req.bytes);
+    const print = fingerprint(req.bytes);
+    doc = open(BerryDocument, req.bytes, print);
+    // Bytes this worker did not save (the person's file) start the trust; its own keep it.
+    trust.opened(print, doc);
     current = req.bytes;
     return { op: "open", pageCount: doc.pageCount };
   }
@@ -174,8 +181,11 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
     }
     try {
       // Reopen from the output so the next save appends to it, and undo states stay prefixes.
+      // The output is this worker's own, made from bytes of the current trust epoch.
+      const print = fingerprint(saved.bytes);
+      trust.saved(print);
       dropDoc();
-      doc = open(BerryDocument, saved.bytes);
+      doc = open(BerryDocument, saved.bytes, print);
       current = saved.bytes.slice();
     } catch (error) {
       return rollback(BerryDocument, error);

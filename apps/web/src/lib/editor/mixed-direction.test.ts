@@ -111,3 +111,72 @@ describe("mixed-direction edits in an Arabic line (scripts-plain.pdf)", () => {
     });
   }
 });
+
+/**
+ * A second number typed at the end of the same Arabic line: kept, and read as typed by both
+ * readers ("2024 3", not "3 2024").
+ */
+describe("two digit edits in a row at the end of an Arabic line (scripts-plain.pdf)", () => {
+  for (const tails of [[" 2024", " 3"], [" 2024", "5"], [" 24", " 2024"]] as const) {
+    it(`${tails.map((t) => JSON.stringify(t)).join(" then ")}: read back as typed by pdfium and pdf.js`, async () => {
+      const { BerryDocument } = await engine();
+      const doc = new BerryDocument(new Uint8Array(readFileSync(corpus("scripts-plain.pdf"))));
+      try {
+        doc.addFont("Noto Naskh Arabic", false, false, new Uint8Array(readFileSync(corpus("fonts/NotoNaskhArabic-Regular.ttf"))));
+        let want = "";
+        for (const tail of tails) {
+          const page = doc.pageText(0);
+          const id = page.lines.findIndex((l) => l.text.startsWith("مرحبا"));
+          want = page.lines[id].text + tail;
+          expect(doc.replaceLine(0, id, want).page.lines.map((l) => l.text)).toContain(want);
+        }
+        const bytes = doc.save().bytes;
+        if (pdfium) expect(pdfiumText(bytes)).toContain(want);
+        expect(squash(await pdfjsText(bytes))).toContain(squash(want));
+      } finally {
+        doc.free();
+      }
+    });
+  }
+});
+
+/**
+ * The editor's worker reopens the saved output after every edit and restores madeAfter from the
+ * first open, so the sibling font the first digit edit made is extended, not copied again.
+ */
+describe("digit edits across the worker's reopen (scripts-plain.pdf)", () => {
+  for (const trusted of [true, false]) {
+    it(`${trusted ? "with" : "without"} madeAfter restored: ${trusted ? "one" : "a second"} sibling font`, async () => {
+      const { BerryDocument } = await engine();
+      const arabic = new Uint8Array(readFileSync(corpus("fonts/NotoNaskhArabic-Regular.ttf")));
+      let bytes: Uint8Array = new Uint8Array(readFileSync(corpus("scripts-plain.pdf")));
+      const first = new BerryDocument(bytes.slice());
+      const floor = first.madeAfter();
+      const fonts = first.fonts().length;
+      first.free();
+      let want = "";
+      for (const tail of [" 2024", " 3"]) {
+        const doc = new BerryDocument(bytes.slice());
+        try {
+          if (trusted) doc.setMadeAfter(floor);
+          doc.addFont("Noto Naskh Arabic", false, false, arabic);
+          const page = doc.pageText(0);
+          const id = page.lines.findIndex((l) => l.text.startsWith("مرحبا"));
+          want = page.lines[id].text + tail;
+          doc.replaceLine(0, id, want);
+          bytes = doc.save().bytes;
+        } finally {
+          doc.free();
+        }
+      }
+      const done = new BerryDocument(bytes.slice());
+      try {
+        expect(done.pageText(0).lines.map((l) => l.text)).toContain(want);
+        expect(done.fonts().length).toBe(fonts + (trusted ? 1 : 2));
+      } finally {
+        done.free();
+      }
+      if (pdfium) expect(pdfiumText(bytes)).toContain(want);
+    });
+  }
+});

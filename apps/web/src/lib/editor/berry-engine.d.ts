@@ -254,6 +254,23 @@ export class BerryDocument {
   /** Opens a PDF. Throws { kind: "encrypted" } when a password is needed. */
   constructor(bytes: Uint8Array, password?: string | null);
   readonly pageCount: number;
+  /**
+   * A trust boundary: objects numbered above it were made by this engine's own edits, so a
+   * sibling font it made (a copy of a page font with its own Unicode map, for digits an Arabic
+   * subset doesn't map) can be extended by later edits instead of copied again. A new
+   * document's value is its highest object number.
+   */
+  madeAfter(): number;
+  /**
+   * Restores madeAfter after reopening the editor's own output. Only the editor's worker calls
+   * it, with the value it read when it first opened the person's original bytes, and only for
+   * bytes it produced from them (engine-trust.ts). Clamped to the document's highest object
+   * number. A font above it is still reused only when it passes the engine's own checks (same
+   * program and widths, no other text for a code), and extended only when its Unicode map is
+   * exactly one the engine writes, so a wrong value can miss a reuse but never rewrites a
+   * mapping the engine did not write.
+   */
+  setMadeAfter(n: number): void;
   /** Lines (with runs, words, fonts, positions) and paragraphs of a page. */
   pageText(page: number): PageText;
   /** Every font in the document, once each (use FontInfo.object as its stable id). */
