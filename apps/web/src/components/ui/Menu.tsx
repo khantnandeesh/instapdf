@@ -254,6 +254,8 @@ export const MenuButton = forwardRef<
         ref={popup}
         popover="auto"
         onKeyDown={onMenuKey}
+        // A phone sheet can outgrow the space above the dock: its body is an overlay scroller.
+        data-ip-scroll={sheet ? "overlay" : undefined}
         // BerryPDF Menu: white, 1.5px sand, radius 14, shadow-menu, scales in (0.15s). Placed by
         // position() through the CSSOM (never a style attribute in server HTML: strict CSP).
         className={cx("mp-menu fixed inset-auto m-0 max-w-[calc(100vw-32px)] min-w-[220px] p-1.5 text-ink", popupClassName)}
