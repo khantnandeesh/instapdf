@@ -14,7 +14,7 @@ export type SessionEvents = {
   onReady?: () => void;
   onProgress?: (id: string, name: string, loaded: number, total: number) => void;
   onFiles?: (files: { id: string; file: File }[]) => void;
-  onSkipped?: (items: { name: string; reason: SkipReason }[]) => void;
+  onSkipped?: (items: { name: string; reason: SkipReason; id?: string }[]) => void;
   onFailed?: (id: string, name: string) => void;
   onError?: (code: ErrorCode) => void;
   onSaveProgress?: (loaded: number, total: number) => void;
@@ -115,6 +115,11 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
       case "hb":
         post({ t: "pong" });
         break;
+      case "away":
+        // A full-page sign-in: silence is expected until the window comes back (it sends "ready" again).
+        lastSeen = now() + m.ms;
+        contacted = false;
+        break;
       case "progress":
         events.onProgress?.(m.id, m.name, m.loaded, m.total);
         break;
@@ -151,7 +156,7 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
   const timer = setI(() => {
     if (ended || hidden()) return;
     const limit = contacted ? WINDOW_LOST_MS : FIRST_CONTACT_MS;
-    if (now() - lastSeen > limit) {
+    if (now() > lastSeen && now() - lastSeen > limit) {
       end();
       events.onClosed?.("lost");
     }

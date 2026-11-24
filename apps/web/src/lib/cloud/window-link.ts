@@ -72,6 +72,14 @@ export class WindowLink {
     });
   }
 
+  /** Leaving for a full-page sign-in: tell the tool to wait, and don't report the navigation as a cancel. */
+  away(ms: number) {
+    this.send({ t: "away", ms });
+    this.finished = true;
+    if (this.timer) clearInterval(this.timer);
+    if (typeof window !== "undefined") window.removeEventListener("pagehide", this.onHide);
+  }
+
   /** The user cancelled here (×, Escape, Cancel, the provider's own cancel). */
   cancel() {
     if (this.finished) return;

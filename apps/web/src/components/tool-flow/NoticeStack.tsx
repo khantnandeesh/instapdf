@@ -92,7 +92,7 @@ function TimedNotice({ notice: n, onDismiss }: { notice: FlowNotice; onDismiss: 
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPaused(false);
       }}
     >
-      <Notice tone={n.tone} look="alert" title={n.title} onDismiss={onDismiss} action={n.action}>
+      <Notice tone={n.tone} look="alert" title={n.title} onDismiss={onDismiss} action={n.action} inlineAction={n.inlineAction} busy={n.busy}>
         {n.body && <p>{n.body}</p>}
         {n.items && n.items.length > 0 && <NoticeItems items={n.items} />}
       </Notice>

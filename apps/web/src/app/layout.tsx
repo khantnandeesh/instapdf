@@ -4,6 +4,7 @@ import { BerrySprite } from "@/components/berry/Berry";
 import { ToolIndexProvider } from "@/components/catalogue/ToolIndexProvider";
 import { buildToolIndex } from "@/components/catalogue/toolIndex";
 import { siteCopy } from "@/components/site/copy";
+import { CloudPrepaintScript } from "@/components/site/CloudPrepaintScript";
 import { RecentPrepaintScript } from "@/components/site/RecentPrepaintScript";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
@@ -42,6 +43,7 @@ export default function RootLayout({
     <html lang="en" className={fredoka.variable} suppressHydrationWarning>
       <head>
         <RecentPrepaintScript />
+        <CloudPrepaintScript />
       </head>
       <body className="flex min-h-dvh flex-col antialiased">
         <BerrySprite />

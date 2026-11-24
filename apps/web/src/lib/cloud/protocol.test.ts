@@ -21,6 +21,7 @@ describe("parseFromWindow", () => {
     expect(m && m.t === "files" && m.files[0].file).toBe(file); // by reference, no copy
     expect(parseFromWindow(wrap("window", REQ, { t: "skipped", items: [{ name: "big.pdf", reason: "size" }] }), REQ)).toEqual({ t: "skipped", items: [{ name: "big.pdf", reason: "size" }] });
     expect(parseFromWindow(wrap("window", REQ, { t: "error", code: "denied" }), REQ)).toEqual({ t: "error", code: "denied" });
+    expect(parseFromWindow(wrap("window", REQ, { t: "away", ms: 120_000 }), REQ)).toEqual({ t: "away", ms: 120_000 });
     expect(parseFromWindow(wrap("window", REQ, { t: "saved", name: "a.pdf", link: "https://drive.google.com/x" }), REQ)).toEqual({ t: "saved", name: "a.pdf", link: "https://drive.google.com/x" });
   });
 
@@ -47,6 +48,8 @@ describe("parseFromWindow", () => {
       { t: "skipped", items: [{ name: "a.pdf", reason: "because" }] },
       { t: "error", code: "boom" },
       { t: "saved" },
+      { t: "away", ms: 11 * 60_000 },
+      { t: "away", ms: -1 },
     ];
     for (const m of bad) expect(parseFromWindow(wrap("window", REQ, m as never), REQ), JSON.stringify(m).slice(0, 80)).toBeNull();
     expect(parseFromWindow(wrap("window", REQ, { t: "saved", name: "a.pdf", link: "javascript:alert(1)" }), REQ)).toEqual({ t: "saved", name: "a.pdf", link: undefined });

@@ -7,6 +7,9 @@ import type { FlowApi, LoadedFile, ProcessFn, WorkspaceContext } from "@/compone
 import { cx } from "@/components/ui/cx";
 import { ChevronDownIcon, PlusIcon } from "@/components/ui/icons";
 import type { MenuEntry } from "@/components/ui/Menu";
+import { addPagesEntries, phoneAddEntries } from "@/components/cloud/cloud-menus";
+import { cloudFootnote } from "@/components/cloud/SourceCaret";
+import type { CloudProvider } from "@/lib/cloud/providers";
 import {
   A4,
   blankSizeAt,
@@ -474,6 +477,11 @@ export function MergeTool() {
     pendingAt.current = at;
     pagesInput.current?.click();
   };
+  /** F23: "Pages from a file" from a cloud: one file, then the page picker, as for a local file. */
+  const cloudPages = (p: CloudProvider, trigger: string) => {
+    pendingAt.current = null;
+    api.current?.openCloud(p, document.querySelector<HTMLElement>(`[data-testid=${trigger}]`), { tag: { picker: true } satisfies IntakeTag, multiple: false });
+  };
   const toolbarBlank = () => {
     const list = pagesRef.current;
     const last = list.reduce((acc, p, i) => (selection.has(p.uid) ? i : acc), -1);
@@ -788,10 +796,11 @@ export function MergeTool() {
                 placement="bottom-end"
                 disabled={w.dimmed}
                 className={cx(toolbarButton, "-ms-1")}
-                items={[
-                  { id: "from-file", label: c.fromFile, onSelect: () => openPagesPicker(null) },
-                  { id: "blank", label: c.blankPage, onSelect: toolbarBlank },
-                ]}
+                items={addPagesEntries(w.api.cloudProviders, { fromFile: { label: c.fromFile, onSelect: () => openPagesPicker(null) }, blank: { label: c.blankPage, onSelect: toolbarBlank } }, (p) =>
+                  cloudPages(p, "add-pages-menu"),
+                )}
+                footnote={w.api.cloudProviders.length ? cloudFootnote() : undefined}
+                popupClassName={w.api.cloudProviders.length ? "ip-menu-wide" : undefined}
                 data-testid="add-pages-menu"
               >
                 <span>{c.addPages}</span>
@@ -805,11 +814,14 @@ export function MergeTool() {
                 placement="bottom-end"
                 disabled={w.dimmed}
                 className={phoneAddButton}
-                items={[
-                  { id: "files", label: c.addFilesItem, onSelect: () => w.api.openPicker() },
-                  { id: "from-file", label: c.fromFile, onSelect: () => openPagesPicker(null) },
-                  { id: "blank", label: c.blankPage, onSelect: toolbarBlank },
-                ]}
+                items={phoneAddEntries(
+                  w.api.cloudProviders,
+                  { files: { label: c.addFilesItem, onSelect: () => w.api.openPicker() }, fromFile: { label: c.fromFile, onSelect: () => openPagesPicker(null) }, blank: { label: c.blankPage, onSelect: toolbarBlank } },
+                  (p) => w.api.openCloud(p, document.querySelector<HTMLElement>("[data-testid=add-menu]")),
+                  (p) => cloudPages(p, "add-menu"),
+                )}
+                footnote={w.api.cloudProviders.length ? cloudFootnote() : undefined}
+                presentation={w.api.cloudProviders.length ? "auto" : "popover"}
                 data-testid="add-menu"
               >
                 <PlusIcon size={18} />

@@ -10,7 +10,10 @@ import { CheckIcon, DownloadIcon, FilesIcon, ShareIcon } from "../ui/icons";
 import { Notice } from "../ui/Notice";
 import { copy } from "./copy";
 import { PrivacyNote } from "./notes";
-import type { ToolOutput } from "./types";
+import type { FlowNoticeInput, ToolOutput } from "./types";
+import { configuredProviders, SAVE_PROVIDERS, type CloudProvider } from "@/lib/cloud/providers";
+import { cloudCopy } from "../cloud/copy";
+import { SaveToCloud } from "../cloud/SaveToCloud";
 
 export function ResultCard({
   output,
@@ -20,6 +23,7 @@ export function ResultCard({
   onStartOver,
   onBack,
   announce,
+  cloud,
 }: {
   output: ToolOutput;
   tool: FlowTool;
@@ -28,7 +32,11 @@ export function ResultCard({
   onStartOver: () => void;
   onBack: () => void;
   announce: (message: string) => void;
+  /** F23: save to a cloud, and the provider any input came from (for the privacy line, AC-131). */
+  cloud?: { pushNotice: (n: Omit<FlowNoticeInput, "id">) => string; from: CloudProvider | null };
 }) {
+  const [savedTo, setSavedTo] = useState<CloudProvider | null>(null);
+  const savable = cloud ? SAVE_PROVIDERS.filter((p) => configuredProviders().includes(p)) : [];
   const download = useRef<HTMLAnchorElement>(null);
   const isZip = output.type === "application/zip";
   // Created in an effect and revoked in its cleanup, so StrictMode's double
@@ -111,6 +119,17 @@ export function ResultCard({
                 Download
               </span>
             </a>
+            {cloud && savable.length > 0 && (
+              <SaveToCloud
+                file={file}
+                providers={savable}
+                preferred={cloud.from}
+                toolName={tool.flow.title}
+                pushNotice={cloud.pushNotice}
+                announce={announce}
+                onSaved={setSavedTo}
+              />
+            )}
             {canShare && (
               <Button
                 variant="line"
@@ -125,7 +144,11 @@ export function ResultCard({
             )}
           </div>
           <div className="flex flex-col gap-2">
-            <PrivacyNote runtime={tool.runtime} context="result" />
+            <PrivacyNote
+              runtime={tool.runtime}
+              context="result"
+              text={savedTo ? cloudCopy.resultPrivacySaved(savedTo) : cloud?.from ? cloudCopy.resultPrivacy(cloud.from) : undefined}
+            />
             {output.wasEncrypted && <Notice tone="warning">{copy.resultUnencrypted}</Notice>}
           </div>
           {!isZip && continueTargets.length > 0 && (

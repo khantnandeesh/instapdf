@@ -70,7 +70,7 @@ export const CLOUD_ALLOW: Record<"google" | "dropbox" | "onedrive" | "mock", { s
   dropbox: { script: ["https://www.dropbox.com/static/api/2/dropins.js"], connect: ["https://dl.dropboxusercontent.com"], frame: [], form: [] },
   google: {
     script: ["https://apis.google.com/js/api.js", "https://apis.google.com/_/scs/", "https://accounts.google.com/gsi/client"],
-    connect: ["https://www.googleapis.com/drive/v3/files/", "https://www.googleapis.com/upload/drive/v3/files", "https://accounts.google.com/gsi/"],
+    connect: ["https://www.googleapis.com/drive/v3/files", "https://www.googleapis.com/drive/v3/files/", "https://www.googleapis.com/upload/drive/v3/files", "https://accounts.google.com/gsi/"],
     frame: ["https://docs.google.com/picker", "https://accounts.google.com/gsi/"],
     form: [],
   },

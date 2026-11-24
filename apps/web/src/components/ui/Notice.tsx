@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Button } from "./Button";
+import { Button, buttonClasses } from "./Button";
 import { cx } from "./cx";
 import { AlertIcon, CheckCircleIcon, CloseIcon, ErrorIcon, InfoIcon, LeafIcon } from "./icons";
 
@@ -22,14 +22,20 @@ export function Notice({
   action,
   look,
   className,
+  inlineAction,
+  busy,
 }: {
   tone: NoticeTone;
   title?: string;
   children?: ReactNode;
   onDismiss?: () => void;
-  action?: { label: string; onClick: () => void };
+  action?: { label: string; onClick?: () => void; href?: string; autoFocus?: boolean };
   look?: "alert" | "callout";
   className?: string;
+  /** The action sits on the alert's row, before the close (F23 short alerts). */
+  inlineAction?: boolean;
+  /** A small busy ring replaces the icon (waiting). */
+  busy?: boolean;
 }) {
   const kind = look ?? (tone === "danger" ? "alert" : "callout");
   const Icon =
@@ -55,19 +61,20 @@ export function Notice({
         className,
       )}
     >
-      <Icon
-        size={22}
-        className={cx("shrink-0", kind === "callout" && (tone === "danger" ? "text-danger" : tone === "warning" ? "text-brand-strong" : "text-leaf"))}
-      />
+      {busy ? (
+        <span className="ip-busy-ring" aria-hidden="true" />
+      ) : (
+        <Icon
+          size={22}
+          className={cx("shrink-0", kind === "callout" && (tone === "danger" ? "text-danger" : tone === "warning" ? "text-brand-strong" : "text-leaf"))}
+        />
+      )}
       <div className="min-w-0 flex-1 break-words">
         {title && <p className="font-semibold">{title}</p>}
         {children && <div className={cx(kind === "alert" && title && "font-normal")}>{children}</div>}
-        {action && (
-          <Button size="sm" variant="outline" className="mt-2" onClick={action.onClick}>
-            {action.label}
-          </Button>
-        )}
+        {action && !inlineAction && <NoticeAction action={action} className="mt-2" />}
       </div>
+      {action && inlineAction && <NoticeAction action={action} className="-my-1 shrink-0 self-center" />}
       {onDismiss && (
         <button
           type="button"
@@ -79,5 +86,19 @@ export function Notice({
         </button>
       )}
     </div>
+  );
+}
+
+function NoticeAction({ action, className }: { action: { label: string; onClick?: () => void; href?: string; autoFocus?: boolean }; className?: string }) {
+  if (action.href)
+    return (
+      <a href={action.href} target="_blank" rel="noopener noreferrer" className={buttonClasses("outline", "sm", className)} onClick={action.onClick} autoFocus={action.autoFocus}>
+        {action.label}
+      </a>
+    );
+  return (
+    <Button size="sm" variant="outline" className={className} onClick={action.onClick} autoFocus={action.autoFocus}>
+      {action.label}
+    </Button>
   );
 }

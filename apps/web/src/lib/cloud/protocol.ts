@@ -31,13 +31,18 @@ export type FromWindow =
   | { t: "hb" }
   | { t: "progress"; id: string; name: string; loaded: number; total: number }
   | { t: "files"; files: { id: string; file: File }[] }
-  | { t: "skipped"; items: { name: string; reason: SkipReason }[] }
+  | { t: "skipped"; items: { name: string; reason: SkipReason; id?: string }[] }
   | { t: "failed"; id: string; name: string }
   | { t: "done" }
   | { t: "cancel" }
   | { t: "error"; code: ErrorCode }
   | { t: "saveProgress"; loaded: number; total: number }
-  | { t: "saved"; name: string; link?: string };
+  | { t: "saved"; name: string; link?: string }
+  /** The window leaves for a full-page sign-in (OneDrive): keep the request open for up to `ms`. */
+  | { t: "away"; ms: number };
+
+/** Longest "away" a window may ask for (a sign-in page). */
+export const MAX_AWAY_MS = 10 * 60 * 1000;
 
 export type FromTool =
   | { t: "pong" }
@@ -92,10 +97,10 @@ export function parseFromWindow(data: unknown, req: string): FromWindow | null {
     }
     case "skipped": {
       if (!Array.isArray(m.items) || m.items.length === 0 || m.items.length > MAX_FILES_PER_MESSAGE) return null;
-      const items: { name: string; reason: SkipReason }[] = [];
+      const items: { name: string; reason: SkipReason; id?: string }[] = [];
       for (const it of m.items) {
-        if (!isObj(it) || !isText(it.name) || !SKIPS.includes(it.reason as SkipReason)) return null;
-        items.push({ name: it.name, reason: it.reason as SkipReason });
+        if (!isObj(it) || !isText(it.name) || !SKIPS.includes(it.reason as SkipReason) || (it.id !== undefined && !isId(it.id))) return null;
+        items.push(it.id === undefined ? { name: it.name, reason: it.reason as SkipReason } : { name: it.name, reason: it.reason as SkipReason, id: it.id });
       }
       return { t: "skipped", items };
     }
@@ -105,6 +110,9 @@ export function parseFromWindow(data: unknown, req: string): FromWindow | null {
     case "error":
       if (!ERRORS.includes(m.code as ErrorCode)) return null;
       return { t: "error", code: m.code as ErrorCode };
+    case "away":
+      if (!isCount(m.ms) || m.ms > MAX_AWAY_MS) return null;
+      return { t: "away", ms: m.ms };
     case "saveProgress":
       if (!isCount(m.loaded) || !isCount(m.total)) return null;
       return { t: "saveProgress", loaded: m.loaded, total: m.total };

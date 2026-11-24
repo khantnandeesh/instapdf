@@ -91,6 +91,22 @@ describe("openCloudWindow (tool tab)", () => {
     expect(onClosed).toHaveBeenCalledWith("lost");
   });
 
+  it("an 'away' notice (sign-in page) holds off the watchdog for that long, then falls back to the first-contact wait", async () => {
+    const onClosed = vi.fn();
+    openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false });
+    const win = peer();
+    win.postMessage(wrap("window", REQ, { t: "ready" }));
+    win.postMessage(wrap("window", REQ, { t: "away", ms: 60_000 }));
+    await tick();
+    vi.advanceTimersByTime(59_000);
+    expect(onClosed).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000 + WINDOW_LOST_MS + 1000);
+    expect(onClosed).not.toHaveBeenCalled(); // back from the redirect: the slower first-contact limit applies
+    vi.advanceTimersByTime(FIRST_CONTACT_MS);
+    expect(onClosed).toHaveBeenCalledWith("lost");
+    win.close();
+  });
+
   it("a cancel from the window ends the session quietly", async () => {
     const onClosed = vi.fn();
     openCloudWindow("mock", params, { onClosed }, { Channel, open: () => ({}) as Window, hidden: () => false });

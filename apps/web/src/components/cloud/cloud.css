@@ -1,0 +1,462 @@
+/*
+ * F23 cloud sources (spec ## UI). Imported by the cloud components only, so it ships with tool
+ * routes and /cloud/* and stays out of the site-wide stylesheet budget (F2 AC-55). Values come from
+ * the BerryPDF tokens; the provider marks are the only raw colours (ProviderMark.tsx).
+ */
+@layer components {
+  /* ---- Split button: the upload button + a caret that opens the source menu ------------------ */
+  .ip-split {
+    display: inline-flex;
+    align-items: stretch;
+  }
+  .ip-split > .mp-btn:first-child {
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+  }
+  .ip-split .ip-split__caret.mp-btn {
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+    padding-inline: 0;
+    width: 52px;
+  }
+  /* The seam: a light line inside the berry, so the two halves read as two targets (decorative). */
+  .ip-split .ip-split__caret.mp-btn:not(.mp-btn--tool, .mp-btn--line)::before {
+    content: "";
+    position: absolute;
+    inset-block: 12px;
+    inset-inline-start: 0;
+    width: 1.5px;
+    border-radius: 1px;
+    background: rgb(255 255 255 / 0.45);
+  }
+  .ip-split__caret svg {
+    transition: transform var(--dur-base) var(--ease-standard);
+  }
+  .ip-split__caret[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+  }
+  /* Tool (blueberry) variant in the working toolbar: the halves share one outline. */
+  .ip-split--tool {
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-glow);
+  }
+  .ip-split--tool > .mp-btn--tool:first-child {
+    border-inline-end-width: 0;
+    box-shadow: none;
+  }
+  .ip-split--tool .ip-split__caret.mp-btn--tool {
+    width: 36px;
+    border-inline-start-color: color-mix(in srgb, var(--link) 45%, transparent);
+  }
+  @media (max-width: 639px) {
+    .ip-split--tool .ip-split__caret.mp-btn--tool {
+      width: 44px;
+      min-height: 44px;
+    }
+    .ip-split--lg {
+      width: 100%;
+    }
+    .ip-split--lg > .mp-btn:first-child {
+      flex: 1;
+      min-height: 56px;
+    }
+    .ip-split--lg .ip-split__caret.mp-btn {
+      min-height: 56px;
+    }
+  }
+
+  /* ---- Cloud row: one tap to each provider, under the upload button ------------------------- */
+  .ip-cloud-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 44px;
+  }
+  .ip-cloud-glyph {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    color: var(--ink);
+    transition:
+      background-color var(--dur-base),
+      transform var(--dur-lift);
+  }
+  .ip-cloud-glyph:hover {
+    background: var(--band);
+  }
+  .ip-cloud-glyph:active {
+    transform: scale(0.92);
+  }
+  .ip-cloud-glyph:focus-visible {
+    outline: 3px solid var(--link);
+    outline-offset: 2px;
+  }
+  .ip-cloud-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .ip-cloud-last {
+    display: none;
+  }
+  /* The last used provider (pre-paint script sets html[data-cloud-last]): first, with its name (a chip). */
+  html[data-cloud-last="google"] .ip-cloud-glyph[data-p="google"],
+  html[data-cloud-last="dropbox"] .ip-cloud-glyph[data-p="dropbox"],
+  html[data-cloud-last="onedrive"] .ip-cloud-glyph[data-p="onedrive"] {
+    order: -1;
+    height: 36px;
+    padding: 0 14px 0 10px;
+    margin-inline-end: 4px;
+    background: var(--band);
+    box-shadow: inset 0 0 0 1.5px var(--sand);
+    font: 500 15px/20px var(--font-display);
+    white-space: nowrap;
+  }
+  :is(html[data-cloud-last="google"] [data-p="google"], html[data-cloud-last="dropbox"] [data-p="dropbox"], html[data-cloud-last="onedrive"] [data-p="onedrive"]).ip-cloud-glyph:hover {
+    background: var(--mp-pink-hover);
+    color: var(--brand-strong);
+  }
+  :is(html[data-cloud-last="google"] [data-p="google"], html[data-cloud-last="dropbox"] [data-p="dropbox"], html[data-cloud-last="onedrive"] [data-p="onedrive"]) .ip-cloud-name {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+  :is(html[data-cloud-last="google"] [data-p="google"], html[data-cloud-last="dropbox"] [data-p="dropbox"], html[data-cloud-last="onedrive"] [data-p="onedrive"]) .ip-cloud-last {
+    display: inline;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  @media (pointer: coarse), (max-width: 639px) {
+    html[data-cloud-last] .ip-cloud-glyph[data-p] {
+      height: 44px;
+    }
+  }
+
+  /* ---- Menu footnote (outside role=menu) and the phone sheet --------------------------------- */
+  .ip-menu-foot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 6px 0;
+    padding: 8px 6px 4px;
+    border-top: 1.5px solid var(--sand);
+    font-size: 12px;
+    line-height: 17px;
+    color: var(--muted);
+  }
+  .ip-menu-foot svg {
+    flex: none;
+    color: var(--brand-strong);
+  }
+  .mp-menu.ip-menu-wide {
+    min-width: 248px;
+  }
+  /* < 640 px: a sheet that rises from the top edge of the dock and never covers it (U-3). */
+  .mp-menu.ip-menu-sheet {
+    position: fixed;
+    inset: auto 8px calc(var(--ip-dock-actual, 0px) + 8px) 8px;
+    width: auto;
+    max-width: none;
+    max-height: calc(100dvh - var(--ip-dock-actual, 0px) - 72px);
+    overflow-y: auto;
+    padding: 8px;
+    border-radius: 20px;
+    animation: mp-pop-in 300ms var(--ease-pop) both;
+  }
+  .mp-menu.ip-menu-sheet::backdrop {
+    /* The berry scrim over the page above the dock only: the dock and its primary stay uncovered. */
+    background: linear-gradient(to top, transparent var(--ip-dock-actual, 0px), rgb(58 20 30 / 0.16) var(--ip-dock-actual, 0px));
+  }
+
+  /* ---- Waiting ring in a notice (one turn per 0.8 s; pulses under reduced motion) ------------- */
+  .ip-busy-ring {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    flex: none;
+    margin-top: 1px;
+    border-radius: 50%;
+    border: 2.5px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-top-color: currentColor;
+    animation: ip-spin 0.8s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ip-busy-ring {
+      border-color: currentColor;
+      animation: ip-pulse 1.6s ease-in-out infinite !important;
+    }
+  }
+
+  /* ---- Download cards (in the workspace while cloud files arrive) ---------------------------- */
+  .ip-dl-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .ip-dl {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: max(180px, var(--ip-thumb-size, 160px));
+    padding: 10px 12px 12px;
+    border-radius: var(--radius-tray);
+    background: var(--page-tray);
+  }
+  .ip-dl__page {
+    position: relative;
+    display: grid;
+    place-items: center;
+    height: calc(var(--ip-thumb-size, 160px) * 0.9);
+    border-radius: 4px;
+  }
+  .ip-dl__paper {
+    display: grid;
+    place-items: center;
+    height: 80%;
+    aspect-ratio: 0.72;
+    border-radius: 4px;
+    background: var(--surface);
+    box-shadow: var(--ip-shadow-paper);
+  }
+  .ip-dl__x {
+    position: absolute;
+    top: -2px;
+    inset-inline-end: -4px;
+  }
+  .ip-dl__bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font: 600 13px/18px var(--font-display);
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .ip-dl__bar .mp-jam {
+    height: 12px;
+    flex: 1;
+  }
+  .ip-dl__name {
+    font: 600 15px/20px var(--font-display);
+    color: var(--ink-black);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ip-dl__meta {
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .ip-dl--failed .ip-dl__meta {
+    color: var(--danger);
+    font-weight: 600;
+  }
+  .ip-dl--failed .ip-dl__paper {
+    height: 50%;
+    box-shadow: inset 0 0 0 1.5px var(--mp-alert-danger-border);
+    color: var(--danger);
+  }
+
+  /* ---- Save to cloud (result) ----------------------------------------------------------------- */
+  .ip-save {
+    align-self: center;
+  }
+  .ip-save .mp-btn--line {
+    min-height: 44px;
+    padding-inline: 14px;
+  }
+  .ip-save > .mp-btn--line:first-child {
+    min-width: 168px;
+  }
+  .ip-save .ip-split__caret.mp-btn--line {
+    width: 40px;
+    margin-inline-start: -1.5px;
+  }
+  @media (max-width: 639px) {
+    .ip-save {
+      width: 100%;
+    }
+    .ip-save > .mp-btn--line:first-child {
+      flex: 1;
+    }
+    .ip-save .ip-split__caret.mp-btn--line {
+      width: 52px;
+    }
+  }
+
+  /* ---- The /cloud/<provider> window ---------------------------------------------------------- */
+  body:has(.ip-cw) :is(.ip-site-header, .ip-site-footer, a[href="#main"]) {
+    display: none;
+  }
+  body:has(.ip-cw) > div.flex-1 {
+    padding-bottom: 0;
+  }
+  .ip-cw {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  .ip-cw__top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 52px;
+    padding: 0 8px 0 16px;
+    font: 600 16px/1 var(--font-display);
+    color: var(--ink-black);
+  }
+  .ip-cw__top .ip-cw__sub {
+    font-weight: 400;
+    color: var(--muted);
+  }
+  .ip-cw__close {
+    margin-inline-start: auto;
+  }
+  .ip-cw__main {
+    flex: 1;
+    display: grid;
+    place-items: center;
+    padding: 8px 16px 24px;
+  }
+  .ip-cw__card {
+    width: 100%;
+    max-width: 420px;
+    border-radius: 16px 16px 28px 16px;
+    border: 1.5px solid var(--sand);
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+    padding: 32px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    text-align: center;
+    animation: mp-pop-in 380ms var(--ease-pop) both;
+  }
+  .ip-cw__title {
+    font: 600 24px/28px var(--font-display);
+    color: var(--ink-black);
+    outline: none;
+  }
+  .ip-cw__text {
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--muted);
+  }
+  .ip-cw__privacy {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    text-align: start;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--muted);
+    max-width: 340px;
+  }
+  .ip-cw__privacy svg {
+    flex: none;
+    margin-top: 1px;
+    color: var(--brand-strong);
+  }
+  .ip-cw__btn.mp-btn {
+    width: 100%;
+    min-height: 56px;
+  }
+  .ip-cw__rows {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    text-align: start;
+  }
+  .ip-cw__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    align-items: center;
+  }
+  .ip-cw__row .mp-jam {
+    grid-column: 1 / -1;
+    height: 12px;
+  }
+  .ip-cw__name {
+    font: 600 15px/20px var(--font-display);
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ip-cw__meta {
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .ip-cw__meta--bad {
+    color: var(--danger);
+    font-weight: 600;
+  }
+  .ip-cw__picker {
+    width: 100%;
+    flex: 1;
+    min-height: 420px;
+    border: 0;
+    border-top: 1.5px solid var(--sand);
+    background: var(--surface);
+  }
+  .ip-cw__tick {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    background: var(--mp-alert-ok-bg);
+    color: var(--leaf);
+    animation: mp-pop-in 400ms var(--ease-pop) 160ms both;
+  }
+  .ip-cw__mock {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: start;
+    font-size: 14px;
+  }
+  .ip-cw__mock label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+  }
+  .ip-cw__mock-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  @media (forced-colors: active) {
+    .ip-cloud-glyph,
+    .ip-split__caret {
+      border: 1px solid ButtonText;
+    }
+    .mp-menu.ip-menu-sheet::backdrop {
+      background: transparent;
+    }
+  }
+}

@@ -12,12 +12,12 @@ export function LimitsNote({ text, full }: { text: string; full: string }) {
 }
 
 /** Browser tools only: server tools get their own copy in F6 and no result variant. */
-export function PrivacyNote({ runtime, context }: { runtime: "client" | "server"; context: "intro" | "result" }) {
+export function PrivacyNote({ runtime, context, text }: { runtime: "client" | "server"; context: "intro" | "result"; text?: string }) {
   if (runtime !== "client") return null;
   return (
     <p className="flex items-center gap-2 text-sm text-ink" data-testid={`privacy-${context}`}>
       <ShieldIcon size={18} className="shrink-0 text-brand-strong" />
-      {context === "intro" ? copy.privacyIntro : copy.privacyResult}
+      {text ?? (context === "intro" ? copy.privacyIntro : copy.privacyResult)}
     </p>
   );
 }
