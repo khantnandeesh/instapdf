@@ -58,7 +58,7 @@ export function SidePanel({ onGo, onPicked, sheet }: { onGo: (i: number) => void
           </button>
         ))}
       </div>
-      <div role="tabpanel" id={`ed-tabpanel-${tab}`} aria-labelledby={`ed-tab-${tab}`} className="ed-side__body ed-scroll" data-ip-scroll={sheet ? "overlay" : "rail"}>
+      <div role="tabpanel" id={`ed-tabpanel-${tab}`} aria-labelledby={`ed-tab-${tab}`} className="ed-side__body ed-scroll" data-ip-scroll={sheet ? undefined : "rail"}>
         {tab === "pages" && <Thumbs onGo={(i) => (onGo(i), onPicked?.())} sheet={sheet} />}
         {tab === "objects" && <Objects onPicked={onPicked} />}
         {tab === "history" && <HistoryList />}
@@ -140,8 +140,9 @@ const Thumb = memo(function Thumb({
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    // Measured against the panel body that scrolls (the list itself grows with its content).
-    const root = el.closest<HTMLElement>(".ed-side__body");
+    // Measured against the region that scrolls: the rail, or the phone sheet's body (the list
+    // itself grows with its content).
+    const root = el.closest<HTMLElement>("[data-ip-scroll]");
     // Near: draw. Far (several screens away): release the canvas (iOS memory).
     const near = new IntersectionObserver(([e]) => e.isIntersecting && setVisible(true), { root, rootMargin: "300px 0px" });
     const far = new IntersectionObserver(([e]) => !e.isIntersecting && setVisible(false), { root, rootMargin: "1500px 0px" });

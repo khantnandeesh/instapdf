@@ -1146,12 +1146,15 @@
 .ed-side__body {
   flex: 1;
   min-height: 0;
-  /* ip-scroll: rail (overlay inside the phone sheet) */
+  /* ip-scroll: rail */
   overflow: auto;
   padding: 8px;
 }
 .ed-side--sheet .ed-side__body {
-  max-height: calc(var(--ip-sheet-max-h, 70dvh) - 120px);
+  /* In the phone sheet the sheet's own body scrolls (one scroller per layer): this one grows. */
+  overflow: visible;
+  overflow-x: clip;
+  padding: 0;
 }
 .ed-thumbs {
   display: flex;
