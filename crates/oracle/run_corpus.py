@@ -1,6 +1,7 @@
 """PDFium oracle for berry-engine (test-only; PDFium is never the edit engine).
 
-For every case in tests/parity/editor/manifest.json this runs the `berry` CLI and then checks,
+For every case in tests/parity/editor/manifest.json this runs the `berry` CLI (a replacement, or
+with "add" a new line of text) and then checks,
 with PDFium (pypdfium2) and qpdf (pikepdf):
 
   1. every pixel outside the regions the engine reported as changed is identical at 2x;
@@ -61,7 +62,13 @@ def run_case(case, args):
     out = os.path.join(args.out, case["id"] + ".pdf")
     # A case can name its own font folder in the corpus (the open fonts its scripts need).
     fonts = os.path.join(CORPUS, case["fonts"]) if case.get("fonts") else args.fonts
-    cmd = [args.berry, "replace", src, out, "1", case["find"], case["replace"], "--fonts", fonts]
+    if "add" in case:
+        # New text: a line drawn at (x, y) in the box's family.
+        a = case["add"]
+        cmd = [args.berry, "add", src, out, "1", str(a["x"]), str(a["y"]), str(a["size"]), a["text"], "--fonts", fonts]
+        cmd += ["--family", a.get("family", "Noto Sans")]
+    else:
+        cmd = [args.berry, "replace", src, out, "1", case["find"], case["replace"], "--fonts", fonts]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         return [f"engine failed: {proc.stderr.strip()}"]

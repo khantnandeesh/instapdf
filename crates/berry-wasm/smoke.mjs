@@ -58,4 +58,32 @@ if (shaping) {
   assert.throws(() => scripts.replaceRange(0, hindi, 0, 3, "संपूर्ण"), (e) => e.kind === "read-only" && e.reason === "needs-shaping");
 }
 
+// New text: Latin in both engines, Hindi and Arabic only in the full one. Fonts are the WOFF
+// files the web app ships.
+const webfont = (f) => new Uint8Array(readFileSync(new URL(`../../tests/parity/editor/webfonts/${f}`, here)));
+const page = new BerryDocument(pdf);
+assert.ok(page.addFont("Noto Sans", false, false, webfont("NotoSans-Regular.woff")));
+assert.ok(page.addFont("Noto Sans Devanagari", false, false, webfont("NotoSansDevanagari-Regular.woff")));
+assert.ok(page.addFont("Noto Naskh Arabic", false, false, webfont("NotoNaskhArabic-Regular.woff")));
+const sans = { families: ["Noto Sans"], bold: false, italic: false };
+const measured = page.shape("Approved by the client", sans, 12);
+assert.ok(measured.width > 100 && measured.runs.length === 1 && measured.runs[0].family === "Noto Sans");
+const added = page.addText(0, "Approved by the client", sans, 12, 72, 40, 0, [0, 0, 0]);
+assert.ok(added.changed.length === 1 && added.page.lines.some((l) => l.text === "Approved by the client"));
+assert.throws(() => page.addText(0, "x", { families: ["Noto Sans"] }, 12, 0, 0, 0, "red"));
+const hindiText = "संपूर्ण राशि का भुगतान";
+const arabicText = "مرحبا بالعالم، هذا نص تجريبي.";
+if (shaping) {
+  const ar = page.shape(arabicText, sans, 14);
+  assert.equal(ar.direction, "rtl");
+  page.addText(0, arabicText, sans, 14, 540 - ar.width, 60, 0, [0, 0, 0]);
+  const hi = page.addText(0, hindiText, sans, 14, 72, 80, 0, [0, 0, 0]);
+  assert.ok(hi.substitutions.some((s) => s.substitute_font === "Noto Sans Devanagari"));
+  const reread = new BerryDocument(page.save().bytes).pageText(0);
+  for (const t of [arabicText, hindiText]) assert.ok(reread.lines.some((l) => l.text === t), t);
+} else {
+  assert.throws(() => page.shape(hindiText, sans, 14), (e) => e.kind === "read-only" && e.reason === "needs-shaping");
+  assert.throws(() => page.addText(0, arabicText, sans, 14, 72, 60, 0, [0, 0, 0]), (e) => e.reason === "needs-shaping");
+}
+
 console.log(`${name} smoke ok: ${pdf.length} → ${bytes.length} bytes, save ${ms.toFixed(1)} ms`);

@@ -144,6 +144,44 @@ export interface SaveReport {
  * script's open family, e.g. "Noto Sans Devanagari" or "Noto Naskh Arabic", then Latin stand-ins. */
 export interface FontRequest { families: string[]; bold: boolean; italic: boolean }
 
+/** One glyph of shaped text. Lengths in points at the requested size. */
+export interface ShapedGlyph {
+  gid: number;
+  /** UTF-16 index in the text where the glyph's cluster starts. */
+  cluster: number;
+  advance: number;
+  dx: number;
+  dy: number;
+}
+
+/** Consecutive glyphs of one registered font and direction. */
+export interface ShapedRun {
+  /** UTF-16 range [start, end) of the text. */
+  start: number;
+  end: number;
+  /** Empty for blanks no registered font draws (they still take a space's width). */
+  family: string;
+  bold: boolean;
+  italic: boolean;
+  direction: "ltr" | "rtl";
+  /** Points. */
+  width: number;
+  glyphs: ShapedGlyph[];
+}
+
+/** One line of text laid out with the registered fonts. */
+export interface ShapedText {
+  /** Paragraph direction, from the first strong character. */
+  direction: "ltr" | "rtl";
+  /** Points. */
+  width: number;
+  /** Points: the largest ascent and descent of the fonts used (descent is negative). */
+  ascent: number;
+  descent: number;
+  /** Visual order, left to right. */
+  runs: ShapedRun[];
+}
+
 /** What every method throws. Nothing is changed when an edit throws. */
 export type BerryError =
   | { kind: "parse"; message: string }
@@ -177,7 +215,24 @@ export class BerryDocument {
   replaceLine(page: number, line: number, text: string): EditResult;
   /** Replaces characters [start, end) of a line. */
   replaceRange(page: number, line: number, start: number, end: number, text: string): EditResult;
-  /** Registers an open-licensed TrueType font for characters the original font lacks. */
+  /**
+   * Lays out one line of new text with the registered fonts. The engine adds the open families
+   * of the text's scripts (e.g. "Noto Naskh Arabic") to `font.families` itself. Throws
+   * missing-glyphs when no registered font draws a character; the default module throws
+   * read-only "needs-shaping" for text that needs the shaping module (Indic, Arabic, Hebrew…).
+   */
+  shape(text: string, font: FontRequest, size: number): ShapedText;
+  /**
+   * Draws one line of new text in a content stream of its own. `x, y` is the left end of the
+   * baseline in PDF user space (for right alignment pass `right - shape(…).width`), `angle` is
+   * in degrees counter-clockwise, `color` is sRGB 0–255. Fonts are embedded as subsets with
+   * Unicode mappings. The page is read back and the edit rolled back unless the line reads as
+   * typed. Throws as shape() does; call once per line.
+   */
+  addText(page: number, text: string, font: FontRequest, size: number, x: number, y: number, angle: number,
+    color: [number, number, number]): EditResult;
+  /** Registers an open-licensed TrueType font (TTF or WOFF 1.0) for characters the original
+   * font lacks and for added text. */
   addFont(family: string, bold: boolean, italic: boolean, bytes: Uint8Array): boolean;
   /**
    * Returns the original bytes plus one appended revision, after reading the result back and
