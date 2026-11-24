@@ -6,8 +6,8 @@
 import { buildPdf, type BuildInput } from "./build";
 import { FONT_BASE, type EditorFontManifest } from "./fonts";
 
-export type BuildRequest = { id: number; input: BuildInput };
-export type BuildResponse = { id: number; ok: true; bytes: Uint8Array } | { id: number; ok: false; message: string };
+export type BuildRequest = { id: number; input: BuildInput } | { id: number; owner: { bytes: Uint8Array; password: string; userPassword?: string } };
+export type BuildResponse = { id: number; ok: true; bytes: Uint8Array } | { id: number; ok: true; owner: boolean } | { id: number; ok: false; message: string };
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -40,6 +40,12 @@ const fonts = {
 scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: true }>) => {
   const msg = event.data;
   if ("warm" in msg) return;
+  if ("owner" in msg) {
+    const { isOwnerPassword } = await import("./owner");
+    const owner = await isOwnerPassword(msg.owner.bytes, msg.owner.password, msg.owner.userPassword);
+    scope.postMessage({ id: msg.id, ok: true, owner } satisfies BuildResponse);
+    return;
+  }
   try {
     const fontkit = (await import("@cantoo/fontkit")).default;
     const out = await buildPdf(msg.input, fonts, fontkit);

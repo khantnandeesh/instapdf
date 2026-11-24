@@ -14,6 +14,7 @@ const manifest = JSON.parse(read("manifest.json").toString("utf8")) as {
   wasmBindgen: string;
   files: Record<string, string>;
   wasmGzipBytes: number;
+  wasmBytes: number;
 };
 
 describe("engine artifact", () => {
@@ -28,6 +29,10 @@ describe("engine artifact", () => {
     const ci = readFileSync(new URL("../../../../../.github/workflows/engine.yml", import.meta.url), "utf8");
     expect(ci).toContain(`WASM_BINDGEN_VERSION: ${manifest.wasmBindgen}`);
     expect(ci).toContain(`rustup toolchain install ${manifest.rust}`);
+  });
+
+  it("records the raw WebAssembly size that load progress counts against", () => {
+    expect(manifest.wasmBytes).toBe(read("berry_engine_bg.wasm").length);
   });
 
   it("stays inside the 1 MB gzip budget", () => {

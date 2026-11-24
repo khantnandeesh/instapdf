@@ -38,6 +38,7 @@ export function renderPage(pdf: PDFDocumentProxy, src: number, scale: number, ro
     run: async () => {
       if (job.cancelled) return resolve(null);
       let page: Awaited<ReturnType<PDFDocumentProxy["getPage"]>> | null = null;
+      let canvas: HTMLCanvasElement | null = null;
       try {
         page = await pdf.getPage(src + 1);
         if (job.cancelled) return resolve(null);
@@ -47,13 +48,15 @@ export function renderPage(pdf: PDFDocumentProxy, src: number, scale: number, ro
           dpr *= Math.sqrt(MAX_PIXELS / (viewport.width * viewport.height));
           viewport = page.getViewport({ scale: scale * dpr, rotation });
         }
-        const canvas = document.createElement("canvas");
+        canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.floor(viewport.width));
         canvas.height = Math.max(1, Math.floor(viewport.height));
         task = page.render({ canvas, viewport });
         await task.promise;
+        if (job.cancelled) release(canvas);
         resolve(job.cancelled ? null : canvas);
       } catch {
+        if (canvas) release(canvas);
         resolve(job.cancelled ? null : "failed");
       } finally {
         page?.cleanup();
@@ -69,4 +72,21 @@ export function renderPage(pdf: PDFDocumentProxy, src: number, scale: number, ro
       task?.cancel();
     },
   };
+}
+
+/**
+ * Puts `next` (or nothing) in `holder`, zeroing the canvases it replaces: iOS keeps a canvas's
+ * backing store until its size is 0, and counts it against a small per-page budget.
+ */
+export function release(c: HTMLCanvasElement) {
+  c.width = 0;
+  c.height = 0;
+}
+
+export function swapCanvas(holder: HTMLElement, next: HTMLCanvasElement | null) {
+  for (const old of Array.from(holder.querySelectorAll("canvas"))) {
+    if (old !== next) release(old);
+  }
+  if (next) holder.replaceChildren(next);
+  else holder.replaceChildren();
 }

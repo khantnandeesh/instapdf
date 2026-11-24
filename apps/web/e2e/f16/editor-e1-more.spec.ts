@@ -270,14 +270,28 @@ test("AC-50: with reduced motion, nothing animates", async ({ page }) => {
   expect(running).toBe(0);
 });
 
-test("AC-46: every output passes qpdf's structural check", async ({ page }) => {
-  let check = "";
+test("AC-46: every output passes qpdf's structural check, renders in pdfium and parses in pdf.js", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "Output checks run once, on the desktop project");
+  // qpdf (pikepdf) checks the structure; pdfium (pypdfium2) renders every page; pdf.js below
+  // builds every page's operator list.
+  const check = [
+    "import sys, pikepdf, pypdfium2",
+    "with pikepdf.open(sys.argv[1]) as p:",
+    "  probs = [str(x) for x in p.check_pdf_syntax()]",
+    "doc = pypdfium2.PdfDocument(sys.argv[1])",
+    "for i in range(len(doc)):",
+    "  bmp = doc[i].render(scale=0.5)",
+    "  if bmp.width < 10 or bmp.height < 10: probs.append(f'page {i + 1} rendered empty')",
+    "print('\\n'.join(probs))",
+  ].join("\n");
   try {
-    execFileSync("python3", ["-c", "import pikepdf"], { stdio: "ignore" });
-    check = "import sys, pikepdf\nwith pikepdf.open(sys.argv[1]) as p:\n  probs = p.check_pdf_syntax()\n  print('\\n'.join(map(str, probs)))";
+    execFileSync("python3", ["-c", "import pikepdf, pypdfium2"], { stdio: "ignore" });
   } catch {
-    test.skip(true, "pikepdf (qpdf) is not installed here");
+    // CI installs both: a missing install there is a failure, not a skip.
+    if (process.env.CI) throw new Error("AC-46 needs pikepdf and pypdfium2 in CI: pip install pikepdf==10.18.2 pypdfium2==5.14.0");
+    test.skip(true, "pikepdf (qpdf) or pypdfium2 is not installed here");
   }
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const dir = mkdtempSync(join(tmpdir(), "berry-qpdf-"));
   for (const file of ["report-form-3p.pdf", "rotated-90.pdf", "shared-xobject.pdf", "std14-reportlab.pdf", "libreoffice-memo.pdf"]) {
     await openFile(page, file);
@@ -298,7 +312,14 @@ test("AC-46: every output passes qpdf's structural check", async ({ page }) => {
     const path = join(dir, file);
     writeFileSync(path, out.bytes);
     const problems = execFileSync("python3", ["-c", check, path], { encoding: "utf8" }).trim();
-    expect(problems, `qpdf check ${file}`).toBe("");
+    expect(problems, `qpdf check and pdfium render of ${file}`).toBe("");
+    const task = getDocument({ data: out.bytes.slice(), verbosity: 0, stopAtErrors: true });
+    const doc = await task.promise;
+    for (let i = 1; i <= doc.numPages; i++) {
+      const ops = await (await doc.getPage(i)).getOperatorList();
+      expect(ops.fnArray.length, `pdf.js operators on page ${i} of ${file}`).toBeGreaterThan(0);
+    }
+    await task.destroy();
   }
 });
 

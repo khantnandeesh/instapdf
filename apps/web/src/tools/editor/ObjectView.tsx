@@ -5,6 +5,8 @@
  * points × scale (CSS px), inside the page's overlay, which the page's rotation turns as a whole.
  * Text is drawn with the same font file and the same baselines as the output (AC-91).
  */
+import { listChars } from "@/lib/editor/coverage";
+import { useMissing } from "./coverage-browser";
 import { memo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { arrowHead, svgPolyline, typedSignatureSize } from "@/lib/editor/draw-math";
 import { cssFamily, faceOf } from "@/lib/editor/fonts";
@@ -93,6 +95,7 @@ export const ObjectView = memo(function ObjectView({
       return (
         <div {...common} className={cls} style={boxStyle(o.x, o.y, o.w, o.h, scale, o.rot)}>
           {editing ? <TextEditor o={o} scale={scale} onDone={onTextDone} /> : <TextLines o={o} scale={scale} />}
+          {!editing && <MissingNote o={o} />}
           {pos}
         </div>
       );
@@ -315,5 +318,16 @@ function TypedSignature({ o, text, face, scale }: { o: SignatureObj; text: strin
         {text}
       </text>
     </svg>
+  );
+}
+
+/** Characters of this text that no font we ship can print (AC-75): said on the box, not silently. */
+function MissingNote({ o }: { o: TextObj }) {
+  const missing = useMissing(o);
+  if (!missing.length) return null;
+  return (
+    <span className="ed-missing" data-testid="text-missing">
+      Won’t print: {listChars(missing)}
+    </span>
   );
 }

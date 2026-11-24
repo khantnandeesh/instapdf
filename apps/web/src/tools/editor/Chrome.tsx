@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { MenuButton, type MenuEntry } from "@/components/ui/Menu";
 import { cx } from "@/components/ui/cx";
 import * as H from "@/lib/editor/history";
+import { ToolRing } from "./EngineProgress";
 import { useCtl } from "./context";
 import { TOOL_NAMES } from "./controller";
 import {
@@ -100,6 +101,7 @@ function ToolButton({ t, active, locked, disabled, onPick, tabIndex, side, label
       onDoubleClick={() => !disabled && onPick(true)}
     >
       {t.icon}
+      {t.id === "edit" && <ToolRing />}
       {label && <span className="ed-tool__label">{label}</span>}
       {active && locked && (
         <span className="ed-tool__lock" aria-hidden="true">
@@ -254,6 +256,9 @@ export function PrivacyChip({ short }: { short?: boolean }) {
 export function DownloadButton({ compact }: { compact?: boolean }) {
   const ctl = useCtl();
   const busy = useStore(ctl.store, (s) => s.busy === "save");
+  // Encrypted input: the copy is saved without a password (re-encryption comes later). Read-only
+  // files download unchanged, so they keep theirs.
+  const noPassword = useStore(ctl.store, (s) => ctl.rt.wasEncrypted && !s.readOnly);
   const [done, setDone] = useState(false);
   const [edited, setEdited] = useState(false);
   const [name, setName] = useState(() => ctl.outputName());
@@ -272,6 +277,11 @@ export function DownloadButton({ compact }: { compact?: boolean }) {
       <Button variant="primary" size={compact ? "sm" : "md"} busy={busy} aria-label="Download PDF" aria-keyshortcuts="Control+S Meta+S" iconStart={done ? <CheckBold size={18} /> : <DownloadBold size={18} />} onClick={() => void run()} data-testid="download">
         <span className="max-[359px]:sr-only">Download</span>
       </Button>
+      {noPassword && (
+        <span className="ed-download__note" data-testid="no-password-note">
+          The downloaded copy has no password.
+        </span>
+      )}
       {!compact && (
         <Pop label="Save as" title="Save as" className="ed-download__more" trigger={<CaretDownBold size={14} />} panelClassName="w-[280px] p-4">
           {(close) => (
@@ -340,7 +350,7 @@ export function SaveChip() {
   const save = useStore(ctl.store, (s) => s.save);
   if (save === "idle") return null;
   return (
-    <div className={cx("ed-chip ed-glass ed-savechip", save === "off" && "ed-savechip--off")} title={save === "off" ? "This browser can’t keep changes on this device" : "Changes are kept on this device"} data-testid="save-chip" role="status">
+    <div className={cx("ed-chip ed-glass ed-savechip", save === "off" && "ed-savechip--off")} title={save === "off" ? "Changes aren’t kept on this device for this file" : "Changes are kept on this device"} data-testid="save-chip" role="status">
       {save === "off" ? <WarningBold size={16} aria-hidden="true" /> : <SavedBold size={16} aria-hidden="true" />}
       <span>{save === "saving" ? "Saving…" : save === "off" ? "Not saved on device" : "Saved"}</span>
     </div>

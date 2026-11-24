@@ -277,10 +277,22 @@
   white-space: nowrap;
 }
 .ed-download {
+  position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
   gap: 2px;
+}
+/* Encrypted input: one quiet line under Download. */
+.ed-download__note {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
 }
 .ed-download__more {
   min-width: 28px;
@@ -1508,4 +1520,96 @@
   .ed-mark--highlight {
     forced-color-adjust: none;
   }
+}
+
+/* ---- text engine load progress (only when Edit text was asked for early) ----------------- */
+.ed-tool__ring {
+  position: absolute;
+  inset: auto -4px -6px auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 4px 1px 1px;
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-ink) 12%, transparent);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--color-ink);
+  pointer-events: none;
+}
+.ed-tool__ring .ed-ring {
+  width: 14px;
+  height: 14px;
+}
+.ed-ring {
+  transform: rotate(-90deg);
+}
+.ed-ring circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+.ed-ring__track {
+  stroke: color-mix(in srgb, var(--color-ink) 14%, transparent);
+}
+.ed-ring__bar {
+  stroke: var(--color-brand);
+  stroke-linecap: round;
+}
+.ed-engine {
+  position: absolute;
+  left: 50%;
+  bottom: 64px;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.ed-engine__retry {
+  font-weight: 600;
+  color: var(--color-brand-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ed-ring__bar {
+    transition: stroke-dashoffset 240ms linear;
+  }
+  .ed-engine,
+  .ed-tool__ring {
+    animation: ed-fade 160ms ease-out both;
+  }
+}
+
+/* Owner-restricted file: the read-only notice and its owner-password action (U-E9). */
+.ed-owner {
+  position: absolute;
+  top: 78px;
+  left: 50%;
+  z-index: 10;
+  width: min(520px, calc(100% - 24px));
+  translate: -50% 0;
+}
+
+/* Added text with characters no font can print (AC-75). */
+.ed-missing {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--color-surface-raised);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger) 40%, transparent);
+  color: var(--color-danger);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
 }

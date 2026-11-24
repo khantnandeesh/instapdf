@@ -11,12 +11,13 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { cx } from "@/components/ui/cx";
-import { svgPolyline } from "@/lib/editor/draw-math";
 import { SIGN_FACES, cssFamily } from "@/lib/editor/fonts";
 import { cssFont, ensureFace, measurer } from "@/lib/editor/fonts-browser";
 import { newId, type Pt, type SigSource } from "@/lib/editor/model";
+import { svgPolyline } from "@/lib/editor/draw-math";
+import { drawnPreview, safeHex } from "@/lib/editor/sign-preview";
 import { deleteSignature, listSignatures, saveSignature, type SavedSignature } from "@/lib/editor/persist";
-import { IMAGE_ACCEPT, addAsset, imageFromFile, plainAssets } from "./assets";
+import { IMAGE_ACCEPT, addAsset, imageError, imageFromFile, plainAssets, releaseAsset } from "./assets";
 import { useCtl } from "./context";
 import { CloseBold, PenBold, TextBold, UploadBold } from "./icons";
 import { INK } from "./Properties";
@@ -38,20 +39,10 @@ export async function typedPlacement(text: string, face: string, color: string):
   const ctx = c.getContext("2d")!;
   ctx.scale(2, 2);
   ctx.font = cssFont(face, size);
-  ctx.fillStyle = color;
+  ctx.fillStyle = safeHex(color);
   ctx.textBaseline = "alphabetic";
   ctx.fillText(text, (w - tw) / 2, (h - (m.ascent + m.descent) * size) / 2 + m.ascent * size);
   return { aspect: w / h, preview: c.toDataURL("image/png") };
-}
-
-export function drawnPreview(strokes: Pt[][], aspect: number, color: string): string {
-  const W = 300;
-  const H = W / aspect;
-  const paths = strokes
-    .map((s) => `<path d="${svgPolyline((s.length === 1 ? [s[0], [s[0][0] + 0.002, s[0][1]]] : s).map(([u, v]) => [u * W, v * H] as Pt))}"/>`)
-    .join("");
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H.toFixed(1)}" viewBox="0 0 ${W} ${H.toFixed(1)}"><g fill="none" stroke="${color}" stroke-width="${Math.max(2, Math.min(W, H) * 0.035).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round">${paths}</g></svg>`;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 export function SignDialog({ open, role: initialRole, onClose, onPlace }: { open: boolean; role: Role; onClose: () => void; onPlace: (p: Placement) => void }) {
@@ -90,24 +81,50 @@ export function SignDialog({ open, role: initialRole, onClose, onPlace }: { open
     };
   }, [open, text]);
 
-  // Re-run the background removal when the toggle changes.
+  // Re-run the background removal when the toggle changes. The upload it replaces is released;
+  // the current one is held until the dialog closes (placed ones are then kept by the placement).
+  const uploadId = useRef<string | null>(null);
+  const mineHeld = useRef(new Set<string>());
+  const hold = useCallback(
+    (id: string) => {
+      ctl.rt.held.add(id);
+      mineHeld.current.add(id);
+    },
+    [ctl],
+  );
+  useEffect(() => {
+    const rt = ctl.rt;
+    const held = mineHeld.current;
+    return () => {
+      for (const id of held) rt.held.delete(id);
+      held.clear();
+    };
+  }, [ctl]);
   useEffect(() => {
     if (!file) return;
     let alive = true;
     setBusy(true);
     imageFromFile(ctl.rt, file, clean)
       .then((id) => {
-        if (!alive) return;
+        if (!alive) return releaseAsset(ctl.rt, id);
+        const prev = uploadId.current;
+        if (prev && prev !== id) {
+          ctl.rt.held.delete(prev);
+          mineHeld.current.delete(prev);
+          releaseAsset(ctl.rt, prev);
+        }
+        uploadId.current = id;
+        hold(id);
         const a = ctl.rt.assets[id];
         setUpload({ id, url: a.url, aspect: a.w / Math.max(1, a.h) });
         setError(null);
       })
-      .catch((e: Error) => alive && setError(e.message === "too-big" ? "Images up to 25 MB" : "That image couldn’t be read."))
+      .catch((e: Error) => alive && setError(imageError(e, true)))
       .finally(() => alive && setBusy(false));
     return () => {
       alive = false;
     };
-  }, [file, clean, ctl]);
+  }, [file, clean, ctl, hold]);
 
   const mine = saved.filter((s) => s.role === role).sort((a, b) => b.at - a.at).slice(0, 5);
   const label = role === "initials" ? "Initials" : "Signature";
@@ -146,7 +163,10 @@ export function SignDialog({ open, role: initialRole, onClose, onPlace }: { open
   async function pickSaved(s: SavedSignature) {
     setBusy(true);
     try {
-      for (const [id, a] of Object.entries(s.assets)) if (!ctl.rt.assets[id]) await addAsset(ctl.rt, a, id);
+      for (const [id, a] of Object.entries(s.assets)) {
+        hold(id);
+        if (!ctl.rt.assets[id]) await addAsset(ctl.rt, a, id);
+      }
       const preview = s.sig.type === "typed" ? (await typedPlacement(s.sig.text, s.sig.face, s.color)).preview : s.sig.type === "drawn" ? drawnPreview(s.sig.strokes, s.sig.aspect, s.color) : ctl.rt.assets[s.sig.asset].url;
       await saveSignature({ ...s, at: Date.now() });
       onPlace({ kind: "signature", role: s.role, sig: s.sig, color: s.color, aspect: s.aspect, preview, label: s.role === "initials" ? "Initials" : "Signature" });

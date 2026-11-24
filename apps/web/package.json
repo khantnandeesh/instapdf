@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/copy-fonts.mjs && node scripts/copy-editor-fonts.mjs && node scripts/licenses.mjs && next dev",
-    "build": "node scripts/copy-fonts.mjs && node scripts/copy-editor-fonts.mjs && node scripts/licenses.mjs && next build && node scripts/csp-manifest.mjs",
+    "dev": "node scripts/engine-precompress.mjs && node scripts/copy-fonts.mjs && node scripts/copy-editor-fonts.mjs && node scripts/licenses.mjs && next dev",
+    "build": "node scripts/engine-precompress.mjs && node scripts/copy-fonts.mjs && node scripts/copy-editor-fonts.mjs && node scripts/licenses.mjs && next build && node scripts/csp-manifest.mjs",
     "licenses": "node scripts/copy-fonts.mjs && node scripts/copy-editor-fonts.mjs && node scripts/licenses.mjs",
     "start": "next start",
     "lint": "eslint",

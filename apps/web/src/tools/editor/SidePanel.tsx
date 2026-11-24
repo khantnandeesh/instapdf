@@ -15,7 +15,7 @@ import { displaySize } from "@/lib/editor/geometry";
 import { pageActions } from "./Chrome";
 import { useCtl } from "./context";
 import { HistoryBold, ListBold, MoreBold, PagesBold } from "./icons";
-import { renderPage } from "./render";
+import { release, renderPage, swapCanvas } from "./render";
 import { shallowArray, useStore } from "./store";
 
 const THUMB_W = 112;
@@ -98,7 +98,6 @@ function Thumbs({ onGo, sheet }: { onGo: (i: number) => void; sheet?: boolean })
             setDrag(null);
           }}
           onDragEnd={() => setDrag(null)}
-          root={list.current}
         />
       ))}
     </ul>
@@ -116,7 +115,6 @@ const Thumb = memo(function Thumb({
   onDragOver,
   onDrop,
   onDragEnd,
-  root,
 }: {
   entry: PageEntry;
   index: number;
@@ -128,7 +126,6 @@ const Thumb = memo(function Thumb({
   onDragOver: () => void;
   onDrop: () => void;
   onDragEnd: () => void;
-  root: HTMLElement | null;
 }) {
   const ctl = useCtl();
   const holder = useRef<HTMLSpanElement>(null);
@@ -143,19 +140,32 @@ const Thumb = memo(function Thumb({
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    const io = new IntersectionObserver(([e]) => e.isIntersecting && setVisible(true), { root, rootMargin: "300px 0px" });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [root]);
+    // Measured against the panel body that scrolls (the list itself grows with its content).
+    const root = el.closest<HTMLElement>(".ed-side__body");
+    // Near: draw. Far (several screens away): release the canvas (iOS memory).
+    const near = new IntersectionObserver(([e]) => e.isIntersecting && setVisible(true), { root, rootMargin: "300px 0px" });
+    const far = new IntersectionObserver(([e]) => !e.isIntersecting && setVisible(false), { root, rootMargin: "1500px 0px" });
+    near.observe(el);
+    far.observe(el);
+    return () => {
+      near.disconnect();
+      far.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
-    if (!visible || entry.src == null) return;
+    if (!visible) {
+      const el = holder.current;
+      if (el?.firstChild) swapCanvas(el, null);
+      return;
+    }
+    if (entry.src == null) return;
     const job = renderPage(ctl.rt.pdf, entry.src, scale, rotation, 1000 + index);
     void job.promise.then((c) => {
       if (c && c !== "failed" && holder.current) {
         c.className = "ed-thumb__canvas";
-        holder.current.replaceChildren(c);
-      }
+        swapCanvas(holder.current, c);
+      } else if (c && c !== "failed") release(c);
     });
     return () => job.cancel();
   }, [visible, entry.src, scale, rotation, ctl, index, pdfRev, rev]);
@@ -199,7 +209,7 @@ const Thumb = memo(function Thumb({
           }
         }}
       >
-        <span ref={holder} className="ed-thumb__img" style={{ width: size.width, height: size.height }} aria-hidden="true" />
+        <span ref={holder} className="ed-thumb__img" style={{ width: size.width, height: size.height }} aria-hidden="true" data-thumb-img />
         <span className="ed-thumb__n" aria-hidden="true">
           {index + 1}
         </span>

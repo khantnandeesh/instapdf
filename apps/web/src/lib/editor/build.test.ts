@@ -199,6 +199,31 @@ describe("buildPdf", () => {
     expect(texts[1]).toContain("Asha Rao");
   });
 
+  it("writes added CJK text so it extracts as one word, without spaces between characters", async () => {
+    const fonts = await nodeFonts();
+    const jp = dirname(require.resolve("@fontsource/noto-sans-jp/package.json"));
+    const jpRanges = JSON.parse(await readFile(join(jp, "unicode.json"), "utf8")) as Record<string, string>;
+    const jpFiles = Object.entries(jpRanges).map(([k, r]) => ({ file: `noto-sans-jp-${k.replace(/[[\]]/g, "")}-400-normal.woff`, ranges: parse(r) }));
+    const base = await fonts.fallback!.manifest();
+    fonts.fallback = {
+      manifest: async () => ({ fonts: [...base.fonts, ...jpFiles] }),
+      load: async (f: string) => new Uint8Array(await readFile(f.startsWith("noto-sans-jp-") ? join(jp, "files", f) : join(dirname(require.resolve("@fontsource/noto-sans/package.json")), "files", f))),
+    };
+    const pages = initialPages([{ view: [0, 0, 600, 800], rotate: 0 }]);
+    const objects: EditorObject[] = [
+      { kind: "text", id: "t", page: "p0", x: 100, y: 200, wrap: null, lines: ["日本語のテキスト"], w: 200, h: 20, rot: 0, text: "日本語のテキスト", font: "arimo", size: 14, bold: false, italic: false, underline: false, color: "#000000", align: "left" },
+    ];
+    const out = await buildPdf({ bytes: await source(), pages: pages.slice(0, 1), objects, assets: {} }, fonts, fontkit);
+    const { items } = await pdfText(out);
+    // Characters from different Noto subset files are separate pdf.js items, but they sit edge to
+    // edge (full-width glyphs, 14 pt each) with no gap, so extractors that join by position (pdfium,
+    // Acrobat, the pdf.js text layer) read one word. A space only appears when items are joined with one.
+    const parts = items[0].filter((i) => /[\u3040-\u30ff\u4e00-\u9fff]/u.test(i.str));
+    expect(parts.map((i) => i.str).join("")).toBe("日本語のテキスト");
+    for (let k = 1; k < parts.length; k++) expect(parts[k]!.x - parts[k - 1]!.x).toBeCloseTo(14 * [...parts[k - 1]!.str].length, 1);
+    expect(new Set(parts.map((i) => i.y)).size).toBe(1);
+  });
+
   it("puts objects on the right copy of a duplicated page and draws them in order (AC-69)", async () => {
     const fonts = await nodeFonts();
     const pages = initialPages([{ view: [0, 0, 600, 800], rotate: 0 }]);

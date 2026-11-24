@@ -148,3 +148,24 @@ export function diffIds(a: DocState, b: DocState): { objects: Set<string>; pages
   ai.forEach((id, i) => bi[i] !== id && pages.add(id));
   return { objects, pages };
 }
+
+/**
+ * Drops the oldest states whose engine version is below `floor` (those bytes were released).
+ * States are in edit order and engine versions only grow along it, so this trims a prefix.
+ */
+export function dropBelowEngine(h: History, floor: number): History {
+  let k = 0;
+  while (k < h.index && h.states[k].engine < floor) k++;
+  if (!k) return h;
+  return { states: h.states.slice(k), entries: h.entries.slice(k), index: h.index - k };
+}
+
+/** The lowest engine version any state still refers to. */
+export const minEngine = (h: History) => h.states.reduce((m, s) => Math.min(m, s.engine), Infinity);
+
+/** The last `keep` steps before the shown state, and what follows it (for saving on the device). */
+export function tail(h: History, keep: number): History {
+  const k = Math.max(0, h.index - keep);
+  if (!k) return h;
+  return { states: h.states.slice(k), entries: h.entries.slice(k), index: h.index - k };
+}

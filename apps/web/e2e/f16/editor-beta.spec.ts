@@ -20,9 +20,10 @@ async function pageTexts(bytes: Uint8Array): Promise<string[]> {
 
 /** Serves the engine's JS glue with `patch` appended (it can wrap BerryDocument methods). */
 async function patchEngine(page: Page, patch: string) {
-  await page.route("**/engine/berry_engine.js", async (route) => {
+  // The glue is served from a content-hashed path (/engine/<sha>/berry_engine.js), compressed.
+  await page.route("**/engine/*/berry_engine.js", async (route) => {
     const res = await route.fetch();
-    await route.fulfill({ response: res, body: `${await res.text()}\n${patch}` });
+    await route.fulfill({ status: 200, contentType: "text/javascript", body: `${await res.text()}\n${patch}` });
   });
 }
 
@@ -49,7 +50,10 @@ async function download(page: Page) {
   return { name: dl.suggestedFilename(), bytes: new Uint8Array(await readFile((await dl.path())!)) };
 }
 
-test("landing: noindex, Beta badge, no engine before a file, and no serious axe violations", async ({ page }) => {
+test("landing: noindex, Beta badge, no engine before a file with Data Saver on, and no serious axe violations", async ({ page }) => {
+  // With Data Saver (or on 2g) the engine waits for a file; otherwise it is fetched on idle
+  // (e2e/f16/editor-slow-network.spec.ts).
+  await page.addInitScript(() => Object.defineProperty(navigator, "connection", { value: { saveData: true, effectiveType: "4g" }, configurable: true }));
   const requests: string[] = [];
   page.on("request", (r) => requests.push(new URL(r.url()).pathname));
   await page.goto("/edit-pdf");

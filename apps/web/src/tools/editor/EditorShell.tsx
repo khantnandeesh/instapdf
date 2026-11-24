@@ -4,21 +4,29 @@
  * history entry (Back closes it), the canvas with every page, and the bars around it. Loaded as a
  * separate chunk once the user shows intent (AC-86).
  */
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import type { MenuEntry } from "@/components/ui/Menu";
 import { cx } from "@/components/ui/cx";
 import { useLeaveGuard } from "@/components/tool-flow/useLeaveGuard";
-import { buildInWorker } from "@/lib/editor/build-client";
-import { callEngine, disposeEngine, setEngineFileSize } from "@/lib/editor/engine-client";
+import { buildInWorker, checkOwnerPassword, disposeBuild } from "@/lib/editor/build-client";
+import { OwnerPasswordDialog, OwnerPermissionNotice } from "@/components/tool-flow/OwnerPassword";
+import type { Permission } from "@/tools/registry";
+import { disposeEngine, getEngineStatus, subscribeEngine } from "@/lib/editor/engine-client";
 import { screenDeltaToFrame, screenToFrame, displaySize } from "@/lib/editor/geometry";
 import * as H from "@/lib/editor/history";
 import { clampDelta, initialPages, isPristine, kindName, moveObject, newId, objectBounds, pageSize, totalRotation, type EditorObject, type PageEntry, type Pt } from "@/lib/editor/model";
-import { clearDevice, deleteSession, loadSession, saveSession, sha256, storageAvailable, type SavedSession } from "@/lib/editor/persist";
+import { clearDevice, deleteSession, loadSession, sha256, storageAvailable, writeSession, type LoadedSession } from "@/lib/editor/persist";
+import { planSession, restoreVersions } from "@/lib/editor/persist-plan";
+import { initialVersions } from "@/lib/editor/versions";
 import type { OpenedPdf } from "@/lib/pdf/pdfjs";
-import { addAsset, IMAGE_ACCEPT, imageFromFile, isImageFile, plainAssets, releaseAssets } from "./assets";
+import { assetsOf } from "@/lib/editor/asset-refs";
+import { listChars } from "@/lib/editor/coverage";
+import { missingInObjects } from "./coverage-browser";
+import { addAsset, IMAGE_ACCEPT, imageError, imageFromFile, isImageFile, plainAssets, releaseAssets } from "./assets";
+import { EnginePill } from "./EngineProgress";
 import { AnnotsToggle, DOCK_ORDER, MoreTools, PageChip, PageHeader, PrivacyChip, SaveChip, ToolDock, ToolRail, TopBar, TOOLS, ViewPill } from "./Chrome";
 import { createController, TOOL_NAMES, type Controller, type Runtime, type Toast } from "./controller";
 import { BASE_SCALE, EditorContext, MAX_ZOOM, MIN_ZOOM, ZOOM_STEPS, useCtl } from "./context";
@@ -90,6 +98,8 @@ function initialState(pages: PageEntry[], wide: boolean): EditorState {
     rasterRev: {},
     pdfRev: 0,
     engineReady: false,
+    engineWanted: false,
+    pendingLine: null,
     lineEdit: null,
     busy: null,
     panel: wide && (readLocal(PANEL_KEY) ?? (typeof innerWidth !== "undefined" && innerWidth >= 1280 ? "1" : "0")) === "1",
@@ -119,6 +129,20 @@ async function readGeometry(pdf: OpenedPdf): Promise<Runtime["src"]> {
 }
 
 export function EditorShell(props: ShellProps) {
+  // Engine state on the shell element (for tests and styling), without re-rendering the editor per percent.
+  const shellEl = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const put = () => {
+      const el = shellEl.current;
+      if (!el) return;
+      const s = getEngineStatus();
+      el.dataset.engine = s.state;
+      if (s.cached) el.dataset.engineCached = "true";
+      else delete el.dataset.engineCached;
+    };
+    put();
+    return subscribeEngine(put);
+  });
   const [host] = useState(() => {
     const el = document.createElement("div");
     el.className = "ed-host";
@@ -128,8 +152,7 @@ export function EditorShell(props: ShellProps) {
   const [failed, setFailed] = useState(false);
   const [announce, setAnnounce] = useState("");
   const [toast, setToast] = useState<Toast | null>(null);
-  const [recovery, setRecovery] = useState<SavedSession | null>(null);
-  const engineOpen = useRef<Promise<void>>(Promise.resolve());
+  const [recovery, setRecovery] = useState<LoadedSession | null>(null);
 
   // Focus mode: fixed over the page, everything else inert, the page under it does not scroll.
   useLayoutEffect(() => {
@@ -163,40 +186,41 @@ export function EditorShell(props: ShellProps) {
       const src = await readGeometry(props.pdf);
       if (!alive) return;
       const wide = matchMedia("(min-width: 1024px)").matches;
-      const rt: Runtime = { name: props.name, password: props.password, hash: null, versions: [props.bytes], pdf: props.pdf.doc, shown: 0, src, assets: {} };
-      const store = createStore(initialState(initialPages(src), wide));
+      const rt: Runtime = { name: props.name, password: props.password, hash: null, versions: initialVersions(props.bytes), pdf: props.pdf.doc, shown: 0, src, assets: {}, held: new Set(), clip: null, wasEncrypted: props.pdf.wasEncrypted };
+      // Owner-restricted (no modify): read-only until the owner password is entered (U-E9).
+      const store = createStore({ ...initialState(initialPages(src), wide), readOnly: props.pdf.denied.includes("modify") });
       made = createController(store, rt, { announce: say, toast: showToast });
       setCtl(made);
       say(`${props.name} opened, ${src.length} ${src.length === 1 ? "page" : "pages"}`);
+      // Viewing and every object tool work at once; only Edit text waits for the engine.
       if (!props.pdf.wasEncrypted) {
-        setEngineFileSize(props.bytes.length);
-        const copy = props.bytes.slice();
-        engineOpen.current = callEngine({ op: "open", bytes: copy }, [copy.buffer]).then(
-          () => void (alive && store.set({ engineReady: true })),
-          () => void store.set({ engineReady: false }),
-        );
+        made.engineAllowed = true;
+        if (getEngineStatus().state !== "idle") made.startEngine();
       }
+      // Encrypted files are never kept on the device: their content would sit there decrypted.
+      if (props.pdf.wasEncrypted) return store.set({ save: "off" });
       const [hash, ok] = await Promise.all([sha256(props.bytes), storageAvailable()]);
       if (!alive) return;
+      if (!ok) return store.set({ save: "off" }); // no device store: nothing to save to
       rt.hash = hash;
-      if (!ok) return store.set({ save: "off" });
       const saved = await loadSession(hash).catch(() => null);
-      if (alive && saved && saved.history.index > 0) setRecovery(saved);
+      if (alive && saved && saved.record.history.index > 0) setRecovery(saved);
     })().catch(() => alive && setFailed(true));
     return () => {
       alive = false;
       if (made) releaseAssets(made.rt.assets);
       disposeEngine();
+      disposeBuild();
     };
     // Opened once per file: the route remounts the shell for another file.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const body = (
-    <div className="ed-shell" role="region" aria-label={`Editing ${props.name}`} data-testid="editor-shell">
+    <div className="ed-shell" role="region" aria-label={`Editing ${props.name}`} data-testid="editor-shell" ref={shellEl}>
       {ctl ? (
         <EditorContext.Provider value={ctl}>
-          <Frame {...props} recovery={recovery} setRecovery={setRecovery} engineOpen={engineOpen} toast={toast} setToast={setToast} />
+          <Frame {...props} recovery={recovery} setRecovery={setRecovery} toast={toast} setToast={setToast} />
         </EditorContext.Provider>
       ) : (
         <div className="ed-opening">
@@ -226,17 +250,13 @@ export function EditorShell(props: ShellProps) {
 }
 
 type FrameProps = ShellProps & {
-  recovery: SavedSession | null;
-  setRecovery: (s: SavedSession | null) => void;
-  engineOpen: React.RefObject<Promise<void>>;
+  recovery: LoadedSession | null;
+  setRecovery: (s: LoadedSession | null) => void;
   toast: Toast | null;
   setToast: (t: Toast | null) => void;
 };
 
-/** In-memory clipboard for added objects (Ctrl/Cmd+C, V). */
-let clip: { objs: EditorObject[]; page: string } | null = null;
-
-function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, onOpenFile, onBlank }: FrameProps) {
+function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, onBlank, bytes: original, pdf }: FrameProps) {
   const ctl = useCtl();
   const { store, rt } = ctl;
   const pages = useStore(store, (s) => H.current(s.history).pages, shallowArray);
@@ -257,6 +277,28 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
   const [sheet, setSheet] = useState<"more" | "pages" | null>(null);
   const [shortcuts, setShortcuts] = useState(false);
   const [confirm, setConfirm] = useState<"close" | "clear" | null>(null);
+  /** Opening another file (or a blank one) while there are edits not downloaded: asks first. */
+  const [replace, setReplace] = useState<{ run: () => void; label: string } | null>(null);
+  const [missingAsk, setMissingAsk] = useState<{ chars: string[]; name?: string } | null>(null);
+  const readOnly = useStore(store, (s) => s.readOnly);
+  const [ownerOpen, setOwnerOpen] = useState(false);
+  const [ownerError, setOwnerError] = useState<string | undefined>();
+  const [ownerBusy, setOwnerBusy] = useState(false);
+  const unlockOwner = async (password: string) => {
+    setOwnerBusy(true);
+    try {
+      const ok = await checkOwnerPassword(original.slice(), password, rt.password ?? "");
+      if (!ok) return setOwnerError("That isn’t the owner password.");
+      setOwnerOpen(false);
+      setOwnerError(undefined);
+      store.set({ readOnly: false });
+      ctl.toast({ text: "Unlocked. You can edit this file now.", tone: "success" });
+    } catch {
+      setOwnerError("That couldn’t be checked. Please try again.");
+    } finally {
+      setOwnerBusy(false);
+    }
+  };
   const [singleKeys, setSingleKeys] = useState(() => readLocal(KEYS_KEY) !== "0");
   const imageInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -274,27 +316,40 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
   }, [store]);
 
   // ---- zoom ----
-  const widest = useMemo(() => {
-    let w = 1;
-    let h = 1;
-    for (const p of pages) {
-      const d = displaySize(p.view, totalRotation(p), 1);
-      w = Math.max(w, d.width);
-      h = Math.max(h, d.height);
-    }
+  // Fit uses one reference page (the current one, else the first), as pdf.js does: a single
+  // over-wide page doesn't shrink the rest. Pages wider than the column are then scaled down on
+  // their own while a fit is on (AC-83), so there is never sideways page scroll.
+  const [avail, setAvail] = useState(0);
+  const innerSize = useCallback(() => {
+    if (!scroller) return null;
+    const cs = getComputedStyle(scroller);
+    const w = scroller.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - (wide ? 32 : 0);
+    const h = scroller.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - (wide ? 32 : 0);
     return { w, h };
-  }, [pages]);
+  }, [scroller, wide]);
   const fitZoom = useCallback(
     (f: "width" | "page") => {
-      if (!scroller) return 1;
-      const cs = getComputedStyle(scroller);
-      const innerW = scroller.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-      const innerH = scroller.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-      const zw = (innerW - (wide ? 32 : 0)) / (widest.w * BASE_SCALE);
-      const z = f === "width" ? zw : Math.min(zw, (innerH - (wide ? 32 : 0)) / (widest.h * BASE_SCALE));
+      const inner = innerSize();
+      if (!inner) return 1;
+      const ps = H.current(store.get().history).pages;
+      const ref = ps[store.get().current] ?? ps[0];
+      const d = ref ? displaySize(ref.view, totalRotation(ref), 1) : { width: 612, height: 792 };
+      const zw = inner.w / (Math.max(1, d.width) * BASE_SCALE);
+      const z = f === "width" ? zw : Math.min(zw, inner.h / (Math.max(1, d.height) * BASE_SCALE));
       return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
     },
-    [scroller, widest, wide],
+    [innerSize, store],
+  );
+  /** Set by a zoom the user picks (buttons, keys, pinch); a fit clears it. */
+  const [manualZoom, setManualZoom] = useState(false);
+  /** The scale a page is drawn at: the zoom, or smaller for a page wider than the column unless the user zoomed in. */
+  const pageScale = useCallback(
+    (p: PageEntry) => {
+      if (manualZoom || avail <= 0) return scale;
+      const w = displaySize(p.view, totalRotation(p), 1).width;
+      return Math.min(scale, avail / Math.max(1, w));
+    },
+    [manualZoom, avail, scale],
   );
   const anchor = useRef<{ ratio: number; at: number } | null>(null);
   const zoomTo = useCallback(
@@ -308,6 +363,7 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
         anchor.current = { ratio: (scroller.scrollTop + y) / Math.max(1, scroller.scrollHeight), at: y };
       }
       store.set({ zoom: next, fit: null });
+      setManualZoom(true);
       say(`Zoom ${Math.round(next * 100)}%`);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -318,6 +374,7 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
     (f: "width" | "page") => {
       if (scroller) anchor.current = { ratio: (scroller.scrollTop + scroller.clientHeight / 2) / Math.max(1, scroller.scrollHeight), at: scroller.clientHeight / 2 };
       store.set({ fit: f, zoom: fitZoom(f) });
+      setManualZoom(false);
     },
     [store, fitZoom, scroller],
   );
@@ -326,19 +383,23 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
   useLayoutEffect(() => {
     if (!scroller || fitted.current) return;
     fitted.current = true;
+    const inner = innerSize();
+    if (inner) setAvail(inner.w);
     const fits = fitZoom("width") >= 1;
     if (wide && fits) store.set({ zoom: 1, fit: null });
     else store.set({ zoom: fitZoom("width"), fit: "width" });
-  }, [scroller, wide, fitZoom, store]);
+  }, [scroller, wide, fitZoom, store, innerSize]);
   useEffect(() => {
     if (!scroller) return;
     const ro = new ResizeObserver(() => {
+      const inner = innerSize();
+      if (inner) setAvail(inner.w);
       const f = store.get().fit;
       if (f) store.set({ zoom: fitZoom(f) });
     });
     ro.observe(scroller);
     return () => ro.disconnect();
-  }, [scroller, fitZoom, store]);
+  }, [scroller, fitZoom, store, innerSize]);
   useLayoutEffect(() => {
     const a = anchor.current;
     if (!a || !scroller) return;
@@ -497,13 +558,14 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
     const el = column.current?.querySelector<HTMLElement>(`[data-testid="page-${index + 1}"]`);
     if (!el) return null;
     const { w, h } = pageSize(entry);
-    return { rect: el.getBoundingClientRect(), W: w * scale, H: h * scale, rot: totalRotation(entry) };
+    const k = pageScale(entry);
+    return { rect: el.getBoundingClientRect(), W: w * k, H: h * k, rot: totalRotation(entry), k };
   };
   const toFrameAt = (entry: PageEntry, index: number, x: number, y: number): Pt | null => {
     const g = pageGeom(entry, index);
     if (!g) return null;
     const [fx, fy] = screenToFrame(x - g.rect.left, y - g.rect.top, g.W, g.H, g.rot);
-    return [fx / scale, fy / scale];
+    return [fx / g.k, fy / g.k];
   };
   const visibleCentre = (entry: PageEntry, index: number): Pt => {
     const { w, h } = pageSize(entry);
@@ -521,7 +583,7 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
       try {
         return await imageFromFile(rt, file);
       } catch (e) {
-        ctl.toast({ text: (e as Error).message === "too-big" ? "Images up to 25 MB, please." : "That image couldn’t be read.", tone: "danger" });
+        ctl.toast({ text: imageError(e), tone: "danger" });
         return null;
       }
     },
@@ -539,20 +601,26 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
 
   // ---- download (AC-44) ----
   const download = useCallback(
-    async (name?: string) => {
+    async (name?: string, force = false) => {
       const s = store.get();
       if (s.busy === "save") return;
       if (s.editing) store.set({ editing: null });
       if (s.lineEdit) await ctl.commitLine();
+      // Added text with characters no font can print: say so before the file is made (AC-75).
+      if (!force && !s.readOnly) {
+        const missing = await missingInObjects(H.current(store.get().history).objects);
+        if (missing.length) return setMissingAsk({ chars: missing, name });
+      }
       store.set({ busy: "save" });
       const at = store.get().history.index;
       const doc = H.current(store.get().history);
-      const base = rt.versions[doc.engine] ?? rt.versions[rt.shown];
       const file = name ?? ctl.outputName();
       try {
+        const base = ctl.bytesOf(doc.engine);
         let out: Uint8Array;
-        try {
-          out = await buildInWorker({ bytes: base.slice(), password: rt.password, pages: doc.pages, objects: doc.objects, assets: plainAssets(rt.assets) });
+        if (s.readOnly) out = original; // nothing changed: the file as it came, its restrictions intact
+        else try {
+          out = await buildInWorker({ bytes: base.slice(), password: rt.password, pages: doc.pages, objects: doc.objects, assets: plainAssets(rt.assets, assetsOf(doc.objects)) });
         } catch (err) {
           if (!isPristine(doc)) throw err;
           out = base;
@@ -567,7 +635,7 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 30_000);
         store.set({ downloadedAt: at });
-        ctl.toast({ text: `Downloaded · ${file} · 0 B uploaded`, tone: "success" });
+        ctl.toast({ text: `Downloaded · ${file} · 0 B uploaded${rt.wasEncrypted && !s.readOnly ? " · no password" : ""}`, tone: "success" });
         ctl.announce(`Downloaded ${file}`);
       } catch {
         ctl.toast({ text: "The PDF couldn’t be made. Your edits are still here; please try again.", tone: "danger" });
@@ -575,7 +643,7 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
         store.set({ busy: null });
       }
     },
-    [ctl, store, rt],
+    [ctl, store, rt, original],
   );
   useEffect(() => {
     ctl.download = (n) => void download(n);
@@ -585,24 +653,54 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
   }, [ctl, download]);
 
   // ---- autosave to this device (AC-45, AC-81) ----
+  // Each save writes a small record and only the blobs not written yet (persist-plan); a failed
+  // save drops the stale record, says so once, and tries again on the next change.
   const recoveryRef = useRef(recovery);
   recoveryRef.current = recovery;
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     let last = store.get().history;
     let savingSince = 0;
+    let warned = false;
+    const written = new Set<string>();
+    const keys = new WeakMap<Uint8Array, string>();
+    const keyOf = (b: Uint8Array) => {
+      let k = keys.get(b);
+      if (!k) keys.set(b, (k = newId("v")));
+      return k;
+    };
+    const blocked = () => !rt.hash || pdf.wasEncrypted;
+    const fail = async () => {
+      written.clear();
+      if (rt.hash) await deleteSession(rt.hash);
+      store.set({ save: "off" });
+      if (!warned) {
+        warned = true;
+        ctl.toast({ text: "Changes aren’t being kept on this device right now.", tone: "info" });
+      }
+      clearTimeout(retry);
+      retry = setTimeout(() => void save(), 30_000);
+    };
     const save = async () => {
       const s = store.get();
-      if (!rt.hash || s.save === "off") return;
+      if (blocked()) return;
       const h = s.history;
       if (!h.entries.length || (h.index === 0 && isPristine(H.current(h)))) {
-        await deleteSession(rt.hash).catch(() => {});
+        await deleteSession(rt.hash!);
+        written.clear();
         store.set({ save: "idle" });
         return;
       }
-      const ok = await saveSession({ hash: rt.hash, name: rt.name, savedAt: Date.now(), history: h, assets: plainAssets(rt.assets), engineVersions: rt.versions.slice(1) });
+      const plan = planSession({ hash: rt.hash!, name: rt.name, history: h, versions: rt.versions, assets: plainAssets(rt.assets), written, keyOf });
+      if (!plan) return fail();
+      const ok = await writeSession(plan);
+      if (!ok) return fail();
+      plan.put.forEach(([k]) => written.add(k));
+      plan.drop.forEach((k) => written.delete(k));
+      warned = false;
       const wait = Math.max(0, 300 - (Date.now() - savingSince));
-      setTimeout(() => store.get().history === h && store.set({ save: ok ? "saved" : "off" }), wait);
+      setTimeout(() => store.get().history === h && store.set({ save: "saved" }), wait);
     };
     const unsub = store.subscribe(() => {
       const h = store.get().history;
@@ -614,35 +712,42 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
         setRecovery(null);
         ctl.toast({ text: "Started fresh. Earlier changes were set aside.", tone: "info", action: { label: "Restore", run: () => void restore(rec) } });
       }
-      if (store.get().save !== "off") {
-        savingSince = Date.now();
-        store.set({ save: "saving" });
-      }
+      if (blocked()) return;
+      savingSince = Date.now();
+      store.set({ save: "saving" });
       clearTimeout(timer);
       timer = setTimeout(() => void save(), 500);
     });
     return () => {
       unsub();
       clearTimeout(timer);
+      clearTimeout(retry);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, rt, ctl]);
 
-  async function restore(s: SavedSession) {
+  async function restore(s: LoadedSession) {
     setRecovery(null);
     store.set({ busy: "edit" });
+    const ids = Object.keys(s.assets);
+    ids.forEach((id) => rt.held.add(id)); // not swept before the history that uses them is in
     try {
-      await engineOpen.current;
+      // No wait for the engine: showVersion switches the view, and the engine opens the shown bytes.
+      const versions = restoreVersions(s.record, original, s.blobs);
+      if (!versions) throw new Error("blobs");
       for (const [id, a] of Object.entries(s.assets)) if (!rt.assets[id]) await addAsset(rt, a, id);
-      rt.versions = [rt.versions[0], ...s.engineVersions];
-      const target = H.current(s.history).engine;
+      rt.versions = versions;
+      const h = s.record.history;
+      const target = H.current(h).engine;
       if (target !== rt.shown) await ctl.showVersion(target);
-      store.set({ history: s.history, selection: [], editing: null, downloadedAt: -1 });
-      ctl.announce(`Restored ${s.history.index} ${s.history.index === 1 ? "change" : "changes"}`);
-      ctl.toast({ text: `Restored ${s.history.index} ${s.history.index === 1 ? "change" : "changes"}`, tone: "success" });
+      store.set({ history: h, selection: [], editing: null, downloadedAt: -1 });
+      const n = `${h.index} ${h.index === 1 ? "change" : "changes"}`;
+      ctl.announce(`Restored ${n}`);
+      ctl.toast({ text: `Restored ${n}`, tone: "success" });
     } catch {
       ctl.toast({ text: "Those changes couldn’t be restored.", tone: "danger" });
     } finally {
+      ids.forEach((id) => rt.held.delete(id));
       store.set({ busy: null });
     }
   }
@@ -653,6 +758,8 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
     if ((history.state as { berryEditor?: boolean } | null)?.berryEditor) history.back();
     else onClose();
   }, [onClose]);
+  const unsaved = () => store.get().history.index !== store.get().downloadedAt && !isPristine(H.current(store.get().history));
+  const requestOpen = (run: () => void, label: string) => (unsaved() ? setReplace({ run, label }) : run());
   const requestClose = useCallback(() => {
     if (store.get().history.index !== store.get().downloadedAt && !isPristine(H.current(store.get().history))) setConfirm("close");
     else finishClose();
@@ -713,7 +820,7 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
       }
       if (mod && (k === "c" || k === "C") && sel.length) {
         const objs = ctl.objectsById(sel);
-        clip = { objs, page: objs[0].page };
+        rt.clip = { objs, page: objs[0].page };
         ctl.announce(`Copied ${objs.length === 1 ? kindName(objs[0]).toLowerCase() : `${objs.length} objects`}`);
         return;
       }
@@ -784,7 +891,7 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ctl, store, download, zoomTo, goto, singleKeys]);
+  }, [ctl, store, download, zoomTo, goto, singleKeys, rt]);
 
   // ---- paste and drop (AC-93) ----
   useEffect(() => {
@@ -800,6 +907,7 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
         void loadImage(img).then((id) => id && placeImage(id, s.current));
         return;
       }
+      const clip = rt.clip;
       if (clip && !s.readOnly) {
         e.preventDefault();
         const doc = H.current(s.history);
@@ -814,13 +922,13 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
         const [dx, dy] = clampDelta(b, 0, 0, { w, h });
         const fixed = dx || dy ? copies.map((o) => moveObject(o, dx, dy)) : copies;
         ctl.add(fixed, `Paste ${fixed.length === 1 ? kindName(fixed[0]).toLowerCase() : `${fixed.length} objects`}`);
-        if (same) clip = { objs: fixed, page: entry.id };
+        if (same) rt.clip = { objs: fixed, page: entry.id };
         ctl.announce(`Pasted on page ${s.current + 1}`);
       }
     };
     window.addEventListener("paste", paste);
     return () => window.removeEventListener("paste", paste);
-  }, [ctl, store, loadImage, placeImage]);
+  }, [ctl, store, loadImage, placeImage, rt]);
 
   const [dropOn, setDropOn] = useState(false);
   const onDragOver = (e: React.DragEvent) => {
@@ -836,7 +944,7 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
     const file = e.dataTransfer.files[0];
     if (!file) return;
     if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") {
-      onOpenFile(file);
+      requestOpen(() => onOpenFile(file), file.name);
       return;
     }
     if (!isImageFile(file) || store.get().readOnly) return ctl.toast({ text: "Drop a PNG, JPEG, WebP, GIF or SVG image.", tone: "info" });
@@ -851,7 +959,7 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
   // ---- menus ----
   const fileMenu: MenuEntry[] = [
     { id: "open", label: "Open another PDF", icon: <FileUpBold size={16} />, onSelect: () => fileInput.current?.click() },
-    { id: "blank", label: "Blank page", icon: <FilePlusBold size={16} />, onSelect: onBlank },
+    { id: "blank", label: "Blank page", icon: <FilePlusBold size={16} />, onSelect: () => requestOpen(onBlank, "a blank page") },
     { separator: true },
     { id: "keys", label: "Keyboard shortcuts", icon: <KeyboardBold size={16} />, onSelect: () => setShortcuts(true) },
     { id: "clear", label: "Clear from this device", icon: <BroomBold size={16} />, onSelect: () => setConfirm("clear") },
@@ -888,15 +996,17 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
               {pageList.map(({ p, i, first }) => (
                 <div key={p.id} className="ed-slot" data-index={i}>
                   {wide && <PageHeader pageId={p.id} index={i} total={pages.length} />}
-                  <PageView entry={p} index={i} total={pages.length} scale={scale} wide={wide} root={scroller} firstOfSrc={first} />
+                  <PageView entry={p} index={i} total={pages.length} scale={pageScale(p)} wide={wide} root={scroller} firstOfSrc={first} />
                 </div>
               ))}
             </div>
           </div>
+          {readOnly && <OwnerLock name={rt.name} denied={pdf.denied} onUnlock={() => setOwnerOpen(true)} />}
           {recovery && <RecoveryNotice s={recovery} onRestore={() => void restore(recovery)} onDiscard={() => (setRecovery(null), rt.hash && void deleteSession(rt.hash))} />}
           {placement && <ModeHint text={`Click to place ${placement.label.toLowerCase()} · Esc cancels`} />}
           {!placement && (tool === "draw" || tool === "mark" || tool === "shapes" || tool === "whiteout") && <ModeHint text={`${TOOL_HINTS[tool]} · Esc to stop`} />}
           {!wide && <PageChip onOpen={() => setSheet("pages")} />}
+          <EnginePill wide={wide} />
           <div className="ed-floor">
             {wide && <SaveChip />}
             <ViewPill pageCount={pages.length} onZoom={(z) => zoomTo(z)} onFit={fitTo} onGo={goto} />
@@ -931,8 +1041,8 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
       <input ref={fileInput} type="file" accept=".pdf,application/pdf" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => {
         const f = e.target.files?.[0];
         e.target.value = "";
-        if (f) onOpenFile(f);
-      }} />
+        if (f) requestOpen(() => onOpenFile(f), f.name);
+      }} data-testid="open-input" />
 
       {sign && (
         <Suspense fallback={null}>
@@ -1002,6 +1112,54 @@ function Frame({ recovery, setRecovery, engineOpen, toast, setToast, onClose, on
           </>
         }
       />
+      <OwnerPasswordDialog
+        open={ownerOpen}
+        fileName={rt.name}
+        denied={pdf.denied}
+        error={ownerError}
+        busy={ownerBusy}
+        onSubmit={(pw) => void unlockOwner(pw)}
+        onClose={() => (setOwnerOpen(false), setOwnerError(undefined))}
+      />
+      <Dialog
+        open={!!missingAsk}
+        onClose={() => setMissingAsk(null)}
+        title="Some characters won’t print"
+        description={`No font here can draw ${missingAsk ? listChars(missingAsk.chars) : ""}. They come out as “?” in the downloaded copy.`}
+        footer={
+          <>
+            <Button variant="plain" onClick={() => setMissingAsk(null)} data-autofocus>
+              Keep editing
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                const n = missingAsk?.name;
+                setMissingAsk(null);
+                void download(n, true);
+              }}
+            >
+              Download anyway
+            </Button>
+          </>
+        }
+      />
+      <Dialog
+        open={!!replace}
+        onClose={() => setReplace(null)}
+        title={replace ? `Open ${replace.label} without downloading?` : "Open without downloading?"}
+        description="Your changes to this file aren’t downloaded. They stay on this device: open it again to restore them."
+        footer={
+          <>
+            <Button variant="plain" onClick={() => setReplace(null)} data-autofocus>
+              Keep editing
+            </Button>
+            <Button variant="primary" onClick={() => (replace?.run(), setReplace(null))}>
+              Open
+            </Button>
+          </>
+        }
+      />
       <Dialog
         open={confirm === "clear"}
         onClose={() => setConfirm(null)}
@@ -1046,13 +1204,22 @@ function ModeHint({ text }: { text: string }) {
   );
 }
 
-function RecoveryNotice({ s, onRestore, onDiscard }: { s: SavedSession; onRestore: () => void; onDiscard: () => void }) {
+/** Owner-restricted file: why it's read-only, and the owner-password way out (U-E9). */
+function OwnerLock({ name, denied, onUnlock }: { name: string; denied: Permission[]; onUnlock: () => void }) {
+  return (
+    <div className="ed-owner" data-testid="owner-lock">
+      <OwnerPermissionNotice fileName={name} denied={denied} onEnterPassword={onUnlock} />
+    </div>
+  );
+}
+
+function RecoveryNotice({ s, onRestore, onDiscard }: { s: LoadedSession; onRestore: () => void; onDiscard: () => void }) {
   const btn = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     btn.current?.focus({ preventScroll: true });
   }, []);
-  const n = s.history.index;
-  const time = new Date(s.savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const n = s.record.history.index;
+  const time = new Date(s.record.savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   return (
     <div className="ed-recover ed-glass" role="alert" data-testid="recovery">
       <span>

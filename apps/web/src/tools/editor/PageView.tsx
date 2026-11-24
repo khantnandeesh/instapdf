@@ -21,7 +21,8 @@ import { useCtl } from "./context";
 import { LineLayer } from "./LineLayer";
 import { ObjectView, boxStyle } from "./ObjectView";
 import { PropertiesPopover } from "./Properties";
-import { renderPage } from "./render";
+import { lineAt } from "@/lib/editor/line-hit";
+import { release, renderPage, swapCanvas } from "./render";
 import { shallowArray, useStore, type EditorState } from "./store";
 import { TOOL_NAMES } from "./controller";
 
@@ -92,6 +93,19 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     return () => io.disconnect();
   }, [root]);
 
+  // A line clicked before the engine was ready opens as soon as the engine has read the page.
+  const pending = useStore(store, useCallback((s: EditorState) => (src != null && firstOfSrc && s.pendingLine?.src === src ? s.pendingLine : null), [src, firstOfSrc]));
+  useEffect(() => {
+    if (!pending || !engineReady) return;
+    if (!fresh || !text) {
+      if (src != null) void ctl.ensureText(src);
+      return;
+    }
+    const i = lineAt(text.lines, pending.at[0], pending.at[1]);
+    store.set({ pendingLine: null, ...(i >= 0 ? { lineEdit: { src: pending.src, line: i, text: text.lines[i].text }, selection: [] } : {}) });
+    if (i < 0) ctl.announce("That text can’t be edited.");
+  }, [pending, engineReady, fresh, text, src, ctl, store]);
+
   useEffect(() => {
     if (visible && src != null && !fresh) void ctl.ensureText(src);
   }, [visible, src, fresh, ctl, pdfRev, engineReady]);
@@ -103,7 +117,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     if (!visible) {
       // Released when far off-screen; redrawn on the way back.
       const t = setTimeout(() => {
-        if (holder.firstChild) holder.replaceChildren();
+        if (holder.firstChild) swapCanvas(holder, null);
         drawnFor.current = null;
         setDrawn("none");
       }, 1500);
@@ -118,19 +132,23 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     const job = renderPage(rt.pdf, src, scale, rotation, index);
     let live = true;
     void job.promise.then((canvas) => {
-      if (!live) return;
+      if (!live) {
+        if (canvas && canvas !== "failed") release(canvas);
+        return;
+      }
       if (canvas === "failed") return setDrawn("failed");
       if (!canvas) return;
       drawnFor.current = key;
       canvas.className = "ed-raster";
-      holder.replaceChildren(canvas); // swap only when ready: no blank flash
+      swapCanvas(holder, canvas); // swap only when ready: no blank flash
       setDrawn("ok");
+      ctl.startEngine(); // the first page is up: now the text engine may use the network
     });
     return () => {
       live = false;
       job.cancel();
     };
-  }, [visible, src, rasterRev, pdfRev, scale, rotation, rt, index, retry]);
+  }, [visible, src, rasterRev, pdfRev, scale, rotation, rt, index, retry, ctl]);
 
   // ---- coordinates ----
   const toFrame = useCallback(
@@ -315,6 +333,8 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     // Empty space.
     if (t === "select" || t === "edit") {
       if (s.selection.length || s.editing) ctl.select([]);
+      // On existing text before the engine is ready: remembered, edited once it is.
+      if (!s.engineReady && src != null && firstOfSrc && !s.readOnly) void ctl.wantLine(src, [entry.view[0] + p[0], entry.view[3] - p[1]]);
       if (t === "select" && e.pointerType === "mouse") {
         wrap.current?.setPointerCapture(e.pointerId);
         gesture.current = { type: "marquee", start: p, cur: p, pointer: e.pointerId };
@@ -522,7 +542,8 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
   const ghost = useRef<HTMLDivElement>(null);
   const selectedHere = shown.filter((o) => selection.includes(o.id));
   const current = useStore(store, (s) => s.current === index);
-  const interactiveLines = (tool === "select" || tool === "edit") && engineReady && firstOfSrc && !placement;
+  const readOnly = useStore(store, (s) => s.readOnly);
+  const interactiveLines = (tool === "select" || tool === "edit") && engineReady && firstOfSrc && !placement && !readOnly;
   const toolClass = placement ? "place" : tool;
 
   return (

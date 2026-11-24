@@ -67,6 +67,10 @@ export type EditorState = {
   pdfRev: number;
   /** The engine could open the file: existing text is editable. */
   engineReady: boolean;
+  /** Someone asked for Edit text before the engine was ready: show its load progress. */
+  engineWanted: boolean;
+  /** A click on existing text before the engine was ready (user space): edited once it is. */
+  pendingLine: { src: number; at: [number, number] } | null;
   /** Line being edited (Edit text). */
   lineEdit: { src: number; line: number; text: string } | null;
   busy: "edit" | "save" | null;

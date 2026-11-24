@@ -4,7 +4,7 @@ import "./editor.css";
  * Edit PDF (F16 E1): the route component. The landing is the shared F1 pieces only (title, drop
  * card, limits, privacy), so the route's first-load JS stays small (AC-86). The editor shell,
  * pdf.js and the engine are separate chunks, fetched on intent (pointer or focus on Open PDF,
- * a drag, idle after load) or on the pick itself. Picking a file opens focus mode at once.
+ * a drag, idle after load; the engine not on Data Saver or 2g) or on the pick itself. Picking a file opens focus mode at once.
  */
 import { useCallback, useEffect, useRef, useState, type ComponentType } from "react";
 import { Floaties } from "@/components/berry/Berry";
@@ -16,6 +16,7 @@ import { copy } from "@/components/tool-flow/copy";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { blankPdf, defaultPaper } from "@/lib/editor/blank";
+import { earlyFetchAllowed } from "@/lib/editor/engine-load";
 import { openPdf, prefetchPdfjs, type OpenedPdf } from "@/lib/pdf/pdfjs";
 import { FilePlusBold, FileUpBold } from "./icons";
 import type { ShellProps } from "./EditorShell";
@@ -50,7 +51,12 @@ export function EditorTool() {
   useEffect(() => {
     setHydrated(true);
     const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
-    const go = () => void prefetchShell();
+    const go = () => {
+      void prefetchShell();
+      // The engine (Edit text) too, at low priority, unless the connection asks to save data.
+      const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+      if (earlyFetchAllowed(conn)) void import("@/lib/editor/engine-client").then((m) => m.preloadEngine("low"));
+    };
     const id = w.requestIdleCallback ? w.requestIdleCallback(go, { timeout: 4000 }) : window.setTimeout(go, 2500);
     return () => {
       if (!w.requestIdleCallback) clearTimeout(id);

@@ -27,6 +27,10 @@ import {
   type DocState,
   type EditorObject,
 } from "@/lib/editor/model";
+import { referencedAssets } from "@/lib/editor/asset-refs";
+import { textAt, type TextItemLike } from "@/lib/editor/line-hit";
+import { releaseUnused } from "./assets";
+import { pushVersion, releaseBelow, versionBytes, type VersionEntry } from "@/lib/editor/versions";
 import { pdfOutputName, baseName } from "@/lib/pdf/naming";
 import { openPdf } from "@/lib/pdf/pdfjs";
 import type { Store, ToolId } from "./store";
@@ -38,13 +42,20 @@ export type Runtime = {
   name: string;
   password?: string;
   hash: string | null;
-  versions: Uint8Array[];
+  /** Engine byte versions (lib/editor/versions): lengths into newer copies where saves appended. */
+  versions: VersionEntry[];
   pdf: PDFDocumentProxy;
   /** Index into versions that pdf.js and the engine show. */
   shown: number;
   /** Source page geometry (view box and own rotation), from the original file. */
   src: { view: [number, number, number, number]; rotate: number }[];
   assets: Record<string, RuntimeAsset>;
+  /** Assets an open dialog is using (not yet placed). */
+  held: Set<string>;
+  /** Objects copied with Ctrl/Cmd+C. */
+  clip: { objs: EditorObject[]; page: string } | null;
+  /** The file was encrypted: the download has no password (re-encryption comes later). */
+  wasEncrypted: boolean;
 };
 
 export type Announce = (msg: string, assertive?: boolean) => void;
@@ -63,6 +74,8 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
 
   /** Records one change. */
   function apply(next: DocState, label: string, opts: { page?: string; targets?: string[]; key?: string; select?: string[] } = {}) {
+    // An owner-restricted file is read-only until its owner password is entered.
+    if (store.get().readOnly) return ui.toast({ text: "Locked by the file’s owner.", tone: "info" });
     store.set((s) => ({
       history: H.commit(s.history, next, { label, page: opts.page, targets: opts.targets, key: opts.key, at: Date.now() }),
       selection: opts.select ?? s.selection.filter((id) => next.objects.some((o) => o.id === id)),
@@ -81,9 +94,35 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     return `${objs.length} objects`;
   }
 
+  // Versions no history state refers to any more are released (history trims at MAX_STEPS).
+  let lastHistory = store.get().history;
+  store.subscribe(() => {
+    const h = store.get().history;
+    if (h === lastHistory) return;
+    lastHistory = h;
+    rt.versions = releaseBelow(rt.versions, Math.min(H.minEngine(h), rt.shown));
+  });
+
+  // Assets nothing refers to any more are released (a short delay lets a dialog hold a new one).
+  let sweep: ReturnType<typeof setTimeout> | null = null;
+  const sweepAssets = () => {
+    sweep = null;
+    const s = store.get();
+    releaseUnused(rt, referencedAssets({ history: s.history, placement: s.placement, clip: rt.clip?.objs, held: rt.held }));
+  };
+  store.subscribe(() => {
+    if (!sweep) sweep = setTimeout(sweepAssets, 1000);
+  });
+
   const ctl = {
     store,
     rt,
+    /** Bytes of an engine version (throws if it was released: no state can point at it). */
+    bytesOf(i: number): Uint8Array {
+      const b = versionBytes(rt.versions, i);
+      if (!b) throw new Error(`engine version ${i} was released`);
+      return b;
+    },
     state,
     announce: ui.announce,
     toast: ui.toast,
@@ -93,7 +132,10 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     setTool(tool: ToolId, locked = false) {
       const s = store.get();
       if (s.readOnly && tool !== "select") return;
-      store.set({ tool, locked, placement: null, editing: null, lineEdit: null, ...(tool !== "select" && tool !== "edit" ? {} : {}) });
+      // Edit text before the engine is ready: its load progress shows on the tool.
+      const wanted = tool === "edit" && ctl.engineAllowed && !s.engineReady ? { engineWanted: true } : {};
+      if (tool === "edit") ctl.startEngine();
+      store.set({ tool, locked, placement: null, editing: null, lineEdit: null, pendingLine: null, ...wanted });
       ui.announce(`${TOOL_NAMES[tool]} tool${locked ? ", locked" : ""}`);
     },
 
@@ -214,7 +256,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
 
     // ---- existing text (engine) ----
     async showVersion(index: number) {
-      const bytes = rt.versions[index];
+      const bytes = ctl.bytesOf(index);
       const copy = bytes.slice();
       if (store.get().engineReady) await callEngine({ op: "open", bytes: copy }, [copy.buffer]);
       const opened = await openPdf(bytes.slice(), rt.password);
@@ -225,6 +267,54 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       setEngineFileSize(bytes.length);
       store.set((s) => ({ pdfRev: s.pdfRev + 1, fresh: {}, rasterRev: Object.fromEntries(rt.src.map((_, i) => [i, (s.rasterRev[i] ?? 0) + 1])) }));
       setTimeout(() => void prev.loadingTask.destroy(), 2000);
+    },
+
+    /** Opens the shown bytes in the engine (downloading it first if needed). Never throws. */
+    openEngine(): Promise<void> {
+      ctl.engineStarted = true;
+      const opening = (async () => {
+        // The shown version can change while the engine downloads (a restore): open the latest.
+        for (;;) {
+          const shown = rt.shown;
+          const copy = ctl.bytesOf(shown).slice();
+          setEngineFileSize(copy.length);
+          await callEngine({ op: "open", bytes: copy }, [copy.buffer]);
+          if (shown === rt.shown) break;
+        }
+        store.set({ engineReady: true, fresh: {} });
+      })().catch(() => store.set({ engineReady: false }));
+      ctl.engineOpening = opening;
+      return opening;
+    },
+    engineOpening: Promise.resolve() as Promise<void>,
+    /** False for files the engine never opens (encrypted ones). */
+    engineAllowed: false,
+    engineStarted: false,
+    /**
+     * Starts the engine (download, then open) unless it's running. Called once the first page is
+     * drawn, or at once when it's already loaded or loading (prefetched), or when Edit text is
+     * asked for: on a slow connection the page itself comes first.
+     */
+    startEngine() {
+      if (ctl.engineAllowed && !ctl.engineStarted) void ctl.openEngine();
+    },
+    /**
+     * A click at (ux, uy) on source page `src` before the engine is ready: if pdf.js finds text
+     * there, it's remembered (and the load progress shown) so the line edit starts once it's ready.
+     */
+    async wantLine(src: number, at: [number, number]) {
+      if (!ctl.engineAllowed || store.get().engineReady) return;
+      try {
+        const page = await rt.pdf.getPage(src + 1);
+        const content = await page.getTextContent();
+        if (!textAt(content.items.flatMap((i) => ("str" in i ? [i as unknown as TextItemLike] : [])), at[0], at[1])) return;
+      } catch {
+        return;
+      }
+      if (store.get().engineReady) return;
+      store.set({ pendingLine: { src, at }, engineWanted: true, selection: [] });
+      ctl.startEngine();
+      ui.announce("Getting text editing ready. The line opens when it is.");
     },
 
     loadingText: new Set<number>(),
@@ -261,7 +351,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     recoverEngine(): Promise<void> {
       ctl.recovering ??= (async () => {
         try {
-          const copy = rt.versions[rt.shown].slice();
+          const copy = ctl.bytesOf(rt.shown).slice();
           await callEngine({ op: "open", bytes: copy }, [copy.buffer]);
           store.set({ fresh: {} });
         } catch {
@@ -275,22 +365,25 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       const s = store.get();
       const e = s.lineEdit;
       store.set({ lineEdit: null });
-      if (!e) return;
+      if (!e || s.readOnly) return;
       const line = s.texts[e.src]?.lines[e.line];
       if (!line || line.text === e.text) return;
       store.set({ busy: "edit" });
       try {
-        const { result, bytes } = await callEngine({ op: "replace", page: e.src, line: e.line, text: e.text });
+        const { result, bytes, appended } = await callEngine({ op: "replace", page: e.src, line: e.line, text: e.text });
         const opened = await openPdf(bytes.slice(), rt.password);
         if (!opened.ok) {
-          const back = rt.versions[rt.shown].slice();
+          const back = ctl.bytesOf(rt.shown).slice();
           await callEngine({ op: "open", bytes: back }, [back.buffer]).catch(() => {});
           ui.toast({ text: "That change couldn’t be shown, so it wasn’t made.", tone: "danger" });
           return;
         }
         const prev = rt.pdf;
-        rt.versions = [...rt.versions.slice(0, rt.shown + 1), bytes];
-        rt.shown = rt.versions.length - 1;
+        const pushed = pushVersion(rt.versions, rt.shown, bytes, appended);
+        rt.versions = pushed.versions;
+        rt.shown = pushed.index;
+        // Copies beyond the budget were released: states that needed them can't be shown any more.
+        if (pushed.floor > 0) store.set((st) => ({ history: H.dropBelowEngine(st.history, pushed.floor) }));
         rt.pdf = opened.pdf.doc;
         setEngineFileSize(bytes.length);
         setTimeout(() => void prev.loadingTask.destroy(), 2000);

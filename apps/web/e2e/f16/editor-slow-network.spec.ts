@@ -1,0 +1,147 @@
+/**
+ * F16 on a slow phone connection (owner request on PR #25): the text engine (WebAssembly) never
+ * blocks viewing or object tools, shows its progress only when Edit text is asked for early,
+ * prefetches on idle (not with Data Saver), and comes from the HTTP cache on a second visit.
+ *
+ * Mobile project only, with Chrome's network emulation at a slow-3G profile.
+ */
+import { expect, test, type Page } from "@playwright/test";
+
+const corpus = (name: string) => `../../tests/parity/editor/${name}`;
+/** Slow 3G: about 400 kbit/s down and up, 400 ms round trip. */
+const SLOW_3G = { offline: false, latency: 400, downloadThroughput: 50_000, uploadThroughput: 50_000 };
+/** The first body line of std14-reportlab.pdf ("This page is a synthetic test paragraph…"), as page fractions. */
+const LINE = { fx: 0.356, fy: 0.15, text: "This page is a synthetic test paragraph with several lines of" };
+
+test.skip(({ isMobile, browserName }) => !isMobile || browserName !== "chromium", "The slow-network profile runs on the mobile project (Chrome's emulation)");
+
+async function throttle(page: Page) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Network.enable");
+  await cdp.send("Network.emulateNetworkConditions", SLOW_3G);
+  return cdp;
+}
+
+/** Data Saver on: the landing doesn't prefetch the engine, so it starts once a file's page is up. */
+const dataSaver = (page: Page) =>
+  page.addInitScript(() => Object.defineProperty(navigator, "connection", { value: { saveData: true, effectiveType: "3g" }, configurable: true }));
+
+const engineState = (page: Page) => page.getByTestId("editor-shell").getAttribute("data-engine");
+
+async function tapPage(page: Page, fx: number, fy: number) {
+  const b = (await page.getByTestId("page-1").boundingBox())!;
+  await page.mouse.click(b.x + b.width * fx, b.y + b.height * fy);
+}
+
+test("slow 3G: the first page and Add text work before the engine; a line clicked early opens when it's ready", async ({ page }, info) => {
+  test.setTimeout(300_000);
+  await dataSaver(page);
+  await throttle(page);
+  const tNav = Date.now();
+  await page.goto("/edit-pdf", { timeout: 120_000 });
+  await expect(page.getByTestId("editor")).toHaveAttribute("data-hydrated", "true", { timeout: 120_000 });
+  const tLanding = Date.now() - tNav;
+
+  const t0 = Date.now();
+  await page.getByTestId("editor-input").setInputFiles(corpus("std14-reportlab.pdf"));
+  await expect(page.getByTestId("page-1")).toHaveAttribute("data-drawn", "true", { timeout: 120_000 });
+  const tFirstPage = Date.now() - t0;
+  expect(await engineState(page)).not.toBe("ready");
+
+  // An object tool works at once.
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("t");
+  await tapPage(page, 0.3, 0.55);
+  await expect(page.getByTestId("text-input")).toBeFocused();
+  await page.keyboard.type("Added on a slow line");
+  await page.getByTestId("text-input").press("Escape");
+  await expect(page.getByRole("group", { name: /Added on a slow line/ })).toHaveCount(1);
+  expect(await engineState(page)).not.toBe("ready");
+
+  // A tap on existing text: the progress shows and rises, then the line edit starts by itself.
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("v");
+  await tapPage(page, LINE.fx, LINE.fy);
+  const progress = page.getByTestId("engine-progress");
+  await expect(progress).toBeVisible({ timeout: 10_000 });
+  const seen: number[] = [];
+  const input = page.getByTestId("line-input");
+  const deadline = Date.now() + 180_000;
+  while (Date.now() < deadline && !(await input.isVisible())) {
+    const t = await page.getByTestId("engine-percent").textContent().catch(() => null);
+    if (t) {
+      const n = Number(t.replace("%", ""));
+      if (seen.at(-1) !== n) seen.push(n);
+    }
+    await page.waitForTimeout(250);
+  }
+  await expect(input).toBeFocused();
+  const tEngine = Date.now() - t0;
+  await expect(input).toHaveValue(LINE.text);
+  await expect(progress).toHaveCount(0);
+  expect(seen.length, `percent values seen: ${seen.join(", ")}`).toBeGreaterThanOrEqual(3);
+  for (let i = 1; i < seen.length; i++) expect(seen[i]).toBeGreaterThanOrEqual(seen[i - 1]!);
+  expect(seen.at(-1)! - seen[0]!).toBeGreaterThan(20);
+  await page.keyboard.press("Escape");
+
+  info.annotations.push({ type: "slow-3g", description: `landing ${tLanding} ms; first page ${tFirstPage} ms after the pick; engine ready ${tEngine} ms after the pick` });
+  console.log(`[slow-3g] landing ${tLanding} ms, first page ${tFirstPage} ms, engine ready ${tEngine} ms (from the pick)`);
+
+  // Second visit, same browser: the engine comes from the HTTP cache (nothing over the network).
+  const again = await page.context().newPage();
+  await throttle(again);
+  await again.goto("/edit-pdf", { timeout: 120_000 });
+  await again.getByTestId("editor-input").setInputFiles(corpus("std14-reportlab.pdf"));
+  await expect(again.getByTestId("editor-shell")).toHaveAttribute("data-engine", "ready", { timeout: 60_000 });
+  await expect(again.getByTestId("editor-shell")).toHaveAttribute("data-engine-cached", "true");
+});
+
+test("slow 3G: the landing prefetches the engine on idle, from hashed paths, unless Data Saver is on", async ({ browser }) => {
+  test.setTimeout(240_000);
+  const run = async (saver: boolean) => {
+    const context = await browser.newContext({ ...test.info().project.use });
+    const page = await context.newPage();
+    if (saver) await dataSaver(page);
+    await throttle(page);
+    const engine: string[] = [];
+    page.on("request", (r) => {
+      const p = new URL(r.url()).pathname;
+      if (p.startsWith("/engine/")) engine.push(p);
+    });
+    await page.goto("/edit-pdf", { timeout: 120_000 });
+    await expect(page.getByTestId("editor")).toHaveAttribute("data-hydrated", "true", { timeout: 120_000 });
+    if (!saver) await expect.poll(() => engine.length, { timeout: 60_000 }).toBeGreaterThanOrEqual(2);
+    else await page.waitForTimeout(6000);
+    await context.close();
+    return engine;
+  };
+  const normal = await run(false);
+  expect(normal.every((p) => /^\/engine\/[0-9a-f]{16}\/berry_engine(_bg\.wasm|\.js)$/.test(p)), normal.join(", ")).toBe(true);
+  expect(await run(true)).toEqual([]);
+});
+
+test("home: the engine is fetched on intent on the Edit PDF link, never on load", async ({ page }) => {
+  const engine: string[] = [];
+  page.on("request", (r) => {
+    const p = new URL(r.url()).pathname;
+    if (p.startsWith("/engine/")) engine.push(p);
+  });
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(1500);
+  expect(engine).toEqual([]);
+  // Edit PDF is unlisted during the beta, so no card links to it yet: stand one in for the card.
+  await page.evaluate(() => {
+    const a = document.createElement("a");
+    a.href = "/edit-pdf";
+    a.textContent = "Edit PDF";
+    a.dataset.testCard = "";
+    document.querySelector("main")!.prepend(a);
+  });
+  const link = page.locator("a[data-test-card]");
+  await page.waitForTimeout(500);
+  expect(engine).toEqual([]);
+  await link.dispatchEvent("touchstart");
+  await expect.poll(() => engine.length).toBeGreaterThanOrEqual(2);
+  expect(engine.every((p) => /^\/engine\/[0-9a-f]{16}\//.test(p))).toBe(true);
+});
