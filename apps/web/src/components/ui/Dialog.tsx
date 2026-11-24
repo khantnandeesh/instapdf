@@ -82,7 +82,7 @@ export function Dialog({
     const parts = () => [dialog];
     if (open && !dialog.open) {
       dialog.removeAttribute("data-leaving");
-      settle(dialog);
+      // Reopened mid-exit too: the fade stops and inert/aria-hidden go back to what they were before it.
       parts().forEach(settle);
       opener.current = document.activeElement as HTMLElement | null;
       dialog.showModal();
@@ -92,12 +92,9 @@ export function Dialog({
       // Closed at once (focus returns now, the page is usable now); globals.css keeps a leaving dialog
       // painted in the top layer while lib/motion fades it, then it is gone. No engine yet: instant.
       const leaving = motionReady();
-      if (leaving) {
-        // The whole dialog leaves the a11y tree and takes no input while it is still painted.
-        dialog.setAttribute("data-leaving", "");
-        dialog.setAttribute("aria-hidden", "true");
-        dialog.inert = true;
-      }
+      // The whole dialog leaves the a11y tree and takes no input while it is still painted: exit() makes
+      // it inert and aria-hidden at once (and settle() on the next opening gives back what it had).
+      if (leaving) dialog.setAttribute("data-leaving", "");
       dialog.close();
       void Promise.all(leaving ? parts().map((el) => exit(el, variant === "default" ? "dialog" : variant === "sheet" ? "sheet" : "overlay")) : []).then(() => {
         if (dialog.open) return; // reopened meanwhile

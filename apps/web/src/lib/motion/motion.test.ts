@@ -41,13 +41,12 @@ describe("lib/motion without the engine", () => {
     expect(el.style.transform).toBe("translateY(4px)");
   });
 
-  it("settle clears what an exit leaves on an element", () => {
+  it("settle leaves the element alone (no exit ran, so its own inert and aria-hidden stay)", () => {
     const el = fakeEl();
     settle(el);
-    expect(el.style.opacity).toBe("");
-    expect(el.style.transform).toBe("");
-    expect(el.inert).toBe(false);
-    expect(el.getAttribute("aria-hidden")).toBeNull();
+    expect(el.style.opacity).toBe("0");
+    expect(el.inert).toBe(true);
+    expect(el.getAttribute("aria-hidden")).toBe("true");
     expect(() => settle(null)).not.toThrow();
   });
 });

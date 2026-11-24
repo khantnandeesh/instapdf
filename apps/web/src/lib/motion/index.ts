@@ -40,11 +40,10 @@ export function popoverLeaving(e: Event): void {
   else el.removeAttribute("aria-hidden");
 }
 
-/** Stops any motion on `el` and clears what an exit left on it (inline opacity/transform, inert, aria-hidden). */
+/**
+ * Stops any motion on `el` and undoes what an exit left on it: the inline opacity/transform, and inert and
+ * aria-hidden back to what they were before the exit (not simply removed). Nothing to undo without the engine.
+ */
 export function settle(el: El): void {
-  if (!el) return;
-  motion()?.kill(el);
-  el.style.opacity = el.style.transform = "";
-  el.inert = false;
-  el.removeAttribute("aria-hidden");
+  if (el) motion()?.settle(el);
 }

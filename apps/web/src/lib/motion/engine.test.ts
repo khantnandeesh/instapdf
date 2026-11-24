@@ -79,6 +79,27 @@ describe("lib/motion engine: retained animations", () => {
     expect(await drained()).toBe(0);
   });
 
+  it("settle clears what an exit left and restores the inert and aria-hidden the element had before it", async () => {
+    const [plain, scrim, inertOne] = els(3);
+    scrim.setAttribute("aria-hidden", "true"); // set on purpose in the markup (the ToolMenu scrim)
+    inertOne.inert = true;
+    for (const el of [plain, scrim, inertOne]) {
+      void m.exit(el, "overlay");
+      void m.exit(el, "overlay"); // a second exit mid-leave must not record the leaving state
+      expect(el.inert).toBe(true);
+      expect(el.getAttribute("aria-hidden")).toBe("true");
+    }
+    for (const el of [plain, scrim, inertOne]) m.settle(el);
+    expect([plain.inert, plain.getAttribute("aria-hidden"), plain.style.opacity]).toEqual([false, null, ""]);
+    expect([scrim.inert, scrim.getAttribute("aria-hidden")]).toEqual([false, "true"]);
+    expect([inertOne.inert, inertOne.getAttribute("aria-hidden")]).toEqual([true, null]);
+    expect(await drained()).toBe(0);
+    // Once settled, a later settle without an exit changes nothing.
+    scrim.inert = true;
+    m.settle(scrim);
+    expect(scrim.inert).toBe(true);
+  });
+
   it("does not register zero-length tweens", () => {
     const before = m.liveCount();
     m.enter([], "list");

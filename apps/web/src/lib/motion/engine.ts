@@ -156,7 +156,12 @@ export function enter(el: HTMLElement | HTMLElement[], p: Preset): void {
   );
 }
 
+/** What an element had before its exit made it inert and aria-hidden, so settle() can put it back. */
+const before = new WeakMap<HTMLElement, { inert: boolean; hidden: string | null }>();
+
 export function exit(el: HTMLElement, p: Preset): Promise<void> {
+  // Kept from the first exit: a second exit on a leaving element must not record the leaving state.
+  if (!before.has(el)) before.set(el, { inert: el.inert, hidden: el.getAttribute("aria-hidden") });
   el.inert = true;
   el.setAttribute("aria-hidden", "true");
   const to = pick(TO, p);
@@ -227,4 +232,19 @@ export function swap(outEl: HTMLElement, inEl: HTMLElement, p: Preset): void {
 
 export function kill(el: HTMLElement): void {
   gsap.killTweensOf(el);
+}
+
+/**
+ * Stops any motion on `el`, clears the inline opacity/transform it left, and gives back the inert and
+ * aria-hidden the element had before an exit (a scrim's aria-hidden="true" in the markup stays).
+ */
+export function settle(el: HTMLElement): void {
+  gsap.killTweensOf(el);
+  el.style.opacity = el.style.transform = "";
+  const was = before.get(el);
+  if (!was) return;
+  before.delete(el);
+  el.inert = was.inert;
+  if (was.hidden === null) el.removeAttribute("aria-hidden");
+  else el.setAttribute("aria-hidden", was.hidden);
 }
