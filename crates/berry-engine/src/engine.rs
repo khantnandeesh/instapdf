@@ -423,8 +423,9 @@ impl Engine {
         }
     }
 
-    /// True when an edit moves a glyph of the line past the visible page edge, where none of
-    /// the line's glyphs were before.
+    /// True when an edit moves a glyph of the line past the visible page edge or past the
+    /// rectangle the page clips it to (it would be in the file but not drawn), where none of the
+    /// line's glyphs were before.
     pub(crate) fn overflows(
         &self,
         page: usize,
@@ -436,6 +437,10 @@ impl Engine {
         let [x0, y0, x1, y1] = self.page_box(page);
         let out = |g: &Glyph| {
             let end = (g.origin.0 + g.advance * g.angle.cos(), g.origin.1 + g.advance * g.angle.sin());
+            let [x0, y0, x1, y1] = match g.clip {
+                Some(c) => [x0.max(c[0]), y0.max(c[1]), x1.min(c[2]), y1.min(c[3])],
+                None => [x0, y0, x1, y1],
+            };
             [g.origin, end].iter().any(|p| p.0 < x0 - 0.5 || p.0 > x1 + 0.5 || p.1 < y0 - 0.5 || p.1 > y1 + 0.5)
         };
         !line.iter().any(|&g| out(&before.glyphs[g])) && touched.iter().any(|&g| out(&after.glyphs[g]))
@@ -542,7 +547,10 @@ impl Engine {
         let glyphs = chars
             .chars()
             .filter_map(|ch| {
-                let code = font.encode(ch, &none)?;
+                // To show or compare the font, a code whose glyph is in the program is enough,
+                // also where its declared width disagrees with the program's own (some
+                // subsetters write a wrong advance table; readers go by the PDF's widths).
+                let code = font.encode(ch, &none).or_else(|| font.code_with_glyph(ch))?;
                 Some(ProgramGlyph { cp: ch as u32, gid: font.program_gid(code).unwrap_or(0), width: font.width(code) })
             })
             .collect();

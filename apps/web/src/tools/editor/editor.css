@@ -951,7 +951,7 @@
 .ed-toast__x:hover {
   background: var(--color-hover);
 }
-/* The font notice: one row. On a phone its text is short and cut with an ellipsis. */
+/* The font notice: one compact row, its actions beside the sentence. */
 .ed-toast--font {
   max-width: min(640px, 100%);
 }
@@ -959,6 +959,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Both fonts are always named in full: on a phone the sentence takes a second line when it must. */
+.ed-narrow .ed-toast--font > span {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.25;
 }
 .ed-toast__act--pop {
   min-width: 0;
@@ -1271,7 +1279,7 @@
 }
 .ed-input__hint {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 5px);
   z-index: 2;
   display: flex;
   align-items: center;
@@ -1292,8 +1300,10 @@
 /* Text lies right under the box: the hint goes over it instead. */
 .ed-input__hint--over {
   top: auto;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 5px);
 }
+/* A short line with text under it: the hint stands after the box, on the line's own row (its
+   place is set in LineEditBox). */
 .ed-input__chars {
   font-weight: 700;
 }

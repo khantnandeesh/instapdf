@@ -18,7 +18,8 @@ import { foldName } from "@/lib/font-library/client";
 import { cx } from "@/components/ui/cx";
 import { useCtl } from "./context";
 import { docFace, type DocFace } from "./doc-face";
-import { chosenStandIn, fontLabel, standInCandidates } from "./font-service";
+import { USER_FONT_ACCEPT } from "@/lib/font-library/user-fonts";
+import { addUserFontFile, chosenStandIn, fontLabel, getFontState, standInCandidates } from "./font-service";
 
 type Line = PageText["lines"][number];
 export type EditBoxGeometry = { left: number; top: number; width: number; height: number; transform?: string };
@@ -28,6 +29,8 @@ const MARK = "ed-miss";
 const CHOICES = 3;
 /** Room the hint is given on the page (its CSS max-width). */
 const HINT_WIDTH = 300;
+/** The gap between the box and its hint (the CSS offset of .ed-input__hint). */
+const HINT_GAP = 5;
 
 const generic = (font: FontInfo | undefined) => (font?.monospace ? "ui-monospace, Menlo, Consolas, monospace" : font?.serif ? "'Times New Roman', Times, serif" : "Arial, Helvetica, sans-serif");
 /** The key a person's stand-in choice is kept under: the same name the controller asks the engine's request by. */
@@ -49,9 +52,12 @@ function scan(el: HTMLElement, faces: Record<number, DocFace | null>, first: num
     for (let i = 0; i < s.length; ) {
       const cp = s.codePointAt(i)!;
       const ch = String.fromCodePoint(cp);
-      // Letters of joined scripts are the engine's to judge on save: never asked about or marked here.
-      if (ch.trim() && !isComplex(cp)) {
-        if (!face.asked.has(cp)) out.unasked.set(font, (out.unasked.get(font) ?? "") + ch);
+      if (ch.trim()) {
+        // A letter of a joined script (Hebrew, Arabic, Hindi, Thai) in a font that draws this
+        // line letter by letter: the font is not asked about it (that would swap the whole
+        // line to a stand-in), it is marked as missing unless the font is known to have it.
+        const complex = isComplex(cp);
+        if (!complex && !face.asked.has(cp)) out.unasked.set(font, (out.unasked.get(font) ?? "") + ch);
         else if (!face.covered.has(cp)) {
           const r = document.createRange();
           r.setStart(node, i);
@@ -101,7 +107,7 @@ export function LineEditBox({
   length,
   maxWidth,
   paperInset,
-  hintBelow,
+  around,
   point,
   paper,
   onChange,
@@ -121,8 +127,8 @@ export function LineEditBox({
   maxWidth: number;
   /** How far the paper under the text stays clear of the box's top and bottom, so it never covers a neighbouring line. */
   paperInset: { top: number; bottom: number };
-  /** The hint goes under the box (false: over it, because text is right under). */
-  hintBelow: boolean;
+  /** Where the text of the lines around this one is drawn (layer pixels): the hint keeps off it where it can. */
+  around: { left: number; right: number; top: number; bottom: number }[];
   /** Where the line was clicked (viewport pixels): the caret goes there. */
   point: { x: number; y: number } | null;
   /** The page's colour under the line. */
@@ -147,6 +153,9 @@ export function LineEditBox({
   const [fit, setFit] = useState<{ word?: number; letter?: number } | null>(null);
   /** Where the first missing character stands in the box: the hint starts there. */
   const [missAt, setMissAt] = useState(0);
+  const [hintSize, setHintSize] = useState({ w: 220, h: 26 });
+  /** How wide the box is drawn now (it grows with the text). */
+  const [inputWidth, setInputWidth] = useState(0);
   /** What the browser's own rounding puts between the baseline asked for and the one drawn, at this size. */
   const [nudge, setNudge] = useState<{ key: string; px: number } | null>(null);
   const turned = !!box.transform;
@@ -159,6 +168,22 @@ export function LineEditBox({
   const facesRef = useRef(faces);
   facesRef.current = faces;
 
+  /** The file chooser for "Use your own font" is open: the box losing focus to it is not the end of the edit. */
+  const choosing = useRef(false);
+  const ownFile = useRef<HTMLInputElement>(null);
+  const [ownError, setOwnError] = useState("");
+  /** Counts fonts the person added while this box is open: the choices are looked up again. */
+  const [added, setAdded] = useState(0);
+  // Closing the chooser without a file hands the caret back too.
+  useEffect(() => {
+    const input = ownFile.current;
+    const back = () => {
+      choosing.current = false;
+      el.current?.focus({ preventScroll: true });
+    };
+    input?.addEventListener("cancel", back);
+    return () => input?.removeEventListener("cancel", back);
+  }, []);
   const caretTodo = useRef(false);
   const placeCaret = () => {
     const caret = point && !touched.current && el.current ? caretAt(el.current, point.x, point.y) : null;
@@ -172,6 +197,7 @@ export function LineEditBox({
     const box = el.current;
     if (!box) return;
     const found = scan(box, facesRef.current, first);
+    setInputWidth(box.offsetWidth);
     mark(found.ranges);
     if (found.at !== null) setMissAt(Math.round(found.at));
     setMissing((m) => (m?.font === found.missing?.font && m?.chars.join("") === found.missing?.chars.join("") ? m : found.missing));
@@ -188,14 +214,20 @@ export function LineEditBox({
     const box = el.current!;
     if (!box.isContentEditable) box.contentEditable = "true";
     box.textContent = "";
+    // An edit opened again (it couldn't be saved, or its font is being changed) keeps each part
+    // in its own font as far as the text is still the line's; what differs from there on is in
+    // the font of the part where it starts to differ.
+    let same = 0;
+    while (same < value.length && same < line.text.length && value[same] === line.text[same]) same++;
     const whole = value === line.text;
-    const runs = whole ? line.runs : line.runs.slice(0, 1);
+    const runs = whole ? line.runs : line.runs.filter((run, k) => k === 0 || run.start < same);
     runs.forEach((run, k) => {
       const span = document.createElement("span");
       span.dataset.font = String(run.font);
       span.dataset.size = String(run.size);
       span.dataset.color = run.color.join(" ");
-      span.textContent = whole ? line.text.slice(k === 0 ? 0 : run.start, k === runs.length - 1 ? line.text.length : runs[k + 1]!.start) : value;
+      const from = k === 0 ? 0 : run.start;
+      span.textContent = k === runs.length - 1 ? value.slice(from) : value.slice(from, runs[k + 1]!.start);
       box.append(span);
     });
     if (!runs.length) box.textContent = value;
@@ -310,14 +342,14 @@ export function LineEditBox({
     const chars = missing.chars.join("");
     void (async () => {
       const ids = await standInCandidates(info, { families: [info.family || info.name], bold: info.bold, italic: info.italic }, chars);
-      await resolveFonts(ids).catch(() => undefined);
+      await resolveFonts([...ids, ...getFontState().user.map((u) => u.id)]).catch(() => undefined);
       const m = knownManifest();
       // Those that have the most of the missing characters first; closeness decides between equals.
       const has = (id: string) => {
         const face = m?.faces[id] && faceOf(m, id, info.bold, info.italic);
         return face ? missing.chars.filter((c) => fileFor(face, c.codePointAt(0)!)).length : 0;
       };
-      const able = ids
+      const able = [...getFontState().user.map((u) => u.id).filter((id) => !ids.includes(id)), ...ids]
         .filter((id) => has(id) > 0)
         .sort((a, b) => has(b) - has(a))
         .slice(0, CHOICES);
@@ -335,7 +367,7 @@ export function LineEditBox({
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lacking]);
+  }, [lacking, added]);
 
   const firstFace = faces[first];
   const fontSize = line.size * scale;
@@ -394,6 +426,23 @@ export function LineEditBox({
   };
   const settling = !ready || paperColor === null;
   const hintId = `ed-miss-${line.id}`;
+  // The hint goes where it hides no text: under the box, starting at the missing character,
+  // when nothing is drawn there; else beside the box on the line's own row (a short line has
+  // room after it); else over the box (inside a paragraph something is always covered: then it
+  // is the line already read, not the one that comes next).
+  const free = (left: number, top: number) =>
+    !around.some((o) => o.right > box.left + left && o.left < box.left + left + hintSize.w && o.bottom > top && o.top < top + hintSize.h);
+  const underLeft = Math.max(4 - box.left, Math.min(missAt - 10, maxWidth - HINT_WIDTH));
+  const besideLeft = inputWidth + 8;
+  // Beside the box it is centred on the text's own middle (between baseline and cap height), which is where the rows around leave most room.
+  const besideTop = (start ? start.y - fontSize * 0.25 : box.top + box.height / 2) - hintSize.h / 2;
+  const side: "under" | "beside" | "over" =
+    turned || free(underLeft, box.top + box.height + HINT_GAP)
+      ? "under"
+      : inputWidth > 0 && besideLeft + hintSize.w <= maxWidth && free(besideLeft, besideTop)
+        ? "beside"
+        : "over";
+  const hintLeft = side === "beside" ? besideLeft : underLeft;
   const shown = standIn && missing && standIn.font === missing.font ? standIn : null;
 
   return (
@@ -402,6 +451,7 @@ export function LineEditBox({
       style={{ left: box.left, top: box.top, width: box.width, height: box.height, transform: box.transform }}
       // Leaving the box and its hint ends the edit; moving between them (Tab to a font) does not.
       onBlur={(e) => {
+        if (choosing.current) return;
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onCommit();
       }}
       onKeyDown={(e) => {
@@ -415,7 +465,7 @@ export function LineEditBox({
     >
       {/* Always here, so a screen reader hears the change when a character turns out to be missing. */}
       <span role="status" className="sr-only" data-testid="line-missing-status">
-        {missing ? `Not in this font: ${missing.chars.join(" ")}.${shown?.picked ? ` ${fontLabel(shown.picked)} draws ${missing.chars.length > 1 ? "them" : "it"}.` : ""}` : ""}
+        {missing ? `Not in this font: ${missing.chars.join(" ")}.${shown?.picked ? ` ${fontLabel(shown.picked)} draws ${missing.chars.length > 1 ? "them" : "it"}.` : shown ? " No font here has it. Use your own font, or remove it." : ""}` : ""}
       </span>
       <div
         ref={el}
@@ -467,11 +517,14 @@ export function LineEditBox({
       {missing && (
         <div
           id={hintId}
-          className={cx("ed-input__hint", !hintBelow && "ed-input__hint--over")}
-          // Starts at the missing character, and stays inside the page.
-          style={{ left: Math.max(4 - box.left, Math.min(missAt - 10, maxWidth - HINT_WIDTH)) }}
+          className={cx("ed-input__hint", side !== "under" && `ed-input__hint--${side}`)}
+          ref={(node) => {
+            // Its real size (it depends on the fonts offered) decides which side is clear.
+            if (node && (Math.abs(node.offsetWidth - hintSize.w) > 1 || Math.abs(node.offsetHeight - hintSize.h) > 1)) setHintSize({ w: node.offsetWidth, h: node.offsetHeight });
+          }}
+          style={side === "beside" ? { left: hintLeft, top: besideTop - box.top } : { left: hintLeft }}
           data-testid="line-missing"
-          data-side={hintBelow ? "under" : "over"}
+          data-side={side}
         >
           <span>
             Not in this font: <span className="ed-input__chars">{missing.chars.slice(0, 8).join(" ")}</span>
@@ -493,6 +546,8 @@ export function LineEditBox({
                   onClick={() => {
                     const font = text.fonts[shown.font];
                     if (!font || shown.picked === id) return el.current?.focus({ preventScroll: true });
+                    // Another font may be able to save what the last one couldn't.
+                    ctl.failedEdit = null;
                     void ctl.pickStandIn(familyKey(font), id);
                     setStandIn({ ...shown, picked: id });
                     el.current?.focus({ preventScroll: true });
@@ -503,8 +558,51 @@ export function LineEditBox({
               ))}
             </span>
           )}
+          {shown && shown.ids.length === 0 && (
+            <span className="ed-input__picks">
+              <span data-testid="line-missing-none">{ownError || "No font here has it."}</span>
+              <button
+                type="button"
+                data-testid="line-missing-own"
+                className="ed-input__pick"
+                onMouseDown={(e) => e.preventDefault()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => {
+                  choosing.current = true;
+                  // Back from the chooser, with or without a file: leaving the box ends the edit again.
+                  window.addEventListener("focus", () => setTimeout(() => (choosing.current = false), 500), { once: true });
+                  ownFile.current?.click();
+                }}
+              >
+                Use your own font
+              </button>
+            </span>
+          )}
         </div>
       )}
+      <input
+        ref={ownFile}
+        type="file"
+        accept={USER_FONT_ACCEPT}
+        hidden
+        data-testid="line-missing-own-file"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          choosing.current = false;
+          el.current?.focus({ preventScroll: true });
+          if (!f) return;
+          void addUserFontFile(f).then(
+            (out) => {
+              if ("error" in out) return setOwnError(out.error);
+              setOwnError("");
+              ctl.failedEdit = null;
+              setAdded((n) => n + 1);
+            },
+            () => setOwnError("That font couldn’t be read."),
+          );
+        }}
+      />
     </div>
   );
 }

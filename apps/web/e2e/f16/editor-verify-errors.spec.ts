@@ -67,9 +67,11 @@ test("a line that would run into its page number says so, and Replace with new t
   const notice = page.getByTestId("editor-notice");
   await expect(notice).toContainText("The edited line would run into the text next to it.");
   expect(logs).toContain("[editor] edit not applied: verify/overlap");
-  // The line is unchanged.
-  await expect(page.locator(`[data-testid="line"][data-text="${before}"]`)).toHaveCount(1);
+  // The typed text is kept in the box (F24 AC-305) and the line itself is unchanged.
+  await expect(page.getByTestId("line-input")).toHaveText(`${before} and more`);
   await notice.getByRole("button", { name: "Replace with new text" }).click();
+  await expect(page.getByTestId("line-input")).toHaveCount(0);
+  await expect(page.locator(`[data-testid="line"][data-text="${before}"]`)).toHaveCount(1);
   await expect(page.locator('[data-kind="whiteout"]')).toHaveCount(1);
   const box = page.locator('[data-kind="text"]');
   await expect(box).toHaveCount(1);

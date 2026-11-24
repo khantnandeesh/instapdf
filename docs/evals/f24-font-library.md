@@ -141,6 +141,8 @@ Fixture `chrome-justified-mixed.pdf`; task: open the first body line, type " for
 
 None on record. M2 is therefore counted as a loss.
 
+Note from the lead (2026-11-24, after this evaluation): M2 is owned by the cloud pickers feature (F23). Its code merged in #32 and stays behind a flag until the owner creates the OAuth apps, so it is blocked on owner setup, not waived, and is not F24's to fix.
+
 ## Harness notes
 
 - **Sejda T1.** The output was lost to a wrong selector in the evaluator's script, so both tasks went on the same edit and no second scenario (for example `libreoffice-memo.pdf`) has a reference output. Checks without a Sejda reference run this round: the added-text font preview (AC-292), the font replacement dialog, first-screen fit at 1280x632, 1536x730 and 1920x969, and medians for M7.

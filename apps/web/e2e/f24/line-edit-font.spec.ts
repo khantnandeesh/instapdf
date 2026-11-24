@@ -64,6 +64,10 @@ const SAME_PLACE: [file: string, text: string, faces: RegExp][] = [
   ["font-coverage-1p.pdf", "charter line one", /^own$/],
   ["report-form-3p.pdf", "This report was made", /^own$/],
   ["std14-reportlab.pdf", "Quarterly review", /^close$/],
+  // An embedded CFF program (Type 1C), and a subset whose own advance table is wrong: both are
+  // set by the widths the PDF declares.
+  ["latex-type1c.pdf", "The e", /^own/],
+  ["reportlab-mono-subset.pdf", "The quick brown fox", /^own$/],
 ];
 
 for (const [file, text, faces] of SAME_PLACE) {
@@ -216,7 +220,7 @@ test("the keyboard opens a line with the caret at its end", async ({ page }, inf
 
 test("a typed letter the font lacks is marked as typed, with fonts to draw it; picking one keeps the edit going", async ({ page }) => {
   await open(page, "chrome-justified-mixed.pdf");
-  const line = lineWith(page, "and it stays in force");
+  const line = lineWith(page, "in full");
   const text = (await line.getAttribute("data-text"))!;
   const input = await edit(page, line);
   await expect(input).toHaveAttribute("data-missing", "");
@@ -308,6 +312,104 @@ test("a letter of a joined script typed into a Latin line doesn't turn the marks
   await input.press("Escape");
 });
 
+for (const [script, letter] of [
+  ["Hebrew", "ש"],
+  ["Arabic", "ب"],
+  ["Devanagari", "क"],
+  ["Thai", "ก"],
+] as const) {
+  test(`AC-300: a ${script} letter typed into a Latin line is marked and named like any other missing letter`, async ({ page }) => {
+    await open(page, "chrome-justified-mixed.pdf");
+    const input = await edit(page, lineWith(page, "in full"));
+    await page.keyboard.press("End");
+    await page.keyboard.type(` ${letter}`);
+    await expect(input).toHaveAttribute("data-missing", letter);
+    // The line keeps the document's own font: only the letter is marked.
+    await expect(input).toHaveAttribute("data-face", "own");
+    await expect(page.getByTestId("line-missing")).toContainText(letter);
+    await expect(page.getByTestId("line-missing-status")).toContainText(`Not in this font: ${letter}`);
+    expect(await page.evaluate(() => CSS.highlights.get("ed-miss")?.size ?? 0)).toBe(1);
+    await input.press("Escape");
+  });
+}
+
+test("AC-304: the hint goes under the box when no text is drawn there, beside a short line, and over it only inside a paragraph", async ({ page }, info) => {
+  // (On a phone at fit-width zoom the page's text is smaller than the hint: nothing under a line is clear.)
+  test.skip(info.project.name !== "desktop", "room under a line is judged at the desktop size");
+  await open(page, "chrome-justified-mixed.pdf");
+  // The paragraph's last line is short: the gap under it is too thin for the hint, the row after it is free.
+  let input = await edit(page, lineWith(page, "in full"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ř");
+  const hint = page.getByTestId("line-missing");
+  await expect(hint).toHaveAttribute("data-side", "beside");
+  // It covers none of the text of the lines around (their ink: the middle of each line's box).
+  const hb = (await hint.boundingBox())!;
+  for (const other of ["and it stays in force", "Total amount due"]) {
+    const o = (await lineWith(page, other).boundingBox())!;
+    const [top, bottom] = [o.y + o.height * 0.2, o.y + o.height * 0.8];
+    const apart = hb.y + hb.height <= top || hb.y >= bottom || hb.x >= o.x + o.width || hb.x + hb.width <= o.x;
+    expect(apart, other).toBe(true);
+  }
+  // It doesn't cover the box either, and typing moves it along.
+  const ib = (await input.boundingBox())!;
+  expect(hb.x).toBeGreaterThanOrEqual(ib.x + ib.width);
+  await input.press("Escape");
+  // Nothing at all under the last line of the page's text: the hint goes under it.
+  input = await edit(page, lineWith(page, "non-refundable"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ř");
+  await expect(hint).toHaveAttribute("data-side", "under");
+  await input.press("Escape");
+  // The paragraph's first line: text is right under it.
+  input = await edit(page, lineWith(page, "This agreement is made"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ř");
+  await expect(hint).toHaveAttribute("data-side", "over");
+  await input.press("Escape");
+});
+
+test("the list of lines never points at the line that is open in the box", async ({ page }) => {
+  await open(page, "chrome-justified-mixed.pdf");
+  const list = page.getByRole("listbox").first();
+  const input = await edit(page, lineWith(page, "in full"));
+  // The option is out of the list while its box is open: no reference to an element that isn't there.
+  const ref = await list.getAttribute("aria-activedescendant");
+  expect(ref === null || (await page.locator(`[id="${ref}"]`).count()) === 1).toBe(true);
+  await input.press("Escape");
+  const after = await list.getAttribute("aria-activedescendant");
+  expect(after === null || (await page.locator(`[id="${after}"]`).count()) === 1).toBe(true);
+});
+
+test("AC-298: a line in an embedded CFF font (Type 1C) opens in that font, not a system one", async ({ page }) => {
+  await open(page, "latex-type1c.pdf");
+  const input = await edit(page, page.getByTestId("line").first());
+  await expect(input).toHaveAttribute("data-face", "own");
+  expect(await input.evaluate((el) => getComputedStyle(el.querySelector("[data-font]")!).fontFamily)).toMatch(/^"?bp-doc-/);
+  expect(await page.evaluate(() => [...document.fonts].some((f) => f.family.startsWith("bp-doc-") && f.status === "loaded"))).toBe(true);
+  await input.press("Escape");
+});
+
+test("text typed past where the page clips its content is refused, kept in the box, and can replace the line", async ({ page }) => {
+  await open(page, "chrome-justified-mixed.pdf");
+  const line = lineWith(page, "This agreement is made");
+  const text = (await line.getAttribute("data-text"))!;
+  const input = await edit(page, line);
+  await page.keyboard.press("End");
+  await page.keyboard.type(" and then the date");
+  await page.keyboard.press("Enter");
+  // A Chrome print clips to its print area: the words would be in the file but not drawn.
+  const notice = page.getByTestId("editor-notice");
+  await expect(notice).toContainText("The edited line would run past the page edge. Your text is still in the box.", { timeout: 30_000 });
+  await expect(input).toHaveText(`${text} and then the date`);
+  await expect(input).toBeFocused();
+  await expect(lineWith(page, "and then the date")).toHaveCount(0);
+  // The message's own way out takes the kept text and closes the box.
+  await notice.getByRole("button", { name: "Replace with new text" }).click();
+  await expect(input).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Undo/ }).first()).toBeEnabled();
+});
+
 test("a PDF's bare CFF font program becomes a font the browser loads, with the PDF's widths", async ({ page }) => {
   const cff = new Uint8Array(readFileSync("src/lib/font-library/__fixtures__/berry-test.cff"));
   const file = webFontFromProgram({
@@ -330,4 +432,14 @@ test("a PDF's bare CFF font program becomes a font the browser loads, with the P
   expect(widths[0]).toBeCloseTo(60, 2);
   expect(widths[1]).toBeCloseTo(70, 2);
   expect(widths[2]).toBe(true);
+});
+
+test("a fixed-pitch subset whose own advance table is wrong is still matched to its library family", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "the font menu is checked on the desktop layout");
+  await open(page, "reportlab-mono-subset.pdf");
+  const picker = page.getByTestId("font-picker").first();
+  if (!(await picker.isVisible().catch(() => false))) await page.getByRole("button", { name: /^Text/ }).first().click();
+  await picker.click();
+  const row = page.getByTestId("font-doc").filter({ hasText: "Fixture Mono" });
+  await expect(row).toContainText("Roboto Mono · Exact", { timeout: 30_000 });
 });

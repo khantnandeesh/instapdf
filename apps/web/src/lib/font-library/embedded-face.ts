@@ -292,6 +292,25 @@ function fromTrueType(program: EmbeddedProgram, family: string): Uint8Array | nu
     const data = t.get(tag);
     if (data) out.set(tag, data);
   }
+  // A PDF reader sets each glyph by the width the PDF declares, not by the program's own
+  // advance (a subset's advance table is sometimes wrong): the browser gets the PDF's widths.
+  const numLong = Math.min(hh.getUint16(34), numGlyphs);
+  if (numLong > 0 && hmtx.length >= numLong * 4 + (numGlyphs - numLong) * 2) {
+    const hv = view(hmtx);
+    const declared = new Map<number, number>();
+    for (const g of program.glyphs) if (g.gid > 0 && g.gid < numGlyphs && g.width > 0 && !declared.has(g.gid)) declared.set(g.gid, Math.round((g.width * unitsPerEm) / 1000));
+    const last = hv.getUint16((numLong - 1) * 4);
+    const table = new Writer();
+    for (let gid = 0; gid < numGlyphs; gid++) {
+      const own = gid < numLong ? hv.getUint16(gid * 4) : last;
+      const lsb = gid < numLong ? hv.getInt16(gid * 4 + 2) : hv.getInt16(numLong * 4 + (gid - numLong) * 2);
+      table.u16(declared.get(gid) ?? own).i16(lsb);
+    }
+    out.set("hmtx", table.bytes());
+    const wide = hhea.slice();
+    view(wide).setUint16(34, numGlyphs);
+    out.set("hhea", wide);
+  }
   out.set("cmap", cmapTable(map));
   out.set("name", nameTable(family));
   out.set("OS/2", os2Table(metrics));

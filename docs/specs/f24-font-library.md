@@ -127,10 +127,25 @@ We keep what is useful (the edit happens in place) and go further: the whole lin
 - **AC-299 (P0)** A click opens the line with the caret where the click landed; the keyboard opens it with the caret at the end. Nothing is selected or animated on opening.
 - **AC-300 (P0)** A typed character the line's font can't draw is underlined where it stands and named under the box as it is typed. Typing is never blocked and focus never leaves the box.
 - **AC-301 (P0)** Next to the name of the missing characters the closest fonts that have them are offered (at most three, the closest first and already in use). Picking one draws the characters with it in the box at once and writes the file with it on Enter; it is remembered for that document font.
-- **AC-304 (P0)** The box and its paper never cover a neighbouring line's text, and the hint is one compact opaque row placed where it hides no text right under the box (under the box when that is clear, else over it), starting at the missing character. The fonts in it are reachable with Tab without ending the edit, and a screen reader is told when a character is missing.
+- **AC-304 (P0)** The box and its paper never cover a neighbouring line's text, and the hint is one compact opaque row, starting at the missing character: under the box whenever no text is drawn where it would stand (judged by the text itself and the hint's real size), else over it. Inside a paragraph it then covers part of the line above (the one already read), never the box or the line that follows. The fonts in it are reachable with Tab without ending the edit, and a screen reader is told when a character is missing.
 - **AC-302 (P1)** For characters of another alphabet (Greek, Cyrillic, Hebrew, Arabic, Devanagari, Thai) the fonts offered and tried include library families of the same kind that have that alphabet.
 - **AC-303 (P1)** The edit box lays glyphs out as a PDF does (no kerning or ligatures of the browser's own), and its text is fitted to the line's length on the page (justified text).
 
 Checked in `e2e/f24/line-edit-font.spec.ts` (the box's ink is compared with the page's, pixel for pixel in place) and `lib/font-library/embedded-face.test.ts`.
 
-Not in this PR: Hindi, Arabic and other joined scripts open in a stand-in font that can join their letters (the embedded program carries the glyphs but not the joining rules), with nothing marked as missing; lines turned on the page and right-to-left lines open in their own font but centred in the box, not on their baseline; a CFF font is covered by a made-up program in the tests because the corpus has no PDF with one.
+### After the first evaluation (fourth PR)
+
+The evaluation of 2026-11-24 (`docs/evals/f24-font-library.md`) failed on four P0 criteria, one critical accessibility issue and one output defect. What changed:
+
+- **AC-305 (P0)** Typed text is never thrown away. When an edit can't be saved (no font has a character, the line would run past the page, the engine refuses it), the message says why and that the text is still in the box, and the box is open again with it and has the caret. Leaving the box with the same text neither tries again nor drops it; Escape gives the line back as it was.
+- **AC-306 (P0)** An edit that would push text past the rectangle the page clips its content to (every Chrome print has one) is refused like one that runs past the page edge, with "Replace with new text" on offer: the words are never written where no reader draws them. Only upright rectangular clips are followed; other clip shapes are not guessed at.
+- **AC-307 (P0)** When no font here has a missing character, the hint says so and offers "Use your own font" in place, without ending the edit; a font added that way is offered at once.
+- AC-300 now covers Hebrew, Arabic, Devanagari and Thai letters typed into a line that is drawn letter by letter: they are marked and named like any other missing character (the line keeps its own font).
+- AC-298 now holds for embedded CFF programs whose subset keeps no advances of its own (`latex-type1c.pdf`) and for subsets with a wrong advance table (`reportlab-mono-subset.pdf`): the box sets every glyph by the width the PDF declares, as a PDF reader does. The same fix lets these fonts be matched to the library (they showed "No match yet").
+- AC-286 on a phone: the notice names both fonts in full (two short lines at most); "Use your own font" stays inside "Change".
+- The list of lines no longer points a screen reader at the line that is open in the box.
+- Up to 200 fonts of a document are matched (was 24).
+
+Still open from that evaluation: AC-296 (looking the PDF's own font up on the device), the hint on a phone at fit-width zoom (the page's text is smaller than the hint, so inside a paragraph it covers the line above), two font objects per stand-in (one per slice), `/fonts/editor/*.woff` caching, and focus after a mouse-opened edit.
+
+Not in this PR: Hindi, Arabic and other joined scripts open in a stand-in font that can join their letters (the embedded program carries the glyphs but not the joining rules), with nothing marked as missing; lines turned on the page and right-to-left lines open in their own font but centred in the box, not on their baseline.

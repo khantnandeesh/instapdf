@@ -192,7 +192,7 @@ test.describe("font library (desktop)", () => {
     expect(names.filter((n) => /\+Tinos/.test(n)).length).toBeGreaterThanOrEqual(2);
   });
 
-  test("a character no font here can draw is refused with a plain message, and nothing changes", async ({ page }) => {
+  test("a character no font here can draw is refused with a plain message; the typed text stays in the box and the file is unchanged", async ({ page }) => {
     await open(page);
     await page.getByTestId("canvas").focus();
     await page.keyboard.press("e");
@@ -204,8 +204,29 @@ test.describe("font library (desktop)", () => {
     await page.getByTestId("line-input").fill(`${before} \uE123`);
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("editor-notice")).toContainText("This font has no", { timeout: 30_000 });
+    await expect(page.getByTestId("editor-notice")).toContainText("Your text is still in the box.");
     await expect(page.getByTestId("font-notice")).toHaveCount(0);
-    await expect(page.getByTestId("line").nth(1)).toHaveAttribute("data-text", before);
+    // Nothing typed is thrown away: the box is open again with it, and it has the caret.
+    const input = page.getByTestId("line-input");
+    await expect(input).toHaveText(`${before} \uE123`);
+    await expect(input).toBeFocused();
+    // The hint says no font has it and offers the person's own, without ending the edit.
+    await expect(page.getByTestId("line-missing-none")).toHaveText("No font here has it.");
+    await expect(page.getByTestId("line-missing-own")).toHaveText("Use your own font");
+    // Leaving the box with the same text doesn't try again or drop it.
+    const notices = await page.getByTestId("editor-notice").count();
+    await input.evaluate((el) => (el as HTMLElement).blur());
+    await expect(input).toHaveText(`${before} \uE123`);
+    expect(await page.getByTestId("editor-notice").count()).toBe(notices);
+    // Without the character the edit goes through; Escape would have given the line back as it was.
+    await input.focus();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type(" ok");
+    await page.keyboard.press("Enter");
+    await expect(input).toHaveCount(0);
+    await expect(page.locator(`[data-testid="line"][data-text="${before} ok"]`)).toBeAttached({ timeout: 15_000 });
   });
 
   test("AC-294: your own font file is used and embedded without leaving the device; a file that isn't a font is refused", async ({ page }) => {
@@ -252,7 +273,7 @@ test.describe("font library (desktop)", () => {
   });
 });
 
-test("on a phone the stand-in notice is one short row, with your own font inside Change", async ({ page, isMobile }) => {
+test("on a phone the stand-in notice names both fonts in one compact row, with your own font inside Change", async ({ page, isMobile }) => {
   test.skip(!isMobile, "phone layout");
   await open(page);
   await page.getByTestId("dock-more").click();
@@ -266,9 +287,11 @@ test("on a phone the stand-in notice is one short row, with your own font inside
   await page.getByTestId("line-input").fill(`${before} QXZ`);
   await page.keyboard.press("Enter");
   const notice = page.getByTestId("font-notice");
-  await expect(notice).toContainText("Using Tinos for missing characters", { timeout: 30_000 });
+  // Both fonts are named in full (AC-286), never cut with an ellipsis.
+  await expect(notice).toContainText("Liberation Serif isn’t complete. Using Tinos.", { timeout: 30_000 });
+  expect(await notice.locator("span").first().evaluate((el) => el.scrollHeight <= el.clientHeight + 1 && el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   const box = (await notice.boundingBox())!;
-  expect(box.height).toBeLessThanOrEqual(52);
+  expect(box.height).toBeLessThanOrEqual(60);
   expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   // It sits clear of the tool dock.
   const dock = (await page.getByTestId("dock").boundingBox())!;

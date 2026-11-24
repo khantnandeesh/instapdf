@@ -988,7 +988,9 @@ impl PdfFont {
         if declared <= 0.0 {
             return false;
         }
-        match self.program_advance(code) {
+        // A program that gives no advance of its own (some CFF subsets keep none) can't be
+        // compared: the declared width stands, as for a program we cannot read.
+        match self.program_advance(code).filter(|prog| *prog > 0.0) {
             Some(prog) => (declared - prog).abs() <= prog.abs() * 0.02 + 2.0,
             // Type 0 without a readable advance: trust only an explicit /W entry.
             None => !matches!(&self.widths, Widths::Cid { map, .. } if !map.contains_key(&code)),
@@ -1041,6 +1043,16 @@ impl PdfFont {
             })
             .min()
             .map(|(_, c)| c)
+    }
+
+    /// A one-byte code whose text is `ch` and whose glyph the embedded program really has,
+    /// whatever its width: enough to show or compare the font, not to write new text with.
+    pub fn code_with_glyph(&self, ch: char) -> Option<u32> {
+        if self.two_byte {
+            return None;
+        }
+        let target = ch.to_string();
+        (0..256u32).find(|&code| self.unicode(code).as_deref() == Some(target.as_str()) && self.has_glyph(code) == Some(true))
     }
 
     /// True when the code's own advance is affected by word spacing (`Tw`).
