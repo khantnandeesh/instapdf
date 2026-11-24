@@ -46,24 +46,33 @@ jobs:
           restore-keys: engine-${{ runner.os }}-${{ env.WASM_BINDGEN_VERSION }}-
       - run: cargo fmt --all --check
       - run: cargo clippy --all-targets --locked -- -D warnings
+      # berry-engine alone builds without the `shaping` feature (the default WebAssembly engine).
+      - run: cargo clippy -p berry-engine --all-targets --locked -- -D warnings
       - name: Test fonts (tests register Liberation Sans as a fallback)
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq fonts-liberation fonts-crosextra-carlito fonts-crosextra-caladea
       - run: cargo test --locked
+      - run: cargo test -p berry-engine --locked
       - name: Dependency licences
         run: python3 oracle/check_licences.py
       - name: Build WebAssembly
         run: |
-          cargo build -p berry-wasm --target wasm32-unknown-unknown --release --locked
           command -v wasm-bindgen || cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
+          # Two modules: the default engine, and the full one with complex-script shaping.
+          cargo build -p berry-wasm --target wasm32-unknown-unknown --release --locked
           wasm-bindgen target/wasm32-unknown-unknown/release/berry_wasm.wasm --out-dir berry-wasm/pkg --target web --out-name berry_engine
+          cargo build -p berry-wasm --features shaping --target wasm32-unknown-unknown --release --locked
+          wasm-bindgen target/wasm32-unknown-unknown/release/berry_wasm.wasm --out-dir berry-wasm/pkg --target web --out-name berry_engine_shaping
       - name: WebAssembly smoke test and size budget
         run: |
           node berry-wasm/smoke.mjs
-          size=$(gzip -9 -c berry-wasm/pkg/berry_engine_bg.wasm | wc -c)
-          echo "berry_engine_bg.wasm: $size bytes gzip"
-          test "$size" -le 1000000
+          BERRY_ENGINE=berry_engine_shaping node berry-wasm/smoke.mjs
+          for m in berry_engine berry_engine_shaping; do
+            size=$(gzip -9 -c "berry-wasm/pkg/${m}_bg.wasm" | wc -c)
+            echo "${m}_bg.wasm: $size bytes gzip"
+            test "$size" -le 1000000
+          done
       - name: PDFium oracle over the editor corpus
         run: |
           pip install --quiet pypdfium2==5.14.0 pikepdf==10.18.2 pillow==13.0.0 uharfbuzz==0.57.0

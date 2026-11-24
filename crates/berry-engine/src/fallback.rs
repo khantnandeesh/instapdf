@@ -85,8 +85,8 @@ pub fn request_for(font: &PdfFont) -> FontRequest {
 }
 
 /// Open families for a script, best first, given the original font's look.
-fn script_families(sc: unicode_script::Script, serif: bool, stem: &str) -> Vec<&'static str> {
-    use unicode_script::Script as S;
+fn script_families(sc: crate::script::Script, serif: bool, stem: &str) -> Vec<&'static str> {
+    use crate::script::Script as S;
     let naskh = [
         "times",
         "timesnew",
@@ -145,7 +145,7 @@ fn script_families(sc: unicode_script::Script, serif: bool, stem: &str) -> Vec<&
 pub fn request_for_text(font: &PdfFont, text: &str) -> FontRequest {
     let base = request_for(font);
     let stem = family_stem(&font.base_font);
-    let mut scripts: Vec<unicode_script::Script> = Vec::new();
+    let mut scripts: Vec<crate::script::Script> = Vec::new();
     for c in text.chars() {
         let sc = crate::script::script(c);
         if crate::script::is_complex(c) && !scripts.contains(&sc) {

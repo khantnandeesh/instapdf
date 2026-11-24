@@ -18,6 +18,11 @@
  * rewrite whole words, shaped by the engine, so typing inside a word re-shapes the word.
  * Right-to-left lines keep their right edge; `shift` is then negative when the text grows.
  *
+ * Two builds share this interface: `berry_engine` (default, smaller) and `berry_engine_shaping`
+ * (adds the shaper). The default build reads complex-script lines but marks them read-only with
+ * "needs-shaping", and an edit that types such text into any line throws read-only
+ * "needs-shaping". Load `berry_engine_shaping` (open the same bytes again) to edit them.
+ *
  * Not in this version (planned): add text and other objects, style changes on existing text,
  * move and delete, paragraph reflow. Phase E1 tools keep using pdf-lib.
  */
@@ -76,7 +81,13 @@ export interface Line {
   editable: boolean;
   /** Why the line is not editable. "legacy-font-encoding": a pre-Unicode Hindi font (Kruti Dev
    * and similar) that draws Devanagari from Latin codes, so the file holds no real text. */
-  read_only_reason?: "vertical-text" | "unsupported-encoding" | "invisible-text" | "legacy-font-encoding";
+  read_only_reason?:
+    | "vertical-text"
+    | "unsupported-encoding"
+    | "invisible-text"
+    | "legacy-font-encoding"
+    /** Hindi, Arabic or other complex-script text in the default build: load the shaping build. */
+    | "needs-shaping";
   /** Index into PageText.paragraphs. */
   paragraph: number;
 }

@@ -1,6 +1,7 @@
 //! Text shaping with rustybuzz (a Rust port of HarfBuzz): turns a word into positioned glyphs
 //! of a font, in visual order, with the script's reordering, conjuncts, joining and marks.
 
+#[cfg(feature = "shaping")]
 use rustybuzz::{Direction, UnicodeBuffer};
 
 /// One shaped glyph. Lengths are in em (1.0 = the font size).
@@ -33,6 +34,7 @@ pub fn can_shape(data: &[u8], text: &str) -> bool {
     !needs_gsub || face.tables().gsub.is_some()
 }
 
+#[cfg(feature = "shaping")]
 /// Shapes `text` with the font in `data`. Returns `None` when the font cannot be read or a
 /// glyph is missing (`.notdef`).
 pub fn shape(data: &[u8], text: &str, rtl: bool) -> Option<Vec<Shaped>> {
@@ -45,7 +47,7 @@ pub fn shape(data: &[u8], text: &str, rtl: bool) -> Option<Vec<Shaped>> {
     // Arabic: keep dotted letters whole (no `ccmp` decomposition into a base and its dots), so
     // every glyph stands for a letter and text extraction from glyphs alone reads right, as in
     // files from word processors.
-    let arabic = text.chars().any(|c| crate::script::script(c) == unicode_script::Script::Arabic);
+    let arabic = text.chars().any(|c| crate::script::script(c) == crate::script::Script::Arabic);
     let features =
         if arabic { vec![rustybuzz::Feature::new(rustybuzz::ttf_parser::Tag::from_bytes(b"ccmp"), 0, ..)] } else { vec![] };
     let out = rustybuzz::shape(&face, &features, buf);
@@ -90,7 +92,7 @@ pub fn cluster_texts(text: &str, glyphs: &[Shaped]) -> Vec<String> {
     out
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "shaping"))]
 mod tests {
     use super::*;
 

@@ -6,6 +6,7 @@ use crate::font::{strip_subset_prefix, FontKind, PdfFont};
 use crate::geom::Rect;
 use crate::interp::{self, FontCache, Glyph, PageContent, Segment, ShowKind, ShowState, SourceKind, TextEvent};
 use crate::layout::{self, Line, Paragraph};
+use crate::script;
 use lopdf::{Dictionary, Document, IncrementalDocument, Object, ObjectId, Stream};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -177,6 +178,8 @@ pub(crate) enum Seg {
 }
 
 #[derive(Clone)]
+// Rise and the ActualText items are only written by the shaping build.
+#[cfg_attr(not(feature = "shaping"), allow(dead_code))]
 pub(crate) enum Item {
     Bytes(Vec<u8>),
     Kern(f64),
@@ -512,8 +515,11 @@ impl Engine {
             let page_text = self.page_text(page)?;
             return Ok(EditResult { page: page_text, changed: Vec::new(), substitutions: Vec::new(), shift: 0.0 });
         }
-        if crate::complex::needs_complex(line, &inserted) {
+        if script::needs_shaping(&line.text, line.direction == "rtl") || script::needs_shaping(&inserted, false) {
+            #[cfg(feature = "shaping")]
             return self.edit_complex(page, page_id, pc, lines, line_id, a, b, inserted);
+            #[cfg(not(feature = "shaping"))]
+            return Err(Error::ReadOnly { reason: "needs-shaping".into() });
         }
 
         // 2. Positions along the baseline.

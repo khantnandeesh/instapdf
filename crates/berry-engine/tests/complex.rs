@@ -38,6 +38,7 @@ fn line_of(p: &PageText, text: &str) -> usize {
     p.lines.iter().position(|l| l.text == text).unwrap_or_else(|| panic!("no line {text:?} in {:#?}", texts(p)))
 }
 
+#[cfg(feature = "shaping")]
 /// Replaces `find` with `replace` in the line that reads `line`, saves, reopens, and returns
 /// the reopened page text.
 fn edit(e: &mut Engine, line: &str, find: &str, replace: &str) -> Result<PageText, Error> {
@@ -51,8 +52,160 @@ fn edit(e: &mut Engine, line: &str, find: &str, replace: &str) -> Result<PageTex
     Ok(Engine::open(out, None).unwrap().page_text(0).unwrap())
 }
 
+#[cfg(feature = "shaping")]
 fn shapes_ok(after: &PageText, expected: &str) {
     assert!(texts(after).iter().any(|t| t == expected), "{expected:?} not in {:#?}", texts(after));
+}
+
+#[cfg(feature = "shaping")]
+#[test]
+fn ac203_hindi_word_replace() {
+    for f in FIXTURES {
+        let mut e = open(f, true);
+        let after = edit(&mut e, HINDI[0], "कुल", "संपूर्ण").unwrap_or_else(|err| panic!("{f}: {err:?}"));
+        shapes_ok(&after, "संपूर्ण राशि का भुगतान समय पर किया गया।");
+        // Untouched lines still read the same.
+        for t in &HINDI[1..] {
+            shapes_ok(&after, t);
+        }
+    }
+}
+
+#[cfg(feature = "shaping")]
+#[test]
+fn ac211_insert_inside_word() {
+    for f in FIXTURES {
+        let mut e = open(f, true);
+        let after = edit(&mut e, HINDI[0], "भुगतान", "भुगतानों").unwrap_or_else(|err| panic!("{f}: {err:?}"));
+        shapes_ok(&after, "कुल राशि का भुगतानों समय पर किया गया।");
+    }
+}
+
+#[cfg(feature = "shaping")]
+#[test]
+fn hindi_append_word() {
+    for f in FIXTURES {
+        let mut e = open(f, true);
+        let after = edit(&mut e, HINDI[0], "गया।", "गया। धन्यवाद").unwrap_or_else(|err| panic!("{f}: {err:?}"));
+        shapes_ok(&after, "कुल राशि का भुगतान समय पर किया गया। धन्यवाद");
+    }
+}
+
+#[cfg(feature = "shaping")]
+#[test]
+fn ac208_reuse_page_words() {
+    // "का" and "की" are on the page: swapping them needs no new font.
+    for f in FIXTURES {
+        let mut e = open(f, false);
+        let p = e.page_text(0).unwrap();
+        let id = line_of(&p, HINDI[2]);
+        let r = e.replace_line(0, id, "हिंदी में पूर्ण विराम और अर्धविराम की प्रयोग।").unwrap_or_else(|err| panic!("{f}: {err:?}"));
+        assert!(r.substitutions.is_empty(), "{f}: {:?}", r.substitutions);
+        shapes_ok(&r.page, "हिंदी में पूर्ण विराम और अर्धविराम की प्रयोग।");
+    }
+}
+
+#[cfg(feature = "shaping")]
+#[test]
+fn ac205_arabic_word_replace_keeps_right_edge() {
+    for f in FIXTURES {
+        let mut e = open(f, true);
+        let before = e.page_text(0).unwrap();
+        let right = before.lines[line_of(&before, ARABIC[0])].bbox.x1;
+        let after = edit(&mut e, ARABIC[0], "بالعالم،", "بالجميع،").unwrap_or_else(|err| panic!("{f}: {err:?}"));
+        let expected = "مرحبا بالجميع، هذا نص تجريبي.";
+        shapes_ok(&after, expected);
+        let l = &after.lines[line_of(&after, expected)];
+        assert_eq!(l.direction, "rtl");
+        assert!((l.bbox.x1 - right).abs() < 0.5, "{f}: right edge moved {right} → {}", l.bbox.x1);
+    }
+}
+
+#[cfg(feature = "shaping")]
+#[test]
+fn arabic_append_word() {
+    for f in FIXTURES {
+        let mut e = open(f, true);
+        let after = edit(&mut e, ARABIC[0], "تجريبي.", "تجريبي. شكرا").unwrap_or_else(|err| panic!("{f}: {err:?}"));
+        shapes_ok(&after, "مرحبا بالعالم، هذا نص تجريبي. شكرا");
+    }
+}
+
+#[cfg(feature = "shaping")]
+#[test]
+fn ac206_number_in_arabic_line() {
+    for f in FIXTURES {
+        let mut e = open(f, true);
+        let after = edit(&mut e, ARABIC[1], "2500", "3750").unwrap_or_else(|err| panic!("{f}: {err:?}"));
+        shapes_ok(&after, "المبلغ الإجمالي 3750 ريال للفاتورة رقم 77.");
+    }
+}
+
+#[cfg(feature = "shaping")]
+#[test]
+fn ac210_missing_glyphs_names_script_family() {
+    let mut e = open("scripts-chrome.pdf", false);
+    match edit(&mut e, HINDI[0], "कुल", "ज्ञानौषधि") {
+        Err(Error::MissingGlyphs { request, .. }) => {
+            let norm = berry_engine::fallback::normalize;
+            assert_eq!(norm(&request.families[0]), norm("Noto Sans Devanagari"), "{:?}", request.families);
+            assert!(request.families.iter().any(|f| f == "Noto Serif Devanagari"), "{:?}", request.families);
+        }
+        other => panic!("expected missing glyphs, got {other:?}"),
+    }
+}
+
+#[cfg(feature = "shaping")]
+#[test]
+fn ac214_latin_line_unchanged_path() {
+    for f in &FIXTURES[..2] {
+        let mut e = open(f, false);
+        let after = edit(&mut e, "Invoice 2041 — total due on Friday", "Friday", "Monday");
+        match after {
+            Ok(p) => shapes_ok(&p, "Invoice 2041 — total due on Monday"),
+            // A subset without the letters is fine, as long as it says so.
+            Err(Error::MissingGlyphs { .. }) => {}
+            Err(err) => panic!("{f}: {err:?}"),
+        }
+    }
+}
+
+#[cfg(feature = "shaping")]
+#[test]
+fn ac209_embedded_font_shapes_when_it_can() {
+    // The Word-style file embeds full fonts with their layout tables: no stand-in is needed.
+    let mut e = open("scripts-plain.pdf", false);
+    let p = e.page_text(0).unwrap();
+    let id = line_of(&p, HINDI[0]);
+    let r = e.replace_range(0, id, 0, "कुल".chars().count(), "संपूर्ण").unwrap();
+    assert!(r.substitutions.is_empty(), "{:?}", r.substitutions);
+    shapes_ok(&r.page, "संपूर्ण राशि का भुगतान समय पर किया गया।");
+    // An Arabic word whose glyphs the embedded font's own Unicode map already covers.
+    let p = e.page_text(0).unwrap();
+    let id = line_of(&p, ARABIC[3]);
+    let start = ARABIC[3].chars().count() - "عليكم «تجربة».".chars().count();
+    let r = e.replace_range(0, id, start, start + "عليكم".chars().count(), "عليكما").unwrap();
+    assert!(r.substitutions.is_empty(), "{:?}", r.substitutions);
+    shapes_ok(&r.page, "قال مُحَمَّدٌ: السلام عليكما «تجربة».");
+}
+
+#[cfg(feature = "shaping")]
+#[test]
+fn ac207_rest_of_page_unchanged() {
+    // The engine's own check compares every untouched glyph; here, the lines around an edit
+    // keep their exact boxes.
+    for f in FIXTURES {
+        let mut e = open(f, true);
+        let before = e.page_text(0).unwrap();
+        let after = edit(&mut e, HINDI[0], "कुल", "संपूर्ण").unwrap();
+        for t in HINDI[1..].iter().chain(ARABIC.iter()) {
+            let (Some(a), Some(b)) = (before.lines.iter().find(|l| l.text == *t), after.lines.iter().find(|l| l.text == *t))
+            else {
+                continue;
+            };
+            assert!((a.bbox.x0 - b.bbox.x0).abs() < 1e-6 && (a.bbox.y1 - b.bbox.y1).abs() < 1e-6, "{f}: {t} moved");
+        }
+    }
 }
 
 #[test]
@@ -74,146 +227,6 @@ fn ac200_201_202_reading() {
         assert_eq!(p.lines.len(), if plain { 6 } else { 8 }, "{f}: {:#?}", texts(&p));
         if !plain {
             line_of(&p, "Invoice 2041 — total due on Friday");
-        }
-    }
-}
-
-#[test]
-fn ac203_hindi_word_replace() {
-    for f in FIXTURES {
-        let mut e = open(f, true);
-        let after = edit(&mut e, HINDI[0], "कुल", "संपूर्ण").unwrap_or_else(|err| panic!("{f}: {err:?}"));
-        shapes_ok(&after, "संपूर्ण राशि का भुगतान समय पर किया गया।");
-        // Untouched lines still read the same.
-        for t in &HINDI[1..] {
-            shapes_ok(&after, t);
-        }
-    }
-}
-
-#[test]
-fn ac211_insert_inside_word() {
-    for f in FIXTURES {
-        let mut e = open(f, true);
-        let after = edit(&mut e, HINDI[0], "भुगतान", "भुगतानों").unwrap_or_else(|err| panic!("{f}: {err:?}"));
-        shapes_ok(&after, "कुल राशि का भुगतानों समय पर किया गया।");
-    }
-}
-
-#[test]
-fn hindi_append_word() {
-    for f in FIXTURES {
-        let mut e = open(f, true);
-        let after = edit(&mut e, HINDI[0], "गया।", "गया। धन्यवाद").unwrap_or_else(|err| panic!("{f}: {err:?}"));
-        shapes_ok(&after, "कुल राशि का भुगतान समय पर किया गया। धन्यवाद");
-    }
-}
-
-#[test]
-fn ac208_reuse_page_words() {
-    // "का" and "की" are on the page: swapping them needs no new font.
-    for f in FIXTURES {
-        let mut e = open(f, false);
-        let p = e.page_text(0).unwrap();
-        let id = line_of(&p, HINDI[2]);
-        let r = e.replace_line(0, id, "हिंदी में पूर्ण विराम और अर्धविराम की प्रयोग।").unwrap_or_else(|err| panic!("{f}: {err:?}"));
-        assert!(r.substitutions.is_empty(), "{f}: {:?}", r.substitutions);
-        shapes_ok(&r.page, "हिंदी में पूर्ण विराम और अर्धविराम की प्रयोग।");
-    }
-}
-
-#[test]
-fn ac205_arabic_word_replace_keeps_right_edge() {
-    for f in FIXTURES {
-        let mut e = open(f, true);
-        let before = e.page_text(0).unwrap();
-        let right = before.lines[line_of(&before, ARABIC[0])].bbox.x1;
-        let after = edit(&mut e, ARABIC[0], "بالعالم،", "بالجميع،").unwrap_or_else(|err| panic!("{f}: {err:?}"));
-        let expected = "مرحبا بالجميع، هذا نص تجريبي.";
-        shapes_ok(&after, expected);
-        let l = &after.lines[line_of(&after, expected)];
-        assert_eq!(l.direction, "rtl");
-        assert!((l.bbox.x1 - right).abs() < 0.5, "{f}: right edge moved {right} → {}", l.bbox.x1);
-    }
-}
-
-#[test]
-fn arabic_append_word() {
-    for f in FIXTURES {
-        let mut e = open(f, true);
-        let after = edit(&mut e, ARABIC[0], "تجريبي.", "تجريبي. شكرا").unwrap_or_else(|err| panic!("{f}: {err:?}"));
-        shapes_ok(&after, "مرحبا بالعالم، هذا نص تجريبي. شكرا");
-    }
-}
-
-#[test]
-fn ac206_number_in_arabic_line() {
-    for f in FIXTURES {
-        let mut e = open(f, true);
-        let after = edit(&mut e, ARABIC[1], "2500", "3750").unwrap_or_else(|err| panic!("{f}: {err:?}"));
-        shapes_ok(&after, "المبلغ الإجمالي 3750 ريال للفاتورة رقم 77.");
-    }
-}
-
-#[test]
-fn ac210_missing_glyphs_names_script_family() {
-    let mut e = open("scripts-chrome.pdf", false);
-    match edit(&mut e, HINDI[0], "कुल", "ज्ञानौषधि") {
-        Err(Error::MissingGlyphs { request, .. }) => {
-            let norm = berry_engine::fallback::normalize;
-            assert_eq!(norm(&request.families[0]), norm("Noto Sans Devanagari"), "{:?}", request.families);
-            assert!(request.families.iter().any(|f| f == "Noto Serif Devanagari"), "{:?}", request.families);
-        }
-        other => panic!("expected missing glyphs, got {other:?}"),
-    }
-}
-
-#[test]
-fn ac214_latin_line_unchanged_path() {
-    for f in &FIXTURES[..2] {
-        let mut e = open(f, false);
-        let after = edit(&mut e, "Invoice 2041 — total due on Friday", "Friday", "Monday");
-        match after {
-            Ok(p) => shapes_ok(&p, "Invoice 2041 — total due on Monday"),
-            // A subset without the letters is fine, as long as it says so.
-            Err(Error::MissingGlyphs { .. }) => {}
-            Err(err) => panic!("{f}: {err:?}"),
-        }
-    }
-}
-
-#[test]
-fn ac209_embedded_font_shapes_when_it_can() {
-    // The Word-style file embeds full fonts with their layout tables: no stand-in is needed.
-    let mut e = open("scripts-plain.pdf", false);
-    let p = e.page_text(0).unwrap();
-    let id = line_of(&p, HINDI[0]);
-    let r = e.replace_range(0, id, 0, "कुल".chars().count(), "संपूर्ण").unwrap();
-    assert!(r.substitutions.is_empty(), "{:?}", r.substitutions);
-    shapes_ok(&r.page, "संपूर्ण राशि का भुगतान समय पर किया गया।");
-    // An Arabic word whose glyphs the embedded font's own Unicode map already covers.
-    let p = e.page_text(0).unwrap();
-    let id = line_of(&p, ARABIC[3]);
-    let start = ARABIC[3].chars().count() - "عليكم «تجربة».".chars().count();
-    let r = e.replace_range(0, id, start, start + "عليكم".chars().count(), "عليكما").unwrap();
-    assert!(r.substitutions.is_empty(), "{:?}", r.substitutions);
-    shapes_ok(&r.page, "قال مُحَمَّدٌ: السلام عليكما «تجربة».");
-}
-
-#[test]
-fn ac207_rest_of_page_unchanged() {
-    // The engine's own check compares every untouched glyph; here, the lines around an edit
-    // keep their exact boxes.
-    for f in FIXTURES {
-        let mut e = open(f, true);
-        let before = e.page_text(0).unwrap();
-        let after = edit(&mut e, HINDI[0], "कुल", "संपूर्ण").unwrap();
-        for t in HINDI[1..].iter().chain(ARABIC.iter()) {
-            let (Some(a), Some(b)) = (before.lines.iter().find(|l| l.text == *t), after.lines.iter().find(|l| l.text == *t))
-            else {
-                continue;
-            };
-            assert!((a.bbox.x0 - b.bbox.x0).abs() < 1e-6 && (a.bbox.y1 - b.bbox.y1).abs() < 1e-6, "{f}: {t} moved");
         }
     }
 }
@@ -243,4 +256,24 @@ fn ac212_legacy_hindi_font_is_read_only() {
     assert_eq!(p.lines[0].read_only_reason, Some("legacy-font-encoding"));
     assert!(!p.lines[0].editable);
     assert!(matches!(e.replace_line(0, 0, "x"), Err(Error::ReadOnly { reason }) if reason == "legacy-font-encoding"));
+}
+
+#[test]
+fn base_engine_marks_complex_lines_needs_shaping() {
+    // Without the shaper, Hindi and Arabic lines read right but are read-only until the host
+    // loads the full engine; Latin lines stay editable.
+    let mut e = open("scripts-chrome.pdf", false);
+    let p = e.page_text(0).unwrap();
+    for l in &p.lines {
+        let complex = l.direction == "rtl" || l.text.chars().any(berry_engine::script::is_complex);
+        let want = if cfg!(feature = "shaping") || !complex { None } else { Some("needs-shaping") };
+        assert_eq!(l.read_only_reason, want, "{}", l.text);
+    }
+    if !cfg!(feature = "shaping") {
+        let id = line_of(&p, HINDI[0]);
+        assert!(matches!(e.replace_line(0, id, "x"), Err(Error::ReadOnly { reason }) if reason == "needs-shaping"));
+        // Hindi typed into a Latin line needs the shaper too.
+        let latin = line_of(&p, "Invoice 2041 — total due on Friday");
+        assert!(matches!(e.replace_range(0, latin, 0, 7, "चालान"), Err(Error::ReadOnly { reason }) if reason == "needs-shaping"));
+    }
 }

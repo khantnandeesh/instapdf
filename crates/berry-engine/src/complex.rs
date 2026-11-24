@@ -57,11 +57,6 @@ enum Piece {
     },
 }
 
-/// True when an edit of this line must go through this module.
-pub(crate) fn needs_complex(line: &Line, inserted: &str) -> bool {
-    line.direction == "rtl" || line.text.chars().any(script::is_complex) || inserted.chars().any(script::is_complex)
-}
-
 fn along(p: (f64, f64), ang: f64) -> f64 {
     p.0 * ang.cos() + p.1 * ang.sin()
 }

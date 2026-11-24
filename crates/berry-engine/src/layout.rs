@@ -618,10 +618,16 @@ fn build_line(pc: &PageContent, id: usize, clusters: Vec<&Cluster>) -> Line {
             reason = Some("legacy-font-encoding");
         }
     }
+    let text: String = chars.iter().map(|c| c.text.as_str()).collect();
+    // Without the shaper (the default, smaller engine) complex-script lines are read-only; the
+    // host loads the full engine to edit them.
+    if reason.is_none() && !cfg!(feature = "shaping") && script::needs_shaping(&text, rtl) {
+        reason = Some("needs-shaping");
+    }
     let bbox = boxes(pc, &chars).unwrap_or(Rect { x0: 0.0, y0: 0.0, x1: 0.0, y1: 0.0 });
     Line {
         id,
-        text: chars.iter().map(|c| c.text.as_str()).collect(),
+        text,
         bbox,
         origin: first.origin,
         angle: first.angle.to_degrees(),

@@ -1,32 +1,79 @@
 //! Character properties for complex scripts: marks, scripts, bidi classes, Indic reordering
 //! helpers and presentation-form folding.
 
-use crate::presentation::PRESENTATION;
-use unicode_bidi::BidiClass;
-use unicode_properties::{GeneralCategory, UnicodeGeneralCategory};
-use unicode_script::{Script, UnicodeScript};
+use crate::script_tables::{DIGITS, NONSPACING_MARKS, PRESENTATION, PRESENTATION_TEXT, RTL, SCRIPTS, SPACING_MARKS};
+
+/// The scripts the engine treats specially. Everything else (Latin, digits, punctuation) is
+/// `Other`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Script {
+    Devanagari,
+    Bengali,
+    Gurmukhi,
+    Gujarati,
+    Oriya,
+    Tamil,
+    Telugu,
+    Kannada,
+    Malayalam,
+    Sinhala,
+    Arabic,
+    Hebrew,
+    Syriac,
+    Thaana,
+    Thai,
+    Lao,
+    Khmer,
+    Myanmar,
+    Tibetan,
+    Other,
+}
+
+fn in_ranges(table: &[(u32, u32)], ch: char) -> bool {
+    let c = ch as u32;
+    table
+        .binary_search_by(|&(a, b)| {
+            if b < c {
+                std::cmp::Ordering::Less
+            } else if a > c {
+                std::cmp::Ordering::Greater
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        })
+        .is_ok()
+}
 
 /// A combining mark that sits on a base character (accents, Indic signs, Arabic harakat).
 pub fn is_mark(ch: char) -> bool {
-    matches!(ch.general_category(), GeneralCategory::NonspacingMark | GeneralCategory::EnclosingMark)
+    in_ranges(NONSPACING_MARKS, ch)
 }
 
 /// Any mark, spacing ones (Indic dependent vowels) included.
 pub fn is_any_mark(ch: char) -> bool {
-    matches!(
-        ch.general_category(),
-        GeneralCategory::NonspacingMark | GeneralCategory::EnclosingMark | GeneralCategory::SpacingMark
-    )
+    is_mark(ch) || in_ranges(SPACING_MARKS, ch)
 }
 
 pub fn script(ch: char) -> Script {
-    ch.script()
+    let c = ch as u32;
+    match SCRIPTS.binary_search_by(|&(a, b, _)| {
+        if b < c {
+            std::cmp::Ordering::Less
+        } else if a > c {
+            std::cmp::Ordering::Greater
+        } else {
+            std::cmp::Ordering::Equal
+        }
+    }) {
+        Ok(i) => SCRIPTS[i].2,
+        Err(_) => Script::Other,
+    }
 }
 
 /// Indic (Brahmic) scripts whose shaping reorders and conjoins letters.
 pub fn is_indic(ch: char) -> bool {
     matches!(
-        ch.script(),
+        script(ch),
         Script::Devanagari
             | Script::Bengali
             | Script::Gurmukhi
@@ -46,28 +93,30 @@ pub fn is_complex(ch: char) -> bool {
     is_indic(ch)
         || is_rtl(ch)
         || matches!(
-            ch.script(),
+            script(ch),
             Script::Thai | Script::Lao | Script::Khmer | Script::Myanmar | Script::Tibetan | Script::Syriac | Script::Thaana
         )
         || (0xFB1D..=0xFEFF).contains(&(ch as u32))
 }
 
-pub fn bidi(ch: char) -> BidiClass {
-    unicode_bidi::bidi_class(ch)
+/// True when editing this text needs the shaper (whole-word edits, bidi layout).
+pub fn needs_shaping(text: &str, rtl: bool) -> bool {
+    rtl || text.chars().any(is_complex)
 }
 
-/// A strong right-to-left letter.
+/// A strong right-to-left letter (bidi class R or AL).
 pub fn is_rtl(ch: char) -> bool {
-    matches!(bidi(ch), BidiClass::R | BidiClass::AL)
+    in_ranges(RTL, ch)
 }
 
+/// A strong left-to-right character: a letter that is not right-to-left.
 pub fn is_ltr(ch: char) -> bool {
-    bidi(ch) == BidiClass::L
+    ch.is_alphabetic() && !is_rtl(ch) && !is_any_mark(ch)
 }
 
 /// European or Arabic-Indic digits.
 pub fn is_digit(ch: char) -> bool {
-    matches!(bidi(ch), BidiClass::EN | BidiClass::AN)
+    in_ranges(DIGITS, ch)
 }
 
 pub fn mirror(ch: char) -> char {
@@ -81,9 +130,13 @@ pub fn fold_presentation(s: &str) -> String {
     }
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
-        match PRESENTATION.binary_search_by_key(&(c as u32), |(k, _)| *k) {
-            Ok(i) => out.push_str(PRESENTATION[i].1),
-            Err(_) => out.push(c),
+        let code = c as u32;
+        match PRESENTATION.binary_search_by_key(&code, |&(k, _, _)| k as u32) {
+            Ok(i) if code <= 0xFFFF => {
+                let (_, a, b) = PRESENTATION[i];
+                out.push_str(PRESENTATION_TEXT.get(a as usize..b as usize).unwrap_or(""));
+            }
+            _ => out.push(c),
         }
     }
     out
@@ -108,7 +161,7 @@ pub fn is_ra(ch: char) -> bool {
 
 /// An Indic letter that can be the base of a syllable.
 pub fn is_indic_letter(ch: char) -> bool {
-    is_indic(ch) && ch.general_category() == GeneralCategory::OtherLetter
+    is_indic(ch) && ch.is_alphabetic() && !is_any_mark(ch)
 }
 
 /// Legacy Hindi fonts that put Devanagari shapes on Latin codes (no Unicode text behind them).
