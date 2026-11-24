@@ -3,6 +3,27 @@
  * preview chunk only. The page fills the stage; the chrome is a quiet counter, a small close button and two small
  * round arrows. Guarded by e2e/ui/modals.spec.ts.
  */
+/* The <dialog> (Dialog variant "fullscreen" + .mp-viewer): covers the viewport, no surface of its own, never
+   scrolls, fades in rather than rising. Unlayered, so it wins over the variant's utility classes. */
+.mp-viewer {
+  overflow: hidden;
+  background: transparent;
+  animation: ip-pv-in 160ms ease-out;
+}
+/* The scrim: dark enough that a white page reads, berry-warm like the rest. */
+.mp-viewer::backdrop {
+  background: color-mix(in srgb, var(--ink-black) 92%, transparent);
+  backdrop-filter: blur(4px);
+}
+/* On-theme focus on the dark scrim: 2px pale pink, keyboard only. */
+.mp-viewer :focus-visible:not([data-quiet-focus]) {
+  outline: 2px solid var(--brand-tint);
+  outline-offset: 2px;
+}
+.mp-viewer :focus:not(:focus-visible) {
+  outline: none;
+}
+
 .ip-pv {
   position: relative;
   display: grid;

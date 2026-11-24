@@ -10,8 +10,8 @@ export type DialogCloseReason = "escape" | "action";
 /**
  * Modal dialog on the native <dialog> element: top layer, inert background and
  * a focus trap from the browser. Escape goes through `onClose("escape")`.
- * Backdrop clicks do nothing in the default modal (prevents an accidental skip); the
- * "viewer" variant leaves the backdrop to its content, which closes on a tap there.
+ * Backdrop clicks do nothing in the default modal (prevents an accidental skip); the page
+ * viewer (fullscreen, PagePreviewDialog) closes on a tap on its own backdrop.
  *
  * Chrome follows docs/design/berrypdf.md "Modals": no decoration, a small title row
  * (title, optional close), content, then content-width buttons at the end of the row.
@@ -49,11 +49,7 @@ export function Dialog({
    * `initialFocusRef` is set (no on-screen keyboard popping up on open).
    */
   /** "sheet" (spec F3 M-4): anchored to the bottom, full width, max height --ip-sheet-max-h; body scrolls, header and footer stay. */
-  /**
-   * "viewer": the big page view. Covers the viewport on a dark scrim with no surface of its own;
-   * renders `children` as is under a visually hidden title (focused on open, like "fullscreen").
-   */
-  variant?: "default" | "fullscreen" | "sheet" | "viewer";
+  variant?: "default" | "fullscreen" | "sheet";
   /** Default modal and sheet: a small close button in the title row. */
   onCloseButton?: () => void;
 }) {
@@ -71,16 +67,8 @@ export function Dialog({
     if (open && !dialog.open) {
       opener.current = document.activeElement as HTMLElement | null;
       dialog.showModal();
-      const target = initialFocusRef?.current ?? (variant === "fullscreen" || variant === "viewer" ? titleRef.current : null);
+      const target = initialFocusRef?.current ?? (variant === "fullscreen" ? titleRef.current : null);
       if (target) requestAnimationFrame(() => target.focus());
-      // The browser focuses the first control, which would be the close button in the title row; start on the
-      // content instead (the close button stays one Shift+Tab away, and Escape closes).
-      else if (variant === "default" && onCloseButton) {
-        const first = Array.from(dialog.querySelectorAll<HTMLElement>("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])")).find(
-          (el) => !el.hasAttribute("data-dialog-close") && !(el as HTMLButtonElement).disabled && el.getClientRects().length > 0,
-        );
-        first?.focus();
-      }
     } else if (!open && dialog.open) {
       dialog.close();
       const back = returnFocusRef?.current ?? opener.current;
@@ -89,7 +77,7 @@ export function Dialog({
       const el = back && back !== document.body && back.isConnected && !back.closest("[inert]") ? back : fallbackFocus?.();
       el?.focus();
     }
-  }, [open, initialFocusRef, returnFocusRef, fallbackFocus, variant]); // eslint-disable-line react-hooks/exhaustive-deps -- onCloseButton: only whether it is set
+  }, [open, initialFocusRef, returnFocusRef, fallbackFocus, variant]);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -125,7 +113,7 @@ export function Dialog({
       ref={ref}
       onKeyDown={wrapTab}
       aria-labelledby={titleId}
-      aria-modal={variant === "fullscreen" || variant === "viewer" ? true : undefined}
+      aria-modal={variant === "fullscreen" ? true : undefined}
       aria-describedby={description ? descId : undefined}
       // One scroller per layer (docs/design/berrypdf.md "Scrolling"): the full-screen dialog scrolls itself;
       // the sheet and the modal scroll their inner body, so the <dialog> element never does.
@@ -133,9 +121,7 @@ export function Dialog({
       className={cx(
         variant === "fullscreen"
           ? "mp-modal-in m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto overscroll-contain border-0 bg-surface-raised p-0 text-ink backdrop:bg-transparent"
-          : variant === "viewer"
-            ? "mp-viewer m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden border-0 bg-transparent p-0"
-            : variant === "sheet"
+          : variant === "sheet"
             ? // BerryPDF bottom sheet: white, 24px top corners, the modal's blurred berry backdrop; rises in (0.3s overshoot).
               "mp-sheet mx-0 mt-auto mb-0 max-h-(--ip-sheet-max-h) w-screen max-w-none border-0 p-0"
             : cx(
@@ -147,7 +133,7 @@ export function Dialog({
         className,
       )}
     >
-      {open && (variant === "fullscreen" || variant === "viewer") && (
+      {open && variant === "fullscreen" && (
         <>
           <h2 id={titleId} ref={titleRef} tabIndex={-1} className="sr-only">
             {title}
@@ -175,15 +161,12 @@ export function Dialog({
         // The modal's one scroll region (only used when it is taller than the screen). A dialog with a long list
         // (the page picker) caps the list instead, so this never scrolls around a second scroller.
         <div className="flex max-h-[calc(100dvh-32px)] flex-col gap-4 overflow-y-auto overscroll-contain px-6 pt-5 pb-5" data-ip-scroll="overlay">
-          <div className="min-w-0" data-dialog-head>
-            <div className="flex items-start justify-between gap-3">
-              <h2 id={titleId} className="mp-modal__title min-w-0 break-words">
-                {title}
-              </h2>
-              {onCloseButton && <IconButton label="Close" size="sm" icon={<CloseIcon size={18} />} tooltip={false} className="-me-2 -mt-1" data-dialog-close onClick={onCloseButton} />}
-            </div>
+          <div className={onCloseButton && "pe-9"}>
+            <h2 id={titleId} className="mp-modal__title break-words">
+              {title}
+            </h2>
             {description && (
-              <div id={descId} className="mt-1.5 text-[15px] leading-[1.45] text-muted" data-dialog-desc>
+              <div id={descId} className="mt-1.5 text-[15px] leading-[1.45] text-muted">
                 {description}
               </div>
             )}
@@ -196,6 +179,9 @@ export function Dialog({
               {footer}
             </div>
           )}
+          {/* Last in the DOM, so the dialog opens on its content (the browser focuses the first control); drawn in
+              the title row's corner. */}
+          {onCloseButton && <IconButton label="Close" size="sm" icon={<CloseIcon size={18} />} tooltip={false} className="absolute top-3.5 right-3.5" onClick={onCloseButton} />}
         </div>
       )}
     </dialog>

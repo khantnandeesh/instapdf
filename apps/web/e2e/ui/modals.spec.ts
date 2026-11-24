@@ -50,7 +50,8 @@ async function expectQuietTop(dialog: Locator, contentTop: Locator, where: strin
   const stray = await dialog.evaluate((d, top) => {
     const limit = top.getBoundingClientRect().top;
     // The description under the title is body copy: it counts as content.
-    const allowed = 'h2, [data-dialog-desc], [aria-label="Close"], [data-testid="page-preview-counter"]';
+    const desc = d.getAttribute("aria-describedby");
+    const allowed = `h2, [aria-label="Close"], [data-testid="page-preview-counter"]${desc ? `, [id="${desc}"]` : ""}`;
     const out: string[] = [];
     for (const el of d.querySelectorAll("*")) {
       if (el.children.length && !(el instanceof SVGElement)) continue; // leaves only (and whole icons)

@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ThumbnailRenderer } from "@/lib/pdf/thumbnails";
 import { Dialog } from "../ui/Dialog";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "../ui/icons";
-import { fitPage, keyTarget, neighbours, readGesture, type Size } from "./preview-fit";
+import { fitPage, keyTarget, neighbours, readGesture, renderSize, type Size } from "./preview-fit";
 import type { ReadyFile } from "./types";
 import "./page-preview.css";
 
@@ -13,8 +13,6 @@ type Item = PreviewTarget["items"][number];
 
 /** Rendered pages kept for instant back-and-forth: the page on screen and its neighbours. */
 const KEEP = 5;
-/** The sharpest the view draws (device pixels per CSS pixel). */
-const MAX_DPR = 3;
 
 const pageSize = (it: Item): Size => it.file.pages[it.index] ?? { width: 1, height: 1 };
 const keyOf = (it: Item, size: number) => `${it.file.id}:${it.index}:${size}`;
@@ -89,32 +87,23 @@ export function PagePreviewDialog({
   // Draw the page on screen (from the cache when it was drawn ahead), then its neighbours.
   useEffect(() => {
     if (!item || !renderer || !longest) return;
-    const want = (it: Item, priority: number, show: boolean) => {
-      const b = fit(it)?.box;
-      if (!b) return;
-      const size = Math.max(b.width, b.height);
-      const key = keyOf(it, size);
-      const done = cache.current.get(key);
-      if (done) {
-        if (show) put(done);
-        return;
-      }
-      if (pending.current.has(key)) return;
-      const cancel = renderer.request(
-        it.file.id,
-        it.index,
-        size,
-        priority,
-        (canvas) => {
-          pending.current.delete(key);
-          canvas.className = "ip-pv__canvas";
-          cache.current.set(key, canvas);
-          while (cache.current.size > KEEP) cache.current.delete(cache.current.keys().next().value!);
-          if (show && current.current === key) put(canvas);
-        },
-        MAX_DPR,
-      );
+    const want = (it: Item, priority: number) => {
+      const key = keyFor(it);
+      if (!key || cache.current.has(key) || pending.current.has(key)) return;
+      const b = fit(it)!.box;
+      const cancel = renderer.request(it.file.id, it.index, renderSize(Math.max(b.width, b.height), window.devicePixelRatio), priority, (canvas) => {
+        pending.current.delete(key);
+        canvas.className = "ip-pv__canvas";
+        cache.current.set(key, canvas);
+        while (cache.current.size > KEEP) cache.current.delete(cache.current.keys().next().value!);
+        // A page drawn ahead may be the one on screen by now (the user moved while it was drawing).
+        if (current.current === key) put(canvas);
+      });
       pending.current.set(key, cancel);
+    };
+    const keyFor = (it: Item) => {
+      const b = fit(it)?.box;
+      return b ? keyOf(it, renderSize(Math.max(b.width, b.height), window.devicePixelRatio)) : null;
     };
     const put = (canvas: HTMLCanvasElement) => {
       const el = host.current;
@@ -125,10 +114,12 @@ export function PagePreviewDialog({
       canvas.classList.add("ip-pv__canvas--in");
       el.replaceChildren(canvas);
     };
-    current.current = keyOf(item, longest);
-    if (!cache.current.has(current.current)) host.current?.replaceChildren();
-    want(item, -2, true);
-    for (const n of neighbours(at, total)) want(items[n], -1, false);
+    current.current = keyFor(item) ?? "";
+    const ready = cache.current.get(current.current);
+    if (ready) put(ready);
+    else host.current?.replaceChildren();
+    want(item, -2);
+    for (const n of neighbours(at, total)) want(items[n], -1);
   }, [item, at, total, renderer, longest, avail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keys work wherever focus is in the dialog (Escape is the dialog's own).
@@ -172,7 +163,8 @@ export function PagePreviewDialog({
   const title = file ? `Page ${pageNo} of ${count}, ${file.name}` : "";
 
   return (
-    <Dialog open={open} variant="viewer" onClose={onClose} fallbackFocus={fallbackFocus} title={title}>
+    // The full-screen dialog, restyled as the viewer by page-preview.css (.mp-viewer): no surface, a dark scrim.
+    <Dialog open={open} variant="fullscreen" className="mp-viewer" onClose={onClose} fallbackFocus={fallbackFocus} title={title}>
       {file && (
         <div
           className="ip-pv"

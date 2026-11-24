@@ -18,8 +18,6 @@ type Request = {
   doc: Entry;
   index: number;
   cssSize: number;
-  /** Device-pixel cap for this render (thumbnails stop at 2; the big page view goes to the screen's own). */
-  maxDpr: number;
   priority: number;
   resolve: (canvas: HTMLCanvasElement) => void;
   reject: (reason: unknown) => void;
@@ -29,12 +27,6 @@ type Request = {
 };
 
 const MAX_DPR = 2;
-
-/** Device pixels per CSS pixel for a render: the screen's ratio, capped (never below 1). */
-export function renderDpr(deviceRatio: number | undefined, cap = MAX_DPR): number {
-  return Math.max(1, Math.min(cap, deviceRatio || 1));
-}
-const screenDpr = (cap: number) => renderDpr(typeof window === "undefined" ? 1 : window.devicePixelRatio, cap);
 const CONCURRENCY = 3;
 
 export class ThumbnailRenderer {
@@ -67,10 +59,10 @@ export class ThumbnailRenderer {
   }
 
   /**
-   * Renders page `index` so its longest side is `cssSize` CSS pixels, at up to `maxDpr` device pixels each.
+   * Renders page `index` so its longest side is `cssSize` CSS pixels.
    * Returns a cancel function; `onDone` is not called after cancel.
    */
-  request(fileId: string, index: number, cssSize: number, priority: number, onDone: (canvas: HTMLCanvasElement) => void, maxDpr = MAX_DPR): () => void {
+  request(fileId: string, index: number, cssSize: number, priority: number, onDone: (canvas: HTMLCanvasElement) => void): () => void {
     const doc = this.docs.get(fileId);
     if (!doc) return () => {};
     let cancelled = false;
@@ -79,7 +71,6 @@ export class ThumbnailRenderer {
       doc,
       index,
       cssSize,
-      maxDpr,
       priority,
       cancelled: false,
       resolve: (canvas) => {
@@ -103,7 +94,7 @@ export class ThumbnailRenderer {
       if (next.cancelled) continue;
       this.running++;
       const doc = next.doc;
-      next.handle = isImage(doc) ? startImageRender(next.key.slice(0, next.key.lastIndexOf(":")), doc, next.index, next.cssSize, next.maxDpr) : startRender(doc, next.index, next.cssSize, next.maxDpr);
+      next.handle = isImage(doc) ? startImageRender(next.key.slice(0, next.key.lastIndexOf(":")), doc, next.index, next.cssSize) : startRender(doc, next.index, next.cssSize);
       this.active.add(next);
       next.handle.promise
         .then(next.resolve, next.reject)
@@ -124,7 +115,7 @@ export type RenderHandle = { promise: Promise<HTMLCanvasElement>; cancel: () => 
  * `cancel()` cancels the pdf.js RenderTask (the promise then rejects). The
  * page's resources are released with `page.cleanup()` when it settles.
  */
-export function startRender(doc: PDFDocumentProxy, index: number, cssSize: number, maxDpr = MAX_DPR): RenderHandle {
+export function startRender(doc: PDFDocumentProxy, index: number, cssSize: number): RenderHandle {
   let task: RenderTask | null = null;
   let cancelled = false;
   const promise = (async () => {
@@ -132,7 +123,7 @@ export function startRender(doc: PDFDocumentProxy, index: number, cssSize: numbe
     try {
       if (cancelled) throw new DOMException("Render cancelled", "AbortError");
       const base = page.getViewport({ scale: 1 });
-      const dpr = screenDpr(maxDpr);
+      const dpr = Math.min(MAX_DPR, typeof window === "undefined" ? 1 : window.devicePixelRatio || 1);
       const scale = (cssSize * dpr) / Math.max(base.width, base.height);
       const viewport = page.getViewport({ scale });
       const canvas = document.createElement("canvas");
@@ -211,14 +202,14 @@ function bitmapFor(fileId: string, entry: ImageEntry, index: number): Promise<Im
 }
 
 /** Draws image frame `index` on its white A4 page, longest side `cssSize` CSS pixels. */
-export function startImageRender(fileId: string, entry: ImageEntry, index: number, cssSize: number, maxDpr = MAX_DPR): RenderHandle {
+export function startImageRender(fileId: string, entry: ImageEntry, index: number, cssSize: number): RenderHandle {
   let cancelled = false;
   const promise = (async () => {
     const frame = entry.frames[index] ?? entry.frames[0];
     const place = imagePlacement(frame.width, frame.height);
     const bitmap = await bitmapFor(fileId, entry, index);
     if (cancelled) throw new DOMException("Render cancelled", "AbortError");
-    const dpr = screenDpr(maxDpr);
+    const dpr = Math.min(MAX_DPR, typeof window === "undefined" ? 1 : window.devicePixelRatio || 1);
     const k = (cssSize * dpr) / Math.max(place.page.width, place.page.height);
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.floor(place.page.width * k));

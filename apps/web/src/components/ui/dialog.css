@@ -24,16 +24,3 @@
   outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
-
-/* The page viewer's scrim: dark enough that a white page reads, berry-warm like the rest. */
-.mp-viewer::backdrop {
-  background: color-mix(in srgb, var(--ink-black) 92%, transparent);
-  backdrop-filter: blur(4px);
-}
-.mp-viewer :focus-visible:not([data-quiet-focus]) {
-  outline: 2px solid var(--brand-tint);
-  outline-offset: 2px;
-}
-.mp-viewer :focus:not(:focus-visible) {
-  outline: none;
-}

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderDpr } from "@/lib/pdf/thumbnails";
-import { fitPage, keyTarget, neighbours, readGesture } from "./preview-fit";
+import { fitPage, keyTarget, neighbours, readGesture, renderSize } from "./preview-fit";
 
 const A4 = { width: 595, height: 842 };
 
@@ -77,12 +76,17 @@ describe("readGesture", () => {
   });
 });
 
-describe("renderDpr", () => {
-  it("uses the screen's ratio up to the cap, never below 1", () => {
-    expect(renderDpr(3, 3)).toBe(3);
-    expect(renderDpr(3)).toBe(2);
-    expect(renderDpr(1.5, 3)).toBe(1.5);
-    expect(renderDpr(undefined, 3)).toBe(1);
-    expect(renderDpr(0.5, 3)).toBe(1);
+describe("renderSize", () => {
+  it("asks for the box size where the renderer's own 2x cap is enough", () => {
+    expect(renderSize(600, 1)).toBe(600);
+    expect(renderSize(600, 2)).toBe(600);
+    expect(renderSize(600, undefined)).toBe(600);
+  });
+  it("asks for more on a 3x screen, so the page is drawn at 3 device pixels per CSS pixel", () => {
+    expect(renderSize(600, 3)).toBe(900);
+    expect(renderSize(600, 2.5)).toBe(750);
+  });
+  it("stops at 3x", () => {
+    expect(renderSize(600, 4)).toBe(900);
   });
 });

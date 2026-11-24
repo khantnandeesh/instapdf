@@ -22,6 +22,20 @@ export function fitPage(page: Size, rotation: number, avail: Size): { box: Size;
   return { box, shown };
 }
 
+/** The renderer draws at up to 2 device pixels per CSS pixel (enough for thumbnails). */
+const RENDERER_DPR = 2;
+/** The big view is drawn at the screen's own ratio, up to 3. */
+export const VIEW_DPR = 3;
+
+/**
+ * The longest side (CSS px) to ask the thumbnail renderer for, so the page comes out at the screen's pixel ratio
+ * (up to 3) although the renderer caps at 2: on a 3x phone it draws a 1.5x larger canvas, which CSS fits to the box.
+ */
+export function renderSize(longest: number, deviceRatio: number | undefined): number {
+  const dpr = Math.max(1, deviceRatio || 1);
+  return Math.round((longest * Math.min(VIEW_DPR, dpr)) / Math.min(RENDERER_DPR, dpr));
+}
+
 /** The neighbours worth drawing ahead of time: next first (the usual direction), then previous. */
 export function neighbours(at: number, total: number): number[] {
   return [at + 1, at - 1].filter((i) => i >= 0 && i < total);
