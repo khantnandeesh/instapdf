@@ -62,16 +62,18 @@ test("a Hindi line loads the shaping build on click, then opens for editing and 
   const before = (await hindi.getAttribute("data-text"))!;
   expect(seen.shaping()).toEqual([]);
   await expect(page.getByTestId("editor-shell")).toHaveAttribute("data-engine", "ready", { timeout: 30_000 });
-  const workers = page.workers().length;
+  // (Engine workers only: opening the line may also start the font matcher, which is its own worker.)
+  const engines = () => page.workers().filter((w) => w.url().includes("berry-engine")).length;
+  const workers = engines();
   await hindi.click();
   await expect(page.getByTestId("editor-shell")).toHaveAttribute("data-shaping", "ready", { timeout: 30_000 });
   expect(seen.shaping().some((u) => u.endsWith(".wasm"))).toBe(true);
   // Still one engine worker: the shaping build took over in a fresh one, and the old one (with the
   // default build's memory) was ended.
-  await expect.poll(() => page.workers().length).toBe(workers);
+  await expect.poll(engines).toBe(workers);
   const input = page.getByTestId("line-input");
   await expect(input).toBeFocused();
-  await expect(input).toHaveValue(before);
+  await expect(input).toHaveText(before);
   // Drop a word: the file's own subset has every glyph left (typing new letters would need them).
   const after = before.replace(" सेवा", "");
   expect(after).not.toBe(before);

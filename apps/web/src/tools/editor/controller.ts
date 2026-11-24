@@ -538,6 +538,13 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       }
     },
 
+    /** The person picks, while typing, the font that draws what a document font lacks. */
+    async pickStandIn(key: string, id: string) {
+      chooseStandIn(key, id);
+      ctl.standIns.clear();
+      await callEngine({ op: "clearFonts" }).catch(() => {});
+    },
+
     /**
      * Fallback for an edit the engine refused: cover the line with a whiteout and put a text box
      * with the typed text in its place (same size, colour and baseline, the closest editor font).
@@ -604,7 +611,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         const info = fonts.find((f) => asked && foldName(f.family || f.name) === asked && f.bold === err.request.bold && f.italic === err.request.italic) ?? fonts.find((f) => asked && foldName(f.family || f.name) === asked) ?? fonts[0];
         ctl.standInKey = key;
         ctl.standInFor = asked;
-        for (const id of await standInCandidates(info, err.request)) {
+        for (const id of await standInCandidates(info, err.request, err.chars)) {
           if (!(await registerWithEngine(id, err.request.bold, err.request.italic, err.chars))) continue;
           ctl.standIns.set(fontLabel(id), id);
           try {
