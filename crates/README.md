@@ -40,6 +40,10 @@ codebase that runs as WebAssembly in the browser and natively for the consented 
    rustybuzz (`shape.rs`). New words get `/ActualText` where their glyphs alone would not read
    right. Reading (`layout.rs`) rebuilds logical order from ActualText, or from glyph order with
    the Indic and inverse-bidi rules in `script.rs`; the spec is `docs/specs/f16-complex-scripts.md`.
+   On either path, an edit that touches an `/ActualText` span (a ligature, replaced text)
+   rewrites the whole span with its real characters and removes the span. Its other
+   properties, such as a tagged PDF's `/MCID`, stay; a named property list holding more than
+   the ActualText is left alone and the edit is refused (`actual-text-span`).
 7. **Save.** The output is the original bytes plus one appended revision (incremental update).
    It is read back and every object is compared with the engine's copy.
 
@@ -81,12 +85,12 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
 - Fake-bold text drawn twice reads as doubled characters.
 - No width-fitting (`Tz`) of substitute fonts yet (AC-11e), and no style changes, move or delete
   of existing text (AC-12, AC-13).
-- A line that grows past the next column is not flagged yet, and `/ActualText` spans are not updated.
+- A line that grows past the next column is not flagged yet.
 - Saving holds the original and the new file in memory together (about 2x the file size).
 - Owner-password permission flags are not enforced; that is a product decision for the editor.
 - Two WebAssembly modules with one interface: `berry_engine` (default, about 0.75 MB gzip)
   reads Hindi and Arabic but marks those lines read-only with `needs-shaping`;
-  `berry_engine_shaping` (cargo feature `shaping`, about 0.97 MB gzip) adds rustybuzz and
+  `berry_engine_shaping` (cargo feature `shaping`, about 0.98 MB gzip) adds rustybuzz and
   edits them. The editor loads the second only when someone edits such a line. `berry-cli`
   always has shaping. Neither module loads until the editor opens a file.
 

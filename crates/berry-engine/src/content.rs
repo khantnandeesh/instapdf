@@ -448,6 +448,37 @@ pub fn fmt_name(name: &[u8], out: &mut Vec<u8>) {
     }
 }
 
+/// Writes an operand back out. `None` when it holds a value the parser did not keep
+/// (booleans, null, past the nesting limit), so a rewrite would lose it.
+pub fn fmt_operand(op: &Operand, out: &mut Vec<u8>) -> Option<()> {
+    match op {
+        Operand::Num(n) => out.extend_from_slice(fmt_num(*n).as_bytes()),
+        Operand::Str(b) => fmt_string(b, out),
+        Operand::Name(n) => fmt_name(n, out),
+        Operand::Array(items) => {
+            out.push(b'[');
+            for (i, it) in items.iter().enumerate() {
+                if i > 0 {
+                    out.push(b' ');
+                }
+                fmt_operand(it, out)?;
+            }
+            out.push(b']');
+        }
+        Operand::Dict(entries) => {
+            out.extend_from_slice(b"<<");
+            for (k, v) in entries {
+                fmt_name(k, out);
+                out.push(b' ');
+                fmt_operand(v, out)?;
+            }
+            out.extend_from_slice(b">>");
+        }
+        Operand::Other => return None,
+    }
+    Some(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

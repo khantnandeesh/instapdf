@@ -156,6 +156,14 @@ pub(crate) struct Embed {
     chars: BTreeMap<u16, (String, u16)>,
 }
 
+impl Embed {
+    /// The ToUnicode text already written for a glyph of the full font.
+    #[cfg(feature = "shaping")]
+    pub(crate) fn text_of(&self, gid: u16) -> Option<&str> {
+        self.chars.get(&self.remap.get(gid)?).map(|(t, _)| t.as_str())
+    }
+}
+
 pub struct Engine {
     orig: Vec<u8>,
     pub(crate) doc: Document,
@@ -200,8 +208,44 @@ pub(crate) struct Plan {
     pub(crate) segs: Vec<Seg>,
     /// Where the new text starts along the baseline, relative to the anchor glyph's origin.
     pub(crate) insert_at: f64,
-    /// Operators to delete: (stream, operator), e.g. the BDC/EMC of removed ActualText spans.
-    pub(crate) drop_ops: Vec<(usize, usize)>,
+    /// Operators to rewrite: (stream, operator, new bytes; empty deletes it), e.g. the BDC/EMC
+    /// of removed ActualText spans.
+    pub(crate) drop_ops: Vec<(usize, usize, Vec<u8>)>,
+}
+
+/// The operator rewrites that take whole ActualText spans out of the content, so the glyphs that
+/// replace them read as themselves. Other marked-content properties (such as `/MCID`) stay.
+pub(crate) fn unwrap_spans(pc: &PageContent, spans: impl IntoIterator<Item = usize>) -> Result<Vec<(usize, usize, Vec<u8>)>> {
+    let mut spans: Vec<usize> = spans.into_iter().collect();
+    // Spans nested inside one (glyphs only record the outermost) go with it.
+    let inner: Vec<usize> = spans
+        .iter()
+        .filter_map(|&s| Some((&pc.spans[s], pc.spans[s].emc?)))
+        .flat_map(|(outer, emc)| {
+            pc.spans
+                .iter()
+                .enumerate()
+                .filter(move |(_, t)| t.source == outer.source && t.bdc > outer.bdc && t.emc.is_some_and(|e| e < emc))
+        })
+        .map(|(i, _)| i)
+        .collect();
+    spans.extend(inner);
+    spans.sort_unstable();
+    spans.dedup();
+    let mut ops = Vec::new();
+    for s in spans {
+        let sp = &pc.spans[s];
+        let emc = sp.emc.ok_or_else(|| limit("actual-text-span"))?;
+        match &sp.unwrap {
+            interp::Unwrap::Drop => {
+                ops.push((sp.source, sp.bdc, Vec::new()));
+                ops.push((sp.source, emc, Vec::new()));
+            }
+            interp::Unwrap::Rewrite(bytes) => ops.push((sp.source, sp.bdc, bytes.clone())),
+            interp::Unwrap::Keep => return Err(limit("actual-text-span")),
+        }
+    }
+    Ok(ops)
 }
 
 /// Engine state saved before an edit: next object id, dirty objects, embedded faces.
@@ -522,6 +566,55 @@ impl Engine {
             return Err(Error::ReadOnly { reason: "needs-shaping".into() });
         }
 
+        // 1. ActualText spans (ligatures, replaced text): an edit that touches one rewrites the
+        // whole span with its real characters and removes the span, or its old text would keep
+        // replacing what is drawn.
+        let (a, b, inserted, drop_ops) = {
+            let span_of = |i: usize| line.chars[i].glyphs.iter().find_map(|&g| pc.glyphs[g].span);
+            let mut spans: BTreeSet<usize> = (a..b).filter_map(span_of).collect();
+            // New text is drawn next to the glyph it is anchored on (as in step 3): inside that
+            // glyph's span when it has one.
+            let anchor = if a < n && line.chars[a].glyph.is_some() && !(a == b && a > 0 && line.chars[a - 1].glyph.is_some()) {
+                line.chars[a].glyph
+            } else {
+                (0..a).rev().find_map(|k| line.chars[k].glyph)
+            };
+            if !inserted.is_empty() {
+                spans.extend(anchor.and_then(|g| pc.glyphs[g].span));
+            }
+            if spans.is_empty() {
+                (a, b, inserted, Vec::new())
+            } else {
+                let (mut a2, mut b2) = (a, b);
+                loop {
+                    let lo = (0..n).find(|&i| span_of(i).is_some_and(|s| spans.contains(&s))).unwrap_or(a2);
+                    let hi = (0..n).rev().find(|&i| span_of(i).is_some_and(|s| spans.contains(&s))).map_or(b2, |i| i + 1);
+                    let (na, nb) = (a2.min(lo), b2.max(hi));
+                    let before = spans.len();
+                    spans.extend((na..nb).filter_map(span_of));
+                    if (na, nb) == (a2, b2) && spans.len() == before {
+                        break;
+                    }
+                    (a2, b2) = (na, nb);
+                }
+                // Every glyph of the spans must be on this line.
+                let on_line: HashSet<usize> = line.chars[a2..b2].iter().flat_map(|c| c.glyphs.iter().copied()).collect();
+                if pc.glyphs.iter().enumerate().any(|(i, g)| g.span.is_some_and(|s| spans.contains(&s)) && !on_line.contains(&i))
+                {
+                    return Err(limit("actual-text-span"));
+                }
+                let text_of = |r: std::ops::Range<usize>| line.chars[r].iter().map(|c| c.text.as_str()).collect::<String>();
+                let widened = format!("{}{}{}", text_of(a2..a), inserted, text_of(b..b2));
+                (a2, b2, widened, unwrap_spans(&pc, spans)?)
+            }
+        };
+        if script::needs_shaping(&inserted, false) {
+            #[cfg(feature = "shaping")]
+            return self.edit_complex(page, page_id, pc, lines, line_id, a, b, inserted);
+            #[cfg(not(feature = "shaping"))]
+            return Err(Error::ReadOnly { reason: "needs-shaping".into() });
+        }
+
         // 2. Positions along the baseline.
         let ang = pc.glyphs[line.glyphs[0]].angle;
         let along = |pt: (f64, f64)| pt.0 * ang.cos() + pt.1 * ang.sin();
@@ -630,15 +723,8 @@ impl Engine {
             };
         }
         let shift = new_width - (pos(b) - pos(a));
-        let mut plan = Plan {
-            removed: HashSet::new(),
-            want: HashMap::new(),
-            anchor,
-            after: after_anchor,
-            segs,
-            insert_at: 0.0,
-            drop_ops: Vec::new(),
-        };
+        let mut plan =
+            Plan { removed: HashSet::new(), want: HashMap::new(), anchor, after: after_anchor, segs, insert_at: 0.0, drop_ops };
         plan.removed.extend(line.chars[a..b].iter().flat_map(|c| c.glyphs.iter().copied()));
         for g in line.chars[b..n].iter().flat_map(|c| c.glyphs.iter().copied()) {
             plan.want.insert(g, shift);
@@ -832,10 +918,10 @@ impl Engine {
                 splices.insert(si, reps);
             }
         }
-        for &(si, oi) in &plan.drop_ops {
-            let reps = splices.entry(si).or_default();
-            if !reps.iter().any(|(o, _)| *o == oi) {
-                reps.push((oi, Vec::new()));
+        for (si, oi, bytes) in &plan.drop_ops {
+            let reps = splices.entry(*si).or_default();
+            if !reps.iter().any(|(o, _)| o == oi) {
+                reps.push((*oi, bytes.clone()));
             }
         }
 
@@ -1085,12 +1171,11 @@ impl Engine {
                 }
             }
         };
+        // The first text written for a glyph stays: earlier edits read through it. Words whose
+        // glyphs would need a different text are wrapped in ActualText instead.
         for (g, text) in glyphs {
             let n = embed.remap.remap(*g);
-            let slot = embed.chars.entry(n).or_insert((String::new(), *g));
-            if slot.0.is_empty() {
-                slot.0 = text.clone();
-            }
+            embed.chars.entry(n).or_insert_with(|| (text.clone(), *g));
         }
         let parsed = ttf_parser::Face::parse(&face.data, 0).map_err(|e| err(e.to_string()))?;
         let upem = parsed.units_per_em() as f64;

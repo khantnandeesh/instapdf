@@ -230,6 +230,10 @@ fn clusters(pc: &PageContent) -> Vec<Cluster> {
     for cs in by_key.values_mut() {
         cs.sort_by(|a, b| out[*a].u0.total_cmp(&out[*b].u0));
     }
+    // The largest cluster size per baseline key: a constant bound keeps the search window's
+    // predicates monotone along the sorted clusters.
+    let max_size: HashMap<(bool, i64), f64> =
+        by_key.iter().map(|(k, cs)| (*k, cs.iter().map(|&ci| out[ci].size).fold(0.0, f64::max))).collect();
     let mut leftovers: Vec<usize> = Vec::new();
     for gi in marks {
         let g = &pc.glyphs[gi];
@@ -250,11 +254,15 @@ fn clusters(pc: &PageContent) -> Vec<Cluster> {
         let mut best: Option<(f64, usize)> = None;
         if let Some(cs) = by_key.get(&key) {
             // Only clusters that can reach the mark horizontally.
-            let lo = cs.partition_point(|&ci| out[ci].u0 < m0 - 4.0 * g.size.max(out[ci].size));
+            let reach = g.size.max(max_size[&key]);
+            let lo = cs.partition_point(|&ci| out[ci].u0 < m0 - 4.0 * reach);
             for &ci in &cs[lo..] {
                 let c = &out[ci];
-                if c.u0 > m1 + 0.3 * c.size {
+                if c.u0 > m1 + 0.3 * reach {
                     break;
+                }
+                if c.u0 > m1 + 0.3 * c.size {
+                    continue;
                 }
                 if (c.v - v).abs() > 0.9 * c.size.max(g.size) {
                     continue;
@@ -519,9 +527,8 @@ fn bidi_logical(pc: &PageContent, units: &mut Vec<Unit>, reversed_hint: bool) ->
             // bracket. Mirror only when the font's own cmap shows the glyph is the named shape.
             let names_shape = u.glyphs.len() == 1 && {
                 let g = &pc.glyphs[u.glyphs[0]];
-                let drawn = pc.fonts[g.font].program_char(g.code);
                 let mut it = u.text.chars();
-                matches!((it.next(), it.next(), drawn), (Some(c), None, Some(d)) if d == c)
+                matches!((it.next(), it.next()), (Some(c), None) if pc.fonts[g.font].program_maps(g.code, c))
             };
             if names_shape {
                 u.text = u.text.chars().map(script::mirror).collect();

@@ -92,6 +92,8 @@ struct Ctx<'a> {
     /// Font size of the anchor glyph in page units.
     size: f64,
     angle: f64,
+    /// The content source (page or form) the anchor is drawn in: new fonts go in its resources.
+    source: usize,
 }
 
 impl Ctx<'_> {
@@ -286,16 +288,7 @@ impl Engine {
         }
         let segment = format!("{}{}{}", text_of(a..a0), inserted, text_of(b0..b));
         let removed: HashSet<usize> = glyphs_in(a, b).into_iter().collect();
-        let mut drop_ops: Vec<(usize, usize)> = Vec::new();
-        let mut spans: Vec<usize> = removed.iter().filter_map(|&g| pc.glyphs[g].span).collect();
-        spans.sort_unstable();
-        spans.dedup();
-        for s in spans {
-            let sp = &pc.spans[s];
-            let emc = sp.emc.ok_or_else(|| limit("actual-text-span"))?;
-            drop_ops.push((sp.source, sp.bdc));
-            drop_ops.push((sp.source, emc));
-        }
+        let drop_ops = crate::engine::unwrap_spans(&pc, removed.iter().filter_map(|&g| pc.glyphs[g].span))?;
 
         // 3. Style: the anchor is the first removed glyph drawn on the baseline.
         let mut order: Vec<usize> = removed.iter().copied().collect();
@@ -311,7 +304,14 @@ impl Engine {
             return Err(limit("degenerate-text-matrix"));
         }
         let rtl = line.direction == "rtl";
-        let ctx = Ctx { pc: &pc, lines: &lines, state: &state, size: pc.glyphs[anchor].size, angle: ang };
+        let ctx = Ctx {
+            pc: &pc,
+            lines: &lines,
+            state: &state,
+            size: pc.glyphs[anchor].size,
+            angle: ang,
+            source: pc.glyphs[anchor].source,
+        };
         // The style font of a word: the font the replaced (else the line's) text of the same
         // script was in, else the anchor's.
         let style_for = |word: &str| -> usize {
@@ -330,6 +330,8 @@ impl Engine {
         let mut pieces: Vec<Piece> = Vec::new();
         let mut missing = String::new();
         let mut request: Option<FontRequest> = None;
+        // ToUnicode texts this edit gives registered-face glyphs, on top of those already written.
+        let mut face_texts: HashMap<(usize, u16), String> = HashMap::new();
         let base = if rtl { unicode_bidi::Level::rtl() } else { unicode_bidi::Level::ltr() };
         let info = unicode_bidi::BidiInfo::new(&segment, Some(base));
         let mut runs: Vec<(std::ops::Range<usize>, bool)> = Vec::new();
@@ -396,17 +398,31 @@ impl Engine {
                     .and_then(|f| shape::shape(&self.faces[f].data, part, run_rtl).map(|s| (f, s)));
                 match picked {
                     Some((f, shaped)) => {
-                        let texts = shape::cluster_texts(part, &shaped);
+                        let texts = if run_rtl {
+                            let face = &self.faces[f];
+                            shape::mark_split_texts(part, &shaped, |c| face.glyph(c))
+                        } else {
+                            shape::cluster_texts(part, &shaped)
+                        };
                         let glyphs = shaped
                             .iter()
                             .zip(texts)
-                            .map(|(g, t)| NewGlyph {
-                                font: GlyphFont::Face(f),
-                                code: g.gid as u32,
-                                text: t,
-                                adv: g.advance * state.tfs,
-                                x_off: g.x_offset * state.tfs,
-                                y_off: g.y_offset * state.tfs,
+                            .map(|(g, t)| {
+                                // A glyph keeps the text first written for it; if this word needs
+                                // another, the word reads wrong plainly and gets ActualText.
+                                let written = self.embeds[f].as_ref().and_then(|e| e.text_of(g.gid)).map(str::to_string);
+                                let text = written.or_else(|| face_texts.get(&(f, g.gid)).cloned()).unwrap_or_else(|| {
+                                    face_texts.insert((f, g.gid), t.clone());
+                                    t
+                                });
+                                NewGlyph {
+                                    font: GlyphFont::Face(f),
+                                    code: g.gid as u32,
+                                    text,
+                                    adv: g.advance * state.tfs,
+                                    x_off: g.x_offset * state.tfs,
+                                    y_off: g.y_offset * state.tfs,
+                                }
                             })
                             .collect();
                         pieces.push(word(glyphs, Some(f)));
@@ -466,7 +482,9 @@ impl Engine {
             // The edited line must read back exactly as asked.
             let probe = touched.first().copied().or_else(|| line.glyphs.iter().find_map(|&g| map[g]));
             let reads = probe.and_then(|g| new_lines.iter().find(|l| l.glyphs.contains(&g))).map(|l| l.text.clone());
-            if reads.as_deref() != Some(expected.as_str()) {
+            // Nothing left to probe: the whole line was deleted, which is right when nothing visible was asked for.
+            let gone = probe.is_none() && expected.trim().is_empty();
+            if !gone && reads.as_deref() != Some(expected.as_str()) {
                 return Err(Error::Verify {
                     message: format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
                 });
@@ -526,7 +544,7 @@ impl Engine {
         let pc = ctx.pc;
         let state = ctx.state;
         let tfs = state.tfs;
-        let source = pc.glyphs.iter().find(|g| g.font == state.font).map(|g| g.source).unwrap_or(0);
+        let source = ctx.source;
         // Embed the faces first so their codes are known.
         let mut per_face: Vec<(usize, Vec<(u16, String)>)> = Vec::new();
         for p in pieces {

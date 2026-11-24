@@ -92,6 +92,30 @@ pub fn cluster_texts(text: &str, glyphs: &[Shaped]) -> Vec<String> {
     out
 }
 
+/// Like [`cluster_texts`], but a mark the font draws with its own glyph (Arabic harakat, Hebrew
+/// points) keeps its own character, so the base glyph maps to the bare letter. The same letter
+/// with and without a mark then shares one Unicode mapping. `gid_of` is the font's cmap.
+pub fn mark_split_texts(text: &str, glyphs: &[Shaped], gid_of: impl Fn(char) -> Option<u16>) -> Vec<String> {
+    let mut out = cluster_texts(text, glyphs);
+    for i in 0..glyphs.len() {
+        let mut rest: Vec<char> = out[i].chars().collect();
+        if rest.len() < 2 {
+            continue;
+        }
+        for j in 0..glyphs.len() {
+            if j == i || glyphs[j].cluster != glyphs[i].cluster || !out[j].is_empty() || rest.len() < 2 {
+                continue;
+            }
+            let own = rest.iter().position(|&c| crate::script::is_any_mark(c) && gid_of(c) == Some(glyphs[j].gid));
+            if let Some(k) = own {
+                out[j] = rest.remove(k).to_string();
+            }
+        }
+        out[i] = rest.into_iter().collect();
+    }
+    out
+}
+
 #[cfg(all(test, feature = "shaping"))]
 mod tests {
     use super::*;

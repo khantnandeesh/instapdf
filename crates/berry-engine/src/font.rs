@@ -906,25 +906,16 @@ impl PdfFont {
         }
     }
 
-    /// The character the embedded program's Unicode cmap gives the glyph a code draws, when it
-    /// has one. Tells a mirrored bracket glyph from the bracket its ToUnicode names.
-    pub fn program_char(&self, code: u32) -> Option<char> {
-        let Program::TrueType(data) = &self.program else { return None };
-        let face = ttf_parser::Face::parse(data, 0).ok()?;
-        let gid = if self.two_byte { self.gid_for(code)? } else { self.simple_truetype_gid(&face, code)? };
-        let cmap = face.tables().cmap?;
-        let mut found = None;
-        for st in cmap.subtables {
-            if !st.is_unicode() || found.is_some() {
-                continue;
-            }
-            st.codepoints(|cp| {
-                if found.is_none() && st.glyph_index(cp).map(|g| g.0) == Some(gid) {
-                    found = char::from_u32(cp);
-                }
-            });
-        }
-        found
+    /// Whether the embedded program's Unicode cmap maps `ch` to the glyph a code draws. Tells a
+    /// mirrored bracket glyph from the bracket its ToUnicode names.
+    pub fn program_maps(&self, code: u32, ch: char) -> bool {
+        let Program::TrueType(data) = &self.program else { return false };
+        let Ok(face) = ttf_parser::Face::parse(data, 0) else { return false };
+        let gid = if self.two_byte { self.gid_for(code) } else { self.simple_truetype_gid(&face, code) };
+        let (Some(gid), Some(cmap)) = (gid, face.tables().cmap) else { return false };
+        // A direct lookup per subtable: walking every codepoint of a hostile cmap could take
+        // millions of steps per glyph.
+        cmap.subtables.into_iter().any(|st| st.is_unicode() && st.glyph_index(ch as u32).map(|g| g.0) == Some(gid))
     }
 
     /// Horizontal extent of the glyph's ink in 1/1000 em, relative to its origin, when the

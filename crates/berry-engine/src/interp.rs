@@ -63,6 +63,21 @@ pub struct ActualSpan {
     pub source: usize,
     pub bdc: usize,
     pub emc: Option<usize>,
+    /// How an edit takes the span out while keeping its other marked-content properties.
+    pub unwrap: Unwrap,
+}
+
+/// How to remove an `/ActualText` span from the content.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Unwrap {
+    /// Nothing else in its properties: drop the `BDC` and its `EMC`.
+    Drop,
+    /// Other properties (such as `/MCID`, which ties the text to the structure tree): rewrite
+    /// the `BDC` to these bytes, without `/ActualText`, and keep its `EMC`.
+    Rewrite(Vec<u8>),
+    /// Named properties that hold more than `/ActualText`, or values that cannot be written
+    /// back: the span cannot be removed safely.
+    Keep,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -239,6 +254,23 @@ pub fn page_resources(doc: &Document, page_id: ObjectId) -> Vec<&Dictionary> {
     out
 }
 
+/// How to take `/ActualText` out of an inline-properties `BDC`.
+fn unwrap_inline(tag: Option<&Operand>, entries: &[(Vec<u8>, Operand)]) -> Unwrap {
+    let rest: Vec<(Vec<u8>, Operand)> = entries.iter().filter(|(k, _)| k != b"ActualText").cloned().collect();
+    if rest.is_empty() {
+        return Unwrap::Drop;
+    }
+    let mut out = Vec::new();
+    let Some(Operand::Name(tag)) = tag else { return Unwrap::Keep };
+    crate::content::fmt_name(tag, &mut out);
+    out.push(b' ');
+    if crate::content::fmt_operand(&Operand::Dict(rest), &mut out).is_none() {
+        return Unwrap::Keep;
+    }
+    out.extend_from_slice(b" BDC");
+    Unwrap::Rewrite(out)
+}
+
 fn lookup<'a>(doc: &'a Document, resources: &[&'a Dictionary], category: &[u8], name: &[u8]) -> Option<&'a Object> {
     for r in resources {
         if let Ok(cat) = r.get(category) {
@@ -320,12 +352,33 @@ struct Interp<'a> {
     invocations: usize,
     ops_seen: usize,
     over_budget: Option<&'static str>,
-    /// Open marked-content sequences: the ActualText span each one opened, and whether it is
-    /// `/ReversedChars`.
-    marked: Vec<(Option<usize>, bool)>,
+    /// Open marked-content sequences, innermost last. Each entry holds the span it opened plus
+    /// the state in effect inside it (outermost span, any `/ReversedChars`), so a glyph reads its
+    /// state in O(1) however deep the nesting.
+    marked: Vec<Marked>,
+}
+
+/// One open marked-content sequence.
+#[derive(Clone, Copy)]
+struct Marked {
+    /// The `/ActualText` span this sequence opened.
+    opened: Option<usize>,
+    /// The outermost `/ActualText` span in effect inside it.
+    span: Option<usize>,
+    /// Whether any enclosing sequence is `/ReversedChars`.
+    reversed: bool,
 }
 
 impl<'a> Interp<'a> {
+    fn push_marked(&mut self, opened: Option<usize>, reversed: bool) {
+        let outer = self.marked.last().copied();
+        self.marked.push(Marked {
+            opened,
+            span: outer.and_then(|m| m.span).or(opened),
+            reversed: reversed || outer.is_some_and(|m| m.reversed),
+        });
+    }
+
     fn font_slot(&mut self, f: Rc<PdfFont>) -> usize {
         let key = Rc::as_ptr(&f) as usize;
         if let Some(&i) = self.font_index.get(&key) {
@@ -350,8 +403,7 @@ impl<'a> Interp<'a> {
                 tx += gs.tw;
             }
             tx *= gs.th;
-            let span = self.marked.iter().find_map(|(s, _)| *s);
-            let reversed = self.marked.iter().any(|(_, r)| *r);
+            let (span, reversed) = self.marked.last().map_or((None, false), |m| (m.span, m.reversed));
             self.out.glyphs.push(Glyph {
                 span,
                 reversed,
@@ -506,32 +558,34 @@ impl<'a> Interp<'a> {
                 }
                 b"BMC" => {
                     let reversed = op.operands.first().and_then(Operand::name) == Some(b"ReversedChars".as_slice());
-                    self.marked.push((None, reversed));
+                    self.push_marked(None, reversed);
                 }
                 b"BDC" => {
                     let props = op.operands.get(1);
-                    let actual: Option<Vec<u8>> = match props {
-                        Some(Operand::Dict(_)) => match props.and_then(|p| p.get(b"ActualText")) {
-                            Some(Operand::Str(t)) => Some(t.clone()),
+                    let actual: Option<(Vec<u8>, Unwrap)> = match props {
+                        Some(Operand::Dict(entries)) => match props.and_then(|p| p.get(b"ActualText")) {
+                            Some(Operand::Str(t)) => Some((t.clone(), unwrap_inline(op.operands.first(), entries))),
                             _ => None,
                         },
                         Some(Operand::Name(n)) => lookup(self.doc, resources, b"Properties", n)
                             .and_then(|o| deref(self.doc, o).as_dict().ok())
-                            .and_then(|d| d.get(b"ActualText").ok())
-                            .and_then(|o| deref(self.doc, o).as_str().ok())
-                            .map(|b| b.to_vec()),
+                            .and_then(|d| {
+                                let t = deref(self.doc, d.get(b"ActualText").ok()?).as_str().ok()?.to_vec();
+                                let only = d.iter().all(|(k, _)| k == b"ActualText" || k == b"Type");
+                                Some((t, if only { Unwrap::Drop } else { Unwrap::Keep }))
+                            }),
                         _ => None,
                     };
-                    let span = actual.map(|t| {
-                        self.out.spans.push(ActualSpan { text: decode_text_string(&t), source, bdc: i, emc: None });
+                    let span = actual.map(|(t, unwrap)| {
+                        self.out.spans.push(ActualSpan { text: decode_text_string(&t), source, bdc: i, emc: None, unwrap });
                         self.out.spans.len() - 1
                     });
                     let reversed = op.operands.first().and_then(Operand::name) == Some(b"ReversedChars".as_slice());
-                    self.marked.push((span, reversed));
+                    self.push_marked(span, reversed);
                 }
                 b"EMC" => {
                     if self.marked.len() > marked_base {
-                        if let Some((Some(s), _)) = self.marked.pop() {
+                        if let Some(Marked { opened: Some(s), .. }) = self.marked.pop() {
                             if self.out.spans[s].source == source {
                                 self.out.spans[s].emc = Some(i);
                             }
