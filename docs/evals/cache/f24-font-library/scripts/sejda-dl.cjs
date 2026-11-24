@@ -1,0 +1,22 @@
+const { chromium } = require("/opt/node-tools/node_modules/playwright");
+const fs = require("fs");
+const ID = process.argv[2], TAG = process.argv[3];
+const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);
+(async () => {
+  const browser = await chromium.launch({ proxy: { server: process.env.HTTPS_PROXY } });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, acceptDownloads: true });
+  let next = 0;
+  await ctx.route(/sejda/i, async (route) => { const now = Date.now(); const at = Math.max(now, next); next = at + 1000; if (at > now) await new Promise((r) => setTimeout(r, at - now)); await route.continue().catch(() => {}); });
+  const page = await ctx.newPage();
+  await page.goto("https://www.sejda.com/result?id=" + ID, { waitUntil: "networkidle", timeout: 120000 }).catch((e) => log("goto", String(e).slice(0, 100)));
+  log("title", await page.title());
+  const links = await page.evaluate(() => [...document.querySelectorAll("a,button")].filter((a) => /download/i.test(a.textContent + (a.href || "") + a.className + a.id)).map((a) => a.tagName + " " + (a.href || "") + " | " + a.id + " | " + a.className + " | " + a.textContent.trim().slice(0, 30)));
+  log(JSON.stringify(links, null, 1));
+  fs.writeFileSync(__dirname + "/out/sejda-" + TAG + "-resultframe.html", await page.content());
+  const p = page.waitForEvent("download", { timeout: 60000 });
+  await page.locator("#download-btn").click();
+  const d = await p; const out = __dirname + "/out/sejda-" + TAG + "-output.pdf";
+  log("download", d.url().slice(0, 150), d.suggestedFilename());
+  await d.saveAs(out); log("saved", fs.statSync(out).size);
+  await browser.close();
+})().catch((e) => { console.error(String(e).slice(0, 800)); process.exit(1); });

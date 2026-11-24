@@ -272,7 +272,8 @@ export function DownloadButton({ compact }: { compact?: boolean }) {
   }, [done]);
   const run = async (n?: string) => {
     await ctl.download?.(n);
-    setDone(true);
+    // Stopped for a line that couldn't be saved: no tick.
+    if (!ctl.store.get().lineEdit?.failed) setDone(true);
   };
   const warm = () => void import("@/lib/editor/build-client").then((m) => m.warmBuild());
   return (

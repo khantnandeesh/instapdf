@@ -101,7 +101,8 @@ export type EditorState = {
   /** A click on existing text before the engine was ready (user space): edited once it is. */
   pendingLine: { src: number; at: [number, number] } | null;
   /** Line being edited (Edit text). */
-  lineEdit: { src: number; line: number; text: string } | null;
+  /** `failed`: this text couldn't be saved and the box was opened again with it; leaving the box doesn't try it again (Enter does). */
+  lineEdit: { src: number; line: number; text: string; failed?: boolean } | null;
   /**
    * A line was edited with characters its font lacks, so another font draws them (F24). Shown
    * as an inline notice that offers another font; never blocks typing.

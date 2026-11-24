@@ -53,6 +53,10 @@ pub struct Glyph {
     pub span: Option<usize>,
     /// Drawn inside `/ReversedChars` marked content (right-to-left text stored in visual order).
     pub reversed: bool,
+    /// The clip the glyph is drawn under, as a box in page space (`x0, y0, x1, y1`), when the
+    /// content clips to upright rectangles only (Chrome prints every page that way). Other
+    /// clip shapes are not followed: `None` then means "not known", never "clipped away".
+    pub clip: Option<[f64; 4]>,
 }
 
 /// A marked-content sequence with `/ActualText`: its text replaces the text of every glyph in it.
@@ -198,9 +202,25 @@ enum ColorSpace {
     Other,
 }
 
+/// The part of `r` inside `clip` (all of it when there is no clip).
+pub(crate) fn meet(clip: Option<[f64; 4]>, r: [f64; 4]) -> [f64; 4] {
+    match clip {
+        Some(c) => [c[0].max(r[0]), c[1].max(r[1]), c[2].min(r[2]), c[3].min(r[3])],
+        None => r,
+    }
+}
+
+#[derive(Clone, Copy)]
+enum PathSoFar {
+    Empty,
+    Rect([f64; 4]),
+    Other,
+}
+
 #[derive(Clone)]
 struct GState {
     ctm: Matrix,
+    clip: Option<[f64; 4]>,
     fill: [u8; 3],
     fill_cs: ColorSpace,
     tc: f64,
@@ -407,6 +427,7 @@ impl<'a> Interp<'a> {
             self.out.glyphs.push(Glyph {
                 span,
                 reversed,
+                clip: gs.clip,
                 text: font.unicode(code).unwrap_or_default(),
                 code,
                 nbytes: nbytes as u8,
@@ -427,10 +448,11 @@ impl<'a> Interp<'a> {
         }
     }
 
-    fn run(&mut self, source: usize, resources: &[&'a Dictionary], ctm: Matrix) {
+    fn run(&mut self, source: usize, resources: &[&'a Dictionary], ctm: Matrix, clip: Option<[f64; 4]>) {
         let ops = self.out.sources[source].ops.clone();
         let mut gs = GState {
             ctm,
+            clip,
             fill: [0, 0, 0],
             fill_cs: ColorSpace::Gray,
             tc: 0.0,
@@ -444,6 +466,8 @@ impl<'a> Interp<'a> {
             font_res: Vec::new(),
         };
         let mut stack: Vec<GState> = Vec::new();
+        // The path being built: its box while it is one upright rectangle.
+        let mut path: PathSoFar = PathSoFar::Empty;
         let mut tm = Matrix::IDENTITY;
         let mut tlm = Matrix::IDENTITY;
         let mut events: Vec<TextEvent> = Vec::new();
@@ -470,6 +494,24 @@ impl<'a> Interp<'a> {
                     }
                 }
                 b"cm" => gs.ctm = Matrix([n(0), n(1), n(2), n(3), n(4), n(5)]).then(&gs.ctm),
+                b"re" => {
+                    let [_, b, c, ..] = gs.ctm.0;
+                    path = if matches!(path, PathSoFar::Empty) && b == 0.0 && c == 0.0 {
+                        let (p, q) = (gs.ctm.apply(n(0), n(1)), gs.ctm.apply(n(0) + n(2), n(1) + n(3)));
+                        PathSoFar::Rect([p.0.min(q.0), p.1.min(q.1), p.0.max(q.0), p.1.max(q.1)])
+                    } else {
+                        PathSoFar::Other
+                    };
+                }
+                b"m" | b"l" | b"c" | b"v" | b"y" | b"h" => path = PathSoFar::Other,
+                // `W` makes the path built so far the clip (from the paint that follows, which is
+                // the next operator in practice).
+                b"W" | b"W*" => {
+                    if let PathSoFar::Rect(r) = path {
+                        gs.clip = Some(meet(gs.clip, r));
+                    }
+                }
+                b"n" | b"S" | b"s" | b"f" | b"F" | b"f*" | b"B" | b"B*" | b"b" | b"b*" => path = PathSoFar::Empty,
                 b"BT" => {
                     tm = Matrix::IDENTITY;
                     tlm = Matrix::IDENTITY;
@@ -661,7 +703,7 @@ impl<'a> Interp<'a> {
                     });
                     let child = self.out.sources.len() - 1;
                     self.form_stack.push(id);
-                    self.run(child, &res, matrix.then(&gs.ctm));
+                    self.run(child, &res, matrix.then(&gs.ctm), gs.clip);
                     self.form_stack.pop();
                 }
                 _ => {}
@@ -740,7 +782,7 @@ pub fn interpret_bytes(
         events: Vec::new(),
         invoked_by: None,
     });
-    it.run(0, &resources, Matrix::IDENTITY);
+    it.run(0, &resources, Matrix::IDENTITY, None);
     match it.over_budget {
         Some(reason) => Err(reason),
         None => Ok(it.out),

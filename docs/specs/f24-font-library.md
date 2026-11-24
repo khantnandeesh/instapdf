@@ -112,7 +112,14 @@ Review follow-ups (not blocking): arrow-key movement in the font list; parse lar
 
 Owner, 2026-11-24: on a click the line's font changed to another one while typing and changed back on Enter ("why show font B at all?"); a letter the font lacks should be told while typing, with fonts to choose from; the flow must be well structured.
 
-**Reference.** Our research (`f16-pdf-editor-research.md`) records that Sejda opens the clicked text in its own stand-in font and replaces a missing font without saying so. We keep what is useful (the edit happens in place) and go further: the box is drawn in the document's own font, so nothing changes on screen; a missing character is told as it is typed; and the font chosen for it applies at once.
+**Reference.** Checked live on 2026-11-24 (17:01 UTC, headless Chromium, `tests/parity/editor/chrome-justified-mixed.pdf`, nothing applied or downloaded; images `designs/fonts/sejda/line-edit-1-opened.png` to `line-edit-5-after.png` in the project files):
+
+- Sejda edits one font run at a time, not a line: hovering the first line outlines only "This agreement is made between the", and the bold word after it is a separate piece.
+- A click opens that piece in place under a floating toolbar. On this file (embedded Liberation Serif subset) the text looked the same after the click, so the font swap our research records (`f16-pdf-editor-research.md`) did not show here; it is recorded there for files whose font Sejda can't use.
+- Typing " for Dvořák" at the end of the piece ran over the bold word that follows: the two overlap and can't be read, and they stay that way after clicking away. The text after the piece does not move.
+- Nothing was said about ř, which the subset doesn't have: no mark, no message, no fonts offered while typing.
+
+We keep what is useful (the edit happens in place) and go further: the whole line is one box drawn in the document's own fonts, so nothing changes on screen and what follows moves along as you type; a missing character is told as it is typed; and the font chosen for it applies at once.
 
 **How.** The engine hands over a document font's embedded program and where it keeps each character (`fontProgram`). `lib/font-library/embedded-face.ts` adds what a browser needs and a PDF leaves out (character map, name and metrics tables; an OpenType file around a bare CFF program), and the result is loaded as a font of the page only (`tools/editor/doc-face.ts`): nothing is fetched or sent, and it goes when another file is opened. Where a program can't be used (not embedded, Type 1, Type 3), the closest library font stands in, as before.
 
@@ -120,7 +127,7 @@ Owner, 2026-11-24: on a click the line's font changed to another one while typin
 - **AC-299 (P0)** A click opens the line with the caret where the click landed; the keyboard opens it with the caret at the end. Nothing is selected or animated on opening.
 - **AC-300 (P0)** A typed character the line's font can't draw is underlined where it stands and named under the box as it is typed. Typing is never blocked and focus never leaves the box.
 - **AC-301 (P0)** Next to the name of the missing characters the closest fonts that have them are offered (at most three, the closest first and already in use). Picking one draws the characters with it in the box at once and writes the file with it on Enter; it is remembered for that document font.
-- **AC-304 (P0)** The box and its paper never cover a neighbouring line's text, and the hint is one compact opaque row placed where it hides no text right under the box (under the box when that is clear, else over it), starting at the missing character. The fonts in it are reachable with Tab without ending the edit, and a screen reader is told when a character is missing.
+- **AC-304 (P0)** The box and its paper never cover a neighbouring line's text, and the hint is one compact opaque row, starting at the missing character: under the box whenever no text is drawn where it would stand (judged by the text itself and the hint's real size), else over it. Inside a paragraph it then covers part of the line above (the one already read), never the box or the line that follows. The fonts in it are reachable with Tab without ending the edit, and a screen reader is told when a character is missing.
 - **AC-302 (P1)** For characters of another alphabet (Greek, Cyrillic, Hebrew, Arabic, Devanagari, Thai) the fonts offered and tried include library families of the same kind that have that alphabet.
 - **AC-303 (P1)** The edit box lays glyphs out as a PDF does (no kerning or ligatures of the browser's own), and its text is fitted to the line's length on the page (justified text).
 
@@ -140,3 +147,23 @@ Hindi, Arabic and other joined scripts: a PDF's subset has the glyphs but usuall
 Checked in `crates/berry-engine/tests/line_preview.rs` (the preview is exactly what the edit draws and changes nothing) and `e2e/f24/line-edit-joined.spec.ts` (the box's ink against the page's, on opening and after Enter).
 
 Not in this PR: turned pages and turned lines keep the stand-in font, and so do a font the engine can't read outlines from (Type 1, Type 3, not embedded) and stroked text (render modes 1, 2, 5, 6); slanted text (a skewed text matrix, such as a synthetic italic) is drawn upright, and a CID-keyed CFF font whose matrix sits in its FDArray is drawn at the top-level scale; the caret inside a word is placed by the unseen text, so it can sit a little off the drawn letters; text typed past the page's edge scrolls inside the box while the drawn glyphs do not; each keystroke makes and rolls back a full edit (fine for a line, and requests never queue up: only the latest text is asked for).
+
+### After the first evaluation (fifth PR)
+
+The evaluation of 2026-11-24 (`docs/evals/f24-font-library.md`) failed on four P0 criteria, one critical accessibility issue and one output defect. What changed:
+
+- **AC-310 (P0)** Typed text is never thrown away. When an edit can't be saved (no font has a character, the line would run past the page, the engine refuses it), the message says why and that the text is still in the box, and the box is open again with it and has the caret. Leaving the box with the same text neither tries again nor drops it; Enter tries again; changing the text, picking a font in the hint or adding your own font makes the next leave try again; Escape gives the line back as it was. While such a line is open, Download stops with a message instead of writing a file without it.
+- **AC-311 (P0)** An edit that would push text past the rectangle the page clips its content to (every Chrome print has one) is refused like one that runs past the page edge, with "Replace with new text" on offer: the words are never written where no reader draws them. Only upright rectangular clips are followed; other clip shapes are not guessed at.
+- **AC-312 (P0)** When no font here has a missing character, the hint says so and offers "Use your own font" in place, without ending the edit; a font added that way is offered at once.
+- AC-300 now covers Hebrew, Arabic, Devanagari and Thai letters typed into a line that is drawn letter by letter: they are marked and named like any other missing character (the line keeps its own font).
+- AC-298 now holds for embedded CFF programs whose subset keeps no advances of its own (`latex-type1c.pdf`) and for subsets with a wrong advance table (`reportlab-mono-subset.pdf`): the box sets every glyph by the width the PDF declares, as a PDF reader does. The same fix lets these fonts be matched to the library (they showed "No match yet").
+- AC-286 on a phone: the notice names both fonts in full (two short lines at most); "Use your own font" stays inside "Change".
+- The list of lines no longer points a screen reader at the line that is open in the box.
+- Up to 100 fonts of a document are matched (was 24).
+- **AC-313 (P0)** On a phone (the layout with the bottom tool dock) the hint does not float over the page: it is one slim row just above the dock, reading "Not in X" with at most two fonts, or "Use your own font" when no font here has the character. The missing character stays marked in the line. The page does not move. The row is always at the same spot, directly above the dock (above the on-screen keyboard while one is open; not checked on a real device yet). While a message is showing, the row is not shown as well: its fonts or "Use your own font" sit in the message, and the row is back when the message goes. Tab from the box reaches the row's buttons, Shift+Tab from the first comes back to the box, and Tab past the last leaves the edit.
+- A line kept open because it couldn't be saved is not dropped by opening another line (a message says why) and Escape gives it up from anywhere; Download pressed while its save is under way waits for the outcome. On a phone, messages now sit directly above the dock (or above the options strip when it has something in it).
+
+- The edit box's outline is always a closed rectangle: on tightly set lines its top and bottom edges are drawn just inside the neighbouring lines' text instead of being left out (owner, 2026-11-24, from a screen recording). Sejda draws no outline round the line being edited.
+
+Still open from that evaluation: AC-296 (looking the PDF's own font up on the device), a character the embedded program has under a code the PDF's own table does not list shows as present in the box and is saved in a stand-in font (the notice after saving says so), two font objects per stand-in (one per slice), `/fonts/editor/*.woff` caching, and focus after a mouse-opened edit.
+

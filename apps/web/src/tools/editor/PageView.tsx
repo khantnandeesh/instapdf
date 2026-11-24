@@ -613,13 +613,21 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
             active={interactiveLines}
             onEdit={(line, t) => {
               const l = text.lines[line];
+              // Text that couldn't be saved is still open in another line: it is not dropped for this one.
+              const open = store.get().lineEdit;
+              if (open?.failed && (open.src !== src || open.line !== line)) {
+                ctl.toast({ text: "The line you were editing couldn’t be saved. Change it, or press Escape to leave it as it was.", tone: "danger" });
+                document.querySelector<HTMLElement>("[data-testid=line-input]")?.focus({ preventScroll: true });
+                return;
+              }
               ctl.dropPendingEdit(src, line);
               // A line the default build can't edit: load the shaping build, then open this line.
               if (l?.read_only_reason === "needs-shaping") ctl.wantShapedLine(src, [(l.bbox.x0 + l.bbox.x1) / 2, (l.bbox.y0 + l.bbox.y1) / 2]);
               else store.set({ lineEdit: { src, line, text: t }, selection: [] });
             }}
-            onChange={(t) => store.set((s) => ({ lineEdit: s.lineEdit ? { ...s.lineEdit, text: t } : null }))}
-            onCommit={() => void ctl.commitLine()}
+            // Changed text is new text: it is tried when the box is left, like any edit.
+            onChange={(t) => store.set((s) => ({ lineEdit: s.lineEdit ? { ...s.lineEdit, text: t, failed: false } : null }))}
+            onCommit={(asked) => void ctl.commitLine(asked)}
             onCancel={() => {
               const e = store.get().lineEdit;
               if (e) ctl.dropPendingEdit(e.src, e.line);

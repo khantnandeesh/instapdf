@@ -78,8 +78,8 @@ jobs:
             test "$size" -le 1000000
           done
           # The default module loads on every editor visit: it must not grow (see engine-manifest.test.ts).
-          # 792,277 bytes locally; builds on other machines differ by a few dozen bytes.
-          test "$(gzip -9 -c berry-wasm/pkg/berry_engine_bg.wasm | wc -c)" -le 793000
+          # 793,037 bytes locally (cap raised from 793000 for #43, owner's OK 2026-11-24); builds on other machines differ by a few dozen bytes.
+          test "$(gzip -9 -c berry-wasm/pkg/berry_engine_bg.wasm | wc -c)" -le 793400
           node berry-fontmatch-wasm/smoke.mjs
           test "$(gzip -9 -c berry-fontmatch-wasm/pkg/berry_fontmatch_bg.wasm | wc -c)" -le 150000
       - name: PDFium oracle over the editor corpus
