@@ -1606,8 +1606,39 @@
   }
 }
 
+/* ---- Scrolling (docs/design/berrypdf.md "Scrolling") ------------------------------------------
+   The page is the one scroller. Only registered regions scroll on their own, each with
+   data-ip-scroll="pages | rail | overlay | chips" (src/lib/ui/scroll-rules.test.ts, e2e/ui/scroll-rules.spec.ts).
+   A vertical region never scrolls sideways: clip x (clip, not hidden, so a region that is visible on
+   the other axis does not become a scroller). A region is also the containing block of what it
+   holds, so an absolutely placed child (an sr-only note, a popover) can't spill out and make the
+   region's parent scroll too. Chip rows swipe with no bar. In the base layer, so a utility such as
+   `fixed` on a menu still wins. */
+@layer base {
+  [data-ip-scroll]:not([data-ip-scroll="chips"], [data-ip-scroll="pages"]) {
+    overflow-x: clip;
+  }
+  /* The pages area only scrolls from 1024 px; below it the page scrolls and tile controls may hang
+     past its edge (insert buttons), so it clips only where it is a scroller. */
+  @media (min-width: 1024px) {
+    [data-ip-scroll="pages"] {
+      overflow-x: clip;
+    }
+  }
+  [data-ip-scroll]:not(dialog, .fixed, .absolute, .sticky) {
+    position: relative;
+  }
+  [data-ip-scroll="chips"] {
+    scrollbar-width: none;
+  }
+  [data-ip-scroll="chips"]::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* A row that scrolls sideways below 1024 px instead of widening the page. */
 .ip-scroll-x {
+  /* ip-scroll: chips */
   overflow-x: auto;
   scrollbar-width: thin;
   scroll-snap-type: x proximity;
@@ -1716,20 +1747,11 @@
 .mp-floaties--empty > :nth-child(18) { --x:63%;--y:44%;--s:22px;--r:0deg;--d:6.3s;--amp:6px;--delay:-5.0s; }
 .mp-floaties--empty > :nth-child(19) { --x:50%;--y:10%;--s:18px;--r:0deg;--d:5.3s;--amp:5px;--delay:-3.7s; }
 
-/* Sticky search and filter bar on long lists (home catalogue). Pinned under the header; a frosted
-   grid-paper ground keeps the list from showing through, and a soft pink shadow appears only while it
-   is stuck. The shadow fades in (off under reduced motion via the global rule). */
+/* Sticky search and filter bar on long lists (home catalogue). Pinned under the header and fully
+   transparent (owner, 2026-11-24): no ground, blur, border or shadow, so it never reads as a box on
+   the grid paper. data-stuck stays for tests and future use; it changes nothing visible. */
 .ip-sticky-bar {
-  background: color-mix(in srgb, var(--ip-bg) 88%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  transition: box-shadow var(--dur-base) var(--ease-standard);
-}
-.ip-sticky-bar[data-stuck] {
-  /* A 1.5px sand line and a soft shadow, both as shadows so being stuck never changes the bar's height. */
-  box-shadow:
-    0 1.5px 0 var(--sand),
-    0 10px 18px -12px rgb(176 30 60 / 0.35);
+  background: transparent;
 }
 @media (forced-colors: active) {
   .ip-sticky-bar {

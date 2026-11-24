@@ -194,7 +194,7 @@ export function Catalogue() {
 
           {!searching && (
             // Inline padding offset by negative margins keeps edge chips' focus outlines inside the scroller.
-            <nav aria-label={copy.jumpLabel} className="ip-scroll-x -mx-1.5 mt-4 px-1.5">
+            <nav aria-label={copy.jumpLabel} className="ip-scroll-x -mx-1.5 mt-4 px-1.5" data-ip-scroll="chips">
               <ul className="flex gap-2 py-1.5 max-lg:flex-nowrap lg:flex-wrap lg:justify-center">
                 {groups.map((g) => (
                   <li key={g.id} className="shrink-0">

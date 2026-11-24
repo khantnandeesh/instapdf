@@ -6,6 +6,7 @@
  * src/components/tool-flow/ToolFlow.tsx). Update this page if that changes.
  */
 import type { Metadata } from "next";
+import "./stack-table.css";
 import { pageMetadata } from "@/lib/seo/metadata";
 import { Code, Fill, LegalPage, Section, Summary, TextLink } from "@/components/legal/Legal";
 import { legalFacts as f } from "@/components/legal/facts";
@@ -39,8 +40,9 @@ export default function CookiesPage() {
           Web browsers let a site keep small notes on your device (&quot;local storage&quot; and &quot;session storage&quot;). Unlike cookies, they are not sent to
           our servers with each request. We use them for two conveniences:
         </p>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px] border-collapse text-sm">
+        {/* Stacks on phones (ip-stack-table) instead of scrolling sideways. */}
+        <div>
+          <table className="ip-stack-table w-full border-collapse text-sm">
             <caption className="sr-only">Browser storage used by BerryPDF</caption>
             <thead>
               <tr className="text-ink">
@@ -60,23 +62,23 @@ export default function CookiesPage() {
             </thead>
             <tbody>
               <tr>
-                <td className={cell}>
+                <td className={cell} data-label="Name">
                   <Code>{f.recentKey}</Code>
                 </td>
-                <td className={cell}>Local storage</td>
-                <td className={cell}>
+                <td className={cell} data-label="Type">Local storage</td>
+                <td className={cell} data-label="What it holds and why">
                   The names of up to {f.recentMax} tools you opened, newest first, so the home page and menu can list them under &quot;Recently used&quot;. No file
                   names or contents.
                 </td>
-                <td className={cell}>Until you clear it</td>
+                <td className={cell} data-label="How long">Until you clear it</td>
               </tr>
               <tr>
-                <td className={cell}>
+                <td className={cell} data-label="Name">
                   <Code>{f.thumbKey}</Code>
                 </td>
-                <td className={cell}>Session storage</td>
-                <td className={cell}>The page-preview size you picked with the size slider in a tool, so it stays the same while you work.</td>
-                <td className={cell}>Until you close the tab</td>
+                <td className={cell} data-label="Type">Session storage</td>
+                <td className={cell} data-label="What it holds and why">The page-preview size you picked with the size slider in a tool, so it stays the same while you work.</td>
+                <td className={cell} data-label="How long">Until you close the tab</td>
               </tr>
             </tbody>
           </table>

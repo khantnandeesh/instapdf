@@ -10,8 +10,10 @@ import { copy } from "./copy";
 /**
  * Options and the primary action. The primary action never leaves the viewport.
  *
- * - `layout="side"` (the empty state): from 1024 px an app Panel in a sticky column, --ip-work-h
- *   tall (fits the first screen); options scroll inside it, status + primary pinned at its bottom.
+ * - `layout="side"` (the empty state): from 1024 px an app Panel at least --ip-work-h tall that
+ *   grows with its options. It never scrolls inside itself (one scroller per screen: the page). When
+ *   the options run past the fold, status + primary stick to the bottom of the screen (position:
+ *   sticky) and the page scrolls to the rest; when they fit, they sit at the panel's bottom.
  * - `layout="bar"` (a file is loaded): one compact row fixed to the bottom, options on the left and
  *   status + primary on the right, so the pages get the rest of the screen (like the phone dock).
  *
@@ -98,34 +100,28 @@ export function ControlDock({
         "fixed inset-x-0 bottom-0 z-20 rounded-t-[18px] bg-sand shadow-menu",
         "px-[15px] pt-3 pb-[calc(14px+env(safe-area-inset-bottom))]",
         side
-          ? "lg:sticky lg:top-[calc(var(--ip-header-h)+16px)] lg:z-auto lg:flex lg:h-(--ip-work-h) lg:flex-col lg:rounded-panel lg:border-[1.5px] lg:border-panel-border lg:bg-surface-raised lg:p-6 lg:shadow-card"
+          ? "lg:static lg:z-auto lg:flex lg:min-h-(--ip-work-h) lg:flex-col lg:rounded-panel lg:border-[1.5px] lg:border-panel-border lg:bg-surface-raised lg:p-6 lg:shadow-card"
           : "mp-dock-bar lg:px-8 lg:pt-3 lg:pb-[calc(12px+env(safe-area-inset-bottom))]",
       ].join(" ")}
     >
       <div
         className={[
           "flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4",
-          side ? "lg:min-h-0 lg:flex-1 lg:flex-col lg:items-stretch" : "lg:mx-auto lg:max-w-[1216px] lg:gap-8",
+          side ? "lg:flex-1 lg:flex-col lg:items-stretch" : "lg:mx-auto lg:max-w-[1216px] lg:gap-8",
         ].join(" ")}
       >
         {inline &&
           (full ? (
-            // Side panel only (hidden below lg). The scrolling wrapper stays keyboard-reachable while every
-            // control in the disabled fieldset is (axe scrollable-region-focusable).
-            <div
-              tabIndex={optionsDisabled ? 0 : undefined}
-              className="ip-dock-scroll min-w-0 rounded-lg focus-visible:outline-focus max-lg:hidden lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
-            >
-              <fieldset disabled={optionsDisabled} className="min-w-0" data-testid="dock-options">
-                <legend className="sr-only">{label}</legend>
-                <h2 className="sr-only">Options</h2>
-                {options}
-              </fieldset>
-            </div>
+            // Side panel only (hidden below lg). Full height, no inner scroller (design rule "One scroller").
+            <fieldset disabled={optionsDisabled} className="min-w-0 max-lg:hidden" data-testid="dock-options">
+              <legend className="sr-only">{label}</legend>
+              <h2 className="sr-only">Options</h2>
+              {options}
+            </fieldset>
           ) : (
             <fieldset
               disabled={optionsDisabled}
-              className={["min-w-0 sm:flex-1", side ? "ip-dock-scroll lg:min-h-0 lg:flex-1 lg:overflow-y-auto" : ""].join(" ")}
+              className="min-w-0 sm:flex-1"
               data-testid="dock-options"
             >
               <legend className="sr-only">{label}</legend>
@@ -159,7 +155,18 @@ export function ControlDock({
           </Button>
         )}
         {full && !side && <span aria-hidden="true" className="hidden lg:block lg:flex-1" />}
-        <div className={["flex shrink-0 flex-col gap-2 sm:min-w-[200px]", side ? "lg:min-w-0" : "lg:flex-row lg:items-center lg:gap-5 lg:[&>*:last-child]:w-[260px] lg:[&>*:last-child]:shrink-0"].join(" ")} data-testid="dock-footer">
+        <div
+          className={[
+            "flex shrink-0 flex-col gap-2 sm:min-w-[200px]",
+            side
+              ? // Side panel: pinned to the bottom of the screen while the options run past the fold (sticky, so
+                // the page stays the only scroller), resting at the panel's bottom once they end. It covers the
+                // panel's padding so options pass under it; a soft fade above it says there is more.
+                "lg:sticky lg:bottom-0 lg:z-20 lg:-mx-6 lg:mt-auto lg:-mb-6 lg:min-w-0 lg:rounded-b-panel lg:bg-surface-raised lg:px-6 lg:pt-2 lg:pb-6 lg:before:pointer-events-none lg:before:absolute lg:before:inset-x-0 lg:before:-top-4 lg:before:h-4 lg:before:bg-linear-to-b lg:before:from-transparent lg:before:to-surface-raised"
+              : "lg:flex-row lg:items-center lg:gap-5 lg:[&>*:last-child]:w-[260px] lg:[&>*:last-child]:shrink-0",
+          ].join(" ")}
+          data-testid="dock-footer"
+        >
           {/* On the sand bar the status reads in ink (muted on sand is under 4.5:1), beside the primary. */}
           <div className={["max-lg:sr-only", side ? "" : "min-w-0 text-end [&_p]:text-ink"].join(" ")}>{status}</div>
           {footer}
