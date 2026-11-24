@@ -333,7 +333,7 @@ test("AC-94: with Draw, one finger draws and two fingers do not", async ({ page 
   await tool(page, "p");
   const cdp = await page.context().newCDPSession(page);
   const a = await at(page, 1, 0.2, 0.6);
-  const touch = (type: string, pts: { x: number; y: number }[]) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts.map((p, i) => ({ ...p, id: i })) });
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", pts: { x: number; y: number }[]) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts.map((p, i) => ({ ...p, id: i })) });
   await touch("touchStart", [a]);
   for (let i = 1; i <= 8; i++) await touch("touchMove", [{ x: a.x + i * 12, y: a.y + i * 4 }]);
   await touch("touchEnd", []);
