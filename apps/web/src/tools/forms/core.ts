@@ -62,7 +62,7 @@ export function nudgeAfterDownload(ctl: Controller): number {
 }
 
 /** The control a field's element focuses, or null when it has none (read-only, inert). */
-const controlOf = (widgetId: string) => {
+export const controlOf = (widgetId: string) => {
   const el = document.querySelector<HTMLElement>(`.bf-field[data-w="${widgetId}"]`);
   if (!el || el.querySelector("[inert]")) return null;
   return el.querySelector<HTMLElement>("input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]):not(.bf-badge)");
@@ -83,8 +83,64 @@ export function fieldTab(ctl: Controller, e: Pick<KeyboardEvent, "key" | "shiftK
   const el = next ? controlOf(next) : null;
   if (!el) return false;
   el.focus({ preventScroll: true });
-  el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  revealField(el);
   return true;
+}
+
+/** The nearest ancestor that scrolls along an axis, else the page. */
+function scrollerOf(el: HTMLElement, axis: "x" | "y"): HTMLElement {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const o = axis === "y" ? getComputedStyle(p).overflowY : getComputedStyle(p).overflowX;
+    const more = axis === "y" ? p.scrollHeight > p.clientHeight : p.scrollWidth > p.clientWidth;
+    if ((o === "auto" || o === "scroll") && more) return p;
+  }
+  return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+}
+
+/** The floating chrome a field must stay clear of (top bar, view pill, tool rail, phone fill bar). */
+const CHROME = '[data-region="top"], [data-region="view"], [data-region="tools"], .bf-peek';
+
+/**
+ * Scrolls a field into the part of the visible screen the floating bars leave free: below the
+ * top bar and the phone fill bar, above the view pill, beside the tool rail (G-21, G-25), on both
+ * axes. A field already clear of them stays put. `skip` leaves one bar out of the sums. `fits` is
+ * false when the free area is too short for the field (a phone keyboard taking most of the
+ * screen); `moving` is true while a smooth scroll is still taking it there.
+ */
+export function revealField(el: HTMLElement, opts: { smooth?: boolean; skip?: Element | null } = {}): { fits: boolean; moving: boolean } {
+  const gap = 12;
+  const vv = window.visualViewport;
+  let [left, top] = [vv?.offsetLeft ?? 0, vv?.offsetTop ?? 0];
+  let [right, bottom] = [left + (vv?.width ?? window.innerWidth), top + (vv?.height ?? window.innerHeight)];
+  const [cx, cy] = [(left + right) / 2, (top + bottom) / 2];
+  for (const c of document.querySelectorAll<HTMLElement>(CHROME)) {
+    if (c === opts.skip || getComputedStyle(c).visibility === "hidden") continue;
+    const r = c.getBoundingClientRect();
+    if (!r.width || !r.height || r.bottom <= top || r.top >= bottom || r.right <= left || r.left >= right) continue;
+    if (r.width >= r.height) {
+      if (r.top + r.height / 2 < cy) top = Math.max(top, r.bottom);
+      else bottom = Math.min(bottom, r.top);
+    } else if (r.left + r.width / 2 < cx) left = Math.max(left, r.right);
+    else right = Math.min(right, r.left);
+  }
+  const r = el.getBoundingClientRect();
+  const fits = r.height <= bottom - top - 2 * gap;
+  // Centre it in the free area; along an axis where it is larger than the area, line up its start.
+  const delta = (lo: number, hi: number, a: number, b: number) =>
+    a >= lo + gap && b <= hi - gap ? 0 : b - a > hi - lo - 2 * gap ? a - (lo + gap) : (a + b) / 2 - (lo + hi) / 2;
+  const dy = delta(top, bottom, r.top, r.bottom);
+  const dx = delta(left, right, r.left, r.right);
+  const behavior = opts.smooth !== false && !matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto";
+  // How far each scroller can really go: none at the very top of the file, for instance.
+  const room = (sc: HTMLElement, d: number, axis: "x" | "y") => {
+    const [pos, max] = axis === "y" ? [sc.scrollTop, sc.scrollHeight - sc.clientHeight] : [sc.scrollLeft, sc.scrollWidth - sc.clientWidth];
+    return Math.max(0, Math.min(max, pos + d)) - pos;
+  };
+  const [sy, sx] = [scrollerOf(el, "y"), scrollerOf(el, "x")];
+  const [my, mx] = [room(sy, dy, "y"), room(sx, dx, "x")];
+  if (Math.abs(my) >= 1) sy.scrollBy({ top: my, behavior });
+  if (Math.abs(mx) >= 1) sx.scrollBy({ left: mx, behavior });
+  return { fits, moving: behavior === "smooth" && (Math.abs(my) >= 1 || Math.abs(mx) >= 1) };
 }
 
 /**

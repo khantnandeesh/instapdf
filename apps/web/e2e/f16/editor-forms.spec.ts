@@ -137,9 +137,84 @@ test("AC-248: Tab follows a custom tab order and crosses pages without stopping 
   await expect(page.getByRole("radio", { name: "contact: Email" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(text("notes")).toBeFocused();
+  // The field Tab lands on is clear of the floating top bar and view pill (G-21).
+  await expect(async () => {
+    const box = (await text("notes").boundingBox())!;
+    const top = (await page.locator('[data-region="top"]').first().boundingBox())!;
+    const pill = await page.locator('[data-region="view"]').first().boundingBox();
+    expect(box.y).toBeGreaterThanOrEqual(top.y + top.height);
+    if (pill) expect(box.y + box.height).toBeLessThanOrEqual(pill.y);
+  }).toPass();
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Shift+Tab");
   await expect(page.getByRole("checkbox", { name: "agree" })).toBeFocused();
+});
+
+test("G-25: on a phone, the fill bar never covers the field being typed into", async ({ page }) => {
+  test.skip(page.viewportSize()!.width >= 1024, "the fill bar is for phones");
+  // Small one-line fields near the top of the file and further down it.
+  const doc = await PDFDocument.create();
+  const form = doc.getForm();
+  const pages = [doc.addPage([612, 792]), doc.addPage([612, 792]), doc.addPage([612, 792])];
+  const add = (name: string, page: number, y: number) => form.createTextField(name).addToPage(pages[page], { x: 150, y, width: 300, height: 22 });
+  add("full_name", 0, 682);
+  add("email", 0, 642);
+  add("city", 2, 400);
+  await open(page, { name: "g25.pdf", mimeType: "application/pdf", buffer: Buffer.from(await doc.save()) });
+  const peek = page.locator(".bf-peek");
+  const text = (n: string) => page.getByRole("textbox", { name: n });
+  const clear = async (n: string) =>
+    expect(async () => {
+      const bar = (await peek.boundingBox())!;
+      const box = (await text(n).boundingBox())!;
+      expect(box.y >= bar.y + bar.height || box.y + box.height <= bar.y, `the bar is clear of ${n}`).toBe(true);
+    }).toPass();
+  // Near the top of the file: nothing to scroll, so the bar moves out of the way.
+  await text("full_name").focus();
+  await expect(peek).toBeVisible();
+  await clear("full_name");
+  // The next field starts from the bar's own place again.
+  await text("email").focus();
+  await clear("email");
+  expect((await peek.boundingBox())!.y, "the bar is back in its own place").toBeLessThan(page.viewportSize()!.height / 2);
+  // Further down, under where the bar sits: the field is scrolled below the bar, which stays on top.
+  await text("email").blur();
+  await text("city").evaluate((el) => el.scrollIntoView({ block: "start" }));
+  await text("city").focus();
+  await clear("city");
+  expect((await peek.boundingBox())!.y).toBeLessThan(page.viewportSize()!.height / 2);
+});
+
+test("G-21: Tab at high zoom brings a field off to the side into view", async ({ page }) => {
+  test.skip(page.viewportSize()!.width < 1024, "desktop zoom");
+  await open(page, await fillable());
+  for (let i = 0; i < 6; i++) await page.getByRole("button", { name: "Zoom in" }).first().click();
+  const text = (n: string) => page.getByRole("textbox", { name: n });
+  const canvas = page.locator(".ed-canvas").first();
+  // Scroll the canvas fully right, so the fields' left side is out of view.
+  await canvas.evaluate((c) => (c.scrollLeft = c.scrollWidth));
+  await text("email").evaluate((el) => el.focus({ preventScroll: true }));
+  await page.keyboard.press("Shift+Tab");
+  await expect(text("full_name")).toBeFocused();
+  await expect(async () => {
+    const box = (await text("full_name").boundingBox())!;
+    const c = (await canvas.boundingBox())!;
+    // Its start is in view (a field wider than the screen lines up its start).
+    expect(box.x).toBeGreaterThanOrEqual(c.x);
+    expect(box.x).toBeLessThan(c.x + c.width / 2);
+  }).toPass();
+});
+
+test("G-23: an editable dropdown takes typed text as well as its options", async ({ page }) => {
+  const buffer = await readFile("tests/fixtures/forms/form-extra.pdf");
+  await open(page, { name: "form-extra.pdf", mimeType: "application/pdf", buffer });
+  const city = page.getByRole("combobox", { name: "city" });
+  await expect(city).toHaveValue("Pune");
+  await city.fill("Nagpur");
+  const out = await PDFDocument.load(await download(page));
+  const dd = out.getForm().getDropdown("city");
+  expect(dd.getSelected()).toEqual(["Nagpur"]);
+  expect(dd.isEditable()).toBe(true);
 });
 
 test("AC-233: required fields left empty become a nudge after Download, never a block", async ({ page }) => {

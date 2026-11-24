@@ -198,6 +198,18 @@ function Control({ f, w, fontPx, widthPx, onValue, onSign, mode }: { f: FormFiel
         </label>
       );
     case "dropdown":
+      // An editable dropdown (Edit flag) takes typed text as well as its options (G-23).
+      if (f.editable)
+        return (
+          <>
+            <input className="bf-input" style={style} list={`bf-opts-${w.id}`} value={String(f.value)} placeholder={named} readOnly={f.readOnly} aria-label={label} aria-required={f.required} onChange={(e) => onValue?.(f.id, e.target.value)} />
+            <datalist id={`bf-opts-${w.id}`}>
+              {f.options.map((o) => (
+                <option key={o} value={o} />
+              ))}
+            </datalist>
+          </>
+        );
       return (
         <select className="bf-input" style={style} value={String(f.value)} disabled={f.readOnly} aria-label={label} onChange={(e) => onValue?.(f.id, e.target.value)}>
           <option value="">{named}</option>
