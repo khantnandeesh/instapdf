@@ -806,8 +806,8 @@ impl Engine {
             };
             let fid = |j: usize| pc.fonts[j].object_id.unwrap_or(id);
             let as_is = family.iter().copied().find(|&j| j != *fi && reads(j, true));
-            let extend = family.iter().copied().find(|&j| self.made_here(fid(j)) && reads(j, false));
             let width = if f.two_byte { 2 } else { 1 };
+            let extend = family.iter().copied().find(|&j| self.extendable_sibling(fid(j), width) && reads(j, false));
             let sib = match (as_is, extend) {
                 (Some(j), _) => fid(j),
                 (None, Some(j)) => {

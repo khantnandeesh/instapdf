@@ -12,6 +12,7 @@ import type { BerryDocument as BerryDocumentType, BerryError, EditResult, FontIn
 
 import { ENGINE_JS, ENGINE_SHAPING_JS, ENGINE_SHAPING_WASM, ENGINE_SHAPING_WASM_BYTES, ENGINE_WASM, ENGINE_WASM_BYTES } from "./engine-assets";
 import { countBody, type Progress } from "./engine-load";
+import { MadeAfterTrust, fingerprint } from "./engine-trust";
 
 type EngineModule = { default: (opts: { module_or_path: Response | Promise<Response> }) => Promise<unknown>; BerryDocument: typeof BerryDocumentType };
 
@@ -70,21 +71,11 @@ let doc: BerryDocumentType | null = null;
 let current: Uint8Array | null = null;
 /** Fonts registered so far. A document is reopened after every edit, so they are added again each time. */
 let added: { family: string; bold: boolean; italic: boolean; bytes: Uint8Array }[] = [];
-/**
- * BerryDocument.madeAfter of the bytes this worker first opened, and digests of those bytes and
- * of every output it saved from them. Reopening one of them restores madeAfter, so the engine
- * can extend a font it made in an earlier edit. Bytes from anywhere else get no trust.
- */
-let trust: { madeAfter: number; ours: Set<string> } | null = null;
-/** Whether `current` is one of the trusted bytes. */
-let currentTrusted = false;
-async function digest(bytes: Uint8Array): Promise<string> {
-  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as Uint8Array<ArrayBuffer>));
-  return Array.from(hash, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-function open(BerryDocument: EngineModule["BerryDocument"], bytes: Uint8Array, trusted = currentTrusted): BerryDocumentType {
+/** Restores BerryDocument.madeAfter when the worker reopens bytes it saved (engine-trust.ts). */
+const trust = new MadeAfterTrust();
+function open(BerryDocument: EngineModule["BerryDocument"], bytes: Uint8Array, print = fingerprint(bytes)): BerryDocumentType {
   const d = new BerryDocument(bytes);
-  if (trusted && trust) d.setMadeAfter(trust.madeAfter);
+  trust.restore(print, d);
   for (const f of added) d.addFont(f.family, f.bold, f.italic, f.bytes);
   return d;
 }
@@ -147,17 +138,14 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
     // A download failure leaves the open document as it was.
     const variant: EngineVariant = req.shaping ? "shaping" : "base";
     const { BerryDocument } = await loadEngine(variant);
-    // The person's file (or another version of it this worker did not save): the trust starts
-    // here. A version this worker saved (undo, redo, a restart) keeps it.
-    const hash = await digest(req.bytes);
-    const ours = !!trust?.ours.has(hash);
     dropDoc();
     current = null;
     active = variant;
-    doc = open(BerryDocument, req.bytes, ours);
-    if (!ours) trust = { madeAfter: doc.madeAfter(), ours: new Set([hash]) };
+    const print = fingerprint(req.bytes);
+    doc = open(BerryDocument, req.bytes, print);
+    // Bytes this worker did not save (the person's file) start the trust; its own keep it.
+    trust.opened(print, doc);
     current = req.bytes;
-    currentTrusted = true;
     return { op: "open", pageCount: doc.pageCount };
   }
   const { BerryDocument } = await loadEngine(active);
@@ -193,13 +181,12 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
     }
     try {
       // Reopen from the output so the next save appends to it, and undo states stay prefixes.
+      // The output is this worker's own, made from bytes of the current trust epoch.
+      const print = fingerprint(saved.bytes);
+      trust.saved(print);
       dropDoc();
-      doc = open(BerryDocument, saved.bytes);
+      doc = open(BerryDocument, saved.bytes, print);
       current = saved.bytes.slice();
-      // The output is this worker's own: it keeps the trust of the bytes it was made from (no
-      // await here, so no other request runs in between).
-      const t = currentTrusted ? trust : null;
-      void digest(current).then((h) => t?.ours.add(h));
     } catch (error) {
       return rollback(BerryDocument, error);
     }

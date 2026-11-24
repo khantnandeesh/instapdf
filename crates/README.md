@@ -133,9 +133,11 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
     session drew uses it. "This session" is `made_after` (`madeAfter` in the d.ts): objects
     above it were made by the engine's own edits. The editor's worker reopens its output after
     every edit, so it restores that value from its first open of the person's file
-    (`setMadeAfter`), for bytes it saved itself only (SHA-256 of each output). A sibling in a
-    file saved earlier that lacks a code is left as it was (other text may draw with it) and a
-    new one is made. Only fonts of the edited page are looked at. Tests in `font_mapping.rs`
+    (`setMadeAfter`), for bytes it saved itself only (apps/web/src/lib/editor/engine-trust.ts).
+    Even then a font is extended only when its ToUnicode is exactly one the engine writes, and a
+    CIDFont only when no other font uses it, so a wrong boundary never rewrites the page font. A
+    sibling in a file saved earlier that lacks a code is left as it was (other text may draw
+    with it) and a new one is made. Only fonts of the edited page are looked at. Tests in `font_mapping.rs`
     (`second_number_at_line_end_reuses_the_sibling`, `reopened_output_keeps_extending_its_sibling`,
     `a_lookalike_with_other_widths_is_not_reused` and others) and `mixed-direction.test.ts`.
   - Numbers in a right-to-left line are read in logical order as UAX #9 orders them: numbers

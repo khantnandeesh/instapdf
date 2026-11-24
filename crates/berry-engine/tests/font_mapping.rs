@@ -402,3 +402,39 @@ fn a_preview_leaves_the_sibling_as_it_was() {
     };
     assert_eq!(edited(true), edited(false));
 }
+
+/// Even with `made_after` set too low (everything counts as made in this session), the page
+/// font's own ToUnicode and CIDFont are never rewritten: only a ToUnicode exactly as the engine
+/// writes it is extended.
+#[test]
+fn a_too_low_made_after_never_rewrites_the_page_font() {
+    let orig = Document::load_mem(&read("scripts-plain.pdf")).unwrap();
+    let (font, tu) = arabic_font(&orig);
+    let cid = |d: &Document| {
+        let id = d.get_dictionary(font).unwrap().get(b"DescendantFonts").unwrap().as_array().unwrap()[0].as_reference().unwrap();
+        (id, d.get_object(id).unwrap().clone())
+    };
+    for first in [None, Some(" 2024")] {
+        let mut bytes = read("scripts-plain.pdf");
+        if let Some(tail) = first {
+            bytes = edits(bytes, &[("مرحبا", tail)]).1;
+        }
+        let mut e = engine(bytes);
+        e.set_made_after(0);
+        let p = e.page_text(0).unwrap();
+        let id = line_id(&p, "مرحبا");
+        let want = format!("{} 3", p.lines[id].text);
+        e.replace_line(0, id, &want).unwrap();
+        let out = Document::load_mem(&e.save().unwrap().0).unwrap();
+        assert_eq!(stream_text(&out, tu), stream_text(&orig, tu), "{first:?}: ToUnicode");
+        assert_eq!(out.get_dictionary(font).unwrap(), orig.get_dictionary(font).unwrap(), "{first:?}: font");
+        assert_eq!(cid(&out), cid(&orig), "{first:?}: CIDFont");
+        assert!(texts(&engine(lopdf_bytes(&out)).page_text(0).unwrap()).contains(&want));
+    }
+}
+
+fn lopdf_bytes(doc: &Document) -> Vec<u8> {
+    let mut out = Vec::new();
+    doc.clone().save_to(&mut out).unwrap();
+    out
+}

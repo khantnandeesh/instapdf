@@ -348,6 +348,28 @@ fn fmt_kern(v: f64) -> String {
     }
 }
 
+/// A ToUnicode CMap mapping each code (`width` bytes) to its text, as this engine writes it.
+#[cfg(feature = "shaping")]
+fn to_unicode_cmap(width: usize, entries: &BTreeMap<u32, String>) -> String {
+    let hex = |n: u32| format!("{n:0w$X}", w = 2 * width);
+    let mut cmap = format!(
+        "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<{}> <{}>\nendcodespacerange\n",
+        hex(0),
+        hex(if width == 1 { 0xFF } else { 0xFFFF }),
+    );
+    let entries: Vec<(&u32, &String)> = entries.iter().collect();
+    for chunk in entries.chunks(100) {
+        cmap.push_str(&format!("{} beginbfchar\n", chunk.len()));
+        for (code, text) in chunk {
+            let t: String = text.encode_utf16().map(|u| format!("{u:04X}")).collect();
+            cmap.push_str(&format!("<{}> <{t}>\n", hex(**code)));
+        }
+        cmap.push_str("endbfchar\n");
+    }
+    cmap.push_str("endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n");
+    cmap
+}
+
 /// The `bfchar` entries of a ToUnicode CMap this engine wrote (code → text).
 #[cfg(feature = "shaping")]
 fn bfchar_entries(cmap: &[u8]) -> BTreeMap<u32, String> {
@@ -417,9 +439,11 @@ impl Engine {
     /// Restores [`Engine::made_after`] after the editor reopens its own output (it reopens the
     /// saved bytes after every edit). Only the editor's worker calls it, with the value read
     /// when it first opened the person's file, so a font this session made can be extended
-    /// again. It is clamped to the document's highest object number. Objects above it are
-    /// still only reused when they pass the engine's own checks (same font, widths and
-    /// mapping), so a wrong value can only miss a reuse or extend a sibling-shaped font.
+    /// again. It is clamped to the document's highest object number. A font above it is still
+    /// reused only when it passes the engine's own checks (same program and widths, no other
+    /// text for a code), and extended only when its ToUnicode is exactly one the engine writes
+    /// (see `extendable_sibling`), so a wrong value can miss a reuse but never rewrites a
+    /// mapping the engine did not write.
     pub fn set_made_after(&mut self, n: u32) {
         self.opened_max = n.min(self.doc.max_id);
     }
@@ -1450,7 +1474,7 @@ impl Engine {
             let (mut cid, own) = match &cid_ref {
                 Some(Object::Reference(id)) => (
                     self.doc.get_dictionary(*id).map_err(|_| limit("font-object"))?.clone(),
-                    into.is_some() && self.made_here(*id),
+                    into.is_some_and(|f| self.made_here(*id) && self.only_user(*id, f)),
                 ),
                 Some(Object::Dictionary(d)) => (d.clone(), false),
                 _ => return Err(limit("font-object")),
@@ -1490,22 +1514,7 @@ impl Engine {
         for (code, text) in map {
             entries.insert(*code, text.clone());
         }
-        let hex = |n: u32| format!("{n:0w$X}", w = 2 * width);
-        let mut cmap = format!(
-            "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<{}> <{}>\nendcodespacerange\n",
-            hex(0),
-            hex(if width == 1 { 0xFF } else { 0xFFFF }),
-        );
-        let entries: Vec<(&u32, &String)> = entries.iter().collect();
-        for chunk in entries.chunks(100) {
-            cmap.push_str(&format!("{} beginbfchar\n", chunk.len()));
-            for (code, text) in chunk {
-                let t: String = text.encode_utf16().map(|u| format!("{u:04X}")).collect();
-                cmap.push_str(&format!("<{}> <{t}>\n", hex(**code)));
-            }
-            cmap.push_str("endbfchar\n");
-        }
-        cmap.push_str("endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n");
+        let cmap = to_unicode_cmap(width, &entries);
         let stream = Object::Stream(new_stream(cmap.into_bytes()));
         let to_unicode = match old_tu {
             Some(id) if self.made_here(id) => {
@@ -1532,6 +1541,38 @@ impl Engine {
     #[cfg(feature = "shaping")]
     pub(crate) fn made_here(&self, id: ObjectId) -> bool {
         id.0 > self.opened_max && self.doc.objects.contains_key(&id)
+    }
+
+    /// True when no font dictionary but `font` names `cid` in its DescendantFonts: a CIDFont a
+    /// sibling shares with the font it copies is copied, not changed.
+    #[cfg(feature = "shaping")]
+    fn only_user(&self, cid: ObjectId, font: ObjectId) -> bool {
+        let names = |o: &Object| {
+            let list = match o {
+                Object::Reference(r) => self.doc.get_object(*r).ok(),
+                o => Some(o),
+            };
+            list.and_then(|l| l.as_array().ok()).is_some_and(|a| a.iter().any(|x| x.as_reference().ok() == Some(cid)))
+        };
+        self.doc
+            .objects
+            .iter()
+            .all(|(id, o)| *id == font || !o.as_dict().ok().and_then(|d| d.get(b"DescendantFonts").ok()).is_some_and(names))
+    }
+
+    /// True when the font is a sibling this engine can extend: the font, its ToUnicode and
+    /// (when it has one of its own) its CIDFont copy were made in this session, and the
+    /// ToUnicode is exactly what the engine writes for its entries. So even with
+    /// [`Engine::made_after`] set too low, a font the engine did not write (whose CMap would
+    /// use ranges, or another layout) is never rewritten.
+    #[cfg(feature = "shaping")]
+    pub(crate) fn extendable_sibling(&self, font: ObjectId, width: usize) -> bool {
+        let Ok(dict) = self.doc.get_dictionary(font) else { return false };
+        let Some(tu) = dict.get(b"ToUnicode").ok().and_then(|o| o.as_reference().ok()) else { return false };
+        let Some(bytes) = self.doc.get_object(tu).ok().and_then(|o| o.as_stream().ok()?.get_plain_content().ok()) else {
+            return false;
+        };
+        self.made_here(font) && self.made_here(tu) && to_unicode_cmap(width, &bfchar_entries(&bytes)).as_bytes() == bytes
     }
 
     /// True when `b` is a sibling of `a` (or `a` of `b`): the same font dictionary but for its

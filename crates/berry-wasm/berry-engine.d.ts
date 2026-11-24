@@ -264,9 +264,11 @@ export class BerryDocument {
   /**
    * Restores madeAfter after reopening the editor's own output. Only the editor's worker calls
    * it, with the value it read when it first opened the person's original bytes, and only for
-   * bytes it produced from them. Clamped to the document's highest object number. A font above
-   * it is still reused only when it passes the engine's own checks (same program and widths),
-   * so a wrong value can miss a reuse but not draw wrong text.
+   * bytes it produced from them (engine-trust.ts). Clamped to the document's highest object
+   * number. A font above it is still reused only when it passes the engine's own checks (same
+   * program and widths, no other text for a code), and extended only when its Unicode map is
+   * exactly one the engine writes, so a wrong value can miss a reuse but never rewrites a
+   * mapping the engine did not write.
    */
   setMadeAfter(n: number): void;
   /** Lines (with runs, words, fonts, positions) and paragraphs of a page. */
