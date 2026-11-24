@@ -5,7 +5,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -77,4 +77,11 @@ export async function annotationsOf(bytes: Uint8Array, pageNumber: number) {
   } finally {
     await pdf.loadingTask.destroy();
   }
+}
+
+/** public/fonts/noto is generated (scripts/copy-fonts.mjs); makes it on a fresh checkout. */
+export function ensureNotoFonts(): URL {
+  const dir = new URL("../../../public/fonts/noto/", import.meta.url);
+  if (!existsSync(new URL("manifest.json", dir))) execFileSync("node", [new URL("../../../scripts/copy-fonts.mjs", import.meta.url).pathname]);
+  return dir;
 }

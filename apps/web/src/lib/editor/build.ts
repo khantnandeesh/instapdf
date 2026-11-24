@@ -72,7 +72,7 @@ export type BuildFonts = {
   manifest: () => Promise<EditorFontManifest>;
   load: (file: string) => Promise<Uint8Array>;
   /** Noto Sans slices (lib/pdf/text.ts manifest) for characters the chosen face lacks. */
-  fallback?: { manifest: () => Promise<{ fonts: { file: string; ranges: [number, number][] }[] }>; load: (file: string) => Promise<Uint8Array> };
+  fallback?: { manifest: () => Promise<{ fonts: { file: string; ranges: [number, number][] }[] }>; load: (file: string) => Promise<Uint8Array>; forms?: () => Promise<Uint8Array> };
 };
 
 const color = (hex: string) => rgb(...hexToRgb(hex));
@@ -327,7 +327,9 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
 
   doc.setProducer(PRODUCER);
   doc.setModificationDate(new Date());
-  return doc.save();
+  // Field appearances are written by applyForms only: fields the user didn't touch stay as they
+  // came, even without an appearance (pdf-lib would draw them in Helvetica, without borders).
+  return doc.save({ updateFieldAppearances: false });
 }
 
 /** Removes widget annotations from a copied page (see the page copy above). */

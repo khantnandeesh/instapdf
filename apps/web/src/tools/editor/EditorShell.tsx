@@ -27,7 +27,7 @@ import { initialVersions } from "@/lib/editor/versions";
 import type { OpenedPdf } from "@/lib/pdf/pdfjs";
 import { assetsOf } from "@/lib/editor/asset-refs";
 import { listChars } from "@/lib/editor/coverage";
-import { missingInObjects } from "./coverage-browser";
+import { missingInFormValues, missingInObjects } from "./coverage-browser";
 import { addAsset, IMAGE_ACCEPT, imageError, imageFromFile, isImageFile, plainAssets, releaseAssets } from "./assets";
 import { EnginePill } from "./EngineProgress";
 import { resetDocFonts } from "./font-service";
@@ -630,7 +630,8 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       if (s.lineEdit) await ctl.commitLine();
       // Added text with characters no font can print: say so before the file is made (AC-75).
       if (!force && !s.readOnly) {
-        const missing = await missingInObjects(H.current(store.get().history).objects);
+        const now = H.current(store.get().history);
+        const missing = [...new Set([...(await missingInObjects(now.objects)), ...(await missingInFormValues(now.forms, store.get().forms.original))])];
         if (missing.length) return setMissingAsk({ chars: missing, name });
       }
       store.set({ busy: "save" });

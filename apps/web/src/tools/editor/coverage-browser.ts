@@ -8,6 +8,8 @@ import { missingChars } from "@/lib/editor/coverage";
 import { faceOf, type EditorFontManifest, type FontFileEntry } from "@/lib/editor/fonts";
 import { knownManifest, loadFontManifest } from "@/lib/editor/fonts-browser";
 import type { EditorObject, TextObj } from "@/lib/editor/model";
+import { missingInForm } from "@/lib/forms/coverage";
+import type { FormState } from "@/lib/forms/types";
 
 let ready: Promise<{ m: EditorFontManifest; fallback: FontFileEntry[] }> | null = null;
 let known: { m: EditorFontManifest; fallback: FontFileEntry[] } | null = null;
@@ -37,6 +39,13 @@ export async function missingInObjects(objects: readonly EditorObject[]): Promis
   const all = new Set<string>();
   for (const o of objects) if (o.kind === "text") missingIn(o).forEach((c) => all.add(c));
   return [...all];
+}
+
+/** Every character of changed form values that won't print (AC-232). */
+export async function missingInFormValues(state: FormState | undefined, original: FormState | null | undefined): Promise<string[]> {
+  if (!state || state === original) return [];
+  await loadCoverage().catch(() => null);
+  return known ? missingInForm(state, original, known.fallback) : [];
 }
 
 export function useMissing(o: TextObj): string[] {

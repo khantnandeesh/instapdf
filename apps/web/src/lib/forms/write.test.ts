@@ -1,11 +1,11 @@
 import { readFile } from "node:fs/promises";
-import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFRef, degrees } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFRawStream, PDFRef, decodePDFRawStream, degrees } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
 import { toPdfRect } from "./frame";
 import { addField, addRadioButton, createField, deleteField, deleteWidget, emptyForm, repeatOnAllPages, setMaxLen, setRadioValue, setValue, setWidgetBox, updateField } from "./model";
 import { hasXfa, pagesOf, readForm } from "./read";
 import { sortByColumns, sortByRows } from "./taborder";
-import { annotationsOf, inkIn, qpdfCheck, renderPage } from "./test-helpers";
+import { annotationsOf, ensureNotoFonts, inkIn, qpdfCheck, renderPage } from "./test-helpers";
 import type { FormState } from "./types";
 import { applyForms } from "./write";
 
@@ -19,13 +19,14 @@ async function blankDoc(n = 1, setup?: (doc: PDFDocument) => void) {
 }
 
 /** Loads, reads, applies a change to the model, writes, and returns the saved bytes. */
-async function roundTrip(bytes: Uint8Array, change: (s: FormState, pages: ReturnType<typeof pagesOf>) => FormState) {
+async function roundTrip(bytes: Uint8Array, change: (s: FormState, pages: ReturnType<typeof pagesOf>) => FormState, opts?: Parameters<typeof applyForms>[5]) {
   const doc = await PDFDocument.load(bytes);
   const pages = pagesOf(doc);
   const original = readForm(doc, pages);
   const next = change(original, pages);
-  const report = await applyForms(doc, doc.getPages(), pages, next, original);
-  return { bytes: await doc.save(), report };
+  const report = await applyForms(doc, doc.getPages(), pages, next, original, opts);
+  // As the editor's build saves (lib/editor/build.ts).
+  return { bytes: await doc.save({ updateFieldAppearances: false }), report };
 }
 
 describe("applyForms: fill (AC-231, AC-233)", () => {
@@ -74,34 +75,109 @@ describe("applyForms: fill (AC-231, AC-233)", () => {
   });
 });
 
-describe("applyForms: text outside WinAnsi (AC-232)", () => {
-  it("embeds an open font that covers the value", async () => {
-    const fontkit = (await import("@cantoo/fontkit")).default;
-    const fonts = {
-      manifest: async () => ({
-        fonts: [
-          { file: "noto-sans-latin-ext-400-normal.woff", ranges: [[0x0100, 0x024f], [0x20a0, 0x20c0]] as [number, number][] },
-          { file: "noto-sans-latin-400-normal.woff", ranges: [[0x0000, 0x00ff], [0x2000, 0x206f]] as [number, number][] },
-          { file: "noto-sans-cyrillic-400-normal.woff", ranges: [[0x0400, 0x045f]] as [number, number][] },
-        ],
-      }),
-      load: async (file: string) => new Uint8Array(await readFile(new URL(`../../../node_modules/@fontsource/noto-sans/files/${file}`, import.meta.url))),
-    };
-    for (const value of ["Zoë Šťastná ₹ 5,000", "Ирина"]) {
-      const doc = await blankDoc();
-      const pages = pagesOf(doc);
-      const original = readForm(doc, pages);
-      let s = addField(original, createField(original, { kind: "text", page: "p0", box: { x: 72, y: 72, w: 260, h: 24 }, name: "who" }));
-      s = setValue(s, s.fields[0].id, value).state;
-      const report = await applyForms(doc, doc.getPages(), pages, s, original, { fonts, fontkit });
-      expect(report.missingGlyphs).toEqual([]);
-      const bytes = await doc.save();
-      expect(qpdfCheck(bytes)).toEqual([]);
-      const back = readForm(await PDFDocument.load(bytes));
-      expect(back.fields[0].value).toBe(value);
-      const px = await renderPage(bytes, 1, 2);
-      expect(inkIn(px, 72 * 2, 72 * 2, 260 * 2, 24 * 2)).toBeGreaterThan(0.02);
+const realFonts = async () => {
+  const noto = ensureNotoFonts();
+  return {
+    fontkit: (await import("@cantoo/fontkit")).default,
+    fonts: {
+      manifest: async () => JSON.parse(await readFile(new URL("manifest.json", noto), "utf8")) as { fonts: { file: string; ranges: [number, number][] }[] },
+      load: async (file: string) => new Uint8Array(await readFile(new URL(file, noto))),
+      forms: async () => new Uint8Array(await readFile(new URL("../../../public/fonts/forms/noto-sans-forms.woff", import.meta.url))),
+    },
+  };
+};
+
+/** The font a field's DA names, looked up in the AcroForm /DR. */
+function daFont(doc: PDFDocument, name: string) {
+  const field = doc.getForm().getField(name);
+  const da = field.acroField.getDefaultAppearance() ?? "";
+  const res = /\/([^\s/]+)\s+[\d.]+\s+Tf/.exec(da)?.[1];
+  const dr = doc.getForm().acroForm.dict.lookup(PDFName.of("DR"), PDFDict).lookup(PDFName.of("Font"), PDFDict);
+  const font = res ? dr.lookup(PDFName.of(res)) : undefined;
+  return { da, res, font: font instanceof PDFDict ? font : undefined };
+}
+
+describe("applyForms: text outside WinAnsi (AC-232, G-1)", () => {
+  it("draws mixed Latin, Latin Extended, ₹ and Cyrillic values in one embedded open font", async () => {
+    const { fonts, fontkit } = await realFonts();
+    const values = { name: "Zoë Šťastná", notes: "₹ 5,000 paid", email: "Ирина Ελένη Việt" };
+    const { bytes, report } = await roundTrip(
+      await fixture("form-basic.pdf"),
+      (s) => {
+        for (const [n, v] of Object.entries(values)) s = setValue(s, s.fields.find((f) => f.name === n)!.id, v).state;
+        return s;
+      },
+      { fonts, fontkit },
+    );
+    expect(report.missingGlyphs).toEqual([]);
+    expect(qpdfCheck(bytes)).toEqual([]);
+    const doc = await PDFDocument.load(bytes);
+    for (const [n, v] of Object.entries(values)) {
+      expect(doc.getForm().getTextField(n).getText()).toBe(v);
+      const { res, font } = daFont(doc, n);
+      expect(res).not.toBe("Helv");
+      // An embedded Type0 font, a subset (kept small: G-19).
+      expect(font?.lookup(PDFName.of("Subtype"))).toEqual(PDFName.of("Type0"));
     }
+    // A subset of the forms font (148 kB whole), so the file stays small (G-19).
+    expect(bytes.length).toBeLessThan(40_000);
+    const px = await renderPage(bytes, 1, 2);
+    expect(px.width).toBeGreaterThan(0);
+  });
+
+  it("keeps Helvetica for WinAnsi text and reports characters no font has", async () => {
+    const { fonts, fontkit } = await realFonts();
+    const { bytes, report } = await roundTrip(
+      await fixture("form-basic.pdf"),
+      (s) => {
+        s = setValue(s, s.fields.find((f) => f.name === "name")!.id, "Café €5").state;
+        return setValue(s, s.fields.find((f) => f.name === "email")!.id, "a\u{1F600}b").state;
+      },
+      { fonts, fontkit },
+    );
+    expect(daFont(await PDFDocument.load(bytes), "name").res).toBe("Helv");
+    expect(report.missingGlyphs).toEqual(["\u{1F600}"]);
+  });
+});
+
+describe("applyForms: appearance details (G-3, G-6)", () => {
+  it("keeps Auto as 0 Tf with the DA font in /DR, and drops the button placeholder DA", async () => {
+    const doc = await blankDoc();
+    const pages = pagesOf(doc);
+    const original = readForm(doc, pages);
+    let s = original;
+    const t = createField(s, { kind: "text", page: "p0", box: { x: 72, y: 72, w: 200, h: 80 }, name: "comments" });
+    s = addField(s, t);
+    s = updateField(s, t.id, { multiline: true, style: { ...t.style, fontSize: 0 } });
+    s = setValue(s, t.id, "Hello").state;
+    const c = createField(s, { kind: "checkbox", page: "p0", box: { x: 72, y: 200, w: 14, h: 14 }, name: "ok" });
+    s = addField(s, c);
+    await applyForms(doc, doc.getPages(), pages, s, original);
+    const out = await PDFDocument.load(await doc.save({ updateFieldAppearances: false }));
+    const { da, font } = daFont(out, "comments");
+    expect(da).toMatch(/ 0 Tf /);
+    expect(font).toBeDefined();
+    const ap = out.getForm().getTextField("comments").acroField.getWidgets()[0].getNormalAppearance();
+    const stream = out.context.lookup(ap as PDFRef) as PDFRawStream;
+    const content = new TextDecoder().decode(decodePDFRawStream(stream).decode());
+    const size = Number(/([\d.]+) Tf/.exec(content)?.[1]);
+    expect(size).toBeGreaterThan(4);
+    expect(size).toBeLessThanOrEqual(12);
+    const raw = new TextDecoder("latin1").decode(await out.save());
+    expect(raw).not.toContain("dummy__noop");
+  });
+
+  it("keeps a legacy /Border on refill and leaves untouched fields without an appearance alone", async () => {
+    const src = await fixture("form-basic.pdf");
+    const before = await PDFDocument.load(src);
+    const townAp = before.getForm().getTextField("address.town").acroField.getWidgets()[0].dict.get(PDFName.of("AP"));
+    const { bytes } = await roundTrip(src, (s) => setValue(s, s.fields.find((f) => f.name === "address.street")!.id, "1 Main St").state);
+    const doc = await PDFDocument.load(bytes);
+    const street = doc.getForm().getTextField("address.street");
+    expect(street.acroField.getWidgets()[0].getBorderStyle()?.getWidth()).toBe(1);
+    expect(street.acroField.getDefaultAppearance()).toMatch(/ 0 Tf/);
+    const town = doc.getForm().getTextField("address.town").acroField.getWidgets()[0].dict.get(PDFName.of("AP"));
+    expect(String(town)).toBe(String(townAp));
   });
 });
 
