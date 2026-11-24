@@ -32,7 +32,13 @@ codebase that runs as WebAssembly in the browser and natively for the consented 
    content stream or Form XObject is copied first, so other pages do not change.
 6. **Check, then keep.** The page is read again and compared glyph by glyph with the plan: same
    glyph, font, size and colour, at the old position plus the planned shift (0.05 pt
-   tolerance). If the check fails, the edit is rolled back and an error is returned.
+   tolerance). A space typed in a font without a space glyph (every TeX font, many subsets) is
+   a gap before the new glyphs, and the check expects them after it. An edit that would push the
+   line past the page edge, or into other text on its baseline (a TOC page number, the next
+   column), is refused too. If any check fails, the edit is rolled back and a `verify` error
+   with a reason code is returned: `text-mismatch`, `position-drift`, `glyph-mismatch`,
+   `overflow` or `overlap`. Letters a subset cannot draw alone but has as a ligature (a TeX
+   heading that kept only "fi") are drawn with the ligature.
    Complex scripts (Hindi and the other Indic scripts, Arabic, Hebrew) take their own path in
    `complex.rs`: the edit widens to whole words, the new text is laid out with the Unicode
    bidi algorithm and each word is drawn from the same word already on the page, the embedded
@@ -46,9 +52,14 @@ codebase that runs as WebAssembly in the browser and natively for the consented 
    On either path, an edit that touches an `/ActualText` span (a ligature, replaced text)
    rewrites the whole span with its real characters and removes the span. Its other
    properties, such as a tagged PDF's `/MCID`, stay; a named property list holding more than
-   the ActualText is left alone and the edit is refused (`actual-text-span`).
+   the ActualText is left alone and the edit is refused (`actual-text-span`). When the read-back
+   of a right-to-left line has the right glyphs in the wrong order (digits or Latin typed into
+   Arabic, which readers reorder with their own bidi rules), the edit is retried once with the
+   whole new segment in one ActualText span.
 7. **Save.** The output is the original bytes plus one appended revision (incremental update).
-   It is read back and every object is compared with the engine's copy.
+   It is read back and every object is compared with the engine's copy. A failure is a `save`
+   error with a reason code (`write-failed`, `prefix-changed`, `reparse-failed`,
+   `object-mismatch`, `page-mismatch`, `text-mismatch`).
 
 ## Commands
 
@@ -76,6 +87,8 @@ ToUnicode map. Past a limit the page is read-only with a reason, never a hang.
 - Edits one line at a time. Paragraph reflow is phase E3.
 - Fallback fonts must have TrueType outlines. Latin text in a fallback font is not shaped
   (no kerning or ligatures); complex-script words are.
+- A Latin letter typed inside an Arabic word next to digits or a Latin word can read back in
+  the wrong order and is refused (`text-mismatch`); the editor offers "Replace with new text".
 - Adding new text (not editing a line) is not in the engine yet, so there is no shaping call for
   it in the interface.
 - PDFium reverses right-to-left `/ActualText`, so for Arabic and Hebrew the engine relies on the

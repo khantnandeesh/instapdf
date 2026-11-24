@@ -193,9 +193,22 @@ export type BerryError =
   /** Fetch one of request.families, call addFont, then retry the edit. */
   | { kind: "missing-glyphs"; chars: string; request: FontRequest }
   | { kind: "unsupported"; reason: string }
-  /** The edit failed the engine's own check and was rolled back. */
-  | { kind: "verify"; message: string }
-  | { kind: "save"; message: string };
+  /** The edit failed the engine's own check and was rolled back. `message` is for logs and may
+   * quote the file's text: show a message chosen by `reason` instead. */
+  | { kind: "verify"; reason: VerifyReason; message: string }
+  /** Writing the edited file, or reading it back, failed. Nothing is kept. */
+  | { kind: "save"; reason: SaveReason; message: string };
+
+/**
+ * Why an edit was rolled back. "text-mismatch": the line would not read back as typed.
+ * "position-drift": a glyph would not sit where planned. "glyph-mismatch": a glyph, font or style
+ * would change. "overflow": the line would run past the page edge. "overlap": it would run into
+ * other text on its baseline (a page number, the next column).
+ */
+export type VerifyReason = "text-mismatch" | "position-drift" | "glyph-mismatch" | "overflow" | "overlap";
+
+/** Why saving failed: the writer failed, or the output read back differently. */
+export type SaveReason = "write-failed" | "prefix-changed" | "reparse-failed" | "object-mismatch" | "page-mismatch" | "text-mismatch";
 
 export class BerryDocument {
   /** Opens a PDF. Throws { kind: "encrypted" } when a password is needed. */

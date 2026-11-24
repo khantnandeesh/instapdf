@@ -5,7 +5,7 @@
 //! registered open font shaped here. Every new word is wrapped in `/ActualText` so copy and
 //! search read it right.
 
-use crate::engine::{limit, show_state, EditResult, Engine, Error, Item, Plan, Result, Substitution};
+use crate::engine::{limit, show_state, verify, EditResult, Engine, Error, Item, Plan, Result, Substitution};
 use crate::fallback::{self, FontRequest};
 use crate::font::{strip_subset_prefix, PdfFont};
 use crate::geom::Rect;
@@ -464,31 +464,57 @@ impl Engine {
         }
         let plan = Plan { removed, want, anchor, after: false, segs: Vec::new(), insert_at: start - u_of(anchor), drop_ops };
 
-        // 6. Apply in a transaction, check, then keep or roll back.
-        let snapshot = (self.doc.max_id, self.dirty.clone(), self.embeds.clone());
-        let mut backup: Vec<(ObjectId, Option<Object>)> = Vec::new();
-        let outcome = self.emit(page_id, &ctx, &pieces, &mut backup).and_then(|(items, expect)| {
-            self.apply_items(page_id, &pc, &plan, &items, new_width, &mut backup)?;
-            let after = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
-            let (touched, map) = check(&pc, &after, &plan, &expect, start, ang, &state)?;
-            let (new_lines, paragraphs) = layout::group(&after);
-            // The edited line must read back exactly as asked.
-            let probe = touched.first().copied().or_else(|| line.glyphs.iter().find_map(|&g| map[g]));
-            let reads = probe.and_then(|g| new_lines.iter().find(|l| l.glyphs.contains(&g))).map(|l| l.text.clone());
-            // Nothing left to probe: the whole line was deleted, which is right when nothing visible was asked for.
-            let gone = probe.is_none() && expected.trim().is_empty();
-            if !gone && reads.as_deref().map(script::canonical_marks) != Some(script::canonical_marks(&expected)) {
-                return Err(Error::Verify {
-                    message: format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
-                });
-            }
-            Ok((after, touched, new_lines, paragraphs))
-        });
-        let (after, touched, new_lines, paragraphs) = match outcome {
-            Ok(v) => v,
-            Err(e) => {
-                self.rollback(backup, snapshot);
-                return Err(e);
+        // 6. Apply in a transaction, check, then keep or roll back. When only the reading order
+        // is wrong (digits or Latin inside a right-to-left line, which readers rebuild from glyph
+        // positions with their own bidi rules), try once more with the whole new segment in one
+        // ActualText span, which states its logical text outright.
+        let mut whole_span = false;
+        let (after, touched, new_lines, paragraphs) = loop {
+            let snapshot = (self.doc.max_id, self.dirty.clone(), self.embeds.clone());
+            let mut backup: Vec<(ObjectId, Option<Object>)> = Vec::new();
+            let outcome = self.emit(page_id, &ctx, &pieces, &mut backup).and_then(|(mut items, expect)| {
+                if whole_span {
+                    items.insert(0, Item::BeginSpan(segment.clone()));
+                    items.push(Item::EndSpan);
+                }
+                self.apply_items(page_id, &pc, &plan, &items, new_width, &mut backup)?;
+                let after = interp::interpret_page(&self.doc, &mut self.cache, page_id).map_err(limit)?;
+                let (touched, map) = check(&pc, &after, &plan, &expect, start, ang, &state)?;
+                if self.overflows(page, &pc, &line.glyphs, &after, &touched) {
+                    return Err(verify("overflow", "the line would run past the page edge".into()));
+                }
+                if Self::collides(&pc, &line.glyphs, &after, &touched) {
+                    return Err(verify("overlap", "the line would run into other text on its baseline".into()));
+                }
+                let (new_lines, paragraphs) = layout::group(&after);
+                // The edited line must read back exactly as asked.
+                let probe = touched.first().copied().or_else(|| line.glyphs.iter().find_map(|&g| map[g]));
+                let reads = probe.and_then(|g| new_lines.iter().find(|l| l.glyphs.contains(&g))).map(|l| l.text.clone());
+                // Nothing left to probe: the whole line was deleted, which is right when nothing visible was asked for.
+                let gone = probe.is_none() && expected.trim().is_empty();
+                if !gone && reads.as_deref().map(script::canonical_marks) != Some(script::canonical_marks(&expected)) {
+                    return Err(verify(
+                        "text-mismatch",
+                        format!("the line reads {:?}, expected {expected:?}", reads.unwrap_or_default()),
+                    ));
+                }
+                Ok((after, touched, new_lines, paragraphs))
+            });
+            match outcome {
+                Ok(v) => break v,
+                Err(e) => {
+                    self.rollback(backup, snapshot);
+                    if !whole_span && matches!(e, Error::Verify { reason: "text-mismatch", .. }) {
+                        whole_span = true;
+                        for p in &mut pieces {
+                            if let Piece::Word { actual, .. } = p {
+                                *actual = false;
+                            }
+                        }
+                        continue;
+                    }
+                    return Err(e);
+                }
             }
         };
         self.edited_pages.insert(page);
@@ -682,10 +708,13 @@ fn check(
     angle: f64,
     state: &ShowState,
 ) -> Result<Checked> {
-    let fail = |m: String| Err(Error::Verify { message: m });
+    let fail = |r: &'static str, m: String| Err(verify(r, m));
     let kept = before.glyphs.len() - plan.removed.len();
     if after.glyphs.len() != kept + expect.len() {
-        return fail(format!("expected {} glyphs after the edit, found {}", kept + expect.len(), after.glyphs.len()));
+        return fail(
+            "glyph-mismatch",
+            format!("expected {} glyphs after the edit, found {}", kept + expect.len(), after.glyphs.len()),
+        );
     }
     let (dx, dy) = (angle.cos(), angle.sin());
     let anchor = &before.glyphs[plan.anchor];
@@ -705,13 +734,13 @@ fn check(
                 );
                 let off = (h.origin.0 - target.0).hypot(h.origin.1 - target.1);
                 if h.code != e.code || after.fonts[h.font].object_id != e.font {
-                    return fail(format!("new glyph {j} is not the planned glyph"));
+                    return fail("glyph-mismatch", format!("new glyph {j} is not the planned glyph"));
                 }
                 if (h.size - anchor.size).abs() > 1e-6 || h.color != anchor.color || h.render_mode != anchor.render_mode {
-                    return fail(format!("new glyph {j} has the wrong style"));
+                    return fail("glyph-mismatch", format!("new glyph {j} has the wrong style"));
                 }
                 if !(off <= TOLERANCE) {
-                    return fail(format!("new glyph {j} is {off:.3} pt from where it should be"));
+                    return fail("position-drift", format!("new glyph {j} is {off:.3} pt from where it should be"));
                 }
                 touched.push(j);
                 j += 1;
@@ -732,10 +761,10 @@ fn check(
             || h.color != g.color
             || h.render_mode != g.render_mode
         {
-            return fail(format!("glyph {i} ({:?}) changed", g.text));
+            return fail("glyph-mismatch", format!("glyph {i} ({:?}) changed", g.text));
         }
         if !(moved <= TOLERANCE) {
-            return fail(format!("glyph {i} ({:?}) is {moved:.3} pt from where it should be", g.text));
+            return fail("position-drift", format!("glyph {i} ({:?}) is {moved:.3} pt from where it should be", g.text));
         }
         if want != 0.0 {
             touched.push(j);

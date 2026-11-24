@@ -3,13 +3,13 @@
   "rust": "1.100.0",
   "wasmBindgen": "0.2.130",
   "files": {
-    "berry_engine_bg.wasm": "d5e3ee025ce2cd911dcc7d0c80fadca323aa3b48d8d8c056fe8751abf52f9064",
+    "berry_engine_bg.wasm": "241c05d16a628d374640413897e192caf8b20a353cb9b919e71ea0e7fc4a3699",
     "berry_engine.js": "a7b0a9c2d9f6c4241f02ca6c17126517863b5685157e6977777d9d9c8a2f046d",
-    "berry_engine_shaping_bg.wasm": "f17b217e2fa7a9c07ae8bfaada4546457124e38d84c7362a7c944af31ff7cff5",
+    "berry_engine_shaping_bg.wasm": "73199f54ce924df6294cb7a926c3288a92fd1e523a02d387028fdddc3e51e033",
     "berry_engine_shaping.js": "32d2bcdb8d3cdca61214d42e0fbf8d364e8c579c0ef73368e2cfc8e62ac02363"
   },
-  "wasmGzipBytes": 786575,
-  "wasmBytes": 2222292,
-  "shapingWasmGzipBytes": 958683,
-  "shapingWasmBytes": 2660958
+  "wasmGzipBytes": 788965,
+  "wasmBytes": 2228684,
+  "shapingWasmGzipBytes": 961259,
+  "shapingWasmBytes": 2666862
 }

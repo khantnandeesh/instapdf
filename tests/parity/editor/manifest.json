@@ -15,7 +15,7 @@
     {"id": "chrome-heading", "file": "chrome-justified-mixed.pdf", "find": "Service Agreement", "replace": "Supply Quote", "expect": ["Supply Quote"], "absent": ["Service Agreement"], "substituted": true},
     {"id": "chrome-rupee-line", "file": "chrome-justified-mixed.pdf", "find": "45,000", "replace": "59,999 Ž", "expect": ["₹ 59,999 Ž — including GST"], "absent": ["45,000"], "substituted": true},
     {"id": "chrome-italic", "file": "chrome-justified-mixed.pdf", "find": "Client", "replace": "Cline", "expect": ["and the Cline on the date"], "absent": ["Client"], "substituted": false},
-    {"id": "chrome-table-cell", "file": "chrome-justified-mixed.pdf", "find": "Item", "replace": "Items sold", "expect": ["Items sold", "Design"], "absent": [], "substituted": false},
+    {"id": "chrome-table-cell", "file": "chrome-justified-mixed.pdf", "find": "Item", "replace": "Items", "expect": ["Items", "Design"], "absent": [], "substituted": false},
     {"id": "shared-form", "file": "shared-xobject.pdf", "find": "Northwind", "replace": "Southwind", "expect": ["Southwind Traders"], "absent": ["Northwind"], "other_pages_keep": ["Northwind Traders"], "substituted": false},
     {"id": "rotated-page", "file": "rotated-90.pdf", "find": "notice", "replace": "bulletin", "expect": ["Landscape bulletin board"], "absent": ["notice"], "substituted": false},
     {"id": "rotated-text", "file": "rotated-90.pdf", "find": "margin", "replace": "footer", "expect": ["Sideways footer note"], "absent": ["margin"], "substituted": false},
