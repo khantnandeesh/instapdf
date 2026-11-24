@@ -372,7 +372,10 @@ impl Engine {
                 if !run_rtl && words >= 2 {
                     return Err(verify(
                         "text-mismatch",
-                        format!("{:?} is a left-to-right run of several words in a right-to-left line, which PDFium reverses", &segment[range.clone()]),
+                        format!(
+                            "{:?} is a left-to-right run of several words in a right-to-left line, which PDFium reverses",
+                            &segment[range.clone()]
+                        ),
                     ));
                 }
             }
