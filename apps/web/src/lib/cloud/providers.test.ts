@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cloudRoutes, configuredProviders, mockActive, providerList, routeFor } from "./providers";
+import { cloudRoutes, cloudSourcesOn, configuredProviders, mockActive, providerList, routeFor } from "./providers";
 
 const keys = { dropboxAppKey: "dbx", googleClientId: "gid", googleApiKey: "gkey", googleAppId: "123", onedriveClientId: "ms" };
 
@@ -26,6 +26,14 @@ describe("cloud providers (flag and keys)", () => {
     expect(cloudRoutes(env)).toEqual(["mock"]);
     expect(routeFor("dropbox", env)).toBe("mock");
     expect(routeFor("dropbox", { flag: "1", production: true, ...keys })).toBe("dropbox");
+  });
+  it("the build's flag (next.config.ts): on only with a provider to show, so the flag without keys builds as off (M-a)", () => {
+    expect(cloudSourcesOn({ flag: "1", production: true })).toBe(false);
+    expect(cloudSourcesOn({ flag: "1", production: true, googleClientId: "gid", googleApiKey: "gkey" })).toBe(false);
+    expect(cloudSourcesOn({ flag: "1", production: true, dropboxAppKey: "dbx" })).toBe(true);
+    expect(cloudSourcesOn({ flag: "1", production: true, mock: "1" })).toBe(true);
+    expect(cloudSourcesOn({ flag: "1", production: false })).toBe(true); // next dev: the mock
+    expect(cloudSourcesOn({ production: true, ...keys })).toBe(false);
   });
   it("names the configured list", () => {
     expect(providerList(["google", "dropbox", "onedrive"])).toBe("Google Drive, Dropbox or OneDrive");

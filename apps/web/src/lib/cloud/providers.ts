@@ -9,12 +9,11 @@
  *   Without it the mock exists only in `next dev` (never in a production build).
  */
 
-export const PROVIDERS = ["google", "dropbox", "onedrive"] as const;
-export type CloudProvider = (typeof PROVIDERS)[number];
+import { PROVIDERS, providerList, providerName, type CloudProvider } from "./names";
+
+export { PROVIDERS, providerList, providerName, type CloudProvider };
 /** A `/cloud/<route>` window. */
 export type CloudRoute = CloudProvider | "mock";
-
-export const providerName: Record<CloudProvider, string> = { google: "Google Drive", dropbox: "Dropbox", onedrive: "OneDrive" };
 /** Short names for the save button ("Save to Drive"). */
 export const providerShort: Record<CloudProvider, string> = { google: "Drive", dropbox: "Dropbox", onedrive: "OneDrive" };
 /** Providers the result screen can save to (no Dropbox: its Saver needs a public URL, spec D-5). */
@@ -70,6 +69,15 @@ export function configuredProviders(env: CloudEnv = readCloudEnv()): CloudProvid
   return PROVIDERS.filter((p) => hasKeys(p, env));
 }
 
+/**
+ * The flag as the build applies it (next.config.ts sets NEXT_PUBLIC_CLOUD_SOURCES from this): on only
+ * when at least one provider is configured. A build with the flag but no provider keys yet (or only
+ * some of a provider's) is then exactly a build without it: no caret, no row, no cloud chunk.
+ */
+export function cloudSourcesOn(env: CloudEnv = readCloudEnv()): boolean {
+  return configuredProviders(env).length > 0;
+}
+
 /** The `/cloud/<route>` pages this build has (for generateStaticParams). */
 export function cloudRoutes(env: CloudEnv = readCloudEnv()): CloudRoute[] {
   if (!cloudEnabled(env)) return [];
@@ -88,10 +96,4 @@ export function isProvider(v: unknown): v is CloudProvider {
 
 export function isRoute(v: unknown): v is CloudRoute {
   return v === "mock" || isProvider(v);
-}
-
-/** "Google Drive, Dropbox or OneDrive". */
-export function providerList(list: readonly CloudProvider[]): string {
-  const names = list.map((p) => providerName[p]);
-  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
 }

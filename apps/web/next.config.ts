@@ -2,6 +2,7 @@ import { join } from "node:path";
 import type { NextConfig } from "next";
 import engine from "./public/engine/manifest.json";
 import { ACCEPTS_BR, ACCEPTS_GZIP } from "./src/lib/editor/accept-encoding";
+import { cloudSourcesOn, configuredProviders, providerList } from "./src/lib/cloud/providers";
 import { baseSecurityHeaders, CLOUD_COOP, contentSecurityPolicy, TOOL_PAGE_COOP } from "./src/lib/security/csp";
 
 /**
@@ -25,16 +26,26 @@ const BR = { type: "header" as const, key: "accept-encoding", value: ACCEPTS_BR 
 const GZIP = { type: "header" as const, key: "accept-encoding", value: ACCEPTS_GZIP };
 const engineFiles = (Object.keys(ENGINE_TYPES) as (keyof typeof ENGINE_TYPES)[]).map((file) => ({ file, source: `/engine/${engine.files[file].slice(0, 16)}/${file}` }));
 
+/**
+ * F23: cloud sources are on only with NEXT_PUBLIC_CLOUD_SOURCES=1 and at least one provider configured
+ * (or the mock). With the flag but no provider, the build is a build without the flag.
+ */
+const CLOUD_ON = cloudSourcesOn();
+
 const nextConfig: NextConfig = {
   output: "standalone",
   // Inlined at build: the site-wide prefetch (EnginePrefetch) needs only these two strings.
   // F23: the cloud flags are always defined (empty when unset), so `process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"`
   // folds to a constant at build time and builds without cloud sources ship none of its code (AC-120).
+  // The flag is the effective one (CLOUD_ON): "1" with no provider configured builds as off.
   env: {
     ...Object.fromEntries(
       engineFiles.flatMap(({ file, source }) => (file in PREFETCH_ENV ? [[PREFETCH_ENV[file as keyof typeof PREFETCH_ENV], source]] : [])),
     ),
-    NEXT_PUBLIC_CLOUD_SOURCES: process.env.NEXT_PUBLIC_CLOUD_SOURCES ?? "",
+    NEXT_PUBLIC_CLOUD_SOURCES: CLOUD_ON ? "1" : "",
+    // The providers this build shows, worked out once here (a tool page's own code reads only this; lib/cloud/names.ts).
+    NEXT_PUBLIC_CLOUD_LIST: CLOUD_ON ? configuredProviders().join(",") : "",
+    NEXT_PUBLIC_CLOUD_NAMES: CLOUD_ON ? providerList(configuredProviders()) : "",
     NEXT_PUBLIC_CLOUD_MOCK: process.env.NEXT_PUBLIC_CLOUD_MOCK ?? "",
   },
   poweredByHeader: false,
@@ -44,7 +55,7 @@ const nextConfig: NextConfig = {
   webpack(config, { webpack }) {
     // F23 off (the default): tool pages get the no-op cloud module, so none of the cloud code ships.
     // The /cloud window page gets a stub too, so its adapters (and MSAL) are not even async chunks.
-    if (process.env.NEXT_PUBLIC_CLOUD_SOURCES !== "1")
+    if (!CLOUD_ON)
       config.plugins.push(
         new webpack.NormalModuleReplacementPlugin(/[\\/]cloud[\\/]tool-cloud$/, join(__dirname, "src/components/cloud/tool-cloud.off.ts")),
         new webpack.NormalModuleReplacementPlugin(/[\\/]cloud[\\/]window[\\/]CloudWindow$/, join(__dirname, "src/components/cloud/window/CloudWindow.off.tsx")),

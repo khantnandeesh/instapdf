@@ -4,14 +4,14 @@
  * provider into <html data-cloud-last>, so the cloud row is laid out right in the first paint
  * (no hydration difference, no layout shift). Every storage access is wrapped.
  */
-import { isProvider, type CloudProvider } from "./providers";
+import type { CloudProvider } from "./names";
 
 export const CLOUD_LAST_KEY = "berrypdf:cloud-last";
 export type LastSource = CloudProvider | "device";
 
 /** A stored value that is one of the configured providers, else null. */
 export function parseLast(raw: string | null | undefined, configured: readonly CloudProvider[]): CloudProvider | null {
-  return isProvider(raw) && configured.includes(raw) ? raw : null;
+  return raw && (configured as readonly string[]).includes(raw) ? (raw as CloudProvider) : null;
 }
 
 export function readLast(configured: readonly CloudProvider[]): CloudProvider | null {
