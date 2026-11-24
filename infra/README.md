@@ -58,6 +58,7 @@ If an org policy (`iam.allowedPolicyMemberDomains`) blocks `allUsers`, the
 | `gh-deploy-staging` | deploy + shift traffic on `web-staging`, push images | impersonable only by `attribute.ref = refs/heads/main` |
 | `gh-deploy-prod` | deploy + shift traffic on `web-prod`, tag images | impersonable only by `attribute.environment = production` (which the condition allows only on `v*` tags) |
 | `web-runtime-<env>` | objectAdmin on `<project>-jobs-<env>`, sign URLs as itself | nothing project-wide |
+| `gh-fonts-publish` | objectAdmin on `<project>-fonts` | impersonable only by `attribute.ref = refs/heads/main` |
 
 Both deployers have `run.developer` on their own service only, `run.viewer` on the
 project (read-only, for gcloud polling), `artifactregistry.writer` on the `instapdf`
@@ -98,6 +99,45 @@ The 2-hour guarantee will come from a scale-to-zero cleaner that **must ship wit
 F6 (server worker), before any upload code goes live**: either Cloud Scheduler
 every 15 minutes calling an authenticated cleanup endpoint on the worker, or a
 Cloud Tasks delete enqueued per upload.
+
+## Fonts bucket
+
+`<project>-fonts` holds the font library (F24): open-licence fonts, their matching index and
+licence texts. It is public and read-only (objects can be read by name, not listed), has no
+lifecycle delete, and is shared by staging and prod because every file is content-addressed.
+Nothing a user uploads ever goes there.
+
+- **Who writes:** only the `Publish font library` workflow (`publish-fonts.yml`), as
+  `gh-fonts-publish`, which has `storage.objectAdmin` on this bucket alone and can be
+  impersonated only from `refs/heads/main`. Run it by hand from main (Actions > Publish font
+  library > Run workflow). A full run takes about 75 minutes: it reads the catalogues, applies
+  the licence gate, downloads each family's package from the npm registry (checked against the
+  registry's sha512, one request a second), builds the index and uploads. With `limit` set it
+  builds only the first N families as a trial and uploads nothing.
+- **Who reads:** the web app. Once Terraform has created the bucket, set the repository variable
+  `FONTS_BUCKET` to its name (`terraform output -raw fonts_bucket`). `deploy-staging.yml` then
+  looks for `manifest.json` in that bucket: when it is there, the image is built with
+  `FONTS_ORIGIN=https://storage.googleapis.com/<bucket>` and the library's own paths under
+  `/fonts/lib/` are passed through to the bucket (each path is spelled out in
+  `apps/web/scripts/font-library/origin.mjs`; nothing else in the bucket, or in any other
+  bucket, is reachable through our address). Browsers still only talk to our own address, so
+  the CSP stays `'self'`. Without the variable, or before the first publish, the image carries
+  the small in-app copy. Prod reuses the staging image.
+- **A publish is live at once**, on staging and prod alike, within five minutes (the cache time
+  of `manifest.json`): both read the same bucket. Font and index files are content-addressed
+  and never deleted, so an older manifest keeps working. The notices page of a running image
+  lists the families of the library as it was when the image was built; deploy again after a
+  publish to refresh it.
+- **To go back:** every published manifest is also kept as `manifests/<UTC time>.json`. Copy the
+  one you want onto `manifest.json`:
+  `gcloud storage cp --cache-control="public, max-age=300" gs://<bucket>/manifests/<time>.json gs://<bucket>/manifest.json`.
+  To go back to the in-app copy, remove the `FONTS_BUCKET` variable and deploy again.
+- **Cost:** about 3 GB of Standard storage (a few rupees a month). Bucket to Cloud Run is the
+  same region (free); Cloud Run to the browser is ordinary egress, and font files are cached for
+  a year by the browser. Reading the bucket directly from outside is billed as egress too
+  (roughly ₹10 a GB), and only the budget alerts watch it: there is no automatic stop yet. If
+  the alerts fire because of it, remove the `allUsers` binding (the site then falls back to
+  errors on `/fonts/lib/`, so also remove `FONTS_BUCKET` and deploy).
 
 ## Budget
 

@@ -10,10 +10,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  web:
+  # Static checks, unit tests and the build (which is also the licence scan).
+  checks:
     runs-on: ubuntu-latest
-    # The e2e suite alone now takes about 20 minutes on a runner (desktop and mobile), so 20 cancelled the job mid-run.
-    timeout-minutes: 40
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -28,30 +28,46 @@ jobs:
       - run: pnpm build
       - name: First-load JS budget
         run: node apps/web/scripts/first-load-budget.mjs apps/web
-      - name: Install Playwright Chromium
-        run: pnpm --filter web exec playwright install --with-deps chromium
-      # AC-46 checks every editor output with qpdf (pikepdf, MPL-2.0) and renders it with pdfium (pypdfium2, Apache-2.0/BSD).
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install pikepdf==10.18.2 pypdfium2==5.14.0
-      - run: pnpm e2e
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report
-          path: apps/web/playwright-report
-          retention-days: 7
 
-  # F23 cloud sources: the same app built with the feature and the mock provider on
-  # (docs/specs/f23-cloud-pickers.md §7). Runs the cloud suite plus the CSP, intake, Merge and
-  # layout specs that branch on the flag, and the phone JS budget (e2e/seo). No provider keys are needed.
-  web-cloud:
+  # The browser tests, in parallel jobs. Each builds the app itself (about a minute), which is
+  # quicker than waiting for another job's build and passing it along.
+  # "serial" holds the tests tagged @serial (wall-clock limits and heavy loads) on one worker.
+  # The "cloud" rows build the app with F23 cloud sources and the mock provider on
+  # (docs/specs/f23-cloud-pickers.md §7) and run the cloud suite plus the specs that branch on the
+  # flag (CSP, intake, Merge, layout, the phone JS budget). No provider keys are needed.
+  e2e:
+    name: e2e (${{ matrix.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     env:
-      NEXT_PUBLIC_CLOUD_SOURCES: "1"
-      NEXT_PUBLIC_CLOUD_MOCK: "1"
+      # Empty outside the cloud rows: the build is then main's, without cloud sources.
+      NEXT_PUBLIC_CLOUD_SOURCES: ${{ matrix.cloud }}
+      NEXT_PUBLIC_CLOUD_MOCK: ${{ matrix.cloud }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: desktop 1/2
+            args: --project desktop --grep-invert @serial --shard 1/2
+          - name: desktop 2/2
+            args: --project desktop --grep-invert @serial --shard 2/2
+          - name: mobile
+            args: --project mobile --grep-invert @serial
+          - name: serial
+            args: --grep @serial --workers 1
+          - name: cloud desktop 1/2
+            cloud: "1"
+            budget: true
+            args: --project desktop --grep-invert @serial --shard 1/2 e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/
+          - name: cloud desktop 2/2
+            cloud: "1"
+            args: --project desktop --grep-invert @serial --shard 2/2 e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/
+          - name: cloud mobile
+            cloud: "1"
+            args: --project mobile --grep-invert @serial e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/
+          - name: cloud serial
+            cloud: "1"
+            args: --grep @serial --workers 1 e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -61,15 +77,37 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      # The same budgets with cloud sources on: production builds have them.
-      - name: First-load JS budget
+      # The same first-load budgets on the cloud build (its own numbers, scripts/first-load-budget.mjs).
+      - name: First-load JS budget (cloud sources on)
+        if: matrix.budget
         run: node apps/web/scripts/first-load-budget.mjs apps/web
       - name: Install Playwright Chromium
         run: pnpm --filter web exec playwright install --with-deps chromium
-      - run: pnpm --filter web exec playwright test e2e/f23/ e2e/q1/csp.spec.ts e2e/f1/ e2e/f3/ e2e/ui/ e2e/seo/ --trace off
+      # AC-46 checks every editor output with qpdf (pikepdf, MPL-2.0) and renders it with pdfium (pypdfium2, Apache-2.0/BSD).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pikepdf==10.18.2 pypdfium2==5.14.0
+      - run: pnpm --filter web exec playwright test --trace off ${{ matrix.args }}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report-cloud
+          name: playwright-report-${{ strategy.job-index }}
           path: apps/web/playwright-report
           retention-days: 7
+
+  # The one check other things wait for: passes only if every job above passed.
+  web:
+    if: always()
+    needs: [checks, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: All web jobs passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          for r in $RESULTS; do
+            [ "$r" = "success" ] || { echo "::error::A web job ended as $r"; exit 1; }
+          done

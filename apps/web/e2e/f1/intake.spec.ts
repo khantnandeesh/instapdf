@@ -188,7 +188,7 @@ test("AC-15: a wrong type next to a PDF shows the error and still loads the PDF"
   await expect(tiles(page)).toHaveCount(3);
 });
 
-test("AC-16: a file over 100 MB is rejected with the cap, within 2 s, without freezing", async ({ page }, info) => {
+test("AC-16: a file over 100 MB is rejected with the cap, within 2 s, without freezing", { tag: "@serial" }, async ({ page }, info) => {
   const huge = info.outputPath("huge.pdf");
   await makeSparseFile(huge, 100 * 1024 * 1024 + 1);
   const started = Date.now();

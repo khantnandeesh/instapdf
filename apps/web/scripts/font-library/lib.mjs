@@ -11,6 +11,12 @@ export const FONT_LICENCES = new Map([
   ["ofl-1.1", "OFL-1.1"],
   ["apache-2.0", "Apache-2.0"],
   ["mit", "MIT"],
+  ["ufl-1.0", "UFL-1.0"],
+  ["cc0-1.0", "CC0-1.0"],
+  // No catalogue we read lists these two yet (TeX Gyre, DejaVu); the ids are here so the gate and
+  // the licence check agree when a source for them is added.
+  ["licenseref-gust-font-license", "LicenseRef-GUST-Font-License"],
+  ["bitstream-vera", "Bitstream-Vera"],
 ]);
 
 /** Canonical SPDX id for a catalogue's licence string, or null when it is not on the list. */

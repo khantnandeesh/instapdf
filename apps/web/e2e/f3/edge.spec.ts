@@ -54,7 +54,7 @@ test.describe("limits and mixed inputs", () => {
     await openMerge(page);
   });
 
-  test("AC-70: with 50 files loaded, Add files with one more says 50 is the cap and adds nothing", async ({ page }) => {
+  test("AC-70: with 50 files loaded, Add files with one more says 50 is the cap and adds nothing", { tag: "@serial" }, async ({ page }) => {
     test.setTimeout(120_000);
     const echo = await readFile(fx("echo.pdf"));
     await pickBuffers(page, Array.from({ length: 50 }, (_, i) => ({ name: `f${String(i + 1).padStart(2, "0")}.pdf`, buffer: echo })));
@@ -147,7 +147,7 @@ test.describe("limits and mixed inputs", () => {
     }
   });
 
-  test("Edge: near the 1,000-page cap: 997 + 3 pages load, one page more is refused, the 1,000-page merge is right", async ({ page }) => {
+  test("Edge: near the 1,000-page cap: 997 + 3 pages load, one page more is refused, the 1,000-page merge is right", { tag: "@serial" }, async ({ page }) => {
     test.setTimeout(180_000);
     await pickBuffers(page, [{ name: "big.pdf", buffer: await bigPdf(997) }]);
     await expect(flow(page)).toHaveAttribute("data-state", "ready", { timeout: 60_000 });
@@ -167,7 +167,7 @@ test.describe("limits and mixed inputs", () => {
     expect(t[999]).toContain("Big 997");
   });
 
-  test("Edge: at 1,000 pages, Blank page and Duplicate are refused with a notice; the output stays at 1,000", async ({ page }) => {
+  test("Edge: at 1,000 pages, Blank page and Duplicate are refused with a notice; the output stays at 1,000", { tag: "@serial" }, async ({ page }) => {
     test.setTimeout(180_000);
     const doc = await PDFDocument.create();
     for (let i = 0; i < 1000; i++) doc.addPage([200, 200]);
