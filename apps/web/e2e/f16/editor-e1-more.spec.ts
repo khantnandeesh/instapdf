@@ -129,10 +129,26 @@ test("AC-6 AC-90: page 1 of a 10-page PDF is visible within a second of picking 
   await page.goto("/edit-pdf");
   // Let the idle prefetch finish, as on a real visit (intent happens before the pick).
   await page.waitForLoadState("networkidle");
-  const t0 = Date.now();
+  // Timed inside the page, from the pick (the input's change event) to page 1 being drawn. Timing
+  // it from the test process added the harness's own polling steps (up to a second apart) and
+  // its round trips to the measurement, which is what failed on main at 1031 and 1066 ms.
+  await page.evaluate(() => {
+    const w = window as unknown as { __pick?: number; __drawn?: number };
+    document.addEventListener("change", (e) => ((e.target as HTMLElement).dataset.testid === "editor-input" ? (w.__pick ??= performance.now()) : 0), true);
+    new MutationObserver(() => {
+      if (w.__drawn === undefined && document.querySelector('[data-testid="page-1"][data-drawn="true"]')) w.__drawn = performance.now();
+    }).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-drawn"] });
+  });
   await page.getByTestId("editor-input").setInputFiles({ name: "ten-page.pdf", mimeType: "application/pdf", buffer });
   await expect(page.getByTestId("page-1")).toHaveAttribute("data-drawn", "true", { timeout: 5000 });
-  expect(Date.now() - t0).toBeLessThan(1000);
+  const took = await page.evaluate(() => {
+    const w = window as unknown as { __pick?: number; __drawn?: number };
+    return w.__pick !== undefined && w.__drawn !== undefined ? w.__drawn - w.__pick : null;
+  });
+  expect(took, "the pick and the first drawn page were both seen").not.toBeNull();
+  info.annotations.push({ type: "first-page", description: `${Math.round(took!)} ms after the pick` });
+  console.log(`[first-page] ${Math.round(took!)} ms after the pick`);
+  expect(took!).toBeLessThan(1000);
 });
 
 test("AC-7 AC-79: zoom by buttons and Ctrl+wheel keeps added objects on their spot", async ({ page }) => {
