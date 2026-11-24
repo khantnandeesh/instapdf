@@ -1,0 +1,40 @@
+{
+ "id": "sejda-t2",
+ "files": [
+  "bravo.pdf",
+  "alpha.pdf",
+  "echo.pdf"
+ ],
+ "opts": "text|Double sided printing;text|Add filename to page footer;text|Based on file names",
+ "net": [
+  "POST https://www.sejda.com/api/files/upload-check 19",
+  "POST https://www.sejda.com/api/files/upload-check 19",
+  "POST https://www.sejda.com/api/files/upload 0",
+  "POST https://www.sejda.com/api/files/upload-check 19",
+  "POST https://www.sejda.com/api/files/upload 0",
+  "POST https://www.sejda.com/api/files/upload 0",
+  "POST https://www.sejda.com/api/tasks 678",
+  "GET https://www.sejda.com/result 0",
+  "GET https://www.sejda.com/js/pages/result.min.js 0",
+  "GET https://www.sejda.com/api/tasks/GOVOPY00-202611240455/change 0"
+ ],
+ "start": "2026-11-24T03:55:06.061Z",
+ "uploadedMs": 6075,
+ "optionsHtml": [
+  "INPUT range name=thumbsSize id=thumbsSizeInput val=165 checked=false label=",
+  "INPUT checkbox name=blankPageIfOdd id= val=true checked=false label=Double sided printing",
+  "INPUT checkbox name=normalizePageSizes id= val=true checked=false label=Make all pages same size",
+  "INPUT checkbox name=firstInputCoverTitle id= val=true checked=false label=First document is a cover/title",
+  "INPUT checkbox name=filenameFooter id= val=true checked=false label=Add filename to page footer"
+ ],
+ "optionsAfter": [
+  "thumbsSize=165",
+  "blankPageIfOdd=true",
+  "normalizePageSizes=false",
+  "firstInputCoverTitle=false",
+  "filenameFooter=true"
+ ],
+ "processMs": 181334,
+ "url": "https://www.sejda.com/merge-pdf#results-GOVOPY00-202611240455",
+ "body": " Sejda All Tools Compress Edit Fill & Sign Merge Delete Pages Crop\nPricing Desktop Log in \nMerge PDF Files Online\nCombine multiple PDFs and images into one\nPages view\nFiles view\n  \n Add Files \n Add Pages \n Reorder \nalpha\nbravo\necho\nPages\n Double sided printing \n Make all pages same size \n First document is a cover/title \n Add filename to page footer \nBookmarks (outline)\nKeep all\nDiscard all\nOne entry each doc\nKeep all, under one entry each doc\nTable of Contents\nNone\nBased on file names\nBased on document titles\nForm Fields\nDiscard \nMerge \nMerge (Rename existing) \nFlatten \nMerge PDF files More options"
+}
