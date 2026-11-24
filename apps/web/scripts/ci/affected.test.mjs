@@ -53,6 +53,11 @@ describe("affected specs", () => {
     expect(groups(r)).not.toContain("f16");
   });
 
+  it("a removed asset runs the full suite; a removed module relies on its importers", () => {
+    expect(pick("apps/web/public/fonts/forms/gone.woff").mode).toBe("full");
+    expect(pick("apps/web/src/tools/editor/gone.ts", "apps/web/src/tools/editor/EditorShell.tsx").mode).toBe("some");
+  });
+
   it("a changed spec runs itself", () => {
     const r = pick("apps/web/e2e/f3/pages.spec.ts");
     expect(r.specs).toContain("e2e/f3/pages.spec.ts");
@@ -86,6 +91,12 @@ describe("affected specs", () => {
 });
 
 describe("shard plan", () => {
+  it("counts @serial tags on the title or in options, also on the next line", () => {
+    const src = 'test("a", async () => {});\ntest("b", { tag: "@serial" }, async () => {});\ntest(\n  "c",\n  { tag: "@serial" },\n  async () => {},\n);\n';
+    expect(testCount(src, true)).toBe(2);
+    expect(testCount(src, false)).toBe(1);
+  });
+
   it("packs heavy files apart", () => {
     const bins = pack(
       [

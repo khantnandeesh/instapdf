@@ -33,6 +33,7 @@ export const IGNORED = [
   ".github/scripts/smoke-test.sh",
   ".github/pull_request_template.md",
   "apps/web/Dockerfile",
+  "apps/web/e2e/timings.json", // only decides how specs are packed into machines
 ];
 /** Repo-relative file patterns that no browser test depends on. */
 const IGNORED_FILES = [
@@ -73,7 +74,7 @@ export const AREAS = {
   f1: ["src/app/rotate-pdf/"],
   f2: ["src/app/page.tsx", "src/app/[slug]/", "src/app/not-found.tsx", "src/app/(info)/", "src/app/rotate-pdf/", "src/app/merge-pdf/"],
   f3: ["src/app/merge-pdf/", "src/app/[slug]/", "src/app/page.tsx"],
-  f16: ["src/app/edit-pdf/", "src/app/page.tsx", "public/engine/"],
+  f16: ["src/app/edit-pdf/", "src/app/page.tsx", "src/app/sitemap.ts", "public/engine/"],
   f23: ["src/app/cloud/", "src/app/cloud-mock/", "src/app/merge-pdf/", "src/app/rotate-pdf/"],
   f24: ["src/app/edit-pdf/", "public/engine/"],
 };
@@ -140,7 +141,7 @@ export function importGraph(webRoot) {
 /** All spec files, repo-relative (apps/web/e2e/...). */
 export function listSpecs(webRoot) {
   return walk(join(webRoot, "e2e"))
-    .filter((f) => f.endsWith(".spec.ts"))
+    .filter((f) => /\.(spec|test)\.[cm]?[jt]sx?$/.test(f)) // Playwright's default testMatch
     .map((f) => relative(webRoot, f).split(sep).join("/"))
     .sort();
 }
@@ -202,7 +203,9 @@ export function selectSpecs({ repoRoot, changed }) {
       continue;
     }
     if (!existsSync(abs)) {
-      // Deleted or renamed: whatever imported it changed too, unless it was dead code.
+      // A removed module: whatever imported it changed too (or the build fails). A removed asset
+      // can be fetched by URL from anywhere, so it runs everything.
+      if (!/^apps\/web\/src\/.*\.(tsx?|mjs|js|css)$/.test(f)) return full(`${f} was removed and may be fetched by URL`);
       reasons.push(`${f}: removed`);
       continue;
     }

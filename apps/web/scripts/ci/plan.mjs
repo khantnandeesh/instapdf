@@ -33,9 +33,9 @@ export const ROW_KINDS = [
   { key: "cloud serial", bucket: "serial", cloud: true, args: ["--grep", "@serial"], workers: 1, maxShards: 3 },
 ];
 
-/** Tests declared in a spec file, by whether their line carries the @serial tag. */
+/** Tests declared in a spec file, by whether their declaration (title and options) has the @serial tag. */
 export const testCount = (src, serial) =>
-  [...src.matchAll(/^\s*test(?:\.(?:only|fixme))?\(.*$/gm)].filter((m) => m[0].includes("@serial") === serial).length +
+  [...src.matchAll(/^\s*test(?:\.(?:only|fixme))?\(([\s\S]*?)\basync\b/gm)].filter((m) => m[1].includes("@serial") === serial).length +
   (serial ? 0 : [...src.matchAll(/^\s*for \(/gm)].length * 2); // a loop of tests: guess a few
 
 /**
@@ -103,20 +103,41 @@ async function gh(path) {
   return res.json();
 }
 
+/** The artifact name a PR run leaves behind: the tree it tested and the main commit it tested on. */
+export const testedName = (tree, base) => `ci-tested-${tree}-${base}`;
+
 /**
- * Push to main: was this exact tree already tested green as a PR? True when the commit came from a
- * merged PR whose head has the same tree (the PR was up to date with main) and CI passed on that head.
+ * Push to main: was this exact tree already tested green, on top of the commit main was at?
+ * True only when all of these hold:
+ * - the commit came from a merged PR, and one of that head's green PR runs left the artifact
+ *   testedName(this tree, previous main commit): it tested this exact tree, with the change
+ *   selected against the very main commit this push sits on;
+ * - that previous main commit's own push run passed (full, or itself skipped this way), so the
+ *   specs the PR didn't select are green on code they share with it.
+ * Anything else (main moved after the PR's run, the previous run red, cancelled or still running)
+ * runs the full suite.
  */
-async function alreadyTested(sha) {
+async function alreadyTested(sha, before) {
+  if (!before || /^0+$/.test(before)) return { ok: false, why: "no previous main commit" };
   const pulls = await gh(`/commits/${sha}/pulls`);
   const pr = pulls.find((p) => p.merged_at && p.base?.ref === "main");
   if (!pr) return { ok: false, why: "no merged PR for this commit" };
-  const head = pr.head.sha;
-  const [mine, theirs] = await Promise.all([gh(`/git/commits/${sha}`), gh(`/git/commits/${head}`)]);
-  if (mine.tree.sha !== theirs.tree.sha) return { ok: false, why: `PR #${pr.number} was behind main when it merged` };
-  const runs = await gh(`/actions/workflows/ci.yml/runs?head_sha=${head}&event=pull_request&status=success&per_page=1`);
-  if (!runs.total_count) return { ok: false, why: `PR #${pr.number} has no green CI run on its head ${head.slice(0, 7)}` };
-  return { ok: true, why: `PR #${pr.number} tested this exact tree (head ${head.slice(0, 7)}, run ${runs.workflow_runs[0].html_url})` };
+  const tree = git("rev-parse", `${sha}^{tree}`);
+  const want = testedName(tree, before);
+  const runs = await gh(`/actions/workflows/ci.yml/runs?head_sha=${pr.head.sha}&event=pull_request&status=success&per_page=20`);
+  let tested = null;
+  for (const run of runs.workflow_runs ?? []) {
+    const arts = await gh(`/actions/runs/${run.id}/artifacts?name=${want}`);
+    if (arts.total_count > 0) {
+      tested = run;
+      break;
+    }
+  }
+  if (!tested) return { ok: false, why: `PR #${pr.number}: no green run tested this tree on ${before.slice(0, 7)} (main moved after its last run)` };
+  const prev = await gh(`/actions/workflows/ci.yml/runs?head_sha=${before}&event=push&per_page=5`);
+  const prevGreen = (prev.workflow_runs ?? []).some((r) => r.conclusion === "success");
+  if (!prevGreen) return { ok: false, why: `the previous main commit ${before.slice(0, 7)} has no green push run yet` };
+  return { ok: true, why: `PR #${pr.number} tested this exact tree on ${before.slice(0, 7)} (${tested.html_url}), and ${before.slice(0, 7)} is green` };
 }
 
 async function main() {
@@ -127,7 +148,9 @@ async function main() {
   let specs = [];
   const notes = [];
 
+  let tested = "";
   if (event === "pull_request") {
+    tested = testedName(git("rev-parse", "HEAD^{tree}"), git("rev-parse", "HEAD^1"));
     if (labels.includes("full-ci")) {
       scope = "full";
       notes.push('label "full-ci"');
@@ -140,14 +163,14 @@ async function main() {
     }
   } else if (event === "push") {
     const sha = process.env.GITHUB_SHA;
-    let tested = { ok: false, why: "check skipped" };
+    let check = { ok: false, why: "check skipped" };
     try {
-      tested = await alreadyTested(sha);
+      check = await alreadyTested(sha, process.env.BEFORE ?? "");
     } catch (e) {
-      tested = { ok: false, why: `could not check (${e.message})` };
+      check = { ok: false, why: `could not check (${e.message})` };
     }
-    notes.push(tested.why);
-    if (tested.ok) scope = "verified";
+    notes.push(check.why);
+    if (check.ok) scope = "verified";
     else {
       const before = process.env.BEFORE ?? "";
       let changed = null;
@@ -165,7 +188,7 @@ async function main() {
   if (scope === "full") specs = listSpecs(webRoot);
 
   const matrix = scope === "verified" || scope === "none" ? [] : buildMatrix(specs, timings);
-  const out = { scope, checks: scope === "verified" ? "skip" : "run", matrix: JSON.stringify({ include: matrix }), e2e: matrix.length > 0 ? "run" : "skip" };
+  const out = { tested, scope, checks: scope === "verified" ? "skip" : "run", matrix: JSON.stringify({ include: matrix }), e2e: matrix.length > 0 ? "run" : "skip" };
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(out).map(([k, v]) => `${k}=${v}\n`).join(""));
 
   const summary = [

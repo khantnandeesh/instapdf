@@ -9,9 +9,11 @@ on:
     - cron: "0 21 * * *" # 02:30 IST
   workflow_dispatch:
 
+# A newer push to a PR cancels its older run. Runs on main are never cancelled: each commit's own
+# result is what the next merge's skip (plan.mjs) relies on.
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -21,8 +23,9 @@ permissions:
 
 jobs:
   # Decides what runs (apps/web/scripts/ci/plan.mjs): on a PR, the browser specs its change can
-  # affect; on main, nothing again when the merged PR was up to date and green (same tree), else
-  # the full suite; nightly, the full suite. Writes the e2e matrix, packed by measured time.
+  # affect; on main, nothing again when a green PR run tested this exact tree on the previous main
+  # commit and that commit is green, else the full suite; nightly or Run workflow, the full suite.
+  # Writes the e2e matrix, packed by measured time.
   plan:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -47,6 +50,17 @@ jobs:
           BEFORE: ${{ github.event.before }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: node apps/web/scripts/ci/plan.mjs
+      # Names the tree this PR run tests and the main commit it sits on. If the run passes and the PR
+      # merges with that same tree on that same commit, main's run finds this and skips the re-run.
+      - name: Record the tested tree
+        if: github.event_name == 'pull_request'
+        run: echo "${{ steps.plan.outputs.tested }}" > tested.txt
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request'
+        with:
+          name: ${{ steps.plan.outputs.tested }}
+          path: tested.txt
+          retention-days: 30
 
   # Static checks, unit tests and the build (which is also the licence scan). Always on PRs.
   checks:
@@ -134,7 +148,7 @@ jobs:
         env:
           FILES: ${{ matrix.files }}
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-report.json
-        run: pnpm --filter web exec playwright test --trace off --reporter=dot,json --pass-with-no-tests ${{ matrix.args }} $FILES
+        run: pnpm --filter web exec playwright test --trace off --reporter=dot,json ${{ matrix.args }} $FILES
       # Durations for e2e/timings.json (scripts/ci/timings.mjs); the nightly full run's are the ones to use.
       - uses: actions/upload-artifact@v4
         if: always()
