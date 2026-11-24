@@ -58,7 +58,7 @@ export function SidePanel({ onGo, onPicked, sheet }: { onGo: (i: number) => void
           </button>
         ))}
       </div>
-      <div role="tabpanel" id={`ed-tabpanel-${tab}`} aria-labelledby={`ed-tab-${tab}`} className="ed-side__body ed-scroll">
+      <div role="tabpanel" id={`ed-tabpanel-${tab}`} aria-labelledby={`ed-tab-${tab}`} className="ed-side__body ed-scroll" data-ip-scroll={sheet ? "overlay" : "rail"}>
         {tab === "pages" && <Thumbs onGo={(i) => (onGo(i), onPicked?.())} sheet={sheet} />}
         {tab === "objects" && <Objects onPicked={onPicked} />}
         {tab === "history" && <HistoryList />}

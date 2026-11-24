@@ -1002,6 +1002,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
           <div
             ref={setScroller}
             className={cx("ed-canvas ed-scroll", dropOn && "ed-canvas--drop")}
+            data-ip-scroll="pages"
             tabIndex={-1}
             aria-label="Pages"
             data-region="canvas"

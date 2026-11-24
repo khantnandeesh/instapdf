@@ -597,6 +597,7 @@
 .ed-canvas {
   position: absolute;
   inset: 0;
+  /* ip-scroll: pages */
   overflow: auto;
   padding: 84px 16px 80px;
   outline: none;
@@ -1145,6 +1146,7 @@
 .ed-side__body {
   flex: 1;
   min-height: 0;
+  /* ip-scroll: rail (overlay inside the phone sheet) */
   overflow: auto;
   padding: 8px;
 }
