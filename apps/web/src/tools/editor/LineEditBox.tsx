@@ -173,6 +173,8 @@ export function LineEditBox({
   const [ink, setInk] = useState<{ left: number; right: number } | null>(null);
   const previewWanted = useRef<string | null>(null);
   const previewBusy = useRef(false);
+  /** Counts requests (and cancels): a result is used only if nothing was asked since. */
+  const previewSeq = useRef(0);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -182,6 +184,7 @@ export function LineEditBox({
   }, []);
   /** Asks the engine for the line with `t`; one request at a time, always for the latest text. */
   const requestPreview = (t: string) => {
+    previewSeq.current++;
     previewWanted.current = t;
     setDrawn((d) => (d && d.current ? { ...d, current: false } : d));
     if (previewBusy.current) return;
@@ -189,18 +192,34 @@ export function LineEditBox({
     void (async () => {
       while (alive.current && previewWanted.current !== null) {
         const asked = previewWanted.current;
+        const seq = previewSeq.current;
         previewWanted.current = null;
         let got: LinePreview | null = null;
         try {
-          got = await ctl.previewLine(text.page, line.id, asked);
+          got = await ctl.previewLine(text.page, line.id, asked, () => alive.current && previewSeq.current === seq);
         } catch {
           // Refused or not drawable: the stand-in text shows what is typed.
         }
-        if (!alive.current || previewWanted.current !== null) continue;
-        setDrawn(got ? { preview: got, current: true } : null);
+        if (!alive.current || previewSeq.current !== seq) continue;
+        if (got) setDrawn({ preview: got, current: true });
+        else {
+          // The stand-in font shows the text, at its own spacing, and the caret goes where the click landed.
+          setDrawn(null);
+          setFit(null);
+          if (caretTodo.current) {
+            caretTodo.current = false;
+            placeCaret();
+          }
+        }
       }
       previewBusy.current = false;
     })();
+  };
+  /** The text no longer needs the engine's glyphs (the joined letters were deleted): the box's own text shows. */
+  const stopPreview = () => {
+    previewSeq.current++;
+    previewWanted.current = null;
+    setDrawn(null);
   };
   const standInRef = useRef(standIn);
   standInRef.current = standIn;
@@ -208,10 +227,15 @@ export function LineEditBox({
   facesRef.current = faces;
 
   const caretTodo = useRef(false);
+  /** Where the caret was put on opening: placed again at the click only while it is still there. */
+  const opened = useRef<{ node: Node | null; offset: number } | null>(null);
   const placeCaret = () => {
     const caret = point && !touched.current && el.current ? caretAt(el.current, point.x, point.y) : null;
     if (!caret) return;
     const sel = getSelection();
+    // The person already moved the caret or selected text (a key, a click, select-all): theirs stands.
+    const at = opened.current;
+    if (sel && at && (!sel.isCollapsed || sel.anchorNode !== at.node || sel.anchorOffset !== at.offset)) return;
     sel?.removeAllRanges();
     sel?.addRange(caret);
   };
@@ -265,6 +289,7 @@ export function LineEditBox({
     const sel = getSelection();
     sel?.removeAllRanges();
     sel?.addRange(end);
+    opened.current = { node: end.startContainer, offset: end.startOffset };
     return () => {
       box.removeEventListener("beforeinput", guard);
       mark([]);
@@ -348,7 +373,8 @@ export function LineEditBox({
   useLayoutEffect(() => {
     const g = glyphsRef.current;
     const input = el.current;
-    if (!drawn || !g || !input?.parentElement) return;
+    // Only glyphs of the text in the box now: a stale drawing would fit the text to the old length.
+    if (!drawn?.current || !g || !input?.parentElement) return;
     const frame = input.parentElement.getBoundingClientRect();
     const r = g.getBoundingClientRect();
     if (!r.width) return;
@@ -360,16 +386,16 @@ export function LineEditBox({
     const diff = r.width - all.getBoundingClientRect().width;
     const t = input.textContent ?? "";
     const spaces = (t.trim().match(/ /g) ?? []).length;
-    if (Math.abs(diff) > 0.5 && Math.abs(diff) < r.width * 0.3)
+    if (Math.abs(diff) > 0.5 && Math.abs(diff) < r.width * 0.5)
       setFit((f) => (spaces ? { word: (f?.word ?? 0) + diff / spaces / scale } : { letter: (f?.letter ?? 0) + diff / Math.max(1, [...t].length) / scale }));
     else if (caretTodo.current) {
       // The caret goes where the click landed once the text lies under the glyphs.
       caretTodo.current = false;
       placeCaret();
     }
-    // Again when a font arrives: the unseen text's length changes with it.
+    // Again when a font arrives or the page is zoomed: the unseen text's length changes with them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawn, faces]);
+  }, [drawn, faces, scale]);
 
   useLayoutEffect(() => {
     if (!fit || !caretTodo.current) return;
@@ -473,7 +499,7 @@ export function LineEditBox({
   const settling = !ready || paperColor === null;
   // A right-to-left line keeps its right end as it grows, as the engine draws it, and the box
   // reaches past the drawn glyphs' ends.
-  if (drawn && line.direction === "rtl") Object.assign(type, { left: "auto", right: 0 });
+  if ((drawn || engineDrawn) && line.direction === "rtl") Object.assign(type, { left: "auto", right: 0 });
   if (drawn && ink && !box.transform) {
     const need = line.direction === "rtl" ? box.width - ink.left + 4 : ink.right + 4;
     type.minWidth = Math.max(box.width, need);
@@ -528,6 +554,7 @@ export function LineEditBox({
           const now = cleaned(e.currentTarget.textContent);
           onChange(now);
           if (pageOrigin && !turned && (needsShaping(line.text) || needsShaping(now))) requestPreview(now);
+          else stopPreview();
           rescan();
         }}
         onCompositionStart={() => (composing.current = true)}
@@ -537,9 +564,14 @@ export function LineEditBox({
           document.execCommand("insertText", false, cleaned(e.clipboardData.getData("text/plain")));
         }}
         onDrop={(e) => e.preventDefault()}
-        onPointerDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          touched.current = true;
+        }}
         onKeyDown={(e) => {
           e.stopPropagation();
+          // A key before the caret was placed at the click (End, an arrow): the person's caret stands.
+          touched.current = true;
           // Enter that finishes a composition (an input method) is not the end of the edit.
           if (e.nativeEvent.isComposing || e.keyCode === 229) return;
           if (e.key === "Enter") {

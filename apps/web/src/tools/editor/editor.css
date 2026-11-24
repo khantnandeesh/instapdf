@@ -1262,6 +1262,12 @@
   overflow: visible;
   pointer-events: none;
 }
+/* Forced colours override the transparent text: the box's own text shows instead of the glyphs. */
+@media (forced-colors: active) {
+  .ed-input__glyphs {
+    display: none;
+  }
+}
 .ed-input {
   box-sizing: border-box;
   width: max-content;

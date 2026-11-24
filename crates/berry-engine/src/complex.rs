@@ -1092,14 +1092,27 @@ pub struct PreviewGlyph {
     pub color: [u8; 3],
 }
 
-/// The outlines and places of a line's glyphs; `None` when a font's program can't be read.
+/// The outlines and places of a line's glyphs; `None` when a font's program can't be read or
+/// the text is stroked (outlines are only filled here).
 fn preview_of(pc: &PageContent, glyphs: &[usize]) -> Option<LinePreview> {
     let mut out = LinePreview::default();
     let mut seen: HashMap<(usize, u32), usize> = HashMap::new();
+    // Horizontal over vertical em per font, from a glyph that advances: zero-advance marks
+    // (virama, harakat) take their base letters' scaling.
+    let mut stretch: HashMap<usize, f64> = HashMap::new();
     for &gi in glyphs {
         let g = &pc.glyphs[gi];
-        if g.render_mode == 3 || g.render_mode == 7 {
-            continue;
+        let w = pc.fonts[g.font].width(g.code);
+        if w > 0.0 && g.width > 0.0 && g.size > 0.0 {
+            stretch.entry(g.font).or_insert(g.width * 1000.0 / w / g.size);
+        }
+    }
+    for &gi in glyphs {
+        let g = &pc.glyphs[gi];
+        match g.render_mode {
+            3 | 7 => continue,
+            1 | 2 | 5 | 6 => return None,
+            _ => {}
         }
         let font = &pc.fonts[g.font];
         let path = match seen.get(&(g.font, g.code)) {
@@ -1115,7 +1128,8 @@ fn preview_of(pc: &PageContent, glyphs: &[usize]) -> Option<LinePreview> {
             continue;
         }
         let w = font.width(g.code);
-        let width = if w > 0.0 && g.width > 0.0 { g.width * 1000.0 / w } else { g.size };
+        let width =
+            if w > 0.0 && g.width > 0.0 { g.width * 1000.0 / w } else { g.size * stretch.get(&g.font).copied().unwrap_or(1.0) };
         out.glyphs.push(PreviewGlyph {
             path,
             x: g.origin.0,
@@ -1133,10 +1147,19 @@ impl Engine {
     /// How the line would look with `text`: the edit is made, read and rolled back, and every
     /// glyph the line then draws is returned with its outline. Complex-script lines only.
     pub fn preview_line(&mut self, page: usize, line_id: usize, text: &str) -> Result<LinePreview> {
-        self.dry = true;
+        /// Clears the flag however the edit ends.
+        struct Dry<'a>(&'a mut Engine);
+        impl Drop for Dry<'_> {
+            fn drop(&mut self) {
+                self.0.dry = false;
+            }
+        }
         self.preview = None;
-        let r = self.replace_line(page, line_id, text);
-        self.dry = false;
+        let r = {
+            let d = Dry(self);
+            d.0.dry = true;
+            d.0.replace_line(page, line_id, text)
+        };
         if let Some(p) = self.preview.take() {
             return Ok(p);
         }

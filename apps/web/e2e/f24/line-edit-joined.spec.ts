@@ -72,7 +72,10 @@ async function textOnly(input: Locator) {
 
 const near = (a: Awaited<ReturnType<typeof ink>>, b: Awaited<ReturnType<typeof ink>>, what: string) => {
   expect(b.count, `${what}: ink`).toBeGreaterThan(50);
-  for (const k of ["left", "right", "top", "bottom"] as const) expect(Math.abs(a[k] - b[k]), `${what}: ${k}`).toBeLessThanOrEqual(1.5);
+  // Along the line the page's raster and the drawn outlines are smoothed differently at the ends
+  // (as in line-edit-font.spec.ts); across it they must agree closely.
+  for (const k of ["left", "right"] as const) expect(Math.abs(a[k] - b[k]), `${what}: ${k}`).toBeLessThanOrEqual(2.5);
+  for (const k of ["top", "bottom"] as const) expect(Math.abs(a[k] - b[k]), `${what}: ${k}`).toBeLessThanOrEqual(1.5);
   expect(a.count / b.count, `${what}: amount of ink`).toBeGreaterThan(0.8);
   expect(a.count / b.count, `${what}: amount of ink`).toBeLessThan(1.25);
 };
@@ -97,8 +100,10 @@ for (const [file, starts, typed] of CASES) {
     const before = await ink(page, await settled(page, clip));
 
     await line.click();
+    // The first joined-script line loads the shaping build, then opens.
+    await expect(page.getByTestId("editor-shell")).toHaveAttribute("data-shaping", "ready", { timeout: 30_000 });
     const input = page.getByTestId("line-input");
-    await expect(input).toBeFocused();
+    await expect(input).toBeFocused({ timeout: 15_000 });
     await expect(input).toHaveAttribute("data-drawn", "engine", { timeout: 20_000 });
     await expect(page.getByTestId("line-glyphs")).toBeVisible();
     await textOnly(input);
@@ -122,6 +127,7 @@ test("an edit the engine refuses shows the typed text in a font that joins lette
   const line = lineStarting(page, "مرحبا");
   const text = (await line.getAttribute("data-text"))!;
   await line.click();
+  await expect(page.getByTestId("editor-shell")).toHaveAttribute("data-shaping", "ready", { timeout: 30_000 });
   const input = page.getByTestId("line-input");
   await expect(input).toHaveAttribute("data-drawn", "engine", { timeout: 20_000 });
   await page.keyboard.press("End");
