@@ -298,7 +298,7 @@ function fromTrueType(program: EmbeddedProgram, family: string): Uint8Array | nu
   if (numLong > 0 && hmtx.length >= numLong * 4 + (numGlyphs - numLong) * 2) {
     const hv = view(hmtx);
     const declared = new Map<number, number>();
-    for (const g of program.glyphs) if (g.gid > 0 && g.gid < numGlyphs && g.width > 0 && !declared.has(g.gid)) declared.set(g.gid, Math.round((g.width * unitsPerEm) / 1000));
+    for (const g of program.glyphs) if (g.gid > 0 && g.gid < numGlyphs && g.width > 0 && !declared.has(g.gid)) declared.set(g.gid, Math.min(0xffff, Math.round((g.width * unitsPerEm) / 1000)));
     const last = hv.getUint16((numLong - 1) * 4);
     const table = new Writer();
     for (let gid = 0; gid < numGlyphs; gid++) {

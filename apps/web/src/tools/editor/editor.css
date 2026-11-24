@@ -1302,8 +1302,31 @@
   top: auto;
   bottom: calc(100% + 5px);
 }
-/* A short line with text under it: the hint stands after the box, on the line's own row (its
-   place is set in LineEditBox). */
+/* On a phone: one slim row above the tool dock, on the dock's own surface, never over the page's text. */
+.ed-hint-slot {
+  display: contents;
+}
+.ed-input__hint--docked {
+  position: static;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-height: 40px;
+  justify-content: space-between;
+  padding: 4px 6px 4px 14px;
+  font-size: 13px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  pointer-events: auto;
+  animation: none;
+}
+.ed-input__hint--docked > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ed-input__hint--docked .ed-input__pick {
+  padding: 5px 12px;
+  font-size: 13px;
+}
 .ed-input__chars {
   font-weight: 700;
 }

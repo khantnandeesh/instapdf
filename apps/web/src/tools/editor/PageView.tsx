@@ -618,8 +618,9 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
               if (l?.read_only_reason === "needs-shaping") ctl.wantShapedLine(src, [(l.bbox.x0 + l.bbox.x1) / 2, (l.bbox.y0 + l.bbox.y1) / 2]);
               else store.set({ lineEdit: { src, line, text: t }, selection: [] });
             }}
-            onChange={(t) => store.set((s) => ({ lineEdit: s.lineEdit ? { ...s.lineEdit, text: t } : null }))}
-            onCommit={() => void ctl.commitLine()}
+            // Changed text is new text: it is tried when the box is left, like any edit.
+            onChange={(t) => store.set((s) => ({ lineEdit: s.lineEdit ? { ...s.lineEdit, text: t, failed: false } : null }))}
+            onCommit={(asked) => void ctl.commitLine(asked)}
             onCancel={() => {
               const e = store.get().lineEdit;
               if (e) ctl.dropPendingEdit(e.src, e.line);

@@ -664,6 +664,11 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       if (s.busy === "save") return;
       if (s.editing) store.set({ editing: null });
       if (s.lineEdit) await ctl.commitLine();
+      // A line whose text couldn't be saved is still open: the file would be made without it.
+      if (store.get().lineEdit?.failed) {
+        ctl.toast({ text: "The line you’re editing couldn’t be saved, so it isn’t in the file yet. Change it, or press Escape to leave it as it was.", tone: "danger" });
+        return;
+      }
       // Added text with characters no font can print: say so before the file is made (AC-75).
       if (!force && !s.readOnly) {
         const { chars, unchecked } = await missingInObjects(H.current(store.get().history).objects);
@@ -1351,6 +1356,8 @@ function ToastView({ toast, onDone, children }: { toast: Toast | null; onDone: (
     <div className="ed-toasts">
       {/* The font notice has controls and is announced once by the controller: not in the live region. */}
       {children}
+      {/* On a phone the line-edit hint (a missing letter, fonts for it) is docked here, off the page. */}
+      <div className="ed-hint-slot" data-line-hint-slot />
       <div className="ed-toasts__live" role="status" aria-live="polite">
       {toast && (
         <div key={toast.key} className={cx("ed-toast ed-glass", `ed-toast--${toast.tone}`)} data-testid="editor-notice">
@@ -1359,6 +1366,8 @@ function ToastView({ toast, onDone, children }: { toast: Toast | null; onDone: (
             <button
               type="button"
               className="ed-toast__act"
+              // A line being edited keeps the caret: the action decides what happens to it.
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 toast.action!.run();
                 onDone();

@@ -18,8 +18,7 @@ import { LineEditBox } from "./LineEditBox";
 import { dominantHex } from "@/lib/editor/markup";
 
 
-/** Height the hint under an edit box takes, with its gap (CSS pixels). */
-/** How far above and below the box the hint can reach. */
+/** How far above and below the box the hint can reach (CSS pixels). */
 const HINT_ROOM = 36;
 
 export function LineLayer({
@@ -47,7 +46,8 @@ export function LineLayer({
   active: boolean;
   onEdit: (line: number, text: string) => void;
   onChange: (text: string) => void;
-  onCommit: () => void;
+  /** `asked`: Enter was pressed (the box was not just left). */
+  onCommit: (asked: boolean) => void;
   onCancel: () => void;
 }) {
   const cancelled = useRef(false);
@@ -225,13 +225,13 @@ export function LineLayer({
           point={point.current}
           paper={() => paperOf(editing.line)}
           onChange={onChange}
-          onCommit={() => {
+          onCommit={(asked) => {
             // An edit opened again by the editor (it couldn't be saved) has no click to go to.
             point.current = null;
             if (cancelled.current) {
               cancelled.current = false;
               onCancel();
-            } else onCommit();
+            } else onCommit(asked);
           }}
           onCancel={() => {
             cancelled.current = true;

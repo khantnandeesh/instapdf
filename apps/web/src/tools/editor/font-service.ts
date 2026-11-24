@@ -56,7 +56,7 @@ export function loadFontList(): void {
 }
 
 /** How many of a document's fonts are matched, in the order the file lists them (a file with more is rare; the rest are listed without a match). */
-const MATCH_LIMIT = 200;
+const MATCH_LIMIT = 100;
 
 async function matchOf(info: FontInfo): Promise<FontMatch[]> {
   if (info.object == null) return [];

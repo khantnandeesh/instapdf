@@ -141,6 +141,8 @@ Fixture `chrome-justified-mixed.pdf`; task: open the first body line, type " for
 
 None on record. M2 is therefore counted as a loss.
 
+Note from the lead (2026-11-24, after this evaluation): AC-296 is P1 and deferred to a follow-up; it does not block the re-evaluation.
+
 Note from the lead (2026-11-24, after this evaluation): M2 is owned by the cloud pickers feature (F23). Its code merged in #32 and stays behind a flag until the owner creates the OAuth apps, so it is blocked on owner setup, not waived, and is not F24's to fix.
 
 ## Harness notes

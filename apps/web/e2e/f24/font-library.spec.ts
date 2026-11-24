@@ -214,10 +214,12 @@ test.describe("font library (desktop)", () => {
     await expect(page.getByTestId("line-missing-none")).toHaveText("No font here has it.");
     await expect(page.getByTestId("line-missing-own")).toHaveText("Use your own font");
     // Leaving the box with the same text doesn't try again or drop it.
-    const notices = await page.getByTestId("editor-notice").count();
+    const tries: string[] = [];
+    page.on("console", (m) => m.text().includes("edit not applied") && tries.push(m.text()));
     await input.evaluate((el) => (el as HTMLElement).blur());
+    await page.waitForTimeout(500);
     await expect(input).toHaveText(`${before} \uE123`);
-    expect(await page.getByTestId("editor-notice").count()).toBe(notices);
+    expect(tries).toHaveLength(0);
     // Without the character the edit goes through; Escape would have given the line back as it was.
     await input.focus();
     await page.keyboard.press("End");

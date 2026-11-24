@@ -10,6 +10,7 @@
  * is never blocked.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import type { FontInfo, PageText } from "@/lib/editor/berry-engine";
 import { cssFamily, faceOf, fileFor } from "@/lib/editor/fonts";
 import { isComplex } from "@/lib/editor/shaping";
@@ -18,6 +19,7 @@ import { foldName } from "@/lib/font-library/client";
 import { cx } from "@/components/ui/cx";
 import { useCtl } from "./context";
 import { docFace, type DocFace } from "./doc-face";
+import { useStore } from "./store";
 import { USER_FONT_ACCEPT } from "@/lib/font-library/user-fonts";
 import { addUserFontFile, chosenStandIn, fontLabel, getFontState, standInCandidates } from "./font-service";
 
@@ -134,10 +136,14 @@ export function LineEditBox({
   /** The page's colour under the line. */
   paper: () => string;
   onChange: (text: string) => void;
-  onCommit: () => void;
+  onCommit: (asked: boolean) => void;
   onCancel: () => void;
 }) {
   const ctl = useCtl();
+  // On a phone the page's text is smaller than the hint: it is docked above the tools instead of floating over the page.
+  const wide = useStore(ctl.store, (s) => s.wide);
+  const [slot, setSlot] = useState<Element | null>(null);
+  useEffect(() => setSlot(wide ? null : document.querySelector("[data-line-hint-slot]")), [wide]);
   const el = useRef<HTMLDivElement>(null);
   const touched = useRef(false);
   const composing = useRef(false);
@@ -171,6 +177,8 @@ export function LineEditBox({
   /** The file chooser for "Use your own font" is open: the box losing focus to it is not the end of the edit. */
   const choosing = useRef(false);
   const ownFile = useRef<HTMLInputElement>(null);
+  /** Enter ended the edit (not a click elsewhere). */
+  const entered = useRef(false);
   const [ownError, setOwnError] = useState("");
   /** Counts fonts the person added while this box is open: the choices are looked up again. */
   const [added, setAdded] = useState(0);
@@ -445,6 +453,75 @@ export function LineEditBox({
   const hintLeft = side === "beside" ? besideLeft : underLeft;
   const shown = standIn && missing && standIn.font === missing.font ? standIn : null;
 
+  const docked = !!slot;
+  const hint = missing ? (
+        <div
+          id={hintId}
+          className={docked ? "ed-input__hint ed-input__hint--docked ed-glass" : cx("ed-input__hint", side !== "under" && `ed-input__hint--${side}`)}
+          ref={(node) => {
+            // Its real size (it depends on the fonts offered) decides which side is clear.
+            if (node && !docked && (Math.abs(node.offsetWidth - hintSize.w) > 1 || Math.abs(node.offsetHeight - hintSize.h) > 1)) setHintSize({ w: node.offsetWidth, h: node.offsetHeight });
+          }}
+          style={docked ? undefined : side === "beside" ? { left: hintLeft, top: besideTop - box.top } : { left: hintLeft }}
+          data-testid="line-missing"
+          data-side={docked ? "docked" : side}
+        >
+          <span>
+            {docked ? "Not in " : "Not in this font: "}
+            <span className="ed-input__chars">{missing.chars.slice(0, 8).join(" ")}</span>
+          </span>
+          {shown && shown.ids.length > 0 && (
+            <span role="group" aria-label="Font for these characters" className="ed-input__picks">
+              {shown.ids.slice(0, docked ? 2 : CHOICES).map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={shown.picked === id}
+                  data-testid="line-missing-font"
+                  data-font-id={id}
+                  className={cx("ed-input__pick", shown.picked === id && "ed-input__pick--on")}
+                  style={{ fontFamily: `"${cssFamily(id)}", inherit` }}
+                  // The box keeps the caret: picking a font never ends the edit.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => {
+                    const font = text.fonts[shown.font];
+                    if (!font || shown.picked === id) return el.current?.focus({ preventScroll: true });
+                    // Another font may be able to save what the last one couldn't.
+                    ctl.retryable();
+                    void ctl.pickStandIn(familyKey(font), id);
+                    setStandIn({ ...shown, picked: id });
+                    el.current?.focus({ preventScroll: true });
+                  }}
+                >
+                  {fontLabel(id)}
+                </button>
+              ))}
+            </span>
+          )}
+          {shown && shown.ids.length === 0 && (
+            <span className="ed-input__picks">
+              {(!docked || ownError) && <span data-testid="line-missing-none">{ownError || "No font here has it."}</span>}
+              <button
+                type="button"
+                data-testid="line-missing-own"
+                className="ed-input__pick"
+                onMouseDown={(e) => e.preventDefault()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => {
+                  choosing.current = true;
+                  // Back from the chooser, with or without a file: leaving the box ends the edit again.
+                  window.addEventListener("focus", () => setTimeout(() => (choosing.current = false), 500), { once: true });
+                  ownFile.current?.click();
+                }}
+              >
+                Use your own font
+              </button>
+            </span>
+          )}
+        </div>
+  ) : null;
+
   return (
     <div
       className="absolute"
@@ -452,12 +529,25 @@ export function LineEditBox({
       // Leaving the box and its hint ends the edit; moving between them (Tab to a font) does not.
       onBlur={(e) => {
         if (choosing.current) return;
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onCommit();
+        const to = e.relatedTarget as Element | null;
+        if (e.currentTarget.contains(to) || to?.closest?.("[data-line-hint-slot]")) return;
+        const asked = entered.current;
+        entered.current = false;
+        onCommit(asked);
       }}
       onKeyDown={(e) => {
         if (e.target === el.current) return;
         // Keys on the hint's buttons are theirs alone (no editor shortcuts); Escape still cancels.
         e.stopPropagation();
+        // From the ends of the docked hint, Tab comes back to the box.
+        if (e.key === "Tab" && slot) {
+          const all = [...slot.querySelectorAll<HTMLElement>("button")];
+          if (e.target === (e.shiftKey ? all[0] : all[all.length - 1])) {
+            e.preventDefault();
+            el.current?.focus({ preventScroll: true });
+          }
+          return;
+        }
         if (e.key !== "Escape") return;
         onCancel();
         (e.target as HTMLElement).blur();
@@ -487,7 +577,10 @@ export function LineEditBox({
         data-open={[paperInset.top > 0 && "top", paperInset.bottom > 0 && "bottom"].filter(Boolean).join(" ")}
         className={cx("ed-input absolute left-0 top-0 rounded-[4px]", settling && "ed-input--settling")}
         style={type}
+        // Back in the box (a file chooser closed without telling): leaving it ends the edit again.
+        onFocus={() => (choosing.current = false)}
         onInput={(e) => {
+          choosing.current = false;
           touched.current = true;
           onChange(cleaned(e.currentTarget.textContent));
           rescan();
@@ -504,8 +597,14 @@ export function LineEditBox({
           e.stopPropagation();
           // Enter that finishes a composition (an input method) is not the end of the edit.
           if (e.nativeEvent.isComposing || e.keyCode === 229) return;
-          if (e.key === "Enter") {
+          // The docked hint is elsewhere in the page: Tab goes to its fonts all the same.
+          const pick = e.key === "Tab" && !e.shiftKey ? slot?.querySelector<HTMLElement>("button") : null;
+          if (pick) {
             e.preventDefault();
+            pick.focus();
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            entered.current = true;
             e.currentTarget.blur();
           } else if (e.key === "Escape") {
             e.preventDefault();
@@ -514,72 +613,7 @@ export function LineEditBox({
           }
         }}
       />
-      {missing && (
-        <div
-          id={hintId}
-          className={cx("ed-input__hint", side !== "under" && `ed-input__hint--${side}`)}
-          ref={(node) => {
-            // Its real size (it depends on the fonts offered) decides which side is clear.
-            if (node && (Math.abs(node.offsetWidth - hintSize.w) > 1 || Math.abs(node.offsetHeight - hintSize.h) > 1)) setHintSize({ w: node.offsetWidth, h: node.offsetHeight });
-          }}
-          style={side === "beside" ? { left: hintLeft, top: besideTop - box.top } : { left: hintLeft }}
-          data-testid="line-missing"
-          data-side={side}
-        >
-          <span>
-            Not in this font: <span className="ed-input__chars">{missing.chars.slice(0, 8).join(" ")}</span>
-          </span>
-          {shown && shown.ids.length > 0 && (
-            <span role="group" aria-label="Font for these characters" className="ed-input__picks">
-              {shown.ids.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={shown.picked === id}
-                  data-testid="line-missing-font"
-                  data-font-id={id}
-                  className={cx("ed-input__pick", shown.picked === id && "ed-input__pick--on")}
-                  style={{ fontFamily: `"${cssFamily(id)}", inherit` }}
-                  // The box keeps the caret: picking a font never ends the edit.
-                  onMouseDown={(e) => e.preventDefault()}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => {
-                    const font = text.fonts[shown.font];
-                    if (!font || shown.picked === id) return el.current?.focus({ preventScroll: true });
-                    // Another font may be able to save what the last one couldn't.
-                    ctl.failedEdit = null;
-                    void ctl.pickStandIn(familyKey(font), id);
-                    setStandIn({ ...shown, picked: id });
-                    el.current?.focus({ preventScroll: true });
-                  }}
-                >
-                  {fontLabel(id)}
-                </button>
-              ))}
-            </span>
-          )}
-          {shown && shown.ids.length === 0 && (
-            <span className="ed-input__picks">
-              <span data-testid="line-missing-none">{ownError || "No font here has it."}</span>
-              <button
-                type="button"
-                data-testid="line-missing-own"
-                className="ed-input__pick"
-                onMouseDown={(e) => e.preventDefault()}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => {
-                  choosing.current = true;
-                  // Back from the chooser, with or without a file: leaving the box ends the edit again.
-                  window.addEventListener("focus", () => setTimeout(() => (choosing.current = false), 500), { once: true });
-                  ownFile.current?.click();
-                }}
-              >
-                Use your own font
-              </button>
-            </span>
-          )}
-        </div>
-      )}
+      {missing && (docked ? createPortal(hint, slot!) : hint)}
       <input
         ref={ownFile}
         type="file"
@@ -596,7 +630,7 @@ export function LineEditBox({
             (out) => {
               if ("error" in out) return setOwnError(out.error);
               setOwnError("");
-              ctl.failedEdit = null;
+              ctl.retryable();
               setAdded((n) => n + 1);
             },
             () => setOwnError("That font couldn’t be read."),

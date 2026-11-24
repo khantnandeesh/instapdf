@@ -115,7 +115,7 @@ for (const [file, text, faces] of SAME_PLACE) {
   });
 }
 
-test("nothing of the edit box (paper, ring) covers the line below it, at any size (tight leading)", async ({ page }) => {
+test("nothing of the edit box (paper, ring) covers the line below it, at any size (tight leading)", async ({ page }, info) => {
   await open(page, "chrome-justified-mixed.pdf");
   const next = lineWith(page, "and it stays in force");
   const nb = (await next.boundingBox())!;
@@ -144,11 +144,37 @@ test("nothing of the edit box (paper, ring) covers the line below it, at any siz
   // And the hint goes over the box here, because text lies right under it.
   await page.keyboard.press("End");
   await page.keyboard.type("ř");
-  await expect(page.getByTestId("line-missing")).toHaveAttribute("data-side", "over");
-  const hb = (await page.getByTestId("line-missing").boundingBox())!;
-  expect(hb.y + hb.height).toBeLessThanOrEqual((await input.boundingBox())!.y);
-  expect(hb.height).toBeLessThanOrEqual(30);
-  expect(await page.getByTestId("line-missing").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(255, 255, 255)");
+  const hb0 = page.getByTestId("line-missing");
+  if (info.project.name === "desktop") {
+    await expect(hb0).toHaveAttribute("data-side", "over");
+    const hb = (await hb0.boundingBox())!;
+    expect(hb.y + hb.height).toBeLessThanOrEqual((await input.boundingBox())!.y);
+    expect(hb.height).toBeLessThanOrEqual(30);
+    // It stays inside the window on a full-width line.
+    expect(hb.x).toBeGreaterThanOrEqual(0);
+    expect(hb.x + hb.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  } else {
+    // On a phone the hint never floats over the page: it is one slim row above the tool dock.
+    await expect(hb0).toHaveAttribute("data-side", "docked");
+    const hb = (await hb0.boundingBox())!;
+    const dock = (await page.getByTestId("dock").boundingBox())!;
+    expect(hb.y + hb.height).toBeLessThanOrEqual(dock.y);
+    expect(hb.x).toBeGreaterThanOrEqual(0);
+    expect(hb.x + hb.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    expect(hb.height).toBeLessThanOrEqual(48);
+    // It covers no line of the page's text, and at most two fonts are offered.
+    for (const l of await page.getByTestId("line").all()) {
+      const b = await l.boundingBox();
+      if (b) expect(b.y + b.height <= hb.y || b.y >= hb.y + hb.height).toBe(true);
+    }
+    expect(await page.getByTestId("line-missing-font").count()).toBeLessThanOrEqual(2);
+    await expect(hb0).toContainText("Not in ř");
+    // Picking a font there keeps the edit going.
+    await page.getByTestId("line-missing-font").last().tap();
+    await expect(input).toHaveCount(1);
+    await expect(page.getByTestId("line-missing-font").last()).toHaveAttribute("aria-pressed", "true");
+  }
+  if (info.project.name === "desktop") expect(await hb0.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(255, 255, 255)");
 });
 
 test("each part of a line is drawn in the font and colour it has in the PDF, never in another font", async ({ page }) => {
@@ -232,8 +258,7 @@ test("a typed letter the font lacks is marked as typed, with fonts to draw it; p
   await expect(input).toHaveAttribute("data-missing", /ř/);
   const hint = page.getByTestId("line-missing");
   await expect(hint).toBeVisible();
-  await expect(hint).toContainText("Not in this font");
-  await expect(hint).toContainText("ř");
+  await expect(hint).toContainText(/Not in (this font: )?ř/);
   expect(await page.evaluate(() => (CSS.highlights.get("ed-miss")?.size ?? 0) > 0)).toBe(true);
   expect(await input.getAttribute("aria-describedby")).toBe(await hint.getAttribute("id"));
 
@@ -374,11 +399,13 @@ test("the list of lines never points at the line that is open in the box", async
   const list = page.getByRole("listbox").first();
   const input = await edit(page, lineWith(page, "in full"));
   // The option is out of the list while its box is open: no reference to an element that isn't there.
-  const ref = await list.getAttribute("aria-activedescendant");
-  expect(ref === null || (await page.locator(`[id="${ref}"]`).count()) === 1).toBe(true);
+  await expect(list).not.toHaveAttribute("aria-activedescendant", /.*/);
   await input.press("Escape");
+  // Back in the list, the line is pointed at again.
+  await list.focus();
   const after = await list.getAttribute("aria-activedescendant");
-  expect(after === null || (await page.locator(`[id="${after}"]`).count()) === 1).toBe(true);
+  expect(after).toBeTruthy();
+  await expect(page.locator(`[id="${after}"]`)).toHaveCount(1);
 });
 
 test("AC-298: a line in an embedded CFF font (Type 1C) opens in that font, not a system one", async ({ page }) => {
@@ -404,10 +431,32 @@ test("text typed past where the page clips its content is refused, kept in the b
   await expect(input).toHaveText(`${text} and then the date`);
   await expect(input).toBeFocused();
   await expect(lineWith(page, "and then the date")).toHaveCount(0);
-  // The message's own way out takes the kept text and closes the box.
+  // Download doesn't quietly make a file without the line that is still open.
+  await page.getByRole("button", { name: "Download PDF" }).click();
+  await expect(notice).toContainText("couldn’t be saved, so it isn’t in the file yet");
+  await expect(input).toHaveText(`${text} and then the date`);
+  // Enter asks again (and is told again); leaving the box does not.
+  const tries: string[] = [];
+  page.on("console", (m) => m.text().includes("edit not applied") && tries.push(m.text()));
+  await input.evaluate((el) => (el as HTMLElement).blur());
+  await page.waitForTimeout(500);
+  expect(tries).toHaveLength(0);
+  await input.focus();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => tries.length).toBe(1);
+  await expect(notice).toContainText("would run past the page edge");
+  await expect(input).toBeFocused();
+  // The text is changed in the box, then the message's own way out is taken: the newer text
+  // replaces the line, the box closes, and no second edit of the line is made.
+  await page.keyboard.press("End");
+  await page.keyboard.type(" shown");
   await notice.getByRole("button", { name: "Replace with new text" }).click();
   await expect(input).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /^Undo/ }).first()).toBeEnabled();
+  await expect(page.locator('[data-kind="text"]')).toContainText("and then the date shown");
+  await expect(page.locator('[data-kind="whiteout"]')).toHaveCount(1);
+  await page.waitForTimeout(500);
+  expect(tries).toHaveLength(1);
+  await expect(lineWith(page, "and then the date")).toHaveCount(0);
 });
 
 test("a PDF's bare CFF font program becomes a font the browser loads, with the PDF's widths", async ({ page }) => {
