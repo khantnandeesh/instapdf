@@ -185,6 +185,29 @@ describe("TIFF structure walker (review fix)", () => {
     expect(Date.now() - started).toBeLessThan(1000);
     expect(process.memoryUsage().rss - before).toBeLessThan(100 * 1024 * 1024);
   });
+  it("inflates only the strips the image uses (many offsets at one blob)", async () => {
+    const blob = deflateSync(Buffer.alloc(16 * 1024 * 1024), { level: 9 });
+    const strips = 200;
+    const entries: [number, number, number, number][] = [[256, 3, 1, 4000], [257, 3, 1, 4000], [258, 3, 1, 8], [259, 3, 1, 8], [262, 3, 1, 1], [273, 4, strips, 0], [277, 3, 1, 1], [278, 3, 1, 4000], [279, 4, strips, 0]];
+    const head = ifdTiff(entries, 0).length;
+    const offArr = head, cntArr = head + strips * 4, data = head + strips * 8;
+    entries[5][3] = offArr;
+    entries[8][3] = cntArr;
+    const b = ifdTiff(entries, 0, strips * 8 + blob.length);
+    const v = new DataView(b.buffer);
+    for (let i = 0; i < strips; i++) {
+      v.setUint32(offArr + i * 4, data, true);
+      v.setUint32(cntArr + i * 4, blob.length, true);
+    }
+    b.set(blob, data);
+    const file = readTiff(b) as TiffFile;
+    expect(file.frames).toHaveLength(1);
+    const before = process.memoryUsage().rss;
+    const started = Date.now();
+    await decodeTiffFrame(b, file, 0);
+    expect(Date.now() - started).toBeLessThan(3000);
+    expect(process.memoryUsage().rss - before).toBeLessThan(300 * 1024 * 1024);
+  });
   it("still decodes an honest deflate TIFF, predictor included", async () => {
     // 4x2 gray, horizontal predictor: rows store differences.
     const rows = [10, 20, 30, 40, 5, 5, 5, 5];

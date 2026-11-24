@@ -222,12 +222,15 @@ export function inflateSegments(bytes: Uint8Array, ifd: TiffIfd, frame: TiffFram
   const tiled = ifd.t322 !== undefined;
   const offKey = ifd.t273 !== undefined ? "t273" : "t324";
   const cntKey = ifd.t279 !== undefined ? "t279" : "t325";
-  const offsets = Array.from(ifd[offKey] as NumList);
-  const counts = Array.from(ifd[cntKey] as NumList);
   const rps = Math.min(num0(ifd, "t278") || frame.height, frame.height);
-  const cap = tiled
-    ? Math.ceil((num0(ifd, "t322") * num0(ifd, "t323") * bipp) / 8)
-    : Math.ceil((frame.width * bipp) / 8) * rps;
+  const tw = num0(ifd, "t322");
+  const th = num0(ifd, "t323");
+  const cap = tiled ? Math.ceil((tw * th * bipp) / 8) : Math.ceil((frame.width * bipp) / 8) * rps;
+  // Only the segments the image can use: extra offsets (all pointing at one small blob, say) would
+  // each inflate to `cap` and be kept, so 200 of them cost gigabytes. UTIF ignores them anyway.
+  const used = tiled ? Math.ceil(frame.width / tw) * Math.ceil(frame.height / th) : Math.ceil(frame.height / rps);
+  const offsets = Array.from(ifd[offKey] as NumList).slice(0, used);
+  const counts = Array.from(ifd[cntKey] as NumList).slice(0, used);
   const parts = offsets.map((off, i) => inflateCapped(bytes.subarray(off, off + counts[i]), cap));
   const header = bytes.subarray(0, 8); // UTIF reads the byte order from the first two bytes.
   const out = new Uint8Array(header.length + parts.reduce((n, p) => n + p.length, 0));

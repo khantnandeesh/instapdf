@@ -3,6 +3,8 @@
 import type { TiffRequest, TiffResponse } from "./tiff.worker";
 
 export const TIFF_PROBE_TIMEOUT_MS = 5000;
+/** A thumbnail slower than this stops the worker, so a stuck decode can't fail the next probe. */
+export const TIFF_THUMB_TIMEOUT_MS = 20000;
 
 let worker: Worker | null = null;
 let nextId = 1;
@@ -53,7 +55,7 @@ export async function probeTiff(blob: Blob): Promise<{ frames: { width: number; 
 
 /** One frame as a bitmap whose longest side is at most `max` pixels. */
 export async function tiffThumb(key: string, blob: Blob, frame: number, max: number): Promise<ImageBitmap> {
-  const r = await ask({ op: "thumb", key, blob, frame, max });
+  const r = await ask({ op: "thumb", key, blob, frame, max }, TIFF_THUMB_TIMEOUT_MS);
   if (!r.ok || !r.bitmap) throw new Error("TIFF frame could not be decoded");
   return r.bitmap;
 }
