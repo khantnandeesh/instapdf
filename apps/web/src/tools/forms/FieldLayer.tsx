@@ -176,7 +176,7 @@ function Control({ f, w, fontPx, widthPx, onValue, onSign, mode }: { f: FormFiel
           data-comb={f.comb && f.maxLen ? f.maxLen : undefined}
           style={f.comb && f.maxLen ? combStyle(style, widthPx / f.maxLen, fontPx) : style}
           value={String(f.value)}
-          placeholder={named}
+          placeholder={f.comb ? undefined : named}
           readOnly={f.readOnly}
           maxLength={f.maxLen ?? undefined}
           aria-label={label}

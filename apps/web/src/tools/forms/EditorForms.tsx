@@ -196,21 +196,27 @@ export const FieldPopover = memo(function FieldPopover({ entry, place, pageWidth
   useLayoutEffect(() => {
     const el = box.current;
     if (!el || !r) return;
-    const { offsetWidth: bw, offsetHeight: bh } = el;
-    // Away from where the next field usually goes (right, then below): beside the field on the
-    // right, else above it, else on its left, else below (G-12).
-    const clampX = (x: number) => Math.max(0, Math.min(x, pageWidth - bw));
-    const clampY = (y: number) => Math.max(0, Math.min(y, pageHeight - bh));
-    const spots = [
-      { left: r.left + r.width + 8, top: clampY(r.top), fits: r.left + r.width + 8 + bw <= pageWidth },
-      { left: clampX(r.left), top: r.top - 8 - bh, fits: r.top - 8 - bh >= 0 },
-      { left: r.left - 8 - bw, top: clampY(r.top), fits: r.left - 8 - bw >= 0 },
-    ];
-    const spot = spots.find((p) => p.fits) ?? { left: clampX(r.left), top: r.top + r.height + 8 };
-    const { left, top } = spot;
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
-    el.style.visibility = "visible";
+    const place = () => {
+      const { offsetWidth: bw, offsetHeight: bh } = el;
+      // Away from where the next field usually goes (right, then below): beside the field on the
+      // right, else above it, else on its left, else below (G-12).
+      const clampX = (x: number) => Math.max(0, Math.min(x, pageWidth - bw));
+      const clampY = (y: number) => Math.max(0, Math.min(y, pageHeight - bh));
+      const spots = [
+        { left: r.left + r.width + 8, top: clampY(r.top), fits: r.left + r.width + 8 + bw <= pageWidth },
+        { left: clampX(r.left), top: r.top - 8 - bh, fits: r.top - 8 - bh >= 0 },
+        { left: r.left - 8 - bw, top: clampY(r.top), fits: r.left - 8 - bw >= 0 },
+      ];
+      const { left, top } = spots.find((p) => p.fits) ?? { left: clampX(r.left), top: r.top + r.height + 8 };
+      el.style.left = `${left}px`;
+      el.style.top = `${top}px`;
+      el.style.visibility = "visible";
+    };
+    place();
+    // "More" grows the popover: find it a spot again, so it never grows over its own field.
+    const ro = new ResizeObserver(place);
+    ro.observe(el);
+    return () => ro.disconnect();
   });
   if (!sel || !form || !f || !w || !r || readOnly || tool !== "form") return null;
   return (
