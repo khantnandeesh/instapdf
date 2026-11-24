@@ -30,7 +30,8 @@ export function RecentStrip({
         <H id={headingId} className="mp-eyebrow shrink-0 px-0 py-1">
           {copy.recentTitle}
         </H>
-        <ul className="-my-1 flex min-w-0 scroll-px-1.5 gap-2 overflow-x-auto px-1.5 py-1.5 [scrollbar-width:thin]">
+        {/* Swipes sideways below 1024 px (data-ip-scroll="chips"), wraps from 1024 px. */}
+        <ul className="-my-1 flex min-w-0 scroll-px-1.5 gap-2 overflow-x-auto px-1.5 py-1.5 lg:flex-wrap lg:overflow-x-visible" data-ip-scroll="chips">
           {items.map((item) => (
             <li key={item.slug} className="shrink-0">
               <ToolChip item={item} />
@@ -48,8 +49,9 @@ export function RecentStrip({
       <H id={headingId} className="mp-eyebrow px-0 py-1">
         {copy.recentTitle}
       </H>
-      {/* 6px of padding (offset by negative margins, so nothing moves) keeps the 2+2px focus outline inside the scroller. */}
-      <ul className="col-span-2 row-start-2 -mx-1.5 -my-1 flex scroll-px-1.5 gap-2 overflow-x-auto px-1.5 py-1.5 [scrollbar-width:thin]">
+      {/* Swipes sideways below 1024 px (no bar, data-ip-scroll="chips"), wraps from 1024 px. 6px of padding (offset by
+          negative margins, so nothing moves) keeps the 2+2px focus outline inside the scroller. */}
+      <ul className="col-span-2 row-start-2 -mx-1.5 -my-1 flex scroll-px-1.5 gap-2 overflow-x-auto px-1.5 py-1.5 lg:flex-wrap lg:overflow-x-visible" data-ip-scroll="chips">
         {items.map((item) => (
           <li key={item.slug}>
             <ToolChip item={item} />

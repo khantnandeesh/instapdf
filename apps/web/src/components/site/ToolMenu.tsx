@@ -197,6 +197,7 @@ export function ToolMenu() {
           <div
             id={MENU_ID}
             className="mp-menu-panel fixed overflow-y-auto overscroll-contain"
+            data-ip-scroll="overlay"
             style={{ top, maxHeight: `calc(100dvh - ${top}px - 24px)` }}
             data-testid="tool-menu"
           >

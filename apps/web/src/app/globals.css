@@ -442,11 +442,6 @@
   /* "Most popular" uses cat-edit (BerryPDF token usage). */
   .ip-cat-popular { --c: var(--cat-edit); --c-text: var(--ip-cat-edit-text); }
 
-  /* Sand wash: the strawberry-cream section ground, fading out. */
-  .mp-sand {
-    background: linear-gradient(var(--sand), rgba(255, 255, 255, 0));
-  }
-
   /* ---- Header: the bar and the All tools panel live in components/site/site-header.css ---- */
   .mp-brand {
     display: inline-flex;
@@ -691,11 +686,6 @@
     color: var(--brand-strong);
     font-size: 16px;
   }
-  .mp-hint {
-    color: var(--muted);
-    font-size: 14px;
-    line-height: 20px;
-  }
 
   /* ---- Switch: 50x28 pill, 22px thumb with a tiny bounce ----------------------------------- */
   .mp-switch-track {
@@ -740,9 +730,6 @@
     border-radius: 999px;
     vertical-align: middle;
     white-space: nowrap;
-  }
-  .mp-pill--leaf {
-    background: var(--leaf);
   }
   .mp-tag {
     display: inline-block;
@@ -1150,24 +1137,7 @@
   /* ---- Berry kit: the one background ------------------------------------------------------------
      Grid paper only (24px squares, 7% berry red, on #fffdfb), carried by html/body above. No waves,
      glows, patterns or coloured bands behind sections; white surfaces stay solid white. */
-  .mp-bg-grid {
-    background-color: var(--mp-grid-ground);
-    background-image:
-      linear-gradient(var(--mp-grid-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--mp-grid-line) 1px, transparent 1px);
-    background-size: 24px 24px;
-  }
-  /* ---- Berry kit: dividers -------------------------------------------------------------------- */
-  .mp-drip {
-    height: 46px;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='46'%3E%3Cpath fill='%23d92b4b' d='M0 0h260v10c-8 0-10 6-10 14s-4 12-9 12-9-4-9-12 0-12-9-13-12 2-13 6-4 6-8 6-7-2-8-6-4-7-12-7-10 5-10 16-4 20-10 20-10-9-10-20-2-15-10-16-12 3-13 8-4 8-9 8-8-3-9-8-5-8-13-8-10 4-10 10-4 9-9 9-9-3-9-9-2-10-10-10-12 4-12 12-5 12-10 12-9-4-10-12S8 10 0 10z'/%3E%3Cpath fill='%23fff' opacity='.35' d='M6 4h248v2H6z'/%3E%3C/svg%3E")
-      repeat-x top left;
-  }
-  .mp-scallop {
-    height: 18px;
-    background: radial-gradient(circle at 14px 0, var(--cream) 13px, transparent 14px) repeat-x;
-    background-size: 28px 18px;
-  }
+  /* ---- Berry kit: jam (the drip and scallop dividers were never placed; removed for the home CSS budget) -------------------------------------------------------------------- */
   /* Indeterminate jam: a short segment glides across the track. */
   .mp-jam--indeterminate > i {
     width: 34%;
@@ -1290,9 +1260,6 @@
   /* Forced colors (Windows High Contrast) drop box-shadows and backgrounds, so controls whose edge
      is a shadow get a real system-coloured border, and the selected choice an outline-free border. */
   @media (forced-colors: active) {
-    .ip-edge {
-      border: 1px solid ButtonText;
-    }
     /* A border, not an outline: the checked choice is the one that takes focus, and its focus
        outline must stay free to show. */
     .ip-seg-checked {
@@ -1378,9 +1345,6 @@
 
 /* Small utilities still used by the shared flow (transform/opacity only). */
 @layer utilities {
-  .ip-spin {
-    animation: ip-spin 800ms linear infinite;
-  }
   .ip-pulse {
     animation: ip-pulse 1.4s ease-in-out infinite;
   }
@@ -1396,11 +1360,6 @@
 }
 
 
-@keyframes ip-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 @keyframes ip-pulse {
   50% {
     opacity: 0.55;
@@ -1524,9 +1483,6 @@
     animation: none !important;
     transition: none !important;
   }
-  .ip-spin {
-    animation: ip-pulse 1.2s linear infinite !important;
-  }
 }
 
 /* ---- F2: site chrome and home catalogue (docs/specs/f2-home.md) ---------------- */
@@ -1569,8 +1525,39 @@
   }
 }
 
+/* ---- Scrolling (docs/design/berrypdf.md "Scrolling") ------------------------------------------
+   The page is the one scroller. Only registered regions scroll on their own, each with
+   data-ip-scroll="pages | rail | overlay | chips" (src/lib/ui/scroll-rules.test.ts, e2e/ui/scroll-rules.spec.ts).
+   A vertical region never scrolls sideways: clip x (clip, not hidden, so a region that is visible on
+   the other axis does not become a scroller). A region is also the containing block of what it
+   holds, so an absolutely placed child (an sr-only note, a popover) can't spill out and make the
+   region's parent scroll too (not on top-layer elements, which the browser positions). Chip rows
+   swipe with no bar. In the base layer, so a utility such as `fixed` on a menu still wins. */
+@layer base {
+  [data-ip-scroll]:not([data-ip-scroll="chips"], [data-ip-scroll="pages"]) {
+    overflow-x: clip;
+  }
+  /* The pages area only scrolls from 1024 px; below it the page scrolls and tile controls may hang
+     past its edge (insert buttons), so it clips only where it is a scroller. */
+  @media (min-width: 1024px) {
+    [data-ip-scroll="pages"] {
+      overflow-x: clip;
+    }
+  }
+  [data-ip-scroll]:not(dialog, [popover]) {
+    position: relative;
+  }
+  [data-ip-scroll="chips"] {
+    scrollbar-width: none;
+  }
+  [data-ip-scroll="chips"]::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* A row that scrolls sideways below 1024 px instead of widening the page. */
 .ip-scroll-x {
+  /* ip-scroll: chips */
   overflow-x: auto;
   scrollbar-width: thin;
   scroll-snap-type: x proximity;
@@ -1679,20 +1666,11 @@
 .mp-floaties--empty > :nth-child(18) { --x:63%;--y:44%;--s:22px;--r:0deg;--d:6.3s;--amp:6px;--delay:-5.0s; }
 .mp-floaties--empty > :nth-child(19) { --x:50%;--y:10%;--s:18px;--r:0deg;--d:5.3s;--amp:5px;--delay:-3.7s; }
 
-/* Sticky search and filter bar on long lists (home catalogue). Pinned under the header; a frosted
-   grid-paper ground keeps the list from showing through, and a soft pink shadow appears only while it
-   is stuck. The shadow fades in (off under reduced motion via the global rule). */
+/* Sticky search and filter bar on long lists (home catalogue). Pinned under the header and fully
+   transparent (owner, 2026-11-24): no ground, blur, border or shadow, so it never reads as a box on
+   the grid paper. data-stuck stays for tests and future use; it changes nothing visible. */
 .ip-sticky-bar {
-  background: color-mix(in srgb, var(--ip-bg) 88%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  transition: box-shadow var(--dur-base) var(--ease-standard);
-}
-.ip-sticky-bar[data-stuck] {
-  /* A 1.5px sand line and a soft shadow, both as shadows so being stuck never changes the bar's height. */
-  box-shadow:
-    0 1.5px 0 var(--sand),
-    0 10px 18px -12px rgb(176 30 60 / 0.35);
+  background: transparent;
 }
 @media (forced-colors: active) {
   .ip-sticky-bar {
