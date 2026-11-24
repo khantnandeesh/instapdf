@@ -238,6 +238,41 @@ describe("buildPdf", () => {
     expect(texts[0]).not.toContain("only on the copy");
     expect(texts[1]).toContain("only on the copy");
   });
+  it("with no form, a copy moved before its original keeps content, annotations and objects on the right pages", async () => {
+    const fonts = await nodeFonts();
+    const src = await PDFDocument.load(await source());
+    // A link annotation on page 1 that every copy should carry.
+    const link = src.context.obj({ Type: "Annot", Subtype: "Link", Rect: [50, 50, 150, 80], Border: [0, 0, 0] });
+    src.getPage(0).node.set(PDFName.of("Annots"), src.context.obj([src.context.register(link)]));
+    const bytes = await src.save();
+    const pages = initialPages(Array.from({ length: 3 }, (_, i) => ({ view: [0, 0, 600, 800] as [number, number, number, number], rotate: i === 2 ? 90 : 0 })));
+    const copy: PageEntry = { ...pages[0], id: "copy", rotate: 90 };
+    const order = [copy, pages[1], pages[0]];
+    const objects: EditorObject[] = [
+      { kind: "shape", id: "on-copy", page: "copy", shape: "rect", x: 10, y: 10, w: 50, h: 50, rot: 0, stroke: "#000000", fill: "#ff0000", width: 1 },
+      { kind: "shape", id: "on-original", page: "p0", shape: "rect", x: 10, y: 10, w: 50, h: 50, rot: 0, stroke: "#000000", fill: "#0000ff", width: 1 },
+    ];
+    const out = await buildPdf({ bytes, pages: order, objects, assets: {} }, fonts, fontkit);
+    const doc = await PDFDocument.load(out);
+    expect(doc.getPageCount()).toBe(3);
+    expect(doc.getPages().map((p) => p.getRotation().angle)).toEqual([90, 0, 0]);
+    const { texts } = await pdfText(out);
+    expect(texts).toEqual([expect.stringContaining("Original page 1"), expect.stringContaining("Original page 2"), expect.stringContaining("Original page 1")]);
+    const links = (i: number) => (doc.getPage(i).node.lookup(PDFName.of("Annots"), PDFArray)?.size() ?? 0);
+    expect([links(0), links(1), links(2)]).toEqual([1, 0, 1]);
+    // Each copy got only its own object: red on page 1, blue on page 3.
+    const fills = async (i: number) => {
+      const c = doc.getPage(i).node.Contents();
+      const raw = c instanceof PDFArray ? c.asArray().map((r) => doc.context.lookup(r)) : [c];
+      const { decodePDFRawStream } = await import("@cantoo/pdf-lib");
+      return raw.map((x) => new TextDecoder().decode(decodePDFRawStream(x as never).decode())).join("\n");
+    };
+    expect(await fills(0)).toMatch(/1 0 0 rg/);
+    expect(await fills(0)).not.toMatch(/0 0 1 rg/);
+    expect(await fills(2)).toMatch(/0 0 1 rg/);
+    expect(await fills(2)).not.toMatch(/1 0 0 rg/);
+  });
+
   it("writes form changes with page actions: filled values, new fields, and widgets on a duplicated page (F16 E3)", async () => {
     const fonts = await nodeFonts();
     const src = await PDFDocument.create();
