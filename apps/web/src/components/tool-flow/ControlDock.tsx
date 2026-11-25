@@ -1,12 +1,15 @@
 "use client";
 import "../ui/dialog.css";
 import "./tool-flow.css";
+import dynamic from "next/dynamic";
 import { forwardRef, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "../ui/Button";
-import { Dialog } from "../ui/Dialog";
 import { Notice } from "../ui/Notice";
 import { ProgressBar } from "../ui/ProgressBar";
 import { copy } from "./copy";
+
+// The options sheet opens only on a tap: its dialog is a lazy chunk (ToolFlow prefetches it on intent).
+const Dialog = dynamic(() => import("../ui/Dialog").then((m) => m.Dialog), { ssr: false });
 
 /**
  * Options and the primary action. The primary action never leaves the viewport.

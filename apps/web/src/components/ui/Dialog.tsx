@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { exit, motionReady, settle } from "@/lib/motion";
 import { cx } from "./cx";
 // Styles: ./dialog.css (modal and sheet) is imported by the screens that open them (ToolFlow, ControlDock, the
 // editor), so it stays off pages whose only dialog is the full-screen menu.
@@ -20,10 +21,10 @@ export type DialogCloseReason = "escape" | "action";
 export function Dialog({
   open,
   onClose,
-  title,
-  description,
-  children,
-  footer,
+  title: titleNow,
+  description: descriptionNow,
+  children: childrenNow,
+  footer: footerNow,
   initialFocusRef,
   returnFocusRef,
   fallbackFocus,
@@ -61,17 +62,50 @@ export function Dialog({
   const descId = useId();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  // The content stays while the dialog leaves (motion.md S7, S11, S13), as it was when it closed: the
+  // screen behind may already have cleared what it showed.
+  const [shown, setShown] = useState(open);
+  if (open && !shown) setShown(true);
+  const body = open || shown;
+  const now = { title: titleNow, description: descriptionNow, children: childrenNow, footer: footerNow };
+  const kept = useRef(now);
+  if (open) kept.current = now;
+  const { title, description, children, footer } = open ? now : kept.current;
 
-  useEffect(() => {
+  // A layout effect: the dialog opens and closes in the same commit as its content, never a frame apart.
+  useLayoutEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
+    // What fades on close: the whole dialog, the full-screen variant too. Fading only its content left
+    // its opaque ground on screen, which flashed blank white before the page came back; the whole
+    // dialog crossfades to the page instead (visual gate, 24 Nov).
+    const parts = () => [dialog];
     if (open && !dialog.open) {
+      dialog.removeAttribute("data-leaving");
+      // Reopened mid-exit too: the fade stops and inert/aria-hidden go back to what they were before it.
+      parts().forEach(settle);
       opener.current = document.activeElement as HTMLElement | null;
       dialog.showModal();
       const target = initialFocusRef?.current ?? (variant === "fullscreen" ? titleRef.current : null);
       if (target) requestAnimationFrame(() => target.focus());
     } else if (!open && dialog.open) {
+      // Closed at once (focus returns now, the page is usable now); globals.css keeps a leaving dialog
+      // painted in the top layer while lib/motion fades it, then it is gone. No engine yet: instant.
+      const leaving = motionReady();
+      // The whole dialog leaves the a11y tree and takes no input while it is still painted: exit() makes
+      // it inert and aria-hidden at once (and settle() on the next opening gives back what it had).
+      const preset = variant === "default" ? "dialog" : variant === "sheet" ? "sheet" : "overlay";
+      // The value names the exit preset, so globals.css holds the dialog in the top layer for that preset's
+      // fade (the overlay fade is 120ms, the others 200ms) at most.
+      if (leaving) dialog.setAttribute("data-leaving", preset);
       dialog.close();
+      void Promise.all(leaving ? parts().map((el) => exit(el, preset)) : []).then(() => {
+        if (dialog.open) return; // reopened meanwhile
+        // The fade is done (opacity 0): end the top-layer hold now rather than when the CSS transition,
+        // which starts a frame late, runs out. Inert and aria-hidden stay until the next opening.
+        dialog.removeAttribute("data-leaving");
+        setShown(false);
+      });
       const back = returnFocusRef?.current ?? opener.current;
       // <body> means nothing had focus when the dialog opened (e.g. the picker that started
       // the intake had already unmounted), so use the fallback instead of dropping focus.
@@ -134,7 +168,7 @@ export function Dialog({
         className,
       )}
     >
-      {open && variant === "fullscreen" && (
+      {body && variant === "fullscreen" && (
         <>
           <h2 id={titleId} ref={titleRef} tabIndex={-1} className="sr-only">
             {title}
@@ -142,7 +176,7 @@ export function Dialog({
           {children}
         </>
       )}
-      {open && variant === "sheet" && (
+      {body && variant === "sheet" && (
         <div className="flex max-h-(--ip-sheet-max-h) flex-col">
           <div className="flex shrink-0 flex-col items-stretch border-b-[1.5px] border-sand px-4 py-2.5">
             <div className="flex items-center justify-between gap-3">
@@ -158,7 +192,7 @@ export function Dialog({
           {footer && <div className="flex shrink-0 flex-wrap gap-2 border-t-[1.5px] border-sand px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">{footer}</div>}
         </div>
       )}
-      {open && variant === "default" && (
+      {body && variant === "default" && (
         // The modal's one scroll region (only used when it is taller than the screen). A dialog with a long list
         // (the page picker) caps the list instead, so this never scrolls around a second scroller.
         <div className="flex max-h-[calc(100dvh-32px)] flex-col gap-4 overflow-y-auto overscroll-contain px-6 pt-5 pb-5" data-ip-scroll="overlay">

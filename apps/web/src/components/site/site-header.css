@@ -44,17 +44,18 @@
   border-top: 0;
   box-shadow: 0 24px 48px -24px rgba(120, 20, 40, 0.28);
   border-radius: 0 0 var(--radius-panel) var(--radius-panel);
-  /* backwards, not both: no transform is left on the panel once it has arrived. */
-  animation: mp-panel-in var(--dur-move) var(--ease-enter, ease-out) backwards;
+  /* backwards, not both: no transform is left on the panel once it has arrived. lib/motion runs the
+     exit (fade + 4px up, 120ms) and, once loaded, the entrance too (motion.md S6). */
+  animation: mp-panel-in var(--motion-quick) var(--ease-out) backwards;
 }
-/* The page behind: dimmed and blurred; a click on it closes the panel. */
+/* The page behind: dimmed and blurred (the blur is static; only opacity fades); a click on it closes the panel. */
 .mp-menu-backdrop {
   inset-inline: 0;
   bottom: 0;
   background: rgba(42, 28, 32, 0.22);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
-  animation: mp-fade-in var(--dur-move) ease-out backwards;
+  animation: mp-fade-in var(--motion-quick) var(--ease-out) backwards;
 }
 @media (prefers-reduced-transparency: reduce) {
   .mp-menu-backdrop {

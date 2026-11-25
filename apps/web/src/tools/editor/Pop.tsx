@@ -4,8 +4,9 @@
  * below its trigger or above when there is no room, clamped to the viewport. Escape closes and
  * returns focus to the trigger.
  */
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cx } from "@/components/ui/cx";
+import { popoverLeaving } from "@/lib/motion";
 
 export function Pop({
   label,
@@ -33,6 +34,13 @@ export function Pop({
   const btn = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  // The content stays while the panel fades out (editor.css, motion.md E3), inert and hidden.
+  const [leaving, setLeaving] = useState(false);
+  // Each opening draws the content afresh, even when it reopens while the last one is fading.
+  const [opened, setOpened] = useState(0);
+  // The timer that ends a fade. Cleared on every toggle: one left from an earlier close would otherwise
+  // cut a later fade short (close, reopen, close again within 160ms).
+  const leaveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const id = useId();
 
   const place = useCallback(() => {
@@ -54,6 +62,11 @@ export function Pop({
     const onToggle = (e: Event) => {
       const isOpen = (e as ToggleEvent).newState === "open";
       setOpen(isOpen);
+      if (isOpen) setOpened((n) => n + 1);
+      const fades = !isOpen && getComputedStyle(p).transitionDuration.split(",").some((d) => parseFloat(d) > 0);
+      setLeaving(fades);
+      clearTimeout(leaveTimer.current);
+      if (fades) leaveTimer.current = setTimeout(() => !p.matches(":popover-open") && setLeaving(false), 160);
       if (isOpen) {
         place();
         onOpen?.();
@@ -63,14 +76,17 @@ export function Pop({
         requestAnimationFrame(() => p.querySelector<HTMLElement>(touch ? "[aria-checked=true], [aria-selected=true], button, [tabindex='0']" : "[data-autofocus], [aria-checked=true], button, input, [tabindex='0']")?.focus({ preventScroll: true }));
       }
     };
+    p.addEventListener("beforetoggle", popoverLeaving);
     p.addEventListener("toggle", onToggle);
     // The content is drawn after the panel opens and can grow (a list that loads): place it
     // again whenever its size changes, so a panel opened near the bottom edge stays on screen.
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => p.matches(":popover-open") && place());
     ro?.observe(p);
     return () => {
+      p.removeEventListener("beforetoggle", popoverLeaving);
       p.removeEventListener("toggle", onToggle);
       ro?.disconnect();
+      clearTimeout(leaveTimer.current);
     };
   }, [place, onOpen]);
 
@@ -129,7 +145,7 @@ export function Pop({
           }
         }}
       >
-        {open && (typeof children === "function" ? children(close) : children)}
+        {(open || leaving) && <Fragment key={opened}>{typeof children === "function" ? children(close) : children}</Fragment>}
       </div>
     </>
   );

@@ -15,7 +15,7 @@ export type NoticeEntry = {
   author: string | null;
   homepage: string | null;
   hasNotice: boolean;
-  /** Set when the package is accepted as a reviewed exception to the allow-list. */
+  /** Set when the package is accepted as a reviewed exception to the allow-list: the line shown for it. */
   exception: string | null;
 };
 

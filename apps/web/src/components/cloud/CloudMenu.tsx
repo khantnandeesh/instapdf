@@ -5,6 +5,7 @@
  * only with the cloud controls, so the shared Menu (and builds without cloud sources) stay as they were.
  */
 import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { popoverLeaving } from "@/lib/motion";
 import { cx } from "../ui/cx";
 import { BackIcon, SubmenuIcon } from "./cloud-icons";
 
@@ -166,6 +167,7 @@ export const MenuButton = forwardRef<
       }
     };
     p.addEventListener("toggle", onToggle);
+    p.addEventListener("beforetoggle", popoverLeaving);
     const reposition = () => {
       if (p.matches(":popover-open")) position();
     };
@@ -173,6 +175,7 @@ export const MenuButton = forwardRef<
     window.addEventListener("scroll", reposition, true);
     return () => {
       p.removeEventListener("toggle", onToggle);
+      p.removeEventListener("beforetoggle", popoverLeaving);
       window.removeEventListener("resize", reposition);
       window.removeEventListener("scroll", reposition, true);
     };

@@ -1,6 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { InsertKind, PageAction } from "@/components/page-edit/EditablePageGrid";
 import { loadCloud } from "@/components/cloud/tool-cloud";
 import { onIntent } from "@/components/tool-flow/intent";
@@ -33,6 +34,7 @@ import {
   type SortKey,
   type SourceInfo,
 } from "@/lib/page-list";
+import { flip } from "@/lib/motion/flow";
 import { changedCount, defaultMergeOptions, MERGE_OPTIONS_KEY, parseMergeOptions, type MergeOptions as Options } from "@/lib/pdf/merge-options";
 import { mergedName } from "@/lib/pdf/naming";
 import { acceptAttribute } from "@/lib/pdf/validation";
@@ -102,6 +104,8 @@ export function MergeTool() {
 
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const anchor = useRef<string | null>(null);
+  // The list of whichever grid is shown (files or pages): what Sort FLIPs.
+  const gridList = useRef<HTMLDivElement>(null);
   const [undo, setUndoState] = useState<Undo | null>(null);
   const undoRef = useRef<Undo | null>(null);
   const setUndo = (u: Undo | null) => {
@@ -601,7 +605,8 @@ export function MergeTool() {
   const sortBy = (key: SortKey | "reverse") => {
     const list = pagesRef.current;
     const next = key === "reverse" ? reverseSegments(list) : sortPages(list, sourcesRef.current, key);
-    commit(next, { undo: c.sorted[key] });
+    // The visible grid FLIPs into the new order (T9; a crossfade above 40 items).
+    flip(gridList.current, () => flushSync(() => commit(next, { undo: c.sorted[key] })), "reorder");
     announce(c.sorted[key]);
   };
 
@@ -663,6 +668,7 @@ export function MergeTool() {
     <>
       {w.view === "files" ? (
         <SegmentGrid
+          listRef={gridList}
           model={viewModel}
           focusUid={focus}
           dimmed={w.dimmed}
@@ -686,6 +692,7 @@ export function MergeTool() {
         />
       ) : (
         <EditablePageGrid
+          listRef={gridList}
           model={viewModel}
           selection={selection}
           inserted={inserted}

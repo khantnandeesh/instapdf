@@ -12,7 +12,7 @@
  *
  * Usage: node scripts/first-load-budget.mjs [apps/web dir]   (V=1 lists each route's files)
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 
@@ -87,6 +87,42 @@ for (const [route, [budget, budgetAll]] of Object.entries(budgets)) {
   );
   if (process.env.V) for (const f of [...entry, ...extra.map((f) => `${f} (preload)`)]) console.log(`       ${f} ${gz(f.replace(/ \(preload\)$/, ""))}`);
 }
+
+/**
+ * The motion engine (GSAP, docs/design/motion.md §7) is never in any route's first load: no file in any
+ * route's entry, or in the scripts its prerendered HTML loads or preloads, carries GreenSock's banner.
+ * It must exist as its own lazy chunk (reported with its size).
+ */
+const GSAP_MARK = /GreenSock|gsap\.com\/standard-license|_gsap\b/;
+const has = (f) => GSAP_MARK.test(readFileSync(join(dir, ".next", f), "utf8"));
+for (const route of Object.keys(pages)) {
+  const entry = [...new Set(pages[route])].filter((f) => f.endsWith(".js"));
+  let extra = [];
+  try {
+    extra = scriptsInHtml(readFileSync(htmlOf(route), "utf8"));
+  } catch {
+    // Not prerendered (dynamic or an API route): its entry is still checked.
+  }
+  const hits = [...new Set([...entry, ...extra])].filter(has);
+  if (hits.length) {
+    console.error(`OVER ${route}: the motion engine is in its first load (${hits.join(", ")})`);
+    failed++;
+  }
+}
+const chunksDir = join(dir, ".next/static/chunks");
+const engineChunks = readdirSync(chunksDir, { recursive: true })
+  .filter((f) => String(f).endsWith(".js"))
+  .map((f) => `static/chunks/${f}`)
+  .filter(has);
+const noticed = engineChunks.filter((f) => /Copyright 2026, GreenSock[^"]*gsap\.com\/standard-license/.test(readFileSync(join(dir, ".next", f), "utf8")));
+if (!engineChunks.length || !noticed.length) {
+  console.error(`motion engine: no lazy chunk carries GSAP${engineChunks.length ? ", or GreenSock's notice is missing (licence §III)" : ""}`);
+  failed++;
+} else
+  console.log(
+    `ok   motion engine is lazy only: ${engineChunks.map((f) => `${f.replace("static/chunks/", "")} ${gz(f)} B`).join(" + ")} = ${sum(engineChunks)} B gz, GreenSock's notice in ${noticed.length} (not in any route's first load)`,
+  );
+
 if (failed) {
   console.error(`First-load JS budget: ${failed} route(s) over.`);
   process.exit(1);

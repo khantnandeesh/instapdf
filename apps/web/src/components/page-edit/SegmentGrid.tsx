@@ -1,6 +1,8 @@
 "use client";
 import "./page-edit.css";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
+import { flushSync } from "react-dom";
+import { flip } from "@/lib/motion/flow";
 import { pageBoxStyle } from "@/components/tool-flow/PageTile";
 import { PageThumb } from "@/components/tool-flow/Thumbnail";
 import { cx } from "@/components/ui/cx";
@@ -75,6 +77,7 @@ export function SegmentGrid({
   onPreview,
   onAddFiles,
   onDragState,
+  listRef,
 }: {
   model: ListModel;
   labels?: SegmentGridLabels;
@@ -89,14 +92,19 @@ export function SegmentGrid({
   onPreview: (key: string) => void;
   onAddFiles: (trigger: HTMLElement) => void;
   onDragState: (s: { phase: "start" | "cancel"; name: string }) => void;
+  /** The list element (the [data-flip-root] the owner FLIPs, e.g. on Sort). */
+  listRef?: RefObject<HTMLDivElement | null>;
 }) {
   const labels = labelsIn ?? segmentLabels(sourceCount);
   const cards = useMemo(() => buildCards(model), [model.pages, model.sources, model.files]); // eslint-disable-line react-hooks/exhaustive-deps
-  const list = useRef<HTMLDivElement>(null);
+  const ownList = useRef<HTMLDivElement>(null);
+  const list = listRef ?? ownList;
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [dragKey, setDragKey] = useState<string | null>(null);
   const settled = useSettled();
   const active = Math.max(0, cards.findIndex((c) => c.key === activeKey));
+  // A keyboard move, the arrow buttons or a removal: the cards FLIP to their new slots (200ms, T9, T10).
+  const moved = (change: () => void) => flip(list.current, () => flushSync(change), "reorder");
 
   const focusCard = (i: number) => {
     const c = cards[Math.max(0, Math.min(cards.length - 1, i))];
@@ -132,7 +140,7 @@ export function SegmentGrid({
     const step = moveStepFor(e);
     if (step) {
       e.preventDefault(); // Alt+Left is "Back" in some browsers
-      onMove(card.key, step);
+      moved(() => onMove(card.key, step));
       return;
     }
     const next = navTarget(e.key, i, cards.length, gridColumns(list.current));
@@ -143,7 +151,7 @@ export function SegmentGrid({
     }
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
-      onRemove(card.key);
+      moved(() => onRemove(card.key));
     } else if (e.key === "[" || e.key === "]") {
       e.preventDefault();
       onRotate(card.key, e.key === "]" ? 90 : -90);
@@ -185,6 +193,7 @@ export function SegmentGrid({
       </span>
       <div
         ref={list}
+        data-flip-root
         role="list"
         aria-label={labels.list}
         aria-describedby="ip-files-hint"
@@ -201,7 +210,7 @@ export function SegmentGrid({
           const badge = formatDelta(card.rotation);
           // BerryPDF PagePreview tray: the file's first page on a pink tray, its name in Fredoka below.
           return (
-            <div key={card.key} role="listitem" className="group/card mp-tray flex min-w-0 flex-col gap-1 max-sm:p-2" data-card-key={card.key} data-testid="file-card">
+            <div key={card.key} role="listitem" className="group/card mp-tray flex min-w-0 flex-col gap-1 max-sm:p-2" data-card-key={card.key} data-testid="file-card" data-flip>
               <div
                 data-card-box=""
                 onPointerDown={(e) => onPointerDown(e, card)}
@@ -249,7 +258,7 @@ export function SegmentGrid({
                   data-no-drag=""
                   className="absolute -top-2 -right-2 z-[2] bg-surface-raised text-brand-strong shadow-menu transition-[background-color,color,transform] duration-(--dur-fast) hover:rotate-90 hover:bg-brand hover:text-white focus-visible:bg-brand focus-visible:text-white motion-reduce:hover:rotate-0 max-lg:size-11"
                   icon={<CloseIcon size={16} />}
-                  onClick={() => onRemove(card.key)}
+                  onClick={() => moved(() => onRemove(card.key))}
                 />
                 {card.status === "ready" && !dimmed && (
                   <div
@@ -279,7 +288,7 @@ export function SegmentGrid({
                   className="max-lg:size-11"
                   disabled={i === 0 || dimmed}
                   icon={<ChevronLeftIcon size={16} />}
-                  onClick={() => onMove(card.key, "earlier")}
+                  onClick={() => moved(() => onMove(card.key, "earlier"))}
                 />
                 <IconButton
                   label={labels.moveLater(card.name)}
@@ -288,13 +297,13 @@ export function SegmentGrid({
                   className="max-lg:size-11"
                   disabled={i === cards.length - 1 || dimmed}
                   icon={<ChevronRightIcon size={16} />}
-                  onClick={() => onMove(card.key, "later")}
+                  onClick={() => moved(() => onMove(card.key, "later"))}
                 />
               </div>
             </div>
           );
         })}
-        <div role="listitem" className="flex min-w-0 flex-col">
+        <div role="listitem" className="flex min-w-0 flex-col" data-flip>
           <button
             type="button"
             onClick={(e) => onAddFiles(e.currentTarget)}

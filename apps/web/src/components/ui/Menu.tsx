@@ -1,5 +1,6 @@
 "use client";
 import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { popoverLeaving } from "@/lib/motion";
 import { cx } from "./cx";
 
 export type MenuEntry =
@@ -102,6 +103,7 @@ export const MenuButton = forwardRef<
       if (isOpen) position();
     };
     p.addEventListener("toggle", onToggle);
+    p.addEventListener("beforetoggle", popoverLeaving);
     const reposition = () => {
       if (p.matches(":popover-open")) position();
     };
@@ -109,6 +111,7 @@ export const MenuButton = forwardRef<
     window.addEventListener("scroll", reposition, true);
     return () => {
       p.removeEventListener("toggle", onToggle);
+      p.removeEventListener("beforetoggle", popoverLeaving);
       window.removeEventListener("resize", reposition);
       window.removeEventListener("scroll", reposition, true);
     };

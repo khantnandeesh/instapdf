@@ -1,6 +1,7 @@
 "use client";
 import "@/components/berry/berry-loader.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Ref } from "react";
+import { swap } from "@/lib/motion/flow";
 import { formatBytes } from "@/lib/pdf/naming";
 import { openPdf } from "@/lib/pdf/pdfjs";
 import { renderPage } from "@/lib/pdf/thumbnails";
@@ -41,6 +42,7 @@ export function ResultCard({
   onStartOver,
   onBack,
   announce,
+  ref,
 }: {
   output: ToolOutput;
   tool: FlowTool;
@@ -49,6 +51,8 @@ export function ResultCard({
   onStartOver: () => void;
   onBack: () => void;
   announce: (message: string) => void;
+  /** The card's root (ToolFlow fades it out on Back to options, T12). */
+  ref?: Ref<HTMLElement>;
 }) {
   // F23: the privacy line when the files came from a cloud or a copy went to one.
   // eslint-disable-next-line react-hooks/rules-of-hooks -- the flag is a build-time constant: the same call on every render
@@ -76,10 +80,23 @@ export function ResultCard({
       download.current?.focus({ preventScroll: true });
     }
   }, [url]);
+  // Download success (motion.md T13): the download starts on the click; the arrow turns into a tick
+  // (200ms, the one other overshoot) and back after 2.4s (120ms). The button stays enabled throughout.
   const [downloaded, setDownloaded] = useState(false);
+  const arrow = useRef<HTMLSpanElement>(null);
+  const tick = useRef<HTMLSpanElement>(null);
+  const shownTick = useRef(false);
+  // A layout effect: the crossfade starts from the commit that swaps the icons' CSS, so the tick never
+  // shows at full opacity for a frame before its fade.
+  useLayoutEffect(() => {
+    if (downloaded === shownTick.current) return;
+    shownTick.current = downloaded;
+    if (downloaded) swap(arrow.current, tick.current, "tick");
+    else swap(tick.current, arrow.current, "swap");
+  }, [downloaded]);
   useEffect(() => {
     if (!downloaded) return;
-    const t = setTimeout(() => setDownloaded(false), 1500);
+    const t = setTimeout(() => setDownloaded(false), 2400);
     return () => clearTimeout(t);
   }, [downloaded]);
 
@@ -100,7 +117,7 @@ export function ResultCard({
   return (
     // BerryPDF Panel: one centred white panel (20px radius, sand outline, soft pink shadow);
     // Download is the single berry action. A leaf-green tick says "done" (success, not category).
-    <section aria-labelledby={titleId} className="mp-panel mp-pop-in mx-auto w-full max-w-[760px] p-5 sm:p-10" data-testid="result">
+    <section ref={ref} aria-labelledby={titleId} className="mp-panel mp-pop-in mx-auto w-full max-w-[760px] p-5 sm:p-10" data-testid="result">
       <h2 id={titleId} className="flex items-center gap-3 font-display text-[22px] leading-[1.2] font-semibold text-ink-black">
         <span className="mp-tick-in grid size-10 place-items-center rounded-full bg-[var(--mp-alert-ok-bg)] text-leaf">
           <CheckIcon size={24} />
@@ -132,7 +149,15 @@ export function ResultCard({
               className={buttonClasses("primary", "lg", "max-sm:w-full")}
             >
               <span className="inline-flex items-center gap-2">
-                {downloaded ? <CheckIcon /> : <DownloadIcon />}
+                {/* Both icons share one cell; CSS shows one, lib/motion crossfades them. */}
+                <span className="grid *:col-start-1 *:row-start-1">
+                  <span ref={arrow} className={downloaded ? "opacity-0" : undefined}>
+                    <DownloadIcon />
+                  </span>
+                  <span ref={tick} className={downloaded ? undefined : "opacity-0"}>
+                    <CheckIcon />
+                  </span>
+                </span>
                 Download
               </span>
             </a>

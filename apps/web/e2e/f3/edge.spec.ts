@@ -406,6 +406,9 @@ test.describe("dark mode", () => {
     await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
     await page.keyboard.press("Escape");
     await tileAction(page, "B2", "Move to position…");
+    // The Move dialog is a lazy component on first use: it opens a render after the click, so wait for it
+    // before settled() looks for its entrance (otherwise axe can catch its fade-in, CI on the cloud build).
+    await expect(page.getByRole("dialog", { name: "Move B2" })).toBeVisible();
     await expectNoSeriousAxeViolations(page, "dark: move dialog");
     await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
     await chooseAddPages(page, "Pages from a file…");

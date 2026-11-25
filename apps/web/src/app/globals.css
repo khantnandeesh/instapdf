@@ -93,9 +93,7 @@
       0 10px 18px rgba(217, 43, 75, 0.22),
       inset 0 1px 0 rgba(255, 255, 255, 0.35);
     transition:
-      transform var(--dur-lift) ease,
-      box-shadow var(--dur-lift) ease,
-      filter var(--dur-base),
+      transform var(--dur-lift) var(--ease-out),
       background-color var(--dur-base),
       color var(--dur-base);
   }
@@ -214,9 +212,8 @@
     border-radius: var(--radius-md);
     box-shadow: none;
     transition:
-      background-color var(--dur-tool),
-      color var(--dur-tool),
-      box-shadow var(--dur-tool);
+      background-color var(--motion-quick),
+      color var(--motion-quick);
   }
   .mp-btn--tool:hover:not(:disabled),
   .mp-btn--tool:active:not(:disabled) {
@@ -346,19 +343,33 @@
     color: var(--ink-black);
     text-decoration: none;
     transition:
-      transform var(--dur-base) var(--ease-pop),
-      box-shadow var(--dur-base) ease,
-      border-color var(--dur-base);
+      transform var(--motion-quick) var(--ease-out),
+      border-color var(--motion-quick);
+  }
+  /* The lift shadow sits on ::after and fades in (opacity), so no shadow is ever animated. */
+  .mp-card::after {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    border-radius: inherit;
+    box-shadow: var(--shadow-lift);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--motion-quick) var(--ease-out);
   }
   .mp-card:hover {
     transform: translateY(-3px);
-    box-shadow: var(--shadow-lift);
     border-color: var(--mp-card-hover-border);
   }
+  .mp-card:hover::after {
+    opacity: 1;
+  }
   .mp-card:active {
-    transform: translateY(0) scale(0.98);
-    box-shadow: var(--shadow-card);
-    transition-duration: var(--dur-press);
+    transform: scale(0.97);
+    transition-duration: var(--motion-micro);
+  }
+  .mp-card:active::after {
+    opacity: 0;
   }
   .mp-card__name {
     min-width: 0;
@@ -491,7 +502,32 @@
     border: 1.5px solid var(--sand);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-menu);
-    animation: mp-modal-in 0.15s ease;
+  }
+  /* Menus (popover="auto", motion.md S8): open from the anchor corner, opacity + scale 0.96 + 4px in
+     200ms; every close (an item, Escape, a light dismiss) fades out in 120ms. A native popover's light
+     dismiss can't be delayed from script, so this is CSS: the discrete display/overlay transition keeps
+     it in the top layer while it fades. It is closed (inert) from the first frame of the fade. */
+  .mp-menu[popover] {
+    transform-origin: top left;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity var(--motion-micro) var(--ease-in),
+      display var(--motion-micro) allow-discrete,
+      overlay var(--motion-micro) allow-discrete;
+  }
+  .mp-menu[popover]:popover-open {
+    opacity: 1;
+    pointer-events: auto;
+    transition:
+      opacity var(--motion-quick) var(--ease-out),
+      transform var(--motion-quick) var(--ease-out);
+  }
+  @starting-style {
+    .mp-menu[popover]:popover-open {
+      opacity: 0;
+      transform: translateY(calc(var(--motion-nudge) * -1)) scale(0.96);
+    }
   }
   .mp-menu-row {
     display: flex;
@@ -551,9 +587,7 @@
     /* Deviation: --ip-field-line (3.39:1) instead of the bundle's #ecd5d9 (1.39:1), WCAG 1.4.11. */
     border: 1.5px solid var(--ip-field-line);
     border-radius: var(--radius-md);
-    transition:
-      border-color var(--dur-fast) ease-in-out,
-      box-shadow var(--dur-fast) ease-in-out;
+    transition: border-color var(--dur-fast) ease-in-out;
   }
   .ip-field:hover {
     border-color: var(--ip-field-line-hover);
@@ -625,7 +659,6 @@
     font: 500 15px/20px var(--font-display);
     transition:
       transform var(--dur-lift),
-      box-shadow var(--dur-lift),
       background-color var(--dur-base);
   }
   .mp-choice:hover:not(:disabled) {
@@ -709,7 +742,7 @@
     background: #fff;
     border-radius: 50%;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-    transition: transform var(--dur-move) var(--ease-pop);
+    transition: transform var(--motion-quick) var(--ease-move);
   }
   .mp-switch-track[data-on] {
     background: var(--brand);
@@ -753,7 +786,7 @@
     color: var(--mp-alert-ok-ink);
     border: 1.5px solid var(--mp-alert-ok-border);
     font-weight: 600;
-    animation: mp-slide-down 0.9s ease-out both;
+    animation: mp-toast-in var(--motion-quick) var(--ease-out) both;
   }
   .mp-alert--danger {
     background: var(--mp-alert-danger-bg);
@@ -844,13 +877,17 @@
     box-shadow:
       inset 0 3px 0 rgba(255, 255, 255, 0.35),
       inset 0 -3px 0 rgba(0, 0, 0, 0.12);
-    transition: width var(--dur-slow);
+    width: 100%;
+    transform: translateX(calc(var(--p, 0) * 1% - 100%));
+    transition: transform var(--motion-quick) var(--ease-out);
     animation: mp-jam-flow 2.4s linear infinite;
   }
 
-  /* The full-screen menu's entrance. The modal and sheet surfaces live in components/ui/dialog.css. */
-  .mp-modal-in {
-    animation: mp-modal-in var(--dur-move) var(--ease-pop);
+  /* The full-screen menu (phone All tools): the opaque ground is there on frame 0; only its content
+     fades up 8px (motion.md S7), so the page behind never shows through. The modal and sheet surfaces
+     live in components/ui/dialog.css. */
+  .mp-modal-in:not(.mp-viewer) > :not(h2) {
+    animation: mp-fade-up var(--motion-quick) var(--ease-out) both;
   }
 
   /* ---- Panel and page tray (working mode) --------------------------------------------------- */
@@ -864,7 +901,6 @@
     background: var(--page-tray);
     padding: 16px 16px 10px;
     border-radius: var(--radius-tray);
-    transition: box-shadow var(--dur-base);
   }
   .mp-tray[aria-selected="true"],
   .mp-tray[data-selected] {
@@ -1093,6 +1129,7 @@
   /* Indeterminate jam: a short segment glides across the track. */
   .mp-jam--indeterminate > i {
     width: 34%;
+    transform: none;
     animation:
       mp-jam-flow 2.4s linear infinite,
       mp-jam-glide 1.4s var(--ease-standard, ease-in-out) infinite;
@@ -1168,7 +1205,8 @@
     margin: calc(var(--s, 56px) / -2) 0 0 calc(var(--s, 56px) / -2);
     transform-style: preserve-3d;
     will-change: transform;
-    animation: mp-levitate var(--d, 6s) ease-in-out var(--delay, 0s) infinite;
+    /* One drift, then rest: every berry is still by 4.8s (WCAG 2.2.2, motion.md rule 5). */
+    animation: mp-levitate calc(var(--d, 6s) * 0.58) ease-in-out calc(var(--delay, 0s) * 0.58) 1 both;
     filter: drop-shadow(0 calc(var(--s, 56px) * 0.26) calc(var(--s, 56px) * 0.16) rgba(150, 24, 50, 0.24));
   }
   .mp-floaty svg {
@@ -1243,27 +1281,10 @@
 }
 
 /* ---- Keyframes (motion.md) -------------------------------------------------------------------- */
-@keyframes mp-slide-down {
-  0% {
-    transform: translateY(-30px);
+@keyframes mp-toast-in {
+  from {
+    transform: translateY(calc(var(--motion-rise) * -1));
     opacity: 0;
-  }
-  70% {
-    transform: translateY(5px);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(0);
-  }
-}
-@keyframes mp-modal-in {
-  0% {
-    transform: translateY(14px) scale(0.94);
-    opacity: 0;
-  }
-  100% {
-    transform: none;
-    opacity: 1;
   }
 }
 @keyframes mp-jam-glide {
@@ -1298,10 +1319,11 @@
     animation: ip-shake 240ms linear;
   }
   .ip-fade-in {
-    animation: ip-fade-in var(--dur-base) ease-out both;
+    animation: mp-fade-in var(--dur-base) ease-out both;
   }
   .ip-tooltip {
-    animation: ip-fade-in var(--dur-fast) ease-out 300ms both;
+    /* 120ms fade after a 300ms hover delay (motion.md S9); the delay is a wait, not motion. */
+    animation: mp-fade-in var(--motion-micro) var(--ease-out) 300ms both;
   }
 }
 
@@ -1326,67 +1348,76 @@
     transform: translateX(4px);
   }
 }
-@keyframes ip-fade-in {
-  from {
-    opacity: 0;
-  }
-}
 
-/* ---- Motion pass (owner 2026-11-23): quiet entrances, at most 400ms, CSS only -------------- */
+
+/* ---- First paint (docs/design/motion.md S1, S2, T1, T7, T12): CSS keyframes, so nothing waits for
+   JavaScript; lib/motion (GSAP, lazy) takes over interactions after hydration. Transform and opacity
+   only, at most 400ms, no overshoot except the two success ticks. ---------------------------------- */
 @layer components {
-  /* Tool tiles rise in, staggered per grid (the first dozen 30ms apart, the rest together). */
+  /* Tool tiles rise in, 24ms apart; the whole grid has arrived by 400ms (items past the 9th arrive
+     with the 9th). */
   .mp-rise > li {
-    animation: mp-rise-in 360ms var(--ease-enter) both;
+    animation: mp-rise-in var(--motion-quick) var(--ease-out) both;
   }
-  .mp-rise > li:nth-child(2) { animation-delay: 30ms; }
-  .mp-rise > li:nth-child(3) { animation-delay: 60ms; }
-  .mp-rise > li:nth-child(4) { animation-delay: 90ms; }
-  .mp-rise > li:nth-child(5) { animation-delay: 120ms; }
-  .mp-rise > li:nth-child(6) { animation-delay: 150ms; }
-  .mp-rise > li:nth-child(7) { animation-delay: 180ms; }
-  .mp-rise > li:nth-child(8) { animation-delay: 210ms; }
-  .mp-rise > li:nth-child(9) { animation-delay: 240ms; }
-  .mp-rise > li:nth-child(10) { animation-delay: 270ms; }
-  .mp-rise > li:nth-child(n + 11) { animation-delay: 300ms; }
-  /* Hero: title, line, button and note fade up one after another. */
-  /* The h1 is the largest paint, so it shows at once (AC-55). */
+  .mp-rise > li:nth-child(2) { animation-delay: 24ms; }
+  .mp-rise > li:nth-child(3) { animation-delay: 48ms; }
+  .mp-rise > li:nth-child(4) { animation-delay: 72ms; }
+  .mp-rise > li:nth-child(5) { animation-delay: 96ms; }
+  .mp-rise > li:nth-child(6) { animation-delay: 120ms; }
+  .mp-rise > li:nth-child(7) { animation-delay: 144ms; }
+  .mp-rise > li:nth-child(8) { animation-delay: 168ms; }
+  .mp-rise > li:nth-child(n + 9) { animation-delay: 192ms; }
+  /* Hero: line, button and note fade up 40ms apart, done by 400ms. The h1 is the largest paint, so it
+     shows at once (AC-55). */
   .mp-hero > p,
   .mp-hero > div {
-    animation: mp-fade-up 400ms var(--ease-enter) both;
+    animation: mp-fade-up var(--motion-base) var(--ease-out) both;
   }
-  .mp-hero > p:first-of-type { animation-delay: 70ms; }
-  .mp-hero > div { animation-delay: 140ms; }
-  .mp-hero > p.mp-hero__note { animation-delay: 210ms; }
+  .mp-hero > p:first-of-type { animation-delay: 40ms; }
+  .mp-hero > div { animation-delay: 60ms; }
+  .mp-hero > p.mp-hero__note { animation-delay: 80ms; }
   .mp-intro > h1,
   .mp-enter {
-    animation: mp-fade-up 360ms var(--ease-enter) both;
+    animation: mp-fade-up var(--motion-base) var(--ease-out) both;
   }
-  /* Panels (drop card, result) pop in with the bundle's small overshoot. */
+  /* Panels (drop card, result) rise in: no overshoot on a core flow. */
   .mp-pop-in {
-    animation: mp-pop-in 380ms var(--ease-pop) both;
+    animation: mp-pop-in var(--motion-base) var(--ease-out) both;
   }
+  /* The success tick: the one overshoot, 200ms starting 80ms in. */
   .mp-tick-in {
-    animation: mp-pop-in 400ms var(--ease-pop) 160ms both;
+    animation: mp-tick-in var(--motion-quick) var(--ease-pop) 80ms both;
   }
-  /* The empty-state card's outline breathes in pale berry, inviting a drop. */
+  /* The empty-state card rises in, then a pale ring (::after, opacity only) glows once to invite a
+     drop: still by 2.8s (WCAG 2.2.2). */
   .mp-dropcard {
-    animation:
-      mp-pop-in 380ms var(--ease-pop) both,
-      mp-breathe 3.2s ease-in-out 400ms 1; /* breathes once: no motion past 5s (WCAG 2.2.2) */
+    animation: mp-pop-in var(--motion-base) var(--ease-out) both;
   }
-  /* The floating selection bar and the options sheet rise in. */
+  .mp-dropcard::after {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    border-radius: inherit;
+    border: 1.5px solid var(--mp-card-hover-border);
+    box-shadow: 0 0 0 8px rgba(217, 43, 75, 0.07);
+    opacity: 0;
+    pointer-events: none;
+    animation: mp-ring-once 2.4s ease-in-out 400ms 1;
+    transition: opacity var(--motion-quick) var(--ease-out);
+  }
+  /* The floating selection bar rises in. */
   .mp-rise-in {
-    animation: mp-pop-in 300ms var(--ease-pop) both;
+    animation: mp-pop-in var(--motion-quick) var(--ease-out) both;
   }
   /* Rendered page thumbnails ease in (fade + settle from 98%). */
   .mp-thumb-in {
-    animation: mp-thumb-in 300ms var(--ease-enter) both;
+    animation: mp-thumb-in var(--motion-quick) var(--ease-out) both;
   }
 }
 @keyframes mp-rise-in {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.98);
+    transform: translateY(var(--motion-rise)) scale(0.98);
   }
 }
 @keyframes mp-fade-up {
@@ -1398,7 +1429,13 @@
 @keyframes mp-pop-in {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.96);
+    transform: translateY(var(--motion-rise)) scale(0.98);
+  }
+}
+@keyframes mp-tick-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
   }
 }
 @keyframes mp-thumb-in {
@@ -1407,15 +1444,9 @@
     transform: scale(0.98);
   }
 }
-@keyframes mp-breathe {
-  0%,
-  100% {
-    border-color: var(--sand);
-    box-shadow: var(--shadow-card), 0 0 0 0 rgba(217, 43, 75, 0);
-  }
+@keyframes mp-ring-once {
   50% {
-    border-color: var(--mp-card-hover-border);
-    box-shadow: var(--shadow-card), 0 0 0 8px rgba(217, 43, 75, 0.07);
+    opacity: 1;
   }
 }
 
@@ -1428,6 +1459,33 @@
   *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* A dialog that is leaving (Dialog.tsx, motion.md S11; data-leaving names its exit preset): closed, so focus
+   and the page are back and it takes no clicks, but kept painted in the top layer, where it was, while
+   lib/motion fades it. Browsers
+   without the discrete overlay transition close it at once. */
+@supports (overlay: auto) {
+  dialog[data-leaving] {
+    position: fixed;
+    inset-block: 0;
+    pointer-events: none;
+    transition:
+      display var(--motion-quick) allow-discrete,
+      overlay var(--motion-quick) allow-discrete;
+  }
+  dialog[data-leaving]::backdrop {
+    opacity: 0;
+    transition: opacity var(--motion-quick) var(--ease-in);
+  }
+  /* A full-screen dialog fades out in 120ms (the "overlay" exit): hold it no longer than that, or it stays
+     in the top layer, invisible, for another 80ms. */
+  dialog[data-leaving="overlay"] {
+    transition-duration: var(--motion-micro);
+  }
+  dialog[data-leaving="overlay"]::backdrop {
+    transition-duration: var(--motion-micro);
   }
 }
 

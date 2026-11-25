@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { exit } from "@/lib/motion";
 import { Notice } from "../ui/Notice";
 import type { FlowNoticeInput } from "./types";
 
@@ -7,8 +8,9 @@ export type FlowNotice = FlowNoticeInput;
 
 /**
  * Floating notices (never in the document flow, so they never move content), as BerryPDF
- * Alerts: top center, dropping in from above. Newest first, three visible, the rest behind
- * "+N more". Errors never auto-dismiss.
+ * Alerts: top center, rising in 200ms from just above (CSS). A dismissed or expired notice
+ * fades out in 120ms (lib/motion, inert at once) before it is removed. Newest first, three
+ * visible, the rest behind "+N more". Errors never auto-dismiss.
  */
 export function NoticeStack({ notices, onDismiss }: { notices: FlowNotice[]; onDismiss: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false);
@@ -68,8 +70,9 @@ function TimedNotice({ notice: n, onDismiss }: { notice: FlowNotice; onDismiss: 
   const left = useRef(n.timeoutMs ?? 0);
   const expire = useRef(n.onExpire);
   expire.current = n.onExpire;
+  const box = useRef<HTMLDivElement>(null);
   const dismiss = useRef(onDismiss);
-  dismiss.current = onDismiss;
+  dismiss.current = () => void exit(box.current, "toast").then(onDismiss);
   useEffect(() => {
     if (!n.timeoutMs || paused) return;
     const started = Date.now();
@@ -84,6 +87,7 @@ function TimedNotice({ notice: n, onDismiss }: { notice: FlowNotice; onDismiss: 
   }, [n.timeoutMs, paused]);
   return (
     <div
+      ref={box}
       data-testid="notice"
       onPointerEnter={() => setPaused(true)}
       onPointerLeave={() => setPaused(false)}
@@ -92,7 +96,7 @@ function TimedNotice({ notice: n, onDismiss }: { notice: FlowNotice; onDismiss: 
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPaused(false);
       }}
     >
-      <Notice tone={n.tone} look="alert" title={n.title} onDismiss={onDismiss} action={n.action}>
+      <Notice tone={n.tone} look="alert" title={n.title} onDismiss={() => dismiss.current()} action={n.action}>
         {n.body && <p>{n.body}</p>}
         {n.items && n.items.length > 0 && <NoticeItems items={n.items} />}
       </Notice>

@@ -27,14 +27,15 @@ import { DropOverlay } from "./DropOverlay";
 import { FilePicker, type FilePickerHandle } from "./FilePicker";
 import { LimitsNote, PrivacyNote } from "./notes";
 import { NoticeStack, type FlowNotice } from "./NoticeStack";
-import { OwnerPermissionNotice } from "./OwnerPassword";
+import { OwnerPermissionNotice } from "./OwnerPermissionNotice";
 import type { PageActionsRenderer } from "./PageGrid";
 import type { PreviewTarget } from "./PagePreviewDialog";
 import { createVisibilityWatcher, ThumbContext } from "./Thumbnail";
 import { ToolIntro } from "./ToolIntro";
 import type { FlowApi, FlowContext, FlowState, LoadedFile, PageDecoration, PreviewItem, ProcessFn, ReadyFile, ToolOutput, WorkspaceContext } from "./types";
-import { LeaveGuard } from "./LeaveGuard";
 import { onIntent } from "./intent";
+import { exit, settle } from "@/lib/motion";
+import { enter } from "@/lib/motion/flow";
 // F23 cloud sources: the caret, the row and the hub on tool pages (everything else is the cloud chunk,
 // ui.ts, fetched on intent), compiled out entirely without them (every use sits behind the flag).
 import { CloudCaret, CloudRow, useCloud } from "../cloud/tool-cloud";
@@ -48,6 +49,9 @@ const lazyParts = {
   preview: () => import("./PagePreviewDialog"),
   pageGrid: () => import("./PageGrid"),
   fileGrid: () => import("./FileGrid"),
+  // Only needed once files are in (the leave prompt, the options sheet): out of the first load.
+  leave: () => import("./LeaveGuard"),
+  dialog: () => import("../ui/Dialog"),
 };
 const loadLazyParts = () => void Promise.all(Object.values(lazyParts).map((load) => load())).catch(() => {});
 const PageGrid = dynamic(() => lazyParts.pageGrid().then((m) => m.PageGrid), { ssr: false });
@@ -57,6 +61,7 @@ const PasswordDialog = dynamic(() => lazyParts.password().then((m) => m.Password
 const OwnerPasswordDialog = dynamic(() => lazyParts.owner().then((m) => m.OwnerPasswordDialog), { ssr: false });
 const ReplaceFileDialog = dynamic(() => lazyParts.replace().then((m) => m.ReplaceFileDialog), { ssr: false });
 const PagePreviewDialog = dynamic(() => lazyParts.preview().then((m) => m.PagePreviewDialog), { ssr: false });
+const LeaveGuard = dynamic(() => lazyParts.leave().then((m) => m.LeaveGuard), { ssr: false });
 
 /*
  * F23 cloud sources: every check is `process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"` written out, a
@@ -66,8 +71,8 @@ const PagePreviewDialog = dynamic(() => lazyParts.preview().then((m) => m.PagePr
 
 type Phase = "idle" | "processing" | "done" | "error";
 
-/** Shown for at least this long so a fast run does not flash. */
-const MIN_PROCESSING_MS = 300;
+/** Once shown, the processing card stays at least this long, so a fast run does not flash (motion.md T11). */
+const MIN_PROCESSING_MS = 400;
 const THUMB_MIN = 80;
 const THUMB_MAX = 400;
 /** Same as --ip-thumb-size in tokens.css, so the server HTML needs no style attribute (strict CSP style-src). */
@@ -236,6 +241,7 @@ export function ToolFlow({
   const intakeTrigger = useRef<HTMLElement | null>(null);
   const progressBox = useRef<HTMLDivElement>(null);
   const retryButton = useRef<HTMLButtonElement>(null);
+  const workArea = useRef<HTMLDivElement>(null);
   const abort = useRef<AbortController | null>(null);
   const phoneAddMenuRef = useRef(phoneAddMenu);
   phoneAddMenuRef.current = phoneAddMenu;
@@ -566,6 +572,12 @@ export function ToolFlow({
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       if (controller.signal.aborted) return;
       setProgress(1);
+      // The work area fades out (120ms, inert at once) and the result card rises in its place (T12).
+      // Inert drops the focus it holds (the progress bar) to <body>: park it on the tool heading first,
+      // until the result card focuses Download.
+      if (workArea.current?.contains(document.activeElement)) heading.current?.focus({ preventScroll: true });
+      await exit(workArea.current, "result");
+      if (controller.signal.aborted) return settle(workArea.current);
       setOutput(out);
       for (const w of out.warnings ?? []) pushNotice({ tone: "warning", title: w });
       setPhase("done");
@@ -627,10 +639,20 @@ export function ToolFlow({
     setFocusPickerTick((n) => n + 1);
   }, [announce, onReset, releaseDoc, updateFiles]);
 
+  // Back to options (T12 reversed): the work area is back at once and fades in (200ms; opacity only, so the
+  // sticky dock inside it never gets a transformed containing block). Focus moves to the tool heading, not
+  // <body>, as the card goes. The card's own 120ms fade-out first is deferred (docs/design/motion.md T12).
+  const resultCard = useRef<HTMLElement>(null);
+  const [workBack, setWorkBack] = useState(0);
   const backToOptions = useCallback(() => {
+    if (resultCard.current?.contains(document.activeElement)) heading.current?.focus({ preventScroll: true });
     setOutput(null);
     setPhase("idle");
+    setWorkBack((n) => n + 1);
   }, []);
+  useLayoutEffect(() => {
+    if (workBack) enter(workArea.current, "overlay");
+  }, [workBack]);
 
   const continueWith = useCallback(
     (target: FlowTool) => {
@@ -837,6 +859,7 @@ export function ToolFlow({
 
       {state === "done" && output ? (
         <ResultCard
+          ref={resultCard}
           output={output}
           tool={tool}
           continueTargets={continueTargets(output.type)}
@@ -850,7 +873,7 @@ export function ToolFlow({
         // with its options. When the panel runs past the fold the page scrolls (never the panel), the drop
         // area stays in view (sticky) and the primary stays pinned at the bottom of the screen.
         // Loaded: the pages take the full width down to the compact bottom bar.
-        <div className={state === "empty" ? "lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]" : undefined}>
+        <div ref={workArea} className={state === "empty" ? "lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]" : undefined}>
           <section aria-label="Your files" className={state === "empty" ? "min-w-0 lg:sticky lg:top-[calc(var(--ip-header-h)+16px)]" : "min-w-0"}>
             {state === "empty" ? (
               <DropCard>
@@ -968,7 +991,7 @@ export function ToolFlow({
                   // Decorative; the dock's progress bar and status carry the state for assistive tech.
                   <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[11]" data-testid="processing-loader">
                     <div className="sticky top-[calc(var(--ip-header-h)+120px)] flex justify-center pt-16">
-                      <div className="mp-loading rounded-panel border-[1.5px] border-sand bg-surface-raised px-8 pt-5 pb-4 shadow-card">
+                      <div className="mp-loading ip-wait-in rounded-panel border-[1.5px] border-sand bg-surface-raised px-8 pt-5 pb-4 shadow-card">
                         <BerryLoader size="md" />
                         <span className="tabular-nums">{copy.progress(flow.progressLabel, Math.round(progress * 100))}</span>
                       </div>
