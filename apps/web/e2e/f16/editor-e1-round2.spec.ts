@@ -222,3 +222,57 @@ test.describe("AC-66: recent images", () => {
     });
   }
 });
+
+// ---- focus after a text box is finished (the onTextDone refocus) -------------------------------
+
+test.describe("finishing an added text box", () => {
+  /** Opens a text box at a point of page 1 and types `text` into it. */
+  async function typeBox(page: Page, fx: number, fy: number, text: string) {
+    await tool(page, "t");
+    const p = await at(page, fx, fy);
+    await page.mouse.click(p.x, p.y);
+    await expect(page.getByTestId("text-input")).toBeFocused();
+    await page.keyboard.insertText(text);
+  }
+  const focusedObject = (page: Page) => page.evaluate(() => document.activeElement?.closest("[data-obj-id]")?.getAttribute("data-obj-id") ?? null);
+
+  for (const [label, text] of [
+    ["Latin", "Focus check"],
+    ["shaped (its font loads first)", "नमस्ते दुनिया"],
+  ] as const) {
+    test(`Escape puts focus back on the finished box: ${label}`, async ({ page }) => {
+      await open(page);
+      await typeBox(page, 0.3, 0.3, text);
+      await page.keyboard.press("Escape");
+      await expect(page.getByTestId("text-input")).toHaveCount(0);
+      await expect.poll(() => focusedObject(page), { timeout: 10_000 }).not.toBeNull();
+      const id = await focusedObject(page);
+      await expect(page.locator(`[data-obj-id="${id}"]`)).toBeFocused();
+      // It stays there once the box's font is in (no later move).
+      await page.waitForTimeout(800);
+      await expect(page.locator(`[data-obj-id="${id}"]`)).toBeFocused();
+    });
+  }
+
+  test("Enter starts a new line in the box; Escape then finishes it and focus comes back to it", async ({ page }) => {
+    await open(page);
+    await typeBox(page, 0.3, 0.3, "First line");
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("text-input")).toBeFocused();
+    await page.keyboard.insertText("Second line");
+    await expect(page.getByTestId("text-input")).toHaveValue("First line\nSecond line");
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("text-input")).toHaveCount(0);
+    await expect.poll(() => focusedObject(page), { timeout: 10_000 }).not.toBeNull();
+  });
+
+  test("a box opened while the last one's font loads keeps focus and its text", async ({ page }) => {
+    await open(page);
+    await typeBox(page, 0.3, 0.3, "नमस्ते");
+    await page.keyboard.press("Escape");
+    await typeBox(page, 0.3, 0.5, "Second box");
+    await page.waitForTimeout(800);
+    await expect(page.getByTestId("text-input")).toBeFocused();
+    await expect(page.getByTestId("text-input")).toHaveValue("Second box");
+  });
+});

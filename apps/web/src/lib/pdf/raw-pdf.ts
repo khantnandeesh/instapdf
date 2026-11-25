@@ -54,19 +54,26 @@ class ParseError extends Error {}
 
 /** Reads PDF objects from `bytes` starting at `pos`. */
 class Lexer {
+  /**
+   * `charge` is told of every byte the lexer looks at, as it looks (a parse that fails still
+   * scanned its bytes, so failing can't be a way round the reader's budget).
+   */
   constructor(
     readonly b: Uint8Array,
     public pos = 0,
+    readonly charge: (n: number) => void = () => {},
   ) {}
 
   skip(): void {
     const b = this.b;
+    const from = this.pos;
     while (this.pos < b.length) {
       const c = b[this.pos]!;
       if (WS.has(c)) this.pos++;
       else if (c === 0x25) while (this.pos < b.length && b[this.pos] !== 10 && b[this.pos] !== 13) this.pos++;
       else break;
     }
+    this.charge(this.pos - from);
   }
 
   /** A run of regular characters (a number or a keyword), without moving past it when `peek`. */
@@ -74,6 +81,7 @@ class Lexer {
     this.skip();
     let end = this.pos;
     while (end < this.b.length && !WS.has(this.b[end]!) && !DELIM.has(this.b[end]!)) end++;
+    this.charge(end - this.pos + 1);
     const w = latin1(this.b.subarray(this.pos, end));
     if (!peek) this.pos = end;
     return w;
@@ -137,6 +145,7 @@ class Lexer {
     this.pos++;
     let end = this.pos;
     while (end < this.b.length && !WS.has(this.b[end]!) && !DELIM.has(this.b[end]!)) end++;
+    this.charge(end - this.pos + 1);
     const raw = latin1(this.b.subarray(this.pos, end));
     this.pos = end;
     return name(raw.replace(/#([0-9a-fA-F]{2})/g, (_, h: string) => String.fromCharCode(parseInt(h, 16))));
@@ -145,8 +154,16 @@ class Lexer {
   private literal(): PdfString {
     const b = this.b;
     const out: number[] = [];
+    const from = this.pos++;
+    try {
+      return this.literalBody(b, out);
+    } finally {
+      this.charge(this.pos - from);
+    }
+  }
+
+  private literalBody(b: Uint8Array, out: number[]): PdfString {
     let depth = 0;
-    this.pos++;
     while (this.pos < b.length) {
       const c = b[this.pos++]!;
       if (c === 0x5c) {
@@ -172,6 +189,8 @@ class Lexer {
 
   private hex(): PdfString {
     const end = this.b.indexOf(0x3e, this.pos);
+    // The search looked at every byte up to the `>`, or to the end when there is none.
+    this.charge((end < 0 ? this.b.length : end + 1) - this.pos);
     if (end < 0) throw new ParseError("open hex string");
     const digits = latin1(this.b.subarray(this.pos + 1, end)).replace(/[^0-9a-fA-F]/g, "");
     this.pos = end + 1;
@@ -291,6 +310,9 @@ export class RawPdf {
     return new RawPdf(bytes, budget);
   }
 
+  /** `work`, for a Lexer to call. */
+  private readonly charge = (n: number) => this.work(n);
+
   /** Charges `n` bytes of work to the budget. */
   private work(n: number) {
     this.left -= n;
@@ -357,10 +379,7 @@ export class RawPdf {
       if (!s) return undefined;
       const at = s.offsets[entry.index * 2 + 1];
       if (s.offsets[entry.index * 2] !== num || at === undefined || s.first + at >= s.data.length) return undefined;
-      const lx = new Lexer(s.data, s.first + at);
-      const obj = lx.object();
-      this.work(lx.pos - (s.first + at));
-      return obj;
+      return new Lexer(s.data, s.first + at, this.charge).object();
     }
     if (entry?.type === "at") {
       const obj = this.objectAt(entry.offset, num);
@@ -372,12 +391,11 @@ export class RawPdf {
 
   /** The object whose `N G obj` header starts at `offset`; undefined when it is not `num`'s. */
   private objectAt(offset: number, num: number | null): PdfObj | undefined {
-    const lx = new Lexer(this.bytes, offset);
+    const lx = new Lexer(this.bytes, offset, this.charge);
     const n = lx.int();
     const gen = lx.int();
     if (n === null || gen === null || (num !== null && n !== num) || lx.word() !== "obj") return undefined;
     const obj = lx.object();
-    this.work(lx.pos - offset);
     if (!isDict(obj) || lx.word(true) !== "stream") return obj;
     lx.word();
     // The data starts after the end of the `stream` line.
@@ -429,7 +447,7 @@ export class RawPdf {
         const data = this.decode(s);
         const [n, first] = [this.lookup(s, "N"), this.lookup(s, "First")];
         if (isNum(n) && isNum(first) && Number.isInteger(n) && Number.isInteger(first) && n >= 0 && first >= 0 && first < data.length) {
-          const lx = new Lexer(data);
+          const lx = new Lexer(data, 0, this.charge);
           const offsets: number[] = [];
           for (let i = 0; i < Math.min(n * 2, data.length); i++) {
             const v = lx.int();
@@ -464,12 +482,11 @@ export class RawPdf {
       const at = queue.shift()!;
       if (seen.has(at) || at < 0 || at >= this.bytes.length || seen.size > 256) continue;
       seen.add(at);
-      const lx = new Lexer(this.bytes, at);
+      const lx = new Lexer(this.bytes, at, this.charge);
       let section: Map<string, PdfObj>;
       if (lx.word(true) === "xref") {
         lx.word();
         section = this.readTable(lx);
-        this.work(lx.pos - at);
         const stm = section.get("XRefStm");
         // Hybrid files: the stream's entries rank right after this table's.
         if (isNum(stm)) queue.unshift(stm);
@@ -560,9 +577,7 @@ export class RawPdf {
     // From the last `trailer` back to the first (at 0 there is none before it: stop).
     for (let at = text.lastIndexOf("trailer"); at >= 0; at = at === 0 ? -1 : text.lastIndexOf("trailer", at - 1)) {
       try {
-        const lx = new Lexer(this.bytes, at + "trailer".length);
-        const t = lx.object();
-        this.work(lx.pos - at);
+        const t = new Lexer(this.bytes, at + "trailer".length, this.charge).object();
         if (isDict(t) && isRef(t.dict.get("Root"))) return t.dict;
       } catch (e) {
         if (e instanceof BudgetError) throw e;

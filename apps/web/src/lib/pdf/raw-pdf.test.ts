@@ -207,6 +207,27 @@ describe("raw PDF reader on hostile input", () => {
     }).toThrow(BudgetError);
   });
 
+  // A parse that fails still scanned its bytes: many objects whose string never closes made every
+  // fallback attempt read to the end of the file for free (33 s and 15 s before failures were charged).
+  it.each([
+    ["an unclosed literal string", (i: number) => `${i} 0 obj\n(\n`, 16_000],
+    ["an unclosed hex string", (i: number) => `${i} 0 obj\n<a\n`, 200_000],
+  ])("objects that each open %s run out of budget, quickly", (_, obj, count) => {
+    const parts = ["%PDF-1.4\n"];
+    for (let i = 1; i <= count; i++) parts.push(obj(i));
+    const bytes = ascii(parts.join(""));
+    let error: unknown;
+    bounded(5000, () => {
+      try {
+        readAll(bytes);
+      } catch (e) {
+        error = e;
+        throw e;
+      }
+    });
+    expect(error).toBeInstanceOf(BudgetError);
+  });
+
   it("writes numbers without exponents", () => {
     expect(num(1e21)).toBe("1000000000000000000000");
     expect(num(-1e22)).toBe("-10000000000000000000000");
