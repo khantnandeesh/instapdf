@@ -27,9 +27,9 @@
 |---|---|---|---|---|
 | sejda-t1 | ~03:47 | alpha, bravo, charlie.png | defaults | The merge was started, but my result-page selector missed the download (the result screen is inside an iframe). **Output not captured.** Counted against the budget. |
 | sejda-t2 | 03:55 | alpha, bravo, echo | TOC = file names, footer, double-sided | Same harness miss. The result screen was seen in a screenshot (name `alpha_merged.pdf`). A later GET of the task download URL returned 404, so **no output.** Counted against the budget. |
-| sejda-t3 | 04:02 | alpha, bravo, echo | TOC = file names, footer, double-sided | **Captured:** `docs/evals/cache/f3-merge/sejda-t3-alpha_merged.pdf` (7,229 B). Result appeared 3.2 s after "Merge PDF files" (1 s polling). |
+| sejda-t3 | 04:02 | alpha, bravo, echo | TOC = file names, footer, double-sided | **Captured:** `/mnt/project-files/evals-cache/f3-merge/sejda-t3-alpha_merged.pdf` (7,229 B). Result appeared 3.2 s after "Merge PDF files" (1 s polling). |
 
-Other Sejda traffic was observation only (page loads and uploads, no tasks): about 25 small synthetic files, which is under the free tier's 30-files-per-hour limit. Lighthouse also ran once on the reference page. Cached in `docs/evals/cache/f3-merge/`: the t3 output, run logs (`sejda-t2.json`, `sejda-t3.json`, `sejda-observation.json`, `lh-sejda.json`) and the reference screenshots. These are reference only and must never ship. `ours-same-task-alpha-merged.pdf` is our output for the same task as sejda-t3.
+Other Sejda traffic was observation only (page loads and uploads, no tasks): about 25 small synthetic files, which is under the free tier's 30-files-per-hour limit. Lighthouse also ran once on the reference page. Cached in `/mnt/project-files/evals-cache/f3-merge/`: the t3 output, run logs (`sejda-t2.json`, `sejda-t3.json`, `sejda-observation.json`, `lh-sejda.json`) and the reference screenshots. These are reference only and must never ship. `ours-same-task-alpha-merged.pdf` is our output for the same task as sejda-t3.
 
 What the reference does on the first real Merge run (the spec asked the evaluator to record these items, which it marked *unverified*):
 

@@ -1,0 +1,83 @@
+{
+ "feature": "f16-e1-editor",
+ "raw_evidence": "/mnt/project-files/evals-cache/f16-e1-editor/",
+ "note": "Raw evidence (Sejda outputs, captures, logs, Lighthouse runs and our matching captures) moved out of git per docs/process/workflow.md 'Reference (Sejda) runs'. Hashes let a re-eval verify the cache is unchanged.",
+ "moved_on": "2026-11-25",
+ "files": [
+  {
+   "path": "fixture-para-times.pdf",
+   "bytes": 2215,
+   "sha256": "39fa50eb078b67270136fca61fdc14375e2d6c760d2a884a4c0cda7818d3af1f"
+  },
+  {
+   "path": "ours-same-task-o1-text-sign-lineedit.pdf",
+   "bytes": 8279,
+   "sha256": "7c2ba6961aa204f889db750027f6be90a9c2a66d7287dfea9bb2782eed97ef85"
+  },
+  {
+   "path": "ours-same-task-o2-whiteout-shapes-annots.pdf",
+   "bytes": 6047,
+   "sha256": "0b591b698fe6b121d898bcf50bbe07aa02f07dad8ffc7e8ef0c7ad9cf6c00815"
+  },
+  {
+   "path": "sejda-t1-placed.png",
+   "bytes": 55062,
+   "sha256": "962ce2f38062847f1d7707b91713ff44cf608eedbcd036f86921449b4ae5ff77"
+  },
+  {
+   "path": "sejda-t1-signmodal.png",
+   "bytes": 118484,
+   "sha256": "febbfa0084c814c41b3bfb892088bd668558845754fdd9c1600bb73b7abfe07b"
+  },
+  {
+   "path": "sejda-t1.json",
+   "bytes": 449,
+   "sha256": "d96ebb97e5e5366170ba699e9e80e09ef97d5fc72a3f114ba011c2107a58cdaa"
+  },
+  {
+   "path": "sejda-t2-output-p1.png",
+   "bytes": 57373,
+   "sha256": "3469f2fe993a26538d95c009c99ad97719025d4160b313a6a5c23b74d318624b"
+  },
+  {
+   "path": "sejda-t2-page1-before-apply.png",
+   "bytes": 76152,
+   "sha256": "c6d07a6a89f6c720861ba8ef6ddf5e17592f729dd6cbc5418fb7d1244aed9d98"
+  },
+  {
+   "path": "sejda-t2-text-sign-lineedit.pdf",
+   "bytes": 7649,
+   "sha256": "b5484cdbdec44eab3ef5c566440de98d99cd8e4a1cf7fb5e2118372c0c680b6f"
+  },
+  {
+   "path": "sejda-t2.json",
+   "bytes": 446,
+   "sha256": "7d9e6c653c483d5810dcfc37c551d6ec12a583e870f8e5b920d742074d97138d"
+  },
+  {
+   "path": "sejda-t3-output-p1.png",
+   "bytes": 57339,
+   "sha256": "a492466f5b7e1562990fe51b2b7a86a211168611ce126170c7b02f0f4a993a04"
+  },
+  {
+   "path": "sejda-t3-page1-before-apply.png",
+   "bytes": 82819,
+   "sha256": "fa425b46a8a0eab0eff27a755485f6ddddd6db82d5190c39beb24cd475ad4dad"
+  },
+  {
+   "path": "sejda-t3-whiteout-shapes-annots.pdf",
+   "bytes": 4032,
+   "sha256": "af5c66cfef04bc61408c41b8ca91e0f3639cc64b47e1aa47121a77b2e1f106cc"
+  },
+  {
+   "path": "sejda-t3-whiteout.png",
+   "bytes": 60383,
+   "sha256": "dcfc554a5b25b48baae610b4a26dafc802b0b7b9419a62216acaaefbf3808299"
+  },
+  {
+   "path": "sejda-t3.json",
+   "bytes": 446,
+   "sha256": "a7e3d29148a1e85b0fa0bf675de913d50219520e8467b128c9d3d728dba51fce"
+  }
+ ]
+}

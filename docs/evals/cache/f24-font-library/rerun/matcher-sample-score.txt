@@ -1,2 +1,0 @@
-true family first: 133/141 = 94.3% {'Exact': 141}
-misses: [('noto-sans-jp_400-normal', 'Noto Sans HK · Exact'), ('noto-sans-jp_700-normal', 'Noto Sans HK · Exact'), ('noto-sans-kr_400-normal', 'Noto Sans HK · Exact'), ('noto-sans-kr_700-normal', 'Noto Sans HK · Exact'), ('noto-sans-sc_400-normal', 'Noto Sans HK · Exact'), ('noto-sans-sc_700-normal', 'Noto Sans HK · Exact'), ('noto-sans-thai_400-normal', 'Noto Sans · Exact'), ('noto-sans-thai_700-normal', 'Noto Sans Armenian · Exact')]
