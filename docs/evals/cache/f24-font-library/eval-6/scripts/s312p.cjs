@@ -1,0 +1,15 @@
+// Fifth evaluation, AC-310/AC-312 follow-up: " नया ⸘ ok" on the embedded line, own font added, Enter: is the text kept in the file? Full line list before and after, and the download.
+const { chromium, BASE, log, SHOTS, FX } = require("./lib.cjs"); const { install, state } = require("./st.cjs");
+(async () => { const browser = await chromium.launch({ proxy: { server: process.env.HTTPS_PROXY } });
+  for (const [txt, own] of [[" नया ⸘ ok", true], [" नया ok", false], [" Ω ⸘ ok", true]]) { const ctx = await browser.newContext({ deviceScaleFactor: 2, acceptDownloads: true, viewport: { width: 1280, height: 800 } }); const page = await ctx.newPage();
+    await page.goto(BASE + "/edit-pdf", { waitUntil: "networkidle", timeout: 90000 }); await page.locator('input[type="file"]').first().setInputFiles(FX + "chrome-justified-mixed.pdf"); await page.waitForTimeout(4000); await install(page);
+    const all = () => page.getByTestId("line").evaluateAll((ls) => ls.map((l) => l.dataset.text)); const before = await all();
+    const o = page.getByRole("option", { name: /^in full/ }); const b = await o.boundingBox(); await page.mouse.click(b.x + b.width - 3, b.y + b.height / 2); await page.getByTestId("line-input").waitFor(); await page.waitForTimeout(600); await page.keyboard.press("End"); await page.keyboard.insertText(txt); await page.waitForTimeout(4000);
+    if (own) { await page.keyboard.press("Enter"); await page.waitForTimeout(1500); const fc = page.waitForEvent("filechooser", { timeout: 6000 }).catch(() => null); await page.getByRole("button", { name: /own font/ }).first().click(); const ch = await fc; await ch.setFiles(process.env.FXD + "/own-dejavu.ttf"); await page.waitForTimeout(2500); const s = await state(page); log(JSON.stringify(txt), "own added:", JSON.stringify({ hint: s.hint && s.hint.text, status: s.status })); await page.screenshot({ path: SHOTS + `ac312-deva-own-added-${txt.trim().replace(/\s/g, "_")}-1280.png` }); await page.locator("[data-testid=line-input]").focus(); }
+    await page.keyboard.press("Enter"); await page.waitForTimeout(3500); const s = await state(page); const after = await all(); const snap = await page.locator("body").ariaSnapshot();
+    log(JSON.stringify(txt), "after Enter:", JSON.stringify({ box: !!s.box, notice: s.notice && s.notice.text, undo: s.undo, standin: [...new Set(snap.split("\n").filter((x) => /isn’t|Using/.test(x)).map((x) => x.trim()))], linesBefore: before.length, linesAfter: after.length, changed: after.filter((l) => !before.includes(l)), gone: before.filter((l) => !after.includes(l)) }));
+    await page.mouse.move(5, 5); await page.screenshot({ path: SHOTS + `ac312-deva-own-after-${txt.trim().replace(/\s/g, "_")}-1280.png` });
+    if (!s.box) { const dl = page.waitForEvent("download", { timeout: 8000 }).catch(() => null); await page.getByTestId("download").click(); const d = await dl; if (d) await d.saveAs(`out/s312p-${txt.trim().replace(/\s/g, "_")}.pdf`); }
+    await ctx.close(); }
+  await browser.close();
+})().catch((e) => { console.error(String(e).slice(0, 1200)); process.exit(1); });

@@ -1,0 +1,33 @@
+const { open, load, log, SHOTS } = require("./lib.cjs"); const { install, state } = require("./st.cjs"); const fs = require("fs");
+(async () => {
+  const phone = process.env.PHONE === "1"; const tag = phone ? "390" : "1280";
+  const { browser, page, reqs } = await open({ phone });
+  await load(page, "chrome-justified-mixed.pdf"); await install(page);
+  const tap = (x, y) => phone ? page.touchscreen.tap(x, y) : page.mouse.click(x, y);
+  const S = async (name, shot) => { const s = await state(page); log(tag, "##", name, JSON.stringify(s)); if (shot) await page.screenshot({ path: SHOTS + `ac310-${shot}-${tag}.png` }); return s; };
+  let downloads = 0; page.on("download", (d) => { downloads++; d.saveAs(`out/s3a-${tag}-dl${downloads}.pdf`); });
+  const blank = phone ? [200, 500] : [900, 700];
+  const opt = page.getByRole("option", { name: /^This agreement/ }); const b = await opt.boundingBox();
+  await tap(b.x + b.width * 0.3, b.y + b.height / 2); const box = page.getByTestId("line-input"); await box.waitFor(); await page.waitForTimeout(500);
+  await page.keyboard.press("End"); await page.keyboard.type(" for Dvořák", { delay: 40 }); await page.waitForTimeout(1500);
+  await page.keyboard.press("Enter"); await page.waitForTimeout(2000);
+  await S("1 after Enter (refused)", "1-refused");
+  await tap(...blank); await page.waitForTimeout(2000);
+  await S("2 after leaving (click blank)", "2-left");
+  await box.focus().catch(() => {}); await page.keyboard.press("Enter"); await page.waitForTimeout(2000);
+  await S("3 after Enter again");
+  await page.getByTestId("download").click(); await page.waitForTimeout(4000);
+  await S("4 after Download (downloads=" + downloads + ")", "4-download-blocked");
+  const l2 = page.getByRole("option", { name: /^in full/ }); const b2 = await l2.boundingBox();
+  await tap(b2.x + 10, b2.y + b2.height / 2); await page.waitForTimeout(2000);
+  await S("5 after clicking another line", "5-other-line");
+  // change the text: drop " Dvořák" so " for" remains
+  await box.focus().catch(() => {}); await page.keyboard.press("End"); for (let i = 0; i < 7; i++) await page.keyboard.press("Backspace"); await page.waitForTimeout(800);
+  await S("6a text changed");
+  await tap(...blank); await page.waitForTimeout(2500);
+  await S("6b after leaving with changed text", "6-saved");
+  await page.getByTestId("download").click(); await page.waitForTimeout(4000);
+  await S("7 after Download (downloads=" + downloads + ")");
+  log(tag, "errors", JSON.stringify(reqs.filter((r) => r.console || r.pageerror)), "non-GET", reqs.filter((r) => r.u && r.m !== "GET").length);
+  await browser.close();
+})().catch((e) => { console.error(String(e).slice(0, 1500)); process.exit(1); });
