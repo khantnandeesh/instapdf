@@ -1,231 +1,222 @@
-# Evaluation: F16 PDF editor, phase E1
+# Evaluation: F16 PDF editor, phase E1 (round 2)
 
-- **Verdict: FAIL**
-- Evaluated: 2026-11-24 (10:20–11:55 UTC) by parity-evaluator
-- Spec: `docs/specs/f16-pdf-editor.md` at `ba63a9c` (E1-mapped ACs: 1–8, 23–27, 31–32, 41, 43–46, 48–52, 54–58, 60, 64–73, 78–98; AC-1b N/A in E1). That gives 62 judged ACs: 21 P0, 37 P1, 4 P2.
-- Reference: https://www.sejda.com/pdf-editor
-- Candidate: https://web-staging-qzq5fa2g7q-uc.a.run.app/edit-pdf (deployed from `main` `ba63a9c`; Beta badge and noindex are expected)
-- Harness: Playwright (headless Chromium), pikepdf (`check_pdf_syntax`), pypdfium2 (text, char boxes, renders), pypdf, pdfjs-dist 6.5.438, @axe-core/playwright, Lighthouse 12 CLI (mobile). Fixtures were generated for this eval (reportlab, Pillow, Chromium print): `para-times.pdf` (2 pages, Letter, Times 12), `ten-page.pdf`, `big-300p.pdf`, `big-500p.pdf`, `big-195mb.pdf` (197 MB, 24 pages), `scan.pdf`, `tinted.pdf` (#f6efd9 background), `deva-chrome.pdf` (Chrome print, Noto Sans Devanagari, OFL), `photo.png`, `sig.png`, `notes.txt`, `corrupt.pdf`, an empty file, plus the repo's `user-pw.pdf` (password `test`) and `owner-restricted.pdf`.
-- Screenshots (both sites, 1280x720 and 390x844 at DSF 1, plus 320x568 and 1366x657 / 390x664 for M12): `/mnt/project-files/designs/editor-e1/eval/`
+- **Verdict: FAIL.** The only gate still failing is the micro-check gate: **M2 (upload start) is a lose**, with no owner waiver on record. Every other gate now clears: **P0 21/21**, **all ACs 60/62 (96.8%)**, Lighthouse mobile performance **96** (median of 4), and **0 critical** axe issues. M12 is no longer a lose: desktop now ties the reference and phone wins. Two ACs still fail, neither of them P0: **AC-51** (P1, editor JS over 250 KB gzip) and **AC-66** (P2, no recent images).
+- Evaluated: 2026-11-25, 18:45–19:10 UTC, by parity-evaluator. This is a re-evaluation of the round-1 FAIL of 2026-11-24.
+- Spec: `docs/specs/f16-pdf-editor.md` at `origin/main` `da7cede`. The E1-mapped AC set is the same as round 1: 62 judged ACs (21 P0, 37 P1, 4 P2); AC-1b is N/A in E1.
+- Reference: https://www.sejda.com/pdf-editor. **New Sejda tasks run: 0.** The cached round-1 evidence (T1–T3 from 2026-11-24, within the 30-day reuse window) was reused, and sejda.com was not visited.
+- Candidate: https://web-staging-qzq5fa2g7q-uc.a.run.app/edit-pdf
+  - **Build confirmed:** `/api/health` returned `{"version":"da7cede6b7515ee5b97d7296bc5b60ed4c30967b"}` at 18:47 UTC and again at 19:09 UTC.
+  - The "Deploy staging" run for `da7cede` finished at 18:47:33 UTC: Cloud Run revision `web-staging-00053-4tz`, Next build id `tLmS5w5CNZNtOZOQskqxf` (it was `F4ouSvYEVgO4VWZYJ61DL` before the deploy).
+- Harness:
+  - Playwright 1.63 driving Chrome headless, with touch emulation for phones and `--workers 1`.
+  - Output checks: pikepdf `check_pdf_syntax`, pypdfium2 (text, char boxes, renders), @axe-core/playwright, Lighthouse 13.6 CLI (mobile).
+  - Fixtures: `para-times.pdf` (the round-1 fixture, from cache), plus `ten-page.pdf`, `one-page.pdf`, `photo.png` and `photo2.png`, generated for this run.
+- Raw evidence (screenshots, PDFs, network logs, axe and Lighthouse JSON, harness scripts): `/mnt/project-files/evals-cache/f16-e1-editor/round2/`
 
 ## Summary
 
 | Gate | Bar | Result | OK |
 |---|---|---|---|
-| P0 ACs | all pass | 18 / 21 (AC-48, AC-68, AC-82 fail) | **no** |
-| All ACs | at least 90% | 56 / 62 (90.3%) | yes (barely) |
-| Lighthouse performance (mobile) | at least 90 | 93 (median of 3 valid runs: 85 / 94 / 93) | yes |
-| axe critical issues | none | 0 critical; 1 serious; moderate landmark issues | yes |
-| Micro-checks (mission) | no "lose" unless waived | M2 lose, M12 lose on desktop | **no** |
+| P0 ACs | all pass | **21 / 21** (AC-48, AC-68 and AC-82 now pass; no P0 regressions) | yes |
+| All ACs | at least 90% | **60 / 62 (96.8%)** | yes |
+| Lighthouse performance (mobile) | at least 90 | **96** (runs: 96 / 96 / 95 / 98) | yes |
+| axe critical issues | none | **0 critical**; 1 serious (unchanged from round 1); 1 minor | yes |
+| Micro-checks (mission) | no "lose" unless waived | **M2 lose** (no waiver). M12 is now tie on desktop and win on phone | **no** |
 
-By priority: **P0 18/21**, **P1 35/37**, **P2 3/4**. No owner waiver is on record.
+By priority: **P0 21/21**, **P1 36/37**, **P2 3/4**. No owner waiver is on record. The lead's note in `f24-font-library.md` says M2 is owned by F23 (cloud pickers, behind a flag until the owner creates the OAuth apps) and is "not waived". This eval keeps the gate as briefed: no lose unless waived.
 
-## Sejda runs (budget: 3 real tasks in total for this eval)
+## Sejda evidence (cached, no new tasks)
 
-All on 2026-11-24, UTC. Each "apply → ready" time includes Sejda's server processing plus our 1 s polling; requests stayed at or below 1 per second.
+The round-1 cache was reused: `sejda-t2-text-sign-lineedit.pdf`, `sejda-t3-whiteout-shapes-annots.pdf`, `sejda-t1/t2/t3.json` and their screenshots, plus the M12 reference captures. Compared with today's InstaPDF output for the same edits (`round2/out-flow-1.pdf`):
 
-| # | Apply (UTC) | Ready | Task | Cached output | Result |
-|---|---|---|---|---|---|
-| T1 | 10:36:51 (upload 10:36:15) | not captured | `para-times.pdf`: add text + typed signature. Task `YK4CCN1C-202611241136` | none (`sejda-t1.json`, screenshots) | Output lost: the script turned on Sejda's auto-download, and the later GET for the file returned 404. It still counts as a task. |
-| T2 | 10:42:14.4 | 10:42:22.0 (7.7 s); downloaded 10:42:22.3 | Add text + typed signature + edit line 2 "page" to "sheet". Task `BV4JF0MA-202611241142` | `cache/f16-e1-editor/sejda-t2-text-sign-lineedit.pdf` | 7,649 B. Added text is Helvetica 10 pt, **not embedded**, no ToUnicode. Signature is a 183x58 px **raster** image with SMask, so it is not extractable. The edited line moved to the end of the text order. qpdf-clean. |
-| T3 | 10:50:55.0 | 10:51:02.7 (7.7 s); downloaded 10:51:03.1 | Whiteout over footer, rectangle, ellipse, arrow, highlight "quick brown", strike "thirty", freehand. Task `WVWUAKX2-202611241150` | `cache/f16-e1-editor/sejda-t3-whiteout-shapes-annots.pdf` | 4,032 B. Whiteout, rectangle and ellipse are in the content stream. Arrow is a Line annotation. Highlight and StrikeOut have **no appearance stream**; Ink has one. |
-
-Same tasks on InstaPDF (cached as `ours-same-task-o1-text-sign-lineedit.pdf` and `ours-same-task-o2-whiteout-shapes-annots.pdf`):
-
-- O1 (= T2), 8,279 B, built in about 1.18 s in the tab, 0 non-GET requests:
-  - Added text is an embedded Arimo subset with ToUnicode, 12 pt (follows nearby text).
-  - The signature is vector Caveat text, embedded; "Alex Rao" is extractable.
-  - The line edit changed "page" to "sheet" and kept the reading order.
-  - Added text is at the click point on both sites (x 72.0 for us, 72.1 for Sejda).
-- O2 (= T3), 6,047 B. Whiteout, shapes and arrow are content paths. Highlight, StrikeOut and Ink all have appearance streams.
-- Pixel diff at 2x of the untouched regions is 0 on both sites, and page 2 is identical on both.
-
-Upload-only visits (no apply) were used to read Sejda's controls, its upload sources and its first-screen layout.
+| Property | Sejda T2 / T3 (cached) | InstaPDF `da7cede` |
+|---|---|---|
+| Page count, size, rotation | 2, Letter, 0 / 2, Letter, 0 | 2, Letter, 0 |
+| Added text | Helvetica, not embedded, no ToUnicode | Arimo subset, embedded, ToUnicode. Starts at x 72.0 pt, the click point |
+| Signature | Raster image, not extractable | Caveat subset, embedded; "Alex Rao" extracts |
+| Highlight / StrikeOut | No appearance stream | Appearance streams on both, and on Ink |
+| Whiteout | Content path | Content path. The footer region renders pure white (min 255, against 338 dark px in the source) |
+| Page 2 untouched | yes | yes (pixel diff 0 at 2x) |
+| File size | 7,649 B / 4,032 B | 11,958 B (more objects in a single file) |
+| qpdf | clean | clean (all 7 outputs from this run) |
 
 ## AC results
 
-| AC | Pri | Sejda result | InstaPDF result | Pass |
+The previously failing ACs and every P0 were re-run on `da7cede`. Rows marked "carried" were not re-run this round; their round-1 PASS stands, and nothing seen this round contradicts it.
+
+| AC | Pri | Sejda result | InstaPDF result (`da7cede`) | Pass |
 |---|---|---|---|---|
-| AC-1 | P0 | Uploads the file as soon as it is picked | 0 non-GET requests, largest request body 0 B, single origin through open, edit and download | PASS |
-| AC-2 | P0 | n/a | CSP `connect-src 'self'`; a test cross-origin fetch is blocked | PASS |
-| AC-3 | P1 | Privacy copy only | "0 B uploaded" chip; popover; "How to check" goes to `/privacy#files` | PASS |
-| AC-4 | P0 | Free tier: 3 tasks per hour | 5 downloads in 9 s; no counter or limit copy anywhere | PASS |
-| AC-5 | P1 | n/a | 300 pages open in 3.5 s; virtualised list; no limit toast | PASS |
-| AC-6 | P0 | Upload, then first page (about 5.5 s) | First page median 239 ms | PASS |
-| AC-7 | P1 | Zoom | 50/100/200% with 0 overlay drift; Ctrl+wheel; pinch; consistent at DPR 1.25 | PASS |
-| AC-8 | P1 | Thumbnails | Thumbnail jump in about 1.2 s (smooth scroll); page field follows | PASS |
-| AC-23 | P0 | Text added at the click; Helvetica, not embedded | Text at the click point ±0.1 pt; embedded Arimo with ToUnicode; extractable | PASS |
-| AC-24 | P0 | Image move and resize | Move, aspect-locked corner resize and Rotate 90° all reach the output. Gap 3 below (free-rotate handle covered) | PASS |
-| AC-25 | P0 | Whiteout | Fill, border colour and width; inline "Hides content; doesn't delete it" | PASS |
-| AC-26 | P0 | Rectangle, ellipse in content; arrow as annotation | Rectangle, ellipse, line, arrow as content paths with stroke and fill colour (6 paths, `rg`/`RG` checked) | PASS |
-| AC-27 | P0 | Highlight and strike have no appearance stream | Highlight, underline (96.3–119, blue), strike, pen, marker (CA 0.4), all with appearance streams | PASS |
-| AC-31 | P0 | Type / draw / upload; signature saved as a raster image | 8 faces, 5 inks; drawn signature as a path; upload with Remove background (SMask); place and resize | PASS |
-| AC-32 | P1 | Saved signatures | IndexedDB `berrypdf-editor`; persists across tabs; each removable; clear from this device | PASS |
-| AC-41 | P1 | Page actions | Displayed orientation matches the output; delete shows an undo toast | PASS |
-| AC-43 | P0 | Undo | 105 history items; 105 undos; redo | PASS |
-| AC-44 | P0 | Apply (7.7 s), then a separate result page | Download in 1.15 s; stays in the editor; second download works | PASS |
-| AC-45 | P1 | n/a | "Restore 2 changes from 11:28 AM?" banner, non-blocking; restored | PASS |
-| AC-46 | P1 | qpdf-clean | All 45 outputs clean in qpdf, PDFium and pdf.js | PASS |
-| AC-48 | P0 | Toolbar is 600 px wide on a 390 px phone and scrolls sideways | Toolbar fits and tools work by touch, but **coarse-pointer handle hit areas are 42 px** (`::before` 42 px, inset -16 px) and **the rotate handle is 36 px**. Spec: ≥ 44 px | **FAIL** |
-| AC-49 | P1 | n/a | Toolbar role, 9 tool shortcuts (V E T S H P R I W), named objects, Objects list; axe 0 critical | PASS |
-| AC-50 | P1 | n/a | No motion under `prefers-reduced-motion` | PASS |
-| AC-51 | P1 | n/a | **`berry_engine_bg.wasm` (564 KB) downloads 2.2 s after the landing page loads, with no file opened.** Editor route JS 233–254 KB gzip (at the 250 KB line) | **FAIL** |
-| AC-52 | P1 | n/a | Lighthouse mobile performance 85 / 94 / 93, median 93 | PASS |
-| AC-54 | P0 | Toolbar scrolls away | Top bar and tool bar stay put on desktop and phone | PASS |
-| AC-55 | P1 | Page number + actions | Page number and actions (rotate, delete, duplicate, insert after) on the page in focus; thumbnail rail | PASS |
-| AC-56 | P1 | Tooltips | Name, shortcut and a how-to line for all 9 tools | PASS |
-| AC-57 | P0 | n/a | Placeholder "Text" pre-selected; first key replaces it; an empty box is removed on blur; placeholder never written | PASS |
-| AC-58 | P1 | n/a | Duplicate lands +15 pt below and selected; Alt duplicate to page 2; typed size 37; presets 8–72 | PASS |
-| AC-60 | P1 | Fixed swatches | Palette, hex, custom, No colour, Recent colours, eyedropper | PASS |
-| AC-64 | P1 | None | Guides, snap to centre (-0.01 px), position readout, Alt suspends snapping | PASS |
-| AC-65 | P1 | Info modals | Inline notes and toasts only; no information-only modal | PASS |
-| AC-66 | P2 | n/a | **The Image tool opens the OS file picker directly; there is no list of recent images.** Recent signatures do work | **FAIL** |
-| AC-67 | P1 | n/a | Ghost at opacity 0.6 follows the pointer; Esc cancels image and signature placement | PASS |
-| AC-68 | P0 | n/a | Esc works in every mode, **but the Text tool's hint "Click to type, drag for a box" does not mention Esc**, unlike every other mode ("· Esc to stop" / "Esc cancels") | **FAIL** |
-| AC-69 | P1 | n/a | Ctrl+[ and the menu reorder change the output paint order | PASS |
-| AC-70 | P1 | n/a | Hide is view-only; 5 colours each; recent colours | PASS |
-| AC-71 | P0 | Highlight boxes approximate | Latin strike 200.3–226.3 and Devanagari highlight 72–274.7 match the glyph advance boxes exactly. Caveat: the spec's named corpus is not in the repo, so generated fixtures were used | PASS |
-| AC-72 | P1 | Fixed default | 120x80 pt default on click; Shift gives a square | PASS |
-| AC-73 | P1 | n/a | History lists "Add text p. 1 11:52 AM" (type, page, time); 2 of 3 changes reverted at once; one undo brings them back | PASS |
-| AC-78 | P1 | n/a | Highlight on an edited line; the line does not move | PASS |
-| AC-79 | P1 | n/a | Overlays keep place through rotate, zoom and thumbnail reorder (bounds identical) | PASS |
-| AC-80 | P2 | n/a | Thumbnail drag reorders; the counter follows scroll | PASS |
-| AC-81 | P1 | n/a | Autosaved in 221 ms | PASS |
-| AC-82 | P0 | n/a | **After drawing a shape or whiteout, focus stays on the tool button, so arrow keys do not nudge the new (selected) object.** Delete works. Text, signature and image do take focus. After a click on the object, all keys work (arrows, Shift+arrows, Ctrl+C/V/D, Delete, Backspace, Ctrl+Y, Ctrl+Shift+Z) | **FAIL** |
-| AC-83 | P0 | Sideways scroll at 390 px | No sideways scroll; bottom dock + More; page fits the width; pinch zoom allowed | PASS |
-| AC-84 | P1 | n/a | 500 pages and the 197 MB file open, edit and download (197 MB: open 3.3 s, download 2.6 s) | PASS |
-| AC-85 | P0 | 17 words (phone) / 28 (desktop) before the action | Open PDF at y 229–281 (desktop), 211–263 (phone) | PASS |
-| AC-86 | P1 | n/a | 148.9 KB JS by load; pdf.js prefetched after load | PASS |
-| AC-87 | P0 | Initials exist | Separate saved lists for initials | PASS |
-| AC-88 | P1 | n/a | 1 pt / 10 pt nudges, live "Moved 10 pt", one undo per burst | PASS |
-| AC-89 | P1 | n/a | Enter or click in the Objects list focuses the object on canvas and scrolls to it | PASS |
-| AC-90 | P1 | n/a | 339 ms | PASS |
-| AC-91 | P1 | Helvetica | Tinos in preview and output, embedded | PASS |
-| AC-92 | P1 | n/a | CLS 0 | PASS |
-| AC-93 | P1 | n/a | Paste lands on the current page; drop at the drop point; Ctrl+S downloads | PASS |
-| AC-94 | P1 | n/a | One finger draws, two fingers pan. The pen-only rule can't be checked headless | PASS |
-| AC-95 | P2 | n/a | Area highlight on the scan | PASS |
-| AC-96 | P1 | n/a | Colour change applies live, is one undo step, and becomes the next shape's default | PASS |
-| AC-97 | P2 | White whiteout | Whiteout auto-matches the tinted page (RGB distance 0.1) | PASS |
-| AC-98 | P1 | n/a | **At 320 px the Text context strip is 329 px wide inside a 290 px box; the ⋯ More button (x 308–344) runs off-screen.** It has 8 controls; the spec budget is 6 | **FAIL** |
+| AC-1 | P0 | Uploads the file as soon as it is picked | From open through 11 edits and 5 downloads: 0 non-GET requests, largest request body 0 B, 0 cross-origin requests | PASS |
+| AC-2 | P0 | n/a | CSP `connect-src 'self'`; a `fetch('https://example.com/')` from the page fails ("Failed to fetch") | PASS |
+| AC-3 | P1 | Privacy copy only | carried ("0 B uploaded" chip still in the top bar and the download toast) | PASS |
+| AC-4 | P0 | Free tier: 3 tasks per hour | 5 downloads in a row (805 / 227 / 199 / 206 / 175 ms); no limit, countdown or upgrade copy | PASS |
+| AC-5 | P1 | n/a | carried | PASS |
+| AC-6 | P0 | Upload, then first page (about 5.5 s) | First page painted 285 ms and 290 ms after the pick | PASS |
+| AC-7 | P1 | Zoom | carried. The editor now opens at fit width (141% at 1280) | PASS |
+| AC-8 | P1 | Thumbnails | carried | PASS |
+| AC-23 | P0 | Text at the click; Helvetica, not embedded | Text starts at x 72.0 pt (clicked at 72); embedded Arimo with ToUnicode; extractable | PASS |
+| AC-24 | P0 | Image move and resize | Move (+60, +39.5 px), aspect-locked corner resize (1.500 → 1.500) and Rotate 90° all reach the output (`cm 0 -1 1 0`, 267.5×178.3 pt). The rotate handle is no longer covered (round-1 gap 8 fixed) | PASS |
+| AC-25 | P0 | Whiteout | Covers the footer in the output; inline "Hides content; doesn't delete it" shown with the tool | PASS |
+| AC-26 | P0 | Rectangle and ellipse in content; arrow as annotation | Rectangle, ellipse, line and arrow as content paths (`c` 4, `l` 10, `S` 6, `RG` 6) | PASS |
+| AC-27 | P0 | Highlight and strike without appearance streams | Highlight, StrikeOut and Ink, each with an appearance stream | PASS |
+| AC-31 | P0 | Type / draw / upload; raster signature | Type (8 faces, 5 inks), Draw (pad), Upload (file input + switch). Placed typed signature is vector Caveat and extractable | PASS |
+| AC-32 | P1 | Saved signatures | carried | PASS |
+| AC-41 | P1 | Page actions | carried | PASS |
+| AC-43 | P0 | Undo | Undo to empty and redo to full via Ctrl+Z / Ctrl+Shift+Z; buttons disable at the ends. The 100-step depth is carried from round 1 (105) | PASS |
+| AC-44 | P0 | Apply (7.7 s), then a separate result page | Download in 0.2–0.8 s; stays on `/edit-pdf` with all 11 objects; repeat downloads work | PASS |
+| AC-45 | P1 | n/a | "Restore 1 change from 07:04 PM?" on reopening after a reload; Restore brings the edit back (390 and 320). See gap 3 for clipping at 320 | PASS |
+| AC-46 | P1 | qpdf-clean | All 7 outputs from this run are clean | PASS |
+| AC-48 | P0 | Toolbar is 600 px wide on a 390 px phone and scrolls sideways | **Fixed.** Coarse pointer, 390×844 and 320×568: each of the 8 resize handles and the rotate handle has a **48×48** hit box. Hit-tested extent is 48 px wide and 45–48 px tall where neighbouring handles meet (one 42 px edge case at 320, see note). Touch grabs 20 px off centre resize (140×90 → 200×150) and rotate (to about 55°). Dock fits with no sideways scroll | PASS |
+| AC-49 | P1 | n/a | carried. Toolbar role and `aria-keyshortcuts` on all tools seen | PASS |
+| AC-50 | P1 | n/a | carried | PASS |
+| AC-51 | P1 | n/a | **WASM timing now meets the revised AC.** `berry_engine_bg.wasm` is fetched about 450 ms after the landing `load` event at idle; with effectiveType 2g or `saveData` it waits for the pick (hovering the picker did not trigger it). Landing first-load JS is 141.8 KB gzip (≤ 150). **Editor JS is still over 250 KB gzip:** the chunks fetched on file open are 253.7 kB (`9799…js`, pdf-lib + fontkit, 239.0 kB, plus 3 small ones), and the editor chunk prefetched at idle (`6632…js`, engine loader, 99.8 kB) comes on top. That makes about 366 kB of editor JS, excluding pdf.js, fonts and WASM. Round-1 gap 6 asked for this to be trimmed under 250 KB | **FAIL** |
+| AC-52 | P1 | n/a | Lighthouse mobile 96 / 96 / 95 / 98 | PASS |
+| AC-54 | P0 | Toolbar scrolls away | After scrolling: desktop top bar at y 10 and tool rail at y 85 (unchanged); phone top bar at y 8 and dock at y 774 (unchanged) | PASS |
+| AC-55 | P1 | Page number + actions | carried | PASS |
+| AC-56 | P1 | Tooltips | carried. Name, key and a how-to line seen on Shapes and Image | PASS |
+| AC-57 | P0 | n/a | After a click, the selection is "Text" in a focused textarea; typing replaces it; an empty box is removed on Esc / blur | PASS |
+| AC-58 | P1 | n/a | carried | PASS |
+| AC-60 | P1 | Fixed swatches | carried | PASS |
+| AC-64 | P1 | None | carried | PASS |
+| AC-65 | P1 | Info modals | carried | PASS |
+| AC-66 | P2 | n/a | **Unchanged.** The Image tool opens the OS file picker directly, also after an image was placed; no list of recent images. Recent signatures work | **FAIL** |
+| AC-67 | P1 | n/a | carried. Image ghost shows "Click to place image · Esc cancels"; Esc leaves 0 objects | PASS |
+| AC-68 | P0 | n/a | **Fixed.** The Text hint now reads "Click to type, drag for a box · Esc to stop". Esc returns to Select from Text, Shapes, Mark, Draw and Whiteout, mid-drag (no object left), and from the image ghost. Every mode hint names Esc | PASS |
+| AC-69 | P1 | n/a | carried | PASS |
+| AC-70 | P1 | n/a | carried | PASS |
+| AC-71 | P0 | Highlight boxes approximate | Highlight "quick brown" QuadPoints x 93.7–154.0 (pdfium tight glyph boxes 93.9–153.8); StrikeOut "thirty" 200.3–226.3, identical to round 1 | PASS |
+| AC-72 | P1 | Fixed default | carried | PASS |
+| AC-73 | P1 | n/a | carried | PASS |
+| AC-78 | P1 | n/a | carried | PASS |
+| AC-79 | P1 | n/a | carried | PASS |
+| AC-80 | P2 | n/a | carried | PASS |
+| AC-81 | P1 | n/a | "Saving…" → "Saved" chip; the session restores after a reload (see AC-45) | PASS |
+| AC-82 | P0 | n/a | **Fixed.** A newly drawn rectangle, ellipse, line, arrow or whiteout takes focus. Arrows nudge 2 pt (3.76 px at 1.882 px/pt) and Shift+arrow 10 pt (18.8 px); Ctrl+D duplicates and focuses; Delete, Ctrl+Z and Ctrl+Y work without a click. Ink and highlight stay with their armed tool, as the spec's sticky rule says; once selected they nudge 1 / 10 pt, delete and undo | PASS |
+| AC-83 | P0 | Sideways scroll at 390 px | `scrollWidth` 390; dock of 5 tools + More; page 374 px wide (fit width); viewport meta `width=device-width, initial-scale=1` (pinch allowed) | PASS |
+| AC-84 | P1 | n/a | carried | PASS |
+| AC-85 | P0 | 17 / 28 words before the action | `h1` and the whole Open PDF button are above the fold at 1280×720, 1366×768, 1440×900 (button y 229–281) and 390×844 (211–263) | PASS |
+| AC-86 | P1 | n/a | carried | PASS |
+| AC-87 | P0 | Initials exist | Signature / Initials switch; Initials has its own "Your initials" field with Type / Draw / Upload | PASS |
+| AC-88 | P1 | n/a | Nudges seen in AC-82 (1 pt and 10 pt) | PASS |
+| AC-89 | P1 | n/a | carried | PASS |
+| AC-90 | P1 | n/a | carried | PASS |
+| AC-91 | P1 | Helvetica | carried | PASS |
+| AC-92 | P1 | n/a | Lighthouse CLS 0 in all 4 runs | PASS |
+| AC-93 | P1 | n/a | carried | PASS |
+| AC-94 | P1 | n/a | carried | PASS |
+| AC-95 | P2 | n/a | carried | PASS |
+| AC-96 | P1 | n/a | carried | PASS |
+| AC-97 | P2 | White whiteout | carried | PASS |
+| AC-98 | P1 | n/a | **Fixed.** At 320×568 the context strip is 267 px wide with 6 controls (Font, −, size, +, Bold, More), and the top bar and dock are 304 px. At 390×844 the strip is 305–343 px, the top bar 374 and the dock 370. No bar's `scrollWidth` exceeds its `clientWidth`; no control is clipped. The active tool shows as the More icon when it lives in More ("More tools (Shapes active)") | PASS |
 | AC-1b | P0 | n/a | Not applicable in E1 (no server fallback ships) | N/A |
+
+AC-48 note: at 320×568, the bottom edge of a handle's hit box can sit under the context strip when the object is drawn right above it (the `se` handle measured 48×45, `sw` 48×42). That's the strip's z-order, not the handle size. It's acceptable, and is listed as a minor gap.
+
+## Phone spot-check (390×844 and 320×568)
+
+| Check | 390×844 | 320×568 | Result |
+|---|---|---|---|
+| Top bar, page chip and mode hint overlap | Top bar 8–60, chip 66–102, hint 114–148: no overlap | Same layout: no overlap | pass |
+| Download toast | 716–762, above the dock (774) | 426–486, above the dock (498) | pass |
+| Recovery notice | 3–387 wide, under the chip, no overlap | **Notice is 384 px wide in a 320 viewport (x −32 to 352).** "Restore 1 change from…" is cut off at the left and **Discard** at the right (281–344). The page doesn't scroll sideways, and Restore still works | **fail (clipping)**, gap 3 |
+| Go to page from the page chip sheet | Page 2: top at y 114 (chip bottom 102). Page 10 (last): top at y 264, end of document | Pages 2 and 10: top at y 114 | pass |
+| Desktop page field jump (1280×720, 1366×657) | Pages 7, 3 and 10: top at y 116–118, below the top bar (66) | n/a | pass |
 
 ## Micro-comparison (M1–M12)
 
 | Check | Sejda | InstaPDF | Result |
 |---|---|---|---|
-| M1 Landing | 17 words before the action (phone), 28 (desktop) | 3 words; Lighthouse 93 | win |
-| M2 Upload start | Click, drop, Dropbox, Google Drive, OneDrive, Web address (URL), blank document | Click, drop, paste, Blank page. **No cloud or URL import** | **lose** (same finding as earlier features; needs an owner waiver or the sources) |
-| M3 Loading | Upload, then first page (about 5.5 s) | Page 1 in 239–339 ms; 0 bytes sent | win |
-| M4 Display | Sharp | Sharp; 500 pages fine | win |
-| M5 Interaction | Basic | Undo history, keyboard, snapping (with the AC-82 focus gap) | win |
-| M6 Options | Free tier limited | Initials, marker, unlimited | win |
-| M7 Processing | 7.7 s apply to ready | about 1.15 s | win |
-| M8 Output | Helvetica not embedded, raster signature, annotations without AP | Embedded fonts, vector signature, APs everywhere | win |
-| M9 Errors | Error page | `notes.txt`: "isn't a PDF, so it was skipped"; corrupt and empty: "couldn't be opened. It may be damaged or not really a PDF"; password prompt with a clear wrong-password message, then opens; owner-restricted opens with tools disabled and a plain explanation | win |
-| M10 Privacy | Uploads on pick; 3 tasks per hour | 0 B uploaded, verifiable | win |
-| M11 Look | Toolbar 600 px on a 390 px phone, sideways scroll | Minimal chrome | win |
-| M12 First screen fit | 1366x657: page 45% of screen, 91% after open. 390x664: 46% → 84% | 1366x657: 48% → **54%** (page width 58% at default 100% zoom). 390x664: 83% → 93%. 1920x969: only 39% | **lose on desktop**, win on phone |
+| M1 Landing | 17 words before the action (phone), 28 (desktop) | carried; Lighthouse 96 | win |
+| M2 Upload start | Click, drop, Dropbox, Google Drive, OneDrive, Web address (URL), blank document | Open PDF, drop, paste, Blank page. **No cloud or URL source** on `/edit-pdf` at 1280 or 390, and none in `/merge-pdf` HTML either | **lose** (no owner waiver; owned by F23 per the lead's note) |
+| M3 Loading | Upload, then first page (about 5.5 s) | First page in 285–290 ms; 0 B sent | win |
+| M4 Display | Sharp | carried | win |
+| M5 Interaction | Basic | Undo history, keyboard (focus gap now fixed), snapping | win |
+| M6 Options | Free tier limited | carried | win |
+| M7 Processing | 7.7 s apply to ready | 0.2–0.8 s per download | win |
+| M8 Output | Helvetica not embedded, raster signature, annotations without AP | Embedded fonts, vector signature, APs on all annotations | win |
+| M9 Errors | Error page | carried | win |
+| M10 Privacy | Uploads on pick; 3 tasks per hour | 0 non-GET requests, 0 B uploaded | win |
+| M11 Look | Toolbar 600 px on a 390 px phone, sideways scroll | carried | win |
+| M12 First screen fit | Pages area after scroll: 1366×657 about 91%; 1920×969 83%. Phone 390×664 46–69% with sideways overflow | Opens at fit width. Pages area after a 60% scroll (same method as the f16-forms re-measure): 1280×632 **90.0%**, 1366×657 **90.6%**, 1536×730 **91.7%**, 1920×969 **83.6%**, 390×664 **93.0%**. As loaded: 73.5–77.1% (Sejda's 1366×657 capture as loaded: about 43%) | **tie on desktop, win on phone** (was lose on desktop) |
 
-## Lighthouse (mobile, simulated throttling) and axe
+## Lighthouse (mobile) and axe
 
-- Lighthouse on `/edit-pdf`: performance 85 / 94 / 93 (median **93**). Runs 1 and 4 failed with `NO_NAVSTART` and were discarded. SEO is 66 because staging is noindex (expected).
-- axe across these states: landing, editor open, text selected, sign dialog, markup, phone dock, More sheet, history.
-  - **0 critical** issues.
-  - **1 serious:** `label-content-name-mismatch` on the active tool button while the sign dialog is open.
-  - Moderate: `landmark-banner-is-top-level`.
+- Lighthouse 13.6.0, mobile, simulated throttling, empty `/edit-pdf`. 4 runs, none failed. The median is 96.
+
+  | Run | Perf | A11y | BP | SEO | FCP | LCP | TBT | CLS |
+  |---|---|---|---|---|---|---|---|---|
+  | 1 | 96 | 100 | 100 | 66 | 1.1 s | 1.1 s | 230 ms | 0 |
+  | 2 | 96 | 100 | 100 | 66 | 1.1 s | 1.1 s | 220 ms | 0 |
+  | 3 | 95 | 100 | 100 | 66 | 1.2 s | 1.2 s | 250 ms | 0 |
+  | 4 | 98 | 100 | 100 | 66 | 1.2 s | 1.2 s | 180 ms | 0 |
+
+  SEO 66 is the expected staging noindex.
+- axe was run in 9 states: landing, editor open, text selected, Mark tool, sign dialog, File menu, phone editor, phone More sheet and phone Pages sheet. Tools were also checked with the pointer resting on the tool button and with it moved away.
+  - **0 critical.**
+  - **Serious, unchanged from round 1:** `label-content-name-mismatch` on the active tool button while its tooltip is shown (pointer resting on it). The text inside the button ("Mark H Drag across words…") is not included in the name "Mark".
+  - **Serious, transient:** `color-contrast` on `.ed-hint` while the hint is fading in. It is gone after 1.5 s, so it was not counted.
+  - **Minor:** `aria-allowed-role`, because `role="spinbutton"` is set on the font size `<input>`.
+  - The round-1 moderate `landmark-banner-is-top-level` no longer appears.
+
+## Round-1 gaps: status
+
+| Round-1 gap | Status on `da7cede` |
+|---|---|
+| 1 AC-48 handle hit areas | **Fixed** (48 px; rotate 48 px) |
+| 2 AC-82 focus after drawing | **Fixed** |
+| 3 AC-68 Text hint without Esc | **Fixed** |
+| 4 M12 desktop | **Fixed** (fit width; tie) |
+| 5 M2 cloud / URL import | **Open** |
+| 6 AC-51 WASM early + JS at 250 KB | WASM timing **fixed** against the revised AC; JS size **open** |
+| 7 AC-98 320 strip overflow | **Fixed** |
+| 8 Rotate handle covered by the popover | **Fixed** (hit-test reaches the handle) |
+| 9 AC-66 recent images | **Open** |
+| 10 Tool options hidden while an object is selected (desktop) | **Fixed** (the Shapes kind switch stays visible with a shape selected) |
+| 11 Esc order | **Fixed** (first Esc deselects, second returns to Select) |
+| 12 Strike snapping takes in a neighbour word | **Fixed** (a drag from the space before "quick" marks only "quick brown") |
+| 13 axe serious name mismatch | **Open**; the nested-banner moderate issue is fixed |
 
 ## Gap list (actionable, in priority order)
 
-1. **AC-48 (P0): coarse-pointer hit areas are too small.** Resize handles are 42 px and the rotate handle is 36 px; the spec says 44 px. Make the coarse-pointer hit area at least 44x44 for every handle, including rotate.
-2. **AC-82 (P0): new shapes and whiteouts don't take keyboard focus.** After one is drawn it is selected, but focus stays on the tool button, so arrows and Shift+arrows don't move it. Focus the new object, as already happens for text, signature and image.
-3. **AC-68 (P0): the Text mode hint doesn't mention Esc.** Add "· Esc to stop" (or the same wording as the other modes) to "Click to type, drag for a box".
-4. **M12 (desktop lose): the default desktop view leaves the page small.** At 1366x657 the page fills 54% of the screen against Sejda's 91%, and at 1920x969 only 39%. Open in fit-width (or fit-page, whichever is larger) rather than at 100%.
-5. **M2 (lose): no cloud or URL import.** Add the sources (Dropbox, Google Drive, OneDrive, URL) or get a written owner waiver, as for earlier features.
-6. **AC-51 (P1): the editor WASM loads too early.** `berry_engine_bg.wasm` (564 KB) is fetched 2.2 s after the landing page with no file open. Load it only after a file is opened. Editor JS is at 233–254 KB gzip, so trim it to stay under 250 KB.
-7. **AC-98 (P1): the 320 px Text strip overflows.** It is 329 px wide in a 290 px box, so the More button is off-screen. Cut the strip to 6 controls and move the rest into More.
-8. **AC-24 follow-up: the free-rotate handle is hard to reach.** The selection popover's Duplicate button covers it. Move the popover or the handle.
-9. **AC-66 (P2): no recent images.** Before the file picker opens, show the last 5 images used on this device, each removable.
-10. **Desktop tool options disappear while an object is selected** (at 1024 px and up). Switching Rectangle to Ellipse then takes Esc, Esc and a tool click. Keep the active tool's options visible, or show the kind switch in the properties bar.
-11. **The Esc order is reversed from the spec.** The first Esc returns to Select and the second deselects. With a sticky tool and an object selected, clicking empty space only deselects; it doesn't place a new object.
-12. **Strike-out drag snapping takes in a neighbouring word** when the drag starts in a space between words.
-13. **axe:** fix the serious `label-content-name-mismatch` on the active tool button while the sign dialog is open, and the moderate nested-banner landmark issue.
+1. **M2 (gate blocker): no cloud or URL source on the editor's landing.** Ship the F23 cloud pickers to staging for `/edit-pdf`, or record the owner's written waiver in this file. Nothing else blocks a PASS.
+2. **AC-51 (P1): editor JS is over the 250 KB gzip budget.**
+   - On file open the editor fetches `9799.bee524a3c32ba431.js` (pdf-lib + fontkit, 239.0 kB gzip) plus 3 small chunks, 253.7 kB in total.
+   - On top of that, the idle-prefetched editor chunk `6632.b909802994ace601.js` (99.8 kB) makes about 366 kB, excluding pdf.js, fonts and WASM.
+   - U-E13 budgets pdf-lib to load on **Download intent**, not on open. Defer it, or split fontkit out, so the editor's JS stays at or under 250 KB.
+3. **Recovery notice clips at 320×568.** The notice is 384 px wide (x −32 to 352). The start of "Restore 1 change from…" and most of **Discard** are off-screen. Let it wrap to two lines, or stack the buttons, below 360 px. The spec says nothing on a phone clips.
+4. **AC-66 (P2): no recent images.** Before the file picker opens, show the last 5 images used on this device, each removable.
+5. **axe serious:** the active tool button's tooltip text sits inside the button, so its name ("Mark") doesn't match its content. Move the tooltip out of the button (for example with `aria-describedby`), or start the name with the visible text.
+6. **With Draw armed, a click on an existing ink stroke draws a new stroke instead of selecting it.** Checked by clicking the middle of a straight stroke. The spec says clicking an existing object with any tool selects it.
+7. **Minor:**
+   - At 390×844 the text properties strip shows 8 controls; U-E2 budgets 6 (first 5 + ⋯). It fits, so it is not an AC fail.
+   - At 320×568 the context strip can sit over the lower 3–6 px of a handle's hit box.
+   - `role="spinbutton"` on an `<input>` (axe minor).
+   - The hint pill fails contrast during its fade-in.
 
-## AC-224: added Arabic and Hindi text, side by side
+## Process notes for the lead
 
-Same two lines added with the Text tool on both sites: a Hindi sentence ("the full amount was paid on time") and an Arabic one ("hello world, this is a test text"). The reference run and both renders are in `/mnt/project-files/designs/complex-scripts/` (`side-by-side-add-text.png`, `sejda-add-text-editor.jpg`, `sejda-add-text-output.png`, `sejda/01-05`). No new Sejda task was spent for this entry.
-
-| Check | Sejda | InstaPDF |
-|---|---|---|
-| Warning | Shows a banner while you type that complex scripts (Arabic, Devanagari) are not supported. | None needed. Scripts we ship fonts for (Devanagari, Arabic, Hebrew, Thai) no longer show "Won't print". |
-| Devanagari output | Broken: the reph of "संपूर्ण" ends up as a separate letter with a halant (र्ण → रण), and the i-matra of "किया" sits after its consonant (कयि). | Correct: conjuncts, reph and matra order as typed, drawn by the shaping engine with Noto Sans Devanagari. |
-| Arabic output | Joined and right-to-left: parity. | Joined and right-to-left, in the requested face (Noto Naskh Arabic, the engine's pick for the box; the punctuation comes from Noto Sans). |
-| Copy and paste | Not checked on Sejda (no new task). | pdfium extracts both lines exactly, in reading order (e2e `AC-224` in `e2e/f16/editor-shaping.spec.ts`). |
-
-**Result: PASS.** Hindi is better than the reference, Arabic is at parity. How it works: `buildPdf` leaves out lines that need shaping and returns where each one goes; the download worker then loads the shaping engine (only for such text), opens the built file, calls `addText` once per line (`x = right - shape().width` for right alignment) and saves. Latin-only downloads never request the shaping engine or its fonts (tested).
-
-Known limit: shaped lines are drawn after the other added objects, so an object added later that overlaps such a line sits under it instead of on top.
-
-## Mixed-direction line edits: refused where other readers would misread them
-
-Checked with pdf.js and pdfium (pypdfium2) on the saved file, not only with the engine's own read-back (`apps/web/src/lib/editor/mixed-direction.test.ts`, `crates/berry-engine/tests/latex.rs`).
-
-- **Refused (`text-mismatch`), with "Replace with new text" offered:** a new word in a right-to-left line that would read as typed only through ActualText, which pdf.js ignores. On `scripts-plain.pdf` that covers " 2024" (pdf.js read "202v") and " abc 12" (pdf.js read "abc s2", pdfium "12 abc").
-- **AC-206 on `scripts-plain.pdf` is refused for now.** The Arabic font's digit glyphs map elsewhere in its ToUnicode, so "2500" → "3750" read "u750" in pdf.js. Accepted by the lead for now: the sibling-font fix in the Hindi thread is to turn these refusals into correct edits. AC-206 still passes on the Chrome and LibreOffice files.
-- **Exemption:** lines already drawn with ActualText spans (Chrome and LibreOffice Arabic) are not refused. Both readers already garble those lines before any edit.
-- **Refused because PDFium reorders them (round 3):** in a right-to-left line, punctuation typed next to punctuation ("، نعم", ": نعم", ", نعم" and "!" after "تجريبي." read "تجريبي،. نعم" and similar in PDFium) and a left-to-right run of two or more words (" abc def" read "defabc"). The bar is that a kept edit reads correctly in PDFium; "Replace with new text" keeps these lines editable.
-- **Known pdf.js ordering limit (kept, confirmed by the lead):** a word drawn in a font the line doesn't otherwise use (AC-205 and Arabic appends on scripts-plain.pdf, whose subset lacks their letters) is its own text item. pdf.js orders a line's items by content order, so it can read the words out of order; PDFium reads them in order. Recorded in `crates/README.md`.
-
-## Zoom without a white flash (reported on staging)
-
-Zooming showed the page white for a moment on every re-render: each new bitmap faded in from opacity 0 over the white page. Now:
-
-- the current bitmap stays on screen, stretched to the new size, until the render at the new scale is drawn offscreen; then it is swapped in one frame (only a page's first appearance fades in);
-- Ctrl+wheel and pinch only scale the pages (bitmap, text layer and objects together) with a transform while the gesture goes on; the zoom is applied and the pages re-render once it rests (160 ms after the last wheel step);
-- only pages on screen plus about one screen are rendered, and a render made stale by a newer zoom is cancelled (unchanged).
-
-| Run | Screen frames recorded | Frames with page 1 near blank |
-|---|---|---|
-| Before (zoom buttons and Ctrl+wheel, `e2e/f16/editor-zoom-flash.spec.ts` with `ZOOM_FRAMES`) | 312 | 155 |
-| After, same steps | 343 | 0 |
-
-The e2e samples every animation frame at an ink spot of page 1 (canvas present, fully opaque, dark there) and fails on any blank frame; a second test checks that a line keeps its place on the page during and after a Ctrl+wheel zoom.
-
-Reference: Sejda's zoom (page toolbar button, one upload-only visit, no Apply, requests held to 1 per second) blanks the page to white, shows one black frame, then draws it at the new size. Strips and screenshots: `/mnt/project-files/designs/editor-e1/zoom-flash/` (`before-strip-zoom-in.png`, `after-strip-zoom-in.png`, `sejda-strip-zoom.png`, `sejda-strip-zoom-end.png`). With requests throttled, Sejda's blank period is longer than a normal visit would show, so only its order of frames is compared, not its timing.
+- **AC-51 was reworded after the round-1 FAIL.** The rewording came in commit `1b30656` (PR #37, the builders' E1 polish PR): "(Revised after the E1 eval: the idle prefetch is by design…)". This eval judges the WASM timing against the revised wording on `main`. Under the round-1 wording ("not downloaded until the editor opens a file") it would still fail, because the WASM is fetched about 450 ms after the landing load with no file. Please confirm the revision was sanctioned.
+  - *Lead (25 Nov): confirmed. The idle prefetch was a lead decision (U-E13, so Edit text is ready when reached), made in reviewed PR #37 and recorded in the spec with its reason. The JS-size half of AC-51 is unchanged and still binds.* The verdict does not depend on it: AC-51 fails on JS size either way, and M2 blocks.
+- **Coverage:** every P0 and every round-1 failure was re-run. P1/P2 rows marked "carried" were not.
+- **Harness false alarms, ruled out:**
+  - A first AC-82 run that chained Esc presses between shapes showed lost focus. It was a harness artefact; isolated runs per shape pass.
+  - A `Beta` badge reported "under" the hint pill is not visible in screenshots (it sits behind the editor surface), so it is not counted as an overlap.
 
 ## Where InstaPDF is better than Sejda
 
-- Nothing is uploaded: 0 B, checkable through the CSP. Sejda uploads on pick and allows 3 tasks per hour.
-- Output quality:
-  - embedded, extractable fonts that follow the size of nearby text, where Sejda uses Helvetica 10 pt, not embedded and without ToUnicode;
-  - a vector, extractable signature, where Sejda's is a raster image;
-  - annotations that all have appearance streams;
-  - line edits that keep the reading order;
-  - the font of edited lines matched (Tinos).
-- Speed: first page in about 0.24 s, and download in about 1.15 s against 7.7 s plus a result page.
-- Editing tools Sejda lacks:
-  - history with multi-revert;
-  - 105+ undo steps;
-  - autosave and recovery;
-  - snapping guides;
-  - keyboard nudging;
-  - an Objects list;
-  - a whiteout that matches tinted pages;
-  - marker and initials;
-  - a colour picker with recent colours and an eyedropper.
-- Added Hindi text prints correctly (reph and matra order), where Sejda's output breaks it and warns that these scripts are not supported (AC-224).
-- Phone layout: no sideways scroll, a bottom dock, and the page fits the width. Sejda's toolbar is 600 px wide on a 390 px phone.
-- Large files: 500 pages and 197 MB work without a limit.
+Unchanged from round 1, and confirmed again on `da7cede`:
+
+- nothing is uploaded (0 non-GET requests);
+- embedded, extractable fonts and a vector signature;
+- appearance streams on all annotations;
+- a first page in about 0.29 s and downloads in 0.2–0.8 s, against 7.7 s plus a result page;
+- the editor stays open after a download.
+
+New this round:
+
+- the desktop opens at fit width and matches Sejda's page share;
+- on phones the page fills 93% of the screen with no sideways scroll.
 
 ## Owner waiver
 
-None on record. M2 and M12 are therefore counted as losses.
-
-## Harness notes
-
-- **The spec is missing from the local checkout.** It exists only at `ba63a9c` / `origin/main`; the local checkout is on `feat/ui-berrypdf`. The spec was read from an export of `ba63a9c`.
-- **AC-71 corpus.** The spec's named corpus isn't in the repo, so generated Latin and Chrome-printed Devanagari fixtures were used.
-- **AC-94 pen rule.** The pen-only rule can't be checked headless; the touch behaviour was checked with emulated touch.
-- **Sejda T1.** The output was lost to Sejda's auto-download (a later GET returned 404). T2 repeats T1's edits and adds the line edit, so no comparison was lost. In total 3 tasks were used.
-- **Lighthouse.** Runs 1 and 4 hit `NO_NAVSTART` and are excluded; the median is over the 3 valid runs.
-- **Cache.** Raw logs and outputs are in `/mnt/project-files/evals-cache/f16-e1-editor/`. The Sejda outputs can be reused for re-evaluation, so no new Sejda tasks are needed unless the task set changes.
+None on record. M2 is therefore counted as a lose.
