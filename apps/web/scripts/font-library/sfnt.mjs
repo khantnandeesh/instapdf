@@ -118,6 +118,7 @@ export function cmapRanges(sfnt) {
   const o = best.offset;
   if (best.format === 4) {
     if (o + 14 > cmap.length) return [];
+    if (u16(cmap, o + 6) % 2) return [];
     const segs = u16(cmap, o + 6) / 2;
     if (o + 16 + segs * 8 > cmap.length) return [];
     for (let i = 0; i < segs; i++) {

@@ -75,6 +75,29 @@ describe("characters a font has", () => {
     expect(cmapRanges(Buffer.from("not a font"))).toEqual([]);
   });
 
+  it("reads a format 12 table, and gives nothing for a table that does not add up", () => {
+    const font = (sub: Buffer) => {
+      const cmap = Buffer.concat([Buffer.from([0, 0, 0, 1, 0, 3, 0, 10, 0, 0, 0, 12]), sub]);
+      const head = Buffer.alloc(28);
+      head.writeUInt32BE(0x00010000, 0);
+      head.writeUInt16BE(1, 4);
+      head.write("cmap", 12, "latin1");
+      head.writeUInt32BE(28, 20);
+      head.writeUInt32BE(cmap.length, 24);
+      return Buffer.concat([head, cmap]);
+    };
+    const f12 = Buffer.alloc(16 + 24);
+    f12.writeUInt16BE(12, 0);
+    f12.writeUInt32BE(2, 12);
+    [0x1f600, 0x1f64f, 1, 0x41, 0x5a, 2].forEach((v, i) => f12.writeUInt32BE(v, 16 + i * 4));
+    expect(cmapRanges(font(f12))).toEqual([[0x41, 0x5a], [0x1f600, 0x1f64f]]);
+    const f4 = Buffer.alloc(32);
+    f4.writeUInt16BE(4, 0);
+    f4.writeUInt16BE(3, 6); // an odd doubled segment count
+    expect(cmapRanges(font(f4))).toEqual([]);
+    expect(cmapRanges(font(f12.subarray(0, 30)))).toEqual([]);
+  });
+
   it("writes ranges the way the manifest reader takes them", () => {
     expect(rangesToCss([[32, 126], [305, 305]])).toBe("U+20-7e,U+131");
     expect(parseUnicodeRange(rangesToCss([[32, 126], [305, 305]]))).toEqual([[32, 126], [305, 305]]);

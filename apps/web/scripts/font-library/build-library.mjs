@@ -201,9 +201,15 @@ async function main() {
       : opt.source === "catalogue"
         ? await catalogueSource(opt.catalogue, opt.families, opt.limit)
         : await packageSource(opt.families);
+  /** Pinned families this build must contain: one that fails stops the build, so a publish never drops it quietly. */
+  const wanted = [];
   if (opt.extras) {
     // A family a catalogue carries too stays the catalogue's.
-    for (const extra of EXTRAS) if ((!opt.families || opt.families.includes(extra.id)) && !sources.some((s) => s.entry.id === extra.id)) sources.push(extraSource(extra, polite));
+    for (const extra of EXTRAS) {
+      if ((opt.families && !opt.families.includes(extra.id)) || sources.some((s) => s.entry.id === extra.id)) continue;
+      sources.push(extraSource(extra, polite));
+      wanted.push(extra.id);
+    }
   }
   const matcher = await loadMatcher();
   if (opt.clean) await rm(opt.out, { recursive: true, force: true });
@@ -273,6 +279,8 @@ async function main() {
     rows.push(familyRow({ ...entry, weights: [...new Set(Object.keys(faces).map((k) => Number(k.split("-")[0])))], styles: [...new Set(Object.keys(faces).map((k) => k.split("-")[1]))] }, sha));
   }
 
+  const lost = wanted.filter((id) => !rows.some((r) => r.i === id));
+  if (lost.length) throw new Error(`pinned families missing from the build: ${lost.join(", ")}: refusing to write a library without them`);
   if (rows.length < opt.minFamilies) throw new Error(`only ${rows.length} families built, ${opt.minFamilies} expected: refusing to write a shrunken library`);
   // The matching index, from the same Rust code the browser runs (its WebAssembly build).
   const features = Buffer.concat(prints.map(([, p]) => Buffer.from(p.coarse)));

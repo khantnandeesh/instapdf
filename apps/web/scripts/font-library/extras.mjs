@@ -1,7 +1,8 @@
 /**
  * Families the open catalogues do not carry, each taken from its maker's own release at a pinned
  * version. Every download is checked against the sha256 written here, so a release that changes
- * under its name is refused, not published.
+ * under its name is refused, not published: the build stops, so a publish never drops the family
+ * quietly.
  *
  * The files are published exactly as released (no slicing, no conversion): a font under the OFL
  * with a reserved name may only keep that name unchanged.
@@ -86,7 +87,7 @@ export function extraSource(extra, get, unzip = unzipOne) {
 
 /** Reads one named file out of a zip archive with the system's unzip (the name is taken literally). */
 async function unzipOne(archive, name) {
-  if (!/^[A-Za-z0-9._-]+$/.test(name)) throw new Error(`bad file name ${name}`);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) throw new Error(`bad file name ${name}`);
   const dir = await mkdtemp(join(tmpdir(), "font-extra-"));
   try {
     const zip = join(dir, "archive.zip");

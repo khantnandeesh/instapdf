@@ -196,7 +196,7 @@ Still open from the first evaluation: AC-296 (looking the PDF's own font up on t
 
 AC-283 named eight fonts and seven had a twin: Selawik, Segoe UI's, is in no catalogue we read. It now comes from its maker.
 
-- **Source.** Microsoft's own release, `microsoft/Selawik` 1.01 (`Selawik_Release.zip`), SIL OFL 1.1 with the reserved name Selawik. The archive, each font file taken from it and the licence text are pinned by sha256 in `apps/web/scripts/font-library/extras.mjs`; a download that differs stops the family, not the library.
+- **Source.** Microsoft's own release, `microsoft/Selawik` 1.01 (`Selawik_Release.zip`), SIL OFL 1.1 with the reserved name Selawik. The archive, each font file taken from it and the licence text are pinned by sha256 in `apps/web/scripts/font-library/extras.mjs`; a download that fails or differs stops the publish, so the library never loses the family quietly.
 - **Published as released.** The release's own WOFF files, whole (one file a weight, listed with the characters it has): no slicing and no conversion, because a font with a reserved name may keep it only unchanged. Light 300, Regular 400, Semibold 600 and Bold 700; no italics exist. Semilight is left out (its file gives weight 300, the same as Light).
 - **Recorded.** The family manifest carries `source` (name, version, release address), and `licences/selawik.txt` opens with the version and release address above the licence text. The notices page lists it with the rest of the library.
 - **Where.** Only the published library (`publish-fonts.yml` passes `--extras`). The small in-app copy (development, tests, CI) stays offline and has no Selawik; there Segoe UI falls to the closest shapes as before.
