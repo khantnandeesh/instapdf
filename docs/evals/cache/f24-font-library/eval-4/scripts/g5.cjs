@@ -1,0 +1,8 @@
+const { open, load, log, SHOTS } = require("./lib.cjs"); const { install, state } = require("./st.cjs");
+(async () => { const { browser, page } = await open({}); await load(page, "chrome-justified-mixed.pdf"); await install(page);
+  const go = async (txt, end) => { const o = page.getByRole("option", { name: /^in full/ }); const b = await o.boundingBox(); await page.mouse.click(b.x + b.width - 3, b.y + b.height / 2); await page.getByTestId("line-input").waitFor(); await page.keyboard.press("End"); await page.keyboard.insertText(txt); await page.waitForTimeout(4500); const s = await state(page); log(JSON.stringify(txt), JSON.stringify(s.hint && s.hint.btns), s.status); await page.keyboard.press(end); await page.waitForTimeout(2500); const s2 = await state(page); log("  after", end, JSON.stringify({ box: s2.box && s2.box.text.slice(-8), notice: s2.notice && s2.notice.text.slice(0, 80) })); };
+  await go(" ใ", "Escape"); await go(" ₹", "Escape"); await go(" Ω", "Escape"); await go(" ř", "Escape");
+  // stale message check (gap 8): refuse then Escape
+  const o = page.getByRole("option", { name: /^This agreement/ }); const b = await o.boundingBox(); await page.mouse.click(b.x + b.width * 0.3, b.y + b.height / 2); await page.getByTestId("line-input").waitFor(); await page.keyboard.press("End"); await page.keyboard.type(" for Dvořák", { delay: 30 }); await page.waitForTimeout(1200); await page.keyboard.press("Enter"); await page.waitForTimeout(1800);
+  log("refused", JSON.stringify((await state(page)).notice)); await page.keyboard.press("Escape"); await page.waitForTimeout(700); log("after Escape", JSON.stringify((await state(page)).notice));
+  await browser.close(); })().catch((e) => { console.error(String(e).slice(0, 800)); process.exit(1); });

@@ -6,7 +6,7 @@
  */
 import type { FontInfo, FontRequest } from "@/lib/editor/berry-engine";
 import { callEngine } from "@/lib/editor/engine-client";
-import { TEXT_FONTS, USER_FILE, USER_FONT, faceOf, filesFor, fontUrl } from "@/lib/editor/fonts";
+import { TEXT_FONTS, USER_FILE, USER_FONT, faceOf, fileFor, filesFor, fontUrl } from "@/lib/editor/fonts";
 import { ensureFace, knownManifest, registerUserFont, resolveFonts, userFontBytes, widenFor } from "@/lib/editor/fonts-browser";
 import { familyByName, foldName, loadLibrary, type Library } from "@/lib/font-library/client";
 import { orderCandidates } from "@/lib/font-library/candidates";
@@ -195,6 +195,21 @@ export async function standInCandidates(info: FontInfo | undefined, request: Fon
     name: info?.name,
     chars,
   });
+}
+
+/**
+ * Which of `ids` have any of `chars` (how many each), and the characters none of them has.
+ * Read from the fonts' own lists of characters: no font file is fetched for it.
+ */
+export async function coverOf(ids: readonly string[], bold: boolean, italic: boolean, chars: readonly string[]): Promise<{ has: Map<string, number>; none: string[] }> {
+  await resolveFonts([...ids]).catch(() => undefined);
+  // A built-in family may have these characters in the library's copy of it.
+  await widenFor([...ids], chars.join("")).catch(() => undefined);
+  const m = knownManifest();
+  const faces = ids.map((id) => [id, m?.faces[id] ? faceOf(m, id, bold, italic) : undefined] as const);
+  const has = new Map(faces.map(([id, face]) => [id, face ? chars.filter((c) => fileFor(face, c.codePointAt(0)!)).length : 0]));
+  const none = chars.filter((c) => !faces.some(([, face]) => face && fileFor(face, c.codePointAt(0)!)));
+  return { has, none };
 }
 
 /**
