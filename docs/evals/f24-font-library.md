@@ -1,5 +1,138 @@
 # Evaluation: F24 Font library and font matching
 
+## Re-evaluation 2026-11-25, fifth (staging 6e82ac3)
+
+- **Verdict: FAIL** (narrowly: one P0 criterion, AC-312, fails on what happens after "Use your own font" in the mixed case. Both cases the fourth evaluation blocked on are fixed.)
+- Evaluated: 2026-11-25, 05:10–06:45 UTC, by parity-evaluator. No source code, builder notes or PR text were read.
+- Candidate: https://web-staging-qzq5fa2g7q-uc.a.run.app/edit-pdf. `/api/health` reports version `6e82ac353ad0778dda906b406ca26a230c9507d2`. `/fonts/lib/manifest.json` counts 1,972 families, 7,937 faces.
+- Sizes: 1280x800 and 390x844 (touch), device scale factor 2, headless Chromium 1243. AC-312 also at 320x640 (touch). The baseline check of AC-298 at device scale factors 1 and 2 (the bar), and for information at 3 (390), 1.25 and 1.5 (1280).
+- Sejda evidence: all from the cache (`/mnt/project-files/evals-cache/f24/`, notes in `docs/evals/cache/f24/manifest.json`). **No new Sejda task was run.**
+- Our scripts: `docs/evals/cache/f24-font-library/eval-5/scripts/` (`run.sh` lists the order). Our outputs, logs, Lighthouse runs and the capture sets (`shots/a298.tar`, `shots/v298.tar`): `/mnt/project-files/evals-cache/f24-font-library/eval-5/` (not in git). Our screenshots: `/mnt/project-files/designs/fonts/eval-5/`. Fixtures: those of `eval-4/fixtures/` and `tests/parity/editor/`.
+
+### Summary
+
+| Gate | Bar | Result | OK |
+|---|---|---|---|
+| P0 ACs | all pass | **22 / 23 judged** (AC-312 fails, on one continuation of its flow) | **no** |
+| All ACs | at least 90% | 25 / 27 judged (93%), counting AC-296 as the deferred fail it still is | yes |
+| Lighthouse performance (mobile) | at least 90 | 100 / 100 / 99 (median 100) | yes |
+| axe critical issues | none | 0 critical. 0 violations in the 8 states of the last run at both sizes; 1 **serious** one (not critical) in 4 of the 9 new mixed-case states, see gap 3 | yes |
+| Micro-checks | no lose unless owned elsewhere or waived | M2 lose (owned by F23 per the lead's note, as before); rest win | yes, with M2 as noted |
+
+Fixed since the fourth verdict (both re-run, not taken on trust):
+
+- **AC-298, the baseline.** On the ten lines of the last run, at 1280 and 390, device scale 1 and 2, in 3 of 3 fresh sessions each (120 sessions), the opened box's ink is within **0.28 CSS px** of the page's vertically (was 0.9–1.0 on eight line-and-size cases). The whole-pixel shift that best matches the page is 0 on all 40.
+- **AC-312, the two cases of the last verdict.** " ř ⸘" on "in full." now gives "Not in this font: ř ⸘ · Tinos · STIX Two Text · No font has ⸘. · Use your own font", the status "Tinos draws ř. No font here has ⸘. Use your own font, or remove it.", and Enter is refused in 0.15–0.28 s with "This font has no “⸘”." (was 1.0–1.8 s, naming ř as well). The phone row reads "ř [Tinos]  ⸘ no font [Your font]" and fits at 320.
+
+What blocks now:
+
+1. **AC-312: after the person's own font is added in the mixed case, the editor again says a font draws a letter it does not have, and in one case does not offer the added font and goes silent for 2 to 5 seconds.** Not tested before this round (the fourth run added a font only in the single-letter case, which still passes). Details in the criterion row and gap 1.
+
+### Criteria
+
+The editor rows (AC-286, AC-298 to AC-304, AC-310 to AC-313) were run at both sizes. The library, matcher and output rows were run at 1280 only, except AC-283, AC-290, AC-294 and AC-295 (both sizes). "Same as the fourth run" means the same script gave the same log once times are masked (`logs/difflog.txt` pattern, `scripts/difflog.py`), and the numbers quoted were read from this run.
+
+| AC | Pri | Result | Evidence |
+|---|---|---|---|
+| AC-271 | P0 | PASS | `/licenses` (2.9 MB): 1,972 distinct licence links; the served `index/families.08543aad.json` has 1,972 families; no id missing either way and no family name missing from the page; "Selawik (font library) · self-hosted · OFL-1.1" is listed and `licences/selawik.txt` opens with the version and release address (`logs/ac271.log`) |
+| AC-275 | P0 | PASS | Index file `max-age=31536000, immutable`; `manifest.json` 300 s. POST 400, PUT 404. CSP `font-src 'self'; connect-src 'self'; form-action 'self'`. 0 non-GET requests in every session of this run |
+| AC-280 | P0 | PASS | Same as the fourth run (`logs/s9.log`): "them" → "us all" adds no font object. Same-length edits on 14 named-only lines add none (`outputs/s283-ac283-named-only-1280.pdf`, 11,713 → 11,872 B) |
+| AC-281 | P0 | PASS | Same as the fourth run (`logs/d.log`, 113 lines identical; `logs/s288c.log` same-family part) |
+| AC-282 | P0 | PASS | Same as the fourth run (`logs/d.log`). Gap 6 below still stands |
+| AC-283 | P0 | PASS | 14 of 14 named-only fonts at both sizes and the 3 standard-font lines: the box opens in the twin in 21–69 ms, box width equals line width, "time" → "emit" leaves the width unchanged, the last origin moves 0.0 pt and "END" stays at 500.0 pt in the output; menu rows "… · Same widths" ready 0.55 s after the menu opens, 0 signature files. Segoe UI's own widths not checked, as before |
+| AC-284 | P0 | PASS | The fourth run's sample (152 faces of 53 families, names hidden) run again: true family first for **152 of 152**, all "Exact", 8–16 s per 16-font file (`logs/score.log`) |
+| AC-286 | P0 | PASS | Same as the fourth run (`logs/s5.log`, `s6.log`). But see gap 1 (c): when two stand-ins are used the notice names one |
+| AC-288 | P0 | PASS | Same as the fourth run: all 11 same-script and 11 cross-script lines of `ac288-scripts2.pdf` give the same faces (`logs/s288c.log`) |
+| AC-290 | P0 | PASS (as the spec words it) | Landing: no font or library request at either size; JS by load 141 KB. Files with embedded fonts: no `/fonts/` request in the 6 s after opening. Named-only files: the twins' Latin files 0.3–1.5 s after opening, no index, no signature file. First page drawn in 246–517 ms in its 12 runs (`logs/g6.log`) |
+| AC-291 | P0 | PASS | Same as the fourth run (`logs/c-d.log`, `c-p.log`): the menu loads the preview fonts in view |
+| AC-292 | P0 | PASS | Same as the fourth run (`logs/s9.log`, Playfair Display). See gap 1 (b) for one letter that is shown in a font other than the one saved |
+| AC-293 | P1 | PASS | Same as the fourth run |
+| AC-294 | P0 | PASS | Same as the fourth run at both sizes; no request with the file in any own-font session of this run (0 non-GET) |
+| AC-295 | P0 | PASS | Same as the fourth run at both sizes |
+| AC-296 | P1 | FAIL (deferred) | Not re-run. The spec still lists it as open |
+| AC-298 | P0 | PASS | **Baseline (the part that failed).** `scripts/v298.cjs`, 3 fresh sessions per line, read two ways (`v298.py`: ink centroid of the capture; `v298b.py`: centroid and best whole-pixel shift on the line's own rows only, so neighbouring lines cannot dilute it). The ten lines of the fourth run, vertical offset in CSS px, identical in 3 of 3 sessions: at 1280 ×1 0.00 to −0.28, 1280 ×2 0.00 to −0.14, 390 ×1 0.00 to −0.16, 390 ×2 0.00 to −0.11 (largest: "Spaced out words here"). The eight cases that were 0.9–1.0 off are now 0.00–0.06 ("Results don’t match…", "Office ligatures…", Georgia, Segoe UI, "A footnote mark follows.", the mono line on a phone). In the 39-line run at ×2 every line is within 0.5; **two sit exactly on it** (one device pixel high): "non-refundable" at 1280 ×2 (−0.50; 0.01 at ×1) and "Times New Roman Italic…" at 390 ×2 (−0.50; 0.00 at ×1), gap 4. Ink off by more than a device pixel on opening: 0.0–7.6% at 1280 and 0.0–11.1% at 390 (was up to 31.9% and 35.3%); of the lines that were 15–35%, seven are now 0.0%, the Type 1 stand-in line is 7.6% and two phone lines are 11% ("and it stays…", and the one-character line "1"). Font, start, length, colour: as before. No other font is shown at any moment (39 of 39 timelines). For information, outside the bar: ×3 at 390 within 0.35 on the ten lines; at 1280 ×1.5 one of 14 lines is 0.66 high and at ×1.25 one of 14 is 0.79 high (one device pixel each), gap 4. A Type 1 line opens in a stand-in (spec) |
+| AC-299 | P0 | PASS | 0 animations and opacity 1 from the first frame on 39 of 39 lines at both sizes; `getAnimations()` empty at 50, 600 and 2,000 ms. Selection "Caret" everywhere. Caret within 7.3 px of the click on 38 of 39 lines at 1280 and 2.4 px on 38 of 39 at 390; the one out is gap 7 (Type 1 file, 174 and 57 px until the stand-in arrives), as before |
+| AC-300 | P0 | PASS | Marked 13–69 ms after typing on embedded and named-only lines, named with fonts or "No font here has it" in 0.4–3.3 s; focus stays in the box. Enter: " ⸘" refused in 0.19–0.26 s, " ř" saved in 0.36–0.68 s, " नया" in 0.69–0.84 s, " नया ใหม่" in 0.68–0.76 s (`logs/s300q-d.log`, `s300q-p.log`) |
+| AC-301 | P0 | PASS | At most three fonts (two on a phone), closest first and in use: "Tinos, STIX Two Text, Fenix"; Greek "Tinos, STIX Two Text, Arimo"; picking one redraws at once and is written on Enter (`pick` runs of `logs/s312o.log`: ř and ⸘ both in `BERRYA+DejaVuSans` after DejaVu Sans is picked). After an own font is added in a mixed case the font marked "in use" is not the one that draws every letter: counted under AC-312 |
+| AC-302 | P1 | PASS | Same as the fourth run |
+| AC-303 | P1 | PASS | `font-kerning: none`, `font-variant-ligatures: none` on all 39 boxes at both sizes |
+| AC-304 | P0 | PASS | Footnote line: the mark stays drawn. No neighbour ink hidden on 38 of 39 lines at each size; the 77 and 51 px counted on the mark's own row are the anti-aliasing noted last time. Hint: under, beside or over as before (`logs/s8-d.log`: 3 under, 2 beside, 3 over), one opaque 26 px row, Tab and Shift+Tab work, status text present. After an own font is added the row's buttons stand outside its paper (gap 2) |
+| AC-310 | P0 | PASS | Same as the fourth run at both sizes (`logs/s3a-*.log`, `s3c-*.log`, `s4.log`). In every refusal of the AC-312 run the text stayed in the box with the caret (42 of 42) |
+| AC-311 | P0 | PASS | Same as the fourth run (`logs/s3c-*.log`, `s3d-*.log`) |
+| AC-312 | P0 | **FAIL** (narrow) | **Passes, before a font is added** (54 sessions: "in full." and a named-only Arial line, 9 texts, at 1280, 390 and 320; `logs/s312n-summary.log`). Embedded line, " ř ⸘", " ⸘ ř", " Ω ⸘": the hint names both letters, offers Tinos and STIX Two Text, says "No font has ⸘." and offers "Use your own font"; status "Tinos draws ř. No font here has ⸘. Use your own font, or remove it."; Enter refused in 152–281 ms with "This font has no “⸘”. Your text is still in the box." (box open, caret in it). " नया ⸘ ok": "Noto Serif Devanagari draws न य ा k. No font here has ⸘."; refused in 562–612 ms (575–694 ms in the heavier loop of `s300q`; it was 4.8 s), naming only ⸘. " ř ⸘ Ω ⸙": "Tinos draws ř Ω. No font here has ⸘ ⸙." Phone and 320: "ř [Tinos] ⸘ no font [Your font]", one 40 px row above the dock, nothing outside the screen, no letter cut. Named-only line: only ⸘ is listed (the twin draws ř and Ω), and the message names only ⸘. Single letters: " ř" and " Ω" saved in 0.21–0.52 s, " ⸘" and " ⸘ ⸙" "No font here has it. Use your own font" as before. No font is fetched for a letter none has. **Fails after "Use your own font"** (`own-dejavu.ttf`, which has ⸘ and ř; `logs/s312n.log`, `s312o.log`, `s312p.log`, `s312q.log`; `ac312-own-ř_⸘-enter-added-1280.png`, `ac312-deva-own-added-नया_⸘_ok-1280.png`): **(a)** in every mixed case, at all three sizes, the status then reads "Not in this font: ř ⸘. **Tinos draws them.**" (or "Noto Serif Devanagari draws them.", "Tinos draws ř ⸘ Ω."), with Tinos still marked in use. Tinos has no ⸘: the file gets ř from `BERRYA+Tinos` and ⸘ from `BERRYF+DejaVuSans`. The phone row pairs "ř ⸘ Ω" with an unpressed DejaVu Sans while the status says Tinos. **(b)** Until Enter the box draws ⸘ in a system font (its stack is the document font, Tinos, Times), not in the font that will be saved. **(c)** For " नया ⸘ ok" the added font is **not offered**: the hint shows three Devanagari fonts (two on a phone), "No font has ⸘" is gone, DejaVu Sans is nowhere, on both line kinds at all three sizes. The criterion says "a font added that way is offered at once". **(d)** For that text Enter then closes the box and shows the old line, with no message and Undo off, for **4.1–5.3 s** on the embedded line (4 of 4 runs) and 2.1–2.4 s on the named-only line (4 of 4) before the text appears (0.64–0.78 s for " नया ok" with no font added). The text is saved in the end and Download waits for it, so nothing is lost. In the single-letter case the added font is offered in 0.27–0.39 s, marked in use, drawn in the box, and saved in 0.2–0.3 s: that part passes, as before |
+| AC-313 | P0 | PASS | Row 366x40 px at y 722 above the dock (296x40 at y 518 at 320), the same on every line tried; "Missing: ř" with at most two fonts, or the paired form of AC-312; page and scroll unchanged; Tab reaches the fonts (`logs/s8-p.log` same as the fourth run) |
+| AC-305, AC-306 | P0 | informational | Same as the fourth run (`logs/s10.log`). Ink not re-measured. AC-307, AC-308 not run |
+
+Not judged: AC-270, AC-272, AC-273, AC-274 (crawler, not visible on staging); AC-285, AC-287, AC-297 (the spec lists them as not built).
+
+### Regression checks
+
+- **Downloaded files carry no extra font files.** All 100 files downloaded in this run were compared with their sources (`scripts/outfonts.sh`, `fonts.py`; `logs/outfonts.log`): every source font object is unchanged in every file, no font the source only names gained a font program (14 of 14 still without one in the named-only files), all pass the syntax check, page counts unchanged. What is added is only the subset for the letters typed: 350–2,752 B for library fonts; 12.9–13.2 KB for one or two letters of the person's own font (gap 9).
+- **Gap 6 of the third list (page and box in the same font):** named-only Georgia and Segoe UI differ by 0.0% of ink beyond a device pixel on opening at both sizes, and by 0.00 CSS px vertically (they were ±1.0).
+- JS by load 141 KB. First page 214–517 ms in 39 runs (one cold run 940 ms).
+
+### Sejda tasks spent
+
+**None of the two allowed.** No request was made to sejda.com. Every reference number below is from the cache (tasks T1, T2, T2b of the earlier rounds). The cache holds no Sejda run with a letter no font has; none was needed, because AC-312 is judged against our own criterion and M9 already rests on what Sejda does with a missing letter (nothing is said, or a blocking dialog).
+
+### Micro-checks
+
+| Check | Sejda (cache) | BerryPDF now | Result |
+|---|---|---|---|
+| M1 Landing | 17 / 28 words before the action | 3 words; Open PDF in view at all 7 viewports | win |
+| M2 Upload start | click, drop, 3 clouds, URL | click, drop, paste, blank page | **lose**, owned by F23 (lead's note) |
+| M3 Loading | 4.96 s pick to text | first page 214–517 ms in 39 runs (one 940 ms) | win |
+| M4 Display | 600 px page at 390 | fits the width; named-only fonts drawn in their twins | win |
+| M5 Interaction | one run at a time; on CFF a blocking dialog on the first letter | whole line, own fonts, hint, Tab and Enter; CFF "O" saved 323 ms after Enter | win |
+| M6 Options | 36 fonts, no search, no own fonts | 1,972 families, search, own file, installed fonts, twins "Same widths" | win |
+| M7 Processing | 6.0 s, 6.5 s, 6.6 s | Download to file 1,095–1,161 ms at 1280 (median 1,149), 1,015–1,131 ms at 390 (median 1,056) | win |
+| M8 Output fidelity | CFF: whole line redrawn in non-embedded Helvetica, moved in the reading order | CFF: line keeps Charter, one letter from a Charis SIL subset; source fonts untouched in all 100 outputs | win |
+| M9 Errors | two blocking dialogs; nothing about missing letters | plain messages, text kept, the letters no font has are named; but see AC-312 (a wrong status after an own font is added) | win |
+| M10 Privacy | 10,645 B and 30,583 B uploaded on pick | 0 non-GET requests in every session, own-font sessions included | win |
+| M11 Look | floating toolbar over the text | closed outline, one hint row, slim phone row, no fade; the line no longer steps on opening | win |
+| M12 First screen fit | 1366x657: 45% of the screen; 390x664: 46% | 75% / 73% / 77% / 74% / 76% at the five viewports; Download in view | win at the two viewports with a reference |
+
+### Lighthouse and axe
+
+- Lighthouse 12.8.2 mobile on `/edit-pdf`: performance 100 / 100 / 99 (median 100), accessibility 100, best practices 100, LCP 1.4–1.6 s, CLS 0, TBT 50–100 ms. SEO 66 because staging is noindex.
+- axe 4.14.1: 0 violations in landing, editor open, line open, missing-letter hint, refused line kept open, second hint, stand-in notice and the Change menu, at both sizes (`logs/axe.log`). New states (`scripts/axe2.cjs`, `logs/axe2.log`: mixed hint, mixed refusal, own font added, at 1280, 390 and 320): 0 at 1280; at 390 and 320 one **serious** violation in the hint and the refusal, `label-content-name-mismatch`: the button shows "Your font" and is named "Use your own font" (gap 3). No critical issue.
+
+### Gap list
+
+Blocking:
+
+1. **AC-312 (P0): finish the mixed case after "Use your own font".** Re-check with `scripts/s312n.cjs` (OWN=1), `s312o.cjs`, `s312p.cjs` and `s312q.cjs`.
+   - (a) Say which font draws which letter after a font is added, as is done before: "Tinos draws ř. DejaVu Sans draws ⸘." Today the status says "Tinos draws them." and the phone row and the status disagree.
+   - (b) Draw the letter in the box with the font that will be saved (the added font is not in the box's stack until it is picked).
+   - (c) Offer the added font when it is the only one with a letter, even when three library fonts are listed for other letters (" नया ⸘ ok": DejaVu Sans is not shown at any size). The notice after saving names one stand-in ("Using Tinos.") when two were written.
+   - (d) Answer Enter as fast as without the added font. " नया ⸘ ok" with an added font: 4.1–5.3 s (embedded) and 2.1–2.4 s (named-only) with the box closed, the old line on screen and nothing shown; " नया ok" without it: 0.64–0.78 s. At the least keep the box, or show that the save is under way.
+   - If the owner accepts this state as it is, that needs a waiver in writing; (c) is against the criterion's own words.
+
+Open, not blocking:
+
+2. **Hint row after a font is added (1280).** The row's paper keeps its old width: "STIX Two Text", or "Tiro Devanagari Hindi" and "Martel", stand outside it on the page (`ac312-own-ř_⸘-enter-added-1280.png`). At 320 the font name is cut without an ellipsis ("Noto Serif D") and the second font in the message runs off its edge. In the phone message after a refusal the letter before the first font ("ř") is not visible at 390.
+3. **axe, serious:** phone button "Your font" has the name "Use your own font"; make the name contain the visible words.
+4. **AC-298, one device pixel.** "non-refundable" (1280 ×2) and "Times New Roman Italic…" (390 ×2) open exactly 0.50 CSS px high, on the bar. At 1280 ×1.5 "Times New Roman Italic…" is 0.66 high and at ×1.25 "Please bring…" is 0.79 high (one device pixel; scales the bar does not name, common on Windows laptops). Re-check with `OUT=… DSFS=1.5,1.25 scripts/v298.cjs` and `v298b.py`. The owner or lead should say whether fractional scales belong in the bar.
+5. **Enter in the Devanagari mix sits on the 0.6 s bar:** 562–612 ms (694 ms once in the heavier loop). The Latin and Greek mixes take 0.15–0.28 s.
+6. **Menu and line disagree** (`ac282-name-lies.pdf`, line 3: menu "Adamina · Close", the edit saves Besley). As before.
+7. **First stand-in by shape still takes about 2.6 s** (`latex-type1.pdf`, first line: caret 174 px from the click at 1280, 57 px at 390, until the font arrives). On embedded lines the hint's fonts appear 2.1–3.3 s after the letter.
+8. **Screen-reader text of the accent line** still reads "cafe´ naıve". **Names read oddly** ("ArialMT isn’t in this file"). **Stale message** after a kept-open line is saved by leaving it. As before.
+9. **Fonts:** each built-in twin file is still requested twice; `BERRYA+` / `BERRYB+` pairs per slice (three objects for " Ω ⸘ ok"); one letter of an own font costs 12.9 KB (the subset keeps the font's hinting programs).
+10. **"Use your own font" from the keyboard:** Tab then Enter opened the file dialog at 1280 in every run this time, but not at 390 in one run (`logs/s3c-p.log`).
+11. **Carried over, not re-checked:** AC-296; "Replace with new text" font objects and reading order; focus on `body` after a mouse-opened edit is saved; horizontal scaling shown as spacing; the NUL after a saved Devanagari word in PDFium (seen again: "नया￾"); heavier apostrophe and dash in the Type 1 stand-in.
+
+### Not checked
+
+- AC-285, AC-287, AC-297, AC-307, AC-308 and AC-296 were not run. AC-305 and AC-306 were opened and saved but their ink was not re-measured.
+- AC-283: Segoe UI's own widths against Selawik's (no copy of the font).
+- An own font that has ⸘ but not ř, and an own font added before the letter is typed, were not tried; only `own-dejavu.ttf` (TTF) was used in the mixed case.
+- The phone row against a real on-screen keyboard; the Local Font Access prompt; a real screen reader (the status text was read from the page).
+- First-screen fit on Sejda at 1280x632, 1536x730 and 1920x969 (no reference run, as before). No new side-by-side images were made: the Sejda side is unchanged and the earlier ones in `/mnt/project-files/comparisons/f24/` still apply.
+- Width 375 px: the phone runs were at 390 and 320.
+- `docs/evals/cache/f24-font-library/manifest.json` was not updated (this round's brief limits edits to this file and `eval-5/scripts/`); output hashes are in `eval-5/outputs/sha256.txt` in the project files.
+
+---
+
 ## Re-evaluation 2026-11-25, fourth (staging 6fbd651)
 
 - **Verdict: FAIL** (narrowly: two P0 criteria fail on one case each; everything the third evaluation blocked on is fixed)
