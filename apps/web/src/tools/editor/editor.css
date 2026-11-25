@@ -1341,11 +1341,15 @@
   align-items: center;
   gap: 6px;
   width: max-content;
-  max-width: min(calc(100vw - 16px), 300px);
+  /* Wide enough for three fonts with long names; past that the row wraps inside its paper. */
+  max-width: min(calc(100vw - 16px), 380px);
+  flex-wrap: wrap;
+  row-gap: 2px;
   margin: 0;
   padding: 2px 3px 2px 9px;
   border: 1px solid color-mix(in srgb, var(--color-ink) 10%, transparent);
-  border-radius: 999px;
+  /* A pill on one line; still rounded if it ever takes two. */
+  border-radius: 14px;
   background: var(--ip-surface-overlay, #fff);
   box-shadow: var(--shadow-menu);
   font: 500 11px/1.4 var(--font-sans, system-ui, sans-serif);
@@ -1368,6 +1372,9 @@
   width: 100%;
   max-width: 100%;
   min-height: 40px;
+  /* One row always: the dock never moves. */
+  flex-wrap: nowrap;
+  border-radius: 999px;
   justify-content: space-between;
   padding: 4px 6px 4px 14px;
   font-size: 13px;
@@ -1385,8 +1392,20 @@
   overflow: hidden;
 }
 .ed-input__hint--docked .ed-input__pick {
+  /* A long font name gives way (the letters beside it never do). */
+  min-width: 0;
+  overflow: hidden;
   padding: 5px 12px;
   font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Two fonts share the row: the longer name gives way first, and neither goes below a few letters. */
+.ed-input__hint--docked .ed-input__pair {
+  flex: 0 1 auto;
+}
+.ed-input__hint--docked .ed-input__pair > .ed-input__pick {
+  flex: 0 1 auto;
 }
 .ed-input__chars {
   font-weight: 700;
@@ -1396,18 +1415,32 @@
   align-items: center;
   gap: 3px;
 }
+/* A letter and the font that draws it. */
+.ed-input__pair {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+.ed-input__pair > .ed-input__chars {
+  flex: none;
+}
+.ed-input__pair + .ed-input__pair,
+.ed-input__pair + .ed-input__pick {
+  margin-left: 5px;
+}
 /* On a phone: each letter beside its own answer, the two pairs at the row's two ends. */
 .ed-input__hint--pairs {
   justify-content: flex-start;
   gap: 8px;
 }
-.ed-input__hint--pairs > .ed-input__picks:last-child {
+.ed-input__hint--pairs > .ed-input__picks--none {
   flex: none;
   margin-left: auto;
 }
 /* Fonts for some letters and none for others: both are said, so the row is longer. */
 .ed-input__hint--both {
-  max-width: min(calc(100vw - 16px), 460px);
+  max-width: min(calc(100vw - 16px), 560px);
 }
 .ed-input__pick {
   padding: 1px 8px;

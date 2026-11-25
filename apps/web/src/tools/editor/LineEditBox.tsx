@@ -29,7 +29,7 @@ import { useCtl } from "./context";
 import { docFace, type DocFace } from "./doc-face";
 import { useStore } from "./store";
 import { USER_FONT_ACCEPT } from "@/lib/font-library/user-fonts";
-import { addUserFontFile, chosenStandIn, coverOf, fontLabel, getFontState, standInCandidates } from "./font-service";
+import { addUserFontFile, chosenPartners, chosenStandIn, coverOf, fontLabel, getFontState, planCover, rankStandIns, standInCandidates } from "./font-service";
 
 type Line = PageText["lines"][number];
 export type EditBoxGeometry = { left: number; top: number; width: number; height: number; transform?: string };
@@ -53,13 +53,50 @@ const ACCENT = /[\u00B4\u0060\u00A8\u02C6\u02DC\u00AF\u02D8\u02D9\u02DA\u00B8\u0
 type Piece = { span: HTMLElement; from: number };
 
 /** What a screen reader hears after the missing characters: which font draws which, and which none has. */
-function missingSaid(shown: { picked: string; none: string[] } | null, chars: readonly string[]): string {
+function missingSaid(shown: { plan: Plan; none: string[] } | null): string {
   if (!shown) return "";
-  const drawn = chars.filter((c) => !shown.none.includes(c));
-  const by = shown.picked && drawn.length ? ` ${fontLabel(shown.picked)} draws ${shown.none.length ? drawn.join(" ") : drawn.length > 1 ? "them" : "it"}.` : "";
-  const none = !shown.picked ? " No font here has it. Use your own font, or remove it." : shown.none.length ? ` No font here has ${shown.none.join(" ")}. Use your own font, or remove it.` : "";
+  const alone = shown.plan.length === 1 && !shown.none.length;
+  const by = shown.plan.map((p) => ` ${fontLabel(p.id)} draws ${alone ? (p.chars.length > 1 ? "them" : "it") : p.chars.join(" ")}.`).join("");
+  const none = !shown.plan.length ? " No font here has it. Use your own font, or remove it." : shown.none.length ? ` No font here has ${shown.none.join(" ")}. Use your own font, or remove it.` : "";
   return by + none;
 }
+
+/**
+ * The missing letters as the person typed them: whole letters ("नया" as न या), never a vowel sign
+ * or accent on its own, which a browser draws on a dotted circle. A typed letter is listed when
+ * its first missing character is one of `chars`.
+ */
+function asTyped(typed: string, chars: readonly string[], all: readonly string[] = chars): string[] {
+  const out: string[] = [];
+  const Seg = (Intl as { Segmenter?: typeof Intl.Segmenter }).Segmenter;
+  const parts = Seg ? Array.from(new Seg(undefined, { granularity: "grapheme" }).segment(typed), (x) => x.segment) : [...typed];
+  const left = new Set(chars);
+  for (const part of parts) {
+    const first = [...part].find((c) => all.includes(c));
+    if (first === undefined || !chars.includes(first)) continue;
+    for (const c of part) left.delete(c);
+    if (!out.includes(part)) out.push(part);
+  }
+  // A character not found in the text (it changed meanwhile) is still named.
+  return [...out, ...[...left].filter((c) => !out.some((o) => o.includes(c)))];
+}
+
+/** Which font draws which of the missing letters, the font in use first. */
+type Plan = { id: string; chars: string[] }[];
+type StandIn = {
+  font: number;
+  chars: string;
+  /** The fonts offered, in the row's order. */
+  ids: string[];
+  picked: string;
+  plan: Plan;
+  /** The offered fonts' letters, for a new plan when another font is picked. */
+  by: Map<string, string[]>;
+  /** The characters no font here has. */
+  none: string[];
+};
+/** The edit box's font list for the letters a document font lacks: each font of the plan, in its order. */
+const standStack = (s: StandIn | null, font: number) => (s && s.font === font ? s.plan.map((p) => `"${cssFamily(p.id)}", `).join("") : "");
 
 type Scan = { at: number | null; ranges: Range[]; missing: { font: number; chars: string[] } | null; unasked: Map<number, string> };
 
@@ -220,7 +257,7 @@ export function LineEditBox({
   const [waited, setWaited] = useState(false);
   const [paperColor, setPaperColor] = useState<string | null>(null);
   const [missing, setMissing] = useState<Scan["missing"]>(null);
-  const [standIn, setStandIn] = useState<{ font: number; chars: string; ids: string[]; picked: string; /** The characters no font here has. */ none: string[] } | null>(null);
+  const [standIn, setStandIn] = useState<StandIn | null>(null);
   /** Spacing that fits the text to the line's length, per unit of zoom (so it holds when the page is zoomed). */
   const [fit, setFit] = useState<{ word?: number; letter?: number } | null>(null);
   /** Where the first missing character stands in the box: the hint starts there. */
@@ -560,7 +597,7 @@ export function LineEditBox({
       const i = Number(span.dataset.font);
       const info = text.fonts[i];
       const face = faces[i];
-      const stand = standIn && standIn.font === i && standIn.picked ? `"${cssFamily(standIn.picked)}", ` : "";
+      const stand = standStack(standIn, i);
       span.style.fontFamily = `${face ? `"${face.family}", ` : ""}${stand}${generic(info)}`;
       // The embedded font already is the bold or italic face: asking again would fake one on top.
       span.style.fontWeight = (face ? face.kind === "close" && face.bold : !!info?.bold) ? "700" : "400";
@@ -673,24 +710,42 @@ export function LineEditBox({
       const users = getFontState().user.map((u) => u.id).filter((id) => !ids.includes(id));
       const cover = await coverOf([...users, ...ids], info.bold, info.italic, missing.chars);
       // Those that have the most of the missing characters first; closeness decides between equals.
-      const has = (id: string) => cover.has.get(id) ?? 0;
-      const able = [...users, ...ids]
-        .filter((id) => has(id) > 0)
-        .sort((a, b) => has(b) - has(a))
-        .slice(0, CHOICES);
+      const ranked = rankStandIns(users, ids, cover.has);
+      const pickedNow = () => {
+        const k = standInRef.current;
+        return k && k.font === missing.font && ranked.includes(k.picked) ? k.picked : (ranked[0] ?? "");
+      };
+      let picked = pickedNow();
+      // One answer for the hint, the box and the file: the font in use draws what it has, and
+      // the font with the most of the rest (one the person added counts) draws the rest.
+      let plan = planCover(picked ? [picked] : [], ranked, cover.by, missing.chars);
+      // Every font of the plan is offered: one with a single letter no other has is never left out.
+      const able = ranked.slice(0, CHOICES);
+      for (const { id } of plan) {
+        if (able.includes(id)) continue;
+        const spare = able.findLastIndex((a) => !plan.some((p) => p.id === a));
+        if (spare >= 0) able[spare] = id;
+        else able.push(id);
+      }
       await Promise.allSettled(able.map((id) => ensureFace(id, info.bold, info.italic, chars + fontLabel(id))));
       if (!alive) return;
       const kept = standInRef.current;
+      // A font picked while the fonts loaded stays picked (it is one of the row's fonts).
+      if (pickedNow() !== picked && able.includes(pickedNow())) {
+        picked = pickedNow();
+        plan = planCover([picked], able, cover.by, missing.chars);
+      }
       // The same fonts stay in the same places: a pick never reshuffles the row.
       if (kept && kept.font === missing.font && kept.ids.length === able.length && able.every((id) => kept.ids.includes(id))) able.splice(0, able.length, ...kept.ids);
-      const picked = kept && kept.font === missing.font && able.includes(kept.picked) ? kept.picked : (able[0] ?? "");
-      // What the box shows is what the file gets: the font in use is recorded as the choice.
-      if (picked && chosenStandIn(familyKey(info)) !== picked) {
+      // What the box shows is what the file gets: the fonts in use are recorded as the choice.
+      const key = familyKey(info);
+      const partners = plan.slice(1).map((p) => p.id);
+      if (picked && (chosenStandIn(key) !== picked || chosenPartners(key).join() !== partners.join())) {
         // Taken without being asked: an edit given up with Escape leaves no trace of it.
-        taken.current ??= { key: familyKey(info), before: chosenStandIn(familyKey(info)) };
-        await ctl.pickStandIn(familyKey(info), picked);
+        taken.current ??= { key, before: chosenStandIn(key) };
+        await ctl.pickStandIn(key, picked, partners);
       }
-      if (alive) setStandIn({ font: missing.font, chars, ids: able, picked, none: cover.none });
+      if (alive) setStandIn({ font: missing.font, chars, ids: able, picked, plan, by: cover.by, none: cover.none });
     })().catch(() => undefined);
     return () => {
       alive = false;
@@ -738,7 +793,7 @@ export function LineEditBox({
     paddingBottom: padBottom,
     lineHeight: `${box.height - padTop - padBottom}px`,
     fontSize,
-    fontFamily: `${firstFace ? `"${firstFace.family}", ` : ""}${standIn && standIn.font === first && standIn.picked ? `"${cssFamily(standIn.picked)}", ` : ""}${generic(info)}`,
+    fontFamily: `${firstFace ? `"${firstFace.family}", ` : ""}${standStack(standIn, first)}${generic(info)}`,
     fontWeight: (firstFace ? firstFace.kind === "close" && firstFace.bold : !!info?.bold) ? 700 : 400,
     fontStyle: (firstFace ? firstFace.kind === "close" && firstFace.italic : !!info?.italic) ? "italic" : "normal",
     ...(ready
@@ -784,13 +839,30 @@ export function LineEditBox({
   const shown = standIn && missing && standIn.font === missing.font && standIn.chars === missing.chars.join("") ? standIn : null;
   /** Fonts for some of the missing letters and none for others. */
   const both = !!shown && shown.ids.length > 0 && shown.none.length > 0;
+  /** Two fonts share the letters: each is shown beside its own. */
+  const shared = !!shown && shown.plan.length > 1;
+  const pick = (id: string) => {
+    if (!shown) return;
+    const font = text.fonts[shown.font];
+    if (!font || shown.picked === id) return el.current?.focus({ preventScroll: true });
+    // Another font may be able to save what the last one couldn't.
+    ctl.retryable();
+    taken.current = null;
+    const plan = planCover([id], shown.ids, shown.by, missing?.chars ?? []);
+    void ctl.pickStandIn(familyKey(font), id, plan.slice(1).map((p) => p.id));
+    setStandIn({ ...shown, picked: id, plan });
+    el.current?.focus({ preventScroll: true });
+  };
 
   const docked = !!slot;
+  const paired = shared || (both && docked);
+  /** The box's text, for showing the missing letters as they were typed. */
+  const typedNow = el.current?.textContent ?? "";
   const inMessage = slot?.getAttribute("data-line-hint-slot") === "toast";
   const hint = missing ? (
         <div
           id={hintId}
-          className={inMessage ? "ed-toast__picks" : docked ? cx("ed-input__hint ed-input__hint--docked ed-glass", both && "ed-input__hint--pairs") : cx("ed-input__hint", side !== "under" && `ed-input__hint--${side}`, both && "ed-input__hint--both")}
+          className={inMessage ? "ed-toast__picks" : docked ? cx("ed-input__hint ed-input__hint--docked ed-glass", paired && "ed-input__hint--pairs") : cx("ed-input__hint", side !== "under" && `ed-input__hint--${side}`, (both || shared) && "ed-input__hint--both")}
           ref={(node) => {
             // Its real size (it depends on the fonts offered) decides which side is clear.
             if (node && !docked && (Math.abs(node.offsetWidth - hintSize.w) > 1 || Math.abs(node.offsetHeight - hintSize.h) > 1)) setHintSize({ w: node.offsetWidth, h: node.offsetHeight });
@@ -802,42 +874,48 @@ export function LineEditBox({
           data-side={inMessage ? "message" : docked ? "docked" : side}
         >
           <span className={inMessage ? "sr-only" : undefined}>
-            {/* On a phone with fonts for some letters and none for others, each letter stands by its own answer. */}
-            {both && docked ? "" : docked ? "Missing: " : "Not in this font: "}
-            <span className="ed-input__chars">{(both && docked ? missing.chars.filter((c) => !shown!.none.includes(c)) : missing.chars).slice(0, 8).join(" ")}</span>
+            {/* With two answers (two fonts, or a font and none), each letter stands by its own answer. */}
+            {paired && docked ? "" : docked ? "Missing: " : paired ? "Not in this font:" : "Not in this font: "}
+            {!paired && <span className="ed-input__chars">{asTyped(typedNow, missing.chars).slice(0, 8).join(" ")}</span>}
           </span>
           {shown && shown.ids.length > 0 && (
             <span role="group" aria-label="Font for these characters" className="ed-input__picks">
-              {shown.ids.slice(0, shown.none.length ? (docked ? 1 : 2) : docked ? 2 : CHOICES).map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={shown.picked === id}
-                  data-testid="line-missing-font"
-                  data-font-id={id}
-                  className={cx("ed-input__pick", shown.picked === id && "ed-input__pick--on")}
-                  style={{ fontFamily: `"${cssFamily(id)}", inherit` }}
-                  // The box keeps the caret: picking a font never ends the edit.
-                  onMouseDown={(e) => e.preventDefault()}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => {
-                    const font = text.fonts[shown.font];
-                    if (!font || shown.picked === id) return el.current?.focus({ preventScroll: true });
-                    // Another font may be able to save what the last one couldn't.
-                    ctl.retryable();
-                    taken.current = null;
-                    void ctl.pickStandIn(familyKey(font), id);
-                    setStandIn({ ...shown, picked: id });
-                    el.current?.focus({ preventScroll: true });
-                  }}
-                >
-                  {fontLabel(id)}
-                </button>
-              ))}
+              {(paired
+                ? [...shown.plan.map((p) => p.id), ...(docked ? [] : shown.ids.filter((id) => !shown.plan.some((p) => p.id === id)).slice(0, Math.max(0, (shown.none.length ? 2 : CHOICES) - shown.plan.length)))]
+                : shown.ids.slice(0, docked || shown.none.length ? 2 : CHOICES)
+              ).map((id) => {
+                const mine = shown.plan.find((p) => p.id === id);
+                const chip = (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={!!mine}
+                    data-testid="line-missing-font"
+                    data-font-id={id}
+                    data-draws={mine?.chars.join("")}
+                    className={cx("ed-input__pick", mine && "ed-input__pick--on")}
+                    style={{ fontFamily: `"${cssFamily(id)}", inherit` }}
+                    // The box keeps the caret: picking a font never ends the edit.
+                    onMouseDown={(e) => e.preventDefault()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => pick(id)}
+                  >
+                    {fontLabel(id)}
+                  </button>
+                );
+                return paired && mine ? (
+                  <span key={id} className="ed-input__pair">
+                    <span className="ed-input__chars">{asTyped(typedNow, mine.chars, missing.chars).slice(0, 4).join(" ")}</span>
+                    {chip}
+                  </span>
+                ) : (
+                  chip
+                );
+              })}
             </span>
           )}
           {shown && (shown.ids.length === 0 || shown.none.length > 0) && (
-            <span className="ed-input__picks">
+            <span className="ed-input__picks ed-input__picks--none">
               {(!docked || ownError || shown.ids.length > 0) && (
                 <span data-testid="line-missing-none">
                   {ownError ||
@@ -845,17 +923,18 @@ export function LineEditBox({
                       "No font here has it."
                     ) : docked ? (
                       <>
-                        <span className="ed-input__chars">{shown.none.slice(0, 4).join(" ")}</span> no font
+                        <span className="ed-input__chars">{asTyped(typedNow, shown.none, missing.chars).slice(0, 4).join(" ")}</span> no font
                       </>
                     ) : (
-                      `No font has ${shown.none.slice(0, 4).join(" ")}.`
+                      `No font has ${asTyped(typedNow, shown.none, missing.chars).slice(0, 4).join(" ")}.`
                     ))}
                 </span>
               )}
               <button
                 type="button"
                 data-testid="line-missing-own"
-                aria-label="Use your own font"
+                // The name starts with the words on the button, so asking for it by voice works.
+                aria-label={both && docked ? "Your font: use your own font" : undefined}
                 className="ed-input__pick"
                 onMouseDown={(e) => e.preventDefault()}
                 onPointerDown={(e) => e.stopPropagation()}
@@ -906,7 +985,7 @@ export function LineEditBox({
     >
       {/* Always here, so a screen reader hears the change when a character turns out to be missing. */}
       <span role="status" className="sr-only" data-testid="line-missing-status">
-        {missing ? `Not in this font: ${missing.chars.join(" ")}.${missingSaid(shown, missing.chars)}` : ""}
+        {missing ? `Not in this font: ${missing.chars.join(" ")}.${missingSaid(shown)}` : ""}
       </span>
       <div
         ref={el}
