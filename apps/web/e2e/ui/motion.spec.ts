@@ -501,7 +501,7 @@ for (const size of SIZES) {
         size.project === "desktop" ? "tool-menu" : "dialog",
       );
       await page.keyboard.press("Escape");
-      await expectExit(page, "All tools", size.project === "desktop" ? 120 : 200, true);
+      await expectExit(page, "All tools", 120, true);
 
       await openMerge(page);
       await primeEngine(page, hits);
