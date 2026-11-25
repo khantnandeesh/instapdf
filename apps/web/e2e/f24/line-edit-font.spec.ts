@@ -955,8 +955,8 @@ test("AC-312: on a line whose font the file only names, the twin keeps its lette
   test.skip(isMobile, "the download is read on desktop");
   const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download PDF" }).click()]);
   const saved = readFileSync((await dl.path())!).toString("latin1");
-  const sizes = [...saved.matchAll(/\+(Tinos|OwnTestSans)\b/g)].map((m) => m[1]);
-  expect(new Set(sizes).size).toBe(2);
+  const names = [...saved.matchAll(/\+(Tinos|OwnTestSans)\b/g)].map((m) => m[1]);
+  expect(new Set(names).size).toBe(2);
 });
 
 test("AC-312: a later line of a font the file only names gets its new letter in the twin, not in the font the person added", async ({ page }) => {

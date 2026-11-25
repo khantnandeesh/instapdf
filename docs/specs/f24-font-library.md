@@ -272,5 +272,9 @@ twin: it gave those letters to the font the person had added.
   before any picked font: every letter the twin has is saved in the twin, as the box draws it.
 - **Later lines.** Once another font is registered with the engine, the twin is registered for
   the new letters of each edit of that font before the edit is tried, so the added font can't
-  take a letter silently. Each letter is registered once.
+  take a letter silently. This holds for every named-only font of a line, each in its own style.
+  Only letters another registered font has are registered, and each of the twin's files once. The
+  record is dropped whenever the engine's fonts are (a pick, another font, an engine restart).
+- Still open: if the twin's file doesn't arrive, the edit goes ahead and the added font takes the
+  letter, with the notice naming it.
 - The notice names the twin too ("Using Tinos and Own Test Sans.").
