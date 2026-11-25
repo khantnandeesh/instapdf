@@ -20,6 +20,8 @@
 import { Inflate } from "fflate";
 
 /** Output cap per decompressed stream: xref and object streams are far smaller (a few hundred kB at most). */
+const ENDSTREAM = Uint8Array.from("endstream", (c) => c.charCodeAt(0));
+
 export const MAX_INFLATE = 8 * 1024 * 1024;
 /** The default work budget, in bytes touched: a few passes over a large file, plus the decoding. */
 export const defaultBudget = (fileBytes: number) => 4 * fileBytes + 64 * 1024 * 1024;
@@ -328,6 +330,23 @@ export class RawPdf {
     return this.textCache;
   }
 
+  /** Whether `endstream` starts within 32 bytes after `at`. */
+  private endstreamNear(at: number): boolean {
+    const window = this.bytes.subarray(at, at + 32 + ENDSTREAM.length);
+    this.work(window.length);
+    for (let i = 0; i + ENDSTREAM.length <= window.length; i++) {
+      let k = 0;
+      while (k < ENDSTREAM.length && window[i + k] === ENDSTREAM[k]) k++;
+      if (k === ENDSTREAM.length) return true;
+    }
+    return false;
+  }
+
+  /** Whether the whole-file `endstream` index was built (tests: a clean file never needs it). */
+  get builtEndstreamIndex(): boolean {
+    return this.endstreams !== null;
+  }
+
   /** The first `endstream` at or after `from` (-1: none), from an index of every one, built in one pass. */
   private endstreamFrom(from: number): number {
     if (!this.endstreams) {
@@ -407,8 +426,8 @@ export class RawPdf {
     const valid = typeof length === "number" && Number.isInteger(length) && length >= 0 && start + length <= this.bytes.length;
     let end = valid ? start + length : -1;
     // The declared length is right when `endstream` follows it (after an end of line).
-    const next = end < 0 ? -1 : this.endstreamFrom(end);
-    if (end < 0 || next < 0 || next - end > 32) {
+    // Looked for in the few bytes after it: the whole-file index is only for the fallback.
+    if (end < 0 || !this.endstreamNear(end)) {
       const at = this.endstreamFrom(start);
       if (at < 0) throw new ParseError("open stream");
       end = at;

@@ -34,6 +34,9 @@ describe("raw PDF reader (twins without pdf-lib, AC-51)", () => {
       const info = pdf.resolve(pdf.trailer.get("Info")) as PdfDict;
       expect(info).toBeDefined();
       expect(pdf.lookup(info, "Title")).toBeDefined();
+      // Every stream's declared /Length was right, so the whole-file endstream index (a pass over
+      // the file, ~0.8 s at 30 MB) was never built.
+      expect(pdf.builtEndstreamIndex).toBe(false);
     });
   }
 
