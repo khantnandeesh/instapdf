@@ -1,0 +1,8 @@
+const { open, load, log, SHOTS } = require("./lib.cjs"); const { install, state } = require("./st.cjs");
+(async () => { for (const txt of [" नया ⸘ ok", " ⸘", " नया"]) { const { browser, page } = await open({}); await load(page, process.env.FXD + "/ac283-named-only.pdf"); await install(page);
+  const o = page.getByTestId("line").nth(0); const b = await o.boundingBox(); await page.mouse.click(b.x + b.width - 3, b.y + b.height / 2); await page.getByTestId("line-input").waitFor(); await page.keyboard.press("End");
+  await page.keyboard.insertText(txt); await page.waitForTimeout(4000); await page.keyboard.press("Enter"); const t0 = Date.now(); let last = "";
+  while (Date.now() - t0 < 14000) { const s = await state(page); const snap = await page.locator("body").ariaSnapshot(); const k = JSON.stringify({ box: s.box && s.box.text.slice(-10), notice: s.notice && s.notice.text.slice(0, 90), line: s.lines[0].slice(-12), undo: s.undo, standin: snap.split("\n").filter((x) => /isn’t|Using/.test(x)).map((x) => x.trim())[0] }); if (k !== last) { log(JSON.stringify(txt), "+" + (Date.now() - t0), k); last = k; } await page.waitForTimeout(150); }
+  await page.mouse.move(5, 5); await page.screenshot({ path: SHOTS + `ac300-arial-named-after-enter-${txt.length}-1280.png` });
+  const dl = page.waitForEvent("download", { timeout: 8000 }).catch(() => null); await page.getByTestId("download").click(); const d = await dl; if (d) await d.saveAs(`out/s300p-${txt.length}.pdf`); log("download", !!d, JSON.stringify((await state(page)).notice));
+  await browser.close(); } })().catch((e) => { console.error(String(e).slice(0, 800)); process.exit(1); });
