@@ -188,7 +188,17 @@ The re-evaluation of 2026-11-24 on staging `f68ba1d` failed on AC-281, AC-301, A
 - **Gap 10.** The phone row reads "Missing: ř á k".
 - **Gap 11.** Courier is listed with Cousine (its twin). A font too small to compare by shape that carries a library family's exact name (a stand-in we embedded earlier) is listed with that family instead of "No match yet".
 
-Still open: Segoe UI's twin (above); AC-296; two font objects per stand-in (one per slice); `/fonts/editor/*.woff` caching; focus after a mouse-opened edit; horizontal scaling shown as spacing.
+Still open: AC-296; two font objects per stand-in (one per slice); `/fonts/editor/*.woff` caching; focus after a mouse-opened edit; horizontal scaling shown as spacing.
 
 Still open from the first evaluation: AC-296 (looking the PDF's own font up on the device), a character the embedded program has under a code the PDF's own table does not list shows as present in the box and is saved in a stand-in font (the notice after saving says so), two font objects per stand-in (one per slice), `/fonts/editor/*.woff` caching, and focus after a mouse-opened edit.
+
+## Segoe UI's twin (seventh PR)
+
+AC-283 named eight fonts and seven had a twin: Selawik, Segoe UI's, is in no catalogue we read. It now comes from its maker.
+
+- **Source.** Microsoft's own release, `microsoft/Selawik` 1.01 (`Selawik_Release.zip`), SIL OFL 1.1 with the reserved name Selawik. The archive, each font file taken from it and the licence text are pinned by sha256 in `apps/web/scripts/font-library/extras.mjs`; a download that fails or differs stops the publish, so the library never loses the family quietly.
+- **Published as released.** The release's own WOFF files, whole (one file a weight, listed with the characters it has): no slicing and no conversion, because a font with a reserved name may keep it only unchanged. Light 300, Regular 400, Semibold 600 and Bold 700; no italics exist. Semilight is left out (its file gives weight 300, the same as Light).
+- **Recorded.** The family manifest carries `source` (name, version, release address), and `licences/selawik.txt` opens with the version and release address above the licence text. The notices page lists it with the rest of the library.
+- **Where.** Only the published library (`publish-fonts.yml` passes `--extras`). The small in-app copy (development, tests, CI) stays offline and has no Selawik; there Segoe UI falls to the closest shapes as before.
+- Not checked by us: Segoe UI's own widths (we may not hold the font). The twin rests on Microsoft's statement that Selawik is its metric-compatible stand-in; its README notes kerning is not matched.
 
