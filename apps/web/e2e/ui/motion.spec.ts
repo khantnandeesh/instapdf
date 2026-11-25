@@ -7,8 +7,8 @@
  * 3. A click on a menu item, and on Download, during its entrance acts on the first try.
  * 4. Opening and closing the All tools menu, a dialog and a menu, filtering, and adding files record no
  *    layout shift.
- * 5. Exits happen: the All tools menu, a dialog and a menu are still shown one frame after Escape, and gone
- *    within 200ms plus one measured frame (and the 400ms cap); their configured lengths are within the preset's.
+ * 5. Exits happen: the first frame after Escape comes within 200ms; the All tools menu, a dialog and a menu are still shown on it, and gone
+ *    within 200ms of that frame plus one measured frame (and the 400ms cap); their configured lengths are within the preset's.
  * 6. No securitypolicyviolation event fires (every test).
  * 7. Nothing is animating on a tool page 5s after load (WCAG 2.2.2).
  * 8. Each Escape exit puts focus back on the trigger, and the leaving part is inert and aria-hidden while
@@ -158,6 +158,8 @@ const strayTransforms = (page: Page) =>
 type ExitWatch = {
   afterFrame?: boolean;
   lastShown?: number;
+  /** The first frame after the key (ms after it): input latency, kept apart from the exit's length. */
+  firstFrame?: number;
   exitGap?: number;
   /** Each frame's time after the key (ms), for the failure message. */
   frames?: number[];
@@ -169,7 +171,7 @@ type ExitWatch = {
 /**
  * Arms a watcher for the next Escape. Everything is on one clock: the keydown's timeStamp and the
  * requestAnimationFrame timestamps. It records whether the part is still shown on the first frame after
- * the key, the last frame it was shown (lastShown, ms after the key), the gap between that frame and the
+ * the key and when that frame came (firstFrame), the last frame it was shown (lastShown, ms after the key), the gap between that frame and the
  * first frame where it is gone (exitGap: the exit ended somewhere inside it), and the configured lengths of the exit
  * on that first frame: the leaving element's CSS transitions and lib/motion tweens on it.
  */
@@ -235,6 +237,7 @@ async function armExitWatch(page: Page, kind: "tool-menu" | "dialog" | "menu") {
           watch.frames!.push(Math.round(ts - t0));
           const on = shown();
           if (watch.afterFrame === undefined) {
+            watch.firstFrame = ts - t0;
             watch.afterFrame = on;
             const el = leaving();
             watch.cssMs = longestCss(el);
@@ -279,11 +282,16 @@ async function expectExit(page: Page, what: string, limitMs: number, tween: bool
     r.afterFrame,
     `${what} is still shown the frame after Escape (it exits, not vanishes)`,
   ).toBe(true);
+  const frames = `frames at ${r.frames.join(", ")}ms after Escape`;
+  // Input latency on its own: a blocked main thread fails here, not as a slow animation.
+  expect(r.firstFrame, `${what}: the first frame after Escape comes within 200ms of it (${frames})`).toBeLessThanOrEqual(200);
+  // The exit itself runs from the first frame after the key.
+  const exit = r.lastShown - r.firstFrame;
   expect(
-    r.lastShown - r.exitGap,
-    `${what}: last shown frame ${r.lastShown.toFixed(1)}ms after Escape, less the gap to the first gone frame ${r.exitGap.toFixed(1)}ms, is within 200ms (frames at ${r.frames.join(", ")}ms)`,
+    exit - r.exitGap,
+    `${what}: last shown frame ${exit.toFixed(1)}ms after the first frame, less the gap to the first gone frame ${r.exitGap.toFixed(1)}ms, is within 200ms (${frames})`,
   ).toBeLessThanOrEqual(200);
-  expect(r.lastShown, `${what} is gone within the 400ms cap`).toBeLessThanOrEqual(400);
+  expect(exit, `${what} is gone within the 400ms cap from the first frame (${frames})`).toBeLessThanOrEqual(400);
   expect(r.cssMs, `${what}: configured CSS transition length`).toBeLessThanOrEqual(limitMs);
   if (tween) {
     expect(r.tweenMs, `${what}: a lib/motion tween runs the exit`).toBeGreaterThan(0);
