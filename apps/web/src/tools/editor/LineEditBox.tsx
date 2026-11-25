@@ -225,6 +225,8 @@ export function LineEditBox({
   const [fit, setFit] = useState<{ word?: number; letter?: number } | null>(null);
   /** Where the first missing character stands in the box: the hint starts there. */
   const [missAt, setMissAt] = useState(0);
+  /** Counts finished compositions (IME). */
+  const [composed, setComposed] = useState(0);
   const [hintSize, setHintSize] = useState({ w: 220, h: 26 });
   /** How wide the box is drawn now (it grows with the text). */
   const [inputWidth, setInputWidth] = useState(0);
@@ -620,7 +622,7 @@ export function LineEditBox({
       else placeCaret();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [faces, standIn, scale, ready, settled]);
+  }, [faces, standIn, scale, ready, settled, composed]);
 
   // The box covers the drawn glyphs, and its unseen text is spread to their length so the caret
   // stands where they end.
@@ -778,14 +780,17 @@ export function LineEditBox({
         ? "beside"
         : "over";
   const hintLeft = side === "beside" ? besideLeft : underLeft;
-  const shown = standIn && missing && standIn.font === missing.font ? standIn : null;
+  // Only once it is about the letters missing now: an answer for fewer letters is never read out for more.
+  const shown = standIn && missing && standIn.font === missing.font && standIn.chars === missing.chars.join("") ? standIn : null;
+  /** Fonts for some of the missing letters and none for others. */
+  const both = !!shown && shown.ids.length > 0 && shown.none.length > 0;
 
   const docked = !!slot;
   const inMessage = slot?.getAttribute("data-line-hint-slot") === "toast";
   const hint = missing ? (
         <div
           id={hintId}
-          className={inMessage ? "ed-toast__picks" : docked ? "ed-input__hint ed-input__hint--docked ed-glass" : cx("ed-input__hint", side !== "under" && `ed-input__hint--${side}`, shown && shown.ids.length > 0 && shown.none.length > 0 && "ed-input__hint--both")}
+          className={inMessage ? "ed-toast__picks" : docked ? cx("ed-input__hint ed-input__hint--docked ed-glass", both && "ed-input__hint--pairs") : cx("ed-input__hint", side !== "under" && `ed-input__hint--${side}`, both && "ed-input__hint--both")}
           ref={(node) => {
             // Its real size (it depends on the fonts offered) decides which side is clear.
             if (node && !docked && (Math.abs(node.offsetWidth - hintSize.w) > 1 || Math.abs(node.offsetHeight - hintSize.h) > 1)) setHintSize({ w: node.offsetWidth, h: node.offsetHeight });
@@ -797,8 +802,9 @@ export function LineEditBox({
           data-side={inMessage ? "message" : docked ? "docked" : side}
         >
           <span className={inMessage ? "sr-only" : undefined}>
-            {docked ? "Missing: " : "Not in this font: "}
-            <span className="ed-input__chars">{missing.chars.slice(0, 8).join(" ")}</span>
+            {/* On a phone with fonts for some letters and none for others, each letter stands by its own answer. */}
+            {both && docked ? "" : docked ? "Missing: " : "Not in this font: "}
+            <span className="ed-input__chars">{(both && docked ? missing.chars.filter((c) => !shown!.none.includes(c)) : missing.chars).slice(0, 8).join(" ")}</span>
           </span>
           {shown && shown.ids.length > 0 && (
             <span role="group" aria-label="Font for these characters" className="ed-input__picks">
@@ -832,10 +838,24 @@ export function LineEditBox({
           )}
           {shown && (shown.ids.length === 0 || shown.none.length > 0) && (
             <span className="ed-input__picks">
-              {(!docked || ownError || shown.ids.length > 0) && <span data-testid="line-missing-none">{ownError || (shown.ids.length ? `No font has ${shown.none.slice(0, 4).join(" ")}.` : "No font here has it.")}</span>}
+              {(!docked || ownError || shown.ids.length > 0) && (
+                <span data-testid="line-missing-none">
+                  {ownError ||
+                    (!shown.ids.length ? (
+                      "No font here has it."
+                    ) : docked ? (
+                      <>
+                        <span className="ed-input__chars">{shown.none.slice(0, 4).join(" ")}</span> no font
+                      </>
+                    ) : (
+                      `No font has ${shown.none.slice(0, 4).join(" ")}.`
+                    ))}
+                </span>
+              )}
               <button
                 type="button"
                 data-testid="line-missing-own"
+                aria-label="Use your own font"
                 className="ed-input__pick"
                 onMouseDown={(e) => e.preventDefault()}
                 onPointerDown={(e) => e.stopPropagation()}
@@ -846,7 +866,7 @@ export function LineEditBox({
                   ownFile.current?.click();
                 }}
               >
-                Use your own font
+                {both && docked ? "Your font" : "Use your own font"}
               </button>
             </span>
           )}
@@ -921,7 +941,11 @@ export function LineEditBox({
           rescan();
         }}
         onCompositionStart={() => (composing.current = true)}
-        onCompositionEnd={() => (composing.current = false)}
+        onCompositionEnd={() => {
+          composing.current = false;
+          // What was put off while composing (the baseline) is measured now.
+          setComposed((n) => n + 1);
+        }}
         onPaste={(e) => {
           e.preventDefault();
           document.execCommand("insertText", false, cleaned(e.clipboardData.getData("text/plain")));

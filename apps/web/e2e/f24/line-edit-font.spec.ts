@@ -853,7 +853,7 @@ for (const [file, text] of [
   });
 }
 
-test("AC-312: of two letters typed together, the one no font has is named, and Enter says so at once", async ({ page }) => {
+test("AC-312: of two letters typed together, the one no font has is named, and Enter says so at once", async ({ page, isMobile }) => {
   await open(page, "chrome-justified-mixed.pdf");
   const input = await edit(page, lineWith(page, "in full"));
   await page.keyboard.press("End");
@@ -861,7 +861,10 @@ test("AC-312: of two letters typed together, the one no font has is named, and E
   // The font that draws ř is offered, and ⸘ is named as the letter no font here has.
   await expect(page.getByTestId("line-missing-font").first()).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("line-missing-status")).toContainText(/draws ř\. No font here has ⸘\./);
-  await expect(page.getByTestId("line-missing-none")).toHaveText("No font has ⸘.");
+  await expect(page.getByTestId("line-missing-none")).toHaveText(isMobile ? "⸘ no font" : "No font has ⸘.");
+  // The missing letters are never cut off.
+  const label = page.locator(".ed-input__hint > span").first();
+  expect(await label.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   const own = page.getByTestId("line-missing-own");
   await expect(own).toBeVisible();
   // The whole row is on screen: the way out is never cut off.
@@ -873,7 +876,8 @@ test("AC-312: of two letters typed together, the one no font has is named, and E
   await page.keyboard.press("Enter");
   const notice = page.getByTestId("editor-notice");
   await expect(notice).toContainText("“⸘”", { timeout: 5_000 });
-  expect(Date.now() - started).toBeLessThan(1500);
+  // The bar is 0.6 s; the rest is the test's own round trips.
+  expect(Date.now() - started).toBeLessThan(1000);
   // Only the letter that can't be drawn is named, and the text is still in the box.
   await expect(notice).not.toContainText("“ř”");
   await expect(input).toContainText("ř ⸘");

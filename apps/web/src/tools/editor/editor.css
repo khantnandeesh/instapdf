@@ -1375,9 +1375,14 @@
   pointer-events: auto;
   animation: none;
 }
+/* The missing letters are never cut off: the fonts beside them give way instead. */
 .ed-input__hint--docked > span:first-child {
+  flex: none;
+}
+.ed-input__hint--docked .ed-input__picks {
+  min-width: 0;
+  align-items: center;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 .ed-input__hint--docked .ed-input__pick {
   padding: 5px 12px;
@@ -1390,6 +1395,15 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
+}
+/* On a phone: each letter beside its own answer, the two pairs at the row's two ends. */
+.ed-input__hint--pairs {
+  justify-content: flex-start;
+  gap: 8px;
+}
+.ed-input__hint--pairs > .ed-input__picks:last-child {
+  flex: none;
+  margin-left: auto;
 }
 /* Fonts for some letters and none for others: both are said, so the row is longer. */
 .ed-input__hint--both {
