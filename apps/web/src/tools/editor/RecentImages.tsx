@@ -53,6 +53,12 @@ export function RecentImages({
     (last ? choose.current : next)?.focus();
   };
 
+  const chooseButton = (
+    <Button ref={choose} variant="primary" iconStart={<ImageBold size={18} />} onClick={onChoose} data-testid="recent-choose" className={sheet ? "w-full justify-center" : undefined}>
+      Choose image
+    </Button>
+  );
+
   return (
     <Dialog
       open={open}
@@ -62,11 +68,7 @@ export function RecentImages({
       variant={sheet ? "sheet" : "default"}
       className="ed-recent"
       initialFocusRef={choose}
-      footer={
-        <Button ref={choose} variant="primary" iconStart={<ImageBold size={18} />} onClick={onChoose} data-testid="recent-choose">
-          Choose image
-        </Button>
-      }
+      footer={sheet ? undefined : chooseButton}
     >
       <ul ref={list} className="ed-recent__list" aria-label="Recent images" data-testid="recent-images">
         {images.map((img, i) => (
@@ -81,6 +83,8 @@ export function RecentImages({
           </li>
         ))}
       </ul>
+      {/* In a sheet: full width under the images (thumb reach), above the home indicator. */}
+      {sheet && <div className="ed-recent__choose">{chooseButton}</div>}
     </Dialog>
   );
 }

@@ -1773,6 +1773,10 @@
   grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
   gap: 12px;
 }
+.ed-recent__choose {
+  margin-top: 20px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
 .ed-recent__item {
   position: relative;
 }
