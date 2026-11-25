@@ -73,6 +73,22 @@ describe("twins on the page (AC-298)", () => {
     expect((await fontsOf(later)).fonts[0]!.missingFile).toBeFalsy();
   });
 
+  it("reads a file with object streams and an xref stream (what pdf-lib and most tools write) without pdf-lib in the editor", async () => {
+    const { PDFDocument, StandardFonts } = await import("@cantoo/pdf-lib");
+    const made = await PDFDocument.create();
+    const font = await made.embedFont(StandardFonts.TimesRoman);
+    made.addPage([300, 100]).drawText("Invoice 450", { x: 20, y: 40, size: 20, font });
+    const bytes = await made.save({ useObjectStreams: true });
+    expect(String.fromCharCode(...bytes)).toContain("/ObjStm");
+    const sfnt = (await woffToSfnt(woff))!;
+    const patch = (await buildTwinPatch(bytes, [{ object: font.ref.objectNumber, twin: "gelasio", bold: false, italic: false }], async () => sfnt))!;
+    expect(patch.fonts).toEqual([font.ref.objectNumber]);
+    expect(patch.names).toEqual({ [font.ref.objectNumber]: "Times-Roman" });
+    const after = await fontsOf(withTwinPatch(bytes, patch));
+    expect(after.fonts[0]!.missingFile).toBeFalsy();
+    expect(after.text).toBe("Invoice 450");
+  });
+
   it("leaves alone a font with remapped codes, an embedded font, and a file it can't place", async () => {
     const bytes = namedOnlyPdf();
     const sfnt = (await woffToSfnt(woff))!;

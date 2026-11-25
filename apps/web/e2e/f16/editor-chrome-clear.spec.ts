@@ -67,6 +67,25 @@ for (const width of [320, 390, 1280]) {
   });
 }
 
+/** The notice, its text and each of its buttons lie wholly inside the viewport, and the text is not cut off. */
+async function expectUnclipped(page: Page, notice: import("@playwright/test").Locator) {
+  const vw = page.viewportSize()!.width;
+  // Let the rise-in settle (its transform moves the box).
+  await page.waitForTimeout(400);
+  const parts = [notice, notice.locator("span").first(), notice.getByRole("button", { name: "Restore" }), notice.getByRole("button", { name: "Discard" })];
+  for (const part of parts) {
+    const b = (await part.boundingBox())!;
+    expect(b.x, `left edge ${b.x} on screen`).toBeGreaterThanOrEqual(0);
+    expect(b.x + b.width, `right edge ${b.x + b.width} on screen (${vw})`).toBeLessThanOrEqual(vw + 0.5);
+  }
+  const text = notice.locator("span").first();
+  expect(await text.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  for (const name of ["Restore", "Discard"]) {
+    const btn = notice.getByRole("button", { name });
+    expect(await btn.evaluate((el) => el.scrollWidth <= el.clientWidth + 1), `${name} is not cut off`).toBe(true);
+  }
+}
+
 /** The lowest edge of the chrome that floats at the top on a phone: the top bar and the page chip. */
 async function topChromeBottom(page: Page) {
   const top = (await page.locator('[data-region="top"]').boundingBox())!;
@@ -131,6 +150,24 @@ for (const width of [320, 390]) {
       expect(box.y, `restore notice top ${box.y} below the chip band (${bottom})`).toBeGreaterThanOrEqual(bottom - 0.5);
       expect(overlaps(box, chip)).toBe(false);
       expect(overlaps(box, top)).toBe(false);
+      await expectUnclipped(page, notice);
+    });
+
+    test("at 568px tall the restore notice, its question and both buttons fit on screen (nothing clips)", async ({ page }) => {
+      await page.setViewportSize({ width, height: 568 });
+      await open(page);
+      await page.getByTestId("canvas").focus();
+      await page.keyboard.press("t");
+      const p = (await page.getByTestId("page-1").boundingBox())!;
+      await page.mouse.click(p.x + p.width * 0.3, p.y + p.height * 0.6);
+      await expect(page.getByTestId("text-input")).toBeFocused();
+      await page.keyboard.type("Keep this too");
+      await page.getByTestId("text-input").press("Escape");
+      await page.waitForTimeout(1200);
+      await open(page);
+      const notice = page.getByTestId("recovery");
+      await expect(notice).toBeVisible();
+      await expectUnclipped(page, notice);
     });
   });
 }

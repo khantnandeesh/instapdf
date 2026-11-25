@@ -5,7 +5,7 @@
  * Icons only (Phosphor Bold, no boxes); names and shortcuts are in tooltips and accessible names.
  */
 import { FieldsChipSlot } from "@/tools/forms/lazy";
-import { useEffect, useLayoutEffect, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { BerryMark } from "@/components/berry/Berry";
 import { Button } from "@/components/ui/Button";
@@ -88,34 +88,51 @@ function useTool() {
   return { tool, locked, readOnly, pick };
 }
 
+/**
+ * A tooltip next to its button, not inside it: the button's name stays exactly what it shows (its
+ * icon, so the name), and the tip is its description (aria-describedby). A tip inside the button
+ * made the active tool's visible text "Mark H Drag across…" against the name "Mark" (WCAG 2.5.3).
+ */
+function Tip({ id, className, children }: { id: string; className: string; children: ReactNode }) {
+  return (
+    <span id={id} role="tooltip" className={cx("ed-tip", className)}>
+      {children}
+    </span>
+  );
+}
+
 function ToolButton({ t, active, locked, disabled, onPick, tabIndex, side, label }: { t: ToolDef; active: boolean; locked: boolean; disabled: boolean; onPick: (lock: boolean) => void; tabIndex: number; side: "right" | "top"; label?: string }) {
   const name = TOOL_NAMES[t.id];
+  const tip = useId();
   return (
-    <button
-      type="button"
-      className={cx("ed-tool group/tool", active && "ed-tool--on")}
-      aria-pressed={active}
-      aria-label={name}
-      aria-keyshortcuts={t.key}
-      aria-disabled={disabled || undefined}
-      tabIndex={tabIndex}
-      data-tool={t.id}
-      onClick={() => !disabled && onPick(false)}
-      onDoubleClick={() => !disabled && onPick(true)}
-    >
-      {t.icon}
-      {t.id === "edit" && <ToolRing />}
-      {label && <span className="ed-tool__label">{label}</span>}
-      {active && locked && (
-        <span className="ed-tool__lock" aria-hidden="true">
-          <LockBold size={10} />
-        </span>
-      )}
-      <span className={cx("ed-tip", `ed-tip--${side}`)} aria-hidden="true">
+    <span className="ed-tool-slot">
+      <button
+        type="button"
+        className={cx("ed-tool group/tool", active && "ed-tool--on")}
+        aria-pressed={active}
+        aria-label={name}
+        aria-describedby={tip}
+        aria-keyshortcuts={t.key}
+        aria-disabled={disabled || undefined}
+        tabIndex={tabIndex}
+        data-tool={t.id}
+        onClick={() => !disabled && onPick(false)}
+        onDoubleClick={() => !disabled && onPick(true)}
+      >
+        {t.icon}
+        {t.id === "edit" && <ToolRing />}
+        {label && <span className="ed-tool__label">{label}</span>}
+        {active && locked && (
+          <span className="ed-tool__lock" aria-hidden="true">
+            <LockBold size={10} />
+          </span>
+        )}
+      </button>
+      <Tip id={tip} className={`ed-tip--${side}`}>
         <b>{name}</b> <kbd>{t.key}</kbd>
         <span className="ed-tip__hint">{disabled ? "Locked by the file’s owner" : t.hint}</span>
-      </span>
-    </button>
+      </Tip>
+    </span>
   );
 }
 
@@ -223,20 +240,25 @@ export function UndoRedo() {
   const r = H.redoEntry(history);
   const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
   const mod = mac ? "⌘" : "Ctrl+";
+  const tips = useId();
   return (
     <span className="flex items-center">
-      <button type="button" className="ed-ctl ed-ctl--top group/tt" aria-label="Undo" aria-keyshortcuts="Control+Z Meta+Z" disabled={!u || !!busy} onClick={() => void ctl.undo()}>
-        <UndoBold size={20} />
-        <span className="ed-tip ed-tip--bottom" aria-hidden="true">
+      <span className="ed-tool-slot">
+        <button type="button" className="ed-ctl ed-ctl--top group/tt" aria-label="Undo" aria-describedby={`${tips}-undo`} aria-keyshortcuts="Control+Z Meta+Z" disabled={!u || !!busy} onClick={() => void ctl.undo()}>
+          <UndoBold size={20} />
+        </button>
+        <Tip id={`${tips}-undo`} className="ed-tip--bottom">
           {u ? `Undo ${u.label.toLowerCase()}` : "Undo"} <kbd>{mod}Z</kbd>
-        </span>
-      </button>
-      <button type="button" className="ed-ctl ed-ctl--top group/tt" aria-label="Redo" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y" disabled={!r || !!busy} onClick={() => void ctl.redo()}>
-        <RedoBold size={20} />
-        <span className="ed-tip ed-tip--bottom" aria-hidden="true">
+        </Tip>
+      </span>
+      <span className="ed-tool-slot">
+        <button type="button" className="ed-ctl ed-ctl--top group/tt" aria-label="Redo" aria-describedby={`${tips}-redo`} aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y" disabled={!r || !!busy} onClick={() => void ctl.redo()}>
+          <RedoBold size={20} />
+        </button>
+        <Tip id={`${tips}-redo`} className="ed-tip--bottom">
           {r ? `Redo ${r.label.toLowerCase()}` : "Redo"} <kbd>{mac ? "⇧⌘Z" : "Ctrl+Y"}</kbd>
-        </span>
-      </button>
+        </Tip>
+      </span>
     </span>
   );
 }
@@ -277,7 +299,7 @@ export function DownloadButton({ compact }: { compact?: boolean }) {
   };
   const warm = () => void import("@/lib/editor/build-client").then((m) => m.warmBuild());
   return (
-    <span className="ed-download" onPointerEnter={warm} onFocus={warm}>
+    <span className="ed-download" onPointerEnter={warm} onPointerDown={warm} onFocus={warm}>
       <Button variant="primary" size={compact ? "sm" : "md"} busy={busy} aria-label="Download PDF" aria-keyshortcuts="Control+S Meta+S" iconStart={done ? <CheckBold size={18} /> : <DownloadBold size={18} />} onClick={() => void run()} data-testid="download">
         <span className="max-[359px]:sr-only">Download</span>
       </Button>

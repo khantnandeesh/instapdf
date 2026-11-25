@@ -170,3 +170,15 @@ export function planSignature<T extends SignatureLike>(all: readonly T[], s: T):
   const rest = all.filter((x) => x.id !== put.id && x.role === s.role).sort((a, b) => b.at - a.at);
   return { put, drop: rest.slice(SIGNATURES_PER_ROLE - 1).map((x) => x.id) };
 }
+
+/** How many recent images the Image tool offers (AC-66). */
+export const RECENT_IMAGES = 5;
+
+/**
+ * Keeping an image used just now among the recent ones (AC-66): the same image (same id, a hash of
+ * its bytes) moves to the front instead of being kept twice, and only the newest RECENT_IMAGES stay.
+ */
+export function planRecentImage<T extends { id: string; at: number }>(all: readonly T[], img: T): { put: T; drop: string[] } {
+  const rest = all.filter((x) => x.id !== img.id).sort((a, b) => b.at - a.at);
+  return { put: img, drop: rest.slice(RECENT_IMAGES - 1).map((x) => x.id) };
+}

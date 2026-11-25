@@ -66,7 +66,8 @@ let shapingFonts: Promise<ShapingManifest> | null = null;
 
 scope.onmessage = async (event: MessageEvent<BuildRequest | { id: number; warm: true }>) => {
   const msg = event.data;
-  if ("warm" in msg) return;
+  // Download intent: fetch and compile the build's own chunks now, so the first build doesn't wait for them.
+  if ("warm" in msg) return void import("@cantoo/fontkit").catch(() => undefined);
   if ("owner" in msg) {
     const { isOwnerPassword } = await import("./owner");
     const owner = await isOwnerPassword(msg.owner.bytes, msg.owner.password);

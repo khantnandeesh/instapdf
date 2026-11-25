@@ -293,7 +293,10 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     box.y += dy;
     const rot = (360 - rotation) % 360;
     const id = newId();
-    if (pl.kind === "image") ctl.add([{ kind: "image", id, page: entry.id, ...box, rot, asset: pl.asset!, opacity: 1 }], "Add image");
+    if (pl.kind === "image") {
+      ctl.add([{ kind: "image", id, page: entry.id, ...box, rot, asset: pl.asset!, opacity: 1 }], "Add image");
+      ctl.imagePlaced?.(pl.asset!);
+    }
     else ctl.add([{ kind: "signature", id, page: entry.id, ...box, rot, role: pl.role ?? "signature", sig: pl.sig!, color: pl.color ?? "#000000" }], pl.role === "initials" ? "Add initials" : "Add signature");
     store.set({ placement: null });
     finishTool();
@@ -339,7 +342,10 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
       else gesture.current = { type: "resize", id: o.id, handle: handle as Handle, origin: o, pointer: e.pointerId };
       return;
     }
-    const passThrough = t === "draw" || t === "mark";
+    // Draw and Mark work over objects (a stroke across an image, a mark through a text box), but a
+    // press right on a drawn stroke or line (its hit path) selects it, as with every tool.
+    const onStroke = t === "draw" && !!target.closest(".ed-hit");
+    const passThrough = (t === "draw" && !onStroke) || t === "mark";
     if (objEl && !passThrough) {
       const id = objEl.dataset.objId!;
       if (s.editing === id) return;
@@ -560,7 +566,14 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
         store.set({ history: H.replaceCurrent(s.history, onPage({ ...H.current(s.history), objects: H.current(s.history).objects.map((x) => (x.id === o.id ? next : x)) }, [o.id])) });
       } else if (cur.text !== value) ctl.update([o.id], () => next, "Edit text");
       ctl.announce(`Text on page ${index + 1}: ${value}`);
-      requestAnimationFrame(() => (document.querySelector(`[data-obj-id="${o.id}"]`) as HTMLElement | null)?.focus({ preventScroll: true }));
+      // Focus comes back to the box, unless the person has moved on while its font loaded (a
+      // script's font can take a moment): then it stays where they are. Taking it from a new
+      // box being typed in would close that box (its blur commits it).
+      requestAnimationFrame(() => {
+        const active = document.activeElement;
+        const busyElsewhere = store.get().editing != null || (active instanceof HTMLElement && active.matches("textarea, input, select, [contenteditable=true], [role=dialog] *"));
+        if (!busyElsewhere) (document.querySelector(`[data-obj-id="${o.id}"]`) as HTMLElement | null)?.focus({ preventScroll: true });
+      });
     },
     [ctl, store, index],
   );

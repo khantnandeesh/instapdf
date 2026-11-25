@@ -198,12 +198,13 @@ export function SizeStepper({ value, onChange }: { value: number; onChange: (n: 
       <button type="button" className="ed-ctl ed-ctl--sm" aria-label="Smaller" title="Smaller" onClick={(e) => commit(value - (e.shiftKey ? 4 : 1))}>
         <MinusBold size={14} />
       </button>
+      {/* A number field: a spinbutton by its own role (a role on a text input is not allowed, axe). */}
       <input
-        role="spinbutton"
+        type="number"
         aria-label="Font size"
-        aria-valuenow={value}
-        aria-valuemin={4}
-        aria-valuemax={400}
+        min={4}
+        max={400}
+        step={0.5}
         inputMode="decimal"
         list="ed-sizes"
         className="ed-field ed-field--size"
