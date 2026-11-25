@@ -103,7 +103,7 @@ describe("matching a PDF's font against the library (F24)", () => {
   });
 
   it("closeness is said in words, never as a number", () => {
-    expect(Object.values(GRADE_LABEL)).toEqual(["Exact", "Very close", "Close", "Similar"]);
+    expect(Object.values(GRADE_LABEL)).toEqual(["Exact", "Very close", "Close", "Similar", "Same widths"]);
     for (const label of Object.values(GRADE_LABEL)) expect(label).not.toMatch(/[0-9%]/);
   });
 });

@@ -1,0 +1,34 @@
+22:35:10.719 AC-290 landing: font-library requests []
+22:35:14.763 AC-290 after file open []
+22:35:17.362 after adding text ["GET /fonts/editor/manifest.json","GET /fonts/editor/arimo-latin-400-normal.woff","GET /fonts/noto/manifest.json"]
+22:35:20.919 AC-291 menu open: woff files ["GET /fonts/editor/tinos-latin-400-normal.woff","GET /fonts/editor/carlito-latin-400-normal.woff","GET /fonts/editor/caladea-latin-400-normal.woff","GET /fonts/editor/cousine-latin-400-normal.woff"] index/sig files 97
+22:35:21.268 groups ["In this document:4","Standard:5","On this device:2","All fonts:120"]
+22:35:21.308 dialog rect {"x":524.78125,"y":111.5,"width":300,"height":436} scrollers ["ed-fonts__list 380/5110"]
+22:35:23.858 after scroll to 900: woff 17 [
+  'GET /fonts/lib/fonts/agbalumo/latin-400-normal.07d20806.woff',
+  'GET /fonts/lib/fonts/agu-display/latin-400-normal.fcad13c5.woff',
+  'GET /fonts/lib/fonts/acme/latin-400-normal.fa6abed5.woff',
+  'GET /fonts/lib/fonts/actor/latin-400-normal.80d0bc3a.woff'
+]
+22:35:23.858 library woff files loaded so far 17 of 354
+22:35:24.780 search playfair ["Add a font file","Show installed fonts","Playfair","Playfair Display","Playfair Display SC"]
+22:35:25.695 search mono ["Add a font file","Show installed fonts","Monofett","Monomakh","Monomaniac One","Monoton","Atkinson Hyperlegible Mono","Azeret Mono","B612 Mono","Cascadia Mono","Chivo Mono","Cutive Mono","DM Mono","Fira Mono","Fragment Mono","Geist Mono","Hibur Mono","IBM Plex Mono","Intel One Mono","Iosevka Charon Mono","JetBrains Mono","Kode Mono","Libertinus Mono","LXGW WenKai Mono TC","Major Mono Display","Martian Mono","Noto Sans Mono","Nova Mono","Overpass Mono","Oxygen Mono","PT Mono","Red Hat Mono","Reddit Mono","Roboto Mono","Rubik Mono One","Share Tech Mono","Sometype Mono","Space Mono","Spline Sans Mono","SUSE Mono","Syne Mono","Ubuntu Mono","Ubuntu Sans Mono","Victor Mono","Xanh Mono"]
+22:35:26.612 search zzzz ["Add a font file","Show installed fonts"]
+22:35:27.992 search Baskerville ["Add a font file","Show installed fonts","Libre Baskerville"]
+22:35:28.917 search noto sans jp ["Add a font file","Show installed fonts","Noto Sans JP"]
+22:35:32.729 picked Playfair: requests [] picker label Font Playfair Display SC
+22:35:32.734 preview font-family fredoka, "fredoka Fallback", system-ui, sans-serif, Fredoka, system-ui, sans-serif loaded faces ["bp-playfair-display 400 normal U+0-FF, U+131, U+152-153, U+2B","bp-playfair 400 normal U+0-FF, U+131, U+152-153, U+2B","bp-playfair-display-sc 400 normal U+0-FF, U+131, U+152-153, U+2B"]
+22:35:34.546 non-GET so far 0
+22:35:38.017 own font notes.txt {"accept":".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2","msgs":"- dialog \"Font Playfair Display SC\": || - alert: That file isn’t a font we can read. Use a TTF, OTF, WOFF or WOFF2 file.","device":["Add a font file","Show installed fonts"],"picker":"Font Playfair Display SC","net":["GET /fonts/lib/families/42dot-sans.481cc6fb.json","GET /fonts/lib/families/abril-fatface.5e8fab90.json","GET /fonts/lib/families/abel.948f7c6f.json","GET /fonts/lib/families/aboreto.0681f8f3.json","GET /fonts/lib/families/abeezee.b7bb0260.json","GET /fonts/lib/families/abhaya-libre.cf3c612d.json","GET /_next/static/chunks/4b10fb02.1f36cf462bb0d496.js","GET /_next/static/chunks/4289.a7974063e168aadc.js","GET /fonts/lib/fonts/42dot-sans/latin-400-normal.7ce8e684.woff","GET /fonts/lib/fonts/abril-fatface/latin-400-normal.1ba2926a.woff","GET /fonts/lib/fonts/aboreto/latin-400-normal.ea487a5d.woff","GET /fonts/lib/fonts/abeezee/latin-400-normal.8cc44f45.woff","GET /fonts/lib/fonts/abel/latin-400-normal.5761d927.woff","GET /fonts/lib/fonts/abhaya-libre/latin-400-normal.141f212e.woff"]}
+22:35:42.479 own font own-fake.ttf {"accept":".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2","msgs":"- dialog \"Font Playfair Display SC\": || - alert: That file isn’t a font we can read. Use a TTF, OTF, WOFF or WOFF2 file.","device":["Add a font file","Show installed fonts"],"picker":"Font Playfair Display SC","net":[]}
+22:35:46.749 own font own-broken.ttf {"accept":".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2","msgs":"- dialog \"Font Playfair Display SC\": || - alert: That font couldn’t be read.","device":["Add a font file","Show installed fonts"],"picker":"Font Playfair Display SC","net":[]}
+22:35:51.084 own font own-empty.otf {"accept":".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2","msgs":"- dialog \"Font Playfair Display SC\": || - alert: That file isn’t a font we can read. Use a TTF, OTF, WOFF or WOFF2 file.","device":["Add a font file","Show installed fonts"],"picker":"Font Playfair Display SC","net":[]}
+22:35:55.289 own font own-restricted.ttf {"accept":".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2","msgs":"- dialog \"Font Playfair Display SC\": || - alert: This font’s licence settings don’t allow putting it in a PDF.","device":["Add a font file","Show installed fonts"],"picker":"Font Playfair Display SC","net":[]}
+22:35:59.549 own font own-dejavu.ttf {"accept":".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2","msgs":"","device":[],"picker":"Font DejaVu Sans","net":[]}
+22:36:04.234 own font own-dejavu.woff {"accept":".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2","msgs":"","device":[],"picker":"Font DejaVu Sans","net":[]}
+22:36:08.963 own font own-dejavu.woff2 {"accept":".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2","msgs":"","device":[],"picker":"Font DejaVu Sans","net":[]}
+22:36:13.660 own font own-inter.otf {"accept":".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2","msgs":"","device":[],"picker":"Font Inter","net":[]}
+22:36:18.399 own font own-preview-print.ttf {"accept":".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2","msgs":"","device":[],"picker":"Font DejaVu Sans","net":[]}
+22:36:49.257 final picker null non-GET total 0 hosts [ 'web-staging-qzq5fa2g7q-uc.a.run.app' ]
+22:36:52.231 after reload: body mentions 
+22:36:52.231 errors []

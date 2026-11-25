@@ -150,6 +150,9 @@ export function LineLayer({
         if (o.angle || o.cx + o.length / 2 < box.left || o.cx - o.length / 2 > box.left + box.width) return;
         const top = o.cy - o.thickness / 2;
         const bottom = o.cy + o.thickness / 2;
+        // Text whose own middle is inside this row is part of it (a raised footnote mark, a
+        // subscript): the ring goes around the row, never through its letters to spare the mark.
+        if (o.cy > box.top + box.height * 0.2 && o.cy < box.top + box.height * 0.8) return;
         if (o.cy > mid) paperBottom = Math.max(paperBottom, Math.min(box.top + box.height - top, box.height / 2 - 1));
         else if (o.cy < mid) paperTop = Math.max(paperTop, Math.min(bottom - box.top, box.height / 2 - 1));
       });

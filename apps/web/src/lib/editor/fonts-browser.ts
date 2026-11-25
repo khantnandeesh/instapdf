@@ -6,7 +6,7 @@
  * (/fonts/lib/, F24) and the user's own fonts (bytes that never leave the page).
  */
 import { loadFamily } from "../font-library/client";
-import { cssFamily, FONT_BASE, LIB_FILE, USER_FILE, USER_FONT, faceOf, filesFor, fontUrl, styleKey, unicodeRange, type EditorFontManifest, type FaceEntry } from "./fonts";
+import { cssFamily, FONT_BASE, LIB_FILE, USER_FILE, USER_FONT, faceOf, fileFor, filesFor, fontUrl, styleKey, unicodeRange, type EditorFontManifest, type FaceEntry } from "./fonts";
 
 let manifest: Promise<EditorFontManifest> | null = null;
 /** The built-in faces. */
@@ -34,8 +34,10 @@ export function subscribeFonts(l: () => void): () => void {
   listeners.add(l);
   return () => listeners.delete(l);
 }
+/** Built-in families with the library's files added after their own (more alphabets). */
+const wider: Faces = {};
 function publish() {
-  known = { faces: { ...extra, ...(base ?? {}) } };
+  known = { faces: { ...extra, ...(base ?? {}), ...wider } };
   listeners.forEach((l) => l());
 }
 
@@ -81,6 +83,7 @@ const registered = new Map<string, Promise<void>>();
 /** Registers and loads the files of a face that `text` needs. Resolves with its metrics. */
 export async function ensureFace(id: string, bold: boolean, italic: boolean, text = "A"): Promise<FaceEntry> {
   await resolveFamily(id);
+  await widenFor([id], text);
   const m = known!;
   const face = faceOf(m, id, bold, italic);
   if (!face) throw new Error(`No font ${id}`);
@@ -120,12 +123,44 @@ export function fontsForBuild(ids: Iterable<string>): { faces: Faces; bytes: Rec
   const faces: Faces = {};
   const bytes: Record<string, Uint8Array> = {};
   for (const id of new Set(ids)) {
-    const fam = extra[id];
-    if (!fam || base?.[id]) continue;
+    const fam = wider[id] ?? (base?.[id] ? undefined : extra[id]);
+    if (!fam) continue;
     faces[id] = fam;
     for (const face of Object.values(fam)) for (const f of face.files) if (userBytes.has(f.file)) bytes[f.file] = userBytes.get(f.file)!;
   }
   return { faces, bytes };
+}
+
+const widening = new Map<string, Promise<void>>();
+/**
+ * The built-in copy of a family has Latin only. When `text` has a character it lacks, the
+ * library's files of the same family are added after its own (its Greek, Cyrillic, Hebrew…),
+ * so the family itself can draw it before any other font is looked for. Nothing is fetched
+ * for text the built-in copy covers.
+ */
+export async function widenFor(ids: Iterable<string>, text: string): Promise<void> {
+  base ??= (await loadFontManifest()).faces;
+  if (!known) publish();
+  const cps = [...text].map((c) => c.codePointAt(0)!);
+  await Promise.all(
+    [...new Set(ids)].map((id) => {
+      const own = base![id];
+      if (!own || wider[id] || !cps.some((cp) => Object.values(own).some((face) => !fileFor(face, cp)))) return widening.get(id);
+      let p = widening.get(id);
+      if (!p) {
+        p = loadFamily(id).then((fam) => {
+          if (!fam) return;
+          wider[id] = Object.fromEntries(
+            Object.entries(own).map(([key, face]) => [key, { ...face, files: [...face.files, ...(fam.faces[key]?.files ?? []).map((f) => ({ ...f, file: LIB_FILE + f.file }))] }]),
+          );
+          publish();
+        });
+        p.catch(() => widening.delete(id));
+        widening.set(id, p);
+      }
+      return p.catch(() => undefined);
+    }),
+  );
 }
 
 /** Resolves once every font id is known (a file reopened with library fonts in it). */

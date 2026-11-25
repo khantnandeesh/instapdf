@@ -294,6 +294,12 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   const ctl = useCtl();
   const { store, rt } = ctl;
   const pages = useStore(store, (s) => H.current(s.history).pages, shallowArray);
+  // A message about the line being edited goes when that line is saved or given up: it would
+  // speak of text that is no longer in a box.
+  const lineOpen = useStore(store, (s) => !!s.lineEdit);
+  useEffect(() => {
+    if (!lineOpen && toast?.line) setToast(null);
+  }, [lineOpen, toast, setToast]);
   const wide = useStore(store, (s) => s.wide);
   const zoom = useStore(store, (s) => s.zoom);
   const fit = useStore(store, (s) => s.fit);
@@ -675,7 +681,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       // A line whose text couldn't be saved is still open: the file would be made without it.
       // (A save that failed just now has said why itself, with its own way out.)
       if (store.get().lineEdit?.failed) {
-        if (kept) ctl.toast({ text: "The line you’re editing couldn’t be saved, so it isn’t in the file yet. Change it, or press Escape to leave it as it was.", tone: "danger" });
+        if (kept) ctl.toast({ text: "The line you’re editing couldn’t be saved, so it isn’t in the file yet. Change it, or press Escape to leave it as it was.", tone: "danger", line: true });
         return;
       }
       // Added text with characters no font can print: say so before the file is made (AC-75).

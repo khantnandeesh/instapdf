@@ -14,6 +14,9 @@ const SLOW_3G = { offline: false, latency: 400, downloadThroughput: 50_000, uplo
 const LINE = { fx: 0.356, fy: 0.15, text: "This page is a synthetic test paragraph with several lines of" };
 
 test.skip(({ isMobile, browserName }) => !isMobile || browserName !== "chromium", "The slow-network profile runs on the mobile project (Chrome's emulation)");
+// No action (a read, a tap) may wait without limit: one that can't happen fails fast, by name,
+// well inside the test timeout. The slow steps (navigation, first page, engine) have their own.
+test.use({ actionTimeout: 30_000 });
 
 async function throttle(page: Page) {
   const cdp = await page.context().newCDPSession(page);
@@ -66,13 +69,21 @@ test("slow 3G: the first page and Add text work before the engine; a line clicke
   await expect(progress).toBeVisible({ timeout: 10_000 });
   const seen: number[] = [];
   const input = page.getByTestId("line-input");
+  // Every read here returns at once. The pill (and its percent) goes away when the engine is ready,
+  // a moment before the line edit opens, so a read that waits for the percent would wait forever
+  // (it hung CI until the 300 s test timeout). A failed download or a line that never opens fails
+  // here, with what was seen, instead of hanging.
   const deadline = Date.now() + 180_000;
-  while (Date.now() < deadline && !(await input.isVisible())) {
-    const t = await page.getByTestId("engine-percent").textContent().catch(() => null);
+  while (!(await input.isVisible())) {
+    const [t] = await page.getByTestId("engine-percent").allTextContents();
     if (t) {
       const n = Number(t.replace("%", ""));
       if (seen.at(-1) !== n) seen.push(n);
     }
+    const state = await engineState(page);
+    const where = `engine ${state}; percent values seen: ${seen.join(", ")}`;
+    if (state === "failed") throw new Error(`The engine download failed before the line opened (${where})`);
+    if (Date.now() > deadline) throw new Error(`The line clicked early didn't open within 180 s (${where})`);
     await page.waitForTimeout(250);
   }
   await expect(input).toBeFocused();

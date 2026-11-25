@@ -30,6 +30,8 @@ export type EngineRequest =
   | { id: number; op: "fonts" }
   /** A document font's embedded program, for the font matcher. */
   | { id: number; op: "program"; font: number; chars: string }
+  /** Which of `text`'s characters a document font can draw. */
+  | { id: number; op: "coverage"; font: number; text: string }
   /** Registers a font file the engine may use for characters a document font lacks. */
   | { id: number; op: "addFont"; family: string; bold: boolean; italic: boolean; bytes: Uint8Array }
   /** Forgets the registered fonts (the person chose another font for the same job). */
@@ -45,6 +47,7 @@ export type EngineReply =
   | { op: "preview"; preview: LinePreview }
   | { op: "fonts"; fonts: FontInfo[] }
   | { op: "program"; program: FontProgram }
+  | { op: "coverage"; covered: string }
   /** `ok` false: the engine can't use this file (not TrueType outlines). */
   | { op: "addFont"; ok: boolean }
   | { op: "clearFonts" };
@@ -159,6 +162,7 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
   }
   if (!doc) throw { kind: "internal", message: "No document" };
   if (req.op === "fonts") return { op: "fonts", fonts: doc.fonts() };
+  if (req.op === "coverage") return { op: "coverage", covered: doc.coverage(req.font, req.text).covered };
   if (req.op === "program") return { op: "program", program: doc.fontProgram(req.font, req.chars) };
   if (req.op === "addFont") {
     const ok = doc.addFont(req.family, req.bold, req.italic, req.bytes);

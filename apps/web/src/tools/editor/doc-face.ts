@@ -7,12 +7,13 @@
  */
 import type { FontInfo } from "@/lib/editor/berry-engine";
 import { callEngine } from "@/lib/editor/engine-client";
-import { cssFamily } from "@/lib/editor/fonts";
+import { TEXT_FONTS, cssFamily } from "@/lib/editor/fonts";
 import { ensureFace } from "@/lib/editor/fonts-browser";
 import { coveredBy, verticalOf, webFontFromProgram } from "@/lib/font-library/embedded-face";
 import { needsShaping } from "@/lib/editor/shaping";
 import { isClose } from "@/lib/font-library/match";
 import { matchFont } from "@/lib/font-library/match-client";
+import { twinOf } from "@/lib/font-library/twins";
 
 export type DocFace = {
   /** CSS family to draw with. */
@@ -49,6 +50,7 @@ const byFamily = new Map<string, FontFace>();
 export function resetDocFaces(): void {
   generation++;
   faces.clear();
+  deferred.clear();
   for (const f of added) document.fonts.delete(f);
   added.clear();
   byFamily.clear();
@@ -56,7 +58,11 @@ export function resetDocFaces(): void {
 
 const codePoints = (text: string) => new Set([...text].map((c) => c.codePointAt(0)!));
 
-async function build(info: FontInfo, text: string, gen: number, prev: DocFace | null): Promise<DocFace | null> {
+/** Fonts whose making was put off while warming up (it needs the font library): made when a line asks. */
+const deferred = new Set<string>();
+
+/** `defer`: called instead of loading anything of the font library (the warm-up never does, AC-290). */
+async function build(info: FontInfo, text: string, gen: number, prev: DocFace | null, defer?: () => void): Promise<DocFace | null> {
   if (info.object == null || gen !== generation) return null;
   const chars = [...new Set([...BASE, ...(prev ? [...prev.asked].map((cp) => String.fromCodePoint(cp)) : []), ...text])].join("");
   const { program } = await callEngine({ op: "program", font: info.object, chars });
@@ -94,6 +100,26 @@ async function build(info: FontInfo, text: string, gen: number, prev: DocFace | 
       // The browser refused the file: the closest library font below.
     }
   }
+  // A font the PDF only names (Helvetica, Times, Courier, Arial…): its metric twin, with no
+  // shapes to compare and nothing to wait for but the font itself (AC-283).
+  const twin = info.embedded ? undefined : twinOf(info.family || info.name);
+  if (defer && !(twin && TEXT_FONTS.some((f) => f.id === twin))) {
+    defer();
+    return null;
+  }
+  if (twin) {
+    try {
+      const entry = await ensureFace(twin, info.bold, info.italic, text || "A");
+      if (gen !== generation) return null;
+      return { family: cssFamily(twin), kind: "close", bold: info.bold, italic: info.italic, ascent: entry.ascent, descent: entry.descent, covered, asked };
+    } catch {
+      // The library hasn't got it: the closest by shape below.
+    }
+  }
+  if (defer) {
+    defer();
+    return null;
+  }
   try {
     const [best] = await matchFont(program, 1);
     if (gen !== generation || !best || !isClose(best)) return null;
@@ -108,7 +134,7 @@ async function build(info: FontInfo, text: string, gen: number, prev: DocFace | 
  * The face for a document font, able to say whether it draws each character of `text`. Built
  * once per font; built again only when `text` has a character that was never asked about.
  */
-export function docFace(info: FontInfo, text: string, known?: DocFace | null): Promise<DocFace | null> {
+export function docFace(info: FontInfo, text: string, known?: DocFace | null, warm = false): Promise<DocFace | null> {
   if (info.object == null) return Promise.resolve(null);
   // Joined scripts get a face of their own (a stand-in that can join letters): a font's Latin
   // text keeps the document's own font and its record of what is missing.
@@ -118,9 +144,35 @@ export function docFace(info: FontInfo, text: string, known?: DocFace | null): P
   const have = faces.get(key);
   // A font that couldn't be made (null) is not tried again for this file; a remake that fails
   // keeps the font there was.
+  const again = () => {
+    deferred.delete(key);
+    return build(info, text, gen, null);
+  };
   const fresh = have
-    ? have.then((f) => (!f || [...codePoints(text)].every((cp) => f.asked.has(cp)) ? f : build(info, text, gen, f).catch(() => f)))
-    : build(info, text, gen, null);
-  faces.set(key, fresh.catch(() => null));
+    ? have.then((f) => (!f && deferred.has(key) && !warm ? again() : !f || [...codePoints(text)].every((cp) => f.asked.has(cp)) ? f : build(info, text, gen, f).catch(() => f)))
+    : build(info, text, gen, null, warm ? () => deferred.add(key) : undefined);
+  // A warm-up that failed (the engine was restarting) is no verdict on the font: a line asks again.
+  faces.set(key, fresh.catch(() => (warm && deferred.add(key), null)));
   return faces.get(key)!;
+}
+
+/** How many of a page's fonts are made ready ahead of the first click. */
+const WARM = 8;
+
+/**
+ * Makes a page's fonts ready while nothing else is happening, so the first line opened is drawn
+ * in its font at once (a font that needs the closest library font takes a second or two the
+ * first time). One font at a time; stops when another file is opened.
+ */
+export function warmDocFaces(fonts: readonly FontInfo[]): void {
+  const gen = generation;
+  const todo = fonts.filter((f) => f.object != null && f.kind !== "type3" && !faces.has(String(f.object))).slice(0, WARM);
+  if (!todo.length) return;
+  const idle = (run: () => void) => (typeof requestIdleCallback === "function" ? requestIdleCallback(run, { timeout: 2000 }) : setTimeout(run, 300));
+  const next = () => {
+    const info = todo.shift();
+    if (!info || gen !== generation) return;
+    void docFace(info, "", undefined, true).then(() => idle(next), () => idle(next));
+  };
+  idle(next);
 }

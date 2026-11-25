@@ -5,7 +5,7 @@
  *
  *   node scripts/font-library/build-library.mjs --out <dir>
  *        [--source packages | npm | catalogue] [--catalogue <catalogue.json>] [--families id,id] [--limit n]
- *        [--subsets latin,latin-ext] [--weights 400,700] [--min-families n] [--clean]
+ *        [--subsets latin,latin-ext] [--weights 400,700] [--min-families n] [--extras] [--clean]
  *
  * --source packages (default) reads the @fontsource packages installed in this app: the small
  * library that development, tests and CI use. --source npm builds every family of a catalogue
@@ -13,7 +13,8 @@
  * family, checked against the registry's sha512, one request a second): the full library the
  * publish workflow uploads. --source catalogue reads the same catalogue file by file from its CDN
  * (slow; for single families). --min-families fails the build when fewer families come out. --subsets and --weights keep
- * only those slices and weights (the copy shipped inside the app stays small); --clean empties
+ * only those slices and weights (the copy shipped inside the app stays small); --extras adds the
+ * pinned families of extras.mjs (downloaded from their makers' releases); --clean empties
  * <out> first.
  *
  * Layout written under <out> (everything but manifest.json is content-addressed and can be
@@ -35,6 +36,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { faceId, faceKey, familyRow, fontFileName, gate, parseUnicodeRange, printSubset } from "./lib.mjs";
+import { EXTRAS, extraSource } from "./extras.mjs";
 import { mayEmbed, verticalMetrics, woffToSfnt } from "./sfnt.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -43,7 +45,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function args() {
   const a = process.argv.slice(2);
   const get = (k) => (a.includes(k) ? a[a.indexOf(k) + 1] : undefined);
-  return { out: get("--out"), source: get("--source") ?? "packages", catalogue: get("--catalogue"), families: get("--families")?.split(","), limit: Number(get("--limit") ?? 0), subsets: get("--subsets")?.split(","), weights: get("--weights")?.split(",").map(Number), minFamilies: Number(get("--min-families") ?? 0), clean: a.includes("--clean") };
+  return { out: get("--out"), source: get("--source") ?? "packages", catalogue: get("--catalogue"), families: get("--families")?.split(","), limit: Number(get("--limit") ?? 0), subsets: get("--subsets")?.split(","), weights: get("--weights")?.split(",").map(Number), minFamilies: Number(get("--min-families") ?? 0), extras: a.includes("--extras"), clean: a.includes("--clean") };
 }
 
 /**
@@ -190,7 +192,7 @@ async function loadMatcher() {
 async function main() {
   const opt = args();
   if (!opt.out) {
-    console.error("usage: build-library.mjs --out <dir> [--source packages|npm|catalogue] [--catalogue file] [--families a,b] [--limit n] [--subsets a,b] [--weights 400,700] [--min-families n] [--clean]");
+    console.error("usage: build-library.mjs --out <dir> [--source packages|npm|catalogue] [--catalogue file] [--families a,b] [--limit n] [--subsets a,b] [--weights 400,700] [--min-families n] [--extras] [--clean]");
     process.exit(2);
   }
   const sources =
@@ -199,6 +201,16 @@ async function main() {
       : opt.source === "catalogue"
         ? await catalogueSource(opt.catalogue, opt.families, opt.limit)
         : await packageSource(opt.families);
+  /** Pinned families this build must contain: one that fails stops the build, so a publish never drops it quietly. */
+  const wanted = [];
+  if (opt.extras) {
+    // A family a catalogue carries too stays the catalogue's.
+    for (const extra of EXTRAS) {
+      if ((opt.families && !opt.families.includes(extra.id)) || sources.some((s) => s.entry.id === extra.id)) continue;
+      sources.push(extraSource(extra, polite));
+      wanted.push(extra.id);
+    }
+  }
   const matcher = await loadMatcher();
   if (opt.clean) await rm(opt.out, { recursive: true, force: true });
   const put = async (rel, bytes) => {
@@ -260,13 +272,15 @@ async function main() {
       console.error(`skip ${entry.id}: no usable files`);
       return;
     }
-    const manifest = Buffer.from(JSON.stringify({ id: entry.id, family: entry.family, licence: entry.licence, faces }));
+    const manifest = Buffer.from(JSON.stringify({ id: entry.id, family: entry.family, licence: entry.licence, ...(src.origin ? { source: src.origin } : {}), faces }));
     const sha = sha256(manifest);
     await put(`families/${entry.id}.${sha.slice(0, 8)}.json`, manifest);
     await put(`licences/${entry.id}.txt`, await src.licence());
     rows.push(familyRow({ ...entry, weights: [...new Set(Object.keys(faces).map((k) => Number(k.split("-")[0])))], styles: [...new Set(Object.keys(faces).map((k) => k.split("-")[1]))] }, sha));
   }
 
+  const lost = wanted.filter((id) => !rows.some((r) => r.i === id));
+  if (lost.length) throw new Error(`pinned families missing from the build: ${lost.join(", ")}: refusing to write a library without them`);
   if (rows.length < opt.minFamilies) throw new Error(`only ${rows.length} families built, ${opt.minFamilies} expected: refusing to write a shrunken library`);
   // The matching index, from the same Rust code the browser runs (its WebAssembly build).
   const features = Buffer.concat(prints.map(([, p]) => Buffer.from(p.coarse)));

@@ -10,7 +10,7 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { Asset } from "@/lib/editor/build";
 import { callEngine, describeEngineError, engineErrorLog, offersLineReplacement, openInShapingEngine, setEngineFileSize, type EngineError } from "@/lib/editor/engine-client";
 import { lineAt } from "@/lib/editor/line-hit";
-import { editorFontFor, lineReplacement } from "@/lib/editor/replace-line";
+import { editorFontFor, styledLineReplacement, type RunPart } from "@/lib/editor/replace-line";
 import { ensureFace, measurer } from "@/lib/editor/fonts-browser";
 import * as H from "@/lib/editor/history";
 import {
@@ -63,9 +63,10 @@ import { releaseUnused } from "./assets";
 import { pushVersion, releaseBelow, versionBytes, type VersionEntry } from "@/lib/editor/versions";
 import { pdfOutputName, baseName } from "@/lib/pdf/naming";
 import { openPdf } from "@/lib/pdf/pdfjs";
-import type { PageText } from "@/lib/editor/berry-engine";
+import type { EditResult, PageText } from "@/lib/editor/berry-engine";
 import { foldName } from "@/lib/font-library/client";
 import { chooseStandIn, chosenStandIn, fontLabel, registerWithEngine, standInCandidates } from "./font-service";
+import { warmDocFaces } from "./doc-face";
 import type { Store, ToolId } from "./store";
 
 export type RuntimeAsset = Asset & { url: string; w: number; h: number };
@@ -92,7 +93,8 @@ export type Runtime = {
 };
 
 export type Announce = (msg: string, assertive?: boolean) => void;
-export type Toast = { text: string; tone: "info" | "success" | "danger"; action?: { label: string; run: () => void }; key: number };
+/** `line`: about the line open for editing (its text is kept in the box); gone once that line is saved or given up. */
+export type Toast = { text: string; tone: "info" | "success" | "danger"; action?: { label: string; run: () => void }; line?: boolean; key: number };
 
 export type Controller = ReturnType<typeof createController>;
 
@@ -444,6 +446,8 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         const { page } = await callEngine({ op: "text", page: src });
         if (version !== rt.shown) return;
         store.set((st) => ({ texts: { ...st.texts, [src]: page }, fresh: { ...st.fresh, [src]: true } }));
+        // The page's fonts are made ready for the first line that is opened.
+        warmDocFaces(page.fonts);
       } catch (err) {
         // Another call crashed the worker while this one waited: ask again once the engine is back.
         if (isEngineError(err) && err.kind === "aborted") retry = true;
@@ -474,6 +478,37 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         }
       })().finally(() => (ctl.recovering = null));
       return ctl.recovering;
+    },
+
+    /**
+     * Shows a file the engine just wrote (a line edited or removed): the page is drawn from it
+     * and its text read again. False when the file can't be opened to show; the engine then goes
+     * back to the file on screen. The caller records the step (apply) with `engine: rt.shown`.
+     */
+    async showEngineResult(src: number, { result, bytes, appended }: { result: EditResult; bytes: Uint8Array; appended: boolean }): Promise<boolean> {
+      const opened = await openPdf(bytes.slice(), rt.password);
+      if (!opened.ok) {
+        const back = ctl.bytesOf(rt.shown).slice();
+        await callEngine({ op: "open", bytes: back, shaping: store.get().shaping === "ready" }, [back.buffer]).catch(() => {});
+        return false;
+      }
+      const prev = rt.pdf;
+      const pushed = pushVersion(rt.versions, rt.shown, bytes, appended);
+      rt.versions = pushed.versions;
+      rt.shown = pushed.index;
+      // Copies beyond the budget were released: states that needed them can't be shown any more.
+      if (pushed.floor > 0) store.set((st) => ({ history: H.dropBelowEngine(st.history, pushed.floor) }));
+      rt.pdf = opened.pdf.doc;
+      setEngineFileSize(bytes.length);
+      setTimeout(() => void prev.loadingTask.destroy(), 2000);
+      store.set((st) => ({
+        pdfRev: st.pdfRev + 1,
+        texts: { ...st.texts, [src]: result.page },
+        fresh: {},
+        rasterRev: { ...st.rasterRev, [src]: (st.rasterRev[src] ?? 0) + 1 },
+        lineFlash: { src, rects: result.changed, key: Date.now() },
+      }));
+      return true;
     },
 
     /** `asked`: the person pressed Enter (leaving the box is not asking again for a text that just failed). */
@@ -511,31 +546,14 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         return ` ${KEPT}`;
       };
       try {
-        const { result, bytes, appended } = await ctl.replaceWithStandIn(e, s.texts[e.src]);
-        const opened = await openPdf(bytes.slice(), rt.password);
-        if (!opened.ok) {
-          const back = ctl.bytesOf(rt.shown).slice();
-          await callEngine({ op: "open", bytes: back, shaping: store.get().shaping === "ready" }, [back.buffer]).catch(() => {});
-          ui.toast({ text: `That change couldn’t be shown, so it wasn’t made.${keep()}`, tone: "danger" });
+        const done = await ctl.replaceWithStandIn(e, s.texts[e.src]);
+        const result = done.result;
+        if (!(await ctl.showEngineResult(e.src, done))) {
+          const kept = keep();
+          ui.toast({ text: `That change couldn’t be shown, so it wasn’t made.${kept}`, tone: "danger", line: !!kept });
           return;
         }
-        const prev = rt.pdf;
-        const pushed = pushVersion(rt.versions, rt.shown, bytes, appended);
-        rt.versions = pushed.versions;
-        rt.shown = pushed.index;
-        // Copies beyond the budget were released: states that needed them can't be shown any more.
-        if (pushed.floor > 0) store.set((st) => ({ history: H.dropBelowEngine(st.history, pushed.floor) }));
-        rt.pdf = opened.pdf.doc;
-        setEngineFileSize(bytes.length);
-        setTimeout(() => void prev.loadingTask.destroy(), 2000);
         const pageId = state().pages.find((p) => p.src === e.src)?.id;
-        store.set((st) => ({
-          pdfRev: st.pdfRev + 1,
-          texts: { ...st.texts, [e.src]: result.page },
-          fresh: {},
-          rasterRev: { ...st.rasterRev, [e.src]: (st.rasterRev[e.src] ?? 0) + 1 },
-          lineFlash: { src: e.src, rects: result.changed, key: Date.now() },
-        }));
         apply({ ...state(), engine: rt.shown }, "Edit text", { page: pageId });
         // Another font drew some characters: say which, and offer a different one (F24).
         const sub = result.substitutions.find((x) => !x.same_family);
@@ -558,7 +576,10 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         if (isEngineError(err)) {
           console.warn(engineErrorLog(err));
           // The box may hold newer text than the one that failed: that is what replaces the line.
-          const action = offersLineReplacement(err)
+          const replaces = offersLineReplacement(err);
+          // What the action will do, before it does it: the line becomes new text in our closest font.
+          const inFont = replaces ? ` Replacing it sets your text in ${fontLabel(editorFontFor(s.texts[e.src]?.fonts[line.runs[0]?.font ?? -1]).font)}.` : "";
+          const action = replaces
             ? {
                 label: "Replace with new text",
                 run: () => {
@@ -567,9 +588,13 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
                 },
               }
             : undefined;
-          ui.toast({ text: `${describeEngineError(err)}${keep()}`, tone: "danger", action });
+          const kept = keep();
+          ui.toast({ text: `${describeEngineError(err)}${kept}${inFont}`, tone: "danger", action, line: !!kept });
           if (err.kind === "crashed" || err.kind === "aborted" || err.kind === "internal") await ctl.recoverEngine();
-        } else ui.toast({ text: `That change couldn’t be made.${keep()}`, tone: "danger" });
+        } else {
+          const kept = keep();
+          ui.toast({ text: `That change couldn’t be made.${kept}`, tone: "danger", line: !!kept });
+        }
       } finally {
         store.set({ busy: null });
       }
@@ -581,42 +606,86 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     },
 
     /** The person picks, while typing, the font that draws what a document font lacks. */
-    async pickStandIn(key: string, id: string) {
+    async pickStandIn(key: string, id: string | undefined) {
       chooseStandIn(key, id);
       ctl.standIns.clear();
       await callEngine({ op: "clearFonts" }).catch(() => {});
     },
 
     /**
-     * Fallback for an edit the engine refused: cover the line with a whiteout and put a text box
-     * with the typed text in its place (same size, colour and baseline, the closest editor font).
+     * Fallback for an edit the engine refused: the line is taken out of the file (so copying and
+     * searching no longer find the old text) and the typed text is put in its place, each bold or
+     * italic part in the closest editor font of that style, at the line's sizes, colours and
+     * baseline. One step to undo. A line the engine can't take out is covered with a whiteout.
      */
-    async replaceLineWithText(edit: { src: number; line: number; text: string }) {
+    replaceLineWithText(edit: { src: number; line: number; text: string }): Promise<void> {
+      // Download waits for it, as for a save: the file is never made halfway through.
+      const run = ctl.replaceLineNow(edit);
+      const all = (ctl.committing = Promise.all([ctl.committing, run]).then(() => undefined));
+      void all.finally(() => {
+        if (ctl.committing === all) ctl.committing = null;
+      });
+      return run;
+    },
+    async replaceLineNow(edit: { src: number; line: number; text: string }): Promise<void> {
       const s = store.get();
       const page = s.texts[edit.src];
       const line = page?.lines[edit.line];
       const entry = state().pages.find((p) => p.src === edit.src);
-      if (!page || !line || !entry) return;
-      const face = editorFontFor(page.fonts[line.runs[0]?.font ?? -1]);
-      const size = line.runs[0]?.size ?? line.size;
+      if (!page || !line || !entry || s.readOnly) return;
+      if (s.busy) {
+        ui.toast({ text: "Still working on the last change. Please try again in a moment.", tone: "info" });
+        return;
+      }
+      // Nothing else changes the file from here on (undo, another edit) until this is done.
+      store.set({ busy: "edit" });
+      const version = rt.shown;
+      let removed = false;
       try {
-        const metrics = await ensureFace(face.font, face.bold, face.italic, edit.text);
+        const parts: RunPart[] = [];
+        for (const run of line.runs) {
+          const face = editorFontFor(page.fonts[run.font]);
+          parts.push({ face, metrics: await ensureFace(face.font, face.bold, face.italic, edit.text), measure: measurer(face.font, run.size, face.bold, face.italic) });
+        }
+        if (!parts.length) {
+          const face = editorFontFor(undefined);
+          parts.push({ face, metrics: await ensureFace(face.font, false, false, edit.text), measure: measurer(face.font, line.size, false, false) });
+        }
+        // The file is still the one the line was read from.
+        if (rt.shown !== version || store.get().texts[edit.src]?.lines[edit.line]?.text !== line.text) return;
         const others = page.lines.filter((_, i) => i !== edit.line).map((l) => l.bbox);
-        const objs = lineReplacement({ line, fonts: page.fonts, entry, text: edit.text, face, metrics, measure: measurer(face.font, size, face.bold, face.italic), others });
-        // The whiteout takes the page's colour behind the line (a tinted page stays tinted).
-        if (objs) objs[0].fill = ctl.samplers.get(entry.id)?.(objs[0]) ?? objs[0].fill;
-        if (!objs) {
+        const made = styledLineReplacement({ line, fonts: page.fonts, entry, text: edit.text, parts, others });
+        if (!made) {
           ui.toast({ text: "This line can’t be replaced automatically. Use Whiteout and Text instead.", tone: "info" });
           return;
         }
-        // The box that kept this text closes: the text is in the new text box now.
+        // The whiteout takes the page's colour behind the line (a tinted page stays tinted).
+        made.whiteout.fill = ctl.samplers.get(entry.id)?.(made.whiteout) ?? made.whiteout.fill;
+        // The box that kept this text closes: the text is in the new text boxes now.
         const open = store.get().lineEdit;
         if (open && open.src === edit.src && open.line === edit.line) store.set({ lineEdit: null });
-        ctl.add([...objs], "Replace line", false);
-        if (objs.overlaps) ui.toast({ text: "The new text runs into text below it. Shorten it, or move or resize the box.", tone: "info" });
+        // The old line leaves the file; where the engine can't take it out it is covered instead.
+        try {
+          removed = await ctl.showEngineResult(edit.src, await callEngine({ op: "replace", page: edit.src, line: edit.line, text: "" }));
+        } catch (err) {
+          if (isEngineError(err)) {
+            console.warn(engineErrorLog(err));
+            if (err.kind === "crashed" || err.kind === "aborted" || err.kind === "internal") await ctl.recoverEngine();
+          }
+        }
+        const objs: EditorObject[] = removed ? made.texts : [made.whiteout, ...made.texts];
+        if (objs.length) {
+          apply(onPage(addObjects({ ...state(), engine: rt.shown }, objs), objs.map((o) => o.id)), "Replace line", { page: entry.id, targets: objs.map((o) => o.id) });
+          store.set({ flash: { ids: objs.map((o) => o.id), key: Date.now() } });
+        } else if (removed) apply({ ...state(), engine: rt.shown }, "Replace line", { page: entry.id });
+        if (made.overlaps) ui.toast({ text: "The new text runs into text below it. Shorten it, or move or resize the box.", tone: "info" });
         else ui.announce("Line replaced with new text");
       } catch {
-        ui.toast({ text: "The font for the new text couldn’t load. Please try again.", tone: "danger" });
+        // The line already left the file: that step is recorded, so Undo brings it back.
+        if (removed) apply({ ...state(), engine: rt.shown }, "Remove line", { page: entry.id });
+        ui.toast({ text: removed ? "The new text couldn’t be placed. Undo brings the line back." : "The font for the new text couldn’t load. Please try again.", tone: "danger" });
+      } finally {
+        store.set({ busy: null });
       }
     },
 

@@ -438,3 +438,16 @@ fn lopdf_bytes(doc: &Document) -> Vec<u8> {
     doc.clone().save_to(&mut out).unwrap();
     out
 }
+
+/// A TeX font names its ff, ffi and ffl glyphs: they read as the ligature characters instead of
+/// dropping out of the line ("The eect of nite stiness").
+#[test]
+fn ff_ligature_glyph_names_are_read() {
+    let mut e = Engine::open(read("latex-type1c.pdf"), None).unwrap();
+    let page = e.page_text(0).unwrap();
+    assert!(
+        texts(&page).iter().any(|t| t == "The e\u{FB00}ect of \u{FB01}nite sti\u{FB00}ness on the \u{FB02}ow is e\u{FB03}cient."),
+        "{:?}",
+        texts(&page)
+    );
+}
