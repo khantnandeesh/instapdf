@@ -499,7 +499,8 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         try {
           const copy = ctl.bytesOf(rt.shown).slice();
           await callEngine({ op: "open", bytes: copy, shaping: store.get().shaping === "ready" }, [copy.buffer]);
-          // The new engine has no fonts.
+          // The reopened engine may have its fonts again (the worker adds them back): start clean on both sides.
+          await callEngine({ op: "clearFonts" }).catch(() => {});
           ctl.forgetFonts();
           store.set({ fresh: {} });
         } catch {
@@ -845,10 +846,11 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         for (const { id } of plan) {
           if (!wanted()) throw stale();
           tried.add(id);
+          const files = id === mate ? [...(await filesOfChars(id, err.request.bold, err.request.italic, asked2)).values()] : [];
           const epoch = ctl.fontEpoch;
           if ((await registerWithEngine(id, err.request.bold, err.request.italic, err.chars)) && epoch === ctl.fontEpoch) {
             ctl.standIns.set(fontLabel(id), id);
-            if (id === mate) for (const file of (await filesOfChars(id, err.request.bold, err.request.italic, asked2)).values()) ctl.twinHas.add(`${id}|${err.request.bold}|${err.request.italic}|${file}`);
+            for (const file of files) ctl.twinHas.add(`${id}|${err.request.bold}|${err.request.italic}|${file}`);
           } else ready = false;
         }
         if (ready) {

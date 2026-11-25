@@ -276,5 +276,8 @@ twin: it gave those letters to the font the person had added.
   Only letters another registered font has are registered, and each of the twin's files once. The
   record is dropped whenever the engine's fonts are (a pick, another font, an engine restart).
 - Still open: if the twin's file doesn't arrive, the edit goes ahead and the added font takes the
-  letter, with the notice naming it.
+  letter, with the notice naming it. On a line with two named-only fonts, new letters typed into
+  both runs in one first edit go to the twin of the font the engine asks about. A font picked in
+  the hint at the very moment Enter registers the plan makes the save fall back to trying fonts
+  one at a time.
 - The notice names the twin too ("Using Tinos and Own Test Sans.").
