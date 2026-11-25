@@ -94,12 +94,16 @@ export function Dialog({
       const leaving = motionReady();
       // The whole dialog leaves the a11y tree and takes no input while it is still painted: exit() makes
       // it inert and aria-hidden at once (and settle() on the next opening gives back what it had).
-      if (leaving) dialog.setAttribute("data-leaving", "");
+      const preset = variant === "default" ? "dialog" : variant === "sheet" ? "sheet" : "overlay";
+      // The value names the exit preset, so globals.css holds the dialog in the top layer for that preset's
+      // fade (the overlay fade is 120ms, the others 200ms) at most.
+      if (leaving) dialog.setAttribute("data-leaving", preset);
       dialog.close();
-      void Promise.all(leaving ? parts().map((el) => exit(el, variant === "default" ? "dialog" : variant === "sheet" ? "sheet" : "overlay")) : []).then(() => {
+      void Promise.all(leaving ? parts().map((el) => exit(el, preset)) : []).then(() => {
         if (dialog.open) return; // reopened meanwhile
-        // data-leaving, inert and aria-hidden stay until the next opening: the top-layer hold (display,
-        // overlay) may end a frame after the fade, and the dialog must stay out of the a11y tree till then.
+        // The fade is done (opacity 0): end the top-layer hold now rather than when the CSS transition,
+        // which starts a frame late, runs out. Inert and aria-hidden stay until the next opening.
+        dialog.removeAttribute("data-leaving");
         setShown(false);
       });
       const back = returnFocusRef?.current ?? opener.current;

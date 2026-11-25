@@ -2,6 +2,7 @@
  * React glue for lib/motion (no @gsap/react). Client components only.
  */
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { flushSync } from "react-dom";
 import { exit, motionReady, settle, type Preset } from "./index";
 
 /**
@@ -21,7 +22,8 @@ export function usePresence(open: boolean, parts: [RefObject<HTMLElement | null>
     if (!shown) return;
     if (!motionReady()) return setShown(false);
     let live = true;
-    void Promise.all(els.map(([el, p]) => exit(el, p))).then(() => live && setShown(false));
+    // Gone in the frame the last fade ends (flushSync), not in a render scheduled after it.
+    void Promise.all(els.map(([el, p]) => exit(el, p))).then(() => live && flushSync(() => setShown(false)));
     return () => {
       live = false;
     };

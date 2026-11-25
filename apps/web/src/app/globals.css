@@ -1462,8 +1462,9 @@
   }
 }
 
-/* A dialog that is leaving (Dialog.tsx, motion.md S11): closed, so focus and the page are back and it
-   takes no clicks, but kept painted in the top layer, where it was, while lib/motion fades it. Browsers
+/* A dialog that is leaving (Dialog.tsx, motion.md S11; data-leaving names its exit preset): closed, so focus
+   and the page are back and it takes no clicks, but kept painted in the top layer, where it was, while
+   lib/motion fades it. Browsers
    without the discrete overlay transition close it at once. */
 @supports (overlay: auto) {
   dialog[data-leaving] {
@@ -1477,6 +1478,14 @@
   dialog[data-leaving]::backdrop {
     opacity: 0;
     transition: opacity var(--motion-quick) var(--ease-in);
+  }
+  /* A full-screen dialog fades out in 120ms (the "overlay" exit): hold it no longer than that, or it stays
+     in the top layer, invisible, for another 80ms. */
+  dialog[data-leaving="overlay"] {
+    transition-duration: var(--motion-micro);
+  }
+  dialog[data-leaving="overlay"]::backdrop {
+    transition-duration: var(--motion-micro);
   }
 }
 
