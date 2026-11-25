@@ -96,9 +96,11 @@ async function build(info: FontInfo, text: string, gen: number, prev: DocFace | 
   const covered = program.format === "none" || joined ? null : coveredBy(program);
   // Asked again for new characters and the font has none of them: the font already made stays
   // (nothing new to draw), it only knows more about what it lacks.
-  if (prev && program.format === "none" && !joined && prev.kind === "close") {
-    // Only named: the stand-in already made is asked about the new characters.
+  if (prev && !info.embedded && program.format === "none" && !joined && prev.kind === "close") {
+    // Only named: the stand-in already made is asked about the new characters, and its files
+    // for them are loaded, so what the record says it draws is what the box shows.
     const id = STAND_IN.get(prev.family);
+    if (id) await ensureFace(id, prev.bold, prev.italic, text || "A").catch(() => undefined);
     const drawn = id ? await standInCovers(id, prev.bold, prev.italic, asked, true) : null;
     if (gen !== generation) return null;
     return { ...prev, covered: drawn, asked };
@@ -155,7 +157,8 @@ async function build(info: FontInfo, text: string, gen: number, prev: DocFace | 
     const [best] = await matchFont(program, 1);
     if (gen !== generation || !best || !isClose(best)) return null;
     const entry = await ensureFace(best.family, best.weight >= 600, best.italic, text || "A");
-    const drawn = program.format === "none" && !joined ? await standInCovers(best.family, best.weight >= 600, best.italic, asked, true) : covered;
+    // An embedded Type 1 or Type 3 font (no program the browser can use) keeps "not known".
+    const drawn = !info.embedded && program.format === "none" && !joined ? await standInCovers(best.family, best.weight >= 600, best.italic, asked, true) : covered;
     return { family: standInFamily(best.family), kind: "close", bold: best.weight >= 600, italic: best.italic, ascent: entry.ascent, descent: entry.descent, covered: drawn, asked };
   } catch {
     return null;

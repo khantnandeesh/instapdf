@@ -1,6 +1,0 @@
-02:05:33.512 1280 refused {"box":[", for Dvořák",true],"notice":"The edited line would run past the page edge. Your text is s","hint":true,"l1":"lists for them","focus":"line-input:Edit line: This"}
-02:05:33.567 1280 after Dismiss click +34 {"box":[", for Dvořák",false],"notice":null,"hint":true,"l1":"lists for them","focus":"BODY:Skip to main contentB"}
-02:05:37.602 1280 after click on blank page +8 {"box":[", for Dvořák",false],"notice":null,"hint":true,"l1":"lists for them","focus":"DIV:Text on page 1"}
-02:05:41.616 1280 after 2nd click on blank +10 {"box":[", for Dvořák",false],"notice":null,"hint":true,"l1":"lists for them","focus":"DIV:Text on page 1"}
-02:05:44.675 1280 focus on download {"box":[", for Dvořák",false],"notice":null,"hint":true,"l1":"lists for them","focus":"download:Download PDF"}
-02:05:44.684 1280 Escape with focus on Download +2 {"box":null,"notice":null,"hint":null,"l1":"e shown below,","focus":"download:Download PDF"}

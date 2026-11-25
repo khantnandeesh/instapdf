@@ -8,7 +8,8 @@ import type { FamilyRow } from "./client";
 export type Look = { kind: "serif" | "sans-serif" | "monospace"; name: string };
 
 const SANS_NAME = /sans|gothic|grotes|kufi/;
-const SERIF_NAME = /serif|roman|times|naskh|nastaliq|antiqua|mincho|myeongjo|tiro|martel|frankruhl|david|amiri|scheherazade/;
+// "Roman" alone is also the upright cut of many sans families (Avenir-Roman), so only "New Roman" counts.
+const SERIF_NAME = /serif|newroman|times|naskh|nastaliq|antiqua|mincho|myeongjo|martel|frankruhl|amiri|scheherazade|^tiro|^david/;
 
 /**
  * Serif, sans or fixed-pitch for a document font: PDFs of other scripts often leave the serif
@@ -17,7 +18,8 @@ const SERIF_NAME = /serif|roman|times|naskh|nastaliq|antiqua|mincho|myeongjo|tir
 export function lookKind(font: { name: string; serif: boolean; monospace: boolean }, row?: Pick<FamilyRow, "c">): Look["kind"] {
   if (font.monospace || row?.c === "monospace") return "monospace";
   if (row?.c === "serif" || row?.c === "sans-serif") return row.c;
-  const n = font.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  // Without a subset's tag ("ABCDEF+"), whose letters could spell anything.
+  const n = font.name.replace(/^[A-Z]{6}\+/, "").toLowerCase().replace(/[^a-z0-9]/g, "");
   if (SANS_NAME.test(n)) return "sans-serif";
   if (SERIF_NAME.test(n)) return "serif";
   return font.serif ? "serif" : "sans-serif";

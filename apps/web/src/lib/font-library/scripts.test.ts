@@ -93,6 +93,10 @@ describe("serif or sans of a document font (AC-288)", () => {
     expect(lookKind(font("Mangal", true))).toBe("serif");
     expect(lookKind(font("Mangal"))).toBe("sans-serif");
     expect(lookKind(font("Whatever", true, true))).toBe("monospace");
+    // The upright cut of a sans family, and a subset tag that happens to spell a word.
+    expect(lookKind(font("Avenir-Roman"))).toBe("sans-serif");
+    expect(lookKind(font("TimesNewRomanPSMT"))).toBe("serif");
+    expect(lookKind(font("SERIFX+Mangal"))).toBe("sans-serif");
   });
 
   it("a serif font of one script gets the serif face of another", () => {

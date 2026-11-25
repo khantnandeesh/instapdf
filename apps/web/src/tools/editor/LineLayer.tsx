@@ -158,7 +158,8 @@ export function LineLayer({
           // The box's paper would hide it, so it is drawn again over the paper (AC-304).
           const left = Math.max(o.cx - o.length / 2, box.left);
           const right = Math.min(o.cx + o.length / 2, box.left + box.width);
-          if (right > left) inRow.push({ left, top: o.cy - o.thickness / 2, width: right - left, height: o.thickness });
+          // Only a small mark: a second line drawn on the same spot (a shadow, a doubled bold) stays under the paper.
+          if (right > left && o.thickness < box.height * 0.8 && o.length < box.width * 0.5) inRow.push({ left, top: o.cy - o.thickness / 2, width: right - left, height: o.thickness });
           return;
         }
         if (o.cy > mid) paperBottom = Math.max(paperBottom, Math.min(box.top + box.height - top, box.height / 2 - 1));

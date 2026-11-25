@@ -81,7 +81,8 @@ async function matchOf(info: FontInfo): Promise<FontMatch[]> {
   const lib = state.library ?? (await loadLibrary().catch(() => null));
   // A font the PDF only names has no shapes to compare: with a twin there is nothing to look up
   // (no index, no signature files), so its row is ready at once.
-  const namedOnly = info.embedded === false && !!(twinOf(info.family || info.name) ?? twinOf(info.name));
+  const twin = info.embedded === false ? (twinOf(info.family || info.name) ?? twinOf(info.name)) : undefined;
+  const namedOnly = !!twin && !!lib?.byId.has(twin);
   const shaped = namedOnly ? [] : await byShape(info).catch(() => [] as FontMatch[]);
   const matches = withTwin(info, shaped, (id) => !lib || lib.byId.has(id));
   if (!lib) return matches;

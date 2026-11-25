@@ -7,7 +7,7 @@
 - Candidate: https://web-staging-qzq5fa2g7q-uc.a.run.app/edit-pdf. `/api/health` reports version `97b0be6de3d1848e9df88dfd869878174e37fe83`. `/fonts/lib/manifest.json` counts 1,972 families, 7,937 faces.
 - Sizes: 1280x800 and 390x844 (touch), device scale factor 2, headless Chromium 1243. Lines low on the page were run at 1280x1100 or 1280x1500.
 - Sejda evidence: reused from the cache, plus one new real task today (the CFF line; see "Sejda tasks spent").
-- Our outputs, logs, scripts and the new fixtures: `docs/evals/cache/f24-font-library/eval-3/`. Our screenshots: `/mnt/project-files/designs/fonts/eval-3/`. Side-by-side images (Sejda left): `/mnt/project-files/comparisons/f24/`. New Sejda captures, logs and output: `/mnt/project-files/evals-cache/f24/` (`sejda-e3-*`, `e3-*`; not in git). Sejda notes and hashes: `docs/evals/cache/f24/manifest.json`.
+- Our scripts: `docs/evals/cache/f24-font-library/eval-3/scripts/`. Our outputs, logs, Lighthouse runs and the new fixtures: `/mnt/project-files/evals-cache/f24-font-library/eval-3/` (not in git). Our screenshots: `/mnt/project-files/designs/fonts/eval-3/`. Side-by-side images (Sejda left): `/mnt/project-files/comparisons/f24/`. New Sejda captures, logs and output: `/mnt/project-files/evals-cache/f24/` (`sejda-e3-*`, `e3-*`; not in git). Sejda notes and hashes: `docs/evals/cache/f24/manifest.json`.
 
 ### Summary
 

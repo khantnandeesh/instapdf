@@ -396,7 +396,10 @@ export function LineEditBox({
       // before that letter (TeX sets the accented letter after a small gap), not between all of them.
       const accent = ps.find((p) => p.from > w.start && p.from < w.end && p.span.dataset.over === "before");
       const base = accent && diff > 0 ? ps.find((p) => p.from === accent.from - 1 && p.from > w.start) : undefined;
-      if (base) set(base.span, "ml", diff);
+      if (base) {
+        set(base.span, "ml", diff);
+        base.span.dataset.base = "1";
+      }
       else for (const p of inside) set(p.span, "ls", diff / letters);
     }
     // Each word where the page has it, counted from the first. What most single spaces are short
@@ -436,6 +439,13 @@ export function LineEditBox({
         delete span.dataset.mr;
         delete span.dataset.over;
         span.style.marginLeft = span.style.marginRight = "";
+      }
+    // A letter set apart for its accent closes up again once the accent is gone or typed over.
+    for (const span of box.querySelectorAll<HTMLElement>("[data-base]"))
+      if (!(span.nextElementSibling as HTMLElement | null)?.dataset.over) {
+        delete span.dataset.base;
+        delete span.dataset.ml;
+        span.style.marginLeft = "";
       }
     const found = scan(box, facesRef.current, first);
     setInputWidth(box.offsetWidth);
