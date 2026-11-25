@@ -787,6 +787,13 @@ test("fonts the file only names are drawn in their twins on the page too, and th
   await expect(lineWith(page, "on time ok")).toBeVisible({ timeout: 30_000 });
   // The edit only added to the file: the page still draws the same fonts in their twins.
   await expect(shell).toHaveAttribute("data-twins", twins!);
+  // Going back to the file as it was, and forward again, keeps them too.
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(lineWith(page, "on time ok")).toHaveCount(0, { timeout: 30_000 });
+  await expect(shell).toHaveAttribute("data-twins", twins!);
+  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await expect(lineWith(page, "on time ok")).toBeVisible({ timeout: 30_000 });
+  await expect(shell).toHaveAttribute("data-twins", twins!);
   test.skip(isMobile, "the download is read on desktop");
   const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download PDF" }).click()]);
   const saved = readFileSync((await dl.path())!).toString("latin1");

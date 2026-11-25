@@ -80,8 +80,21 @@ describe("twins on the page (AC-298)", () => {
     expect(await buildTwinPatch(bytes, [{ object: 4, twin: "gelasio", bold: false, italic: false }], async () => null)).toBeNull();
     expect(await buildTwinPatch(bytes, [{ object: 3, twin: "gelasio", bold: false, italic: false }], async () => sfnt)).toBeNull();
     expect(await buildTwinPatch(bytes, [], async () => sfnt)).toBeNull();
+    // The font's own widths end at 126: it can draw no letter outside Latin-1, and the caller is told so.
+    const asked: number[][] = [];
+    const patch = await buildTwinPatch(bytes, [{ object: 4, twin: "gelasio", bold: false, italic: false }], async (_, declared) => (asked.push(declared), sfnt));
+    expect(asked).toEqual([[]]);
+    expect(patch!.names).toEqual({ 4: "Georgia" });
+    // A later version that holds another font under that number is not covered.
+    expect(await buildTwinPatch(bytes, [{ object: 4, twin: "gelasio", bold: false, italic: false }], async () => sfnt, { 4: "Verdana" })).toBeNull();
+    // Widths up to 255: every Windows-1252 letter outside Latin-1 is one the font may draw.
+    const wide = Uint8Array.from(String.fromCharCode(...bytes).replace("/LastChar 126", "/LastChar 255").replace(/\/Widths \[[^\]]*\]/, `/Widths [${Array(224).fill(500).join(" ")}]`), (c) => c.charCodeAt(0));
+    asked.length = 0;
+    await buildTwinPatch(wide, [{ object: 4, twin: "gelasio", bold: false, italic: false }], async (_, declared) => (asked.push(declared), null));
+    expect(asked[0]).toContain(0x0160);
+    expect(asked[0]).toHaveLength(27);
     expect(withTwinPatch(bytes, null)).toBe(bytes);
     const noEnd = new Uint8Array(40);
-    expect(withTwinPatch(noEnd, { root: "1 0 R", size: 10, objects: [{ num: 4, bytes: new Uint8Array(2) }], fonts: [4] })).toBe(noEnd);
+    expect(withTwinPatch(noEnd, { root: "1 0 R", size: 10, objects: [{ num: 4, bytes: new Uint8Array(2) }], fonts: [4], names: {} })).toBe(noEnd);
   });
 });

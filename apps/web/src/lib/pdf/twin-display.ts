@@ -6,15 +6,16 @@
  * downloads is never touched.
  *
  * The change is an incremental update appended to the bytes (new versions of the font objects,
- * a descriptor and a font file each), so it costs one parse when the fonts are first seen and a
- * copy of the bytes afterwards, also after an edit the engine appended.
+ * a descriptor and a font file each), so it costs one parse per version of the file that is not
+ * just an addition to the last one, and a copy of the bytes otherwise.
  */
 
 /** A font of the open file that the PDF only names and that has a twin. */
 export type NamedFont = { object: number; twin: string; bold: boolean; italic: boolean };
 
 type Obj = { num: number; bytes: Uint8Array };
-export type TwinPatch = { root: string; size: number; objects: Obj[]; fonts: number[] };
+/** `names`: the BaseFont of each font the update covers, so a later version of the file is checked to hold the same font under that number. */
+export type TwinPatch = { root: string; size: number; objects: Obj[]; fonts: number[]; names: Record<number, string> };
 
 /** Object numbers far above anything the file or a later edit will use. */
 const BASE = 6_000_000;
@@ -62,8 +63,10 @@ export function sfntFacts(sfnt: Uint8Array): { unitsPerEm: number; bbox: number[
   };
 }
 
+/** Windows-1252 codes 0x80 to 0x9F as characters (0: no character there). */
+const CP1252_HIGH = [0x20ac, 0, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030, 0x0160, 0x2039, 0x0152, 0, 0x017d, 0, 0, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014, 0x02dc, 0x2122, 0x0161, 0x203a, 0x0153, 0, 0x017e, 0x0178];
 /** Windows-1252 letters outside Latin-1: the ones a Latin slice of a library font may lack. */
-export const CP1252_EXTRA = [0x20ac, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030, 0x0160, 0x2039, 0x0152, 0x017d, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014, 0x02dc, 0x2122, 0x0161, 0x203a, 0x0153, 0x017e, 0x0178];
+export const CP1252_EXTRA = CP1252_HIGH.filter((cp) => cp);
 
 /**
  * Builds the update for `fonts` of the file in `bytes`. A font is left alone unless it is a
@@ -71,9 +74,16 @@ export const CP1252_EXTRA = [0x20ac, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2
  * can show is one the twin's file is asked about by the caller). Null when nothing is to be done
  * or the file can't be read this way (encrypted, damaged).
  */
-export async function buildTwinPatch(bytes: Uint8Array, fonts: readonly NamedFont[], fileOf: (font: NamedFont) => Promise<Uint8Array | null>): Promise<TwinPatch | null> {
+export async function buildTwinPatch(
+  bytes: Uint8Array,
+  fonts: readonly NamedFont[],
+  /** `declared`: the letters outside Latin-1 that the font's own table of widths says it may draw. */
+  fileOf: (font: NamedFont, declared: number[]) => Promise<Uint8Array | null>,
+  /** From an earlier version of the file: a font is only covered again under the same name. */
+  expect?: Record<number, string>,
+): Promise<TwinPatch | null> {
   if (!fonts.length || bytes.length > TWIN_DISPLAY_MAX_BYTES) return null;
-  const { PDFDocument, PDFDict, PDFName, PDFRef, PDFNumber } = await import("@cantoo/pdf-lib");
+  const { PDFDocument, PDFDict, PDFName, PDFRef, PDFNumber, PDFArray } = await import("@cantoo/pdf-lib");
   let doc;
   try {
     doc = await PDFDocument.load(bytes, { updateMetadata: false });
@@ -82,7 +92,9 @@ export async function buildTwinPatch(bytes: Uint8Array, fonts: readonly NamedFon
   }
   const ctx = doc.context;
   const root = ctx.trailerInfo.Root;
-  if (!(root instanceof PDFRef) || ctx.trailerInfo.Encrypt) return null;
+  // Encrypted files, and the rare file that already numbers objects where the update's own go.
+  if (!(root instanceof PDFRef) || ctx.trailerInfo.Encrypt || ctx.largestObjectNumber >= BASE) return null;
+  const names: Record<number, string> = {};
   const name = (s: string) => PDFName.of(s);
   const objects: Obj[] = [];
   const done: number[] = [];
@@ -102,7 +114,22 @@ export async function buildTwinPatch(bytes: Uint8Array, fonts: readonly NamedFon
     const encoding = dict.lookup(name("Encoding"));
     const winAnsi = encoding === name("WinAnsiEncoding") || (encoding instanceof PDFDict && encoding.lookup(name("BaseEncoding")) === name("WinAnsiEncoding") && !encoding.has(name("Differences")));
     if (!winAnsi) continue;
-    const file = await fileOf(font);
+    const base = dict.lookup(name("BaseFont"));
+    const baseName = base instanceof PDFName ? base.decodeText() : "";
+    if (expect && expect[font.object] !== undefined && expect[font.object] !== baseName) continue;
+    // Codes 0x80 to 0x9F the font gives a width: the letters outside Latin-1 it may draw anywhere
+    // in the file. With no table of widths (a standard font) it may draw them all.
+    const [first, last, widths] = [dict.lookup(name("FirstChar")), dict.lookup(name("LastChar")), dict.lookup(name("Widths"))];
+    const declared = CP1252_HIGH.filter((cp, i) => {
+      if (!cp) return false;
+      if (!(first instanceof PDFNumber) || !(last instanceof PDFNumber) || !(widths instanceof PDFArray)) return true;
+      const code = 0x80 + i;
+      if (code < first.asNumber() || code > last.asNumber()) return false;
+      const at = code - first.asNumber();
+      const w = at < widths.size() ? widths.lookup(at) : undefined;
+      return !(w instanceof PDFNumber) || w.asNumber() !== 0;
+    });
+    const file = await fileOf(font, declared);
     const facts = file && sfntFacts(file);
     if (!file || !facts) continue;
     const [descNum, fileNum] = [next++, next++];
@@ -110,7 +137,6 @@ export async function buildTwinPatch(bytes: Uint8Array, fonts: readonly NamedFon
     for (const [k, v] of dict.entries()) copy.set(k, v);
     copy.set(name("Subtype"), name("TrueType"));
     copy.set(name("FontDescriptor"), PDFRef.of(descNum, 0));
-    const base = dict.lookup(name("BaseFont"));
     const desc = ctx.obj({
       Type: "FontDescriptor",
       FontName: base instanceof PDFName ? base : name("Twin"),
@@ -128,9 +154,10 @@ export async function buildTwinPatch(bytes: Uint8Array, fonts: readonly NamedFon
     objects.push({ num: descNum, bytes: serialise(desc) });
     objects.push({ num: fileNum, bytes: join([ascii(`<< /Length ${file.length} /Length1 ${file.length} >>\nstream\n`), file, ascii("\nendstream")]) });
     done.push(font.object);
+    names[font.object] = baseName;
   }
   if (!objects.length) return null;
-  return { root: `${root.objectNumber} ${root.generationNumber} R`, size: next, objects: objects.sort((a, b) => a.num - b.num), fonts: done };
+  return { root: `${root.objectNumber} ${root.generationNumber} R`, size: next, objects: objects.sort((a, b) => a.num - b.num), fonts: done, names };
 }
 
 /** Where the file's last cross-reference section starts, read from its end. */

@@ -324,10 +324,13 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       ensureTwinDisplay(
         rt,
         store.get().texts,
-        () => ({ bytes: ctl.bytesOf(rt.shown), version: rt.shown }),
-        async (version) => {
+        rt.src.length,
+        () => ctl.bytesOf(rt.shown),
+        async () => {
+          const version = rt.shown;
           const opened = await openPdf(displayBytes(rt, ctl.bytesOf(version)), rt.password);
           if (!opened.ok) return;
+          // Another version was shown meanwhile: its own switch drew it with the twins.
           if (version !== rt.shown) return void opened.pdf.task.destroy();
           const prev = rt.pdf;
           rt.pdf = opened.pdf.doc;
