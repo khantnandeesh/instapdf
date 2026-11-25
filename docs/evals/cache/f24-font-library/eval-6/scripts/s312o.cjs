@@ -1,0 +1,25 @@
+// Fifth evaluation, AC-312 follow-up: after "Use your own font" in the mixed case (" ř ⸘"), what the hint and status say, which font each letter is drawn with in the box, and what the file gets.
+// VARIANT=enter (Enter straight away), pick (press the added font's button first), leave (click elsewhere on the page).
+const { chromium, BASE, log, SHOTS, FX } = require("./lib.cjs"); const { install, state } = require("./st.cjs");
+const SIZES = { 1280: { viewport: { width: 1280, height: 800 } }, 390: { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true } };
+(async () => { const browser = await chromium.launch({ proxy: { server: process.env.HTTPS_PROXY } });
+  for (const tag of ["1280", "390"]) for (const variant of ["enter", "pick", "leave"]) for (const txt of [" ř ⸘", " ⸘"]) {
+    const phone = tag !== "1280"; const ctx = await browser.newContext({ deviceScaleFactor: 2, acceptDownloads: true, ...SIZES[tag] }); const page = await ctx.newPage(); const reqs = []; page.on("request", (r) => reqs.push({ m: r.method(), u: r.url() }));
+    await page.goto(BASE + "/edit-pdf", { waitUntil: "networkidle", timeout: 90000 }); await page.locator('input[type="file"]').first().setInputFiles(FX + "chrome-justified-mixed.pdf"); await page.waitForTimeout(4000); await install(page);
+    const o = page.getByRole("option", { name: /^in full/ }); const b = await o.boundingBox();
+    phone ? await page.touchscreen.tap(b.x + b.width - 3, b.y + b.height / 2) : await page.mouse.click(b.x + b.width - 3, b.y + b.height / 2); await page.getByTestId("line-input").waitFor(); await page.waitForTimeout(600); await page.keyboard.press("End");
+    await page.keyboard.insertText(txt); await page.waitForTimeout(4000);
+    const fonts = () => page.evaluate(() => { const el = document.querySelector("[data-testid=line-input]"); if (!el) return null; const out = []; const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) { const t = n.textContent; if (/[ř⸘]/.test(t)) out.push(t.slice(-6) + " → " + getComputedStyle(n.parentElement).fontFamily.slice(0, 90)); } return { out, faces: el.dataset.faces, face: el.dataset.face, html: el.innerHTML.slice(-500) }; });
+    const own = page.getByRole("button", { name: /own font|Your font/ }).first(); const fc = page.waitForEvent("filechooser", { timeout: 6000 }).catch(() => null); phone ? await own.tap() : await own.click(); const ch = await fc; if (!ch) { log(tag, variant, "NO chooser"); await ctx.close(); continue; }
+    await ch.setFiles(process.env.FXD + "/own-dejavu.ttf"); await page.waitForTimeout(2500); let s = await state(page);
+    log(tag, variant, JSON.stringify(txt), "own font added:", JSON.stringify({ focused: s.box && s.box.focused, hint: s.hint && s.hint.text, btns: s.hint && s.hint.btns, status: s.status, notice: s.notice && s.notice.text.slice(0, 200) }), "| box fonts:", JSON.stringify(await fonts()));
+    await page.screenshot({ path: SHOTS + `ac312-own-${txt.trim().replace(/\s/g, "_")}-${variant}-added-${tag}.png` });
+    if (variant === "pick") { const d = page.getByTestId("line-missing").getByRole("button", { name: /DejaVu/ }); phone ? await d.tap() : await d.click(); await page.waitForTimeout(1500); s = await state(page); log(tag, variant, JSON.stringify(txt), "picked DejaVu:", JSON.stringify({ focused: s.box && s.box.focused, hint: s.hint && s.hint.text, btns: s.hint && s.hint.btns, status: s.status }), "| box fonts:", JSON.stringify(await fonts())); await page.locator("[data-testid=line-input]").focus(); }
+    if (variant === "leave") { const t = page.getByRole("option", { name: /^Service Agreement/ }); const tb = await t.boundingBox(); const px = tb.x + tb.width + 30, py = tb.y - 14; phone ? await page.touchscreen.tap(px, py) : await page.mouse.click(px, py); } else { if (!(await page.evaluate(() => document.activeElement === document.querySelector("[data-testid=line-input]")))) await page.locator("[data-testid=line-input]").focus(); await page.keyboard.press("Enter"); }
+    await page.waitForTimeout(3000); s = await state(page); const snap = await page.locator("body").ariaSnapshot();
+    log(tag, variant, JSON.stringify(txt), "after:", JSON.stringify({ box: !!s.box, saved: s.lines.some((l) => l.endsWith(txt.slice(-3))), notice: s.notice && s.notice.text.slice(0, 200), standin: snap.split("\n").filter((x) => /isn’t|Using/.test(x)).map((x) => x.trim()).join(" || ").slice(0, 300) }), "non-GET", reqs.filter((r) => r.m !== "GET").length);
+    await page.screenshot({ path: SHOTS + `ac312-own-${txt.trim().replace(/\s/g, "_")}-${variant}-after-${tag}.png` });
+    if (!s.box) { const dl = page.waitForEvent("download", { timeout: 8000 }).catch(() => null); await page.getByTestId("download").click(); const d = await dl; if (d) await d.saveAs(`out/s312o-${txt.trim().replace(/\s/g, "_")}-${variant}-${tag}.pdf`); else log("no download"); }
+    await ctx.close(); }
+  await browser.close();
+})().catch((e) => { console.error(String(e).slice(0, 1200)); process.exit(1); });

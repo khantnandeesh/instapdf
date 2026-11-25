@@ -260,3 +260,17 @@ Still open: if the font the PDF asks for by name is registered as the second fon
 engine prefers it for letters both fonts have, so the hint can name the first font for a letter the
 second one draws. It needs a picked font that is not the named one plus a letter only the named one
 adds; not seen in the corpus.
+
+### After the sixth evaluation (eleventh PR)
+
+AC-312 still failed on one case: a line whose font the PDF only names (ArialMT, Times), after the
+person added a font of their own. The box draws such a line in the font's twin, and letters the
+twin has are not "missing" there, so the hint never names them. The save did not know about the
+twin: it gave those letters to the font the person had added.
+
+- **Twin first.** For a font the PDF only names, the twin stands at the head of the save's plan,
+  before any picked font: every letter the twin has is saved in the twin, as the box draws it.
+- **Later lines.** Once another font is registered with the engine, the twin is registered for
+  the new letters of each edit of that font before the edit is tried, so the added font can't
+  take a letter silently. Each letter is registered once.
+- The notice names the twin too ("Using Tinos and Own Test Sans.").

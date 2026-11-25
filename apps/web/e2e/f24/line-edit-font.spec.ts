@@ -939,3 +939,42 @@ test("AC-312: a font the person adds for the letter no font has is named for tha
   expect(Date.now() - started).toBeLessThan(2000);
   await expect(page.getByTestId("line-input")).toHaveCount(0);
 });
+
+test("AC-312: on a line whose font the file only names, the twin keeps its letters after the person adds a font", async ({ page, isMobile }) => {
+  await open(page, "std14-reportlab.pdf");
+  await edit(page, lineWith(page, "several lines of"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ř ⸘");
+  await expect(page.getByTestId("line-missing-own")).toBeVisible({ timeout: 20_000 });
+  // The added font has ř too: the box still draws it in the twin, so the file must as well.
+  await page.getByTestId("line-missing-own-file").setInputFiles(corpus("fonts/OwnTestSans-Regular.ttf"));
+  await expect(page.getByTestId("line-missing-font").filter({ hasText: "Own Test Sans" })).toHaveAttribute("data-draws", "⸘", { timeout: 20_000 });
+  await page.keyboard.press("Enter");
+  await expect(lineWith(page, "ř ⸘")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("font-notice")).toContainText("Using Tinos and Own Test Sans");
+  test.skip(isMobile, "the download is read on desktop");
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download PDF" }).click()]);
+  const saved = readFileSync((await dl.path())!).toString("latin1");
+  const sizes = [...saved.matchAll(/\+(Tinos|OwnTestSans)\b/g)].map((m) => m[1]);
+  expect(new Set(sizes).size).toBe(2);
+});
+
+test("AC-312: a later line of a font the file only names gets its new letter in the twin, not in the font the person added", async ({ page }) => {
+  await open(page, "std14-reportlab.pdf");
+  await edit(page, lineWith(page, "several lines of"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ⸘");
+  await expect(page.getByTestId("line-missing-own")).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId("line-missing-own-file").setInputFiles(corpus("fonts/OwnTestSans-Regular.ttf"));
+  await expect(page.getByTestId("line-missing-font").filter({ hasText: "Own Test Sans" })).toHaveAttribute("aria-pressed", "true", { timeout: 20_000 });
+  await page.keyboard.press("Enter");
+  await expect(lineWith(page, "of ⸘")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("font-notice")).toContainText("Using Own Test Sans.");
+  // The added font has ř as well and is in use now; the box draws ř in the twin, so the file does too.
+  await edit(page, lineWith(page, "it went to the client"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ř");
+  await page.keyboard.press("Enter");
+  await expect(lineWith(page, "afternoon. ř")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("font-notice")).toContainText("Using Tinos.");
+});

@@ -1,0 +1,27 @@
+// Sixth evaluation: s292n.cjs on an embedded line (Liberation Serif subset, chrome-justified-mixed.pdf; line 0 = "in full.", second line = "Total amount due").
+// Same cases:
+// after the person's own font is added for "⸘", which font draws the OTHER new letters (ř, Ω: the twin has them) in the box, and which font does the file get for them?
+// Case A: " ř ⸘" typed, font added, Enter. Case B: " Ω ⸘ ok". Case C: font added for a lone " ⸘" and saved, then " ř Ω" typed on the same line again (no letter is missing now).
+// Case D: as C but the second edit is on another named-only line (index 1). Reports real glyph fonts of the box (CDP), hint, status, notice; saves the file as out/s292e-<case>.pdf.
+const { chromium, BASE, log, SHOTS } = require("./lib.cjs"); const { install, state } = require("./st.cjs");
+(async () => { const browser = await chromium.launch({ proxy: { server: process.env.HTTPS_PROXY } });
+  for (const [name, first, second, line2] of [["A", " ř ⸘", null, 0], ["B", " Ω ⸘ ok", null, 0], ["C", " ⸘", " ř Ω", 0], ["D", " ⸘", " ř Ω", 1], ["E", " ř Ω", null, 0]]) {
+    const ctx = await browser.newContext({ deviceScaleFactor: 2, acceptDownloads: true, viewport: { width: 1280, height: 800 } }); const page = await ctx.newPage(); const cdp = await ctx.newCDPSession(page); await cdp.send("DOM.enable"); await cdp.send("CSS.enable");
+    const platform = async () => { await cdp.send("DOM.getDocument", { depth: 0 }); const { result } = await cdp.send("Runtime.evaluate", { expression: `(() => { const el = document.querySelector("[data-testid=line-input]"); if (!el) return null; const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n, last = null; while ((n = w.nextNode())) if (/[^\\x00-\\x7f]/.test(n.textContent)) last = n; return last; })()` }); if (!result.objectId) return null; const { nodeId } = await cdp.send("DOM.requestNode", { objectId: result.objectId }); const { fonts } = await cdp.send("CSS.getPlatformFontsForNode", { nodeId }); return fonts.map((f) => `${f.familyName}${f.isCustomFont ? "(web)" : "(system)"}x${f.glyphCount}`).join(", "); };
+    await page.goto(BASE + "/edit-pdf", { waitUntil: "networkidle", timeout: 90000 }); await page.locator('input[type="file"]').first().setInputFiles("/home/user/instapdf/tests/parity/editor/chrome-justified-mixed.pdf"); await page.waitForTimeout(4000); await install(page);
+    const openLine = async (i) => { const o = page.getByRole("option", { name: i === 0 ? /^in full/ : /^Total amount/ }); const b = await o.boundingBox(); const t = await o.getAttribute("data-text"); await page.mouse.click(b.x + b.width - 3, b.y + b.height / 2); await page.getByTestId("line-input").waitFor(); await page.waitForTimeout(600); return t; };
+    const typeAt = async (txt) => { // before the trailing " END" so the line's last word stays put
+      await page.keyboard.press("End"); await page.keyboard.insertText(txt); await page.waitForTimeout(3500); };
+    const t0 = await openLine(0); await typeAt(first); let s = await state(page);
+    if (/⸘/.test(first)) { const fc = page.waitForEvent("filechooser", { timeout: 6000 }).catch(() => null); await page.getByRole("button", { name: /own font|Your font/ }).first().click(); const ch = await fc; if (!ch) { log(name, "no chooser"); await ctx.close(); continue; } await ch.setFiles(process.env.FXD + "/own-dejavu.ttf"); await page.waitForTimeout(2500); s = await state(page); }
+    log(name, JSON.stringify(first), "line:", JSON.stringify(t0.slice(-30)), "| hint:", s.hint && s.hint.text, "| status:", s.status, "| box glyph fonts:", await platform());
+    await page.screenshot({ path: SHOTS + `ac292e-${name}-box-1280.png` });
+    await page.locator("[data-testid=line-input]").focus(); await page.keyboard.press("Enter"); await page.waitForTimeout(3000); s = await state(page); let snap = await page.locator("body").ariaSnapshot();
+    log(name, "after Enter:", JSON.stringify({ box: !!s.box, notice: s.notice && s.notice.text.slice(0, 160), standin: [...new Set(snap.split("\n").filter((x) => /isn’t|Using/.test(x)).map((x) => x.trim()))] }));
+    await page.mouse.move(5, 5); await page.screenshot({ path: SHOTS + `ac292e-${name}-saved-1280.png` });
+    if (second) { const t1 = await openLine(line2); await typeAt(second); s = await state(page); log(name, "second edit", JSON.stringify(second), "on line", line2, JSON.stringify(t1.slice(-30)), "| hint:", s.hint && s.hint.text, "| status:", s.status, "| box glyph fonts:", await platform()); await page.screenshot({ path: SHOTS + `ac292e-${name}-box2-1280.png` });
+      await page.keyboard.press("Enter"); await page.waitForTimeout(3000); s = await state(page); snap = await page.locator("body").ariaSnapshot(); log(name, "after second Enter:", JSON.stringify({ box: !!s.box, notice: s.notice && s.notice.text.slice(0, 160), standin: [...new Set(snap.split("\n").filter((x) => /isn’t|Using/.test(x)).map((x) => x.trim()))] })); await page.mouse.move(5, 5); await page.screenshot({ path: SHOTS + `ac292e-${name}-saved2-1280.png` }); }
+    if (!s.box) { const dl = page.waitForEvent("download", { timeout: 8000 }).catch(() => null); await page.getByTestId("download").click(); const d = await dl; if (d) await d.saveAs(`out/s292e-${name}.pdf`); else log(name, "no download"); }
+    await ctx.close(); }
+  await browser.close();
+})().catch((e) => { console.error(String(e).slice(0, 1200)); process.exit(1); });
