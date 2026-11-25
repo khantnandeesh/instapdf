@@ -1,6 +1,7 @@
 name: Publish font library
 
-# Builds the full font library (every family of the open catalogues that passes the licence gate)
+# Builds the full font library (every family of the open catalogues that passes the licence gate,
+# and the pinned families of scripts/font-library/extras.mjs)
 # and uploads it to the fonts bucket. Run by hand from main; the next staging deploy then serves
 # the library from the bucket (deploy-staging.yml). See infra/README.md "Fonts bucket".
 on:
@@ -49,7 +50,7 @@ jobs:
           esac
           node --no-warnings scripts/font-library/build-library.mjs \
             --out "$RUNNER_TEMP/library" --source npm \
-            --catalogue "$RUNNER_TEMP/catalogue/catalogue.json" --clean "${extra[@]}" 2> >(tee "$RUNNER_TEMP/skipped.txt" | tail -n 40 >&2)
+            --catalogue "$RUNNER_TEMP/catalogue/catalogue.json" --extras --clean "${extra[@]}" 2> >(tee "$RUNNER_TEMP/skipped.txt" | tail -n 40 >&2)
           echo "Skipped or failed: $(wc -l < "$RUNNER_TEMP/skipped.txt") lines (see the artifact)"
           du -sh "$RUNNER_TEMP/library"
 

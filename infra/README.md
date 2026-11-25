@@ -112,7 +112,9 @@ Nothing a user uploads ever goes there.
   impersonated only from `refs/heads/main`. Run it by hand from main (Actions > Publish font
   library > Run workflow). A full run takes about 75 minutes: it reads the catalogues, applies
   the licence gate, downloads each family's package from the npm registry (checked against the
-  registry's sha512, one request a second), builds the index and uploads. With `limit` set it
+  registry's sha512, one request a second), builds the index and uploads. Families no
+  catalogue carries (Selawik) come from their maker's release, pinned by version and sha256 in
+  `apps/web/scripts/font-library/extras.mjs`. With `limit` set it
   builds only the first N families as a trial and uploads nothing.
 - **Who reads:** the web app. Once Terraform has created the bucket, set the repository variable
   `FONTS_BUCKET` to its name (`terraform output -raw fonts_bucket`). `deploy-staging.yml` then

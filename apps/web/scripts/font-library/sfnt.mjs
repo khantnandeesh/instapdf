@@ -97,3 +97,48 @@ export function mayEmbed(sfnt) {
   if (!os2 || os2.length < 10) return true;
   return (u16(os2, 8) & 0x000f) !== 0x0002;
 }
+
+/**
+ * The characters a font has, as sorted [first, last] ranges, from its Unicode `cmap` (format 4
+ * or 12). Empty when there is none.
+ */
+export function cmapRanges(sfnt) {
+  const cmap = isSfnt(sfnt) ? table(sfnt, "cmap") : null;
+  if (!cmap || cmap.length < 4) return [];
+  let best = null;
+  for (let i = 0, n = u16(cmap, 2); i < n && 4 + i * 8 + 8 <= cmap.length; i++) {
+    const [platform, encoding, offset] = [u16(cmap, 4 + i * 8), u16(cmap, 6 + i * 8), u32(cmap, 8 + i * 8)];
+    if (offset + 4 > cmap.length) continue;
+    const format = u16(cmap, offset);
+    const unicode = platform === 0 || (platform === 3 && (encoding === 1 || encoding === 10));
+    if (unicode && (format === 12 || (format === 4 && best?.format !== 12))) best = { format, offset };
+  }
+  if (!best) return [];
+  const out = [];
+  const o = best.offset;
+  if (best.format === 4) {
+    if (o + 14 > cmap.length) return [];
+    const segs = u16(cmap, o + 6) / 2;
+    if (o + 16 + segs * 8 > cmap.length) return [];
+    for (let i = 0; i < segs; i++) {
+      const [end, start] = [u16(cmap, o + 14 + i * 2), u16(cmap, o + 16 + segs * 2 + i * 2)];
+      if (start <= end && start !== 0xffff) out.push([start, Math.min(end, 0xfffe)]);
+    }
+  } else {
+    if (o + 16 > cmap.length) return [];
+    const groups = u32(cmap, o + 12);
+    if (groups > 100000 || o + 16 + groups * 12 > cmap.length) return [];
+    for (let i = 0; i < groups; i++) {
+      const [start, end] = [u32(cmap, o + 16 + i * 12), u32(cmap, o + 20 + i * 12)];
+      if (start <= end && end <= 0x10ffff) out.push([start, end]);
+    }
+  }
+  out.sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const r of out) {
+    const last = merged[merged.length - 1];
+    if (last && r[0] <= last[1] + 1) last[1] = Math.max(last[1], r[1]);
+    else merged.push([...r]);
+  }
+  return merged;
+}
