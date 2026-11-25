@@ -2,8 +2,9 @@ name: Publish font library
 
 # Builds the full font library (every family of the open catalogues that passes the licence gate,
 # and the pinned families of scripts/font-library/extras.mjs)
-# and uploads it to the fonts bucket. Run by hand from main; the next staging deploy then serves
-# the library from the bucket (deploy-staging.yml). See infra/README.md "Fonts bucket".
+# and uploads it to the fonts bucket. Run by hand from main. A publish then starts a staging deploy
+# (owner, 2026-11-25), since the licences page and notices are built into the image from the
+# published family list (F24 AC-271). See infra/README.md "Fonts bucket".
 on:
   workflow_dispatch:
     inputs:
@@ -15,6 +16,8 @@ on:
 permissions:
   contents: read
   id-token: write
+  # Only to start deploy-staging.yml after a publish (the last step).
+  actions: write
 
 concurrency:
   group: publish-fonts
@@ -95,3 +98,11 @@ jobs:
         if: inputs.limit == ''
         run: |
           curl -fsS "https://storage.googleapis.com/$BUCKET/manifest.json" | tee /dev/stderr | grep -q '"families"'
+
+      # The licences page lists the families of the image's build: a new image is built now, so
+      # no served family is ever missing from it for longer than one deploy.
+      - name: Start a staging deploy
+        if: inputs.limit == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-staging.yml --ref main --repo "$GITHUB_REPOSITORY"
