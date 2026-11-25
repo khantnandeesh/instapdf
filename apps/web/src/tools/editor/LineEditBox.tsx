@@ -20,16 +20,16 @@ import { textOffsets } from "@/lib/editor/line-offsets";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { FontInfo, LinePreview, PageText } from "@/lib/editor/berry-engine";
-import { cssFamily, faceOf, fileFor } from "@/lib/editor/fonts";
+import { cssFamily } from "@/lib/editor/fonts";
 import { isComplex, needsShaping } from "@/lib/editor/shaping";
-import { ensureFace, knownManifest, resolveFonts, widenFor } from "@/lib/editor/fonts-browser";
+import { ensureFace } from "@/lib/editor/fonts-browser";
 import { foldName } from "@/lib/font-library/client";
 import { cx } from "@/components/ui/cx";
 import { useCtl } from "./context";
 import { docFace, type DocFace } from "./doc-face";
 import { useStore } from "./store";
 import { USER_FONT_ACCEPT } from "@/lib/font-library/user-fonts";
-import { addUserFontFile, chosenStandIn, fontLabel, getFontState, standInCandidates } from "./font-service";
+import { addUserFontFile, chosenStandIn, coverOf, fontLabel, getFontState, standInCandidates } from "./font-service";
 
 type Line = PageText["lines"][number];
 export type EditBoxGeometry = { left: number; top: number; width: number; height: number; transform?: string };
@@ -51,6 +51,15 @@ const cleaned = (s: string | null) => (s ?? "").replace(/[\r\n]+/g, " ");
 const ACCENT = /[\u00B4\u0060\u00A8\u02C6\u02DC\u00AF\u02D8\u02D9\u02DA\u00B8\u02C7]/;
 /** A part of the box's text: a new one starts with each font and each word. */
 type Piece = { span: HTMLElement; from: number };
+
+/** What a screen reader hears after the missing characters: which font draws which, and which none has. */
+function missingSaid(shown: { picked: string; none: string[] } | null, chars: readonly string[]): string {
+  if (!shown) return "";
+  const drawn = chars.filter((c) => !shown.none.includes(c));
+  const by = shown.picked && drawn.length ? ` ${fontLabel(shown.picked)} draws ${shown.none.length ? drawn.join(" ") : drawn.length > 1 ? "them" : "it"}.` : "";
+  const none = !shown.picked ? " No font here has it. Use your own font, or remove it." : shown.none.length ? ` No font here has ${shown.none.join(" ")}. Use your own font, or remove it.` : "";
+  return by + none;
+}
 
 type Scan = { at: number | null; ranges: Range[]; missing: { font: number; chars: string[] } | null; unasked: Map<number, string> };
 
@@ -211,7 +220,7 @@ export function LineEditBox({
   const [waited, setWaited] = useState(false);
   const [paperColor, setPaperColor] = useState<string | null>(null);
   const [missing, setMissing] = useState<Scan["missing"]>(null);
-  const [standIn, setStandIn] = useState<{ font: number; chars: string; ids: string[]; picked: string } | null>(null);
+  const [standIn, setStandIn] = useState<{ font: number; chars: string; ids: string[]; picked: string; /** The characters no font here has. */ none: string[] } | null>(null);
   /** Spacing that fits the text to the line's length, per unit of zoom (so it holds when the page is zoomed). */
   const [fit, setFit] = useState<{ word?: number; letter?: number } | null>(null);
   /** Where the first missing character stands in the box: the hint starts there. */
@@ -219,8 +228,6 @@ export function LineEditBox({
   const [hintSize, setHintSize] = useState({ w: 220, h: 26 });
   /** How wide the box is drawn now (it grows with the text). */
   const [inputWidth, setInputWidth] = useState(0);
-  /** What the browser's own rounding puts between the baseline asked for and the one drawn, at this size. */
-  const [nudge, setNudge] = useState<{ key: string; px: number } | null>(null);
   const turned = !!box.transform;
   const boxTop = box.top;
   /** The line as the engine draws it (joined scripts), and whether it is the text in the box now. */
@@ -565,16 +572,28 @@ export function LineEditBox({
       span.style.letterSpacing = span.dataset.ls ? `${Number(span.dataset.ls) * scale}px` : "";
     }
     if (!ready) return;
-    // The baseline as the browser really drew it, read off a mark of no size, against the page's.
-    const nudgeKey = `${scale}|${facesRef.current[first]?.family}`;
-    if (start && facesRef.current[first] && nudge?.key !== nudgeKey && !composing.current) {
+    // The baseline as the browser really laid it out, read off a mark of no size, against the
+    // page's. The browser places a line's baseline in whole pixels from the box's padding and
+    // line height, and paints text on whole CSS pixels, while the page's canvas draws on device
+    // pixels. So the text itself is moved (--ed-rise, which changes no layout) onto the whole
+    // pixel under the page's baseline, and the box by the part of a pixel that is left.
+    if (start && facesRef.current[first] && !composing.current) {
+      box.style.transform = "";
       const probe = document.createElement("span");
-      probe.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
+      probe.style.cssText = "display:inline-block;position:static;width:0;height:0;vertical-align:baseline";
       box.prepend(probe);
-      const off = start.y - (probe.getBoundingClientRect().top - box.parentElement!.getBoundingClientRect().top + boxTop);
+      const at = probe.getBoundingClientRect().top;
+      const want = at + (start.y - (at - box.parentElement!.getBoundingClientRect().top + boxTop));
       probe.remove();
-      setNudge({ key: nudgeKey, px: Math.abs(off) < 4 ? off : 0 });
-    }
+      const dpr = window.devicePixelRatio || 1;
+      const onDevice = Math.round(want * dpr) / dpr;
+      const whole = Math.floor(onDevice + 1e-4);
+      const part = onDevice - whole;
+      if (Math.abs(want - at) < 4) {
+        box.style.setProperty("--ed-rise", `${(whole - at).toFixed(3)}px`);
+        if (part > 0.01) box.style.transform = `translateY(${part.toFixed(3)}px)`;
+      } else box.style.setProperty("--ed-rise", "0px");
+    } else if (!start) box.style.removeProperty("--ed-rise");
     rescan();
     if (!placed.current && settled) {
       placed.current = true;
@@ -649,16 +668,11 @@ export function LineEditBox({
     const chars = missing.chars.join("");
     void (async () => {
       const ids = await standInCandidates(info, { families: [info.family || info.name], bold: info.bold, italic: info.italic }, chars);
-      await resolveFonts([...ids, ...getFontState().user.map((u) => u.id)]).catch(() => undefined);
-      // A built-in family may have these characters in the library's copy of it.
-      await widenFor(ids, chars).catch(() => undefined);
-      const m = knownManifest();
+      const users = getFontState().user.map((u) => u.id).filter((id) => !ids.includes(id));
+      const cover = await coverOf([...users, ...ids], info.bold, info.italic, missing.chars);
       // Those that have the most of the missing characters first; closeness decides between equals.
-      const has = (id: string) => {
-        const face = m?.faces[id] && faceOf(m, id, info.bold, info.italic);
-        return face ? missing.chars.filter((c) => fileFor(face, c.codePointAt(0)!)).length : 0;
-      };
-      const able = [...getFontState().user.map((u) => u.id).filter((id) => !ids.includes(id)), ...ids]
+      const has = (id: string) => cover.has.get(id) ?? 0;
+      const able = [...users, ...ids]
         .filter((id) => has(id) > 0)
         .sort((a, b) => has(b) - has(a))
         .slice(0, CHOICES);
@@ -674,7 +688,7 @@ export function LineEditBox({
         taken.current ??= { key: familyKey(info), before: chosenStandIn(familyKey(info)) };
         await ctl.pickStandIn(familyKey(info), picked);
       }
-      if (alive) setStandIn({ font: missing.font, chars, ids: able, picked });
+      if (alive) setStandIn({ font: missing.font, chars, ids: able, picked, none: cover.none });
     })().catch(() => undefined);
     return () => {
       alive = false;
@@ -688,7 +702,7 @@ export function LineEditBox({
   let padBottom = 0;
   let padLeft = 2;
   if (start && firstFace) {
-    const shift = start.y - box.top - (box.height / 2 + ((firstFace.ascent - firstFace.descent) / 2) * fontSize) + (nudge?.key === `${scale}|${firstFace.family}` ? nudge.px : 0);
+    const shift = start.y - box.top - (box.height / 2 + ((firstFace.ascent - firstFace.descent) / 2) * fontSize);
     if (Math.abs(shift) * 2 < box.height) {
       padTop = Math.max(0, 2 * shift);
       padBottom = Math.max(0, -2 * shift);
@@ -771,7 +785,7 @@ export function LineEditBox({
   const hint = missing ? (
         <div
           id={hintId}
-          className={inMessage ? "ed-toast__picks" : docked ? "ed-input__hint ed-input__hint--docked ed-glass" : cx("ed-input__hint", side !== "under" && `ed-input__hint--${side}`)}
+          className={inMessage ? "ed-toast__picks" : docked ? "ed-input__hint ed-input__hint--docked ed-glass" : cx("ed-input__hint", side !== "under" && `ed-input__hint--${side}`, shown && shown.ids.length > 0 && shown.none.length > 0 && "ed-input__hint--both")}
           ref={(node) => {
             // Its real size (it depends on the fonts offered) decides which side is clear.
             if (node && !docked && (Math.abs(node.offsetWidth - hintSize.w) > 1 || Math.abs(node.offsetHeight - hintSize.h) > 1)) setHintSize({ w: node.offsetWidth, h: node.offsetHeight });
@@ -788,7 +802,7 @@ export function LineEditBox({
           </span>
           {shown && shown.ids.length > 0 && (
             <span role="group" aria-label="Font for these characters" className="ed-input__picks">
-              {shown.ids.slice(0, docked ? 2 : CHOICES).map((id) => (
+              {shown.ids.slice(0, shown.none.length ? (docked ? 1 : 2) : docked ? 2 : CHOICES).map((id) => (
                 <button
                   key={id}
                   type="button"
@@ -816,9 +830,9 @@ export function LineEditBox({
               ))}
             </span>
           )}
-          {shown && shown.ids.length === 0 && (
+          {shown && (shown.ids.length === 0 || shown.none.length > 0) && (
             <span className="ed-input__picks">
-              {(!docked || ownError) && <span data-testid="line-missing-none">{ownError || "No font here has it."}</span>}
+              {(!docked || ownError || shown.ids.length > 0) && <span data-testid="line-missing-none">{ownError || (shown.ids.length ? `No font has ${shown.none.slice(0, 4).join(" ")}.` : "No font here has it.")}</span>}
               <button
                 type="button"
                 data-testid="line-missing-own"
@@ -872,7 +886,7 @@ export function LineEditBox({
     >
       {/* Always here, so a screen reader hears the change when a character turns out to be missing. */}
       <span role="status" className="sr-only" data-testid="line-missing-status">
-        {missing ? `Not in this font: ${missing.chars.join(" ")}.${shown?.picked ? ` ${fontLabel(shown.picked)} draws ${missing.chars.length > 1 ? "them" : "it"}.` : shown ? " No font here has it. Use your own font, or remove it." : ""}` : ""}
+        {missing ? `Not in this font: ${missing.chars.join(" ")}.${missingSaid(shown, missing.chars)}` : ""}
       </span>
       <div
         ref={el}

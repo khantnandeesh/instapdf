@@ -801,3 +801,80 @@ test("fonts the file only names are drawn in their twins on the page too, and th
   expect(saved).not.toMatch(/\b6000\d{3} 0 obj/);
   expect(saved).not.toContain("/FontFile2");
 });
+
+/** The height at which a screenshot's ink sits (darkness-weighted, the brand ring left out), in CSS pixels. */
+async function inkHeight(page: Page, png: Buffer): Promise<number> {
+  const blank = await page.context().newPage();
+  try {
+    return await blank.evaluate(async (b64) => {
+      const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${b64}`)).blob());
+      const c = new OffscreenCanvas(img.width, img.height);
+      const g = c.getContext("2d")!;
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, img.width, img.height).data;
+      let sum = 0;
+      let weight = 0;
+      for (let y = 0; y < img.height; y++)
+        for (let x = 0; x < img.width; x++) {
+          const i = (y * img.width + x) * 4;
+          const w = d[i]! - d[i + 1]! > 40 ? 0 : 765 - d[i]! - d[i + 1]! - d[i + 2]!;
+          sum += y * w;
+          weight += w;
+        }
+      return sum / weight / (window.devicePixelRatio || 1);
+    }, png.toString("base64"));
+  } finally {
+    await blank.close();
+  }
+}
+
+for (const [file, text] of [
+  ["latex-type1c.pdf", "Results don"],
+  ["cid-bold-run.pdf", "Office ligatures"],
+  ["reportlab-mono-subset.pdf", "The quick brown fox"],
+  ["named-only-twins.pdf", "Calibri invoice"],
+  ["named-only-twins.pdf", "Cambria invoice"],
+] as const) {
+  test(`AC-298: the open box's text sits on the page's baseline, to half a pixel: ${file}, "${text}"`, async ({ page }) => {
+    await open(page, file);
+    // Named-only fonts are first drawn in their twins on the page.
+    if (file === "named-only-twins.pdf") await expect(page.getByTestId("editor-shell")).toHaveAttribute("data-twins", /\d/, { timeout: 30_000 });
+    const line = lineWith(page, text);
+    await line.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await page.waitForTimeout(600);
+    const box = (await line.boundingBox())!;
+    // The line's own rows, clear of the ring and of the lines above and below.
+    const clip = { x: Math.floor(box.x) + 6, y: Math.round(box.y) + 1, width: Math.floor(box.width) - 12, height: Math.floor(box.height) - 2 };
+    await page.mouse.move(0, 0);
+    const before = await inkHeight(page, await page.screenshot({ clip }));
+    await edit(page, line);
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => Math.abs((await inkHeight(page, await page.screenshot({ clip }))) - before), { timeout: 10_000 }).toBeLessThan(0.5);
+  });
+}
+
+test("AC-312: of two letters typed together, the one no font has is named, and Enter says so at once", async ({ page }) => {
+  await open(page, "chrome-justified-mixed.pdf");
+  const input = await edit(page, lineWith(page, "in full"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ř ⸘");
+  // The font that draws ř is offered, and ⸘ is named as the letter no font here has.
+  await expect(page.getByTestId("line-missing-font").first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("line-missing-status")).toContainText(/draws ř\. No font here has ⸘\./);
+  await expect(page.getByTestId("line-missing-none")).toHaveText("No font has ⸘.");
+  const own = page.getByTestId("line-missing-own");
+  await expect(own).toBeVisible();
+  // The whole row is on screen: the way out is never cut off.
+  const [ob, vw] = [(await own.boundingBox())!, page.viewportSize()!.width];
+  expect(ob.x + ob.width).toBeLessThanOrEqual(vw);
+  const row = (await own.evaluate((el) => el.closest(".ed-input__hint")!.getBoundingClientRect().right));
+  expect(ob.x + ob.width).toBeLessThanOrEqual(row + 0.5);
+  const started = Date.now();
+  await page.keyboard.press("Enter");
+  const notice = page.getByTestId("editor-notice");
+  await expect(notice).toContainText("“⸘”", { timeout: 5_000 });
+  expect(Date.now() - started).toBeLessThan(1500);
+  // Only the letter that can't be drawn is named, and the text is still in the box.
+  await expect(notice).not.toContainText("“ř”");
+  await expect(input).toContainText("ř ⸘");
+});

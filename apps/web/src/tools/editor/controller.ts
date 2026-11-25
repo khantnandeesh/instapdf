@@ -65,7 +65,7 @@ import { pdfOutputName, baseName } from "@/lib/pdf/naming";
 import { openPdf } from "@/lib/pdf/pdfjs";
 import type { EditResult, PageText } from "@/lib/editor/berry-engine";
 import { foldName } from "@/lib/font-library/client";
-import { chooseStandIn, chosenStandIn, fontLabel, registerWithEngine, standInCandidates } from "./font-service";
+import { coverOf, chooseStandIn, chosenStandIn, fontLabel, registerWithEngine, standInCandidates } from "./font-service";
 import { warmDocFaces } from "./doc-face";
 import { displayBytes, ensureTwinDisplay, retwin, twinCount } from "./twin-display";
 import type { Store, ToolId } from "./store";
@@ -780,7 +780,14 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         ctl.standInKey = key;
         // The person's choice is kept under the font an edit asked about (a preview writes nothing).
         if (call.op === "replace") ctl.standInFor = asked;
-        for (const id of await standInCandidates(info, err.request, err.chars)) {
+        const ids = await standInCandidates(info, err.request, err.chars);
+        // A character none of them has: said at once, naming only that character, without
+        // fetching and trying one font after another first (AC-312).
+        const asked2 = [...new Set(err.chars)];
+        const { has, none } = await coverOf(ids, err.request.bold, err.request.italic, asked2);
+        if (none.length) throw { ...err, chars: none.join("") };
+        for (const id of ids) {
+          if (!has.get(id)) continue;
           if (!wanted()) throw stale();
           if (!(await registerWithEngine(id, err.request.bold, err.request.italic, err.chars))) continue;
           ctl.standIns.set(fontLabel(id), id);

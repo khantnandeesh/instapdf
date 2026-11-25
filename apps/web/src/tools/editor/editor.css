@@ -1308,6 +1308,11 @@
     display: none;
   }
 }
+/* The text is moved onto the page's baseline by what padding and line height can't give (LineEditBox). */
+.ed-input > span {
+  position: relative;
+  top: var(--ed-rise, 0px);
+}
 .ed-input {
   box-sizing: border-box;
   width: max-content;
@@ -1383,7 +1388,12 @@
 }
 .ed-input__picks {
   display: inline-flex;
+  align-items: center;
   gap: 3px;
+}
+/* Fonts for some letters and none for others: both are said, so the row is longer. */
+.ed-input__hint--both {
+  max-width: min(calc(100vw - 16px), 460px);
 }
 .ed-input__pick {
   padding: 1px 8px;
