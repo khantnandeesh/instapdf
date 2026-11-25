@@ -16,7 +16,7 @@ backlog → 1 Analyze → 2 Research → 3 Design → 4 Build → 5 Test → 6 R
 | 3 Design | `ux-designer` | spec | "UI" section: layout, components, states, a11y notes, mobile |
 | 4 Build | `frontend-engineer` / `backend-engineer` | spec | code on branch `feat/<feature>` |
 | 5 Test | `qa-engineer` | spec + branch | unit + e2e tests covering every `AC-n`; fixture PDFs in `tests/fixtures/` |
-| 6 Review | `code-reviewer` | PR | approve, or request changes (correctness, security, license, budget) |
+| 6 Review | `code-reviewer`, at the PR's [review tier](#review-tiers-step-6) | PR | approve, or request changes (correctness, security, license, budget) |
 | 6b Visual review | `ux-designer` (not the builder) | PR screenshots | approve, or request changes against the [visual-quality checklist](#visual-quality-review-step-6b); required for any PR that changes UI |
 | 7 Stage | `devops-engineer` | merged `main` | staging deploy URL, smoke test green |
 | 8 Evaluate | `parity-evaluator` (independent, never sees code or builder notes) | spec + Sejda URL + staging URL | `docs/evals/<feature>.md` with PASS/FAIL, a score per AC, the micro-comparison table (M1–M12 win/tie/lose with captures of both sites) and the gap list |
@@ -44,6 +44,17 @@ Every tool also passes the [SEO checklist](#seo-checklist-part-of-the-definition
 - **Evaluator pass bar:** no micro-check (mission.md M1–M12) is a *lose* unless the owner waived it in writing; every P0 AC passes; at least 90% of all ACs pass; Lighthouse performance ≥ 90 on mobile; no critical a11y violations (axe); and, once the Q2 corpus exists, the tool runs over the real-world PDF corpus with zero crashes and its oracle checks green (`qpdf --check`, render diff, text equality).
 - **Design:** all UI follows the owner's BerryPDF system (`docs/design/berrypdf.md`): grid paper, one berry action on its lip, leaf-cornered tool cards coloured by berry category, Fredoka, Phosphor Duotone icons, berry motifs (floating berries, berry loader, jam progress; no vine), light only (dark mode pending the designer's definition). Owner overrides (2026-11-23): minimal text (only what a task needs; details go to tooltips or screen-reader text), quiet CSS motion (entrances ≤ 400ms, all off under reduced motion), no vine; sections separate by spacing. Deviations from BerryPDF are listed there with measured contrast.
 - **Competitor research:** adopt/skip decisions must not rest on unverified claims.
+
+## Review tiers (step 6)
+
+Owner decision, 25 Nov: review effort follows risk. The builder picks the tier in the PR body (`Review tier: light` or `Review tier: full`), and the reviewer or the lead moves it up whenever in doubt. CI, the visual review (6b) and the owner's screenshot checks apply in both tiers.
+
+| Tier | When | Review |
+|---|---|---|
+| **Light** | UI-only changes: layout, styling, copy, icons, motion tuning; docs and process; test-only changes that tighten or fix a test | One `code-reviewer` pass with a short brief: does it do what it says, does it break a rule in `CLAUDE.md` or `docs/design/berrypdf.md`, are tests weakened. A clean pass merges. No second round unless it found a must-fix. |
+| **Full** | Anything touching the editor (`tools/editor/`, `lib/editor/`), the Rust engine (`crates/`), what a tool writes into a PDF or downloads, file parsing, passwords or encryption, the worker, infra, CI workflows, budgets, CSP, licences or a new dependency | The full checklist below, re-reviewed after every fix round until it approves. |
+
+A PR that mixes both is **full**. A light PR that grows into full territory switches tier, and the PR body says so.
 
 ## Visual-quality review (step 6b)
 
