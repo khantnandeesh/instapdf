@@ -7,8 +7,8 @@
  * 3. A click on a menu item, and on Download, during its entrance acts on the first try.
  * 4. Opening and closing the All tools menu, a dialog and a menu, filtering, and adding files record no
  *    layout shift.
- * 5. Exits happen: the All tools menu, a dialog and a menu are still shown one frame after Escape, and gone
- *    within 200ms plus one measured frame (and the 400ms cap); their configured lengths are within the preset's.
+ * 5. Exits happen: the first frame after Escape comes within 200ms; the All tools menu, a dialog and a menu are still shown on it, and gone
+ *    within 200ms of that frame plus one measured frame, and within 400ms of the key end to end; their configured lengths are within the preset's.
  * 6. No securitypolicyviolation event fires (every test).
  * 7. Nothing is animating on a tool page 5s after load (WCAG 2.2.2).
  * 8. Each Escape exit puts focus back on the trigger, and the leaving part is inert and aria-hidden while
@@ -28,16 +28,37 @@ const SIZES = [
 /** Text only the engine chunk carries (its licence notice, lib/motion/engine.ts). */
 const ENGINE_MARK = "gsap.com/standard-license";
 
-/** Counts the engine chunk's downloads: resolves each script response's body once. */
-function watchEngine(page: Page) {
+/** Counts the engine chunk's downloads: resolves each script response's body once. `urls` gets each one's URL. */
+function watchEngine(page: Page, urls: string[] = []) {
   const hits: number[] = [];
   const t0 = Date.now();
   page.on("response", async (r) => {
     if (!/\/_next\/static\/chunks\/.+\.js(\?|$)/.test(r.url())) return;
+    const at = Date.now() - t0;
     const body = await r.text().catch(() => "");
-    if (body.includes(ENGINE_MARK)) hits.push(Date.now() - t0);
+    if (!body.includes(ENGINE_MARK)) return;
+    hits.push(at);
+    urls.push(r.url());
   });
   return hits;
+}
+
+/**
+ * Page-clock marks for test 1: when the intent listeners were attached (MotionPrime's onIntent adds its
+ * capture listeners on window; on the home page nothing else adds a capture "dragenter" there), and when
+ * the first pointerdown happened.
+ */
+function markIntent(page: Page) {
+  return page.addInitScript(() => {
+    const w = window as unknown as { intentArmedAt?: number; firstPointerAt?: number };
+    const add = window.addEventListener.bind(window);
+    window.addEventListener = ((type: string, fn: EventListenerOrEventListenerObject, opts?: boolean | AddEventListenerOptions) => {
+      const capture = typeof opts === "boolean" ? opts : !!opts?.capture;
+      if (type === "dragenter" && capture && w.intentArmedAt === undefined) w.intentArmedAt = performance.now();
+      return add(type, fn, opts);
+    }) as typeof window.addEventListener;
+    add("pointerdown", (e) => void (w.firstPointerAt ??= e.timeStamp), { capture: true });
+  });
 }
 
 /**
@@ -137,7 +158,11 @@ const strayTransforms = (page: Page) =>
 type ExitWatch = {
   afterFrame?: boolean;
   lastShown?: number;
-  maxGap?: number;
+  /** The first frame after the key (ms after it): input latency, kept apart from the exit's length. */
+  firstFrame?: number;
+  exitGap?: number;
+  /** Each frame's time after the key (ms), for the failure message. */
+  frames?: number[];
   done?: boolean;
   cssMs?: number;
   tweenMs?: number;
@@ -146,8 +171,8 @@ type ExitWatch = {
 /**
  * Arms a watcher for the next Escape. Everything is on one clock: the keydown's timeStamp and the
  * requestAnimationFrame timestamps. It records whether the part is still shown on the first frame after
- * the key, the last frame it was shown (lastShown, ms after the key), the largest gap between frames
- * meanwhile (maxGap; the first frame is one frame late at most), and the configured lengths of the exit
+ * the key and when that frame came (firstFrame), the last frame it was shown (lastShown, ms after the key), the gap between that frame and the
+ * first frame where it is gone (exitGap: the exit ended somewhere inside it), and the configured lengths of the exit
  * on that first frame: the leaving element's CSS transitions and lib/motion tweens on it.
  */
 async function armExitWatch(page: Page, kind: "tool-menu" | "dialog" | "menu") {
@@ -206,13 +231,13 @@ async function armExitWatch(page: Page, kind: "tool-menu" | "dialog" | "menu") {
         if (e.key !== "Escape") return;
         const watch = w.exitWatch!;
         const t0 = e.timeStamp;
-        let prev = t0;
-        let maxGap = 0;
+        let lastShownTs = t0;
+        watch.frames = [];
         const frame = (ts: number) => {
-          maxGap = Math.max(maxGap, ts - prev);
-          prev = ts;
+          watch.frames!.push(Math.round(ts - t0));
           const on = shown();
           if (watch.afterFrame === undefined) {
+            watch.firstFrame = ts - t0;
             watch.afterFrame = on;
             const el = leaving();
             watch.cssMs = longestCss(el);
@@ -220,9 +245,13 @@ async function armExitWatch(page: Page, kind: "tool-menu" | "dialog" | "menu") {
           }
           if (on) {
             watch.lastShown = ts - t0;
-            watch.maxGap = maxGap;
+            lastShownTs = ts;
             requestAnimationFrame(frame);
-          } else watch.done = true;
+          } else {
+            // Only the one gap the exit ended in: from the last shown frame to the first gone one.
+            watch.exitGap = ts - lastShownTs;
+            watch.done = true;
+          }
         };
         requestAnimationFrame(frame);
       },
@@ -232,8 +261,9 @@ async function armExitWatch(page: Page, kind: "tool-menu" | "dialog" | "menu") {
 }
 
 /**
- * The exit gate: shown the frame after Escape; its last shown frame within 200ms plus one measured frame
- * of lateness, and within the 400ms cap outright; and its configured lengths within the preset's
+ * The exit gate: the first frame after Escape within 200ms of it (input latency) and the part still shown
+ * on it; the exit, from that frame to the last shown one, within 200ms less the gap to the first gone
+ * frame; the last shown frame within 400ms of the key end to end; and its configured lengths within the preset's
  * (`limitMs` for the CSS hold and the tween; `tween` says whether a lib/motion tween runs it).
  */
 async function expectExit(page: Page, what: string, limitMs: number, tween: boolean) {
@@ -253,11 +283,17 @@ async function expectExit(page: Page, what: string, limitMs: number, tween: bool
     r.afterFrame,
     `${what} is still shown the frame after Escape (it exits, not vanishes)`,
   ).toBe(true);
+  const frames = `frames at ${r.frames.join(", ")}ms after Escape`;
+  // Input latency on its own: a blocked main thread fails here, not as a slow animation.
+  expect(r.firstFrame, `${what}: the first frame after Escape comes within 200ms of it (${frames})`).toBeLessThanOrEqual(200);
+  // The exit itself runs from the first frame after the key.
+  const exit = r.lastShown - r.firstFrame;
   expect(
-    r.lastShown - r.maxGap,
-    `${what}: last shown frame ${r.lastShown.toFixed(1)}ms after Escape, less the largest frame gap ${r.maxGap.toFixed(1)}ms, is within 200ms`,
+    exit - r.exitGap,
+    `${what}: last shown frame ${exit.toFixed(1)}ms after the first frame, less the gap to the first gone frame ${r.exitGap.toFixed(1)}ms, is within 200ms (${frames})`,
   ).toBeLessThanOrEqual(200);
-  expect(r.lastShown, `${what} is gone within the 400ms cap`).toBeLessThanOrEqual(400);
+  // End to end (motion.md: 400ms), from the key, latency included.
+  expect(r.lastShown, `${what}: last shown frame ${r.lastShown.toFixed(1)}ms after Escape is within the 400ms end-to-end cap (${frames})`).toBeLessThanOrEqual(400);
   expect(r.cssMs, `${what}: configured CSS transition length`).toBeLessThanOrEqual(limitMs);
   if (tween) {
     expect(r.tweenMs, `${what}: a lib/motion tween runs the exit`).toBeGreaterThan(0);
@@ -358,11 +394,33 @@ for (const size of SIZES) {
     test("1: the motion engine waits for intent (or 4s), then loads once", async ({
       page,
     }) => {
-      const hits = watchEngine(page);
+      const urls: string[] = [];
+      const hits = watchEngine(page, urls);
+      await markIntent(page);
       await page.goto("/");
-      await page.waitForTimeout(2500);
+      // One pointer event, sent as soon as the intent listeners are attached (no retries): the engine
+      // request must follow it within about 1s, long before the 4s idle timer could fire.
+      await expect.poll(() => page.evaluate(() => (window as unknown as { intentArmedAt?: number }).intentArmedAt), { message: "intent listeners attached" }).toBeDefined();
       expect(hits, "no engine before intent").toEqual([]);
-      await primeEngine(page, hits);
+      await page.mouse.move(2, 2);
+      await page.mouse.down();
+      await page.mouse.up();
+      await expect.poll(() => urls.length, { message: "the engine chunk was requested", timeout: 4_000 }).toBeGreaterThan(0);
+      const t = await page.evaluate((url) => {
+        const w = window as unknown as { intentArmedAt: number; firstPointerAt?: number };
+        const entry = performance.getEntriesByName(url)[0] as PerformanceResourceTiming | undefined;
+        return { armed: w.intentArmedAt, pointer: w.firstPointerAt, request: entry?.startTime };
+      }, urls[0]);
+      expect(t.pointer, "the pointer event reached the page").toBeDefined();
+      expect(t.request, "the engine request is in resource timing").toBeDefined();
+      const sincePointer = t.request! - t.pointer!;
+      expect(sincePointer, "requested after the pointer event, not before").toBeGreaterThanOrEqual(0);
+      // About 1s; a CPU slowed by E2E_CPU_THROTTLE gets that many times longer.
+      const within = 1_000 * Math.max(1, THROTTLE);
+      expect(sincePointer, `requested ${sincePointer.toFixed(0)}ms after the pointer event (limit ${within}ms)`).toBeLessThanOrEqual(within);
+      expect(t.request! - t.armed, "requested before the 4s idle timer could fire").toBeLessThan(4_000);
+      await page.waitForTimeout(2500);
+      expect(hits.length, "still fetched once after the idle timer's time").toBe(1);
       await page.getByRole("searchbox").first().focus();
       await page.keyboard.type("pdf");
       await page.waitForTimeout(1500);

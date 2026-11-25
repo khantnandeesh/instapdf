@@ -18,6 +18,20 @@
 }
 .ed-frame-root,
 .ed-opening {
+  /*
+   * Floating chrome never covers page content at rest. Everything that floats over the top of the
+   * canvas lives in two rows: the top bar, then the chrome band under it (the phone page chip).
+   * The canvas starts its pages below both, so at scroll 0 (and after "go to page") nothing covers
+   * the first line. Change a row here, never the offsets of the pieces.
+   */
+  --ed-top-y: 10px;
+  --ed-top-h: 56px;
+  --ed-band-h: 0px;
+  --ed-rest-gap: 18px;
+  --ed-band-y: calc(var(--ed-top-y) + var(--ed-top-h) + 6px);
+  --ed-rest-top: calc(var(--ed-top-y) + var(--ed-top-h) + var(--ed-band-h) + var(--ed-rest-gap));
+  /* Where chrome that floats below the bar starts (rail, side panel, hints, notices): below the band too. */
+  --ed-float-y: calc(var(--ed-top-y) + var(--ed-top-h) + var(--ed-band-h) + 12px);
   position: relative;
   display: flex;
   flex: 1;
@@ -216,14 +230,14 @@
 /* ---- top bar: the floating glass pill --------------------------------------------------- */
 .ed-top {
   position: absolute;
-  top: 10px;
+  top: var(--ed-top-y);
   right: 10px;
   left: 10px;
   z-index: 10;
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 56px;
+  height: var(--ed-top-h);
   padding: 0 8px;
   border-radius: 99px;
 }
@@ -302,7 +316,7 @@
 /* ---- tool rail (≥ 1024) and dock (< 1024) ---------------------------------------------- */
 .ed-rail {
   position: absolute;
-  top: 78px;
+  top: var(--ed-float-y);
   left: 10px;
   z-index: 8;
   display: flex;
@@ -671,7 +685,7 @@
   inset: 0;
   /* ip-scroll: pages */
   overflow: auto;
-  padding: 84px 16px 80px;
+  padding: var(--ed-rest-top) 16px 80px;
   outline: none;
   touch-action: pan-x pan-y;
 }
@@ -682,7 +696,7 @@
   padding-left: 266px;
 }
 .ed-narrow .ed-canvas {
-  padding: 72px 8px 96px;
+  padding: var(--ed-rest-top) 8px 96px;
 }
 .ed-narrow.ed-has-strip .ed-canvas {
   padding-bottom: 150px;
@@ -771,7 +785,7 @@
 }
 .ed-panel {
   position: absolute;
-  top: 78px;
+  top: var(--ed-float-y);
   bottom: 10px;
   left: 82px;
   z-index: 7;
@@ -846,7 +860,7 @@
 }
 .ed-pagechip {
   position: absolute;
-  top: 74px;
+  top: var(--ed-band-y);
   right: 12px;
   z-index: 8;
   display: inline-flex;
@@ -861,7 +875,7 @@
 .ed-hint,
 .ed-recover {
   position: absolute;
-  top: 78px;
+  top: var(--ed-float-y);
   left: 50%;
   z-index: 9;
   translate: -50% 0;
@@ -873,9 +887,6 @@
   color: var(--color-muted);
   font-size: 13px;
   pointer-events: none;
-}
-.ed-narrow .ed-hint {
-  top: 118px;
 }
 .ed-recover {
   z-index: 11;
@@ -1763,11 +1774,16 @@
 }
 
 /* ---- narrow layout ---------------------------------------------------------------------- */
+.ed-narrow {
+  /* The band holds the 36px page chip (+ 6px), so the first page starts below it. */
+  --ed-top-y: 8px;
+  --ed-top-h: 52px;
+  --ed-band-h: 42px;
+  --ed-rest-gap: 12px;
+}
 .ed-narrow .ed-top {
-  top: 8px;
   right: 8px;
   left: 8px;
-  height: 52px;
   padding: 0 6px;
 }
 .ed-narrow .ed-file {
@@ -1988,7 +2004,7 @@
 /* Owner-restricted file: the read-only notice and its owner-password action (U-E9). */
 .ed-owner {
   position: absolute;
-  top: 78px;
+  top: var(--ed-float-y);
   left: 50%;
   z-index: 10;
   width: min(520px, calc(100% - 24px));

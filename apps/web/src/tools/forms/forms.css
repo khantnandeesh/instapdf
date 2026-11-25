@@ -136,7 +136,7 @@ textarea.bf-options { height: auto; padding: 6px 8px; line-height: 1.4; resize: 
 .bf-pill-soft, .bf-pill-main { white-space: nowrap; }
 @media (max-width: 1023px) {
   /* Phones: the review pill sits under the top bar, clear of the options strip and the dock. */
-  .bf-pill-dock { top: 76px; bottom: auto; }
+  .bf-pill-dock { top: var(--ed-float-y, 76px); bottom: auto; }
   /* The Form tool's options take two rows in the strip. */
   .ed-strip:has(.bf-formopts) { height: auto; padding-block: 6px; }
 }
