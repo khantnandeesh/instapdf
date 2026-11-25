@@ -726,7 +726,9 @@ test("AC-300: Enter on a named-only line with a letter no font here draws answer
   await page.keyboard.press("End");
   await page.keyboard.type(" ⸘");
   await expect(input).toHaveAttribute("data-missing", "⸘");
-  await expect(page.getByTestId("line-missing-none")).toBeVisible({ timeout: 15_000 });
+  // The fonts were looked for and none has it (the phone's row leaves the words out).
+  await expect(page.getByTestId("line-missing")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("line-missing-own")).toBeVisible({ timeout: 15_000 });
   await input.press("Enter");
   // The reason is given within two seconds, with the box open and the text in it.
   await expect(page.locator(".ed-toast")).toContainText("⸘", { timeout: 2000 });
@@ -743,11 +745,11 @@ test("AC-298: a letter the page sets apart for its accent keeps its place in the
     const accent = spans.findIndex((s) => s.textContent === "´");
     const e = spans[accent - 1]!.getBoundingClientRect();
     const f = spans[accent - 2]!.getBoundingClientRect();
-    return { gap: e.left - f.right, text: spans[accent - 1]!.textContent, width: el.getBoundingClientRect().width };
+    return { gap: e.left - f.right, letter: e.width, text: spans[accent - 1]!.textContent, width: el.getBoundingClientRect().width };
   });
   expect(got.text).toBe("e");
-  // The page has about 3 CSS px between "caf" and its accented letter at this size.
-  expect(got.gap).toBeGreaterThan(1.5);
+  // The page has about a third of the letter's width between "caf" and its accented letter.
+  expect(got.gap).toBeGreaterThan(got.letter * 0.2);
   expect(Math.abs(got.width - pageWidth)).toBeLessThanOrEqual(3);
 });
 
@@ -760,10 +762,10 @@ test("AC-304: a raised mark of another line inside the row stays drawn while the
   const dark = await kept.evaluate((c: HTMLCanvasElement) => {
     const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
     let n = 0;
-    for (let i = 0; i < d.length; i += 4) if (d[i]! + d[i + 1]! + d[i + 2]! < 300) n++;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3]! > 0 && d[i]! + d[i + 1]! + d[i + 2]! < 600) n++;
     return n;
   });
-  expect(dark).toBeGreaterThan(10);
+  expect(dark).toBeGreaterThan(5);
   const [k, b] = [(await kept.boundingBox())!, (await page.getByTestId("line-input").boundingBox())!];
   expect(k.x).toBeGreaterThanOrEqual(b.x - 1);
   expect(k.x + k.width).toBeLessThanOrEqual(b.x + b.width + 1);

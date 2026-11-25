@@ -202,3 +202,17 @@ AC-283 named eight fonts and seven had a twin: Selawik, Segoe UI's, is in no cat
 - **Where.** Only the published library (`publish-fonts.yml` passes `--extras`). The small in-app copy (development, tests, CI) stays offline and has no Selawik; there Segoe UI falls to the closest shapes as before.
 - Not checked by us: Segoe UI's own widths (we may not hold the font). The twin rests on Microsoft's statement that Selawik is its metric-compatible stand-in; its README notes kerning is not matched.
 
+## After the third evaluation (eighth PR)
+
+The evaluation of 2026-11-25 on staging `97b0be6` failed on AC-271, AC-288, AC-298, AC-299, AC-300 and AC-304. What changed, by its gap list:
+
+- **AC-300 (gap 2).** A font the PDF only names has nothing in the file to ask, so nothing was marked. The edit box now keeps the record of what the stand-in (the twin, or the closest font) can draw: a letter it lacks is underlined and named as typed, with the fonts that have it, exactly as on an embedded line. Because the font is chosen before Enter, Enter answers in well under a second (175 to 630 ms measured with the full library; it was 3.4 to 7.8 s).
+- **AC-298 (gap 3a).** In a word with an accent drawn over one of its letters, what the word is longer by on the page now stands before the accented letter ("caf é"), not spread between all its letters.
+- **AC-304 (gap 3b).** Text of another line that stands inside the row being edited (a raised footnote mark, a subscript) is drawn again over the box's paper, as the page had it when the box opened.
+- **AC-299 (gap 4).** The line edit box has no entrance animation (the lead's decision: it sits on the page's own text, and a fade showed both at once). `docs/design/motion.md` E4 says so.
+- **AC-288 (gap 5).** Serif or sans of a document font is read from the library's entry of that name, then from the name, then from the PDF's flag, which fonts of other scripts often leave unset. A serif Devanagari, Bengali or Hebrew font, and Amiri, now get the serif face of another script.
+- **Gap 8.** A named-only font with a twin is no longer sent to the shape matcher (no index, no signature files): its menu row is ready at once. The notice after such an edit says "Courier isn't in this file. Using Cousine." instead of "isn't complete".
+- **AC-271 (gap 1).** The notices page is built into the site image from the published family list, so a publish made after a deploy is missing from it until the next deploy. Open: an owner decision on letting the publish workflow start a staging deploy.
+
+Still open: gap 6 (the page view draws a named-only Georgia or Segoe UI in whatever the device has, the box in the twin; it needs the page renderer to take our twin); gaps 7, 9 to 16; AC-296.
+

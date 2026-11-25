@@ -12,7 +12,7 @@ import { familyByName, foldName, loadLibrary, type Library } from "@/lib/font-li
 import { orderCandidates } from "@/lib/font-library/candidates";
 import { MATCH_CHARS, type FontMatch } from "@/lib/font-library/match";
 import { LATIN_PROBE, SCRIPT_PROBE, lookKind, scriptOf, scriptOrder } from "@/lib/font-library/scripts";
-import { withTwin } from "@/lib/font-library/twins";
+import { twinOf, withTwin } from "@/lib/font-library/twins";
 import { matchFont } from "@/lib/font-library/match-client";
 import { USER_FONT_ERROR, readLocalFamily, readUserFont, type AddedFont, type LocalFontData, type UserFontError } from "@/lib/font-library/user-fonts";
 
@@ -79,7 +79,10 @@ const SCRIPT_FACES = 3;
  */
 async function matchOf(info: FontInfo): Promise<FontMatch[]> {
   const lib = state.library ?? (await loadLibrary().catch(() => null));
-  const shaped = await byShape(info).catch(() => [] as FontMatch[]);
+  // A font the PDF only names has no shapes to compare: with a twin there is nothing to look up
+  // (no index, no signature files), so its row is ready at once.
+  const namedOnly = info.embedded === false && !!(twinOf(info.family || info.name) ?? twinOf(info.name));
+  const shaped = namedOnly ? [] : await byShape(info).catch(() => [] as FontMatch[]);
   const matches = withTwin(info, shaped, (id) => !lib || lib.byId.has(id));
   if (!lib) return matches;
   const weight = info.bold ? 700 : 400;
