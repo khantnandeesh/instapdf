@@ -11,7 +11,7 @@ import { ensureFace, knownManifest, registerUserFont, resolveFonts, userFontByte
 import { familyByName, foldName, loadLibrary, type Library } from "@/lib/font-library/client";
 import { orderCandidates } from "@/lib/font-library/candidates";
 import { MATCH_CHARS, type FontMatch } from "@/lib/font-library/match";
-import { LATIN_PROBE, SCRIPT_PROBE, scriptOf, scriptOrder } from "@/lib/font-library/scripts";
+import { LATIN_PROBE, SCRIPT_PROBE, lookKind, scriptOf, scriptOrder } from "@/lib/font-library/scripts";
 import { withTwin } from "@/lib/font-library/twins";
 import { matchFont } from "@/lib/font-library/match-client";
 import { USER_FONT_ERROR, readLocalFamily, readUserFont, type AddedFont, type LocalFontData, type UserFontError } from "@/lib/font-library/user-fonts";
@@ -61,7 +61,7 @@ export function loadFontList(): void {
 /** How many of a document's fonts are matched, in the order the file lists them (a file with more is rare; the rest are listed without a match). */
 const MATCH_LIMIT = 100;
 
-const kindOf = (info: FontInfo | undefined) => (info?.monospace ? "monospace" : info?.serif ? "serif" : "sans-serif");
+const kindOf = (info: FontInfo | undefined, lib?: Library | null) => (info ? lookKind(info, lib ? familyByName(lib, info.family || info.name) : undefined) : "sans-serif");
 
 async function byShape(info: FontInfo): Promise<FontMatch[]> {
   if (info.object == null) return [];
@@ -88,7 +88,7 @@ async function matchOf(info: FontInfo): Promise<FontMatch[]> {
   // A font made for another writing system: faces of that script, whatever its few Latin letters look like.
   const set = info.object == null ? null : scriptOf((await callEngine({ op: "coverage", font: info.object, text: LATIN_PROBE + SCRIPT_PROBE.map(([, letters]) => letters).join("") }).catch(() => ({ covered: "" }))).covered);
   if (set && set !== "greek" && set !== "cyrillic") {
-    const ids = scriptOrder(set, { kind: kindOf(info), name: info.name }, sameName?.i, matches.map((m) => m.family), lib.families);
+    const ids = scriptOrder(set, { kind: kindOf(info, lib), name: info.name }, sameName?.i, matches.map((m) => m.family), lib.families);
     return ids.slice(0, Math.max(SCRIPT_FACES, 1)).map((id, i) => matches.find((m) => m.family === id) ?? named(id, id === sameName?.i ? "close" : "loose", i));
   }
   if (matches.length) return matches;
@@ -179,14 +179,15 @@ export async function standInCandidates(info: FontInfo | undefined, request: Fon
   const matches = known ?? (info ? await matchOf(info).catch(() => []) : []);
   const lib = state.library ?? (await loadLibrary().catch(() => null));
   if (lib && !state.library) set({ library: lib });
-  const kind = info?.monospace ? "mono" : info?.serif ? "serif" : "sans";
+  const look = kindOf(info, lib);
+  const kind = look === "monospace" ? "mono" : look === "serif" ? "serif" : "sans";
   return orderCandidates({
     choice: choices.get(foldName(request.families[0] ?? "")),
     matches,
     named: request.families.map((name) => (lib ? familyByName(lib, name)?.i : TEXT_FONTS.find((f) => foldName(f.label) === foldName(name))?.id)),
     fallbacks: [TEXT_FONTS.find((f) => f.class === kind)?.id, "arimo"],
     families: lib?.families ?? [],
-    kind: kindOf(info),
+    kind: look,
     name: info?.name,
     chars,
   });

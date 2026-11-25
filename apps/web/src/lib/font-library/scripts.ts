@@ -7,6 +7,22 @@ import type { FamilyRow } from "./client";
 
 export type Look = { kind: "serif" | "sans-serif" | "monospace"; name: string };
 
+const SANS_NAME = /sans|gothic|grotes|kufi/;
+const SERIF_NAME = /serif|roman|times|naskh|nastaliq|antiqua|mincho|myeongjo|tiro|martel|frankruhl|david|amiri|scheherazade/;
+
+/**
+ * Serif, sans or fixed-pitch for a document font: PDFs of other scripts often leave the serif
+ * flag unset, so the library's own entry of that name is asked first, then the name, then the flag.
+ */
+export function lookKind(font: { name: string; serif: boolean; monospace: boolean }, row?: Pick<FamilyRow, "c">): Look["kind"] {
+  if (font.monospace || row?.c === "monospace") return "monospace";
+  if (row?.c === "serif" || row?.c === "sans-serif") return row.c;
+  const n = font.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (SANS_NAME.test(n)) return "sans-serif";
+  if (SERIF_NAME.test(n)) return "serif";
+  return font.serif ? "serif" : "sans-serif";
+}
+
 /** Arabic is written in styles a serif or sans label doesn't tell apart. */
 const ARABIC: Record<"nastaliq" | "kufi" | "naskh" | "sans", string[]> = {
   nastaliq: ["noto-nastaliq-urdu", "gulzar"],
