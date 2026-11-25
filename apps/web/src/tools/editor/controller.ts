@@ -8,7 +8,7 @@
  */
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { Asset } from "@/lib/editor/build";
-import { callEngine, describeEngineError, engineErrorLog, offersLineReplacement, openInShapingEngine, setEngineFileSize, type EngineError } from "@/lib/editor/engine-client";
+import { callEngine, describeEngineError, engineFontCount, engineErrorLog, offersLineReplacement, openInShapingEngine, setEngineFileSize, type EngineError } from "@/lib/editor/engine-client";
 import { lineAt } from "@/lib/editor/line-hit";
 import { editorFontFor, styledLineReplacement, type RunPart } from "@/lib/editor/replace-line";
 import { ensureFace, measurer } from "@/lib/editor/fonts-browser";
@@ -499,9 +499,8 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         try {
           const copy = ctl.bytesOf(rt.shown).slice();
           await callEngine({ op: "open", bytes: copy, shaping: store.get().shaping === "ready" }, [copy.buffer]);
-          // The reopened engine may have its fonts again (the worker adds them back): start clean on both sides.
-          await callEngine({ op: "clearFonts" }).catch(() => {});
-          ctl.forgetFonts();
+          // A worker that crashed came back without fonts; one that survived has them again (it adds them back on open).
+          if (!engineFontCount()) ctl.forgetFonts();
           store.set({ fresh: {} });
         } catch {
           ui.toast({ text: "The editor couldn’t restart. Download what you have, then reload the page.", tone: "danger" });

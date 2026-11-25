@@ -59,6 +59,8 @@ let candidate: Worker | null = null;
 let fonts: { family: string; bold: boolean; italic: boolean; bytes: Uint8Array }[] = [];
 /** Counts clearFonts calls, so a font list replayed into a new worker can follow one sent meanwhile. */
 let clears = 0;
+/** How many fonts the engine holds now (none after a crash: a new worker starts without them). */
+export const engineFontCount = () => fonts.length;
 const listeners = new Set<() => void>();
 function setStatus(next: Partial<EngineStatus>, variant: EngineVariant = "base") {
   if (variant === "base") status = { ...status, ...next };
