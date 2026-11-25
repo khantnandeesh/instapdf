@@ -1,0 +1,43 @@
+{
+ "feature": "f2-home",
+ "raw_evidence": "/mnt/project-files/evals-cache/f2-home/",
+ "note": "Raw evidence (Sejda outputs, captures, logs, Lighthouse runs and our matching captures) moved out of git per docs/process/workflow.md 'Reference (Sejda) runs'. Hashes let a re-eval verify the cache is unchanged.",
+ "moved_on": "2026-11-25",
+ "files": [
+  {
+   "path": "sejda-home-desktop.png",
+   "bytes": 123540,
+   "sha256": "48d6594a1aaaf698de58e47807a7a4ee05084f2c8be911936eb7c424682a87e2"
+  },
+  {
+   "path": "sejda-home-mobile.png",
+   "bytes": 66159,
+   "sha256": "1e8cef3f7d4601894e7104d1d8fae2550c39137fc1f447798f8befeb797cbc6e"
+  },
+  {
+   "path": "sejda-menu-desktop-after-esc.png",
+   "bytes": 123967,
+   "sha256": "82b9059307fbe19636dd5868240aea84cb7960b29994c5f28f90622a73b8d106"
+  },
+  {
+   "path": "sejda-menu-desktop.png",
+   "bytes": 137353,
+   "sha256": "6ec8bbd05359b1457eded8af8ff24960a4c2b69ce147a2d52888e9db7f55485f"
+  },
+  {
+   "path": "sejda-menu-mobile-after-esc.png",
+   "bytes": 66467,
+   "sha256": "9c2814d13d1659a7e99e451eeca3efb509ec90f9c52090637e3a0ebef0a95728"
+  },
+  {
+   "path": "sejda-menu-mobile.png",
+   "bytes": 66716,
+   "sha256": "b4b0f462c1513065a7091020c42fd2a833f29123cb19281b0fe9f6dee6a69e90"
+  },
+  {
+   "path": "sejda-observation.json",
+   "bytes": 4509,
+   "sha256": "510c4192d2b63aa6bdfe9c0a169014fdccab03bd59ad1fc8b5fc9b47faa13414"
+  }
+ ]
+}

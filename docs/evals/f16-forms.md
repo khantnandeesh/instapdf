@@ -18,7 +18,7 @@
   - Outputs: each one was checked with pikepdf 10.18.2 `check_pdf_syntax()`, its raw structure read with pikepdf, its annotations read with pdf.js 6.5.438, and it was rendered at 2× in pdf.js (`AnnotationMode.ENABLE`) and in PDFium (pypdfium2 5.14, forms on).
   - Glyph check: annotations flattened with qpdf (via pikepdf), then text extracted with PDFium. This proves that the drawn glyphs map back to the typed text.
   - Untouched areas: pixel diff against the source render, with widget boxes masked.
-- **Evidence:** `docs/evals/cache/f16-forms/rerun/`. It holds `outputs/` (11 BerryPDF PDFs), `analysis/` (renders, screenshots, pdf.js JSON), `micro/` (side-by-side captures, reference on the left), `vp/` (viewport captures and `vp.json`), `lighthouse-mobile-{1..4}.json`, `axe-results.json` and `net-first-load.txt`. The key UI captures are also in `/mnt/project-files/designs/editor-forms/rerun-2026-11-24/`, and the side-by-sides are in `/mnt/project-files/comparisons/f16-forms/rerun-2026-11-24/`.
+- **Evidence:** `/mnt/project-files/evals-cache/f16-forms/rerun/`. It holds `outputs/` (11 BerryPDF PDFs), `analysis/` (renders, screenshots, pdf.js JSON), `micro/` (side-by-side captures, reference on the left), `vp/` (viewport captures and `vp.json`), `lighthouse-mobile-{1..4}.json`, `axe-results.json` and `net-first-load.txt`. The key UI captures are also in `/mnt/project-files/designs/editor-forms/rerun-2026-11-24/`, and the side-by-sides are in `/mnt/project-files/comparisons/f16-forms/rerun-2026-11-24/`.
 
 ### Gate
 
@@ -83,7 +83,7 @@ Totals on 3fc9e65: 8 win, 2 tie, 2 lose (M2, M12). **Totals after the M12 re-mea
 
 - **Build:** main at bc02fa1 (PR #46, opening zoom cap derived from the canvas limit), Deploy staging run 53 finished 20:22 UTC; build id changed from `MQTVCpHVJcSkxugHeHm_g` to `J2nAKKeDy_fB7fwgueNPb`.
 - **Method:** unchanged from the re-evaluation: headless Playwright Chromium, `report-form-3p.pdf` opened on `/edit-pdf`, measured 3 s after load and after a wheel scroll of 60% of the viewport height. Pages area = visible area of page canvases over the viewport. **Reference tasks run: 0** (reference values are the cached first-run captures).
-- **Evidence:** `docs/evals/cache/f16-forms/rerun/vp-m12/` (`vp.json`, loaded and scrolled captures per viewport).
+- **Evidence:** `/mnt/project-files/evals-cache/f16-forms/rerun/vp-m12/` (`vp.json`, loaded and scrolled captures per viewport).
 
   | Viewport | Opening zoom | Pages area after scroll (was on 3fc9e65) | Page width | Reference after scroll | Result |
   |---|---|---|---|---|---|
@@ -193,7 +193,7 @@ The three biggest problems:
   - Raw structure (`/Fields` order, `/Annots` order, `/Tabs`, `DA`, `AP`, `MK`, `TU`): read with pikepdf.
   - Rendering: each page rendered at 2× in pdf.js (`AnnotationMode.ENABLE`) and in PDFium (pypdfium2, forms on).
   - Untouched areas: pixel diff against the source render, with widget rectangles masked out.
-  - Analysis files: `docs/evals/cache/f16-forms/analysis/`.
+  - Analysis files: `/mnt/project-files/evals-cache/f16-forms/analysis/`.
 - **Field fixtures:** `tests/parity/forms/` (`form-basic.pdf`, `report-form-3p.pdf`, `detect-mix.pdf`, `scan-form.pdf`).
 
 ## AC table
@@ -229,7 +229,7 @@ Summary: **18 pass, 4 fail (AC-232, AC-234, AC-235, AC-248), 2 partly untested (
 
 ## Micro-comparison
 
-Captures are side by side, Sejda left and BerryPDF right. They are in `docs/evals/cache/f16-forms/micro/` and copied to `/mnt/project-files/comparisons/f16-forms/`.
+Captures are side by side, Sejda left and BerryPDF right. They are in `/mnt/project-files/evals-cache/f16-forms/micro/` and copied to `/mnt/project-files/comparisons/f16-forms/`.
 
 | # | Check | Sejda | BerryPDF | Numbers | Score | Captures |
 |---|---|---|---|---|---|---|
@@ -329,5 +329,5 @@ None recorded.
 
 ## Re-run notes
 
-- Sejda outputs and screenshots are cached in `docs/evals/cache/f16-forms/` (`sejda-t1-fill.pdf`, `sejda-t2-create.pdf`, `sejda-t3-detect.pdf`, `sejda-runs.json`). Reuse them. A re-evaluation needs no new Sejda task unless the reference changes.
+- Sejda outputs and screenshots are cached in `/mnt/project-files/evals-cache/f16-forms/` (`sejda-t1-fill.pdf`, `sejda-t2-create.pdf`, `sejda-t3-detect.pdf`, `sejda-runs.json`). Reuse them. A re-evaluation needs no new Sejda task unless the reference changes.
 - To re-check, re-run the same BerryPDF flows with the fixtures above, the pikepdf/pdf.js/PDFium checks and the viewport script. Every gap above has a reproducible check.

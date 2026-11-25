@@ -1,9 +1,0 @@
-{
- "tag": "t1",
- "task": "add text + typed signature (para-times.pdf)",
- "upload": "2026-11-24T10:36:15Z",
- "signature_upload": "2026-11-24T10:36:47Z",
- "apply_post_api_tasks": "2026-11-24T10:36:51Z",
- "taskId": "YK4CCN1C-202611241136",
- "outcome": "task ran; output NOT captured (harness clicked 'Enable auto-download' instead of Download; a later GET of /api/tasks/<id>/change returned 404 outside the page session). Counted against the budget."
-}

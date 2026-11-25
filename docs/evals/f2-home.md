@@ -21,7 +21,7 @@ By priority: **P0 19/19**, **P1 28/29** (AC-56 fails), **P2 14/14** (+ AC-34 dro
 
 ## Sejda runs (budget: 3 real tasks per hour)
 
-**0 processing tasks were run.** The home page takes no files. I loaded the reference home page once at 1366×900 and once at 375×812, opened its "All Tools" menu and pressed Escape. These were plain page loads, with a few seconds between them. Cached in `docs/evals/cache/f2-home/`: `sejda-observation.json` and `sejda-home-*.png` / `sejda-menu-*.png`. They are for reference only and must never ship.
+**0 processing tasks were run.** The home page takes no files. I loaded the reference home page once at 1366×900 and once at 375×812, opened its "All Tools" menu and pressed Escape. These were plain page loads, with a few seconds between them. Cached in `/mnt/project-files/evals-cache/f2-home/`: `sejda-observation.json` and `sejda-home-*.png` / `sejda-menu-*.png`. They are for reference only and must never ship.
 
 What I observed on the reference (2026-11-23), alongside the spec's own observations:
 - `GET /` returns 200. The page has **2** `h1`s ("We help with your PDF tasks" and "How-to PDF Guides"), a title and a meta description.
@@ -157,7 +157,7 @@ Lighthouse's accessibility score is 100 because its bundled axe ruleset does not
 
 - Ground truth for the registry (slugs, groups, popular order, runtime) came from the spec (H-3 slug table, §3b popular order, H-4 group counts) and from consistency checks between the catalogue, the menu and the footer. The evaluator does not read `apps/`.
 - In the AC-10 crawl, `/does-not-exist` shows up as 404 only because the evaluator opened that page itself; it is not linked from anywhere.
-- Evaluator scripts and raw JSON results are in the session scratchpad and are not committed. Reference observations are in `docs/evals/cache/f2-home/`.
+- Evaluator scripts and raw JSON results are in the session scratchpad and are not committed. Reference observations are in `/mnt/project-files/evals-cache/f2-home/`.
 
 ## Re-evaluation (2026-11-23, 17:45–18:05 UTC)
 
