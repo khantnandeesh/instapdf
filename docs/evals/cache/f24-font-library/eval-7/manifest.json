@@ -1,0 +1,48 @@
+{
+ "feature": "f24-font-library",
+ "evaluation": "seventh (narrow re-check of AC-312 on a line whose font the PDF only names)",
+ "captured": "2026-11-25T21:00Z to 21:25Z",
+ "staging_version": "8686e4b2aab1ca2b74cd71ae2cee78c94cf54200",
+ "verdict": "PASS",
+ "sejda": { "new_tasks": 0, "requests_to_sejda": 0, "reference": "cache of the earlier rounds, see ../manifest.json; AC-312 is judged against our own criterion" },
+ "evidence": {
+  "raw": "/mnt/project-files/evals-cache/f24-font-library/eval-7/ (logs/, outputs/, shots/)",
+  "output_hashes": "outputs/sha256.txt there (46 files)",
+  "scripts": "scripts/run.sh lists the order; r7.cjs is the runner, s292n.cjs is the sixth run's script kept for reference"
+ },
+ "fixtures_sha256": {
+  "ac283-named-only.pdf": "1fb91d016e5efc16d9a0c55bdb8bd4bbd349d1d22551c79d2c8c36de9589f50c",
+  "own-dejavu.ttf": "ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280"
+ },
+ "observations": {
+  "AC-312 named-only line after own font, ' ř ⸘' (1280, 390, 320; 3 runs each, plus a Helvetica line once)": "hint names only ⸘ with DejaVu Sans in use; status 'Not in this font: ⸘. DejaVu Sans draws it.'; box: Arimo(web) x7 + DejaVu Sans(web) x1; file: BERRYA+Arimo maps ř, BERRYB+DejaVuSans maps ⸘; notice 'ArialMT isn’t in this file. Using Arimo and DejaVu Sans.'",
+  "AC-312 named-only line after own font, ' Ω ⸘ ok' (1280, 390, 320; 3 runs each)": "same hint and status; box: Arimo(web) x10 + DejaVu Sans(web) x1; file: BERRYA+Arimo maps Ω, BERRYB+DejaVuSans maps ⸘; same notice",
+  "case D (own font saved for ⸘ on line 0, then ' ř Ω' on the END line; 1280 x3, 390 x1)": "no hint, empty status; box Arimo(web) x7; file: BERRYB+Arimo ř, BERRYC+Arimo Ω, DejaVu Sans only ⸘; notice on that line 'Using Arimo.'",
+  "case E (no font added, ' ř Ω'; 1280 x3, 390 x1)": "no hint; box Arimo(web) x8; file BERRYA+Arimo ř, BERRYB+Arimo Ω; byte size 15,368 as in the sixth run; END stays at the same place",
+  "case C (second edit on the SAME line after the added font was saved there)": "hint 'Not in this font: ř Ω', DejaVu Sans in use, box DejaVuSans x5, file DejaVu Sans maps řΩ: box and file agree (the sixth run's gap 5, unchanged)",
+  "embedded line": "' ř ⸘': Tinos draws ř, DejaVu Sans draws ⸘ in hint, status, box and file; ' नया ⸘ ok': Noto Serif Devanagari for नया and k, DejaVu Sans for ⸘; sizes to the byte as in the sixth run (37,234 B for ' ř ⸘')",
+  "AC-301 pick": "embedded line, DejaVu Sans picked: 'DejaVu Sans draws them.', box DejaVu Sans x2, file BERRYA+DejaVuSans maps ř⸘",
+  "axe": "0 violations in 88 hint states (first hint, own font added, picked, second hint) at 1280, 390 and 320",
+  "outputs": "46 files: source font objects unchanged in all, no named-only font gained a program, syntax clean, 1 page each",
+  "non_get_requests": 0
+ },
+ "timings_ms_enter_to_saved": {
+  "named_r_interrobang_1280": [376, 359, 462], "named_r_interrobang_390": [406, 354, 441], "named_r_interrobang_320": [487, 413, 476],
+  "named_omega_interrobang_ok_1280": [504, 461, 487], "named_omega_interrobang_ok_390": [453, 477, 522], "named_omega_interrobang_ok_320": [503, 450, 592],
+  "named_case_D_second_enter_1280": [187, 189, 201], "named_case_D_second_enter_390": [186],
+  "named_case_E_1280": [696, 591, 668], "named_case_E_390": [623],
+  "named_devanagari_mix_1280": [757, 833, 858],
+  "embedded_r_interrobang_1280": [368, 405, 537], "embedded_r_interrobang_390": [398, 358, 398],
+  "embedded_devanagari_mix_1280": [688, 709, 763], "embedded_devanagari_mix_390": [800, 744, 788]
+ },
+ "sha256": {
+  "r7-nA-1280.pdf": "90aba07535469f10b4badc1f0ce62d2249838edbea0e0a2a0bf28f943162270b",
+  "r7-nB-1280.pdf": "05eb32f85c8e84dc16ff9d6c910bd11f7fb61091ad48ebeddcf509f3fcb70ca4",
+  "r7-nD-1280.pdf": "b5460c0861758d1d0ec6c937e24ba0ba63a1e799cd1f551a1d85e699798aef8b",
+  "r7-nE-1280.pdf": "62b4bfc40b7ffe71d1a2d1ab79defb412c566520f647bf60bd580b3758e3b4c4",
+  "r7-nT-1280.pdf": "a42ced213e2a3656bd74c434e8f3160a682560746532df3d6a82cec3a1e08ddf",
+  "r7-eA-1280.pdf": "6d0e1acc80adffec111f1a04510b3188702dbb97c1fff97b5c184c9f7e229d81",
+  "r7-eN-1280.pdf": "b0a027439ce7f4fde1e382b3a783cbb484bcbcd440a3ef226aa2007a2a20fe87",
+  "r7-eP-1280.pdf": "9104260047249be04871b687af388659b921d603f8307bdf7b83671cf0eec41e"
+ }
+}
