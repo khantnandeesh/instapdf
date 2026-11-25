@@ -23,10 +23,13 @@ export type RecentImage = { id: string; bytes: Uint8Array; mime: Asset["mime"]; 
 type StoreName = "sessions" | "signatures" | "blobs" | "images";
 
 let dbp: Promise<IDBDatabase> | null = null;
+/** An open that never settles (another tab holds an older version open and won't let go) gives up after this. */
+const OPEN_TIMEOUT_MS = 5000;
 function db(): Promise<IDBDatabase> {
   dbp ??= new Promise((resolve, reject) => {
     if (typeof indexedDB === "undefined") return reject(new Error("no indexedDB"));
     const req = indexedDB.open(DB, VERSION);
+    const timer = setTimeout(() => reject(new Error("indexedDB open timed out")), OPEN_TIMEOUT_MS);
     req.onupgradeneeded = (e) => {
       const d = req.result;
       if (e.oldVersion < 2 && d.objectStoreNames.contains("sessions")) d.deleteObjectStore("sessions");
@@ -35,15 +38,26 @@ function db(): Promise<IDBDatabase> {
       if (!d.objectStoreNames.contains("blobs")) d.createObjectStore("blobs");
       if (!d.objectStoreNames.contains("images")) d.createObjectStore("images", { keyPath: "id" });
     };
+    // Another tab has the store open at an older version: say so at once rather than wait (the
+    // editor shows "Not saved on device"); the next call tries again.
+    req.onblocked = () => {
+      clearTimeout(timer);
+      reject(new Error("indexedDB open blocked by another tab"));
+    };
     req.onsuccess = () => {
-      // Another tab opening a newer version: let it upgrade, and open again next time.
-      req.result.onversionchange = () => {
-        req.result.close();
+      clearTimeout(timer);
+      const d = req.result;
+      // A newer version opening in another tab (this code, updated): close, so it can upgrade, and open again next time.
+      d.onversionchange = () => {
+        d.close();
         dbp = null;
       };
-      resolve(req.result);
+      resolve(d);
     };
-    req.onerror = () => reject(req.error);
+    req.onerror = () => {
+      clearTimeout(timer);
+      reject(req.error);
+    };
   });
   dbp.catch(() => (dbp = null));
   return dbp;

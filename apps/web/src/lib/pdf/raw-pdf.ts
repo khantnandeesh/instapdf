@@ -8,8 +8,24 @@
  * object streams. When the cross-reference data is missing or points at the wrong place, it
  * scans the file for `N G obj` headers, as readers do. Encryption is not handled: the caller
  * checks `trailer.Encrypt` and leaves such files alone.
+ *
+ * It runs on the main thread, where nothing can stop a hang or an out-of-memory, so every step is
+ * bounded: a hostile file makes it throw (and the page keep its untouched display), never stall.
+ * - Decompression stops past MAX_INFLATE bytes of output per stream (an inflate bomb).
+ * - `endstream` is found from an index of its places, built once in one pass over the bytes.
+ * - Cross-reference streams take /W widths of 0 to 8 bytes and read no more rows than they hold.
+ * - All the work a file costs (bytes scanned, inflated, parsed) is charged to a budget
+ *   (`RawPdf.load(bytes, budget)`); past it, `BudgetError`.
  */
-import { inflateSync } from "fflate";
+import { Inflate } from "fflate";
+
+/** Output cap per decompressed stream: xref and object streams are far smaller (a few hundred kB at most). */
+export const MAX_INFLATE = 8 * 1024 * 1024;
+/** The default work budget, in bytes touched: a few passes over a large file, plus the decoding. */
+export const defaultBudget = (fileBytes: number) => 4 * fileBytes + 64 * 1024 * 1024;
+
+/** The work budget ran out: the caller gives up (the untouched display stays). */
+export class BudgetError extends Error {}
 
 export type PdfName = { name: string };
 export type PdfRef = { num: number; gen: number };
@@ -180,6 +196,31 @@ class Lexer {
   }
 }
 
+/**
+ * Raw deflate data inflated, at most `cap` bytes of output (else throws). Fed in small slices,
+ * so no single step can make much more than a slice's worth of output (deflate expands at most
+ * about 1032 times).
+ */
+export function inflateCapped(data: Uint8Array, cap: number): Uint8Array {
+  const parts: Uint8Array[] = [];
+  let total = 0;
+  const inf = new Inflate((chunk) => {
+    total += chunk.length;
+    if (total > cap) throw new ParseError("stream inflates past the cap");
+    parts.push(chunk);
+  });
+  const SLICE = 1024;
+  for (let i = 0; i < data.length; i += SLICE) inf.push(data.subarray(i, i + SLICE), i + SLICE >= data.length);
+  if (!data.length) inf.push(new Uint8Array(0), true);
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.length;
+  }
+  return out;
+}
+
 /** PNG predictors (10 to 15) on decoded rows of `columns` bytes. */
 function unpredict(data: Uint8Array, columns: number): Uint8Array {
   const row = columns + 1;
@@ -218,12 +259,20 @@ export class RawPdf {
   private scanned: Map<number, number> | null = null;
   private readonly cache = new Map<number, PdfObj | undefined>();
   private readonly streams = new Map<number, { first: number; offsets: number[]; data: Uint8Array } | null>();
+  private textCache: string | null = null;
+  private endstreams: number[] | null = null;
+  private left: number;
 
-  private constructor(readonly bytes: Uint8Array) {
+  private constructor(
+    readonly bytes: Uint8Array,
+    budget: number,
+  ) {
+    this.left = budget;
     let trailer: Map<string, PdfObj> | null = null;
     try {
       trailer = this.readXref();
-    } catch {
+    } catch (e) {
+      if (e instanceof BudgetError) throw e;
       trailer = null;
     }
     if (!trailer || !isRef(trailer.get("Root"))) {
@@ -237,9 +286,42 @@ export class RawPdf {
     this.largestObjectNumber = largest;
   }
 
-  /** Opens a file; throws when it has no readable trailer. */
-  static load(bytes: Uint8Array): RawPdf {
-    return new RawPdf(bytes);
+  /** Opens a file; throws when it has no readable trailer, or `BudgetError` when it costs more than `budget` bytes of work. */
+  static load(bytes: Uint8Array, budget = defaultBudget(bytes.length)): RawPdf {
+    return new RawPdf(bytes, budget);
+  }
+
+  /** Charges `n` bytes of work to the budget. */
+  private work(n: number) {
+    this.left -= n;
+    if (this.left < 0) throw new BudgetError("PDF read budget exceeded");
+  }
+
+  /** The whole file as a string (one character per byte), made once. */
+  private text(): string {
+    if (this.textCache === null) {
+      this.work(this.bytes.length);
+      this.textCache = latin1(this.bytes);
+    }
+    return this.textCache;
+  }
+
+  /** The first `endstream` at or after `from` (-1: none), from an index of every one, built in one pass. */
+  private endstreamFrom(from: number): number {
+    if (!this.endstreams) {
+      const at: number[] = [];
+      const text = this.text();
+      for (let i = text.indexOf("endstream"); i >= 0; i = text.indexOf("endstream", i + 9)) at.push(i);
+      this.endstreams = at;
+    }
+    const list = this.endstreams;
+    let [lo, hi] = [0, list.length];
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (list[mid]! < from) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo < list.length ? list[lo]! : -1;
   }
 
   /** The object `num`, or undefined when the file has none. */
@@ -249,7 +331,8 @@ export class RawPdf {
     let obj: PdfObj | undefined;
     try {
       obj = this.read(num);
-    } catch {
+    } catch (e) {
+      if (e instanceof BudgetError) throw e;
       obj = undefined;
     }
     this.cache.set(num, obj);
@@ -273,8 +356,11 @@ export class RawPdf {
       const s = this.objectStream(entry.stream);
       if (!s) return undefined;
       const at = s.offsets[entry.index * 2 + 1];
-      if (s.offsets[entry.index * 2] !== num || at === undefined) return undefined;
-      return new Lexer(s.data, s.first + at).object();
+      if (s.offsets[entry.index * 2] !== num || at === undefined || s.first + at >= s.data.length) return undefined;
+      const lx = new Lexer(s.data, s.first + at);
+      const obj = lx.object();
+      this.work(lx.pos - (s.first + at));
+      return obj;
     }
     if (entry?.type === "at") {
       const obj = this.objectAt(entry.offset, num);
@@ -291,6 +377,7 @@ export class RawPdf {
     const gen = lx.int();
     if (n === null || gen === null || (num !== null && n !== num) || lx.word() !== "obj") return undefined;
     const obj = lx.object();
+    this.work(lx.pos - offset);
     if (!isDict(obj) || lx.word(true) !== "stream") return obj;
     lx.word();
     // The data starts after the end of the `stream` line.
@@ -299,12 +386,14 @@ export class RawPdf {
     const start = lx.pos;
     const declared = obj.dict.get("Length");
     const length = isNum(declared) ? declared : isRef(declared) ? this.get(declared.num) : undefined;
-    let end = typeof length === "number" && start + length <= this.bytes.length ? start + length : -1;
-    if (end < 0 || !latin1(this.bytes.subarray(end, Math.min(this.bytes.length, end + 32))).includes("endstream")) {
-      const tail = latin1(this.bytes.subarray(start, Math.min(this.bytes.length, start + 64 * 1024 * 1024)));
-      const at = tail.indexOf("endstream");
+    const valid = typeof length === "number" && Number.isInteger(length) && length >= 0 && start + length <= this.bytes.length;
+    let end = valid ? start + length : -1;
+    // The declared length is right when `endstream` follows it (after an end of line).
+    const next = end < 0 ? -1 : this.endstreamFrom(end);
+    if (end < 0 || next < 0 || next - end > 32) {
+      const at = this.endstreamFrom(start);
       if (at < 0) throw new ParseError("open stream");
-      end = start + at;
+      end = at;
       while (end > start && (this.bytes[end - 1] === 10 || this.bytes[end - 1] === 13)) end--;
     }
     return { dict: obj.dict, data: this.bytes.subarray(start, end) };
@@ -317,13 +406,15 @@ export class RawPdf {
     if (!filters.length) return s.data;
     if (filters.length !== 1 || !isName(filters[0]!, "FlateDecode")) throw new ParseError("unsupported filter");
     // The zlib header is skipped and the checksum not required, so a file with a damaged ending still reads.
-    let data = inflateSync(s.data.subarray(2));
+    let data = inflateCapped(s.data.subarray(2), MAX_INFLATE);
+    this.work(s.data.length + data.length);
     const parms = this.resolve(Array.isArray(s.dict.get("DecodeParms")) ? (s.dict.get("DecodeParms") as PdfObj[])[0] : s.dict.get("DecodeParms"));
     if (isDict(parms)) {
       const predictor = this.lookup(parms, "Predictor");
       if (isNum(predictor) && predictor >= 10) {
-        const columns = this.lookup(parms, "Columns");
-        data = unpredict(data, isNum(columns) ? columns : 1);
+        const columns = this.lookup(parms, "Columns") ?? 1;
+        if (!isNum(columns) || !Number.isInteger(columns) || columns < 1 || columns > 65536) throw new ParseError("bad /Columns");
+        data = unpredict(data, columns);
       } else if (isNum(predictor) && predictor > 1) throw new ParseError("unsupported predictor");
     }
     return data;
@@ -337,10 +428,10 @@ export class RawPdf {
       if (isStream(s)) {
         const data = this.decode(s);
         const [n, first] = [this.lookup(s, "N"), this.lookup(s, "First")];
-        if (isNum(n) && isNum(first)) {
+        if (isNum(n) && isNum(first) && Number.isInteger(n) && Number.isInteger(first) && n >= 0 && first >= 0 && first < data.length) {
           const lx = new Lexer(data);
           const offsets: number[] = [];
-          for (let i = 0; i < n * 2; i++) {
+          for (let i = 0; i < Math.min(n * 2, data.length); i++) {
             const v = lx.int();
             if (v === null) break;
             offsets.push(v);
@@ -348,7 +439,8 @@ export class RawPdf {
           out = { first, offsets, data };
         }
       }
-    } catch {
+    } catch (e) {
+      if (e instanceof BudgetError) throw e;
       out = null;
     }
     this.streams.set(num, out);
@@ -377,6 +469,7 @@ export class RawPdf {
       if (lx.word(true) === "xref") {
         lx.word();
         section = this.readTable(lx);
+        this.work(lx.pos - at);
         const stm = section.get("XRefStm");
         // Hybrid files: the stream's entries rank right after this table's.
         if (isNum(stm)) queue.unshift(stm);
@@ -417,13 +510,17 @@ export class RawPdf {
 
   private readStream(s: PdfStream) {
     const w = this.resolve(s.dict.get("W"));
-    if (!Array.isArray(w) || w.length < 3 || !w.every(isNum)) throw new ParseError("bad /W");
+    // Each field is 0 to 8 bytes (a JavaScript number holds 6 exactly; more is no real file), and a row has at least one.
+    if (!Array.isArray(w) || w.length < 3 || !w.slice(0, 3).every((x) => isNum(x) && Number.isInteger(x) && x >= 0 && x <= 8)) throw new ParseError("bad /W");
     const widths = w as number[];
+    const rowLength = widths[0]! + widths[1]! + widths[2]!;
+    if (rowLength < 1) throw new ParseError("bad /W");
     const size = this.resolve(s.dict.get("Size"));
     const index = this.resolve(s.dict.get("Index"));
-    const ranges = Array.isArray(index) && index.every(isNum) ? (index as number[]) : [0, isNum(size) ? size : 0];
+    const ranges = Array.isArray(index) && index.every((x) => isNum(x) && Number.isInteger(x) && x >= 0) ? (index as number[]) : [0, isNum(size) && Number.isInteger(size) && size >= 0 ? size : 0];
     const data = this.decode(s);
-    const rowLength = widths[0]! + widths[1]! + widths[2]!;
+    // No more rows than the data holds, whatever /Size or /Index say.
+    let rows = Math.floor(data.length / rowLength);
     let at = 0;
     const field = (width: number, fallback: number) => {
       if (!width) return fallback;
@@ -433,7 +530,7 @@ export class RawPdf {
     };
     for (let r = 0; r + 1 < ranges.length; r += 2) {
       for (let i = 0; i < ranges[r + 1]!; i++) {
-        if (at + rowLength > data.length) return;
+        if (rows-- <= 0) return;
         const num = ranges[r]! + i;
         const type = field(widths[0]!, 1);
         const a = field(widths[1]!, 0);
@@ -450,7 +547,8 @@ export class RawPdf {
   private scan(): Map<number, number> {
     if (this.scanned) return this.scanned;
     const found = new Map<number, number>();
-    const text = latin1(this.bytes);
+    const text = this.text();
+    this.work(this.bytes.length);
     for (const m of text.matchAll(/(?:^|[\s>\]])(\d{1,10})[ \t\r\n\f\0]+(\d{1,5})[ \t\r\n\f\0]+obj\b/g)) found.set(Number(m[1]), m.index + m[0].indexOf(m[1]!));
     this.scanned = found;
     return found;
@@ -458,13 +556,16 @@ export class RawPdf {
 
   /** For a file whose cross-reference data can't be read: the newest trailer, or the newest xref stream's dictionary. */
   private scanTrailer(): Map<string, PdfObj> {
-    const text = latin1(this.bytes);
-    for (let at = text.lastIndexOf("trailer"); at >= 0; at = text.lastIndexOf("trailer", at - 1)) {
+    const text = this.text();
+    // From the last `trailer` back to the first (at 0 there is none before it: stop).
+    for (let at = text.lastIndexOf("trailer"); at >= 0; at = at === 0 ? -1 : text.lastIndexOf("trailer", at - 1)) {
       try {
         const lx = new Lexer(this.bytes, at + "trailer".length);
         const t = lx.object();
+        this.work(lx.pos - at);
         if (isDict(t) && isRef(t.dict.get("Root"))) return t.dict;
-      } catch {
+      } catch (e) {
+        if (e instanceof BudgetError) throw e;
         // an earlier one, then
       }
     }
@@ -474,7 +575,8 @@ export class RawPdf {
         const o = this.objectAt(at, num);
         if (isDict(o) && isName(o.dict.get("Type"), "XRef") && isRef(o.dict.get("Root"))) return o.dict;
         if (isDict(o) && isName(o.dict.get("Type"), "Catalog")) return new Map<string, PdfObj>([["Root", ref(num)]]);
-      } catch {
+      } catch (e) {
+        if (e instanceof BudgetError) throw e;
         // keep looking
       }
     }
@@ -485,10 +587,13 @@ export class RawPdf {
 const hexOf = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 const NAME_PLAIN = /^[\x21-\x7e]$/;
 
-/** A number as PDF writes it: no exponent, at most 6 decimals. */
-function num(n: number): string {
-  if (Number.isInteger(n)) return String(n);
-  return n.toFixed(6).replace(/\.?0+$/, "");
+/** A number as PDF writes it: never an exponent (1e+21, 1e-7), at most 6 decimals. */
+export function num(n: number): string {
+  if (!Number.isFinite(n)) return "0";
+  // Whole numbers of any size (String(1e21) is "1e+21"; a BigInt prints every digit).
+  if (Number.isInteger(n)) return BigInt(n).toString();
+  const out = n.toFixed(6).replace(/\.?0+$/, "");
+  return out === "-0" ? "0" : out;
 }
 
 /** `o` as PDF syntax. A stream is written as its dictionary only (the caller writes the data). */

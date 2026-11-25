@@ -55,6 +55,8 @@ async function buildFonts(objects: readonly EditorObject[]) {
 }
 
 const SignDialog = lazy(() => import("./SignDialog").then((m) => ({ default: m.SignDialog })));
+/** Images larger than this are placed but not kept among the recent ones (AC-66). */
+const RECENT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const RecentImages = lazy(() => import("./RecentImages").then((m) => ({ default: m.RecentImages })));
 
 export type ShellProps = {
@@ -647,7 +649,14 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     };
   }, []);
   /** Keeps an image among the recent ones on this device (as placed: PNG or JPEG); never sent anywhere. */
-  const remember = useCallback((a: { bytes: Uint8Array; mime: RecentImage["mime"] }) => void rememberImage({ bytes: a.bytes, mime: a.mime }).then(setRecent), []);
+  const remember = useCallback(
+    (a: { bytes: Uint8Array; mime: RecentImage["mime"] }) => {
+      // Not for a file kept off the device (encrypted, or no store), nor a very large image.
+      if (store.get().save === "off" || a.bytes.length > RECENT_IMAGE_MAX_BYTES) return;
+      void rememberImage({ bytes: a.bytes, mime: a.mime }).then(setRecent);
+    },
+    [store],
+  );
   /** Places an image asset on a page: at a point (drop) or centred in the visible part. */
   const placeImage = useCallback(
     (assetId: string, pageIndex: number, point?: Pt) => {

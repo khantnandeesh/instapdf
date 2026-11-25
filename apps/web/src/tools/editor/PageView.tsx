@@ -566,7 +566,14 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
         store.set({ history: H.replaceCurrent(s.history, onPage({ ...H.current(s.history), objects: H.current(s.history).objects.map((x) => (x.id === o.id ? next : x)) }, [o.id])) });
       } else if (cur.text !== value) ctl.update([o.id], () => next, "Edit text");
       ctl.announce(`Text on page ${index + 1}: ${value}`);
-      requestAnimationFrame(() => (document.querySelector(`[data-obj-id="${o.id}"]`) as HTMLElement | null)?.focus({ preventScroll: true }));
+      // Focus comes back to the box, unless the person has moved on while its font loaded (a
+      // script's font can take a moment): then it stays where they are. Taking it from a new
+      // box being typed in would close that box (its blur commits it).
+      requestAnimationFrame(() => {
+        const active = document.activeElement;
+        const busyElsewhere = store.get().editing != null || (active instanceof HTMLElement && active.matches("textarea, input, select, [contenteditable=true], [role=dialog] *"));
+        if (!busyElsewhere) (document.querySelector(`[data-obj-id="${o.id}"]`) as HTMLElement | null)?.focus({ preventScroll: true });
+      });
     },
     [ctl, store, index],
   );

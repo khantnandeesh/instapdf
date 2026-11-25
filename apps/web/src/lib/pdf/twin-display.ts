@@ -77,6 +77,17 @@ export const CP1252_EXTRA = CP1252_HIGH.filter((cp) => cp);
 export async function buildTwinPatch(
   bytes: Uint8Array,
   fonts: readonly NamedFont[],
+  fileOf: (font: NamedFont, declared: number[]) => Promise<Uint8Array | null>,
+  expect?: Record<number, string>,
+): Promise<TwinPatch | null> {
+  // Any failure, the reader's work budget included (raw-pdf.ts: a hostile file is given up on,
+  // never allowed to stall the page), leaves the display as it is.
+  return patch(bytes, fonts, fileOf, expect).catch(() => null);
+}
+
+async function patch(
+  bytes: Uint8Array,
+  fonts: readonly NamedFont[],
   /** `declared`: the letters outside Latin-1 that the font's own table of widths says it may draw. */
   fileOf: (font: NamedFont, declared: number[]) => Promise<Uint8Array | null>,
   /** From an earlier version of the file: a font is only covered again under the same name. */
@@ -87,6 +98,7 @@ export async function buildTwinPatch(
   const { RawPdf, isDict, isName, isNum, isRef, name, ref, serialize } = await import("./raw-pdf");
   let doc: ReturnType<typeof RawPdf.load>;
   try {
+    // At most a few passes over the file's bytes, plus decoding (raw-pdf.ts defaultBudget).
     doc = RawPdf.load(bytes);
   } catch {
     return null;

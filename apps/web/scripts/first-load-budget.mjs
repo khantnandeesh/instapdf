@@ -149,6 +149,23 @@ const heavy = new Set(
     .filter(([k]) => / -> @cantoo\/(pdf-lib|fontkit)$/.test(k))
     .flatMap(([, v]) => v.files.filter((f) => f.endsWith(".js") && !pdfjsFiles.has(f))),
 );
+/**
+ * No `import()` of pdf-lib or fontkit from the editor's own code or lib/pdf, which run on the main
+ * thread, except from modules only the processing worker reaches (listed with why). A new one
+ * would load ~240-330 kB on the main thread; it goes in a worker, or on Download intent.
+ */
+const MAIN_THREAD = /^(tools\/editor\/|lib\/pdf\/)/;
+const WORKER_ONLY = new Set([
+  "lib/pdf/text.ts", // Merge's text writer: lib/pdf/merge.ts ← jobs.ts ← processing.worker.ts
+]);
+for (const key of Object.keys(loadable)) {
+  const [importer, target] = key.split(" -> ");
+  if (MAIN_THREAD.test(importer ?? "") && /^@cantoo\/(pdf-lib|fontkit)$/.test(target ?? "") && !WORKER_ONLY.has(importer)) {
+    console.error(`OVER main thread: ${importer} imports ${target}; load it in a worker (the download worker for the editor, U-E13)`);
+    failed++;
+  }
+}
+
 const missing = EDITOR_GROUPS.filter((k) => !loadable[k]);
 if (missing.length) {
   console.error(`OVER editor JS: chunk groups not in the build (renamed? update EDITOR_GROUPS): ${missing.join("; ")}`);
