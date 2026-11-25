@@ -8,7 +8,7 @@
  */
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { Asset } from "@/lib/editor/build";
-import { callEngine, describeEngineError, engineErrorLog, offersLineReplacement, openInShapingEngine, setEngineFileSize, type EngineError } from "@/lib/editor/engine-client";
+import { callEngine, describeEngineError, engineFontCount, engineErrorLog, offersLineReplacement, openInShapingEngine, setEngineFileSize, type EngineError } from "@/lib/editor/engine-client";
 import { lineAt } from "@/lib/editor/line-hit";
 import { editorFontFor, styledLineReplacement, type RunPart } from "@/lib/editor/replace-line";
 import { ensureFace, measurer } from "@/lib/editor/fonts-browser";
@@ -65,7 +65,8 @@ import { pdfOutputName, baseName } from "@/lib/pdf/naming";
 import { openPdf } from "@/lib/pdf/pdfjs";
 import type { EditResult, PageText } from "@/lib/editor/berry-engine";
 import { foldName } from "@/lib/font-library/client";
-import { coverOf, getFontState, chooseStandIn, chosenPartners, chosenStandIn, planCover, rankStandIns, fontLabel, registerWithEngine, standInCandidates } from "./font-service";
+import { coverOf, filesOfChars, getFontState, chooseStandIn, chosenPartners, chosenStandIn, planCover, rankStandIns, fontLabel, registerWithEngine, standInCandidates } from "./font-service";
+import { twinOf } from "@/lib/font-library/twins";
 import { warmDocFaces } from "./doc-face";
 import { displayBytes, ensureTwinDisplay, retwin, twinCount } from "./twin-display";
 import type { Store, ToolId } from "./store";
@@ -498,6 +499,8 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         try {
           const copy = ctl.bytesOf(rt.shown).slice();
           await callEngine({ op: "open", bytes: copy, shaping: store.get().shaping === "ready" }, [copy.buffer]);
+          // A worker that crashed came back without fonts; one that survived has them again (it adds them back on open).
+          if (!engineFontCount()) ctl.forgetFonts();
           store.set({ fresh: {} });
         } catch {
           ui.toast({ text: "The editor couldn’t restart. Download what you have, then reload the page.", tone: "danger" });
@@ -643,7 +646,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     /** The person picks, while typing, the font that draws what a document font lacks. */
     async pickStandIn(key: string, id: string | undefined, partners: readonly string[] = []) {
       chooseStandIn(key, id, partners);
-      ctl.standIns.clear();
+      ctl.forgetFonts();
       await callEngine({ op: "clearFonts" }).catch(() => {});
     },
 
@@ -729,6 +732,15 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
 
     /** Engine family name → the font id it was registered from. */
     standIns: new Map<string, string>(),
+    /** The twins' files registered with the engine (twin, style, file): none is sent twice. */
+    twinHas: new Set<string>(),
+    /** Counts each time the engine's fonts are dropped: a registration that was under way then is not recorded. */
+    fontEpoch: 0,
+    forgetFonts() {
+      ctl.standIns.clear();
+      ctl.twinHas.clear();
+      ctl.fontEpoch++;
+    },
     /** The document fonts and style the registered stand-ins were chosen for. */
     standInKey: "",
     /** The font id a stand-in name from the engine ("Tinos", "Tinos Bold Italic") was registered from. */
@@ -772,7 +784,32 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       const key = fonts.map((f) => `${f.name}|${f.bold}|${f.italic}`).sort().join(",");
       if (ctl.standIns.size && key !== ctl.standInKey) {
         await callEngine({ op: "clearFonts" });
-        ctl.standIns.clear();
+        ctl.forgetFonts();
+      }
+      // A font the PDF only names is drawn in its twin, in the box and on the page. Once another
+      // font is registered (the person's own, say), the engine would give that one the letters the
+      // twin has but was never asked for: the twin gets them first, as the box draws them (AC-312).
+      const twinFor = (f: (typeof fonts)[number] | undefined) => (f && f.embedded === false ? (twinOf(f.family || f.name) ?? twinOf(f.name)) : undefined);
+      const others = () => [...new Set(ctl.standIns.values())];
+      for (const f of fonts) {
+        const twin = twinFor(f);
+        // Only letters another registered font could take: what the document font writes itself needs no twin.
+        const rivals = others().filter((id) => id !== twin);
+        if (!twin || !rivals.length) continue;
+        const letters = [...new Set(call.text)].filter((c) => c.codePointAt(0)! > 0x7e);
+        if (!letters.length) continue;
+        const theirs = (await coverOf(rivals, f.bold, f.italic, letters)).by;
+        const files = await filesOfChars(twin, f.bold, f.italic, letters.filter((c) => [...theirs.values()].some((got) => got.includes(c))));
+        const tag = (file: string) => `${twin}|${f.bold}|${f.italic}|${file}`;
+        const fresh = [...files].filter(([, file]) => !ctl.twinHas.has(tag(file)));
+        if (!fresh.length) continue;
+        const epoch = ctl.fontEpoch;
+        const ok = await registerWithEngine(twin, f.bold, f.italic, fresh.map(([c]) => c).join(""));
+        if (ok && epoch === ctl.fontEpoch) {
+          ctl.standIns.set(fontLabel(twin), twin);
+          for (const [, file] of fresh) ctl.twinHas.add(tag(file));
+        }
+        if (!wanted()) throw stale();
       }
       try {
         return await callEngine(call);
@@ -788,7 +825,8 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         // The fonts the person added count too, after the closest ones: the hint offers them (LineEditBox).
         const found = await standInCandidates(info, err.request, err.chars);
         const users = getFontState().user.map((u) => u.id);
-        const ids = [...found, ...users.filter((id) => !found.includes(id))];
+        const mate = twinFor(info);
+        const ids = [...new Set([...(mate ? [mate] : []), ...found, ...users])];
         // A character none of them has: said at once, naming only that character, without
         // fetching and trying one font after another first (AC-312).
         const asked2 = [...new Set(err.chars)];
@@ -800,14 +838,19 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         // not one font after another (AC-312). The engine takes the first registered font that
         // has a letter, so the order here is the order of the box's own font list.
         const choice = chosenStandIn(foldName(err.request.families[0] ?? ""));
-        const plan = planCover(choice ? [choice, ...chosenPartners(foldName(err.request.families[0] ?? ""))] : able.slice(0, 1), able, by, asked2);
+        // The twin of a font the PDF only names comes before any choice: the box draws its letters in it.
+        const plan = planCover([...(mate ? [mate] : []), ...(choice ? [choice, ...chosenPartners(foldName(err.request.families[0] ?? ""))] : able.slice(0, 1))], able, by, asked2);
         const tried = new Set<string>();
         let ready = plan.length > 0;
         for (const { id } of plan) {
           if (!wanted()) throw stale();
           tried.add(id);
-          if (await registerWithEngine(id, err.request.bold, err.request.italic, err.chars)) ctl.standIns.set(fontLabel(id), id);
-          else ready = false;
+          const files = id === mate ? [...(await filesOfChars(id, err.request.bold, err.request.italic, asked2)).values()] : [];
+          const epoch = ctl.fontEpoch;
+          if ((await registerWithEngine(id, err.request.bold, err.request.italic, err.chars)) && epoch === ctl.fontEpoch) {
+            ctl.standIns.set(fontLabel(id), id);
+            for (const file of files) ctl.twinHas.add(`${id}|${err.request.bold}|${err.request.italic}|${file}`);
+          } else ready = false;
         }
         if (ready) {
           try {
@@ -856,7 +899,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         }
         chooseStandIn(key, id);
         await callEngine({ op: "clearFonts" });
-        ctl.standIns.clear();
+        ctl.forgetFonts();
         store.set((st) => ({ texts: { ...st.texts, [n.src]: page }, fresh: { ...st.fresh, [n.src]: true }, lineEdit: { src: n.src, line: n.line, text: n.text } }));
         await ctl.commitLine();
         const now = store.get().fontNotice;
@@ -864,7 +907,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
           // The edit could not be made with that font: put it back as it was.
           chooseStandIn(key, before);
           await callEngine({ op: "clearFonts" }).catch(() => {});
-          ctl.standIns.clear();
+          ctl.forgetFonts();
           await ctl.redo();
         } else if (now && !(now.standInIds ?? [now.standInId]).includes(id)) {
           chooseStandIn(key, before);

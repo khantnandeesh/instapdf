@@ -256,6 +256,20 @@ export async function coverOf(ids: readonly string[], bold: boolean, italic: boo
   return { has, by, none };
 }
 
+/** The file of font `id` that holds each of `chars` (those it has). No font file is fetched. */
+export async function filesOfChars(id: string, bold: boolean, italic: boolean, chars: readonly string[]): Promise<Map<string, string>> {
+  await resolveFonts([id]).catch(() => undefined);
+  await widenFor([id], chars.join("")).catch(() => undefined);
+  const m = knownManifest();
+  const face = m?.faces[id] ? faceOf(m, id, bold, italic) : undefined;
+  const out = new Map<string, string>();
+  for (const c of chars) {
+    const file = face && fileFor(face, c.codePointAt(0)!);
+    if (file) out.set(c, file.file);
+  }
+  return out;
+}
+
 /**
  * Registers a font with the engine for `chars`. False when the engine can't use it (it takes
  * TrueType outlines today) or a file didn't arrive.

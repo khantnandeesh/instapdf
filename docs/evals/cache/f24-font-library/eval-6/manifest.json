@@ -1,0 +1,119 @@
+{
+ "feature": "f24-font-library",
+ "evaluation": "sixth",
+ "captured": "2026-11-25T18:30Z to 20:15Z",
+ "staging_version": "e95b2c2903cd13d77fb45b55eb6025f773b52884",
+ "verdict": "FAIL",
+ "sejda": {
+  "new_tasks": 0,
+  "requests_to_sejda": 0,
+  "reference": "cache of the earlier rounds (tasks T1, T2, T2b), see ../manifest.json"
+ },
+ "evidence": {
+  "raw": "/mnt/project-files/evals-cache/f24-font-library/eval-6/ (logs/, outputs/, shots/, lighthouse-run1..3.json)",
+  "output_hashes": "outputs/sha256.txt there (128 files)",
+  "scripts": "scripts/run.sh lists the order"
+ },
+ "observations": {
+  "AC-312 embedded line after own font": "status and hint name each font with its letters at 1280, 390 and 320 (Tinos draws ř. DejaVu Sans draws ⸘.); box glyphs by CDP: Tinos(web) and DejaVu Sans(web); file: BERRYA+Tinos and BERRYB+DejaVuSans; for नया ⸘ ok the added font is offered in 0.31-0.38 s",
+  "AC-312 named-only line after own font": "FAIL: box draws ř / Ω in Arimo(web), file maps them in BERRYA+DejaVuSans; hint and status name only ⸘ (s292n cases A, B, D)",
+  "axe": "0 violations in 8 states at 1280 and 390 and in 9 mixed-case states at 1280, 390, 320",
+  "lighthouse_mobile_performance": [
+   99,
+   99,
+   97
+  ]
+ },
+ "timings_ms": {
+  "enter_to_saved_own_font_devanagari_mix_embedded": [
+   735,
+   725,
+   844,
+   793
+  ],
+  "enter_to_saved_own_font_devanagari_mix_named": [
+   777,
+   766,
+   904,
+   719
+  ],
+  "enter_to_saved_no_own_font_devanagari": [
+   773,
+   724,
+   632,
+   760,
+   864,
+   733,
+   887,
+   799
+  ],
+  "enter_to_saved_own_font_latin_mix": [
+   439,
+   429,
+   433,
+   250,
+   277,
+   263,
+   436,
+   249
+  ],
+  "refusal_devanagari_mix_no_own_font": [
+   679,
+   716,
+   734,
+   606,
+   750,
+   801
+  ],
+  "refusal_latin_mix": [
+   183,
+   249,
+   168,
+   190
+  ],
+  "own_font_offered_after_pick": [
+   288,
+   419
+  ],
+  "download_to_file_1280": [
+   1691,
+   1223,
+   1328
+  ],
+  "download_to_file_390": [
+   1745,
+   1580,
+   1284
+  ],
+  "page_edge_refusal_enter_before_fonts_listed": [
+   1349,
+   2561,
+   1926,
+   1844,
+   2969,
+   2076
+  ],
+  "page_edge_refusal_after_fonts_listed": [
+   575,
+   560,
+   428,
+   439
+  ]
+ },
+ "keyboard_use_your_own_font": {
+  "enter_with_focus_on_button_dialog_opened": "3 of 7",
+  "space": "6 of 6"
+ },
+ "sha256": {
+  "s292n-A.pdf": "4defef73c37f89b6ffc7aa3d2d07d24347b650adcd9ff920cb36dabed22af81c",
+  "s292n-B.pdf": "43da740623d65ba40eb19b69e09c3374b2b3f08e0113b098a626c85f396b5632",
+  "s292n-D.pdf": "b38aa2730da5d30f8402c876d26834ab67d755d70edce0548ec4936c2d5ebc51",
+  "s292n-E.pdf": "30e4a23659b720ad0830e4cc61f4b013763b626427e57fc88443d3250fa501f0",
+  "s292e-A.pdf": "c76a980196ec310c88e89aae677ba1278a3adc36133683fd70e870143cf7bf2c",
+  "s312r-embedded-ř_⸘-1280.pdf": "f3eeee825bf07a65ce9b9a9bc1ae3a29172f3db26a2c39c1a81a958dd137ef99",
+  "s312r-embedded-नया_⸘_ok-1280.pdf": "e5d240c113bf7133cdb19214787ec6f41ece4c08d2d63774794bf0daf21bbed8",
+  "s312r-arial-named-ř_⸘-1280.pdf": "3c10fbeb4e1b534ef8a4eadbf1befd3a6251915c4f5570bba7098031032f724b",
+  "s312r-arial-named-नया_⸘_ok-1280.pdf": "8c135a608acdcbbba2957bc8fb5a916fbadf314d489ee732b9adc363297e2efd",
+  "s312p-नया_⸘_ok.pdf": "b0965dc26c2d0fa33f3c1c5deed4cd8d04219301f43be2d1b1182cd5150ff7ee"
+ }
+}
