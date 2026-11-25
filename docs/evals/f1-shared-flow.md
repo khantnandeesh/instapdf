@@ -149,4 +149,4 @@ None of these blocks the verdict. They are listed so the builders can act on the
 ## Harness notes
 
 - On the first AC-48 attempt, the keyboard-triggered file chooser was missed intermittently. Instrumenting the page showed the app calls `input.click()` with active user activation every time. The cause was Playwright enabling file-chooser interception lazily, which raced with the key press. With interception enabled up front, AC-48 passed 3 of 3 repeats.
-- Evaluator scripts and raw results live in the session scratchpad and are not committed. The Sejda outputs, logs and screenshots are in `docs/evals/cache/f1-shared-flow/`; the screenshots are reference only and must never ship.
+- Evaluator scripts and raw results live in the session scratchpad and are not committed. The Sejda outputs, logs and screenshots are in `/mnt/project-files/evals-cache/f1-shared-flow/`; the screenshots are reference only and must never ship.

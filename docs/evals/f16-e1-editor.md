@@ -228,4 +228,4 @@ None on record. M2 and M12 are therefore counted as losses.
 - **AC-94 pen rule.** The pen-only rule can't be checked headless; the touch behaviour was checked with emulated touch.
 - **Sejda T1.** The output was lost to Sejda's auto-download (a later GET returned 404). T2 repeats T1's edits and adds the line edit, so no comparison was lost. In total 3 tasks were used.
 - **Lighthouse.** Runs 1 and 4 hit `NO_NAVSTART` and are excluded; the median is over the 3 valid runs.
-- **Cache.** Raw logs and outputs are in `docs/evals/cache/f16-e1-editor/`. The Sejda outputs can be reused for re-evaluation, so no new Sejda tasks are needed unless the task set changes.
+- **Cache.** Raw logs and outputs are in `/mnt/project-files/evals-cache/f16-e1-editor/`. The Sejda outputs can be reused for re-evaluation, so no new Sejda tasks are needed unless the task set changes.

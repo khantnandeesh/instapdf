@@ -1,0 +1,93 @@
+{
+ "feature": "f3-merge",
+ "raw_evidence": "/mnt/project-files/evals-cache/f3-merge/",
+ "note": "Raw evidence (Sejda outputs, captures, logs, Lighthouse runs and our matching captures) moved out of git per docs/process/workflow.md 'Reference (Sejda) runs'. Hashes let a re-eval verify the cache is unchanged.",
+ "moved_on": "2026-11-25",
+ "files": [
+  {
+   "path": "lh-sejda.json",
+   "bytes": 622358,
+   "sha256": "56191bbc0fe48ec45f8219e5df30cb00ea02fc14d79683da124c25839f37c284"
+  },
+  {
+   "path": "ours-same-task-alpha-merged.pdf",
+   "bytes": 5778,
+   "sha256": "f8993adb5df96bf008bafa23aa2ca08d77f0b3634126820c7c74c67deebd02df"
+  },
+  {
+   "path": "sejda-375-empty.png",
+   "bytes": 117159,
+   "sha256": "7dd250c83db40dd2a9430e7778c2ddf3c9621f7bafb592668db2fb1b25597fa1"
+  },
+  {
+   "path": "sejda-375-files.png",
+   "bytes": 75756,
+   "sha256": "1d44d220a3337d0f47270543c1e6de062249e23022eb4db9548d506de235f4ff"
+  },
+  {
+   "path": "sejda-375-options.png",
+   "bytes": 151280,
+   "sha256": "a6ac3f47a0b1676854d9b1805bc83fae2f1e81b642a2bda5908c8fa216ccfd7d"
+  },
+  {
+   "path": "sejda-375-pages.png",
+   "bytes": 72947,
+   "sha256": "5b89608235b805d308976e6766457f86fcf45621928d5c26c6f7902b2daec426"
+  },
+  {
+   "path": "sejda-empty-1280.png",
+   "bytes": 277513,
+   "sha256": "12847fdfc0ab0ef92ba4ca7e51c9c1ba518c95bb76a641e19b8cfce27f5ca8fe"
+  },
+  {
+   "path": "sejda-err-broken.png",
+   "bytes": 151593,
+   "sha256": "59b929b7d2a5ff68310ddcaa2eb1de47ecb77f02ea74f7804c46cc307fc468ff"
+  },
+  {
+   "path": "sejda-err-userpw.png",
+   "bytes": 132653,
+   "sha256": "72f947a6a7dd187eee49f9b40d5fae170657ec44a58db62503d4519e8345923d"
+  },
+  {
+   "path": "sejda-observation.json",
+   "bytes": 6039,
+   "sha256": "ce35f5d8641bcd33534a386534f54483da385ca3c63448825285e5fb92e7306f"
+  },
+  {
+   "path": "sejda-t1-pages.png",
+   "bytes": 164978,
+   "sha256": "ce583c3dd259dd50feb69e67666bf32cded3d2534ee2cd6128a0c76ed3897363"
+  },
+  {
+   "path": "sejda-t2.json",
+   "bytes": 2201,
+   "sha256": "aca9c7c7ac9ede76e4259f9e5cdef617d28cc04b4912f94ffa50704baf4ff986"
+  },
+  {
+   "path": "sejda-t3-alpha_merged.pdf",
+   "bytes": 7229,
+   "sha256": "e029a7e55e5237001f4d6e8799a81620e6cd1069bb7deb54ab7e6e0a5e6de6dc"
+  },
+  {
+   "path": "sejda-t3-files.png",
+   "bytes": 158157,
+   "sha256": "3c2abf80696f1927053381786102a8935274a47399c0482c611813404fb9ecf1"
+  },
+  {
+   "path": "sejda-t3-options-set.png",
+   "bytes": 227295,
+   "sha256": "4a313b7883d03362df2cd80424f7bdde4d0d2ab514479bddad7cecc0d4093017"
+  },
+  {
+   "path": "sejda-t3-result.png",
+   "bytes": 198898,
+   "sha256": "47b4ea67d81c028ca591dd2567b78ecf7042eeee0883271573b0a63cb9b607f9"
+  },
+  {
+   "path": "sejda-t3.json",
+   "bytes": 1655,
+   "sha256": "06559613bbc7811900ea7e785a6f57340527e33549fd2c08363cd2ebe7b59313"
+  }
+ ]
+}

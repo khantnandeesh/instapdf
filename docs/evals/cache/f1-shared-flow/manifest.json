@@ -1,0 +1,73 @@
+{
+ "feature": "f1-shared-flow",
+ "raw_evidence": "/mnt/project-files/evals-cache/f1-shared-flow/",
+ "note": "Raw evidence (Sejda outputs, captures, logs, Lighthouse runs and our matching captures) moved out of git per docs/process/workflow.md 'Reference (Sejda) runs'. Hashes let a re-eval verify the cache is unchanged.",
+ "moved_on": "2026-11-25",
+ "files": [
+  {
+   "path": "sejda-t1-before-run.png",
+   "bytes": 42884,
+   "sha256": "eb17005716e0ff3f98b1162a800d0be421aaafc2cf9cfa4de2e723346f832d65"
+  },
+  {
+   "path": "sejda-t1-pre-rotated.pdf",
+   "bytes": 1621,
+   "sha256": "1b9e630fd45b19a312af97e7b431db9cf41f8a94451f064fecb3c2cc237f78e3"
+  },
+  {
+   "path": "sejda-t1-result.png",
+   "bytes": 58346,
+   "sha256": "476365c7d5005385f7c356bba0fdee592815ad113e40a041e81b90c1fac6a0bc"
+  },
+  {
+   "path": "sejda-t1.json",
+   "bytes": 1390,
+   "sha256": "ab7aaa215bcab3eb5ea23e8fcc304f0e8b6e7a3d1dba96d222b9f0410b8203bf"
+  },
+  {
+   "path": "sejda-t2-before-run.png",
+   "bytes": 42466,
+   "sha256": "a108d6c07fab467b40be87b4247fe7d3bf09dc3df2573b32df1032a5ff793944"
+  },
+  {
+   "path": "sejda-t2-pwmodal.png",
+   "bytes": 35091,
+   "sha256": "f0fdc3b8dea03a38b9f69077add02f522ad0822cccec2a8d9e4be3ee6a4969c1"
+  },
+  {
+   "path": "sejda-t2-result.png",
+   "bytes": 59548,
+   "sha256": "52567faa7dc25ce00e4300a4616f1ea179dc18912496f59bac0909656ff10133"
+  },
+  {
+   "path": "sejda-t2-user-pw.pdf",
+   "bytes": 1682,
+   "sha256": "69d00a46c844fd13f3bb7e4477ab09c57a8f899d498b3667c6eb81466f5d0081"
+  },
+  {
+   "path": "sejda-t2.json",
+   "bytes": 1529,
+   "sha256": "bea8f497df436b01c72cc4c610af4183d1f3f6edfa98c36acd6f8f31ae7dcc4f"
+  },
+  {
+   "path": "sejda-t3-before-run.png",
+   "bytes": 42466,
+   "sha256": "a108d6c07fab467b40be87b4247fe7d3bf09dc3df2573b32df1032a5ff793944"
+  },
+  {
+   "path": "sejda-t3-owner-restricted.pdf",
+   "bytes": 1682,
+   "sha256": "e2ead748278ba410c4c4cf3bf5550876187b2feb1f6f4655a819a7767bd0ac34"
+  },
+  {
+   "path": "sejda-t3-result.png",
+   "bytes": 61794,
+   "sha256": "85d933b0b96185a4c32ff520ce5d18bffde4d9010aea769915070590c054c32b"
+  },
+  {
+   "path": "sejda-t3.json",
+   "bytes": 2170,
+   "sha256": "c0bd68d194ba60917b9bdeec0e4a9f084d747441ddaa6d7c82b3830739483e76"
+  }
+ ]
+}

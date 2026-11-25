@@ -142,7 +142,7 @@ Sejda numbers are reused from the cache unless marked new.
 - Candidate: https://web-staging-qzq5fa2g7q-uc.a.run.app/edit-pdf. `/api/health` reports version `f68ba1d058ee077f4feb8d89fe2fcdad6f70c939`. Staging now serves the full library: `/fonts/lib/manifest.json` counts 1,971 families, 7,933 faces (the first evaluation saw 54 families, Latin only). That is why three criteria that passed on Latin letters now fail on other alphabets.
 - Sizes: 1280x800 and 390x844 (touch), device scale factor 2, headless Chromium 1243.
 - Sejda evidence: reused from the first evaluation, plus one real task and four upload-only visits today (see "Sejda tasks spent").
-- Our raw outputs, logs and scripts: `docs/evals/cache/f24-font-library/rerun/`. Our screenshots: `/mnt/project-files/designs/fonts/eval-rerun/`. New Sejda captures, logs, output and three side-by-side images (`05-clip-typed.png`, `05-cff-line-open.png`, `08-output-fidelity-clip.png`): `/mnt/project-files/evals-cache/f24/` (not in git).
+- Our raw outputs, logs and scripts: `/mnt/project-files/evals-cache/f24-font-library/rerun/`. Our screenshots: `/mnt/project-files/designs/fonts/eval-rerun/`. New Sejda captures, logs, output and three side-by-side images (`05-clip-typed.png`, `05-cff-line-open.png`, `08-output-fidelity-clip.png`): `/mnt/project-files/evals-cache/f24/` (not in git).
 
 ### Summary
 
@@ -267,8 +267,8 @@ Sejda numbers are reused from the first evaluation unless marked new.
 - Candidate: https://web-staging-qzq5fa2g7q-uc.a.run.app/edit-pdf (deployed from `main` `a0920ba` at 17:05 UTC; serves the in-app font copy: 54 families, 179 faces, Latin and Latin-ext slices only)
 - Harness: Playwright (headless Chromium 1243), pikepdf, pypdfium2 (text, per-character font, renders), fontTools, reportlab, Pillow, axe-core 4.14.1, Lighthouse 12 (mobile). No source code, builder notes or PR text were read. One exception to note: the earlier Sejda-driving script from the 17:01 check (`scratchpad/sejda.cjs`) was read for Sejda selectors only.
 - Fixtures: `tests/parity/editor/` (`chrome-justified-mixed.pdf`, `libreoffice-memo.pdf`, `std14-reportlab.pdf`, `latex-type1.pdf`, `latex-type1c.pdf`, `cid-bold-run.pdf`, `font-coverage-1p.pdf`), plus files generated for this eval from the fonts staging itself serves and from DejaVu Sans / Inter on the test machine: nine PDFs with 141 library faces under hidden names, `ac281-library-family.pdf`, `ac282-name-lies.pdf`, and own-font files (TTF, WOFF, WOFF2, OTF, a no-embedding font, a truncated font, a text file renamed `.ttf`, an empty `.otf`, a `.txt`).
-- Screenshots (both sites, 1280x800 and 390x844, DSF 2): `/mnt/project-files/designs/fonts/eval/`. Side-by-side images (Sejda left): same folder, `01-…` to `08-…`, copied to `/mnt/project-files/comparisons/f24-font-library/` and, at half size, to `docs/evals/cache/f24-font-library/micro/`.
-- Raw outputs, logs and the harness scripts: `docs/evals/cache/f24-font-library/`.
+- Screenshots (both sites, 1280x800 and 390x844, DSF 2): `/mnt/project-files/designs/fonts/eval/`. Side-by-side images (Sejda left): same folder, `01-…` to `08-…`, copied to `/mnt/project-files/comparisons/f24-font-library/` and, at half size, to `/mnt/project-files/evals-cache/f24-font-library/micro/`.
+- Raw outputs, logs and the harness scripts: `/mnt/project-files/evals-cache/f24-font-library/`.
 
 ## Summary
 
