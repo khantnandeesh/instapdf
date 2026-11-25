@@ -293,7 +293,7 @@ All on 2026-11-24, UTC. Requests to Sejda were queued at 1 per second. No accoun
 | # | Apply (UTC) | Ready | Task | Cached output | Result |
 |---|---|---|---|---|---|
 | T1 | 17:15:47 | not captured | `chrome-justified-mixed.pdf`: click the first run, End, type " for Dvořák". Task `TEF5LIU1-202611241815` | none (screenshots `sejda-t1-*.png`) | **Output lost.** The result's Download button is inside an iframe and the script looked in the page. A second visit could not fetch it (the task is tied to the first visit: status 404). It counts as a task. |
-| T2 | 17:27:02 | 17:27:08.6 (6.6 s); downloaded 17:27:09.5 | The same edit. Task `Y3O3QH4Z-202611241827` | `cache/f24-font-library/sejda-t2-line-edit-dvorak.pdf` | 34,763 B, qpdf-clean. See below. |
+| T2 | 17:27:02 | 17:27:08.6 (6.6 s); downloaded 17:27:09.5 | The same edit. Task `Y3O3QH4Z-202611241827` | `/mnt/project-files/evals-cache/f24/first-eval-sejda-t2-line-edit-dvorak.pdf` (moved out of git 2026-11-25) | 34,763 B, qpdf-clean. See below. |
 
 Upload-only visits (no Apply): one rehearsal (17:14), one for the phone and desktop captures of the line edit and the font menu (17:28–17:31), one for the first-screen measurements (17:56–17:57), and two attempts to reopen the T1 result. Nothing was sent to Sejda after 17:57:08.
 

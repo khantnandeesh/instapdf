@@ -692,3 +692,13 @@ test("AC-313: on a phone a message takes the hint's action in; the two are never
   await expect(hint).toHaveAttribute("data-side", "docked");
   await expect(input).toHaveCount(1);
 });
+
+test("AC-299: the edit box opens at once: no fade or other animation over the page's own text", async ({ page }) => {
+  await open(page, "libreoffice-memo.pdf");
+  const input = await edit(page, lineWith(page, "Team memo"));
+  const style = await input.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { animation: s.animationName, opacity: s.opacity, running: el.getAnimations().length };
+  });
+  expect(style).toEqual({ animation: "none", opacity: "1", running: 0 });
+});
