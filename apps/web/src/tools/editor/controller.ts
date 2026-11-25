@@ -65,7 +65,7 @@ import { pdfOutputName, baseName } from "@/lib/pdf/naming";
 import { openPdf } from "@/lib/pdf/pdfjs";
 import type { EditResult, PageText } from "@/lib/editor/berry-engine";
 import { foldName } from "@/lib/font-library/client";
-import { coverOf, getFontState, chooseStandIn, chosenStandIn, fontLabel, registerWithEngine, standInCandidates } from "./font-service";
+import { coverOf, getFontState, chooseStandIn, chosenPartners, chosenStandIn, planCover, fontLabel, registerWithEngine, standInCandidates } from "./font-service";
 import { warmDocFaces } from "./doc-face";
 import { displayBytes, ensureTwinDisplay, retwin, twinCount } from "./twin-display";
 import type { Store, ToolId } from "./store";
@@ -590,8 +590,11 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
           const standInId = ctl.standInIdOf(sub.substitute_font);
           const original = familyOfFont(sub.original_font);
           const embedded = s.texts[e.src]?.fonts.find((f) => f.name === sub.original_font)?.embedded !== false;
-          store.set({ fontNotice: { original, embedded, standIn: sub.substitute_font, standInId, fontName: sub.original_font, src: e.src, line: e.line, text: e.text, key: Date.now() } });
-          ui.announce(`${original} ${embedded ? "isn’t complete in this file" : "isn’t in this file"}. Using ${sub.substitute_font}.`);
+          // Two fonts may share the letters (one for most, another for a letter only it has): both are named.
+          const names = [...new Set(result.substitutions.filter((x) => !x.same_family && x.original_font === sub.original_font).map((x) => x.substitute_font))];
+          const using = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : sub.substitute_font;
+          store.set({ fontNotice: { original, embedded, standIn: using, standInId, fontName: sub.original_font, src: e.src, line: e.line, text: e.text, key: Date.now() } });
+          ui.announce(`${original} ${embedded ? "isn’t complete in this file" : "isn’t in this file"}. Using ${using}.`);
         } else store.set({ fontNotice: null });
       } catch (err) {
         // Typed Hindi, Arabic or similar into a line of the default build: load the shaping
@@ -636,8 +639,8 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     },
 
     /** The person picks, while typing, the font that draws what a document font lacks. */
-    async pickStandIn(key: string, id: string | undefined) {
-      chooseStandIn(key, id);
+    async pickStandIn(key: string, id: string | undefined, partners: readonly string[] = []) {
+      chooseStandIn(key, id, partners);
       ctl.standIns.clear();
       await callEngine({ op: "clearFonts" }).catch(() => {});
     },
@@ -786,10 +789,32 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         // A character none of them has: said at once, naming only that character, without
         // fetching and trying one font after another first (AC-312).
         const asked2 = [...new Set(err.chars)];
-        const { has, none } = await coverOf(ids, err.request.bold, err.request.italic, asked2);
+        const { has, by, none } = await coverOf(ids, err.request.bold, err.request.italic, asked2);
         if (none.length) throw { ...err, chars: none.join("") };
-        for (const id of ids) {
-          if (!has.get(id)) continue;
+        const able = ids.filter((id) => has.get(id));
+        // The fonts the edit box named, each for its own letters, registered together: one try,
+        // not one font after another (AC-312). The engine takes the first registered font that
+        // has a letter, so the order here is the order of the box's own font list.
+        const choice = chosenStandIn(foldName(err.request.families[0] ?? ""));
+        const plan = planCover(choice ? [choice, ...chosenPartners(foldName(err.request.families[0] ?? ""))] : able.slice(0, 1), able, by, asked2);
+        const tried = new Set<string>();
+        let ready = plan.length > 0;
+        for (const { id } of plan) {
+          if (!wanted()) throw stale();
+          tried.add(id);
+          if (await registerWithEngine(id, err.request.bold, err.request.italic, err.chars)) ctl.standIns.set(fontLabel(id), id);
+          else ready = false;
+        }
+        if (ready) {
+          try {
+            return await callEngine(call);
+          } catch (again) {
+            if (!isEngineError(again) || again.kind !== "missing-glyphs") throw again;
+          }
+        }
+        // A font of the plan the engine can't use: the others, one at a time.
+        for (const id of able) {
+          if (tried.has(id)) continue;
           if (!wanted()) throw stale();
           if (!(await registerWithEngine(id, err.request.bold, err.request.italic, err.chars))) continue;
           ctl.standIns.set(fontLabel(id), id);

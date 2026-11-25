@@ -166,11 +166,45 @@ export function fontLabel(id: string): string {
 }
 
 /** Remembers (or with `id` undefined, forgets) the person's stand-in for a document family (folded name). */
-export function chooseStandIn(key: string, id: string | undefined): void {
+export function chooseStandIn(key: string, id: string | undefined, partners: readonly string[] = []): void {
   if (id) choices.set(key, id);
   else choices.delete(key);
+  if (id && partners.length) partnersOf.set(key, [...partners]);
+  else partnersOf.delete(key);
 }
 export const chosenStandIn = (key: string) => choices.get(key);
+/** The fonts that draw what the chosen stand-in lacks too, as the edit box showed them. */
+export const chosenPartners = (key: string): readonly string[] => partnersOf.get(key) ?? [];
+const partnersOf = new Map<string, string[]>();
+
+/**
+ * Which font draws which of `chars`: the fonts in `first` take what they have, in order, then
+ * the font of `order` with the most of what is left, until nothing is left or no font has any.
+ * The hint, the edit box and the saved file all follow this one answer.
+ */
+export function planCover(first: readonly string[], order: readonly string[], by: ReadonlyMap<string, readonly string[]>, chars: readonly string[]): { id: string; chars: string[] }[] {
+  const left = new Set(chars);
+  const plan: { id: string; chars: string[] }[] = [];
+  const rest = (id: string) => (by.get(id) ?? []).filter((c) => left.has(c));
+  const take = (id: string) => {
+    const got = rest(id);
+    if (!got.length || plan.some((p) => p.id === id)) return;
+    for (const c of got) left.delete(c);
+    plan.push({ id, chars: got });
+  };
+  for (const id of first) take(id);
+  while (left.size) {
+    let best = "";
+    let most = 0;
+    for (const id of order) {
+      const n = rest(id).length;
+      if (n > most) [best, most] = [id, n];
+    }
+    if (!best) break;
+    take(best);
+  }
+  return plan;
+}
 
 /**
  * Font ids to try for the characters a document font lacks, best first: the person's choice,
@@ -201,15 +235,16 @@ export async function standInCandidates(info: FontInfo | undefined, request: Fon
  * Which of `ids` have any of `chars` (how many each), and the characters none of them has.
  * Read from the fonts' own lists of characters: no font file is fetched for it.
  */
-export async function coverOf(ids: readonly string[], bold: boolean, italic: boolean, chars: readonly string[]): Promise<{ has: Map<string, number>; none: string[] }> {
+export async function coverOf(ids: readonly string[], bold: boolean, italic: boolean, chars: readonly string[]): Promise<{ has: Map<string, number>; by: Map<string, string[]>; none: string[] }> {
   await resolveFonts([...ids]).catch(() => undefined);
   // A built-in family may have these characters in the library's copy of it.
   await widenFor([...ids], chars.join("")).catch(() => undefined);
   const m = knownManifest();
   const faces = ids.map((id) => [id, m?.faces[id] ? faceOf(m, id, bold, italic) : undefined] as const);
-  const has = new Map(faces.map(([id, face]) => [id, face ? chars.filter((c) => fileFor(face, c.codePointAt(0)!)).length : 0]));
-  const none = chars.filter((c) => !faces.some(([, face]) => face && fileFor(face, c.codePointAt(0)!)));
-  return { has, none };
+  const by = new Map(faces.map(([id, face]) => [id, face ? chars.filter((c) => fileFor(face, c.codePointAt(0)!)) : []]));
+  const has = new Map([...by].map(([id, got]) => [id, got.length]));
+  const none = chars.filter((c) => ![...by.values()].some((got) => got.includes(c)));
+  return { has, by, none };
 }
 
 /**

@@ -1,0 +1,3 @@
+OwnTestSans-Regular.ttf is a test font: a subset of Arimo Regular (Copyright 2010 Google,
+Apache License 2.0, https://www.apache.org/licenses/LICENSE-2.0), renamed, with U+2E18 mapped
+to an existing glyph so tests have a letter that only a font the person adds can draw.
