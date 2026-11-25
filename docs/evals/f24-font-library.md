@@ -1,5 +1,106 @@
 # Evaluation: F24 Font library and font matching
 
+## Re-evaluation 2026-11-25, seventh (staging 8686e4b)
+
+- **Verdict: PASS.** The one case the sixth verdict failed (AC-312 on a line whose font the PDF only names, after "Use your own font") is fixed: box and file now agree letter by letter at 1280, 390 and 320. Nothing that was spot-checked regressed.
+- Evaluated: 2026-11-25, 21:00–21:25 UTC, by parity-evaluator. **Narrow re-check**: only the failing case and the spot-checks listed below were run; every other result is carried from the sixth run and marked so. No source code, builder notes or PR text were read.
+- Candidate: https://web-staging-qzq5fa2g7q-uc.a.run.app/edit-pdf. `/api/health` reports version `8686e4b2aab1ca2b74cd71ae2cee78c94cf54200` before and after the run.
+- Sizes: 1280x800, 390x844 (touch) and 320x640 (touch), device scale factor 2, headless Chromium.
+- **No Sejda task and no request to sejda.com.** AC-312 is judged against our own criterion; the reference evidence is the cache of the earlier rounds.
+- Scripts: `docs/evals/cache/f24-font-library/eval-7/scripts/` (`run.sh` lists the order; `r7.cjs` is one runner built on the sixth run's `s292n.cjs`, `s292e.cjs`, `s312q.cjs`, `s312o.cjs` and `axe2.cjs`; `out312.py`, `fonts.py`, `st.cjs` reused as they were). Notes, timings and hashes: `eval-7/manifest.json`. Logs, the 46 downloaded files and screenshots: `/mnt/project-files/evals-cache/f24-font-library/eval-7/` (`logs/`, `outputs/`, `shots/`; not in git). Fixtures: `ac283-named-only.pdf` and `own-dejavu.ttf` of `eval-4/fixtures/`, `tests/parity/editor/chrome-justified-mixed.pdf`.
+
+### Summary
+
+| Gate | Bar | Result | OK |
+|---|---|---|---|
+| P0 ACs | all pass | **23 / 23 judged** (AC-312 re-run and passes; the other 22 carried from the sixth run, three of them spot-checked) | yes |
+| All ACs | at least 90% | 26 / 27 judged (96%); AC-296 (P1) is still the deferred fail | yes |
+| Lighthouse performance (mobile) | at least 90 | 99 / 99 / 97 (median 99), **carried from the sixth run, not re-run** | yes |
+| axe critical issues | none | 0 violations of any impact in the 88 hint states opened in this run (1280, 390, 320); the other states carried from the sixth run | yes |
+| Micro-checks | no lose unless owned elsewhere or waived | **carried from the sixth run**: M2 lose, owned by F23 per the lead's note; rest win | yes, with M2 as noted |
+
+### The failing case, re-run
+
+`ac283-named-only.pdf`, line 0 (ArialMT, not embedded, drawn in its twin Arimo), `own-dejavu.ttf` added through "Use your own font". "Box" is what the browser really draws (DevTools' platform fonts per text node, with glyph counts), "file" is which font object of the download maps each typed letter (`logs/r7*.log`, `logs/out312.log`). Each row was run three times (first pass plus two repeats) unless noted; all runs gave the same hint, status, box fonts and file fonts.
+
+| Case | Size | Hint and status after the font is added | Box | File | Notice | Enter to saved |
+|---|---|---|---|---|---|---|
+| A " ř ⸘" | 1280 | "Not in this font: ⸘ [DejaVu Sans, in use]"; "DejaVu Sans draws it." | ř Arimo (web), ⸘ DejaVu Sans (web) | `BERRYA+Arimo` ř, `BERRYB+DejaVuSans` ⸘ | "ArialMT isn’t in this file. Using Arimo and DejaVu Sans." | 359, 376, 462 ms |
+| A | 390 | "Missing: ⸘ [DejaVu Sans, in use]"; same status | same | same | same | 354, 406, 441 ms |
+| A | 320 | as 390 | same | same | same | 413, 476, 487 ms |
+| B " Ω ⸘ ok" | 1280 | as A | Ω, o, k Arimo (web), ⸘ DejaVu Sans (web) | `BERRYA+Arimo` Ω, `BERRYB+DejaVuSans` ⸘; "ok" stays in the PDF's own ArialMT | same | 461, 487, 504 ms |
+| B | 390 | as A at 390 | same | same | same | 453, 477, 522 ms |
+| B | 320 | as A at 320 | same | same | same | 450, 503, 592 ms |
+| D: " ⸘" with the font added and saved on line 0, then " ř Ω" on the other ArialMT line ("END") | 1280 (3 runs), 390 (1) | second edit: no hint, empty status (nothing is missing) | ř, Ω Arimo (web) | `BERRYB+Arimo` ř, `BERRYC+Arimo` Ω; `BERRYA+DejaVuSans` only ⸘ | on that line "Using Arimo."; on line 0 "Using DejaVu Sans." | second Enter 186–201 ms |
+| E: " ř Ω", no font added | 1280 (3 runs), 390 (1) | no hint | ř, Ω Arimo (web) | `BERRYA+Arimo` ř, `BERRYB+Arimo` Ω (15,368 B, as in the sixth run) | "Using Arimo." | 591–696 ms |
+
+- D now equals E for the letters the twin has, so adding a font no longer changes what a later edit is written in. In the sixth run A, B and D had ř and Ω in the DejaVu Sans subset with no Arimo in the file.
+- Before the font is added the hint reads "Not in this font: ⸘. No font here has it. Use your own font, or remove it." and ⸘ is the only glyph a system font draws; once added, no system font draws anything.
+- Extra, beyond the brief: the same " ř ⸘" on the Helvetica line of the fixture (1280, once): same result, "Helvetica isn’t in this file. Using Arimo and DejaVu Sans.". " नया ⸘ ok" on the ArialMT line (1280, 3 runs): Noto Sans Devanagari for नया, DejaVu Sans only for ⸘ in hint, status, box and file, 757–858 ms. Pressing the DejaVu Sans button when it is the only one offered changes nothing (box and file as case A).
+- Screenshots of box and saved line: `shots/r7-nA-*-box.png` / `-saved.png`, and the pairs `r7-nB-1280-box-over-saved.png`, `r7-nA-390-box-over-saved.png`: the letters stand in the same place before and after saving.
+
+### Criteria
+
+| AC | Pri | Result | Run in this round? | Evidence |
+|---|---|---|---|---|
+| AC-271 | P0 | PASS | carried from the sixth run | |
+| AC-275 | P0 | PASS | carried from the sixth run (0 non-GET requests in every session of this run as well) | |
+| AC-280 | P0 | PASS | carried from the sixth run | |
+| AC-281 | P0 | PASS | carried from the sixth run | |
+| AC-282 | P0 | PASS | carried from the sixth run | |
+| AC-283 | P0 | PASS | carried; **one line spot-checked** | ArialMT line, no font added (case E, 1280 and 390): opens in Arimo (web) for every word, box 423 px on a 423.4 px line (139 on 138.5 at 390), " ř Ω" saved in Arimo subsets, "END" at the same x and y after saving, 14 of 14 source fonts unchanged and none gained a font program |
+| AC-284 | P0 | PASS | carried from the sixth run | |
+| AC-286 | P0 | PASS | carried from the sixth run (the notice named every stand-in in every case of this run) | |
+| AC-288 | P0 | PASS | carried from the sixth run | |
+| AC-290 | P0 | PASS (as the spec words it) | carried from the sixth run | |
+| AC-291 | P0 | PASS | carried from the sixth run | |
+| AC-292 | P0 | PASS | carried; the sixth run's note on its words (named-only line after an own font) is closed by the AC-312 re-run | |
+| AC-293 | P1 | PASS | carried from the sixth run | |
+| AC-294 | P0 | PASS | carried from the sixth run | |
+| AC-295 | P0 | PASS | carried from the sixth run | |
+| AC-296 | P1 | FAIL (deferred) | carried from the sixth run, not run | The spec lists it as open |
+| AC-298 | P0 | PASS | carried from the sixth run | |
+| AC-299 | P0 | PASS | carried from the sixth run | |
+| AC-300 | P0 | PASS | carried from the sixth run | |
+| AC-301 | P0 | PASS | carried; **one pick spot-checked** | Embedded line, " ř ⸘", font added, DejaVu Sans pressed (1280): hint reorders to "DejaVu Sans [in use], Tinos, STIX Two Text", status "DejaVu Sans draws them.", box DejaVu Sans (web) x2, file `BERRYA+DejaVuSans` maps "ř⸘", notice "Using DejaVu Sans.", saved 231 ms after Enter |
+| AC-302 | P1 | PASS | carried from the sixth run | |
+| AC-303 | P1 | PASS | carried from the sixth run | |
+| AC-304 | P0 | PASS | carried from the sixth run | |
+| AC-310 | P0 | PASS | carried from the sixth run | |
+| AC-311 | P0 | PASS | carried from the sixth run | |
+| AC-312 | P0 | **PASS** | **re-run**: the named-only case in full (table above); the embedded mixed case as a spot-check; the 54 sessions before a font is added are carried | Named-only line: 11 runs of " ř ⸘" (9 of case A, one with the button pressed, one on the Helvetica line), 9 of " Ω ⸘ ok", 4 of case D, 4 of case E, 3 of " नया ⸘ ok": box and file agree per letter in all, hint, status and notice name the fonts that are used. Embedded line ("in full.", Liberation Serif): " ř ⸘" at 1280 and 390 (3 runs each): "Tinos draws ř. DejaVu Sans draws ⸘.", box Tinos (web) x1 + DejaVu Sans (web) x1, file `BERRYA+Tinos` ř + `BERRYB+DejaVuSans` ⸘ (37,234 B, to the byte as in the sixth run), 358–537 ms; " नया ⸘ ok" (3 runs each): "Noto Serif Devanagari draws न य ा k. DejaVu Sans draws ⸘.", file `BERRYA/B+NotoSerifDevanagari` नया and k + `BERRYC+DejaVuSans` ⸘, 688–763 ms at 1280 and 744–800 ms at 390 |
+| AC-313 | P0 | PASS | carried from the sixth run (phone row in this run: 366x40 at y 722 at 390, 296x40 at y 518 at 320, as before) | |
+| AC-305, AC-306 | P0 | informational | carried from the sixth run | |
+
+Not judged, as before: AC-270, AC-272, AC-273, AC-274; AC-285, AC-287, AC-297.
+
+### Regression checks of this round
+
+- **Saved files carry no extra font files.** All 46 downloads of this run against their sources (`scripts/outfonts.sh`, `logs/outfonts.log`): source font objects unchanged in every file (14 of 14 in the 32 named-only files, 5 of 5 in the 14 embedded ones), no named-only font gained a font program, syntax check clean, 1 page each. Added subsets: 956–1,352 B for library fonts, 12.9–13.2 KB for the person's own font.
+- **axe 4.14.1**: 0 violations of any impact in the 88 states opened (first hint, own font added, after a pick, hint on a second edit) across 1280, 390 and 320 (`logs/r7*.log`, `outputs/axe-*.json`).
+- 0 non-GET requests in every session.
+- Lighthouse and the micro-checks M1–M12 were **not re-run**; the sixth run's results stand (performance 99 / 99 / 97; M2 lose owned by F23, rest win). No new side-by-side captures: neither side's first screen or flow changed in what was looked at.
+
+### Gap list
+
+Blocking: none.
+
+Open, not blocking (numbers 2 to 11 of the sixth run's list are carried unchanged and were not re-checked, except where said):
+
+1. **Same line, second edit after an added font was saved on it** (case C, re-run once at 1280; the sixth run's gap 5): " ř Ω" typed again on line 0 reads "Not in this font: ř Ω" with "DejaVu Sans [in use], Arimo, Advent Pro", the box draws them in DejaVu Sans and the file has them in DejaVu Sans. Box and file agree, so it does not break AC-312, but the twin has both letters and a line of the same font next to it (case D) gets them in Arimo with no hint. The same on an embedded font: after " ⸘" is saved on "in full.", " ř Ω" on another Liberation Serif line is offered and written in DejaVu Sans (hint says so; Tinos is second). Prefer the closest font first, as before the font was added.
+2. **Seen, not judged:** in the open box of "Total amount due: ₹ 45,000 — including GST" (`chrome-justified-mixed.pdf`) the existing "₹" is drawn by a system font (Inter) while the rest is the file's Liberation Serif. Whether this is new was not established (the sixth run's script did not list that node), and AC-298's ink comparison passed on this file in the sixth run. Worth a look when AC-298 is next measured.
+3. The saved line's hit area sits 0.2–0.8 px higher and 0.2 px further left than before once it holds a DejaVu Sans letter (1280: x 207.6 to 207.4, y 187.6 to 186.8; with Devanagari 1.5 px higher and 0.9 px left). The drawn letters do not move in the screenshots. Cosmetic.
+4. Carried from the sixth run, unchanged and not re-checked: Devanagari mix refused in more than 0.6 s; "Use your own font" with Enter from the keyboard; Enter pressed before the hint's fonts are listed; first page at 1280 slow in some runs; phone row with three answers at 320; AC-298 lines exactly on the bar; menu and line disagreeing on `ac282-name-lies.pdf`; twin files requested twice and two objects of one family per slice (seen again: `BERRYB+Arimo` and `BERRYC+Arimo` in case D); AC-296; the NUL after a saved Devanagari word in PDFium (seen again).
+
+### Not checked
+
+- Everything marked "carried" above. Lighthouse, M1–M12, AC-298's ink and baseline numbers and the 54 before-a-font-is-added sessions of AC-312 were not run in this round.
+- Only `own-dejavu.ttf` (has ⸘, ř and Ω) was used. An own font that has ⸘ but not ř, an OTF, a font added from the font menu before anything is typed, and leaving the box by a click instead of Enter on the named-only line were not tried.
+- Named-only fonts other than ArialMT and Helvetica (both twinned to Arimo) were not tried in the mixed case; a serif twin (Times to Tinos) is untested here.
+- Width 375 px: the phone runs were at 390 and 320.
+
+---
+
 ## Re-evaluation 2026-11-25, sixth (staging e95b2c2)
 
 - **Verdict: FAIL** (narrowly: one P0 criterion, AC-312, fails on one case. Everything the fifth evaluation blocked on is fixed on the line it was reported on, an embedded font. On a line whose font the PDF only names, the box and the saved file still disagree after "Use your own font".)
