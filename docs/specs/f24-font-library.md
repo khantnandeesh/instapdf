@@ -229,3 +229,34 @@ The fourth evaluation (staging 6fbd651) failed on two cases: AC-298 (the open bo
 
 Still open: gaps 7, 9 to 12, 14 to 16; AC-296; the items listed as open in the fourth verdict; text typed straight into an emptied box (outside the line's own parts) is placed by padding alone, so it can sit up to a pixel off until the line is opened again.
 
+
+### After the fifth evaluation (tenth PR)
+
+One cause sat behind what was left of AC-312: the hint, the edit box and the save each worked out
+"which font draws the missing letters" for themselves, and each assumed one font. They now share
+one answer, `planCover` in `tools/editor/font-service.ts`:
+
+- The font in use draws every missing letter it has. The font with the most of the rest draws the
+  rest (a font the person added counts), and so on until nothing is left or no font has any.
+- **Hint.** Every font of the plan is offered, even one whose single letter no other font has. When
+  two fonts share the letters, each stands beside its own ("ř Tinos  ⸘ DejaVu Sans"), both are
+  marked in use, and the status reads "Tinos draws ř. DejaVu Sans draws ⸘.". Picking another font
+  makes it the first font and the plan is worked out again.
+- **Box.** The box's font list is the plan, in order, so each letter is drawn before Enter in the
+  font the file gets.
+- **Save.** The plan the box showed is kept with the person's choice. On Enter the fonts of the
+  plan are registered together, in order (the engine takes the first registered font that has a
+  letter), and the edit is tried once. Only if the engine can't use one of them are other fonts
+  tried one at a time. The notice names every font used ("Using Tinos and DejaVu Sans.").
+- **Row.** The desktop hint is up to 380 px (560 px with two answers) and wraps inside its paper
+  instead of letting a font stand outside it. On a phone the row stays one line: a long font name
+  gives way with an ellipsis, the letters never do.
+- **Order.** `rankStandIns` gives the box and the save the same order of fonts, so a save made before
+  the box has recorded a choice picks as the box would.
+- **Name.** The phone's short "Your font" button is named "Your font: use your own font", so its
+  name holds the words on it.
+
+Still open: if the font the PDF asks for by name is registered as the second font of a plan, the
+engine prefers it for letters both fonts have, so the hint can name the first font for a letter the
+second one draws. It needs a picked font that is not the named one plus a letter only the named one
+adds; not seen in the corpus.

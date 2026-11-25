@@ -720,6 +720,17 @@ for (const [script, letter] of [
   });
 }
 
+test("the hint shows missing letters whole, as typed: a vowel sign is never shown alone", async ({ page }) => {
+  await open(page, "std14-reportlab.pdf");
+  const input = await edit(page, lineWith(page, "REF-7731-ZEBRA"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" नया");
+  await expect(input).toHaveAttribute("data-missing", "नया");
+  const chars = page.getByTestId("line-missing").locator(".ed-input__chars").first();
+  await expect(chars).toHaveText("न या");
+  await input.press("Escape");
+});
+
 test("AC-300: Enter on a named-only line with a letter no font here draws answers at once and keeps the text", async ({ page }) => {
   await open(page, "std14-reportlab.pdf");
   const input = await edit(page, lineWith(page, "REF-7731-ZEBRA"));
@@ -881,4 +892,50 @@ test("AC-312: of two letters typed together, the one no font has is named, and E
   // Only the letter that can't be drawn is named, and the text is still in the box.
   await expect(notice).not.toContainText("“ř”");
   await expect(input).toContainText("ř ⸘");
+});
+
+test("AC-312: a font the person adds for the letter no font has is named for that letter, drawn in the box, and saved at once", async ({ page, isMobile }) => {
+  await open(page, "chrome-justified-mixed.pdf");
+  const input = await edit(page, lineWith(page, "in full"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ř ⸘");
+  await expect(page.getByTestId("line-missing-none")).toHaveText(isMobile ? "⸘ no font" : "No font has ⸘.", { timeout: 20_000 });
+  // On a phone the button's name holds the words on it.
+  const own = page.getByTestId("line-missing-own");
+  expect(await own.evaluate((el) => (el.getAttribute("aria-label") ?? el.textContent!).includes(el.textContent!))).toBe(true);
+  await page.getByTestId("line-missing-own-file").setInputFiles(corpus("fonts/OwnTestSans-Regular.ttf"));
+  // Each font is named with the letters it draws, and nothing is said to be missing any more.
+  const status = page.getByTestId("line-missing-status");
+  await expect(status).toContainText(/ draws ř\. Own Test Sans draws ⸘\./, { timeout: 20_000 });
+  await expect(status).not.toContainText("No font here");
+  await expect(page.getByTestId("line-missing-none")).toHaveCount(0);
+  const fonts = page.getByTestId("line-missing-font");
+  const added = fonts.filter({ hasText: "Own Test Sans" });
+  await expect(added).toHaveAttribute("aria-pressed", "true");
+  await expect(added).toHaveAttribute("data-draws", "⸘");
+  await expect(page.locator('[data-testid="line-missing-font"][data-draws="ř"]')).toHaveAttribute("aria-pressed", "true");
+  // Every font offered lies inside the row's paper, and the row inside the screen.
+  const fits = await page.getByTestId("line-missing").evaluate((row) => {
+    const r = row.getBoundingClientRect();
+    const inside = [...row.querySelectorAll("button")].every((b) => {
+      const q = b.getBoundingClientRect();
+      return q.left >= r.left - 0.5 && q.right <= r.right + 0.5 && q.top >= r.top - 0.5 && q.bottom <= r.bottom + 0.5;
+    });
+    return inside && r.left >= 0 && r.right <= innerWidth + 0.5;
+  });
+  expect(fits).toBe(true);
+  // The box draws ⸘ with the added font, the one the file gets.
+  const family = await added.evaluate((b) => b.style.fontFamily.split(",")[0]!.trim());
+  const stack = await input.evaluate((el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) if (n.nodeValue!.includes("⸘")) return getComputedStyle(n.parentElement!).fontFamily;
+    return "";
+  });
+  expect(stack).toContain(family);
+  const started = Date.now();
+  await page.keyboard.press("Enter");
+  await expect(lineWith(page, "ř ⸘")).toBeVisible({ timeout: 5_000 });
+  // One try with both fonts, not one font after another.
+  expect(Date.now() - started).toBeLessThan(2000);
+  await expect(page.getByTestId("line-input")).toHaveCount(0);
 });

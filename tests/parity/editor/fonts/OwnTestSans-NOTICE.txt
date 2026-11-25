@@ -1,0 +1,7 @@
+OwnTestSans-Regular.ttf is a test font: a three-character subset of Arimo Regular 1.341,
+renamed, with U+2E18 mapped to an existing glyph so tests have a letter that only a font the
+person adds can draw.
+
+Copyright 2020 The Arimo Project Authors (https://github.com/googlefonts/arimo)
+Licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org).
+The licence text is in OFL.txt beside this file.
