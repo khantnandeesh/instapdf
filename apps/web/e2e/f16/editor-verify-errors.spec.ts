@@ -73,15 +73,18 @@ test("a line that would run into its page number says so, and Replace with new t
   await expect(page.getByTestId("line-input")).toHaveText(`${before} and more`);
   await notice.getByRole("button", { name: "Replace with new text" }).click();
   await expect(page.getByTestId("line-input")).toHaveCount(0);
-  await expect(page.locator(`[data-testid="line"][data-text="${before}"]`)).toHaveCount(1);
-  await expect(page.locator('[data-kind="whiteout"]')).toHaveCount(1);
+  // The old line is taken out of the file (F24 M8: nothing is covered up, and the text is in
+  // the file once), and the typed text stands in its place.
+  await expect(page.locator(`[data-testid="line"][data-text="${before}"]`)).toHaveCount(0);
+  await expect(page.locator('[data-kind="whiteout"]')).toHaveCount(0);
   const box = page.locator('[data-kind="text"]');
   await expect(box).toHaveCount(1);
   await expect(box).toContainText("1.2 Introduction");
   await expect(box).toContainText("and more");
-  // One step: undo removes both.
+  // One step: undo takes the box away and brings the line back.
   await page.keyboard.press("Control+z");
   await expect(page.locator('[data-kind="whiteout"], [data-kind="text"]')).toHaveCount(0);
+  await expect(page.locator(`[data-testid="line"][data-text="${before}"]`)).toHaveCount(1, { timeout: 15_000 });
 });
 
 test("an unknown verify failure gets the safe message and the fallback; the log has the reason, not the file's text", async ({ page }) => {

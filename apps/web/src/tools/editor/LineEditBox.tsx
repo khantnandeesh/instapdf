@@ -16,12 +16,13 @@
  * while typing is what Enter writes. Where the engine can't preview, a font that joins letters
  * stands in, as before.
  */
+import { textOffsets } from "@/lib/editor/line-offsets";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { FontInfo, LinePreview, PageText } from "@/lib/editor/berry-engine";
 import { cssFamily, faceOf, fileFor } from "@/lib/editor/fonts";
 import { isComplex, needsShaping } from "@/lib/editor/shaping";
-import { ensureFace, knownManifest, resolveFonts } from "@/lib/editor/fonts-browser";
+import { ensureFace, knownManifest, resolveFonts, widenFor } from "@/lib/editor/fonts-browser";
 import { foldName } from "@/lib/font-library/client";
 import { cx } from "@/components/ui/cx";
 import { useCtl } from "./context";
@@ -45,6 +46,11 @@ const generic = (font: FontInfo | undefined) => (font?.monospace ? "ui-monospace
 /** The key a person's stand-in choice is kept under: the same name the controller asks the engine's request by. */
 const familyKey = (font: FontInfo) => foldName(font.family || font.name);
 const cleaned = (s: string | null) => (s ?? "").replace(/[\r\n]+/g, " ");
+
+/** Accents a PDF may draw as a glyph of their own over a letter (TeX does). */
+const ACCENT = /[\u00B4\u0060\u00A8\u02C6\u02DC\u00AF\u02D8\u02D9\u02DA\u00B8\u02C7]/;
+/** A part of the box's text: a new one starts with each font and each word. */
+type Piece = { span: HTMLElement; from: number };
 
 type Scan = { at: number | null; ranges: Range[]; missing: { font: number; chars: string[] } | null; unasked: Map<number, string> };
 
@@ -154,6 +160,14 @@ export function LineEditBox({
   const wide = useStore(ctl.store, (s) => s.wide);
   const [slot, setSlot] = useState<Element | null>(null);
   const hintFocused = useRef(false);
+  /** A stand-in font this edit took on its own, and what was remembered before it. */
+  const taken = useRef<{ key: string; before: string | undefined } | null>(null);
+  const cancel = () => {
+    const t = taken.current;
+    taken.current = null;
+    if (t) void ctl.pickStandIn(t.key, t.before);
+    onCancel();
+  };
   useLayoutEffect(() => {
     if (wide) return setSlot(null);
     const area = document.querySelector<HTMLElement>(".ed-toasts");
@@ -212,6 +226,13 @@ export function LineEditBox({
   /** The line as the engine draws it (joined scripts), and whether it is the text in the box now. */
   const [drawn, setDrawn] = useState<{ preview: LinePreview; current: boolean } | null>(null);
   const settled = fontIds.every((i) => i in faces);
+  /** Each word is set where the page has it (tab gaps, dot leaders, tracking, accents), on lines the browser sets left to right. */
+  const byWord = !!pageOrigin && !turned && Math.abs(line.angle) < 0.01 && line.direction !== "rtl" && !needsShaping(line.text);
+  const pieces = useRef<Piece[]>([]);
+  /** The line's runs and words by their place in its text (the engine's own numbers drift after a ligature). */
+  const runAt = textOffsets(line.text, line.runs) ?? line.runs;
+  const wordAt = textOffsets(line.text, line.words);
+  const words = byWord && wordAt ? line.words.map((w, i) => ({ ...w, ...wordAt[i]! })) : [];
   // Shown in the document's fonts only; a font that never arrives gives way after a long wait.
   const ready = settled || waited || !!drawn;
   /** Joined-script lines on an upright page are drawn from the engine's glyphs. */
@@ -306,9 +327,108 @@ export function LineEditBox({
     sel?.addRange(caret);
   };
 
+  /**
+   * Sets each word where the page has it: a gap the text has no characters for (a tab, dot
+   * leaders, justified text) goes before its word, tracking and a wider or narrower setting go
+   * between its letters, and an accent drawn as a glyph of its own goes over its letter. Kept
+   * per unit of zoom on each part. False when the line has no words to go by.
+   */
+  const fitWords = (): false | "now" | "later" => {
+    const ps = pieces.current;
+    if (!words.length || !ps.length) return false;
+    const node = (offset: number, end: boolean): [Node, number] | null => {
+      for (let i = ps.length - 1; i >= 0; i--) {
+        const p = ps[i]!;
+        if (end ? p.from < offset : p.from <= offset) {
+          const n = p.span.firstChild;
+          return n ? [n, Math.min(offset - p.from, n.nodeValue?.length ?? 0)] : null;
+        }
+      }
+      return null;
+    };
+    const rect = (a: number, b: number): DOMRect | null => {
+      const from = node(a, false);
+      const to = node(b, true);
+      if (!from || !to) return null;
+      const r = document.createRange();
+      r.setStart(from[0], from[1]);
+      r.setEnd(to[0], to[1]);
+      return r.getBoundingClientRect();
+    };
+    const set = (span: HTMLElement, key: "ml" | "mr" | "ls", px: number) => {
+      span.dataset[key] = String(px / scale);
+      span.style[key === "ml" ? "marginLeft" : key === "mr" ? "marginRight" : "letterSpacing"] = `${px}px`;
+    };
+    const wordOf = (offset: number) => words.find((w) => w.start <= offset && offset < w.end);
+    // An accent that the page draws over a letter, where the text has it beside the letter.
+    const letter = (i: number) => /\p{L}/u.test(value[i] ?? "");
+    for (const p of ps) {
+      const t = p.span.textContent ?? "";
+      const word = t.length === 1 && ACCENT.test(t) ? wordOf(p.from) : undefined;
+      if (!word) continue;
+      const all = rect(word.start, word.end);
+      const own = rect(p.from, p.from + 1);
+      if (!all || !own) continue;
+      // Only where the word is shorter on the page than its letters set side by side: an acute
+      // typed for an apostrophe ("d´une") stands beside its letters on the page too.
+      if (all.width - (word.bbox.x1 - word.bbox.x0) * scale < own.width * 0.35) continue;
+      const before = p.from > word.start && letter(p.from - 1) ? (rect(p.from - 1, p.from)?.width ?? 0) : 0;
+      const after = p.from + 1 < word.end && letter(p.from + 1) ? (rect(p.from + 1, p.from + 2)?.width ?? 0) : 0;
+      // Glyphs read left to right, so an accent no wider than the letter before it sits on that
+      // one; a dotless i or j is there for the accent before it.
+      const onNext = after && (/[\u0131\u0237]/.test(value[p.from + 1]!) || !before || own.width > before + 0.5);
+      const left = onNext ? (after - own.width) / 2 : before ? -(before + own.width) / 2 : null;
+      if (left === null) continue;
+      set(p.span, "ml", left);
+      set(p.span, "mr", -(left + own.width));
+    }
+    // Each word as long as on the page.
+    for (const w of words) {
+      const r = rect(w.start, w.end);
+      const want = (w.bbox.x1 - w.bbox.x0) * scale;
+      const inside = ps.filter((p) => p.from >= w.start && p.from < w.end && !p.span.dataset.mr);
+      const letters = inside.reduce((n, p, i) => n + [...(p.span.textContent ?? "").slice(0, (inside[i + 1]?.from ?? w.end) - p.from)].length, 0);
+      if (!r || !r.width || !letters) continue;
+      const diff = want - r.width;
+      if (Math.abs(diff) > 0.5 && Math.abs(diff) < want * 0.25) for (const p of inside) set(p.span, "ls", diff / letters);
+    }
+    // Each word where the page has it, counted from the first. What most single spaces are short
+    // by is the line's word spacing (justified text), so a space typed later is as wide as those.
+    const lefts = words.map((w) => rect(w.start, w.start + 1)?.left);
+    const moves: { span: HTMLElement; px: number; spaces: number; space: boolean }[] = [];
+    let shift = 0;
+    for (let i = 1; i < words.length; i++) {
+      const p = ps.find((q) => q.from === words[i]!.start);
+      if (!p || lefts[i] === undefined || lefts[0] === undefined) continue;
+      const px = (words[i]!.bbox.x0 - words[0]!.bbox.x0) * scale - (lefts[i]! - lefts[0] + shift);
+      const gap = value.slice(words[i - 1]!.end, words[i]!.start);
+      moves.push({ span: p.span, px, spaces: gap.split(" ").length - 1, space: gap === " " });
+      shift += px;
+    }
+    const single = moves.filter((m) => m.space).map((m) => m.px).sort((a, b) => a - b);
+    const common = single.length > 1 ? single[single.length >> 1]! : 0;
+    const spacing = Math.abs(common) > 0.5 && single.filter((v) => Math.abs(v - common) <= 0.5).length >= single.length * 0.8 ? common : 0;
+    if (spacing) setFit({ word: spacing / scale });
+    // What is too small to set at one word is carried to the next, so it never adds up along the line.
+    let carry = 0;
+    for (const m of moves) {
+      const px = m.px - spacing * m.spaces + carry;
+      carry = Math.abs(px) > 0.5 ? 0 : px;
+      if (!carry) set(m.span, "ml", px + Number(m.span.dataset.ml ?? 0) * scale);
+    }
+    return spacing ? "later" : "now";
+  };
+
   const rescan = () => {
     const box = el.current;
     if (!box) return;
+    // An accent's part that was typed into is ordinary text again: it no longer sits over a letter.
+    for (const span of box.querySelectorAll<HTMLElement>("[data-mr]"))
+      if ((span.textContent ?? "").length !== 1) {
+        delete span.dataset.ml;
+        delete span.dataset.mr;
+        span.style.marginLeft = span.style.marginRight = "";
+      }
     const found = scan(box, facesRef.current, first);
     setInputWidth(box.offsetWidth);
     mark(found.ranges);
@@ -333,15 +453,27 @@ export function LineEditBox({
     let same = 0;
     while (same < value.length && same < line.text.length && value[same] === line.text[same]) same++;
     const whole = value === line.text;
-    const runs = whole ? line.runs : line.runs.filter((run, k) => k === 0 || run.start < same);
+    const runsAt = line.runs.map((run, k) => ({ ...run, start: runAt[k]!.start }));
+    const runs = whole ? runsAt : runsAt.filter((run, k) => k === 0 || run.start < same);
+    const cuts = new Set<number>();
+    if (whole && words.length) {
+      for (const w of words) cuts.add(w.start);
+      for (let i = 0; i < value.length; i++) if (ACCENT.test(value[i]!)) cuts.add(i).add(i + 1);
+    }
+    pieces.current = [];
     runs.forEach((run, k) => {
-      const span = document.createElement("span");
-      span.dataset.font = String(run.font);
-      span.dataset.size = String(run.size);
-      span.dataset.color = run.color.join(" ");
       const from = k === 0 ? 0 : run.start;
-      span.textContent = k === runs.length - 1 ? value.slice(from) : value.slice(from, runs[k + 1]!.start);
-      box.append(span);
+      const to = k === runs.length - 1 ? value.length : runs[k + 1]!.start;
+      const at = [from, ...[...cuts].filter((c) => c > from && c < to).sort((a, b) => a - b), to];
+      for (let j = 0; j + 1 < at.length; j++) {
+        const span = document.createElement("span");
+        span.dataset.font = String(run.font);
+        span.dataset.size = String(run.size);
+        span.dataset.color = run.color.join(" ");
+        span.textContent = value.slice(at[j], at[j + 1]);
+        box.append(span);
+        pieces.current.push({ span, from: at[j]! });
+      }
     });
     if (!runs.length) box.textContent = value;
     // No line breaks or rich formatting: the box holds one line of plain text.
@@ -407,6 +539,10 @@ export function LineEditBox({
       span.style.fontSize = `${Number(span.dataset.size) * scale}px`;
       span.style.color = ready ? `rgb(${span.dataset.color})` : "";
       span.style.lineHeight = "0";
+      // Where the page sets this part (fitWords), at this zoom.
+      span.style.marginLeft = span.dataset.ml ? `${Number(span.dataset.ml) * scale}px` : "";
+      span.style.marginRight = span.dataset.mr ? `${Number(span.dataset.mr) * scale}px` : "";
+      span.style.letterSpacing = span.dataset.ls ? `${Number(span.dataset.ls) * scale}px` : "";
     }
     if (!ready) return;
     // The baseline as the browser really drew it, read off a mark of no size, against the page's.
@@ -425,7 +561,13 @@ export function LineEditBox({
       let fitted = false;
       // Fitted to the line's length on the page (justified text, tracking), measured once.
       // (Lines drawn from the engine's glyphs are fitted to those glyphs instead, below.)
-      if (!turned && value === line.text && length > 0 && !engineDrawn) {
+      const byWords = value === line.text && length > 0 && !engineDrawn && fitWords();
+      // (With word spacing still to come, the caret is placed once that is drawn.)
+      if (byWords) {
+        fitted = byWords === "later";
+        setInputWidth(box.offsetWidth);
+      }
+      else if (!turned && value === line.text && length > 0 && !engineDrawn) {
         const all = document.createRange();
         all.selectNodeContents(box);
         const diff = length - all.getBoundingClientRect().width;
@@ -488,6 +630,8 @@ export function LineEditBox({
     void (async () => {
       const ids = await standInCandidates(info, { families: [info.family || info.name], bold: info.bold, italic: info.italic }, chars);
       await resolveFonts([...ids, ...getFontState().user.map((u) => u.id)]).catch(() => undefined);
+      // A built-in family may have these characters in the library's copy of it.
+      await widenFor(ids, chars).catch(() => undefined);
       const m = knownManifest();
       // Those that have the most of the missing characters first; closeness decides between equals.
       const has = (id: string) => {
@@ -505,7 +649,11 @@ export function LineEditBox({
       if (kept && kept.font === missing.font && kept.ids.length === able.length && able.every((id) => kept.ids.includes(id))) able.splice(0, able.length, ...kept.ids);
       const picked = kept && kept.font === missing.font && able.includes(kept.picked) ? kept.picked : (able[0] ?? "");
       // What the box shows is what the file gets: the font in use is recorded as the choice.
-      if (picked && chosenStandIn(familyKey(info)) !== picked) await ctl.pickStandIn(familyKey(info), picked);
+      if (picked && chosenStandIn(familyKey(info)) !== picked) {
+        // Taken without being asked: an edit given up with Escape leaves no trace of it.
+        taken.current ??= { key: familyKey(info), before: chosenStandIn(familyKey(info)) };
+        await ctl.pickStandIn(familyKey(info), picked);
+      }
       if (alive) setStandIn({ font: missing.font, chars, ids: able, picked });
     })().catch(() => undefined);
     return () => {
@@ -615,7 +763,7 @@ export function LineEditBox({
           data-side={inMessage ? "message" : docked ? "docked" : side}
         >
           <span className={inMessage ? "sr-only" : undefined}>
-            {docked ? "Not in " : "Not in this font: "}
+            {docked ? "Missing: " : "Not in this font: "}
             <span className="ed-input__chars">{missing.chars.slice(0, 8).join(" ")}</span>
           </span>
           {shown && shown.ids.length > 0 && (
@@ -637,6 +785,7 @@ export function LineEditBox({
                     if (!font || shown.picked === id) return el.current?.focus({ preventScroll: true });
                     // Another font may be able to save what the last one couldn't.
                     ctl.retryable();
+                    taken.current = null;
                     void ctl.pickStandIn(familyKey(font), id);
                     setStandIn({ ...shown, picked: id });
                     el.current?.focus({ preventScroll: true });
@@ -697,7 +846,7 @@ export function LineEditBox({
           return;
         }
         if (e.key !== "Escape") return;
-        onCancel();
+        cancel();
         (e.target as HTMLElement).blur();
       }}
     >
@@ -765,7 +914,7 @@ export function LineEditBox({
             e.currentTarget.blur();
           } else if (e.key === "Escape") {
             e.preventDefault();
-            onCancel();
+            cancel();
             e.currentTarget.blur();
           }
         }}

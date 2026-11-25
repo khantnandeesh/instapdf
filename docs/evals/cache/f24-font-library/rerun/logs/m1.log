@@ -1,0 +1,3 @@
+22:35:19.058 reportlab-mono-subset.pdf rows 2 pending 0 ms 3102 ["Helvetica => Arimo · Very close","Fixture Mono => Roboto Mono · Exact"] []
+22:36:01.406 match-regular.pdf rows 55 pending 0 ms 33675 ["Helvetica => Arimo · Very close","EvalMatcRegu000 => Alex Brush · Exact","EvalMatcRegu001 => Allura · Exact"] []
+22:37:01.674 match-bold-italic.pdf rows 88 pending 0 ms 52444 ["Helvetica => Arimo · Very close","EvalMatcBoldItal000 Bold Italic => Arimo · Exact","EvalMatcBoldItal001 Bold => Arimo · Exact"] []
