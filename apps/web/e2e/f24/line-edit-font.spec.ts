@@ -732,3 +732,39 @@ test("AC-300: Enter on a named-only line with a letter no font here draws answer
   await expect(page.locator(".ed-toast")).toContainText("⸘", { timeout: 2000 });
   await expect(page.getByTestId("line-input")).toContainText("⸘");
 });
+
+test("AC-298: a letter the page sets apart for its accent keeps its place in the box (caf é)", async ({ page }) => {
+  await open(page, "latex-type1c.pdf");
+  const line = lineWith(page, "cafe");
+  const pageWidth = (await line.boundingBox())!.width;
+  const input = await edit(page, line);
+  const got = await input.evaluate((el) => {
+    const spans = [...el.querySelectorAll("span")];
+    const accent = spans.findIndex((s) => s.textContent === "´");
+    const e = spans[accent - 1]!.getBoundingClientRect();
+    const f = spans[accent - 2]!.getBoundingClientRect();
+    return { gap: e.left - f.right, text: spans[accent - 1]!.textContent, width: el.getBoundingClientRect().width };
+  });
+  expect(got.text).toBe("e");
+  // The page has about 3 CSS px between "caf" and its accented letter at this size.
+  expect(got.gap).toBeGreaterThan(1.5);
+  expect(Math.abs(got.width - pageWidth)).toBeLessThanOrEqual(3);
+});
+
+test("AC-304: a raised mark of another line inside the row stays drawn while the row is edited", async ({ page }) => {
+  await open(page, "latex-type1c.pdf");
+  await edit(page, lineWith(page, "A footnote mark"));
+  const kept = page.getByTestId("line-kept-ink");
+  await expect(kept).toHaveCount(1);
+  // The mark itself is in the copy laid over the box's paper, and the copy sits inside the box.
+  const dark = await kept.evaluate((c: HTMLCanvasElement) => {
+    const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i]! + d[i + 1]! + d[i + 2]! < 300) n++;
+    return n;
+  });
+  expect(dark).toBeGreaterThan(10);
+  const [k, b] = [(await kept.boundingBox())!, (await page.getByTestId("line-input").boundingBox())!];
+  expect(k.x).toBeGreaterThanOrEqual(b.x - 1);
+  expect(k.x + k.width).toBeLessThanOrEqual(b.x + b.width + 1);
+});

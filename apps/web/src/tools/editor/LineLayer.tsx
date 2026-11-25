@@ -142,6 +142,8 @@ export function LineLayer({
     let paperBottom = 0;
     /** Where the other lines' text is drawn (its ink, not its taller line box): the hint keeps off it. */
     const around: { left: number; right: number; top: number; bottom: number }[] = [];
+    /** Other text inside this row (a raised footnote mark, a subscript), in layer coordinates. */
+    const inRow: { left: number; top: number; width: number; height: number }[] = [];
     if (!box.transform) {
       const mid = box.top + box.height / 2;
       text.lines.forEach((other, k) => {
@@ -152,7 +154,13 @@ export function LineLayer({
         const bottom = o.cy + o.thickness / 2;
         // Text whose own middle is inside this row is part of it (a raised footnote mark, a
         // subscript): the ring goes around the row, never through its letters to spare the mark.
-        if (o.cy > box.top + box.height * 0.2 && o.cy < box.top + box.height * 0.8) return;
+        if (o.cy > box.top + box.height * 0.2 && o.cy < box.top + box.height * 0.8) {
+          // The box's paper would hide it, so it is drawn again over the paper (AC-304).
+          const left = Math.max(o.cx - o.length / 2, box.left);
+          const right = Math.min(o.cx + o.length / 2, box.left + box.width);
+          if (right > left) inRow.push({ left, top: o.cy - o.thickness / 2, width: right - left, height: o.thickness });
+          return;
+        }
         if (o.cy > mid) paperBottom = Math.max(paperBottom, Math.min(box.top + box.height - top, box.height / 2 - 1));
         else if (o.cy < mid) paperTop = Math.max(paperTop, Math.min(bottom - box.top, box.height / 2 - 1));
       });
@@ -173,7 +181,7 @@ export function LineLayer({
       const [x, y] = toScreen(0, 0, view, rotation, scale);
       pageOrigin = { x, y };
     }
-    return { box, start, pageOrigin, length: b.length, maxWidth: displaySize(view, rotation, scale).width - box.left - 2, paperInset: { top: Math.max(0, paperTop), bottom: Math.max(0, paperBottom) }, around };
+    return { box, start, pageOrigin, length: b.length, maxWidth: displaySize(view, rotation, scale).width - box.left - 2, paperInset: { top: Math.max(0, paperTop), bottom: Math.max(0, paperBottom) }, around, inRow };
   };
 
   return (
@@ -223,14 +231,17 @@ export function LineLayer({
           );
         })}
       </div>
-      {editing && editLine && (
+      {editing && editLine && (() => {
+        const { inRow, ...rest } = editBox();
+        return (
+          <>
         <LineEditBox
           key={`${editing.line}`}
           text={text}
           line={editLine}
           value={editing.text}
           scale={scale}
-          {...editBox()}
+          {...rest}
           point={point.current}
           paper={() => paperOf(editing.line)}
           onChange={onChange}
@@ -246,7 +257,38 @@ export function LineLayer({
             cancelled.current = true;
           }}
         />
-      )}
+            {inRow.map((r, k) => (
+              <KeptInk key={`${editing.line}-${k}`} rect={r} raster={() => list.current?.parentElement?.parentElement?.querySelector<HTMLCanvasElement>("canvas.ed-raster") ?? null} />
+            ))}
+          </>
+        );
+      })()}
     </div>
   );
 }
+
+/**
+ * A piece of the drawn page shown again over the edit box's paper: text of another line that
+ * stands inside the row being edited, which the paper would otherwise hide. Taken once, as the
+ * page was when the box opened; darker pixels only (multiply), so the paper under it stays as it is.
+ */
+function KeptInk({ rect, raster }: { rect: { left: number; top: number; width: number; height: number }; raster: () => HTMLCanvasElement | null }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const from = raster();
+    const to = ref.current;
+    if (!from || !to || !from.clientWidth) return;
+    const k = from.width / from.clientWidth;
+    to.width = Math.max(1, Math.round(rect.width * k));
+    to.height = Math.max(1, Math.round(rect.height * k));
+    try {
+      to.getContext("2d")?.drawImage(from, rect.left * k, rect.top * k, rect.width * k, rect.height * k, 0, 0, to.width, to.height);
+    } catch {
+      // Nothing to copy from: the mark shows again when the box closes.
+    }
+    // Once, for the page as it was when the line was opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return <canvas ref={ref} aria-hidden data-testid="line-kept-ink" className="pointer-events-none absolute" style={{ ...rect, mixBlendMode: "multiply", zIndex: 2 }} />;
+}
+

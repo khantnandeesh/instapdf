@@ -381,6 +381,7 @@ export function LineEditBox({
       if (left === null) continue;
       set(p.span, "ml", left);
       set(p.span, "mr", -(left + own.width));
+      if (!onNext) p.span.dataset.over = "before";
     }
     // Each word as long as on the page.
     for (const w of words) {
@@ -390,7 +391,13 @@ export function LineEditBox({
       const letters = inside.reduce((n, p, i) => n + [...(p.span.textContent ?? "").slice(0, (inside[i + 1]?.from ?? w.end) - p.from)].length, 0);
       if (!r || !r.width || !letters) continue;
       const diff = want - r.width;
-      if (Math.abs(diff) > 0.5 && Math.abs(diff) < want * 0.25) for (const p of inside) set(p.span, "ls", diff / letters);
+      if (Math.abs(diff) <= 0.5 || Math.abs(diff) >= want * 0.25) continue;
+      // A word with an accent over one of its letters: what it is longer by on the page stands
+      // before that letter (TeX sets the accented letter after a small gap), not between all of them.
+      const accent = ps.find((p) => p.from > w.start && p.from < w.end && p.span.dataset.over === "before");
+      const base = accent && diff > 0 ? ps.find((p) => p.from === accent.from - 1 && p.from > w.start) : undefined;
+      if (base) set(base.span, "ml", diff);
+      else for (const p of inside) set(p.span, "ls", diff / letters);
     }
     // Each word where the page has it, counted from the first. What most single spaces are short
     // by is the line's word spacing (justified text), so a space typed later is as wide as those.
@@ -427,6 +434,7 @@ export function LineEditBox({
       if ((span.textContent ?? "").length !== 1) {
         delete span.dataset.ml;
         delete span.dataset.mr;
+        delete span.dataset.over;
         span.style.marginLeft = span.style.marginRight = "";
       }
     const found = scan(box, facesRef.current, first);
@@ -458,7 +466,9 @@ export function LineEditBox({
     const cuts = new Set<number>();
     if (whole && words.length) {
       for (const w of words) cuts.add(w.start);
-      for (let i = 0; i < value.length; i++) if (ACCENT.test(value[i]!)) cuts.add(i).add(i + 1);
+      // An accent is a part of its own, and so is the letter before it (the page may set that
+      // letter apart from the rest of its word: "caf é").
+      for (let i = 0; i < value.length; i++) if (ACCENT.test(value[i]!)) cuts.add(i).add(i + 1).add(Math.max(0, i - 1));
     }
     pieces.current = [];
     runs.forEach((run, k) => {
