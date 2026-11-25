@@ -1,0 +1,5 @@
+const { open, load, log } = require("./lib.cjs");
+(async () => { const { browser, page } = await open({}); await load(page, "chrome-justified-mixed.pdf");
+  const o = page.getByRole("option", { name: /^and it stays/ }); const b = await o.boundingBox(); await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2); await page.getByTestId("line-input").waitFor();
+  for (const w of [50, 600, 2000]) { await page.waitForTimeout(w); log(w, JSON.stringify(await page.evaluate(() => { const el = document.querySelector("[data-testid=line-input]"); return { sub: el.getAnimations({ subtree: true }).map((a) => [a.constructor.name, a.animationName || a.transitionProperty, a.playState, a.effect && a.effect.getComputedTiming().duration, a.effect && a.effect.getComputedTiming().iterations, a.effect && a.effect.target && (a.effect.target.dataset.testid || a.effect.target.className), a.effect && a.effect.pseudoElement, JSON.stringify(a.effect.getKeyframes()).slice(0, 200)]), all: document.getAnimations().length }; }))); }
+  await browser.close(); })();

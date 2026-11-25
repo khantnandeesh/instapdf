@@ -1,0 +1,39 @@
+ 0 chrome-justified 'Service Agreement'        own      xor  59.4% off>1px   0.5% | f0 xor  36.8% | neighbours' ink lost 0/1646 | ink cols 6-237 -> 5-237
+ 1 chrome-justified 'This agreement is made'   own      xor 107.0% off>1px   6.5% | f0 xor  83.8% | neighbours' ink lost 0/3177 | ink cols 4-537 -> 4-537
+ 2 chrome-justified 'and it stays in force '   own      xor 145.7% off>1px  15.7% | f0 xor 110.5% | neighbours' ink lost 0/3429 | ink cols 5-537 -> 5-537
+ 3 chrome-justified 'Total amount due: ₹ 45'   own      xor 101.9% off>1px   4.9% | f0 xor   0.0% | neighbours' ink lost 0/2580 | ink cols 4-281 -> 4-280
+ 4 chrome-justified 'non-refundable'           own      xor  73.5% off>1px   2.7% | f0 xor  45.6% | neighbours' ink lost 0/1061 | ink cols 5-95 -> 5-94
+ 5 libreoffice-memo 'The meeting moves to F'   own      xor  85.5% off>1px   0.5% | f0 xor  72.0% | neighbours' ink lost 0/1719 | ink cols 5-348 -> 4-348
+ 6 libreoffice-memo 'Please bring the signe'   own      xor 116.1% off>1px  35.3% | f0 xor  90.9% | neighbours' ink lost 0/1694 | ink cols 5-310 -> 5-310
+ 7 libreoffice-memo 'Team memo'                own      xor  53.4% off>1px   1.0% | f0 xor  49.7% | neighbours' ink lost 0/1294 | ink cols 4-118 -> 4-118
+ 8 std14-reportlab. 'Quarterly review'         close    xor  35.3% off>1px   0.1% | f0 xor  29.9% | neighbours' ink lost 0/2237 | ink cols 5-200 -> 5-200
+ 9 std14-reportlab. 'This page is a synthet'   close    xor 110.6% off>1px   0.2% | f0 xor  82.9% | neighbours' ink lost 0/3460 | ink cols 5-360 -> 5-359
+10 std14-reportlab. 'it went to the client '   close    xor  93.6% off>1px   1.5% | f0 xor  63.3% | neighbours' ink lost 0/2838 | ink cols 6-246 -> 5-245
+11 latex-type1.pdf  'The effect of ﬁnite st'   close    xor  41.0% off>1px   3.6% | f0 xor   0.0% | neighbours' ink lost 0/1230 | ink cols 4-276 -> 4-276
+12 latex-type1.pdf  'Results don’t match th'   close    xor  55.6% off>1px   6.1% | f0 xor  43.1% | neighbours' ink lost 0/1602 | ink cols 5-224 -> 5-221
+13 latex-type1c.pdf 'The eﬀect of ﬁnite sti'   own      xor  28.0% off>1px   0.5% | f0 xor  31.2% | neighbours' ink lost 0/1230 | ink cols 4-275 -> 4-275
+14 latex-type1c.pdf 'Results don’t match th'   own      xor  32.0% off>1px   1.7% | f0 xor  24.9% | neighbours' ink lost 0/1608 | ink cols 5-224 -> 5-223
+15 latex-type1c.pdf 'Normal bold and normal'   own      xor 103.2% off>1px   0.5% | f0 xor  97.0% | neighbours' ink lost 0/1805 | ink cols 5-174 -> 5-173
+16 latex-type1c.pdf '1'                        own      xor  94.4% off>1px  33.3% | f0 xor  88.9% | neighbours' ink lost 139/1961 | ink cols 0-11 -> 0-11
+17 latex-type1c.pdf 'A footnote mark follow'   own      xor 107.2% off>1px   2.5% | f0 xor  75.5% | neighbours' ink lost 0/1940 | ink cols 4-139 -> 4-139
+18 latex-type1c.pdf '1.2 Introduction . . .'   own      xor  29.9% off>1px   0.0% | f0 xor  28.9% | neighbours' ink lost 0/1824 | ink cols 6-208 -> 5-208
+19 latex-type1c.pdf '7'                        own      xor  33.3% off>1px   0.0% | f0 xor  33.3% | neighbours' ink lost 0/265 | ink cols 5-9 -> 5-9
+20 latex-type1c.pdf 'Left column text'         own      xor  28.0% off>1px   0.0% | f0 xor  21.0% | neighbours' ink lost 0/1515 | ink cols 5-91 -> 5-91
+21 latex-type1c.pdf 'Right column text'        own      xor  62.9% off>1px   0.4% | f0 xor  54.2% | neighbours' ink lost 0/9 | ink cols 5-100 -> 5-99
+22 latex-type1c.pdf 'cafe´ naıve'              own      xor 142.2% off>1px   6.0% | f0 xor 137.1% | neighbours' ink lost 0/1162 | ink cols 5-58 -> 4-58
+23 latex-type1c.pdf 'Spaced out words here'    own      xor 123.8% off>1px   8.2% | f0 xor  87.7% | neighbours' ink lost 0/698 | ink cols 5-141 -> 5-140
+24 latex-type1c.pdf 'Wide scaled line'         own      xor  69.7% off>1px   1.6% | f0 xor  67.0% | neighbours' ink lost 0/585 | ink cols 5-106 -> 4-106
+25 reportlab-mono-s 'The quick brown fox ju'   own      xor 117.2% off>1px  32.8% | f0 xor  95.6% | neighbours' ink lost 0/0 | ink cols 5-491 -> 5-490
+31 cid-bold-run.pdf 'Invoice total for the '   own      xor  31.8% off>1px   1.0% | f0 xor  22.6% | neighbours' ink lost 0/1049 | ink cols 5-200 -> 5-199
+32 cid-bold-run.pdf 'Office ligatures: offi'   own      xor  96.3% off>1px   2.3% | f0 xor  75.2% | neighbours' ink lost 0/1053 | ink cols 5-195 -> 5-195
+33 font-coverage-1p 'charter line one: tota'   own      xor  82.9% off>1px   0.0% | f0 xor  65.5% | neighbours' ink lost 0/3512 | ink cols 5-243 -> 5-242
+34 font-coverage-1p 'jetbrains mono line: t'   own      xor  82.2% off>1px   1.4% | f0 xor  70.0% | neighbours' ink lost 0/1729 | ink cols 6-412 -> 6-411
+35 /tmp/claude-0/-h 'Arial invoice: total d'   close    xor  64.5% off>1px   0.0% | f0 xor  46.2% | neighbours' ink lost 0/1118 | ink cols 5-272 -> 5-271
+36 /tmp/claude-0/-h 'Courier New invoice: t'   close    xor  69.9% off>1px   0.3% | f0 xor  60.8% | neighbours' ink lost 0/1942 | ink cols 5-446 -> 5-446
+37 /tmp/claude-0/-h 'Calibri invoice: total'   close    xor  68.0% off>1px   0.0% | f0 xor  18.0% | neighbours' ink lost 0/2055 | ink cols 5-266 -> 5-266
+38 /tmp/claude-0/-h 'Cambria invoice: total'   close    xor  76.3% off>1px   0.0% | f0 xor  69.3% | neighbours' ink lost 0/1830 | ink cols 5-280 -> 5-280
+39 /tmp/claude-0/-h 'Georgia invoice: total'   close    xor 120.8% off>1px  45.6% | f0 xor   0.0% | neighbours' ink lost 0/2178 | ink cols 5-299 -> 5-300
+40 /tmp/claude-0/-h 'Segoe UI invoice: tota'   close    xor 104.9% off>1px  45.8% | f0 xor   0.0% | neighbours' ink lost 0/2505 | ink cols 5-308 -> 5-308
+41 /tmp/claude-0/-h 'Arial Bold invoice: to'   close    xor   4.6% off>1px   0.0% | f0 xor   6.9% | neighbours' ink lost 0/2395 | ink cols 5-337 -> 5-337
+42 /tmp/claude-0/-h 'Times New Roman Italic'   close    xor  74.4% off>1px   0.2% | f0 xor  77.7% | neighbours' ink lost 0/3040 | ink cols 6-392 -> 6-392
+43 /tmp/claude-0/-h 'Segoe UI Bold invoice:'   close    xor  66.0% off>1px  11.7% | f0 xor  68.2% | neighbours' ink lost 0/1588 | ink cols 5-371 -> 5-372

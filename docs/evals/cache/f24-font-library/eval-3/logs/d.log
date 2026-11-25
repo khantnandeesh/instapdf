@@ -1,0 +1,63 @@
+02:00:50.997 ac281-library-family pending over time 1s:4 6s:0
+02:00:50.997 ac281-library-family rows 4 settled after ms 5588
+Helvetica => Arimo · Same widths
+Lora => Lora · Exact
+Merriweather => Merriweather · Exact
+Montserrat => Montserrat · Exact
+02:00:55.385 ac281-library-family line 0 {"hint":"Not in this font: ř á | Lora | Brygada 1918 | PT Serif","status":"Not in this font: ř á. Lora draws them.","fam":"bp-doc-7-1, bp-lora, Arial, Helvetica, sans-serif"}
+02:00:57.647    notice: 
+02:01:01.263 ac281-library-family line 1 {"hint":"Not in this font: ř á | Merriweather | Arimo","status":"Not in this font: ř á. Merriweather draws them.","fam":"bp-doc-11-2, bp-merriweather, Arial, Helvetica, sans-serif"}
+02:01:03.553    notice: 
+02:01:07.065 ac281-library-family line 2 {"hint":"Not in this font: ř á | Montserrat | Clarity City | Sora","status":"Not in this font: ř á. Montserrat draws them.","fam":"bp-doc-15-3, bp-montserrat, Arial, Helvetica, sans-serif"}
+02:01:09.495    notice: 
+02:01:10.882 ac281-library-family font files fetched [
+  'editor/arimo-latin-400-normal.woff',
+  'editor/carlito-latin-400-normal.woff',
+  'editor/tinos-latin-400-normal.woff',
+  'editor/caladea-latin-400-normal.woff',
+  'editor/cousine-latin-400-normal.woff',
+  'lib',
+  'editor/arimo-latin-ext-400-normal.woff'
+]
+02:01:10.882 ac281-library-family errors []
+02:01:24.318 ac282-name-lies pending over time 1s:4
+02:01:24.319 ac282-name-lies rows 4 settled after ms 5111
+Helvetica => Arimo · Same widths
+Lora => Roboto · Exact
+Roboto => Playfair Display · Exact
+Inter => Adamina · Close
+02:01:28.854 ac282-name-lies line 0 {"hint":"Not in this font: ř á | Roboto | Roboto Flex | Arimo","status":"Not in this font: ř á. Roboto draws them.","fam":"bp-doc-7-1, bp-roboto, Arial, Helvetica, sans-serif"}
+02:01:31.164    notice: - text: Lora isn’t complete in this file. Using Roboto. || - text: Lora isn’t complete in this file. Using Roboto.
+02:01:34.684 ac282-name-lies line 1 {"hint":"Not in this font: ř á | Playfair Display | PT Serif | Rufina","status":"Not in this font: ř á. Playfair Display draws them.","fam":"bp-doc-11-2, bp-playfair-display, Arial, Helvetica, sans-serif"}
+02:01:37.142    notice: - text: Roboto isn’t complete in this file. Using Playfair Display. || - text: Roboto isn’t complete in this file. Using Playfair Display.
+02:01:40.634 ac282-name-lies line 2 {"hint":"Not in this font: ř á | Besley | Roboto Serif | Montagu Slab","status":"Not in this font: ř á. Besley draws them.","fam":"bp-doc-15-3, bp-besley, Arial, Helvetica, sans-serif"}
+02:01:43.116    notice: - text: Inter isn’t complete in this file. Using Besley. || - text: Inter isn’t complete in this file. Using Besley.
+02:01:45.476 ac282-name-lies font files fetched [
+  'editor/arimo-latin-400-normal.woff',
+  'editor/tinos-latin-400-normal.woff',
+  'editor/carlito-latin-400-normal.woff',
+  'editor/caladea-latin-400-normal.woff',
+  'editor/cousine-latin-400-normal.woff',
+  'lib',
+  'editor/arimo-latin-ext-400-normal.woff'
+]
+02:01:45.477 ac282-name-lies errors []
+02:02:00.530 ac283-embedded pending over time 1s:5 6s:1
+02:02:00.531 ac283-embedded rows 5 settled after ms 6748
+Helvetica => Arimo · Same widths
+ArialMT => Arimo · Exact
+SegoeUI => Selawik · Exact
+Georgia => Roboto · Exact
+Times NewRomanPSMT => Lora · Exact
+02:02:04.905 ac283-embedded line 0 {"hint":"Not in this font: ř á | Arimo | Archivo | Zalando Sans","status":"Not in this font: ř á. Arimo draws them.","fam":"bp-doc-7-1, bp-arimo, Arial, Helvetica, sans-serif"}
+02:02:07.384    notice: - text: ArialMT isn’t complete in this file. Using Arimo. || - text: ArialMT isn’t complete in this file. Using Arimo.
+02:02:10.898 ac283-embedded line 1 {"hint":"Not in this font: ř á | Arimo | Archivo | Balsamiq Sans","status":"Not in this font: ř á. Arimo draws them.","fam":"bp-doc-11-2, bp-arimo, Arial, Helvetica, sans-serif"}
+02:02:13.317    notice: - text: Helvetica isn’t complete in this file. Using Arimo. || - text: Helvetica isn’t complete in this file. Using Arimo.
+02:02:16.814 ac283-embedded line 2 {"hint":"Not in this font: ř á | Selawik | Arimo","status":"Not in this font: ř á. Selawik draws them.","fam":"bp-doc-15-3, bp-selawik, Arial, Helvetica, sans-serif"}
+02:02:19.321    notice: - text: SegoeUI isn’t complete in this file. Using Selawik. || - text: SegoeUI isn’t complete in this file. Using Selawik.
+02:02:22.824 ac283-embedded line 3 {"hint":"Not in this font: ř á | Roboto | Roboto Flex | Arimo","status":"Not in this font: ř á. Roboto draws them.","fam":"bp-doc-19-4, bp-roboto, Arial, Helvetica, sans-serif"}
+02:02:25.230    notice: - text: Georgia isn’t complete in this file. Using Roboto. || - text: Georgia isn’t complete in this file. Using Roboto.
+TimeoutError: locator.waitFor: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for getByTestId('line-input') to be visible[22m
+

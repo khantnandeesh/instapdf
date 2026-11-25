@@ -1,0 +1,42 @@
+{
+  "feature": "f24-font-library",
+  "reference": "https://www.sejda.com/pdf-editor",
+  "raw_evidence": "/mnt/project-files/evals-cache/f24/ (not in git); first-evaluation captures in /mnt/project-files/designs/fonts/eval/",
+  "note": "Evaluator's own text only. Session tokens are removed from the cached logs.",
+  "tasks": [
+    {
+      "id": "T1 (first evaluation)", "date": "2026-11-24", "apply_utc": "17:15:47", "sejda_task": "TEF5LIU1-202611241815",
+      "fixture": "chrome-justified-mixed.pdf", "edit": "first run of line 1, End, type ' for Dvořák'",
+      "output": null, "observation": "Output lost to a harness selector fault. Captures sejda-t1-*.png."
+    },
+    {
+      "id": "T2 (first evaluation)", "date": "2026-11-24", "apply_utc": "17:27:02", "ready_s": 6.6, "sejda_task": "Y3O3QH4Z-202611241827",
+      "fixture": "chrome-justified-mixed.pdf", "edit": "same as T1",
+      "output_bytes": 34763, "output_sha256": "57bebb33927148d567ff1fa423167ce7a3ec939743431e9918f2d44494fef686",
+      "observation": "Typed text is printed over the bold word that follows; both unreadable. Edited run moves to the end of the reading order. A second Liberation Serif subset (10.5 KB) is embedded. Nothing is said about the missing letter."
+    },
+    {
+      "id": "T1 (re-evaluation 1)", "date": "2026-11-24", "apply_utc": "22:24:35", "ready_s": 6.5, "sejda_task": "DU1RDCDH-202611242324",
+      "fixture": "chrome-justified-mixed.pdf", "edit": "last run of line 1, End, type ' for Dvořák'",
+      "output_file": "sejda-rr-t1-clip-output.pdf", "output_bytes": 34228, "output_sha256": "13782640bf91584fef469dd9f8ff65284c4c2e38d2a15a50852c2f247d50cbc3",
+      "observation": "'for Dvořák' drawn in full at 503-556 pt, past the print area (524.8 pt), inside the page. 'Client' loses its italic. The run moves to the end of the reading order."
+    },
+    {
+      "id": "T2b (re-evaluation 2)", "date": "2026-11-25", "apply_utc": "02:04:45", "task_created_utc": "02:04:46", "ready_utc": "02:04:52", "ready_s": 6.0, "sejda_task": "DHJINKFM-202611250304",
+      "fixture": "latex-type1c.pdf (embedded Type 1C / CFF)", "edit": "click 'Results don't match the proof (see 1- 3).', End, type 'O'; 'Replace' in the Font Replacement dialog; 'Remove' in the 'Unused text edits' dialog",
+      "output_file": "sejda-e3-t2b-cff-output.pdf", "output_bytes": 8473, "output_sha256": "36d397105d4f838530930423f9c57297dff43392bb661a3a7f6cc2c8258b99b3",
+      "captures": "sejda-e3-t2b-cff-1-opened.png .. -4-result.png, sejda-e3-t2b-cff-output-render.png, logs e3-t2b-cff.log and sejda-e3-t2b-cff-api.log",
+      "observation": "Clicking the line collapses it into overlapping letters at its left end. Typing 'O' opens a blocking 'Font Replacement' dialog with five fonts (Amiri preselected). After Apply a second dialog ('Unused text edits') must be answered. Output: the whole line is redrawn in Helvetica, not embedded (the page is Charter); the task reports the warning that a font could not be resolved and Helvetica was used. The line moves to the end of the reading order. Page count 3, qpdf-clean, 1,614 B smaller than the source."
+    }
+  ],
+  "upload_only_visits": [
+    "2026-11-24: 17:14, 17:28-17:31, 17:56-17:57 and two attempts to reopen T1 (first evaluation)",
+    "2026-11-24: 22:22, 22:31, 22:34, 22:36 (re-evaluation 1)",
+    "2026-11-25: 02:00 (first CFF attempt this round: stopped at the 'Unused text edits' dialog, no task created), 02:03 (the visit that became T2b)"
+  ],
+  "timings": { "apply_to_ready_s": [6.6, 6.5, 6.0], "pick_to_text_s": 4.96, "upload_bytes_on_pick": [30583, 10645] },
+  "first_screen_fit": { "1366x657": "page 45% of the screen", "390x664": "46%, with sideways scroll" },
+  "options": "36 fonts in a flat list plus the document's by PostScript name; no search; no own fonts",
+  "capture_dates": ["2026-11-24", "2026-11-25"],
+  "refresh_due": "2026-12-24"
+}

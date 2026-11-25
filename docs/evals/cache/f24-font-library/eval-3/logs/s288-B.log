@@ -1,0 +1,28 @@
+02:01:53.852 B menu settled ms 1105 pending 0
+NotoKufiArabic => Noto Kufi Arabic · Close
+NotoNastaliqUrdu => Noto Nastaliq Urdu · Close
+Amiri => Amiri · Close
+Noto SansArabic => Noto Sans Arabic · Close
+Noto SansDevanagari => Noto Sans Devanagari · Close
+Noto SerifDevanagari => Noto Serif Devanagari · Close
+Noto SerifHebrew => Noto Serif Hebrew · Close
+Noto SansHebrew => Noto Sans Hebrew · Close
+Noto SerifBengali => Noto Serif Bengali · Close
+Noto SansTamil => Noto Sans Tamil · Close
+Noto SerifThai => Noto Serif Thai · Close
+02:02:01.589 B lines [["مرحبا بالعالم هذا نص",216],["ل",296],["ن",305],["م ح ل",309],["ر با با عا م هذا ص",312],["مرحبا بالعالم هذا نص",431],["مرحبا بالعالم هذا نص",524],["कुल राशि का भुगतान",631],["कुल राशि का भुगतान",713],["שלום עולם זה טקסט",804],["שלום עולם זה טקסט",883],["মোট পরিমাণ পরিশোধ",967],["மொத்த தொகை செலுத்து",1060],["ยอดรวมที่ต้องชำระ",1140]]
+02:02:11.682 B row 0 {"text":"مرحبا بالعالم هذا نص","face":"none","hint":null,"btns":null,"status":"","box":" نص جديد ظ","notice":"The edited line would run past the page edge. Your text is still in the box. Replacing it sets your text in Arimo. | Replace with new text","woff":["lib","lib"]}
+02:02:21.585 B row 1 {"text":"ل","face":"none","hint":null,"btns":null,"status":"","box":"ا ص جديد ظ","notice":"The edited line would run past the page edge. Your text is still in the box. Replacing it sets your text in Arimo. | Replace with new text","woff":["lib","lib"]}
+02:02:31.509 B row 2 {"text":"ن","face":"none","hint":null,"btns":null,"status":"","box":"ا ص جديد ظ","notice":"The edited line would run past the page edge. Your text is still in the box. Replacing it sets your text in Arimo. | Replace with new text","woff":[]}
+02:02:41.499 B row 3 {"text":"م ح ل","face":"none","hint":null,"btns":null,"status":"","box":"ا ص جديد ظ","notice":"The edited line would run past the page edge. Your text is still in the box. Replacing it sets your text in Arimo. | Replace with new text","woff":[]}
+02:02:51.403 B row 4 {"text":"ر با با عا م هذا ص","face":"none","hint":null,"btns":null,"status":"","box":"ذا ص नया झ","notice":"We couldn’t apply this edit safely, so the line is unchanged. Try a shorter change, or replace the line with new text. Your text is still in the box. Replacing it sets your text in Arimo. | Replace with new text","woff":[]}
+02:03:01.423 B row 5 {"text":"مرحبا بالعالم هذا نص","face":"none","hint":null,"btns":null,"status":"","box":"ا نص नया झ","notice":"We couldn’t apply this edit safely, so the line is unchanged. Try a shorter change, or replace the line with new text. Your text is still in the box. Replacing it sets your text in Arimo. | Replace with new text","woff":[]}
+02:03:11.481 B row 6 {"text":"مرحبا بالعالم هذا نص","face":"none","hint":null,"btns":null,"status":"","box":"ا نص חדש ץ","notice":"The edited line would run past the page edge. Your text is still in the box. Replacing it sets your text in Arimo. | Replace with new text","woff":["lib","lib","lib","lib"]}
+02:03:21.467 B row 7 {"text":"कुल राशि का भुगतान","face":"none","hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Noto SansDevanagari isn’t complete in this file. Using Noto Sans Hebrew.","woff":["lib","lib","lib"]}
+02:03:30.870 B row 8 {"text":"कुल राशि का भुगतान","face":"none","hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Noto SerifDevanagari isn’t complete in this file. Using Noto Sans Bengali.","woff":["lib","lib","lib","lib"]}
+02:03:40.339 B row 9 {"text":"שלום עולם זה טקסט","face":"none","hint":null,"btns":null,"status":"","box":"סט புதிய ஞ","notice":"We couldn’t apply this edit safely, so the line is unchanged. Try a shorter change, or replace the line with new text. Your text is still in the box. Replacing it sets your text in Tinos. | Replace with new text","standin":"- text: Noto SerifDevanagari isn’t complete in this file. Using Noto Sans Bengali.","woff":[]}
+02:03:50.164 B row 10 {"text":"שלום עולם זה טקסט","face":"none","hint":null,"btns":null,"status":"","box":"קסט ใหม่ ฬ","notice":"We couldn’t apply this edit safely, so the line is unchanged. Try a shorter change, or replace the line with new text. Your text is still in the box. Replacing it sets your text in Arimo. | Replace with new text","standin":"- text: Noto SerifDevanagari isn’t complete in this file. Using Noto Sans Bengali.","woff":[]}
+02:04:00.160 B row 11 {"text":"মোট পরিমাণ পরিশোধ","face":"none","hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Noto SerifBengali isn’t complete in this file. Using Noto Sans Thai.","woff":["lib","lib","lib","lib"]}
+02:04:09.515 B row 12 {"text":"மொத்த தொகை செலுத்து","face":"none","hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Noto SansTamil isn’t complete in this file. Using Noto Sans Thai.","woff":["lib","lib","lib"]}
+02:04:18.998 B row 13 {"text":"ยอดรวมที่ต้องชำระ","face":"none","hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Noto SansTamil isn’t complete in this file. Using Noto Sans Thai.","woff":["lib","lib"]}
+02:04:20.325 errors [] non-GET 0

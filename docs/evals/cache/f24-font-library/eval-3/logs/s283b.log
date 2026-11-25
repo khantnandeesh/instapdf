@@ -1,0 +1,32 @@
+01:56:44.888 fresh menu settled ms 10700 pending 0
+at 1s: ["ArialMT => Matching…","Helvetica => Matching…","Arial Bold => Matching…","Times NewRomanPS Italic => Matching…","Calibri Bold => Matching…","SegoeUI Bold => Matching…","Times NewRomanPSMT => Matching…","Times => Matching…","Courier NewPSMT => Matching…","Courier => Matching…","Calibri => Matching…","Cambria => Matching…","Georgia => Matching…","SegoeUI => Matching…"]
+ArialMT => Arimo · Same widths
+Helvetica => Arimo · Same widths
+Arial Bold => Arimo · Same widths
+Times NewRomanPS Italic => Tinos · Same widths
+Calibri Bold => Carlito · Same widths
+SegoeUI Bold => Selawik · Same widths
+Times NewRomanPSMT => Tinos · Same widths
+Times => Tinos · Same widths
+Courier NewPSMT => Cousine · Same widths
+Courier => Cousine · Same widths
+Calibri => Carlito · Same widths
+Cambria => Caladea · Same widths
+Georgia => Gelasio · Same widths
+SegoeUI => Selawik · Same widths
+01:56:45.411 sig files fetched 249 woff [null,"editor/arimo-latin-400-normal.woff","editor/tinos-latin-400-normal.woff","editor/cousine-latin-400-normal.woff","editor/carlito-latin-400-normal.woff","editor/caladea-latin-400-normal.woff","lib","lib"]
+01:57:02.307 0 Arial invoice: total d {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: ArialMT isn’t complete in this file. Using Arimo. || - text: ArialMT isn’t complete in this file. Using Arimo.","req":["editor/arimo-latin-ext-400-normal.woff","editor/arimo-latin-ext-400-normal.woff"]}
+01:57:11.859 2 Helvetica invoice: tot {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Helvetica isn’t complete in this file. Using Arimo. || - text: Helvetica isn’t complete in this file. Using Arimo.","req":["editor/arimo-latin-700-normal.woff","editor/tinos-latin-400-italic.woff","editor/carlito-latin-700-normal.woff","editor/arimo-latin-ext-400-normal.woff"]}
+01:57:21.397 4 Times New Roman invoic {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Times NewRomanPSMT isn’t complete in this file. Using Tinos. || - text: Times NewRomanPSMT isn’t complete in this file. Using Tinos.","req":["editor/tinos-latin-ext-400-normal.woff","editor/tinos-latin-ext-400-normal.woff"]}
+01:57:30.920 6 Times invoice: total d {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Times isn’t complete in this file. Using Tinos. || - text: Times isn’t complete in this file. Using Tinos.","req":["editor/tinos-latin-ext-400-normal.woff"]}
+01:57:40.453 8 Courier New invoice: t {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Courier NewPSMT isn’t complete in this file. Using Cousine. || - text: Courier NewPSMT isn’t complete in this file. Using Cousine.","req":["editor/cousine-latin-ext-400-normal.woff","editor/cousine-latin-ext-400-normal.woff"]}
+01:57:49.956 10 Courier invoice: total {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Courier isn’t complete in this file. Using Cousine. || - text: Courier isn’t complete in this file. Using Cousine.","req":["editor/cousine-latin-ext-400-normal.woff"]}
+01:57:59.451 12 Calibri invoice: total {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Calibri isn’t complete in this file. Using Carlito. || - text: Calibri isn’t complete in this file. Using Carlito.","req":["editor/carlito-latin-ext-400-normal.woff","editor/carlito-latin-ext-400-normal.woff"]}
+01:58:08.927 14 Cambria invoice: total {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Cambria isn’t complete in this file. Using Caladea. || - text: Cambria isn’t complete in this file. Using Caladea.","req":["editor/caladea-latin-ext-400-normal.woff","editor/caladea-latin-ext-400-normal.woff"]}
+01:58:19.370 16 Georgia invoice: total {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Georgia isn’t complete in this file. Using Gelasio. || - text: Georgia isn’t complete in this file. Using Gelasio.","req":["lib","lib","lib"]}
+01:58:29.854 18 Segoe UI invoice: tota {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: SegoeUI isn’t complete in this file. Using Selawik. || - text: SegoeUI isn’t complete in this file. Using Selawik.","req":["lib","lib"]}
+01:58:39.374 20 Arial Bold invoice: to {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Arial isn’t complete in this file. Using Arimo Bold. || - text: Arial isn’t complete in this file. Using Arimo Bold.","req":["editor/arimo-latin-ext-700-normal.woff","editor/arimo-latin-ext-700-normal.woff"]}
+01:58:48.929 22 Times New Roman Italic {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Times NewRomanPS isn’t complete in this file. Using Tinos Italic. || - text: Times NewRomanPS isn’t complete in this file. Using Tinos Italic.","req":["editor/tinos-latin-ext-400-italic.woff","editor/tinos-latin-ext-400-italic.woff"]}
+01:58:58.455 24 Calibri Bold invoice:  {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: Calibri isn’t complete in this file. Using Carlito Bold. || - text: Calibri isn’t complete in this file. Using Carlito Bold.","req":["editor/carlito-latin-ext-700-normal.woff","editor/carlito-latin-ext-700-normal.woff"]}
+01:59:07.981 26 Segoe UI Bold invoice: {"hintMs":null,"hint":null,"btns":null,"status":"","box":null,"notice":null,"standin":"- text: SegoeUI isn’t complete in this file. Using Selawik Bold. || - text: SegoeUI isn’t complete in this file. Using Selawik Bold.","req":["lib","lib"]}
+01:59:08.863 non-GET 0 errors []
