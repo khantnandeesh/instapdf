@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { commit, createHistory, type History } from "./history";
 import type { DocState, EditorObject } from "./model";
-import { planSession, planSignature, restoreVersions, SAVED_STEPS, writtenBy, type SignatureLike } from "./persist-plan";
+import { planRecentImage, planSession, planSignature, RECENT_IMAGES, restoreVersions, SAVED_STEPS, writtenBy, type SignatureLike } from "./persist-plan";
 import { initialVersions, pushVersion, versionBytes, type VersionEntry } from "./versions";
 
 const img = (id: string, asset: string): EditorObject => ({ kind: "image", id, page: "p0", x: 0, y: 0, w: 10, h: 10, rot: 0, asset, opacity: 1 });
@@ -115,5 +115,26 @@ describe("planSignature", () => {
     const initials = sig("i1", "AR", 0, "initials");
     const r = planSignature([...all, initials], sig("s6", "N6", 6));
     expect(r.drop).toEqual(["s1"]);
+  });
+});
+
+describe("planRecentImage (AC-66)", () => {
+  const img = (id: string, at: number) => ({ id, at });
+  it("puts a new image first and keeps the newest five", () => {
+    const all = [img("a", 1), img("b", 2), img("c", 3), img("d", 4), img("e", 5)];
+    const { put, drop } = planRecentImage(all, img("f", 6));
+    expect(put.id).toBe("f");
+    expect(drop).toEqual(["a"]);
+    expect(RECENT_IMAGES).toBe(5);
+  });
+  it("moves an image used again to the front instead of keeping it twice", () => {
+    const all = [img("a", 1), img("b", 2), img("c", 3), img("d", 4), img("e", 5)];
+    const { put, drop } = planRecentImage(all, img("a", 9));
+    expect(put).toEqual(img("a", 9));
+    expect(drop).toEqual([]);
+  });
+  it("drops nothing while there is room", () => {
+    expect(planRecentImage([img("a", 1)], img("b", 2)).drop).toEqual([]);
+    expect(planRecentImage([], img("b", 2)).drop).toEqual([]);
   });
 });

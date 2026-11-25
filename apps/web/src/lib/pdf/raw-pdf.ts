@@ -1,0 +1,505 @@
+/**
+ * A small read-only PDF object reader, for the twins on the page (twin-display.ts): it finds an
+ * object by number and reads it, and writes objects back as PDF syntax. It exists so the editor
+ * does not load pdf-lib (about 240 kB gzip) when a file opens (AC-51, U-E13: pdf-lib loads on
+ * Download intent, in the download worker).
+ *
+ * It reads cross-reference tables and streams (with /Prev, hybrid /XRefStm, PNG predictors) and
+ * object streams. When the cross-reference data is missing or points at the wrong place, it
+ * scans the file for `N G obj` headers, as readers do. Encryption is not handled: the caller
+ * checks `trailer.Encrypt` and leaves such files alone.
+ */
+import { inflateSync } from "fflate";
+
+export type PdfName = { name: string };
+export type PdfRef = { num: number; gen: number };
+export type PdfString = { str: Uint8Array };
+export type PdfDict = { dict: Map<string, PdfObj> };
+export type PdfStream = PdfDict & { data: Uint8Array };
+export type PdfObj = number | boolean | null | PdfName | PdfRef | PdfString | PdfDict | PdfStream | PdfObj[];
+
+export const isName = (o: PdfObj | undefined, name?: string): o is PdfName => typeof o === "object" && o !== null && "name" in o && (name === undefined || o.name === name);
+export const isRef = (o: PdfObj | undefined): o is PdfRef => typeof o === "object" && o !== null && "num" in o && "gen" in o;
+export const isDict = (o: PdfObj | undefined): o is PdfDict => typeof o === "object" && o !== null && "dict" in o;
+export const isStream = (o: PdfObj | undefined): o is PdfStream => isDict(o) && "data" in o;
+export const isNum = (o: PdfObj | undefined): o is number => typeof o === "number";
+export const name = (n: string): PdfName => ({ name: n });
+export const ref = (num: number, gen = 0): PdfRef => ({ num, gen });
+
+const WS = new Set([0, 9, 10, 12, 13, 32]);
+const DELIM = new Set([0x28, 0x29, 0x3c, 0x3e, 0x5b, 0x5d, 0x7b, 0x7d, 0x2f, 0x25]);
+const latin1 = (b: Uint8Array) => {
+  let s = "";
+  for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode(...b.subarray(i, i + 8192));
+  return s;
+};
+
+class ParseError extends Error {}
+
+/** Reads PDF objects from `bytes` starting at `pos`. */
+class Lexer {
+  constructor(
+    readonly b: Uint8Array,
+    public pos = 0,
+  ) {}
+
+  skip(): void {
+    const b = this.b;
+    while (this.pos < b.length) {
+      const c = b[this.pos]!;
+      if (WS.has(c)) this.pos++;
+      else if (c === 0x25) while (this.pos < b.length && b[this.pos] !== 10 && b[this.pos] !== 13) this.pos++;
+      else break;
+    }
+  }
+
+  /** A run of regular characters (a number or a keyword), without moving past it when `peek`. */
+  word(peek = false): string {
+    this.skip();
+    let end = this.pos;
+    while (end < this.b.length && !WS.has(this.b[end]!) && !DELIM.has(this.b[end]!)) end++;
+    const w = latin1(this.b.subarray(this.pos, end));
+    if (!peek) this.pos = end;
+    return w;
+  }
+
+  /** An integer at the current position, or null (the position is kept). */
+  int(): number | null {
+    const at = this.pos;
+    const w = this.word();
+    if (/^\d+$/.test(w)) return Number(w);
+    this.pos = at;
+    return null;
+  }
+
+  object(depth = 0): PdfObj {
+    if (depth > 64) throw new ParseError("too deep");
+    this.skip();
+    const b = this.b;
+    if (this.pos >= b.length) throw new ParseError("end of data");
+    const c = b[this.pos]!;
+    if (c === 0x2f) return this.nameToken();
+    if (c === 0x28) return this.literal();
+    if (c === 0x3c) {
+      if (b[this.pos + 1] === 0x3c) return this.dict(depth);
+      return this.hex();
+    }
+    if (c === 0x5b) {
+      this.pos++;
+      const out: PdfObj[] = [];
+      for (;;) {
+        this.skip();
+        if (this.pos >= b.length) throw new ParseError("open array");
+        if (b[this.pos] === 0x5d) {
+          this.pos++;
+          return out;
+        }
+        out.push(this.object(depth + 1));
+      }
+    }
+    const w = this.word();
+    if (w === "true") return true;
+    if (w === "false") return false;
+    if (w === "null") return null;
+    if (/^[+-]?(\d+\.?\d*|\.\d+)$/.test(w)) {
+      // `N G R`: a reference.
+      if (/^\d+$/.test(w)) {
+        const at = this.pos;
+        const gen = this.int();
+        if (gen !== null && this.word(true) === "R") {
+          this.word();
+          return ref(Number(w), gen);
+        }
+        this.pos = at;
+      }
+      return Number(w);
+    }
+    throw new ParseError(`unexpected "${w.slice(0, 20)}"`);
+  }
+
+  private nameToken(): PdfName {
+    this.pos++;
+    let end = this.pos;
+    while (end < this.b.length && !WS.has(this.b[end]!) && !DELIM.has(this.b[end]!)) end++;
+    const raw = latin1(this.b.subarray(this.pos, end));
+    this.pos = end;
+    return name(raw.replace(/#([0-9a-fA-F]{2})/g, (_, h: string) => String.fromCharCode(parseInt(h, 16))));
+  }
+
+  private literal(): PdfString {
+    const b = this.b;
+    const out: number[] = [];
+    let depth = 0;
+    this.pos++;
+    while (this.pos < b.length) {
+      const c = b[this.pos++]!;
+      if (c === 0x5c) {
+        const e = b[this.pos++];
+        if (e === undefined) break;
+        const map: Record<number, number> = { 0x6e: 10, 0x72: 13, 0x74: 9, 0x62: 8, 0x66: 12 };
+        if (e in map) out.push(map[e]!);
+        else if (e >= 0x30 && e <= 0x37) {
+          let v = e - 0x30;
+          for (let k = 0; k < 2 && b[this.pos]! >= 0x30 && b[this.pos]! <= 0x37; k++) v = v * 8 + (b[this.pos++]! - 0x30);
+          out.push(v & 0xff);
+        } else if (e === 13) {
+          if (b[this.pos] === 10) this.pos++;
+        } else if (e !== 10) out.push(e);
+        continue;
+      }
+      if (c === 0x28) depth++;
+      if (c === 0x29 && depth-- === 0) return { str: Uint8Array.from(out) };
+      out.push(c);
+    }
+    throw new ParseError("open string");
+  }
+
+  private hex(): PdfString {
+    const end = this.b.indexOf(0x3e, this.pos);
+    if (end < 0) throw new ParseError("open hex string");
+    const digits = latin1(this.b.subarray(this.pos + 1, end)).replace(/[^0-9a-fA-F]/g, "");
+    this.pos = end + 1;
+    const padded = digits.length % 2 ? `${digits}0` : digits;
+    return { str: Uint8Array.from(padded.match(/../g) ?? [], (h) => parseInt(h, 16)) };
+  }
+
+  private dict(depth: number): PdfDict {
+    this.pos += 2;
+    const dict = new Map<string, PdfObj>();
+    for (;;) {
+      this.skip();
+      if (this.pos >= this.b.length) throw new ParseError("open dictionary");
+      if (this.b[this.pos] === 0x3e && this.b[this.pos + 1] === 0x3e) {
+        this.pos += 2;
+        return { dict };
+      }
+      const key = this.object(depth + 1);
+      if (!isName(key)) throw new ParseError("dictionary key is not a name");
+      dict.set(key.name, this.object(depth + 1));
+    }
+  }
+}
+
+/** PNG predictors (10 to 15) on decoded rows of `columns` bytes. */
+function unpredict(data: Uint8Array, columns: number): Uint8Array {
+  const row = columns + 1;
+  const rows = Math.floor(data.length / row);
+  const out = new Uint8Array(rows * columns);
+  for (let r = 0; r < rows; r++) {
+    const type = data[r * row]!;
+    for (let i = 0; i < columns; i++) {
+      const raw = data[r * row + 1 + i]!;
+      const left = i > 0 ? out[r * columns + i - 1]! : 0;
+      const up = r > 0 ? out[(r - 1) * columns + i]! : 0;
+      const ul = r > 0 && i > 0 ? out[(r - 1) * columns + i - 1]! : 0;
+      let v = raw;
+      if (type === 1) v = raw + left;
+      else if (type === 2) v = raw + up;
+      else if (type === 3) v = raw + ((left + up) >> 1);
+      else if (type === 4) {
+        const p = left + up - ul;
+        const [pa, pb, pc] = [Math.abs(p - left), Math.abs(p - up), Math.abs(p - ul)];
+        v = raw + (pa <= pb && pa <= pc ? left : pb <= pc ? up : ul);
+      }
+      out[r * columns + i] = v & 0xff;
+    }
+  }
+  return out;
+}
+
+type Entry = { type: "free" } | { type: "at"; offset: number } | { type: "in"; stream: number; index: number };
+
+/** An opened file: its trailer and a way to read any object in it. */
+export class RawPdf {
+  readonly trailer: Map<string, PdfObj>;
+  /** The highest object number the file uses. */
+  readonly largestObjectNumber: number;
+  private readonly entries = new Map<number, Entry>();
+  private scanned: Map<number, number> | null = null;
+  private readonly cache = new Map<number, PdfObj | undefined>();
+  private readonly streams = new Map<number, { first: number; offsets: number[]; data: Uint8Array } | null>();
+
+  private constructor(readonly bytes: Uint8Array) {
+    let trailer: Map<string, PdfObj> | null = null;
+    try {
+      trailer = this.readXref();
+    } catch {
+      trailer = null;
+    }
+    if (!trailer || !isRef(trailer.get("Root"))) {
+      this.entries.clear();
+      trailer = this.scanTrailer();
+    }
+    this.trailer = trailer;
+    let largest = isNum(trailer.get("Size")) ? (trailer.get("Size") as number) - 1 : 0;
+    for (const n of this.entries.keys()) largest = Math.max(largest, n);
+    if (this.scanned) for (const n of this.scanned.keys()) largest = Math.max(largest, n);
+    this.largestObjectNumber = largest;
+  }
+
+  /** Opens a file; throws when it has no readable trailer. */
+  static load(bytes: Uint8Array): RawPdf {
+    return new RawPdf(bytes);
+  }
+
+  /** The object `num`, or undefined when the file has none. */
+  get(num: number): PdfObj | undefined {
+    if (this.cache.has(num)) return this.cache.get(num);
+    this.cache.set(num, undefined); // a loop through references reads as missing
+    let obj: PdfObj | undefined;
+    try {
+      obj = this.read(num);
+    } catch {
+      obj = undefined;
+    }
+    this.cache.set(num, obj);
+    return obj;
+  }
+
+  /** `o` itself, or the object it refers to. */
+  resolve(o: PdfObj | undefined): PdfObj | undefined {
+    return isRef(o) ? this.get(o.num) : o;
+  }
+
+  /** A dictionary's value, with a reference followed. */
+  lookup(d: PdfDict, key: string): PdfObj | undefined {
+    return this.resolve(d.dict.get(key));
+  }
+
+  private read(num: number): PdfObj | undefined {
+    const entry = this.entries.get(num);
+    if (entry?.type === "free") return undefined;
+    if (entry?.type === "in") {
+      const s = this.objectStream(entry.stream);
+      if (!s) return undefined;
+      const at = s.offsets[entry.index * 2 + 1];
+      if (s.offsets[entry.index * 2] !== num || at === undefined) return undefined;
+      return new Lexer(s.data, s.first + at).object();
+    }
+    if (entry?.type === "at") {
+      const obj = this.objectAt(entry.offset, num);
+      if (obj !== undefined) return obj;
+    }
+    const at = this.scan().get(num);
+    return at === undefined ? undefined : this.objectAt(at, num);
+  }
+
+  /** The object whose `N G obj` header starts at `offset`; undefined when it is not `num`'s. */
+  private objectAt(offset: number, num: number | null): PdfObj | undefined {
+    const lx = new Lexer(this.bytes, offset);
+    const n = lx.int();
+    const gen = lx.int();
+    if (n === null || gen === null || (num !== null && n !== num) || lx.word() !== "obj") return undefined;
+    const obj = lx.object();
+    if (!isDict(obj) || lx.word(true) !== "stream") return obj;
+    lx.word();
+    // The data starts after the end of the `stream` line.
+    if (this.bytes[lx.pos] === 13) lx.pos++;
+    if (this.bytes[lx.pos] === 10) lx.pos++;
+    const start = lx.pos;
+    const declared = obj.dict.get("Length");
+    const length = isNum(declared) ? declared : isRef(declared) ? this.get(declared.num) : undefined;
+    let end = typeof length === "number" && start + length <= this.bytes.length ? start + length : -1;
+    if (end < 0 || !latin1(this.bytes.subarray(end, Math.min(this.bytes.length, end + 32))).includes("endstream")) {
+      const tail = latin1(this.bytes.subarray(start, Math.min(this.bytes.length, start + 64 * 1024 * 1024)));
+      const at = tail.indexOf("endstream");
+      if (at < 0) throw new ParseError("open stream");
+      end = start + at;
+      while (end > start && (this.bytes[end - 1] === 10 || this.bytes[end - 1] === 13)) end--;
+    }
+    return { dict: obj.dict, data: this.bytes.subarray(start, end) };
+  }
+
+  /** A stream's data with its filters undone (Flate with PNG predictors, or none). */
+  decode(s: PdfStream): Uint8Array {
+    const filter = this.resolve(s.dict.get("Filter"));
+    const filters = Array.isArray(filter) ? filter.map((f) => this.resolve(f)) : filter === undefined || filter === null ? [] : [filter];
+    if (!filters.length) return s.data;
+    if (filters.length !== 1 || !isName(filters[0]!, "FlateDecode")) throw new ParseError("unsupported filter");
+    // The zlib header is skipped and the checksum not required, so a file with a damaged ending still reads.
+    let data = inflateSync(s.data.subarray(2));
+    const parms = this.resolve(Array.isArray(s.dict.get("DecodeParms")) ? (s.dict.get("DecodeParms") as PdfObj[])[0] : s.dict.get("DecodeParms"));
+    if (isDict(parms)) {
+      const predictor = this.lookup(parms, "Predictor");
+      if (isNum(predictor) && predictor >= 10) {
+        const columns = this.lookup(parms, "Columns");
+        data = unpredict(data, isNum(columns) ? columns : 1);
+      } else if (isNum(predictor) && predictor > 1) throw new ParseError("unsupported predictor");
+    }
+    return data;
+  }
+
+  private objectStream(num: number) {
+    if (this.streams.has(num)) return this.streams.get(num)!;
+    let out: { first: number; offsets: number[]; data: Uint8Array } | null = null;
+    try {
+      const s = this.get(num);
+      if (isStream(s)) {
+        const data = this.decode(s);
+        const [n, first] = [this.lookup(s, "N"), this.lookup(s, "First")];
+        if (isNum(n) && isNum(first)) {
+          const lx = new Lexer(data);
+          const offsets: number[] = [];
+          for (let i = 0; i < n * 2; i++) {
+            const v = lx.int();
+            if (v === null) break;
+            offsets.push(v);
+          }
+          out = { first, offsets, data };
+        }
+      }
+    } catch {
+      out = null;
+    }
+    this.streams.set(num, out);
+    return out;
+  }
+
+  private set(num: number, entry: Entry) {
+    // Newer sections are read first: they win.
+    if (!this.entries.has(num)) this.entries.set(num, entry);
+  }
+
+  /** Reads the cross-reference sections from the last one back; returns the newest trailer. */
+  private readXref(): Map<string, PdfObj> | null {
+    const tail = latin1(this.bytes.subarray(Math.max(0, this.bytes.length - 2048)));
+    const m = /startxref\s+(\d+)/.exec(tail.slice(tail.lastIndexOf("startxref")));
+    if (!m) return null;
+    let trailer: Map<string, PdfObj> | null = null;
+    const seen = new Set<number>();
+    const queue = [Number(m[1])];
+    while (queue.length) {
+      const at = queue.shift()!;
+      if (seen.has(at) || at < 0 || at >= this.bytes.length || seen.size > 256) continue;
+      seen.add(at);
+      const lx = new Lexer(this.bytes, at);
+      let section: Map<string, PdfObj>;
+      if (lx.word(true) === "xref") {
+        lx.word();
+        section = this.readTable(lx);
+        const stm = section.get("XRefStm");
+        // Hybrid files: the stream's entries rank right after this table's.
+        if (isNum(stm)) queue.unshift(stm);
+      } else {
+        const s = this.objectAt(at, null);
+        if (!isStream(s)) throw new ParseError("no cross-reference here");
+        section = s.dict;
+        this.readStream(s);
+      }
+      trailer ??= section;
+      const prev = section.get("Prev");
+      if (isNum(prev)) queue.push(prev);
+    }
+    return trailer;
+  }
+
+  private readTable(lx: Lexer): Map<string, PdfObj> {
+    for (;;) {
+      if (lx.word(true) === "trailer") {
+        lx.word();
+        const t = lx.object();
+        if (!isDict(t)) throw new ParseError("bad trailer");
+        return t.dict;
+      }
+      const start = lx.int();
+      const count = lx.int();
+      if (start === null || count === null) throw new ParseError("bad xref table");
+      for (let i = 0; i < count; i++) {
+        const offset = lx.int();
+        const gen = lx.int();
+        const kind = lx.word();
+        if (offset === null || gen === null || (kind !== "n" && kind !== "f")) throw new ParseError("bad xref row");
+        if (start + i === 0) continue;
+        this.set(start + i, kind === "n" ? { type: "at", offset } : { type: "free" });
+      }
+    }
+  }
+
+  private readStream(s: PdfStream) {
+    const w = this.resolve(s.dict.get("W"));
+    if (!Array.isArray(w) || w.length < 3 || !w.every(isNum)) throw new ParseError("bad /W");
+    const widths = w as number[];
+    const size = this.resolve(s.dict.get("Size"));
+    const index = this.resolve(s.dict.get("Index"));
+    const ranges = Array.isArray(index) && index.every(isNum) ? (index as number[]) : [0, isNum(size) ? size : 0];
+    const data = this.decode(s);
+    const rowLength = widths[0]! + widths[1]! + widths[2]!;
+    let at = 0;
+    const field = (width: number, fallback: number) => {
+      if (!width) return fallback;
+      let v = 0;
+      for (let k = 0; k < width; k++) v = v * 256 + data[at++]!;
+      return v;
+    };
+    for (let r = 0; r + 1 < ranges.length; r += 2) {
+      for (let i = 0; i < ranges[r + 1]!; i++) {
+        if (at + rowLength > data.length) return;
+        const num = ranges[r]! + i;
+        const type = field(widths[0]!, 1);
+        const a = field(widths[1]!, 0);
+        const b = field(widths[2]!, 0);
+        if (num === 0) continue;
+        if (type === 0) this.set(num, { type: "free" });
+        else if (type === 1) this.set(num, { type: "at", offset: a });
+        else if (type === 2) this.set(num, { type: "in", stream: a, index: b });
+      }
+    }
+  }
+
+  /** Where each `N G obj` header is, by a scan of the whole file (the last one of a number wins). */
+  private scan(): Map<number, number> {
+    if (this.scanned) return this.scanned;
+    const found = new Map<number, number>();
+    const text = latin1(this.bytes);
+    for (const m of text.matchAll(/(?:^|[\s>\]])(\d{1,10})[ \t\r\n\f\0]+(\d{1,5})[ \t\r\n\f\0]+obj\b/g)) found.set(Number(m[1]), m.index + m[0].indexOf(m[1]!));
+    this.scanned = found;
+    return found;
+  }
+
+  /** For a file whose cross-reference data can't be read: the newest trailer, or the newest xref stream's dictionary. */
+  private scanTrailer(): Map<string, PdfObj> {
+    const text = latin1(this.bytes);
+    for (let at = text.lastIndexOf("trailer"); at >= 0; at = text.lastIndexOf("trailer", at - 1)) {
+      try {
+        const lx = new Lexer(this.bytes, at + "trailer".length);
+        const t = lx.object();
+        if (isDict(t) && isRef(t.dict.get("Root"))) return t.dict;
+      } catch {
+        // an earlier one, then
+      }
+    }
+    const byOffset = [...this.scan().entries()].sort((a, b) => b[1] - a[1]);
+    for (const [num, at] of byOffset) {
+      try {
+        const o = this.objectAt(at, num);
+        if (isDict(o) && isName(o.dict.get("Type"), "XRef") && isRef(o.dict.get("Root"))) return o.dict;
+        if (isDict(o) && isName(o.dict.get("Type"), "Catalog")) return new Map<string, PdfObj>([["Root", ref(num)]]);
+      } catch {
+        // keep looking
+      }
+    }
+    throw new ParseError("no trailer");
+  }
+}
+
+const hexOf = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+const NAME_PLAIN = /^[\x21-\x7e]$/;
+
+/** A number as PDF writes it: no exponent, at most 6 decimals. */
+function num(n: number): string {
+  if (Number.isInteger(n)) return String(n);
+  return n.toFixed(6).replace(/\.?0+$/, "");
+}
+
+/** `o` as PDF syntax. A stream is written as its dictionary only (the caller writes the data). */
+export function serialize(o: PdfObj): string {
+  if (o === null) return "null";
+  if (typeof o === "boolean") return String(o);
+  if (typeof o === "number") return num(o);
+  if (Array.isArray(o)) return `[${o.map(serialize).join(" ")}]`;
+  if ("name" in o)
+    return `/${Array.from(o.name, (c) => (NAME_PLAIN.test(c) && !DELIM.has(c.charCodeAt(0)) && c !== "#" ? c : `#${(c.charCodeAt(0) & 0xff).toString(16).padStart(2, "0")}`)).join("")}`;
+  if ("num" in o) return `${o.num} ${o.gen} R`;
+  if ("str" in o) return `<${hexOf(o.str)}>`;
+  return `<<${[...o.dict].map(([k, v]) => ` ${serialize(name(k))} ${serialize(v)}`).join("")} >>`;
+}

@@ -123,6 +123,56 @@ if (!engineChunks.length || !noticed.length) {
     `ok   motion engine is lazy only: ${engineChunks.map((f) => `${f.replace("static/chunks/", "")} ${gz(f)} B`).join(" + ")} = ${sum(engineChunks)} B gz, GreenSock's notice in ${noticed.length} (not in any route's first load)`,
   );
 
+/**
+ * The editor's JS (F16 AC-51, U-E13): what /edit-pdf fetches beyond its first load, from the idle
+ * prefetch through opening a file and the first edits, excluding pdf.js, fonts and WASM, is at
+ * most 250 kB gzip. It is the async chunk groups below (react-loadable-manifest.json, the build's
+ * own map of each `import()`), less the route's first load and pdf.js's chunks. pdf-lib and
+ * fontkit are never among them: they load in the download worker, on Download intent. Each group
+ * must exist, so a renamed import fails here rather than dropping out of the sum. The e2e twin of
+ * this check (e2e/f16/editor-js-budget.spec.ts) counts what a browser really fetches.
+ */
+const EDITOR_BUDGET_KB = 250;
+const EDITOR_GROUPS = [
+  "tools/editor/EditorTool.tsx -> ./EditorShell", // the shell (idle prefetch, then the pick)
+  "tools/editor/EditorTool.tsx -> @/lib/editor/engine-client", // the engine's client (its WASM is not counted)
+  "tools/editor/EditorTool.tsx -> @/components/tool-flow/PasswordDialog",
+  "tools/editor/EditorShell.tsx -> ./RecentImages", // the Image tool's first step (AC-66)
+  "lib/pdf/twin-display.ts -> ./raw-pdf", // on open, for a file with fonts it only names (F24)
+  "lib/motion/load.ts -> ./engine", // UI motion
+];
+const loadable = JSON.parse(readFileSync(join(dir, ".next/react-loadable-manifest.json"), "utf8"));
+const groupFiles = (key) => (loadable[key]?.files ?? []).filter((f) => f.endsWith(".js"));
+const pdfjsFiles = new Set(groupFiles("lib/pdf/pdfjs.ts -> pdfjs-dist"));
+const heavy = new Set(
+  Object.entries(loadable)
+    .filter(([k]) => / -> @cantoo\/(pdf-lib|fontkit)$/.test(k))
+    .flatMap(([, v]) => v.files.filter((f) => f.endsWith(".js") && !pdfjsFiles.has(f))),
+);
+const missing = EDITOR_GROUPS.filter((k) => !loadable[k]);
+if (missing.length) {
+  console.error(`OVER editor JS: chunk groups not in the build (renamed? update EDITOR_GROUPS): ${missing.join("; ")}`);
+  failed++;
+} else {
+  const route = "/edit-pdf/page";
+  const first = new Set((pages[route] ?? []).filter((f) => f.endsWith(".js")));
+  try {
+    for (const f of scriptsInHtml(readFileSync(htmlOf(route), "utf8"))) first.add(f);
+  } catch {
+    // not prerendered: its entry alone
+  }
+  // pdf.js's own chunk is left out; a chunk it shares with the editor (a polyfill) is counted.
+  const isPdfjs = (f) => pdfjsFiles.has(f) && /pdfjsVersion|PDFDocumentProxy/.test(readFileSync(join(dir, ".next", f), "utf8"));
+  const files = [...new Set(EDITOR_GROUPS.flatMap(groupFiles))].filter((f) => !first.has(f) && !isPdfjs(f));
+  const bytes = sum(files);
+  const leaked = files.filter((f) => heavy.has(f));
+  const ok = kb(bytes) <= EDITOR_BUDGET_KB && !leaked.length;
+  if (!ok) failed++;
+  console.log(`${ok ? "ok  " : "OVER"} editor JS (idle prefetch + open + edit, no pdf.js/fonts/WASM) ${bytes} B gz, prints ${kb(bytes)} kB (budget ${EDITOR_BUDGET_KB}, room ${EDITOR_BUDGET_KB * 1000 + 499 - bytes} B)`);
+  if (leaked.length) console.error(`OVER editor JS: pdf-lib or fontkit is in the editor's chunks (${leaked.join(", ")}); they belong in the download worker (U-E13)`);
+  if (process.env.V) for (const f of files) console.log(`       ${f} ${gz(f)}`);
+}
+
 if (failed) {
   console.error(`First-load JS budget: ${failed} route(s) over.`);
   process.exit(1);

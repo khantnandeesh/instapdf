@@ -83,81 +83,74 @@ export async function buildTwinPatch(
   expect?: Record<number, string>,
 ): Promise<TwinPatch | null> {
   if (!fonts.length || bytes.length > TWIN_DISPLAY_MAX_BYTES) return null;
-  const { PDFDocument, PDFDict, PDFName, PDFRef, PDFNumber, PDFArray } = await import("@cantoo/pdf-lib");
-  let doc;
+  // Our own small reader, not pdf-lib: the editor loads pdf-lib only on Download intent (AC-51).
+  const { RawPdf, isDict, isName, isNum, isRef, name, ref, serialize } = await import("./raw-pdf");
+  let doc: ReturnType<typeof RawPdf.load>;
   try {
-    doc = await PDFDocument.load(bytes, { updateMetadata: false });
+    doc = RawPdf.load(bytes);
   } catch {
     return null;
   }
-  const ctx = doc.context;
-  const root = ctx.trailerInfo.Root;
+  const root = doc.trailer.get("Root");
   // Encrypted files, and the rare file that already numbers objects where the update's own go.
-  if (!(root instanceof PDFRef) || ctx.trailerInfo.Encrypt || ctx.largestObjectNumber >= BASE) return null;
+  if (!isRef(root) || doc.trailer.get("Encrypt") !== undefined || doc.largestObjectNumber >= BASE) return null;
   const names: Record<number, string> = {};
-  const name = (s: string) => PDFName.of(s);
   const objects: Obj[] = [];
   const done: number[] = [];
   let next = BASE;
-  const serialise = (o: { sizeInBytes(): number; copyBytesInto(buffer: Uint8Array, offset: number): number }) => {
-    const out = new Uint8Array(o.sizeInBytes());
-    o.copyBytesInto(out, 0);
-    return out;
-  };
   for (const font of fonts) {
-    const dict = ctx.lookup(PDFRef.of(font.object, 0));
-    if (!(dict instanceof PDFDict)) continue;
-    const subtype = dict.lookup(name("Subtype"));
-    if (subtype !== name("Type1") && subtype !== name("TrueType")) continue;
-    const descriptor = dict.lookup(name("FontDescriptor"));
-    if (descriptor instanceof PDFDict && ["FontFile", "FontFile2", "FontFile3"].some((k) => descriptor.has(name(k)))) continue;
-    const encoding = dict.lookup(name("Encoding"));
-    const winAnsi = encoding === name("WinAnsiEncoding") || (encoding instanceof PDFDict && encoding.lookup(name("BaseEncoding")) === name("WinAnsiEncoding") && !encoding.has(name("Differences")));
+    const dict = doc.get(font.object);
+    if (!isDict(dict) || "data" in dict) continue;
+    const subtype = doc.lookup(dict, "Subtype");
+    if (!isName(subtype, "Type1") && !isName(subtype, "TrueType")) continue;
+    const descriptor = doc.lookup(dict, "FontDescriptor");
+    if (isDict(descriptor) && ["FontFile", "FontFile2", "FontFile3"].some((k) => descriptor.dict.has(k))) continue;
+    const encoding = doc.lookup(dict, "Encoding");
+    const winAnsi = isName(encoding, "WinAnsiEncoding") || (isDict(encoding) && isName(doc.lookup(encoding, "BaseEncoding"), "WinAnsiEncoding") && !encoding.dict.has("Differences"));
     if (!winAnsi) continue;
-    const base = dict.lookup(name("BaseFont"));
-    const baseName = base instanceof PDFName ? base.decodeText() : "";
+    const base = doc.lookup(dict, "BaseFont");
+    const baseName = isName(base) ? base.name : "";
     if (expect && expect[font.object] !== undefined && expect[font.object] !== baseName) continue;
     // Codes 0x80 to 0x9F the font gives a width: the letters outside Latin-1 it may draw anywhere
     // in the file. With no table of widths (a standard font) it may draw them all.
-    const [first, last, widths] = [dict.lookup(name("FirstChar")), dict.lookup(name("LastChar")), dict.lookup(name("Widths"))];
+    const [first, last, widths] = [doc.lookup(dict, "FirstChar"), doc.lookup(dict, "LastChar"), doc.lookup(dict, "Widths")];
     const declared = CP1252_HIGH.filter((cp, i) => {
       if (!cp) return false;
-      if (!(first instanceof PDFNumber) || !(last instanceof PDFNumber) || !(widths instanceof PDFArray)) return true;
+      if (!isNum(first) || !isNum(last) || !Array.isArray(widths)) return true;
       const code = 0x80 + i;
-      if (code < first.asNumber() || code > last.asNumber()) return false;
-      const at = code - first.asNumber();
-      const w = at < widths.size() ? widths.lookup(at) : undefined;
-      return !(w instanceof PDFNumber) || w.asNumber() !== 0;
+      if (code < first || code > last) return false;
+      const at = code - first;
+      const w = at < widths.length ? doc.resolve(widths[at]) : undefined;
+      return !isNum(w) || w !== 0;
     });
     const file = await fileOf(font, declared);
     const facts = file && sfntFacts(file);
     if (!file || !facts) continue;
     const [descNum, fileNum] = [next++, next++];
-    const copy = PDFDict.withContext(ctx);
-    for (const [k, v] of dict.entries()) copy.set(k, v);
-    copy.set(name("Subtype"), name("TrueType"));
-    copy.set(name("FontDescriptor"), PDFRef.of(descNum, 0));
-    const desc = ctx.obj({
-      Type: "FontDescriptor",
-      FontName: base instanceof PDFName ? base : name("Twin"),
+    const copy = new Map(dict.dict);
+    copy.set("Subtype", name("TrueType"));
+    copy.set("FontDescriptor", ref(descNum));
+    const desc = new Map<string, Parameters<typeof serialize>[0]>([
+      ["Type", name("FontDescriptor")],
+      ["FontName", isName(base) ? base : name("Twin")],
       // Nonsymbolic, plus fixed pitch and italic where they apply.
-      Flags: 32 | (facts.fixed ? 1 : 0) | (font.italic ? 64 : 0),
-      FontBBox: facts.bbox,
-      ItalicAngle: PDFNumber.of(Math.round(facts.italicAngle * 100) / 100),
-      Ascent: facts.ascent,
-      Descent: facts.descent,
-      CapHeight: Math.round(facts.ascent * 0.72),
-      StemV: font.bold ? 140 : 80,
-      FontFile2: PDFRef.of(fileNum, 0),
-    });
-    objects.push({ num: font.object, bytes: serialise(copy) });
-    objects.push({ num: descNum, bytes: serialise(desc) });
+      ["Flags", 32 | (facts.fixed ? 1 : 0) | (font.italic ? 64 : 0)],
+      ["FontBBox", facts.bbox],
+      ["ItalicAngle", Math.round(facts.italicAngle * 100) / 100],
+      ["Ascent", facts.ascent],
+      ["Descent", facts.descent],
+      ["CapHeight", Math.round(facts.ascent * 0.72)],
+      ["StemV", font.bold ? 140 : 80],
+      ["FontFile2", ref(fileNum)],
+    ]);
+    objects.push({ num: font.object, bytes: ascii(serialize({ dict: copy })) });
+    objects.push({ num: descNum, bytes: ascii(serialize({ dict: desc })) });
     objects.push({ num: fileNum, bytes: join([ascii(`<< /Length ${file.length} /Length1 ${file.length} >>\nstream\n`), file, ascii("\nendstream")]) });
     done.push(font.object);
     names[font.object] = baseName;
   }
   if (!objects.length) return null;
-  return { root: `${root.objectNumber} ${root.generationNumber} R`, size: next, objects: objects.sort((a, b) => a.num - b.num), fonts: done, names };
+  return { root: `${root.num} ${root.gen} R`, size: next, objects: objects.sort((a, b) => a.num - b.num), fonts: done, names };
 }
 
 /** Where the file's last cross-reference section starts, read from its end. */

@@ -293,7 +293,10 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
     box.y += dy;
     const rot = (360 - rotation) % 360;
     const id = newId();
-    if (pl.kind === "image") ctl.add([{ kind: "image", id, page: entry.id, ...box, rot, asset: pl.asset!, opacity: 1 }], "Add image");
+    if (pl.kind === "image") {
+      ctl.add([{ kind: "image", id, page: entry.id, ...box, rot, asset: pl.asset!, opacity: 1 }], "Add image");
+      ctl.imagePlaced?.(pl.asset!);
+    }
     else ctl.add([{ kind: "signature", id, page: entry.id, ...box, rot, role: pl.role ?? "signature", sig: pl.sig!, color: pl.color ?? "#000000" }], pl.role === "initials" ? "Add initials" : "Add signature");
     store.set({ placement: null });
     finishTool();
@@ -339,7 +342,10 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
       else gesture.current = { type: "resize", id: o.id, handle: handle as Handle, origin: o, pointer: e.pointerId };
       return;
     }
-    const passThrough = t === "draw" || t === "mark";
+    // Draw and Mark work over objects (a stroke across an image, a mark through a text box), but a
+    // press right on a drawn stroke or line (its hit path) selects it, as with every tool.
+    const onStroke = t === "draw" && !!target.closest(".ed-hit");
+    const passThrough = (t === "draw" && !onStroke) || t === "mark";
     if (objEl && !passThrough) {
       const id = objEl.dataset.objId!;
       if (s.editing === id) return;

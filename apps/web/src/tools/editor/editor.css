@@ -174,8 +174,15 @@
 }
 
 /* Tooltips: name, key, one-line hint (AC-56). Fine pointers only; touch gets the mode hint. */
+/* A button and its tooltip (a sibling, so the button's name is only its own label). */
+.ed-tool-slot {
+  position: relative;
+  display: flex;
+  flex: none;
+}
 .ed-tip {
   position: absolute;
+  pointer-events: none;
   z-index: 20;
   display: none;
   max-width: 240px;
@@ -219,10 +226,10 @@
   transform: translateX(-50%);
 }
 @media (hover: hover) and (pointer: fine) {
-  .ed-tool:hover > .ed-tip,
-  .ed-tool:focus-visible > .ed-tip,
-  .ed-ctl:hover > .ed-tip,
-  .ed-ctl:focus-visible > .ed-tip {
+  .ed-tool:hover + .ed-tip,
+  .ed-tool:focus-visible + .ed-tip,
+  .ed-ctl:hover + .ed-tip,
+  .ed-ctl:focus-visible + .ed-tip {
     display: block;
   }
 }
@@ -472,6 +479,16 @@
   padding: 0 4px;
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+/* − and + sit beside it: no browser spinner arrows as well. */
+.ed-field--size {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.ed-field--size::-webkit-inner-spin-button,
+.ed-field--size::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
 }
 .ed-field--page {
   width: 40px;
@@ -897,6 +914,25 @@
   font-size: 14px;
   font-weight: 600;
 }
+/* Under 360px the one-line pill is wider than the screen: the question takes its own line and the
+   two buttons sit centred under it, so nothing clips (round-2 eval, 320×568). */
+@media (max-width: 359px) {
+  .ed-recover {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 2px;
+    width: max-content;
+    max-width: calc(100% - 24px);
+    padding: 8px 8px 6px;
+    border-radius: 20px;
+    white-space: normal;
+    text-align: center;
+  }
+  .ed-recover > span {
+    flex-basis: 100%;
+    padding: 0 8px;
+  }
+}
 .ed-toasts {
   position: absolute;
   right: 12px;
@@ -1058,6 +1094,10 @@
 }
 .ed-hit {
   pointer-events: stroke;
+}
+/* With Draw armed, a stroke under the pointer is one click from selected: say so. */
+.ed-overlay--draw .ed-hit {
+  cursor: pointer;
 }
 .ed-obj svg {
   pointer-events: none;
@@ -1726,6 +1766,54 @@
   border-bottom: 1px solid var(--color-border);
   pointer-events: none;
 }
+/* Recent images (AC-66): five thumbnails that fit a 320px sheet in one or two rows, each with a
+   small remove button whose hit area is 32px. No boxed icon backgrounds: the image is the button. */
+.ed-recent__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 12px;
+}
+.ed-recent__item {
+  position: relative;
+}
+.ed-recent__use {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 6px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--surface);
+  transition: border-color var(--dur-fast);
+}
+.ed-recent__use:hover {
+  border-color: var(--color-brand);
+}
+.ed-recent__use img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+.ed-recent__x {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 99px;
+  background: var(--color-ink);
+  color: #fff;
+}
+.ed-recent__x::before {
+  position: absolute;
+  inset: -5px;
+  content: "";
+}
 .ed-sigchip {
   position: relative;
 }
@@ -1807,9 +1895,12 @@
   }
   .ed-toast,
   .ed-recover,
-  .ed-hint,
   .ed-notice {
     animation: ed-rise var(--motion-quick) var(--ease-out) both;
+  }
+  /* The hint pill rises in at full opacity: muted text on glass has no contrast to spare mid-fade. */
+  .ed-hint {
+    animation: ed-rise-solid var(--motion-quick) var(--ease-out) both;
   }
   .ed-popover {
     animation: ed-pop-in 140ms var(--ease-out) both;
@@ -1867,6 +1958,11 @@
 @keyframes ed-fade {
   from {
     opacity: 0;
+  }
+}
+@keyframes ed-rise-solid {
+  from {
+    transform: translateY(var(--motion-rise));
   }
 }
 @keyframes ed-rise {

@@ -3,20 +3,24 @@
  * On-device storage for the editor (IndexedDB only; nothing is ever sent anywhere):
  * - sessions: the edit history of a file, keyed by the SHA-256 of its bytes (AC-45, AC-81)
  * - signatures: saved signatures and initials (AC-32, AC-87)
+ * - images: the last 5 images used, for the Image tool's recent list (AC-66)
  * Every call fails soft: private modes without IndexedDB get `null`/`false`, and the editor says
  * "Not saved on device".
  */
 import type { Asset } from "./build";
-import { planSignature, type SessionPlan, type SessionRecord } from "./persist-plan";
+import { planRecentImage, planSignature, RECENT_IMAGES, type SessionPlan, type SessionRecord } from "./persist-plan";
 import type { SigSource } from "./model";
 
 const DB = "berrypdf-editor";
-/** 2: sessions are a small record plus blobs (lib/editor/persist-plan). Version 1 records are dropped. */
-const VERSION = 2;
+/** 2: sessions are a small record plus blobs (lib/editor/persist-plan). Version 1 records are dropped. 3: recent images. */
+const VERSION = 3;
 
 export type SavedSignature = { id: string; role: "signature" | "initials"; sig: SigSource; color: string; aspect: number; assets: Record<string, Asset>; at: number };
 
-type StoreName = "sessions" | "signatures" | "blobs";
+/** An image used on this device (the asset as placed: PNG or JPEG), keyed by the SHA-256 of its bytes. */
+export type RecentImage = { id: string; bytes: Uint8Array; mime: Asset["mime"]; at: number };
+
+type StoreName = "sessions" | "signatures" | "blobs" | "images";
 
 let dbp: Promise<IDBDatabase> | null = null;
 function db(): Promise<IDBDatabase> {
@@ -29,8 +33,16 @@ function db(): Promise<IDBDatabase> {
       if (!d.objectStoreNames.contains("sessions")) d.createObjectStore("sessions", { keyPath: "hash" });
       if (!d.objectStoreNames.contains("signatures")) d.createObjectStore("signatures", { keyPath: "id" });
       if (!d.objectStoreNames.contains("blobs")) d.createObjectStore("blobs");
+      if (!d.objectStoreNames.contains("images")) d.createObjectStore("images", { keyPath: "id" });
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      // Another tab opening a newer version: let it upgrade, and open again next time.
+      req.result.onversionchange = () => {
+        req.result.close();
+        dbp = null;
+      };
+      resolve(req.result);
+    };
     req.onerror = () => reject(req.error);
   });
   dbp.catch(() => (dbp = null));
@@ -200,11 +212,57 @@ export async function deleteSignature(id: string): Promise<void> {
   }
 }
 
-/** Clear from this device: every saved session and signature. */
+/** The recent images, newest first (AC-66). */
+export async function listRecentImages(): Promise<RecentImage[]> {
+  try {
+    const all = (await run("images", "readonly", (st) => st.getAll())) as RecentImage[];
+    return all.sort((a, b) => b.at - a.at).slice(0, RECENT_IMAGES);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Puts an image first among the recent ones and drops the oldest beyond 5, in one transaction (a
+ * reload or a second tab never leaves six). Returns the list as it now is.
+ */
+export async function rememberImage(asset: Asset): Promise<RecentImage[]> {
+  try {
+    const img: RecentImage = { id: await sha256(asset.bytes), bytes: asset.bytes, mime: asset.mime, at: Date.now() };
+    const d = await db();
+    await new Promise<void>((resolve, reject) => {
+      const tx = d.transaction("images", "readwrite");
+      const st = tx.objectStore("images");
+      const req = st.getAll();
+      req.onsuccess = () => {
+        const { put, drop } = planRecentImage(req.result as RecentImage[], img);
+        st.put(put);
+        for (const id of drop) st.delete(id);
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } catch {
+    // not kept: the image is still placed
+  }
+  return listRecentImages();
+}
+
+export async function forgetImage(id: string): Promise<void> {
+  try {
+    await run("images", "readwrite", (st) => st.delete(id));
+  } catch {
+    // nothing stored
+  }
+}
+
+/** Clear from this device: every saved session, signature and recent image. */
 export async function clearDevice(): Promise<void> {
   try {
     await run("sessions", "readwrite", (st) => st.clear());
     await run("signatures", "readwrite", (st) => st.clear());
+    await run("images", "readwrite", (st) => st.clear());
     await run("blobs", "readwrite", (st) => st.clear());
   } catch {
     // nothing stored

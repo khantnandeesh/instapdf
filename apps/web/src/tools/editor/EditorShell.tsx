@@ -14,7 +14,8 @@ import { Dialog } from "@/components/ui/Dialog";
 import type { MenuEntry } from "@/components/ui/Menu";
 import { cx } from "@/components/ui/cx";
 import { useLeaveGuard } from "@/components/tool-flow/useLeaveGuard";
-import { buildInWorker, checkOwnerPassword, disposeBuild } from "@/lib/editor/build-client";
+import { buildInWorker, checkOwnerPassword, disposeBuild, warmBuild } from "@/lib/editor/build-client";
+import { earlyFetchAllowed } from "@/lib/editor/engine-load";
 import { OwnerPasswordDialog, OwnerPermissionNotice } from "@/components/tool-flow/OwnerPassword";
 import type { Permission } from "@/tools/registry";
 import { disposeEngine, getEngineStatus, getShapingStatus, subscribeEngine } from "@/lib/editor/engine-client";
@@ -23,7 +24,7 @@ import { screenDeltaToFrame, screenToFrame, displaySize } from "@/lib/editor/geo
 import { openZoom, renderDpr } from "@/lib/editor/open-zoom";
 import * as H from "@/lib/editor/history";
 import { clampDelta, initialPages, isPristine, kindName, moveObject, newId, objectBounds, pageSize, totalRotation, type EditorObject, type PageEntry, type Pt } from "@/lib/editor/model";
-import { clearDevice, deleteSession, loadSession, sha256, storageAvailable, writeSession, type LoadedSession } from "@/lib/editor/persist";
+import { clearDevice, deleteSession, forgetImage, listRecentImages, loadSession, rememberImage, sha256, storageAvailable, writeSession, type LoadedSession, type RecentImage } from "@/lib/editor/persist";
 import { planSession, restoreVersions, writtenBy } from "@/lib/editor/persist-plan";
 import { initialVersions } from "@/lib/editor/versions";
 import type { OpenedPdf } from "@/lib/pdf/pdfjs";
@@ -54,6 +55,7 @@ async function buildFonts(objects: readonly EditorObject[]) {
 }
 
 const SignDialog = lazy(() => import("./SignDialog").then((m) => ({ default: m.SignDialog })));
+const RecentImages = lazy(() => import("./RecentImages").then((m) => ({ default: m.RecentImages })));
 
 export type ShellProps = {
   name: string;
@@ -182,6 +184,27 @@ export function EditorShell(props: ShellProps) {
     };
     put();
     return ctl.store.subscribe(put);
+  }, [ctl]);
+  // The download worker (pdf-lib, fontkit) loads on Download intent (Chrome.tsx), or at idle after
+  // the first edit, so even a Ctrl+S download finds it ready (U-E13). Never on open (AC-51); not
+  // with Data Saver on or on 2g, where only intent loads it. The worker parses off the main thread.
+  useEffect(() => {
+    if (!ctl) return;
+    let idle = 0;
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    const check = () => {
+      if (ctl.store.get().history.index === 0) return;
+      unsub();
+      const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+      if (!earlyFetchAllowed(conn)) return;
+      const go = () => warmBuild();
+      idle = w.requestIdleCallback ? w.requestIdleCallback(go, { timeout: 3000 }) : window.setTimeout(go, 1000);
+    };
+    const unsub = ctl.store.subscribe(check);
+    return () => {
+      unsub();
+      if (idle) (w.cancelIdleCallback ?? clearTimeout)(idle);
+    };
   }, [ctl]);
   const [failed, setFailed] = useState(false);
   const [announce, setAnnounce] = useState("");
@@ -610,6 +633,21 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   }, [ctl, store, scroller, goto]);
 
   // ---- images ----
+  // Recent images (AC-66): read once from this device, so the Image tool knows at once (in the same
+  // click, which a file picker needs) whether to show them or open the picker.
+  const [recent, setRecent] = useState<RecentImage[]>([]);
+  const recentNow = useRef(recent);
+  recentNow.current = recent;
+  const [imagePick, setImagePick] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void listRecentImages().then((list) => alive && setRecent(list));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  /** Keeps an image among the recent ones on this device (as placed: PNG or JPEG); never sent anywhere. */
+  const remember = useCallback((a: { bytes: Uint8Array; mime: RecentImage["mime"] }) => void rememberImage({ bytes: a.bytes, mime: a.mime }).then(setRecent), []);
   /** Places an image asset on a page: at a point (drop) or centred in the visible part. */
   const placeImage = useCallback(
     (assetId: string, pageIndex: number, point?: Pt) => {
@@ -629,11 +667,12 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       const [dx, dy] = clampDelta(box, 0, 0, { w: pw, h: ph });
       const id = newId();
       ctl.add([{ kind: "image", id, page: entry.id, x: box.x + dx, y: box.y + dy, w, h, rot: (360 - totalRotation(entry)) % 360, asset: assetId, opacity: 1 }], "Add image");
+      remember(a);
       ctl.announce(`Image placed on page ${pageIndex + 1}. Arrow keys move it.`);
       requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-obj-id="${id}"]`)?.focus({ preventScroll: true }));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ctl, store, rt, scale],
+    [ctl, store, rt, scale, remember],
   );
   const pageGeom = (entry: PageEntry, index: number) => {
     const el = column.current?.querySelector<HTMLElement>(`[data-testid="page-${index + 1}"]`);
@@ -671,14 +710,41 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     [rt, ctl],
   );
 
+  /** The Image tool with an image in hand: the next click on a page places it. */
+  const armImage = useCallback(
+    (id: string) => {
+      const a = rt.assets[id];
+      const pl: Placement = { kind: "image", asset: id, aspect: a.w / Math.max(1, a.h), preview: a.url, label: "Image" };
+      ctl.setTool("image");
+      store.set({ placement: pl });
+      ctl.announce("Click a page to place the image. Escape cancels.");
+    },
+    [rt, ctl, store],
+  );
+  const pickRecent = useCallback(
+    async (img: RecentImage) => {
+      setImagePick(false);
+      try {
+        armImage(await addAsset(rt, { bytes: img.bytes, mime: img.mime }));
+      } catch {
+        ctl.toast({ text: "That image couldn’t be read. Choose it again.", tone: "danger" });
+        void forgetImage(img.id).then(() => setRecent((all) => all.filter((x) => x.id !== img.id)));
+        ctl.setTool("select");
+      }
+    },
+    [rt, ctl, armImage],
+  );
+
   useEffect(() => {
-    ctl.pickImage = () => imageInput.current?.click();
+    ctl.imagePlaced = (id) => rt.assets[id] && remember(rt.assets[id]);
+    ctl.pickImage = () => (recentNow.current.length ? setImagePick(true) : imageInput.current?.click());
     ctl.openSign = (role) => setSign({ role: role ?? store.get().defaults.sign.role });
     return () => {
+      ctl.imagePlaced = null;
       ctl.pickImage = null;
       ctl.openSign = null;
     };
-  }, [ctl, store]);
+  }, [ctl, store, rt, remember]);
 
   // ---- download (AC-44) ----
   const download = useCallback(
@@ -1185,17 +1251,13 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         </div>
       )}
 
-      <input ref={imageInput} type="file" accept={IMAGE_ACCEPT} className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="image-input" onChange={(e) => {
+      <input ref={imageInput} type="file" accept={IMAGE_ACCEPT} className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="image-input" data-recent={recent.length} onChange={(e) => {
         const f = e.target.files?.[0];
         e.target.value = "";
         if (!f) return ctl.setTool("select");
         void loadImage(f).then((id) => {
           if (!id) return ctl.setTool("select");
-          const a = rt.assets[id];
-          const pl: Placement = { kind: "image", asset: id, aspect: a.w / Math.max(1, a.h), preview: a.url, label: "Image" };
-          ctl.setTool("image");
-          store.set({ placement: pl });
-          ctl.announce("Click a page to place the image. Escape cancels.");
+          armImage(id);
         });
       }} />
       <input ref={fileInput} type="file" accept=".pdf,application/pdf" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => {
@@ -1204,6 +1266,28 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         if (f) requestOpen(() => onOpenFile(f), f.name);
       }} data-testid="open-input" />
 
+      {(imagePick || recent.length > 0) && (
+        <Suspense fallback={null}>
+          <RecentImages
+            open={imagePick}
+            images={recent}
+            sheet={!wide}
+            onPick={(img) => void pickRecent(img)}
+            onRemove={(id) => {
+              setRecent((all) => all.filter((x) => x.id !== id));
+              void forgetImage(id);
+            }}
+            onChoose={() => {
+              setImagePick(false);
+              imageInput.current?.click();
+            }}
+            onClose={() => {
+              setImagePick(false);
+              if (!store.get().placement) ctl.setTool("select");
+            }}
+          />
+        </Suspense>
+      )}
       {sign && (
         <Suspense fallback={null}>
           <SignDialog
@@ -1330,7 +1414,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         open={confirm === "clear"}
         onClose={() => setConfirm(null)}
         title="Clear from this device?"
-        description="Removes saved changes and saved signatures from this browser. What’s open now stays."
+        description="Removes saved changes, signatures and recent images from this browser. What’s open now stays."
         footer={
           <>
             <Button variant="plain" onClick={() => setConfirm(null)}>
@@ -1341,6 +1425,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
               onClick={() => {
                 setConfirm(null);
                 void clearDevice().then(() => {
+                  setRecent([]);
                   store.set({ save: store.get().save === "off" ? "off" : "idle" });
                   ctl.toast({ text: "Cleared from this device", tone: "success" });
                 });
