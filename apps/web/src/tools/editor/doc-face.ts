@@ -7,8 +7,8 @@
  */
 import type { FontInfo } from "@/lib/editor/berry-engine";
 import { callEngine } from "@/lib/editor/engine-client";
-import { TEXT_FONTS, cssFamily } from "@/lib/editor/fonts";
-import { ensureFace } from "@/lib/editor/fonts-browser";
+import { TEXT_FONTS, cssFamily, faceOf, fileFor } from "@/lib/editor/fonts";
+import { ensureFace, knownManifest, widenFor } from "@/lib/editor/fonts-browser";
 import { coveredBy, verticalOf, webFontFromProgram } from "@/lib/font-library/embedded-face";
 import { needsShaping } from "@/lib/editor/shaping";
 import { isClose } from "@/lib/font-library/match";
@@ -56,10 +56,31 @@ export function resetDocFaces(): void {
   byFamily.clear();
 }
 
+/** CSS family of a stand-in → its library id. */
+const STAND_IN = new Map<string, string>();
+const standInFamily = (id: string) => {
+  const family = cssFamily(id);
+  STAND_IN.set(family, id);
+  return family;
+};
+
 const codePoints = (text: string) => new Set([...text].map((c) => c.codePointAt(0)!));
 
 /** Fonts whose making was put off while warming up (it needs the font library): made when a line asks. */
 const deferred = new Set<string>();
+
+/**
+ * What a library face can draw of `asked`: the record for a font the PDF only names, whose text
+ * the stand-in draws on screen and in the saved file. `widen` also looks at the library's other
+ * files of the family (Greek, Cyrillic…); the warm-up never does (AC-290). Null when unknown.
+ */
+async function standInCovers(id: string, bold: boolean, italic: boolean, asked: Set<number>, widen: boolean): Promise<Set<number> | null> {
+  if (widen) await widenFor([id], [...asked].map((cp) => String.fromCodePoint(cp)).join("")).catch(() => undefined);
+  const m = knownManifest();
+  const face = m?.faces[id] && faceOf(m, id, bold, italic);
+  if (!face) return null;
+  return new Set([...asked].filter((cp) => fileFor(face, cp)));
+}
 
 /** `defer`: called instead of loading anything of the font library (the warm-up never does, AC-290). */
 async function build(info: FontInfo, text: string, gen: number, prev: DocFace | null, defer?: () => void): Promise<DocFace | null> {
@@ -75,6 +96,13 @@ async function build(info: FontInfo, text: string, gen: number, prev: DocFace | 
   const covered = program.format === "none" || joined ? null : coveredBy(program);
   // Asked again for new characters and the font has none of them: the font already made stays
   // (nothing new to draw), it only knows more about what it lacks.
+  if (prev && program.format === "none" && !joined && prev.kind === "close") {
+    // Only named: the stand-in already made is asked about the new characters.
+    const id = STAND_IN.get(prev.family);
+    const drawn = id ? await standInCovers(id, prev.bold, prev.italic, asked, true) : null;
+    if (gen !== generation) return null;
+    return { ...prev, covered: drawn, asked };
+  }
   if (prev && [...asked].every((cp) => prev.asked.has(cp) || !covered?.has(cp))) return { ...prev, covered, asked };
   const file = joined ? null : webFontFromProgram(program, info.family || "Embedded");
   if (file) {
@@ -111,7 +139,10 @@ async function build(info: FontInfo, text: string, gen: number, prev: DocFace | 
     try {
       const entry = await ensureFace(twin, info.bold, info.italic, text || "A");
       if (gen !== generation) return null;
-      return { family: cssFamily(twin), kind: "close", bold: info.bold, italic: info.italic, ascent: entry.ascent, descent: entry.descent, covered, asked };
+      // Nothing of the font is in the file: what the twin draws is what there is (AC-300).
+      const drawn = program.format === "none" && !joined ? await standInCovers(twin, info.bold, info.italic, asked, !defer) : covered;
+      if (gen !== generation) return null;
+      return { family: standInFamily(twin), kind: "close", bold: info.bold, italic: info.italic, ascent: entry.ascent, descent: entry.descent, covered: drawn, asked };
     } catch {
       // The library hasn't got it: the closest by shape below.
     }
@@ -124,7 +155,8 @@ async function build(info: FontInfo, text: string, gen: number, prev: DocFace | 
     const [best] = await matchFont(program, 1);
     if (gen !== generation || !best || !isClose(best)) return null;
     const entry = await ensureFace(best.family, best.weight >= 600, best.italic, text || "A");
-    return { family: cssFamily(best.family), kind: "close", bold: best.weight >= 600, italic: best.italic, ascent: entry.ascent, descent: entry.descent, covered, asked };
+    const drawn = program.format === "none" && !joined ? await standInCovers(best.family, best.weight >= 600, best.italic, asked, true) : covered;
+    return { family: standInFamily(best.family), kind: "close", bold: best.weight >= 600, italic: best.italic, ascent: entry.ascent, descent: entry.descent, covered: drawn, asked };
   } catch {
     return null;
   }

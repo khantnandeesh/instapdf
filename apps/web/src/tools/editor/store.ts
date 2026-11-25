@@ -107,7 +107,7 @@ export type EditorState = {
    * A line was edited with characters its font lacks, so another font draws them (F24). Shown
    * as an inline notice that offers another font; never blocks typing.
    */
-  fontNotice: { original: string; standIn: string; standInId: string; fontName: string; src: number; line: number; text: string; key: number } | null;
+  fontNotice: { original: string; /** False when the PDF only names the font (nothing of it is in the file). */ embedded?: boolean; standIn: string; standInId: string; fontName: string; src: number; line: number; text: string; key: number } | null;
   busy: "edit" | "save" | null;
   panel: boolean;
   panelTab: "pages" | "objects" | "history" | "fields";

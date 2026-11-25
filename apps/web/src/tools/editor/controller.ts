@@ -560,8 +560,9 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         if (sub) {
           const standInId = ctl.standInIdOf(sub.substitute_font);
           const original = familyOfFont(sub.original_font);
-          store.set({ fontNotice: { original, standIn: sub.substitute_font, standInId, fontName: sub.original_font, src: e.src, line: e.line, text: e.text, key: Date.now() } });
-          ui.announce(`${original} isn’t complete in this file. Using ${sub.substitute_font}.`);
+          const embedded = s.texts[e.src]?.fonts.find((f) => f.name === sub.original_font)?.embedded !== false;
+          store.set({ fontNotice: { original, embedded, standIn: sub.substitute_font, standInId, fontName: sub.original_font, src: e.src, line: e.line, text: e.text, key: Date.now() } });
+          ui.announce(`${original} ${embedded ? "isn’t complete in this file" : "isn’t in this file"}. Using ${sub.substitute_font}.`);
         } else store.set({ fontNotice: null });
       } catch (err) {
         // Typed Hindi, Arabic or similar into a line of the default build: load the shaping

@@ -702,3 +702,33 @@ test("AC-299: the edit box opens at once: no fade or other animation over the pa
   });
   expect(style).toEqual({ animation: "none", opacity: "1", running: 0 });
 });
+
+for (const [script, letter] of [
+  ["Devanagari", "न"],
+  ["symbol", "⸘"],
+] as const) {
+  test(`AC-300: on a line whose font the PDF only names, a ${script} letter the twin lacks is marked as typed`, async ({ page }) => {
+    await open(page, "std14-reportlab.pdf");
+    const input = await edit(page, lineWith(page, "REF-7731-ZEBRA"));
+    await expect(input).toHaveAttribute("data-missing", "");
+    await page.keyboard.press("End");
+    await page.keyboard.type(` ${letter}`);
+    await expect(input).toHaveAttribute("data-missing", letter);
+    await expect(page.getByTestId("line-missing")).toContainText(letter);
+    await expect(page.getByTestId("line-missing-status")).toContainText(`Not in this font: ${letter}`);
+    await input.press("Escape");
+  });
+}
+
+test("AC-300: Enter on a named-only line with a letter no font here draws answers at once and keeps the text", async ({ page }) => {
+  await open(page, "std14-reportlab.pdf");
+  const input = await edit(page, lineWith(page, "REF-7731-ZEBRA"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ⸘");
+  await expect(input).toHaveAttribute("data-missing", "⸘");
+  await expect(page.getByTestId("line-missing-none")).toBeVisible({ timeout: 15_000 });
+  await input.press("Enter");
+  // The reason is given within two seconds, with the box open and the text in it.
+  await expect(page.locator(".ed-toast")).toContainText("⸘", { timeout: 2000 });
+  await expect(page.getByTestId("line-input")).toContainText("⸘");
+});
