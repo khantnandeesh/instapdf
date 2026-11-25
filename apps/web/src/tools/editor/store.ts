@@ -89,6 +89,8 @@ export type EditorState = {
   rasterRev: Record<number, number>;
   /** Bumped when pdf.js opens another version of the bytes. */
   pdfRev: number;
+  /** How many fonts the file only names are drawn in their twins on the page (twin-display.ts). */
+  twins: number;
   /** The engine could open the file: existing text is editable. */
   engineReady: boolean;
   /** Someone asked for Edit text before the engine was ready: show its load progress. */

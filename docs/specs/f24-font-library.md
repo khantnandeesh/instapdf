@@ -214,5 +214,9 @@ The evaluation of 2026-11-25 on staging `97b0be6` failed on AC-271, AC-288, AC-2
 - **Gap 8.** A named-only font with a twin is no longer sent to the shape matcher (no index, no signature files): its menu row is ready at once. The notice after such an edit says "Courier isn't in this file. Using Cousine." instead of "isn't complete".
 - **AC-271 (gap 1).** The notices page is built into the site image from the published family list, so a publish made after a deploy is missing from it until the next deploy. Open: an owner decision on letting the publish workflow start a staging deploy.
 
-Still open: gap 6 (the page view draws a named-only Georgia or Segoe UI in whatever the device has, the box in the twin; it needs the page renderer to take our twin); gaps 7, 9 to 16; AC-296.
+Gap 6 (the page drew a named-only Georgia or Segoe UI in whatever the device has, the box in the twin): the page now draws such fonts in their twins too. The page renderer is given a copy of the file to which an update is appended that attaches the twin's font file to each font the file only names (`lib/pdf/twin-display.ts`); the renderer and its worker are unchanged. The copy is for the screen only: the engine, the saved file and the download never see it. It covers simple fonts with the standard Windows encoding and no font file, in files without a password; any other font stays as the device draws it, as does a font whose text uses a letter the twin's Latin file lacks. The code and the twin files load only for a file that has such fonts.
+
+Reading of AC-290 for this: a file that only names a font whose twin is in the library needs that match to draw its pages, so the twin's Latin file (and the library's family list) loads when the pages' text has been read, not when the menu opens. A file with no such font still loads nothing of the library before the menu opens or a line is edited.
+
+Still open: gaps 7, 9 to 16; AC-296.
 

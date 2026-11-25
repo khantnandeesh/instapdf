@@ -770,3 +770,27 @@ test("AC-304: a raised mark of another line inside the row stays drawn while the
   expect(k.x).toBeGreaterThanOrEqual(b.x - 1);
   expect(k.x + k.width).toBeLessThanOrEqual(b.x + b.width + 1);
 });
+
+test("fonts the file only names are drawn in their twins on the page too, and the saved file never carries the twins", async ({ page, isMobile }) => {
+  await open(page, "named-only-twins.pdf");
+  const shell = page.getByTestId("editor-shell");
+  // Arial, Helvetica, Times, Courier, Calibri and Cambria have their twins in the app itself.
+  await expect.poll(async () => Number((await shell.getAttribute("data-twins")) ?? 0), { timeout: 30_000 }).toBeGreaterThanOrEqual(6);
+  const twins = await shell.getAttribute("data-twins");
+  const line = lineWith(page, "Calibri invoice");
+  await line.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  const input = await edit(page, line);
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ok");
+  await page.keyboard.press("Enter");
+  await expect(input).toBeHidden({ timeout: 30_000 });
+  await expect(lineWith(page, "on time ok")).toBeVisible({ timeout: 30_000 });
+  // The edit only added to the file: the page still draws the same fonts in their twins.
+  await expect(shell).toHaveAttribute("data-twins", twins!);
+  test.skip(isMobile, "the download is read on desktop");
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download PDF" }).click()]);
+  const saved = readFileSync((await dl.path())!).toString("latin1");
+  // The twins are for the screen only: none of their objects or font files is in the download.
+  expect(saved).not.toMatch(/\b6000\d{3} 0 obj/);
+  expect(saved).not.toContain("/FontFile2");
+});

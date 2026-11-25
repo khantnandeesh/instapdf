@@ -80,6 +80,9 @@ export function displayBytes(rt: Runtime, bytes: Uint8Array): Uint8Array {
   return shown === bytes ? bytes.slice() : shown;
 }
 
+/** How many fonts are drawn in their twins now. */
+export const twinCount = (rt: Runtime) => stateOf(rt).patch?.fonts.length ?? 0;
+
 /** Another version of the file whose objects may be numbered differently (undo, a full rewrite): the update is made again for it. */
 export async function retwin(rt: Runtime, bytes: Uint8Array): Promise<void> {
   const s = stateOf(rt);

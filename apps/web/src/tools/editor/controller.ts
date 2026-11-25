@@ -67,7 +67,7 @@ import type { EditResult, PageText } from "@/lib/editor/berry-engine";
 import { foldName } from "@/lib/font-library/client";
 import { chooseStandIn, chosenStandIn, fontLabel, registerWithEngine, standInCandidates } from "./font-service";
 import { warmDocFaces } from "./doc-face";
-import { displayBytes, ensureTwinDisplay, retwin } from "./twin-display";
+import { displayBytes, ensureTwinDisplay, retwin, twinCount } from "./twin-display";
 import type { Store, ToolId } from "./store";
 
 export type RuntimeAsset = Asset & { url: string; w: number; h: number };
@@ -308,6 +308,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       if (store.get().engineReady) await callEngine({ op: "open", bytes: copy, shaping: store.get().shaping === "ready" }, [copy.buffer]);
       // Named-only fonts are drawn in their twins on the page too (twin-display.ts).
       await retwin(rt, bytes);
+      store.set({ twins: twinCount(rt) });
       const opened = await openPdf(displayBytes(rt, bytes), rt.password);
       if (!opened.ok) throw new Error("pdf.js");
       const prev = rt.pdf;
@@ -330,7 +331,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
           if (version !== rt.shown) return void opened.pdf.task.destroy();
           const prev = rt.pdf;
           rt.pdf = opened.pdf.doc;
-          store.set((s) => ({ pdfRev: s.pdfRev + 1, rasterRev: Object.fromEntries(rt.src.map((_, i) => [i, (s.rasterRev[i] ?? 0) + 1])) }));
+          store.set((s) => ({ twins: twinCount(rt), pdfRev: s.pdfRev + 1, rasterRev: Object.fromEntries(rt.src.map((_, i) => [i, (s.rasterRev[i] ?? 0) + 1])) }));
           setTimeout(() => void prev.loadingTask.destroy(), 2000);
         },
       );
@@ -510,6 +511,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     async showEngineResult(src: number, { result, bytes, appended }: { result: EditResult; bytes: Uint8Array; appended: boolean }): Promise<boolean> {
       // A file the engine only added to keeps its object numbers: the twins' update goes on as it is.
       if (!appended) await retwin(rt, bytes);
+      store.set({ twins: twinCount(rt) });
       const opened = await openPdf(displayBytes(rt, bytes), rt.password);
       if (!opened.ok) {
         const back = ctl.bytesOf(rt.shown).slice();
