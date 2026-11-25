@@ -178,6 +178,15 @@ export const chosenPartners = (key: string): readonly string[] => partnersOf.get
 const partnersOf = new Map<string, string[]>();
 
 /**
+ * The fonts that have any of the missing characters, the one with the most first; a font the
+ * person added, then closeness, decides between equals. The edit box and the save share it.
+ */
+export function rankStandIns(users: readonly string[], found: readonly string[], has: ReadonlyMap<string, number>): string[] {
+  const n = (id: string) => has.get(id) ?? 0;
+  return [...users.filter((id) => !found.includes(id)), ...found].filter((id) => n(id) > 0).sort((a, b) => n(b) - n(a));
+}
+
+/**
  * Which font draws which of `chars`: the fonts in `first` take what they have, in order, then
  * the font of `order` with the most of what is left, until nothing is left or no font has any.
  * The hint, the edit box and the saved file all follow this one answer.

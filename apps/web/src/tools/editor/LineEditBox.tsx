@@ -29,7 +29,7 @@ import { useCtl } from "./context";
 import { docFace, type DocFace } from "./doc-face";
 import { useStore } from "./store";
 import { USER_FONT_ACCEPT } from "@/lib/font-library/user-fonts";
-import { addUserFontFile, chosenPartners, chosenStandIn, coverOf, fontLabel, getFontState, planCover, standInCandidates } from "./font-service";
+import { addUserFontFile, chosenPartners, chosenStandIn, coverOf, fontLabel, getFontState, planCover, rankStandIns, standInCandidates } from "./font-service";
 
 type Line = PageText["lines"][number];
 export type EditBoxGeometry = { left: number; top: number; width: number; height: number; transform?: string };
@@ -710,13 +710,15 @@ export function LineEditBox({
       const users = getFontState().user.map((u) => u.id).filter((id) => !ids.includes(id));
       const cover = await coverOf([...users, ...ids], info.bold, info.italic, missing.chars);
       // Those that have the most of the missing characters first; closeness decides between equals.
-      const has = (id: string) => cover.has.get(id) ?? 0;
-      const ranked = [...users, ...ids].filter((id) => has(id) > 0).sort((a, b) => has(b) - has(a));
-      const kept = standInRef.current;
-      const picked = kept && kept.font === missing.font && ranked.includes(kept.picked) ? kept.picked : (ranked[0] ?? "");
+      const ranked = rankStandIns(users, ids, cover.has);
+      const pickedNow = () => {
+        const k = standInRef.current;
+        return k && k.font === missing.font && ranked.includes(k.picked) ? k.picked : (ranked[0] ?? "");
+      };
+      let picked = pickedNow();
       // One answer for the hint, the box and the file: the font in use draws what it has, and
       // the font with the most of the rest (one the person added counts) draws the rest.
-      const plan = planCover(picked ? [picked] : [], ranked, cover.by, missing.chars);
+      let plan = planCover(picked ? [picked] : [], ranked, cover.by, missing.chars);
       // Every font of the plan is offered: one with a single letter no other has is never left out.
       const able = ranked.slice(0, CHOICES);
       for (const { id } of plan) {
@@ -727,6 +729,12 @@ export function LineEditBox({
       }
       await Promise.allSettled(able.map((id) => ensureFace(id, info.bold, info.italic, chars + fontLabel(id))));
       if (!alive) return;
+      const kept = standInRef.current;
+      // A font picked while the fonts loaded stays picked (it is one of the row's fonts).
+      if (pickedNow() !== picked && able.includes(pickedNow())) {
+        picked = pickedNow();
+        plan = planCover([picked], able, cover.by, missing.chars);
+      }
       // The same fonts stay in the same places: a pick never reshuffles the row.
       if (kept && kept.font === missing.font && kept.ids.length === able.length && able.every((id) => kept.ids.includes(id))) able.splice(0, able.length, ...kept.ids);
       // What the box shows is what the file gets: the fonts in use are recorded as the choice.

@@ -251,6 +251,8 @@ one answer, `planCover` in `tools/editor/font-service.ts`:
 - **Row.** The desktop hint is up to 380 px (560 px with two answers) and wraps inside its paper
   instead of letting a font stand outside it. On a phone the row stays one line: a long font name
   gives way with an ellipsis, the letters never do.
+- **Order.** `rankStandIns` gives the box and the save the same order of fonts, so a save made before
+  the box has recorded a choice picks as the box would.
 - **Name.** The phone's short "Your font" button is named "Your font: use your own font", so its
   name holds the words on it.
 
