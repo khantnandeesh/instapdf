@@ -7,8 +7,8 @@
  * 3. A click on a menu item, and on Download, during its entrance acts on the first try.
  * 4. Opening and closing the All tools menu, a dialog and a menu, filtering, and adding files record no
  *    layout shift.
- * 5. Exits happen: the All tools menu, a dialog and a menu are still shown one frame after Escape, and
- *    gone within 250ms.
+ * 5. Exits happen: the All tools menu, a dialog and a menu are still shown one frame after Escape, and gone
+ *    within 200ms plus one measured frame (and the 400ms cap); their configured lengths are within the preset's.
  * 6. No securitypolicyviolation event fires (every test).
  * 7. Nothing is animating on a tool page 5s after load (WCAG 2.2.2).
  * 8. Each Escape exit puts focus back on the trigger, and the leaving part is inert and aria-hidden while
@@ -40,17 +40,27 @@ function watchEngine(page: Page) {
   return hits;
 }
 
-/** Waits until the engine has been fetched (after an intent), so exits animate. */
+/**
+ * Waits until the engine has been fetched and evaluated (after an intent), so exits animate. The intent is
+ * repeated while it isn't: on a slow CPU the first one can land before hydration, when nothing listens yet.
+ */
 async function primeEngine(page: Page, hits: number[]) {
-  await page.mouse.move(2, 2);
-  await page.mouse.down();
-  await page.mouse.up();
-  await expect.poll(() => hits.length, { timeout: 10_000 }).toBeGreaterThan(0);
-  // The chunk is evaluated a moment after its response.
-  await page.waitForTimeout(300);
+  const loaded = () => page.evaluate(() => "__motionLive" in window);
+  for (let i = 0; i < 6 && !(await loaded()); i++) {
+    await page.mouse.move(2, 2);
+    await page.mouse.down();
+    await page.mouse.up();
+    await expect.poll(loaded, { timeout: 5_000 }).toBe(true).catch(() => {});
+  }
+  expect(await loaded(), "the motion engine loaded").toBe(true);
+  await expect.poll(() => hits.length, { message: "the engine chunk was fetched" }).toBeGreaterThan(0);
 }
 
+/** E2E_CPU_THROTTLE=4 runs these guards on a CPU slowed 4x (Chromium), to prove the gates hold under load. */
+const THROTTLE = Number(process.env.E2E_CPU_THROTTLE ?? 0);
+
 test.beforeEach(async ({ page }) => {
+  if (THROTTLE > 1) await (await page.context().newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: THROTTLE });
   await page.addInitScript(() => {
     const w = window as unknown as {
       csp: string[];
@@ -123,23 +133,34 @@ const strayTransforms = (page: Page) =>
       ),
   );
 
+/** What armExitWatch records (ms after the Escape keydown, on the rAF clock). */
+type ExitWatch = {
+  afterFrame?: boolean;
+  lastShown?: number;
+  maxGap?: number;
+  done?: boolean;
+  cssMs?: number;
+  tweenMs?: number;
+};
+
 /**
- * Arms a watcher for the next Escape: records whether `shown(el)` still holds on the frame after the key,
- * and how long until it no longer does.
+ * Arms a watcher for the next Escape. Everything is on one clock: the keydown's timeStamp and the
+ * requestAnimationFrame timestamps. It records whether the part is still shown on the first frame after
+ * the key, the last frame it was shown (lastShown, ms after the key), the largest gap between frames
+ * meanwhile (maxGap; the first frame is one frame late at most), and the configured lengths of the exit
+ * on that first frame: the leaving element's CSS transitions and lib/motion tweens on it.
  */
 async function armExitWatch(page: Page, kind: "tool-menu" | "dialog" | "menu") {
   await page.evaluate((kind) => {
     const w = window as unknown as {
-      exitWatch?: { afterFrame?: boolean; goneAfter?: number };
+      exitWatch?: ExitWatch;
+      __motionTweens?: { ms: number; targets: Element[] }[];
     };
-    const find = (): Element | null =>
-      kind === "tool-menu"
-        ? document.querySelector("[data-testid=tool-menu]")
-        : kind === "dialog"
-          ? document.querySelector("dialog[open], dialog[data-leaving]")
-          : (document.querySelector(".mp-menu[popover]:popover-open") ??
-            document.querySelector(".mp-menu[popover]"));
-    const target = find();
+    const menu =
+      kind === "menu"
+        ? (document.querySelector(".mp-menu[popover]:popover-open") ??
+          document.querySelector(".mp-menu[popover]"))
+        : null;
     const shown = () => {
       if (kind === "tool-menu") {
         const el = document.querySelector("[data-testid=tool-menu]");
@@ -154,89 +175,133 @@ async function armExitWatch(page: Page, kind: "tool-menu" | "dialog" | "menu") {
           (d) => d.open || getComputedStyle(d).display !== "none",
         );
       return (
-        !!target &&
-        target.isConnected &&
-        getComputedStyle(target).display !== "none"
+        !!menu && menu.isConnected && getComputedStyle(menu).display !== "none"
       );
     };
+    const leaving = (): Element | null =>
+      kind === "tool-menu"
+        ? document.querySelector("[data-testid=tool-menu]")
+        : kind === "dialog"
+          ? document.querySelector("dialog[data-leaving]")
+          : menu;
+    const longestCss = (el: Element | null) => {
+      if (!el) return -1;
+      const cs = getComputedStyle(el);
+      const secs = (v: string) => v.split(",").map((x) => parseFloat(x) || 0);
+      const d = secs(cs.transitionDuration);
+      const delay = secs(cs.transitionDelay);
+      return Math.max(0, ...d.map((x, i) => (x + (delay[i % delay.length] ?? 0)) * 1000));
+    };
+    const longestTween = (el: Element | null) =>
+      Math.max(
+        -1,
+        ...(w.__motionTweens ?? [])
+          .filter((t) => !!el && t.targets.includes(el))
+          .map((t) => t.ms),
+      );
     w.exitWatch = {};
     window.addEventListener(
       "keydown",
       (e) => {
         if (e.key !== "Escape") return;
-        const t0 = performance.now();
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            w.exitWatch!.afterFrame = shown();
-            // goneAfter is the last frame it was still shown: the first frame without it comes one
-            // (possibly slow, under test load) frame later.
-            let last = performance.now() - t0;
-            const poll = () => {
-              if (!shown()) return void (w.exitWatch!.goneAfter = last);
-              last = performance.now() - t0;
-              requestAnimationFrame(poll);
-            };
-            poll();
-          }),
-        );
+        const watch = w.exitWatch!;
+        const t0 = e.timeStamp;
+        let prev = t0;
+        let maxGap = 0;
+        const frame = (ts: number) => {
+          maxGap = Math.max(maxGap, ts - prev);
+          prev = ts;
+          const on = shown();
+          if (watch.afterFrame === undefined) {
+            watch.afterFrame = on;
+            const el = leaving();
+            watch.cssMs = longestCss(el);
+            watch.tweenMs = longestTween(el);
+          }
+          if (on) {
+            watch.lastShown = ts - t0;
+            watch.maxGap = maxGap;
+            requestAnimationFrame(frame);
+          } else watch.done = true;
+        };
+        requestAnimationFrame(frame);
       },
       { capture: true, once: true },
     );
   }, kind);
 }
 
-async function expectExit(page: Page, what: string) {
+/**
+ * The exit gate: shown the frame after Escape; its last shown frame within 200ms plus one measured frame
+ * of lateness, and within the 400ms cap outright; and its configured lengths within the preset's
+ * (`limitMs` for the CSS hold and the tween; `tween` says whether a lib/motion tween runs it).
+ */
+async function expectExit(page: Page, what: string, limitMs: number, tween: boolean) {
   await expect
     .poll(
       () =>
         page.evaluate(
-          () =>
-            (window as unknown as { exitWatch: { goneAfter?: number } })
-              .exitWatch.goneAfter,
+          () => (window as unknown as { exitWatch: ExitWatch }).exitWatch.done,
         ),
       { message: `${what} goes` },
     )
-    .toBeDefined();
+    .toBe(true);
   const r = await page.evaluate(
-    () =>
-      (
-        window as unknown as {
-          exitWatch: { afterFrame: boolean; goneAfter: number };
-        }
-      ).exitWatch,
+    () => (window as unknown as { exitWatch: Required<ExitWatch> }).exitWatch,
   );
   expect(
     r.afterFrame,
     `${what} is still shown the frame after Escape (it exits, not vanishes)`,
   ).toBe(true);
   expect(
-    r.goneAfter,
-    `${what} is gone within 250ms (last frame shown)`,
-  ).toBeLessThanOrEqual(250);
+    r.lastShown - r.maxGap,
+    `${what}: last shown frame ${r.lastShown.toFixed(1)}ms after Escape, less the largest frame gap ${r.maxGap.toFixed(1)}ms, is within 200ms`,
+  ).toBeLessThanOrEqual(200);
+  expect(r.lastShown, `${what} is gone within the 400ms cap`).toBeLessThanOrEqual(400);
+  expect(r.cssMs, `${what}: configured CSS transition length`).toBeLessThanOrEqual(limitMs);
+  if (tween) {
+    expect(r.tweenMs, `${what}: a lib/motion tween runs the exit`).toBeGreaterThan(0);
+    expect(r.tweenMs, `${what}: configured tween length`).toBeLessThanOrEqual(limitMs);
+  }
 }
 
+type LeaveSample = { painted: boolean; inert: boolean; hidden: boolean; focusInside: boolean };
+
 /**
- * Arms a watcher for the next Escape: one frame after the key, records whether the element `selector`
- * finds is still painted, whether it (or an ancestor) is inert and aria-hidden, and where focus is.
+ * Arms a watcher for the next Escape on the element `selector` finds. Two samples: `atHide`, taken the
+ * moment it has become both inert and aria-hidden (a MutationObserver, so before any frame), and `frame`,
+ * one frame after the key. Each records whether it is still painted and where focus is.
  */
 async function armLeaveWatch(page: Page, selector: string) {
   await page.evaluate((selector) => {
-    const w = window as unknown as { leaveWatch?: Record<string, unknown> };
+    const w = window as unknown as { leaveWatch?: { found: boolean; atHide?: LeaveSample; frame?: LeaveSample } };
     const el = document.querySelector<HTMLElement>(selector);
+    const sample = (): LeaveSample => {
+      const cs = el && getComputedStyle(el);
+      return {
+        painted: !!el && el.isConnected && cs!.display !== "none" && cs!.visibility !== "hidden" && Number(cs!.opacity) > 0,
+        inert: !!el?.closest("[inert]"),
+        hidden: !!el?.closest("[aria-hidden=true]"),
+        focusInside: !!el?.contains(document.activeElement),
+      };
+    };
+    const watch: { found: boolean; atHide?: LeaveSample; frame?: LeaveSample } = { found: !!el };
     w.leaveWatch = undefined;
+    if (!el) return void (w.leaveWatch = watch);
+    const mo = new MutationObserver(() => {
+      const s = sample();
+      if (!s.inert || !s.hidden) return;
+      watch.atHide = s;
+      mo.disconnect();
+    });
     window.addEventListener(
       "keydown",
       (e) => {
         if (e.key !== "Escape") return;
+        mo.observe(el, { attributes: true, attributeFilter: ["inert", "aria-hidden"] });
         requestAnimationFrame(() => {
-          const cs = el && getComputedStyle(el);
-          w.leaveWatch = {
-            found: !!el,
-            painted: !!el && el.isConnected && cs!.display !== "none" && cs!.visibility !== "hidden" && Number(cs!.opacity) > 0,
-            inert: !!el?.closest("[inert]"),
-            hidden: !!el?.closest("[aria-hidden=true]"),
-            focusInside: !!el?.contains(document.activeElement),
-          };
+          watch.frame = sample();
+          w.leaveWatch = watch;
         });
       },
       { capture: true, once: true },
@@ -246,8 +311,13 @@ async function armLeaveWatch(page: Page, selector: string) {
 
 async function expectLeaving(page: Page, what: string) {
   await expect.poll(() => page.evaluate(() => (window as unknown as { leaveWatch?: unknown }).leaveWatch), { message: `${what}: watched` }).toBeDefined();
-  const r = await page.evaluate(() => (window as unknown as { leaveWatch: Record<string, boolean> }).leaveWatch);
-  expect(r, `${what}, one frame after Escape`).toEqual({ found: true, painted: true, inert: true, hidden: true, focusInside: false });
+  const r = await page.evaluate(() => (window as unknown as { leaveWatch: { found: boolean; atHide?: LeaveSample; frame: LeaveSample } }).leaveWatch);
+  expect(r.found, `${what}: found`).toBe(true);
+  // It became inert and aria-hidden while it was still painted, with focus already out of it.
+  expect(r.atHide, `${what}: inert and aria-hidden at the start of its exit`).toEqual({ painted: true, inert: true, hidden: true, focusInside: false });
+  // And whenever it is still painted a frame later, it is still out of reach.
+  if (r.frame.painted) expect(r.frame, `${what}, painted one frame after Escape`).toEqual({ painted: true, inert: true, hidden: true, focusInside: false });
+  else expect(r.frame.focusInside, `${what}: focus is not inside it`).toBe(false);
 }
 
 /** What an exit can leave on an element (all empty once it is settled). */
@@ -417,7 +487,7 @@ for (const size of SIZES) {
       expect(await shifts(page), "menu and dialog").toEqual([]);
     });
 
-    test("5: the All tools menu, a dialog and a menu exit (shown a frame after Escape, gone within 250ms)", async ({
+    test("5: the All tools menu, a dialog and a menu exit (shown a frame after Escape, gone within 200ms plus a frame)", async ({
       page,
     }) => {
       const hits = watchEngine(page);
@@ -431,7 +501,7 @@ for (const size of SIZES) {
         size.project === "desktop" ? "tool-menu" : "dialog",
       );
       await page.keyboard.press("Escape");
-      await expectExit(page, "All tools");
+      await expectExit(page, "All tools", size.project === "desktop" ? 120 : 200, true);
 
       await openMerge(page);
       await primeEngine(page, hits);
@@ -441,7 +511,7 @@ for (const size of SIZES) {
       await page.waitForTimeout(300);
       await armExitWatch(page, "menu");
       await page.keyboard.press("Escape");
-      await expectExit(page, "the Sort menu");
+      await expectExit(page, "the Sort menu", 120, false);
 
       if (size.project === "desktop")
         await page.getByTestId("file-card").first().hover();
@@ -452,7 +522,7 @@ for (const size of SIZES) {
       await page.waitForTimeout(400);
       await armExitWatch(page, "dialog");
       await page.keyboard.press("Escape");
-      await expectExit(page, "the preview dialog");
+      await expectExit(page, "the preview dialog", 200, true);
     });
 
     test("8: each Escape exit returns focus to the trigger; the leaving part is inert and aria-hidden while painted", async ({ page }) => {
@@ -501,14 +571,16 @@ for (const size of SIZES) {
         await page.getByTestId("all-tools-button").first().click();
         await expect(page.getByTestId("tool-menu")).toBeVisible();
         await page.waitForTimeout(400);
+        // Close, check it is leaving (inert set, its tween live) as soon as React has committed the click
+        // (microtasks, never a frame), and reopen in that same task, so a slow frame can never outlast the
+        // 120ms exit first.
         const midExit = await page.evaluate(async () => {
-          document.querySelector<HTMLButtonElement>("[data-testid=all-tools-button]")!.click();
-          const frame = () => new Promise((r) => requestAnimationFrame(r));
-          await frame();
-          await frame();
+          const trigger = document.querySelector<HTMLButtonElement>("[data-testid=all-tools-button]")!;
           const panel = document.querySelector<HTMLElement>("[data-testid=tool-menu]");
-          const leaving = !!panel?.inert && (window as unknown as { __motionLive: number }).__motionLive > 0;
-          document.querySelector<HTMLButtonElement>("[data-testid=all-tools-button]")!.click();
+          trigger.click();
+          for (let i = 0; i < 100 && !panel?.inert; i++) await Promise.resolve();
+          const leaving = !!panel?.inert && panel.isConnected && (window as unknown as { __motionLive: number }).__motionLive > 0;
+          trigger.click();
           return leaving;
         });
         expect(midExit, "the panel was mid-exit when it reopened").toBe(true);
@@ -535,12 +607,11 @@ for (const size of SIZES) {
       const midExit = await page.evaluate(async () => {
         const d = document.querySelector<HTMLDialogElement>("dialog[open]")!;
         d.dataset.probe = "";
-        // What Escape does (the dialog's cancel event), from script so the reopen lands mid-fade.
+        // What Escape does (the dialog's cancel event), from script so the reopen lands mid-fade. React
+        // commits that update in a microtask: wait microtasks (never a frame) until the dialog has closed.
         d.dispatchEvent(new Event("cancel", { cancelable: true }));
-        const frame = () => new Promise((r) => requestAnimationFrame(r));
-        await frame();
-        await frame();
-        const leaving = !d.open && d.hasAttribute("data-leaving") && (window as unknown as { __motionLive: number }).__motionLive > 0;
+        for (let i = 0; i < 100 && d.open; i++) await Promise.resolve();
+        const leaving = !d.open && d.hasAttribute("data-leaving") && d.inert && (window as unknown as { __motionLive: number }).__motionLive > 0;
         document.querySelector<HTMLButtonElement>("button[aria-label='Enlarge alpha.pdf']")!.click();
         return leaving;
       });

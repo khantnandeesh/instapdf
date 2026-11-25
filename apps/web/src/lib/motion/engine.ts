@@ -43,7 +43,16 @@ export const liveCount = () => live.size;
 // The same count for the e2e suites: settled() (e2e/support/axe.ts) waits for 0 as it does for CSS
 // animations, since GSAP tweens are not in document.getAnimations(). A getter on window, not a DOM
 // attribute: nothing is written per tween, and reading it costs nothing.
-if (typeof window !== "undefined") Object.defineProperty(window, "__motionLive", { configurable: true, get: liveCount });
+// __motionTweens lists each running tween's length and targets, for e2e checks on a preset's configured
+// duration; it is built only when read.
+if (typeof window !== "undefined")
+  Object.defineProperties(window, {
+    __motionLive: { configurable: true, get: liveCount },
+    __motionTweens: {
+      configurable: true,
+      get: () => [...live].map((a) => ({ ms: a.totalDuration() * 1000, targets: a instanceof gsap.core.Tween ? (a.targets() as Element[]) : [] })),
+    },
+  });
 
 /**
  * Registers a running animation and drops it when it completes or is interrupted, keeping any callback it
