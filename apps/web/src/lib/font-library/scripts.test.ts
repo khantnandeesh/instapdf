@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { orderCandidates } from "./candidates";
 import type { FamilyRow } from "./client";
-import { arabicStyle, scriptFamilies, scriptOf, scriptOrder } from "./scripts";
+import { arabicStyle, lookKind, scriptFamilies, scriptOf, scriptOrder } from "./scripts";
 
 const row = (i: string, c: string, s: string[]): FamilyRow => ({ i, n: i, c, l: "OFL-1.1", s, w: [400], t: 0, m: "0" });
 const families = [
@@ -80,5 +80,27 @@ describe("faces for other writing systems (F24, AC-288)", () => {
   it("Greek and Cyrillic go by shape as before: no script family is put ahead", () => {
     const out = orderCandidates({ matches: [], named: ["tinos"], fallbacks: ["tinos"], families, kind: "serif", chars: "α" });
     expect(out[0]).toBe("tinos");
+  });
+});
+
+describe("serif or sans of a document font (AC-288)", () => {
+  const font = (name: string, serif = false, monospace = false) => ({ name, serif, monospace });
+  it("asks the library's entry of that name first, then the name, then the PDF's flag", () => {
+    expect(lookKind(font("ABCDEF+Amiri-Regular"), { c: "serif" })).toBe("serif");
+    expect(lookKind(font("NotoSerifDevanagari-Regular"))).toBe("serif");
+    expect(lookKind(font("ABCDEF+NotoSerifBengali"))).toBe("serif");
+    expect(lookKind(font("NotoSansHebrew", true))).toBe("sans-serif");
+    expect(lookKind(font("Mangal", true))).toBe("serif");
+    expect(lookKind(font("Mangal"))).toBe("sans-serif");
+    expect(lookKind(font("Whatever", true, true))).toBe("monospace");
+    // The upright cut of a sans family, and a subset tag that happens to spell a word.
+    expect(lookKind(font("Avenir-Roman"))).toBe("sans-serif");
+    expect(lookKind(font("TimesNewRomanPSMT"))).toBe("serif");
+    expect(lookKind(font("SERIFX+Mangal"))).toBe("sans-serif");
+  });
+
+  it("a serif font of one script gets the serif face of another", () => {
+    const families = [row("noto-sans-bengali", "sans-serif", ["bengali"]), row("noto-serif-bengali", "serif", ["bengali"])];
+    expect(scriptFamilies("bengali", { kind: lookKind(font("NotoSerifDevanagari")), name: "NotoSerifDevanagari" }, families)[0]).toBe("noto-serif-bengali");
   });
 });

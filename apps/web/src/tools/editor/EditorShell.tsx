@@ -114,6 +114,7 @@ function initialState(pages: PageEntry[], wide: boolean): EditorState {
     fresh: {},
     rasterRev: {},
     pdfRev: 0,
+    twins: 0,
     engineReady: false,
     engineWanted: false,
     shaping: "idle",
@@ -170,6 +171,18 @@ export function EditorShell(props: ShellProps) {
     return el;
   });
   const [ctl, setCtl] = useState<Controller | null>(null);
+  // How many named-only fonts the page draws in their twins, on the shell element (for tests).
+  useEffect(() => {
+    if (!ctl) return;
+    const put = () => {
+      const n = ctl.store.get().twins;
+      if (!shellEl.current) return;
+      if (n) shellEl.current.dataset.twins = String(n);
+      else delete shellEl.current.dataset.twins;
+    };
+    put();
+    return ctl.store.subscribe(put);
+  }, [ctl]);
   const [failed, setFailed] = useState(false);
   const [announce, setAnnounce] = useState("");
   const [toast, setToast] = useState<Toast | null>(null);

@@ -202,3 +202,21 @@ AC-283 named eight fonts and seven had a twin: Selawik, Segoe UI's, is in no cat
 - **Where.** Only the published library (`publish-fonts.yml` passes `--extras`). The small in-app copy (development, tests, CI) stays offline and has no Selawik; there Segoe UI falls to the closest shapes as before.
 - Not checked by us: Segoe UI's own widths (we may not hold the font). The twin rests on Microsoft's statement that Selawik is its metric-compatible stand-in; its README notes kerning is not matched.
 
+## After the third evaluation (eighth PR)
+
+The evaluation of 2026-11-25 on staging `97b0be6` failed on AC-271, AC-288, AC-298, AC-299, AC-300 and AC-304. What changed, by its gap list:
+
+- **AC-300 (gap 2).** A font the PDF only names has nothing in the file to ask, so nothing was marked. The edit box now keeps the record of what the stand-in (the twin, or the closest font) can draw: a letter it lacks is underlined and named as typed, with the fonts that have it, exactly as on an embedded line. Because the font is chosen before Enter, Enter answers in well under a second (175 to 630 ms measured with the full library; it was 3.4 to 7.8 s).
+- **AC-298 (gap 3a).** In a word with an accent drawn over one of its letters, what the word is longer by on the page now stands before the accented letter ("caf é"), not spread between all its letters.
+- **AC-304 (gap 3b).** Text of another line that stands inside the row being edited (a raised footnote mark, a subscript) is drawn again over the box's paper, as the page had it when the box opened.
+- **AC-299 (gap 4).** The line edit box has no entrance animation (the lead's decision: it sits on the page's own text, and a fade showed both at once). `docs/design/motion.md` E4 says so.
+- **AC-288 (gap 5).** Serif or sans of a document font is read from the library's entry of that name, then from the name, then from the PDF's flag, which fonts of other scripts often leave unset. A serif Devanagari, Bengali or Hebrew font, and Amiri, now get the serif face of another script.
+- **Gap 8.** A named-only font with a twin is no longer sent to the shape matcher (no index, no signature files): its menu row is ready at once. The notice after such an edit says "Courier isn't in this file. Using Cousine." instead of "isn't complete".
+- **AC-271 (gap 1).** The notices page is built into the site image from the published family list, so a publish made after a deploy is missing from it until the next deploy. Open: an owner decision on letting the publish workflow start a staging deploy.
+
+Gap 6 (the page drew a named-only Georgia or Segoe UI in whatever the device has, the box in the twin): the page now draws such fonts in their twins too. The page renderer is given a copy of the file to which an update is appended that attaches the twin's font file to each font the file only names (`lib/pdf/twin-display.ts`); the renderer and its worker are unchanged. The copy is for the screen only: the engine, the saved file and the download never see it. It covers simple fonts with the standard Windows encoding and no font file, in files without a password; any other font stays as the device draws it. So no letter ever goes missing, a font gets its twin only when the twin's Latin file has every letter the font can draw in the file: its own table of widths leaves the others out, or every page's text has been read and none uses them (so in a long file a standard font with no table of widths gets its twin once all pages have been read). Undo, redo and a full rewrite make the update again for that version, checked to hold the same font under the same number; a version seen before costs no second parse. The code and the twin files load only for a file that has such fonts.
+
+Reading of AC-290 for this: a file that only names a font whose twin is in the library needs that match to draw its pages, so the twin's Latin file (and the library's family list) loads when the pages' text has been read, not when the menu opens. A file with no such font still loads nothing of the library before the menu opens or a line is edited.
+
+Still open: gaps 7, 9 to 16; AC-296.
+

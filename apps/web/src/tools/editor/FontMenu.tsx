@@ -261,10 +261,12 @@ export function FontNotice() {
   const [message, setMessage] = useState("");
   useEffect(() => setMessage(""), [n?.key]);
   if (!n) return null;
+  // A font the PDF only names is not "incomplete": none of it is in the file.
+  const why = n.embedded === false ? "isn’t" : "isn’t complete";
   return (
     <div key={n.key} className="ed-toast ed-toast--font ed-glass" data-testid="font-notice">
-      <span title={`${n.original} isn’t complete in this file. Using ${n.standIn}.`}>
-        {message || (wide ? `${n.original} isn’t complete in this file. Using ${n.standIn}.` : `${n.original} isn’t complete. Using ${n.standIn}.`)}
+      <span title={`${n.original} ${why} in this file. Using ${n.standIn}.`}>
+        {message || (wide ? `${n.original} ${why} in this file. Using ${n.standIn}.` : `${n.original} ${n.embedded === false ? "isn’t in the file" : "isn’t complete"}. Using ${n.standIn}.`)}
       </span>
       <Pop label="Change font" title="Change font" className="ed-toast__act ed-toast__act--pop" testId="font-change" trigger="Change" panelClassName="ed-fonts-pop">
         {(close) => (

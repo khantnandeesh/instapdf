@@ -1764,10 +1764,8 @@
       transform: translateY(var(--motion-nudge)) scale(0.96);
     }
   }
-  /* The line-edit box appears by opacity only, so the text never seems to move (E4). */
-  .ed-input {
-    animation: ed-fade var(--motion-micro) var(--ease-out) both;
-  }
+  /* The line-edit box has no entrance at all (E4, F24 AC-299): it sits on the page's own text, and
+     a fade would show both at once. */
   .ed-options,
   .ed-strip {
     animation: ed-fade var(--motion-micro) var(--ease-out) both;

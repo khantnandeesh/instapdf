@@ -692,3 +692,112 @@ test("AC-313: on a phone a message takes the hint's action in; the two are never
   await expect(hint).toHaveAttribute("data-side", "docked");
   await expect(input).toHaveCount(1);
 });
+
+test("AC-299: the edit box opens at once: no fade or other animation over the page's own text", async ({ page }) => {
+  await open(page, "libreoffice-memo.pdf");
+  const input = await edit(page, lineWith(page, "Team memo"));
+  const style = await input.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { animation: s.animationName, opacity: s.opacity, running: el.getAnimations().length };
+  });
+  expect(style).toEqual({ animation: "none", opacity: "1", running: 0 });
+});
+
+for (const [script, letter] of [
+  ["Devanagari", "न"],
+  ["symbol", "⸘"],
+] as const) {
+  test(`AC-300: on a line whose font the PDF only names, a ${script} letter the twin lacks is marked as typed`, async ({ page }) => {
+    await open(page, "std14-reportlab.pdf");
+    const input = await edit(page, lineWith(page, "REF-7731-ZEBRA"));
+    await expect(input).toHaveAttribute("data-missing", "");
+    await page.keyboard.press("End");
+    await page.keyboard.type(` ${letter}`);
+    await expect(input).toHaveAttribute("data-missing", letter);
+    await expect(page.getByTestId("line-missing")).toContainText(letter);
+    await expect(page.getByTestId("line-missing-status")).toContainText(`Not in this font: ${letter}`);
+    await input.press("Escape");
+  });
+}
+
+test("AC-300: Enter on a named-only line with a letter no font here draws answers at once and keeps the text", async ({ page }) => {
+  await open(page, "std14-reportlab.pdf");
+  const input = await edit(page, lineWith(page, "REF-7731-ZEBRA"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ⸘");
+  await expect(input).toHaveAttribute("data-missing", "⸘");
+  // The fonts were looked for and none has it (the phone's row leaves the words out).
+  await expect(page.getByTestId("line-missing")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("line-missing-own")).toBeVisible({ timeout: 15_000 });
+  await input.press("Enter");
+  // The reason is given within two seconds, with the box open and the text in it.
+  await expect(page.locator(".ed-toast")).toContainText("⸘", { timeout: 2000 });
+  await expect(page.getByTestId("line-input")).toContainText("⸘");
+});
+
+test("AC-298: a letter the page sets apart for its accent keeps its place in the box (caf é)", async ({ page }) => {
+  await open(page, "latex-type1c.pdf");
+  const line = lineWith(page, "cafe");
+  const pageWidth = (await line.boundingBox())!.width;
+  const input = await edit(page, line);
+  const got = await input.evaluate((el) => {
+    const spans = [...el.querySelectorAll("span")];
+    const accent = spans.findIndex((s) => s.textContent === "´");
+    const e = spans[accent - 1]!.getBoundingClientRect();
+    const f = spans[accent - 2]!.getBoundingClientRect();
+    return { gap: e.left - f.right, letter: e.width, text: spans[accent - 1]!.textContent, width: el.getBoundingClientRect().width };
+  });
+  expect(got.text).toBe("e");
+  // The page has about a third of the letter's width between "caf" and its accented letter.
+  expect(got.gap).toBeGreaterThan(got.letter * 0.2);
+  expect(Math.abs(got.width - pageWidth)).toBeLessThanOrEqual(3);
+});
+
+test("AC-304: a raised mark of another line inside the row stays drawn while the row is edited", async ({ page }) => {
+  await open(page, "latex-type1c.pdf");
+  await edit(page, lineWith(page, "A footnote mark"));
+  const kept = page.getByTestId("line-kept-ink");
+  await expect(kept).toHaveCount(1);
+  // The mark itself is in the copy laid over the box's paper, and the copy sits inside the box.
+  const dark = await kept.evaluate((c: HTMLCanvasElement) => {
+    const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3]! > 0 && d[i]! + d[i + 1]! + d[i + 2]! < 600) n++;
+    return n;
+  });
+  expect(dark).toBeGreaterThan(5);
+  const [k, b] = [(await kept.boundingBox())!, (await page.getByTestId("line-input").boundingBox())!];
+  expect(k.x).toBeGreaterThanOrEqual(b.x - 1);
+  expect(k.x + k.width).toBeLessThanOrEqual(b.x + b.width + 1);
+});
+
+test("fonts the file only names are drawn in their twins on the page too, and the saved file never carries the twins", async ({ page, isMobile }) => {
+  await open(page, "named-only-twins.pdf");
+  const shell = page.getByTestId("editor-shell");
+  // Arial, Helvetica, Times, Courier, Calibri and Cambria have their twins in the app itself.
+  await expect.poll(async () => Number((await shell.getAttribute("data-twins")) ?? 0), { timeout: 30_000 }).toBeGreaterThanOrEqual(6);
+  const twins = await shell.getAttribute("data-twins");
+  const line = lineWith(page, "Calibri invoice");
+  await line.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  const input = await edit(page, line);
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ok");
+  await page.keyboard.press("Enter");
+  await expect(input).toBeHidden({ timeout: 30_000 });
+  await expect(lineWith(page, "on time ok")).toBeVisible({ timeout: 30_000 });
+  // The edit only added to the file: the page still draws the same fonts in their twins.
+  await expect(shell).toHaveAttribute("data-twins", twins!);
+  // Going back to the file as it was, and forward again, keeps them too.
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(lineWith(page, "on time ok")).toHaveCount(0, { timeout: 30_000 });
+  await expect(shell).toHaveAttribute("data-twins", twins!);
+  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await expect(lineWith(page, "on time ok")).toBeVisible({ timeout: 30_000 });
+  await expect(shell).toHaveAttribute("data-twins", twins!);
+  test.skip(isMobile, "the download is read on desktop");
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download PDF" }).click()]);
+  const saved = readFileSync((await dl.path())!).toString("latin1");
+  // The twins are for the screen only: none of their objects or font files is in the download.
+  expect(saved).not.toMatch(/\b6000\d{3} 0 obj/);
+  expect(saved).not.toContain("/FontFile2");
+});
