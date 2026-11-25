@@ -30,6 +30,8 @@
   --ed-rest-gap: 18px;
   --ed-band-y: calc(var(--ed-top-y) + var(--ed-top-h) + 6px);
   --ed-rest-top: calc(var(--ed-top-y) + var(--ed-top-h) + var(--ed-band-h) + var(--ed-rest-gap));
+  /* Where chrome that floats below the bar starts (rail, side panel, hints, notices): below the band too. */
+  --ed-float-y: calc(var(--ed-top-y) + var(--ed-top-h) + var(--ed-band-h) + 12px);
   position: relative;
   display: flex;
   flex: 1;
@@ -314,7 +316,7 @@
 /* ---- tool rail (≥ 1024) and dock (< 1024) ---------------------------------------------- */
 .ed-rail {
   position: absolute;
-  top: 78px;
+  top: var(--ed-float-y);
   left: 10px;
   z-index: 8;
   display: flex;
@@ -783,7 +785,7 @@
 }
 .ed-panel {
   position: absolute;
-  top: 78px;
+  top: var(--ed-float-y);
   bottom: 10px;
   left: 82px;
   z-index: 7;
@@ -873,7 +875,7 @@
 .ed-hint,
 .ed-recover {
   position: absolute;
-  top: 78px;
+  top: var(--ed-float-y);
   left: 50%;
   z-index: 9;
   translate: -50% 0;
@@ -885,9 +887,6 @@
   color: var(--color-muted);
   font-size: 13px;
   pointer-events: none;
-}
-.ed-narrow .ed-hint {
-  top: calc(var(--ed-band-y) + var(--ed-band-h));
 }
 .ed-recover {
   z-index: 11;
@@ -1972,7 +1971,7 @@
 /* Owner-restricted file: the read-only notice and its owner-password action (U-E9). */
 .ed-owner {
   position: absolute;
-  top: 78px;
+  top: var(--ed-float-y);
   left: 50%;
   z-index: 10;
   width: min(520px, calc(100% - 24px));

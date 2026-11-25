@@ -8,7 +8,7 @@
  * 4. Opening and closing the All tools menu, a dialog and a menu, filtering, and adding files record no
  *    layout shift.
  * 5. Exits happen: the first frame after Escape comes within 200ms; the All tools menu, a dialog and a menu are still shown on it, and gone
- *    within 200ms of that frame plus one measured frame (and the 400ms cap); their configured lengths are within the preset's.
+ *    within 200ms of that frame plus one measured frame, and within 400ms of the key end to end; their configured lengths are within the preset's.
  * 6. No securitypolicyviolation event fires (every test).
  * 7. Nothing is animating on a tool page 5s after load (WCAG 2.2.2).
  * 8. Each Escape exit puts focus back on the trigger, and the leaving part is inert and aria-hidden while
@@ -261,8 +261,9 @@ async function armExitWatch(page: Page, kind: "tool-menu" | "dialog" | "menu") {
 }
 
 /**
- * The exit gate: shown the frame after Escape; its last shown frame within 200ms plus one measured frame
- * of lateness, and within the 400ms cap outright; and its configured lengths within the preset's
+ * The exit gate: the first frame after Escape within 200ms of it (input latency) and the part still shown
+ * on it; the exit, from that frame to the last shown one, within 200ms less the gap to the first gone
+ * frame; the last shown frame within 400ms of the key end to end; and its configured lengths within the preset's
  * (`limitMs` for the CSS hold and the tween; `tween` says whether a lib/motion tween runs it).
  */
 async function expectExit(page: Page, what: string, limitMs: number, tween: boolean) {
@@ -291,7 +292,8 @@ async function expectExit(page: Page, what: string, limitMs: number, tween: bool
     exit - r.exitGap,
     `${what}: last shown frame ${exit.toFixed(1)}ms after the first frame, less the gap to the first gone frame ${r.exitGap.toFixed(1)}ms, is within 200ms (${frames})`,
   ).toBeLessThanOrEqual(200);
-  expect(exit, `${what} is gone within the 400ms cap from the first frame (${frames})`).toBeLessThanOrEqual(400);
+  // End to end (motion.md: 400ms), from the key, latency included.
+  expect(r.lastShown, `${what}: last shown frame ${r.lastShown.toFixed(1)}ms after Escape is within the 400ms end-to-end cap (${frames})`).toBeLessThanOrEqual(400);
   expect(r.cssMs, `${what}: configured CSS transition length`).toBeLessThanOrEqual(limitMs);
   if (tween) {
     expect(r.tweenMs, `${what}: a lib/motion tween runs the exit`).toBeGreaterThan(0);
@@ -413,7 +415,9 @@ for (const size of SIZES) {
       expect(t.request, "the engine request is in resource timing").toBeDefined();
       const sincePointer = t.request! - t.pointer!;
       expect(sincePointer, "requested after the pointer event, not before").toBeGreaterThanOrEqual(0);
-      expect(sincePointer, `requested ${sincePointer.toFixed(0)}ms after the pointer event`).toBeLessThanOrEqual(1_000);
+      // About 1s; a CPU slowed by E2E_CPU_THROTTLE gets that many times longer.
+      const within = 1_000 * Math.max(1, THROTTLE);
+      expect(sincePointer, `requested ${sincePointer.toFixed(0)}ms after the pointer event (limit ${within}ms)`).toBeLessThanOrEqual(within);
       expect(t.request! - t.armed, "requested before the 4s idle timer could fire").toBeLessThan(4_000);
       await page.waitForTimeout(2500);
       expect(hits.length, "still fetched once after the idle timer's time").toBe(1);
