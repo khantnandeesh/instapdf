@@ -67,6 +67,7 @@ import type { EditResult, PageText } from "@/lib/editor/berry-engine";
 import { foldName } from "@/lib/font-library/client";
 import { chooseStandIn, chosenStandIn, fontLabel, registerWithEngine, standInCandidates } from "./font-service";
 import { warmDocFaces } from "./doc-face";
+import { displayBytes, ensureTwinDisplay, retwin } from "./twin-display";
 import type { Store, ToolId } from "./store";
 
 export type RuntimeAsset = Asset & { url: string; w: number; h: number };
@@ -305,7 +306,9 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       const bytes = ctl.bytesOf(index);
       const copy = bytes.slice();
       if (store.get().engineReady) await callEngine({ op: "open", bytes: copy, shaping: store.get().shaping === "ready" }, [copy.buffer]);
-      const opened = await openPdf(bytes.slice(), rt.password);
+      // Named-only fonts are drawn in their twins on the page too (twin-display.ts).
+      await retwin(rt, bytes);
+      const opened = await openPdf(displayBytes(rt, bytes), rt.password);
       if (!opened.ok) throw new Error("pdf.js");
       const prev = rt.pdf;
       rt.pdf = opened.pdf.doc;
@@ -313,6 +316,24 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
       setEngineFileSize(bytes.length);
       store.set((s) => ({ pdfRev: s.pdfRev + 1, fresh: {}, rasterRev: Object.fromEntries(rt.src.map((_, i) => [i, (s.rasterRev[i] ?? 0) + 1])) }));
       setTimeout(() => void prev.loadingTask.destroy(), 2000);
+    },
+
+    /** Draws the pages again from a copy of the file in which named-only fonts have their twins (once the pages' text shows there are any). */
+    twinsOnPage() {
+      ensureTwinDisplay(
+        rt,
+        store.get().texts,
+        () => ({ bytes: ctl.bytesOf(rt.shown), version: rt.shown }),
+        async (version) => {
+          const opened = await openPdf(displayBytes(rt, ctl.bytesOf(version)), rt.password);
+          if (!opened.ok) return;
+          if (version !== rt.shown) return void opened.pdf.task.destroy();
+          const prev = rt.pdf;
+          rt.pdf = opened.pdf.doc;
+          store.set((s) => ({ pdfRev: s.pdfRev + 1, rasterRev: Object.fromEntries(rt.src.map((_, i) => [i, (s.rasterRev[i] ?? 0) + 1])) }));
+          setTimeout(() => void prev.loadingTask.destroy(), 2000);
+        },
+      );
     },
 
     /** Opens the shown bytes in the engine (downloading it first if needed). Never throws. */
@@ -448,6 +469,7 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
         store.set((st) => ({ texts: { ...st.texts, [src]: page }, fresh: { ...st.fresh, [src]: true } }));
         // The page's fonts are made ready for the first line that is opened.
         warmDocFaces(page.fonts);
+        ctl.twinsOnPage();
       } catch (err) {
         // Another call crashed the worker while this one waited: ask again once the engine is back.
         if (isEngineError(err) && err.kind === "aborted") retry = true;
@@ -486,7 +508,9 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
      * back to the file on screen. The caller records the step (apply) with `engine: rt.shown`.
      */
     async showEngineResult(src: number, { result, bytes, appended }: { result: EditResult; bytes: Uint8Array; appended: boolean }): Promise<boolean> {
-      const opened = await openPdf(bytes.slice(), rt.password);
+      // A file the engine only added to keeps its object numbers: the twins' update goes on as it is.
+      if (!appended) await retwin(rt, bytes);
+      const opened = await openPdf(displayBytes(rt, bytes), rt.password);
       if (!opened.ok) {
         const back = ctl.bytesOf(rt.shown).slice();
         await callEngine({ op: "open", bytes: back, shaping: store.get().shaping === "ready" }, [back.buffer]).catch(() => {});
