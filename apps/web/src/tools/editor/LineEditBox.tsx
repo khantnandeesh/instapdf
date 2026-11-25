@@ -61,6 +61,26 @@ function missingSaid(shown: { plan: Plan; none: string[] } | null): string {
   return by + none;
 }
 
+/**
+ * The missing letters as the person typed them: whole letters ("नया" as न या), never a vowel sign
+ * or accent on its own, which a browser draws on a dotted circle. A typed letter is listed when
+ * its first missing character is one of `chars`.
+ */
+function asTyped(typed: string, chars: readonly string[], all: readonly string[] = chars): string[] {
+  const out: string[] = [];
+  const Seg = (Intl as { Segmenter?: typeof Intl.Segmenter }).Segmenter;
+  const parts = Seg ? Array.from(new Seg(undefined, { granularity: "grapheme" }).segment(typed), (x) => x.segment) : [...typed];
+  const left = new Set(chars);
+  for (const part of parts) {
+    const first = [...part].find((c) => all.includes(c));
+    if (first === undefined || !chars.includes(first)) continue;
+    for (const c of part) left.delete(c);
+    if (!out.includes(part)) out.push(part);
+  }
+  // A character not found in the text (it changed meanwhile) is still named.
+  return [...out, ...[...left].filter((c) => !out.some((o) => o.includes(c)))];
+}
+
 /** Which font draws which of the missing letters, the font in use first. */
 type Plan = { id: string; chars: string[] }[];
 type StandIn = {
@@ -828,6 +848,8 @@ export function LineEditBox({
 
   const docked = !!slot;
   const paired = shared || (both && docked);
+  /** The box's text, for showing the missing letters as they were typed. */
+  const typedNow = el.current?.textContent ?? "";
   const inMessage = slot?.getAttribute("data-line-hint-slot") === "toast";
   const hint = missing ? (
         <div
@@ -846,7 +868,7 @@ export function LineEditBox({
           <span className={inMessage ? "sr-only" : undefined}>
             {/* With two answers (two fonts, or a font and none), each letter stands by its own answer. */}
             {paired && docked ? "" : docked ? "Missing: " : paired ? "Not in this font:" : "Not in this font: "}
-            {!paired && <span className="ed-input__chars">{missing.chars.slice(0, 8).join(" ")}</span>}
+            {!paired && <span className="ed-input__chars">{asTyped(typedNow, missing.chars).slice(0, 8).join(" ")}</span>}
           </span>
           {shown && shown.ids.length > 0 && (
             <span role="group" aria-label="Font for these characters" className="ed-input__picks">
@@ -875,7 +897,7 @@ export function LineEditBox({
                 );
                 return paired && mine ? (
                   <span key={id} className="ed-input__pair">
-                    <span className="ed-input__chars">{mine.chars.slice(0, 4).join(" ")}</span>
+                    <span className="ed-input__chars">{asTyped(typedNow, mine.chars, missing.chars).slice(0, 4).join(" ")}</span>
                     {chip}
                   </span>
                 ) : (
@@ -893,10 +915,10 @@ export function LineEditBox({
                       "No font here has it."
                     ) : docked ? (
                       <>
-                        <span className="ed-input__chars">{shown.none.slice(0, 4).join(" ")}</span> no font
+                        <span className="ed-input__chars">{asTyped(typedNow, shown.none, missing.chars).slice(0, 4).join(" ")}</span> no font
                       </>
                     ) : (
-                      `No font has ${shown.none.slice(0, 4).join(" ")}.`
+                      `No font has ${asTyped(typedNow, shown.none, missing.chars).slice(0, 4).join(" ")}.`
                     ))}
                 </span>
               )}

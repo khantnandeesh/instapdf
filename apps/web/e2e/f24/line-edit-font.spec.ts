@@ -720,6 +720,17 @@ for (const [script, letter] of [
   });
 }
 
+test("the hint shows missing letters whole, as typed: a vowel sign is never shown alone", async ({ page }) => {
+  await open(page, "std14-reportlab.pdf");
+  const input = await edit(page, lineWith(page, "REF-7731-ZEBRA"));
+  await page.keyboard.press("End");
+  await page.keyboard.type(" नया");
+  await expect(input).toHaveAttribute("data-missing", "नया");
+  const chars = page.getByTestId("line-missing").locator(".ed-input__chars").first();
+  await expect(chars).toHaveText("न या");
+  await input.press("Escape");
+});
+
 test("AC-300: Enter on a named-only line with a letter no font here draws answers at once and keeps the text", async ({ page }) => {
   await open(page, "std14-reportlab.pdf");
   const input = await edit(page, lineWith(page, "REF-7731-ZEBRA"));
