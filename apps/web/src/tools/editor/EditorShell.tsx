@@ -577,7 +577,9 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       const el = column.current?.children[i] as HTMLElement | undefined;
       if (!el || !scroller) return;
       store.set({ current: i });
-      scroller.scrollTo({ top: el.offsetTop - 12, behavior: reducedMotion() ? "auto" : "smooth" });
+      // Land the page where the first one rests: below the top bar and the chrome band, never under them.
+      const rest = parseFloat(getComputedStyle(scroller).paddingTop) || 0;
+      scroller.scrollTo({ top: Math.max(0, el.offsetTop - rest), behavior: reducedMotion() ? "auto" : "smooth" });
     },
     [scroller, store],
   );
