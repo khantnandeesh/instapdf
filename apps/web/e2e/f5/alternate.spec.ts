@@ -141,7 +141,7 @@ test("P-11 #11: one file offers Organize, which opens with that file", async ({ 
   // An inline callout at the top of the workspace: it covers nothing (the tools row and the card stay
   // clickable) and it stays in both views while one file is in.
   const hint = page.getByTestId("one-file-hint");
-  await expect(hint).toContainText("One file with all fronts, then all backs? Organize can put it in order.");
+  await expect(hint).toContainText("All fronts, then all backs in one file? Open in Organize");
   await expect(page.getByTestId("notice")).toHaveCount(0);
   const box = (await hint.boundingBox())!;
   const tabs = (await page.getByRole("radiogroup", { name: "View" }).boundingBox())!;

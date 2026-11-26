@@ -392,7 +392,8 @@ export function SegmentGrid({
                   variant="soft"
                   tabIndex={tab}
                   data-no-drag=""
-                  className="absolute -top-2 -right-2 z-[2] bg-surface-raised text-brand-strong shadow-menu transition-[background-color,color,transform] duration-(--dur-fast) hover:rotate-90 hover:bg-brand hover:text-white focus-visible:bg-brand focus-visible:text-white motion-reduce:hover:rotate-0 max-lg:size-11"
+                  // On hover or focus only, no shadow (visual gate round 2): at rest the page corner stays clear.
+                  className="absolute -top-2 -right-2 z-[2] bg-surface-raised text-brand-strong opacity-0 transition-[background-color,color,transform,opacity] duration-(--dur-fast) group-focus-within/card:opacity-100 group-hover/card:opacity-100 hover:rotate-90 hover:bg-brand hover:text-white focus-visible:bg-brand focus-visible:text-white focus-visible:opacity-100 motion-reduce:hover:rotate-0 max-lg:size-11 [@media(hover:none)]:opacity-100"
                   icon={<CloseIcon size={16} />}
                   onClick={() => moved(() => onRemove(card.key))}
                 />

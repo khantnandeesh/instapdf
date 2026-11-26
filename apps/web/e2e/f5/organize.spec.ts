@@ -423,3 +423,24 @@ test("AC-481: owner-restricted.pdf loads with no prompt and gives 3 pages that o
   expect(doc.isEncrypted).toBe(false);
   expect(doc.getPageCount()).toBe(3);
 });
+
+test("Page tools below 768 is a bottom sheet: scrim, title, Close, a capped height and only its list scrolls", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await pickF5(page, "twelve.pdf");
+  await page.getByRole("button", { name: "Page tools", exact: true }).click();
+  const sheet = page.locator(".mp-menu[data-sheet]:popover-open");
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator(".mp-menu__head")).toContainText("Page tools");
+  const m = await sheet.evaluate((el) => {
+    const list = el.querySelector(".mp-menu__list") as HTMLElement;
+    const r = el.getBoundingClientRect();
+    return { self: el.scrollHeight - el.clientHeight, list: list.scrollHeight - list.clientHeight, top: r.top, bottom: r.bottom, backdrop: getComputedStyle(el, "::backdrop").backgroundColor };
+  });
+  expect(m.self, "the sheet itself never scrolls").toBeLessThanOrEqual(1);
+  expect(m.list, "the long list scrolls inside").toBeGreaterThan(0);
+  expect(m.bottom).toBeLessThanOrEqual(641);
+  expect(m.top, "capped below the header").toBeGreaterThanOrEqual(640 * 0.3 - 1);
+  expect(m.backdrop, "a scrim covers the page").not.toBe("rgba(0, 0, 0, 0)");
+  await sheet.getByRole("menuitem", { name: "Close" }).click();
+  await expect(sheet).toHaveCount(0);
+});

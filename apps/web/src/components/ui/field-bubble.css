@@ -132,12 +132,14 @@
     width: 0;
     min-width: 100%;
     pointer-events: auto;
+    /* One line, running on past the stepper's width when it needs to (it never widens the grid). */
+    white-space: nowrap;
   }
   [data-fb-under] .ip-fb__text {
     width: auto;
     border: 0;
     background: none;
-    padding: 4px 0 0;
+    padding: 0;
     box-shadow: none;
     translate: none;
   }

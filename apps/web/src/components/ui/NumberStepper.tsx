@@ -47,7 +47,8 @@ export function NumberStepper({
   error: string;
   min?: number;
   max?: number;
-  /** Outside the dock (Alternate's file cards): the error is a line under the stepper, covering nothing. */
+  /** Outside the dock (Alternate's file cards): the error is a line under the stepper, covering nothing, in a row
+   *  kept free for it, so the card never jumps when it appears (visual gate round 2). */
   under?: boolean;
   className?: string;
 }) {
@@ -74,7 +75,7 @@ export function NumberStepper({
   }
 
   return (
-    <span className={cx("relative items-center gap-1", under ? "inline-grid grid-cols-[auto_auto_auto]" : "inline-flex", className)} data-testid="number-stepper" data-fb-under={under ? "" : undefined}>
+    <span className={cx("relative items-center gap-1", under ? "inline-grid grid-cols-[auto_auto_auto] grid-rows-[auto_1.25rem]" : "inline-flex", className)} data-testid="number-stepper" data-fb-under={under ? "" : undefined}>
       <IconButton
         label={decLabel}
         variant="soft"

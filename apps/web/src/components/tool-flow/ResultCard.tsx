@@ -371,7 +371,7 @@ function ResultPreview({ output }: { output: ToolOutput }) {
     };
   }, [output, isPdf]);
   return (
-    <div className="mp-tray relative grid size-[200px] shrink-0 place-items-center p-4 sm:size-[240px]">
+    <div className="mp-tray relative grid size-[200px] shrink-0 place-items-center p-2.5 sm:size-[240px] sm:p-4">
       {isPdf ? <span ref={host} className="flex h-full min-h-0 w-full min-w-0 items-center justify-center" /> : <FilesIcon size={64} className="text-brand-strong" />}
       {!ready && isPdf && <BerryLoader size="sm" className="absolute" />}
     </div>

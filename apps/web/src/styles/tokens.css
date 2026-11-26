@@ -278,6 +278,9 @@
   --shadow-pressed: #b01e3c 0px 1px 0px 0px;
   --shadow-panel: rgba(217, 43, 75, 0.07) 0px 3px 8px 0px;
   --shadow-glow: rgba(74, 99, 217, 0.14) 0px 0px 0px 4px, rgba(74, 99, 217, 0.16) 0px 6px 14px 0px;
+  /* The toolbar's Add files at rest: a soft blueberry lift, no ring, so it never reads as the focus ring
+     (visual gate round 2). */
+  --shadow-tool-lift: rgba(74, 99, 217, 0.16) 0px 3px 10px 0px;
   --shadow-window: rgba(217, 43, 75, 0.1) 0px 6px 16px 0px;
 
   --ease-standard: ease-in-out;

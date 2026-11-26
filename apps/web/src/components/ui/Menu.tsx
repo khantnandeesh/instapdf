@@ -2,6 +2,7 @@
 import { Fragment, forwardRef, useCallback, useEffect, useId, useImperativeHandle, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { popoverLeaving } from "@/lib/motion";
 import { cx } from "./cx";
+import { CloseIcon } from "./icons";
 
 export type MenuEntry =
   | {
@@ -58,7 +59,17 @@ export const MenuButton = forwardRef<
   const [open, setOpen] = useState(false);
   const focusFirst = useRef<"first" | "last">("first");
 
-  const itemEls = () => Array.from(popup.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]:not(:disabled)") ?? []);
+  // Only items on screen: the sheet's Close is hidden while the menu is a plain popup.
+  const itemEls = () => Array.from(popup.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]:not(:disabled)") ?? []).filter((el) => el.getClientRects().length > 0);
+
+  // The sheet's list fades at an edge while there is more to scroll that way (data-more-up / data-more-down).
+  const list = useRef<HTMLDivElement>(null);
+  const edges = () => {
+    const l = list.current;
+    if (!l) return;
+    l.toggleAttribute("data-more-up", l.scrollTop > 1);
+    l.toggleAttribute("data-more-down", l.scrollTop + l.clientHeight < l.scrollHeight - 1);
+  };
 
   const position = useCallback(() => {
     const t = trigger.current?.getBoundingClientRect();
@@ -70,6 +81,7 @@ export const MenuButton = forwardRef<
     Object.assign(p.style, asSheet ? { top: "auto", bottom: "0px", left: "0px", width: "100%", maxWidth: "none", maxHeight: "" } : { bottom: "", width: "", maxWidth: "" });
     if (asSheet) {
       p.dataset.sheet = "";
+      edges();
       return;
     }
     delete p.dataset.sheet;
@@ -218,7 +230,31 @@ export const MenuButton = forwardRef<
         data-ip-scroll="overlay"
         style={{ inset: "auto" }}
       >
-        {items.map((entry, i) =>
+        {sheet ? (
+          // Below 640 px (data-sheet): a bottom sheet with a title row, a scrim and a list that scrolls inside.
+          // The Close item comes last in the DOM (arrow keys reach the tools first) but sits in the title row.
+          <>
+            <div ref={list} role="none" className="mp-menu__list" data-ip-scroll="overlay" onScroll={edges}>
+              {renderItems()}
+            </div>
+            <div role="none" className="mp-menu__head">
+              <p role="presentation" className="text-tile-title text-ink-black">
+                {label}
+              </p>
+              <button type="button" role="menuitem" tabIndex={-1} aria-label="Close" className="mp-iconbtn mp-iconbtn--soft size-11" onClick={() => hide(true)}>
+                <CloseIcon size={18} />
+              </button>
+            </div>
+          </>
+        ) : (
+          renderItems()
+        )}
+      </div>
+    </>
+  );
+
+  function renderItems() {
+    return items.map((entry, i) =>
           isItem(entry) ? (
             <Fragment key={entry.id}>
             <button
@@ -258,8 +294,6 @@ export const MenuButton = forwardRef<
               {entry.note}
             </p>
           ),
-        )}
-      </div>
-    </>
-  );
+        );
+  }
 });

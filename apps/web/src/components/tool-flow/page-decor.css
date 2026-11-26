@@ -47,8 +47,16 @@
   opacity: var(--ip-veil-marked);
   pointer-events: none;
 }
+/* The strike is a 2px band drawn across the label's padded box, so it runs 4px past each side of even a
+   one-digit number (a text-decoration line ends at the glyph; visual gate round 2). */
 :is(.mp-tray, .ip-tile)[data-marked] :is(.mp-tray__n, .ip-tile__n) {
-  text-decoration: line-through 2px;
+  padding-inline: 4px;
+  background: linear-gradient(currentColor, currentColor) center / 100% 2px no-repeat;
+}
+@media (forced-colors: active) {
+  :is(.mp-tray, .ip-tile)[data-marked] :is(.mp-tray__n, .ip-tile__n) {
+    text-decoration: line-through 2px;
+  }
 }
 
 /* Badges that appear (part disc, pick tick, solid trash): fade + scale 0.9 -> 1, 120ms (P1, P4). */
@@ -170,7 +178,9 @@
   }
 }
 
-/* Hover-only hints on a fine pointer, always shown on touch (Extract's empty ring, Delete's ghost badge). */
+/* Hover-only hints (Extract's empty ring, Delete's ghost badge), from 1024 px on hover or focus. Below 1024 px
+   and on touch nothing control-like sits on an unpicked or unmarked page (PT-1 rule 6, visual gate round 2):
+   only the leaf tick on a picked page and the solid trash on a marked one. */
 .ip-hover-hint {
   opacity: 0;
   transition: opacity var(--motion-micro) var(--ease-out);
@@ -179,9 +189,9 @@
 .group\/tile:focus-within .ip-hover-hint {
   opacity: 1;
 }
-@media (hover: none) {
+@media (max-width: 1023px), (hover: none) {
   .ip-hover-hint {
-    opacity: 1;
+    display: none;
   }
 }
 

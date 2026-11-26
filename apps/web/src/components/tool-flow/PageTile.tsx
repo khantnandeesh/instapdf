@@ -123,17 +123,17 @@ export function PageTile({
           </span>
         )}
         {picked === false && (
-          // Extract: the empty pick ring, on hover / focus (always on touch). A state mark, not a control.
+          // Extract: the empty pick ring, on hover / focus from 1024 px (never on touch). A state mark, not a control.
           <span aria-hidden="true" className="ip-hover-hint pointer-events-none absolute top-1.5 right-1.5 z-[1] size-[22px] rounded-full border-[1.5px] border-field-line bg-surface/85" />
         )}
         {marked !== undefined && (
-          // Delete: a ghost trash badge on hover (always on touch); solid once marked. A state mark, not a control.
+          // Delete: a ghost trash badge on hover from 1024 px (never on touch); solid once marked. A state mark, not a control.
           <span
             aria-hidden="true"
             data-testid={marked ? "marked-badge" : undefined}
             className={cx(
               "pointer-events-none absolute top-1.5 right-1.5 z-[1] grid size-[26px] place-items-center rounded-full ring-2 ring-white transition-colors duration-(--motion-micro)",
-              marked ? "ip-badge-in bg-danger text-white" : "ip-hover-hint bg-surface text-danger shadow-menu",
+              marked ? "ip-badge-in bg-danger text-white" : "ip-hover-hint bg-surface text-danger",
             )}
           >
             <TrashIcon size={15} />

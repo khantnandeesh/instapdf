@@ -118,8 +118,15 @@ function PartsList({ rows, onRename }: { rows: PartRow[]; onRename: (key: string
       <h3 id="ip-parts-title" className="mb-1.5 text-sm font-semibold text-ink">
         {dialogCopy.files} <span className="text-muted tabular-nums">{rows.length.toLocaleString("en")}</span>
       </h3>
-      {/* About five rows, then the list scrolls inside, so the name pattern, bookmarks and Done stay in view. */}
-      <div className="max-h-[calc(5.5*var(--ip-tap-min))] overflow-y-auto overscroll-contain" data-ip-scroll="overlay" data-testid="parts-scroller">
+      {/* About five rows, then the list scrolls inside, so the name pattern, bookmarks and Done stay in view.
+          In the phone sheet the cap also follows the screen height (the sheet is --ip-sheet-max-h tall; its title
+          row, footer, padding, Files heading, pattern and bookmarks take about 335px), so the sheet body never
+          scrolls around the list: only the list scrolls (visual gate round 2). Two rows at least. */}
+      <div
+        className="max-h-[calc(5.5*var(--ip-tap-min))] overflow-y-auto overscroll-contain max-sm:max-h-[max(calc(2*var(--ip-tap-min)),min(calc(5.5*var(--ip-tap-min)),calc(var(--ip-sheet-max-h)-335px)))]"
+        data-ip-scroll="overlay"
+        data-testid="parts-scroller"
+      >
         <ol
           ref={list}
           className="relative"

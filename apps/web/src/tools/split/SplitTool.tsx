@@ -37,11 +37,12 @@ const modes = [
     value: "everyN" as const,
     label: c.everyN,
     icon: <StripGlyph groups={[2, 2]} />,
-    // The bar reads "Every N" (P-5): the stepper beside it says what N is. The name stays "Every N pages".
+    // The tile reads "Every N" on one line, in the bar and the side panel (P-5; visual gate round 2): the
+    // stepper of step 2 says what N is. The accessible name stays "Every N pages".
     node: (
       <>
         {c.everyNShort}
-        <span className="dock-bar:sr-only">{c.everyNRest}</span>
+        <span className="sr-only">{c.everyNRest}</span>
       </>
     ),
   },
@@ -80,14 +81,10 @@ export function SplitTool() {
   const problem = m ? m.splitProblem(split, files) : null;
   const plan = useMemo(() => (m ? m.splitPlan(split, files, { pattern: opts.pattern, renames }) : null), [m, split, files, opts.pattern, renames]);
   const live = useMemo(() => Object.fromEntries(files.map((f) => [f.id, m ? m.partsOf(split, f, files) : null])), [m, split, files]);
-  // While the typed parts don't parse, the grid keeps the last valid parts drawn (the bubble says what is
-  // wrong), instead of dashing every tile (visual review 2026-11-26).
+  // While the typed parts don't parse, the grid draws no parts and no marks (the bubble says what is wrong):
+  // no tile claims a part that the text does not make, and marks would do nothing (visual gate round 2).
   const invalid = !!problem && "field" in problem;
-  const [lastGood, setLastGood] = useState(live);
-  useEffect(() => {
-    if (!invalid) setLastGood(live);
-  }, [invalid, live]);
-  const parts = invalid && lastGood ? lastGood : live;
+  const parts = live;
   const pageParts = useMemo(() => (m ? Object.fromEntries(files.map((f) => [f.id, m.pageParts(parts[f.id] ?? null, f.pageCount)])) : {}), [m, parts, files]);
   const total = files.reduce((n, f) => n + f.pageCount, 0);
   const docCount = plan?.documents.length ?? 0;
@@ -124,6 +121,7 @@ export function SplitTool() {
       readyStatus={() => (used < total ? c.statusLeftOut(used, total, docCount) : c.status(total, docCount))}
       primaryLabel={() => c.primary(docCount)}
       decoratePage={(file, index) => {
+        if (invalid) return { pendingDelta: 0, inScope: false };
         const p = pageParts[file.id]?.[index];
         const count = parts[file.id]?.length ?? 0;
         if (p === undefined) return { pendingDelta: 0, inScope: false };
@@ -133,7 +131,7 @@ export function SplitTool() {
       }}
       renderGap={(file, index, tabIndex, busy) => {
         // Marks are off while the flow is busy (processing, result).
-        if (!m || busy || index >= file.pageCount - 1) return null;
+        if (!m || busy || invalid || index >= file.pageCount - 1) return null;
         const state = m.markAfter(parts[file.id] ?? null, index);
         if (state === "hidden") return null;
         const on = state === "on";
@@ -191,8 +189,10 @@ export function SplitTool() {
                 <Select id={selectId} label={c.mode} hideLabel value={split.kind} options={modes.map((o) => ({ value: o.value, label: o.value === "everyN" ? c.everyNShort : o.label }))} onChange={setKind} />
               </div>
             </div>
-            {/* Step 2: a fixed slot in the side panel, so switching modes moves nothing (P-10). */}
-            <div className="flex min-w-0 flex-1 flex-col gap-3.5 dock-side:min-h-[98px] dock-bar:flex-row dock-bar:items-center">
+            {/* Step 2, when the mode has one. The side panel is the empty state, where the options wait for a file
+                (disabled), so nothing switches there and no slot is reserved: the panel fits --ip-work-h with More
+                options right under the steps (visual gate round 2). In the bar the row keeps its place. */}
+            <div className="flex min-w-0 flex-1 flex-col gap-3.5 empty:hidden dock-bar:flex-row dock-bar:items-center">
               {split.kind === "everyN" && (
                 <>
                   <Step n={2}>{c.perFile}</Step>

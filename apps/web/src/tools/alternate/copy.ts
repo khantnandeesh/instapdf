@@ -19,7 +19,7 @@ export const alternateCopy = {
   filesHint: "Use arrow keys to move between files. Alt with an arrow key moves the file.",
   status: (pages: number, files: number) => `${plural(pages, "page")} · ${plural(files, "file")}`,
   needsAnother: "Add one more file to mix",
-  oneFile: "One file with all fronts, then all backs? Organize can put it in order.",
+  oneFile: "All fronts, then all backs in one file?",
   openOrganize: "Open in Organize",
   sort: "Sort",
   sortNeedsMore: "Add more files to sort",

@@ -340,7 +340,7 @@ function editor(ws: PageWorkspace) {
           label={c.add}
           placement="bottom-end"
           disabled={w.dimmed}
-          className="mp-btn mp-btn--tool shadow-glow h-11 shrink-0 gap-1.5 px-3.5 whitespace-nowrap max-[359px]:w-11 max-[359px]:px-0"
+          className="mp-btn mp-btn--tool shadow-tool-lift h-11 shrink-0 gap-1.5 px-3.5 whitespace-nowrap max-[359px]:w-11 max-[359px]:px-0"
           items={[
             { id: "files", label: c.addFilesItem, onSelect: () => w.api.openPicker() },
             { id: "from-file", label: c.fromFile, onSelect: () => openPagesPicker(null) },

@@ -66,6 +66,9 @@ export const RangeField = forwardRef<
   }, [focused]);
   const message = shownError ?? notice ?? null;
   const hint = hintReady && focused && !value && !message ? selectCopy.hintBubble : null;
+  // Below 640 px a bubble above the field would sit on the controls over it (Extract's Odd / Even): the hint
+  // shows in the empty field instead, covering nothing (visual gate round 2). Errors still use the bubble.
+  const [narrow, setNarrow] = useState(false);
   return (
     <span className={cx("relative flex min-w-0 flex-col", className)}>
       <span ref={box} className="relative flex min-w-0 items-center">
@@ -78,11 +81,14 @@ export const RangeField = forwardRef<
           aria-label={label}
           aria-invalid={shownError ? true : undefined}
           aria-describedby={message ? `${hintId} ${errId}` : hintId}
-          placeholder={differs ? selectCopy.placeholderDiffers : placeholder}
+          placeholder={narrow && hint ? hint : differs ? selectCopy.placeholderDiffers : placeholder}
           value={value}
           data-testid={testId}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
+          onFocus={() => {
+            setNarrow(window.matchMedia("(max-width: 639px)").matches);
+            setFocused(true);
+          }}
           onBlur={() => {
             setFocused(false);
             if (error) {
@@ -110,7 +116,7 @@ export const RangeField = forwardRef<
       <span id={hintId} className="sr-only">
         {selectCopy.hintSr}
       </span>
-      <LazyFieldBubble id={errId} error={message} hint={hint} />
+      <LazyFieldBubble id={errId} error={message} hint={narrow ? null : hint} />
     </span>
   );
 });

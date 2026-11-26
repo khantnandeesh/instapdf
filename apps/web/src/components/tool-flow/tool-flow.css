@@ -9,6 +9,14 @@
     padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);
   }
 }
+/* Below 1024 px the page scrolls under the sticky header + tools row and above the fixed bar: whatever the
+   page scrolls into view (a focused tile, its Enlarge) stops clear of both (visual gate round 2). */
+@media (max-width: 1023px) {
+  html:has(.ip-flow [data-ip-dock]) {
+    scroll-padding-top: calc(var(--ip-header-h) + 64px + 8px);
+    scroll-padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + 8px);
+  }
+}
 body:has([data-ip-dock="bar"]) .ip-site-footer {
   padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);
 }
@@ -75,18 +83,25 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
   }
 }
 
-/* Below 1024 px the same: once a file is in, the head is one compact line (the pages get the screen). */
+/* Below 1024 px the same: once a file is in, and on the result, the head is compact (the pages, or Download,
+   get the screen). */
 @media (max-width: 1023px) {
-  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) .mp-intro {
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"], [data-state="done"]) .mp-intro {
     padding-top: 12px;
     padding-bottom: 10px;
   }
-  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) .mp-intro h1 {
-    overflow: hidden;
+  /* Never cut (visual gate round 2): one step smaller below 360 px, and a long title wraps to a second
+     compact line rather than an ellipsis. */
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"], [data-state="done"]) .mp-intro h1 {
     font-size: 22px;
     line-height: 28px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    text-wrap: balance;
+  }
+}
+@media (max-width: 359px) {
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"], [data-state="done"]) .mp-intro h1 {
+    font-size: 19px;
+    line-height: 24px;
   }
 }
 
@@ -250,14 +265,54 @@ body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard {
   }
 }
 
-/* A long menu on a phone (Organize's Page tools): a bottom sheet, full width, its height capped under the
-   header; the items scroll inside (Menu sets data-sheet below 640 px). */
+/* A long menu on a phone (Organize's Page tools): a bottom sheet like the options sheet (dialog.css .mp-sheet):
+   a scrim, a title row with Close, 24px top corners, its height capped; only the list scrolls, with a soft
+   fade at an edge while there is more that way. Menu sets data-sheet below 640 px; above, the title row hides. */
 @layer components {
+  .mp-menu:not([data-sheet]) .mp-menu__head {
+    display: none;
+  }
   .mp-menu[data-sheet] {
-    max-height: calc(100dvh - var(--ip-header-h) - 16px);
-    border-width: 1.5px 0 0;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    max-height: min(70dvh, calc(100dvh - var(--ip-header-h) - 16px));
+    /* !important over the popup's own utilities (overflow-y-auto, p-1.5): here only the list scrolls. */
+    overflow: hidden !important;
+    border-width: 0;
+    border-radius: 24px 24px 0 0;
+    padding: 0 0 env(safe-area-inset-bottom) !important;
+    box-shadow: 0 -12px 40px rgba(58, 20, 30, 0.18);
     transform-origin: bottom center;
+  }
+  .mp-menu[data-sheet]::backdrop {
+    background: var(--mp-backdrop);
+    backdrop-filter: blur(8px);
+  }
+  .mp-menu[data-sheet] .mp-menu__head {
+    order: -1;
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1.5px solid var(--sand);
+    padding: 8px 12px 8px 16px;
+  }
+  .mp-menu[data-sheet] .mp-menu__list {
+    /* ip-scroll: overlay (the sheet's own list; the sheet itself never scrolls) */
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 6px;
+  }
+  .mp-menu__list[data-more-down] {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
+  }
+  .mp-menu__list[data-more-up] {
+    mask-image: linear-gradient(to top, #000 calc(100% - 32px), transparent);
+  }
+  .mp-menu__list[data-more-up][data-more-down] {
+    mask-image: linear-gradient(to bottom, transparent, #000 32px, #000 calc(100% - 32px), transparent);
   }
 }

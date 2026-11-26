@@ -893,7 +893,7 @@ export function ToolFlow({
       size="sm"
       // Without an Add menu, a multi-file tool's picker drops its word below 400 px (a 44 px icon button,
       // its name kept for assistive tech) so the tools row stays one row (F4/F5 P-3, Alternate & mix).
-      className={phoneAddMenu ? "shadow-glow max-lg:hidden" : flow.multiFile ? "shadow-glow max-[399px]:size-11 max-[399px]:px-0" : "shadow-glow"}
+      className={phoneAddMenu ? "shadow-tool-lift max-lg:hidden" : flow.multiFile ? "shadow-tool-lift max-[399px]:size-11 max-[399px]:px-0" : "shadow-tool-lift"}
       labelClassName={!phoneAddMenu && flow.multiFile ? "max-[399px]:sr-only" : undefined}
       icon={<PlusIcon size={16} />}
       disabled={state === "processing"}
@@ -957,8 +957,11 @@ export function ToolFlow({
               // From 1024 px the area fills the screen down to the bottom bar (--ip-pages-h)
               // and the pages scroll inside it with a slim BerryPDF scroll bar (shown only on overflow);
               // below 1024 px the page scrolls and the tools row sticks under the header.
-              <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 sm:px-5 lg:flex lg:h-(--ip-pages-h) lg:flex-col">
-                <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] shrink-0 items-center gap-2 rounded-t-panel bg-cream px-3 sm:-mx-5 sm:gap-3 sm:px-5 lg:static lg:gap-4">
+              // Below 1024 px the panel clips to its rounded corners (overflow: clip keeps the row sticky) and the
+              // row is square: at rest the panel rounds it, and once stuck under the header its corners cover the
+              // pages scrolling by (a rounded row left them showing at its corners; visual gate round 2).
+              <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 max-lg:overflow-clip sm:px-5 lg:flex lg:h-(--ip-pages-h) lg:flex-col">
+                <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] shrink-0 items-center gap-2 bg-cream px-3 sm:-mx-5 sm:gap-3 sm:px-5 lg:static lg:gap-4 lg:rounded-t-panel">
                   {showViewToggle && (
                     <SegmentedControl
                       look="tabs"

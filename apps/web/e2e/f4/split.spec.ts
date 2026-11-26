@@ -14,6 +14,7 @@ import {
   mark,
   openMore,
   openReady,
+  openTool,
   outlineOf,
   pageCountOf,
   primary,
@@ -422,4 +423,42 @@ test("ZIP result: more than 4 entries show 4 (3 on a phone), then Show all grows
   await expect(page.getByRole("button", { name: "Download twelve-12.pdf" })).toBeVisible();
   // Show all removes itself; focus lands on the first row it revealed, not on the page body.
   await expect(page.getByRole("button", { name: isDesktop(info.project.name) ? "Download twelve-5.pdf" : "Download twelve-4.pdf" })).toBeFocused();
+});
+
+test("Fit the first screen: at 1366x657 the empty side panel shows More options right under the steps, above the status", async ({ page }, info) => {
+  test.skip(!isDesktop(info.project.name), "side panel layout, desktop");
+  await page.setViewportSize({ width: 1366, height: 657 });
+  await openTool(page, "split-pdf");
+  const group = page.getByRole("radiogroup", { name: "Split" });
+  const more = (await page.getByTestId("more-options").boundingBox())!;
+  const tiles = (await group.getByRole("radio", { name: "Custom" }).boundingBox())!;
+  const st = (await status(page).boundingBox())!;
+  expect(more.y, "More options follows the step tiles").toBeGreaterThan(tiles.y + tiles.height);
+  expect(more.y - (tiles.y + tiles.height), "no empty slot between the steps and More options").toBeLessThan(48);
+  expect(more.y + more.height, "More options sits fully above the pinned status").toBeLessThanOrEqual(st.y);
+  expect(st.y + st.height, "the footer fits the screen").toBeLessThanOrEqual(657);
+  const lines = await group.getByRole("radio", { name: /Every N/ }).evaluate((tile) => {
+    // The visible label's text node: one line box means no wrap.
+    const walker = document.createTreeWalker(tile, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentElement?.closest(".sr-only") || !n.textContent?.trim() ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+    const node = walker.nextNode()!;
+    const r = document.createRange();
+    r.selectNodeContents(node);
+    return new Set([...r.getClientRects()].map((b) => Math.round(b.top))).size;
+  });
+  expect(lines, "the Every N tile label stays on one line").toBe(1);
+});
+
+test("More options on a 320x640 phone: only the parts list scrolls, the sheet body does not", async ({ page }, info) => {
+  test.skip(isDesktop(info.project.name), "phone sheet");
+  await page.setViewportSize({ width: 320, height: 640 });
+  await openReady(page, "split-pdf", "twelve.pdf");
+  await openMore(page);
+  const metrics = await page.getByTestId("more-options-dialog").evaluate((d) => {
+    const body = d.closest("[data-ip-scroll=overlay]") as HTMLElement;
+    const list = d.querySelector("[data-testid=parts-scroller]") as HTMLElement;
+    return { body: body.scrollHeight - body.clientHeight, list: list.scrollHeight - list.clientHeight, sheetBottom: body.closest("dialog")!.getBoundingClientRect().bottom };
+  });
+  expect(metrics.body, "the sheet body never scrolls").toBeLessThanOrEqual(1);
+  expect(metrics.list, "twelve parts scroll inside their own list").toBeGreaterThan(0);
+  expect(metrics.sheetBottom).toBeLessThanOrEqual(641);
 });

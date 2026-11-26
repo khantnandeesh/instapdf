@@ -141,7 +141,9 @@ export function ControlDock({
           ) : (
             <fieldset
               disabled={optionsDisabled}
-              className={start ? "min-w-0 flex-1" : "min-w-0 sm:flex-1"}
+              // Side panel: the options keep their height, so More options sits right under the steps and the
+              // status + primary rest at the panel's bottom (visual gate round 2).
+              className={[start ? "min-w-0 flex-1" : "min-w-0 sm:flex-1", side ? "lg:flex-none" : ""].join(" ")}
               data-testid="dock-options"
             >
               <legend className="sr-only">{label}</legend>
