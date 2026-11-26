@@ -33,24 +33,37 @@ export function trackInputModality(onChange: (m: InputModality) => void, target:
   };
 }
 
-type Focusable = Listenable & Pick<HTMLElement, "focus" | "setAttribute" | "removeAttribute">;
+type Focusable = Listenable & Pick<HTMLElement, "focus" | "setAttribute" | "removeAttribute" | "hasAttribute">;
+type Doc = Pick<Document, "hasFocus">;
 
 export const QUIET_FOCUS_ATTR = "data-quiet-focus";
 
 /**
- * Moves focus to `el`. After a pointer action the element is marked quiet
- * (no visible ring) until it gets a key press or loses focus.
+ * Marks `el` quiet (no visible ring) until it gets a key press or focus moves elsewhere in the page.
+ * A blur because the whole window lost focus (the system file dialog, another tab or app) keeps the
+ * mark: the browser gives focus back to the same element when the window returns, and must not show
+ * a ring there for a mouse or touch action (eval G-7).
  */
-export function moveFocus(el: Focusable, modality: InputModality): void {
+export function markQuietFocus(el: Focusable, doc: Doc | undefined = globalThis.document): void {
+  if (el.hasAttribute(QUIET_FOCUS_ATTR)) return;
+  el.setAttribute(QUIET_FOCUS_ATTR, "");
+  const clear = (e: Event) => {
+    if (e.type === "blur" && doc && !doc.hasFocus()) return;
+    el.removeAttribute(QUIET_FOCUS_ATTR);
+    el.removeEventListener("keydown", clear);
+    el.removeEventListener("blur", clear);
+  };
+  el.addEventListener("keydown", clear);
+  el.addEventListener("blur", clear);
+}
+
+/**
+ * Moves focus to `el`. After a pointer action the element is marked quiet
+ * (no visible ring) until it gets a key press or loses focus within the page.
+ */
+export function moveFocus(el: Focusable, modality: InputModality, doc?: Doc): void {
   if (modality === "pointer") {
-    el.setAttribute(QUIET_FOCUS_ATTR, "");
-    const clear = () => {
-      el.removeAttribute(QUIET_FOCUS_ATTR);
-      el.removeEventListener("keydown", clear);
-      el.removeEventListener("blur", clear);
-    };
-    el.addEventListener("keydown", clear);
-    el.addEventListener("blur", clear);
+    markQuietFocus(el, doc);
     // `focusVisible: false` where the browser supports it; the attribute covers the rest.
     el.focus({ focusVisible: false } as FocusOptions);
   } else {

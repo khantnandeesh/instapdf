@@ -3,6 +3,7 @@ import { forwardRef, useImperativeHandle, useRef, type ReactNode } from "react";
 import { prefetchPdfjs } from "@/lib/pdf/pdfjs";
 import { Button, type ButtonSize, type ButtonVariant } from "../ui/Button";
 import { pickedFromDevice } from "../cloud/tool-cloud";
+import { markQuietFocus } from "../ui/focus";
 
 export type FilePickerHandle = { open: () => void; focus: () => void; element: HTMLButtonElement | null };
 
@@ -50,7 +51,12 @@ export const FilePicker = forwardRef<
         className={className}
         onPointerEnter={prefetchPdfjs}
         onFocus={prefetchPdfjs}
-        onClick={() => input.current?.click()}
+        onClick={(e) => {
+          // A mouse or touch click (detail > 0; Enter and Space give 0) keeps the button ring-free
+          // when the window comes back from the file dialog (eval G-7).
+          if (e.detail > 0) markQuietFocus(e.currentTarget);
+          input.current?.click();
+        }}
       >
         {labelClassName ? <span className={labelClassName}>{label}</span> : label}
       </Button>

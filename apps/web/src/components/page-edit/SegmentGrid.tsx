@@ -243,7 +243,9 @@ export function SegmentGrid({
             type="button"
             data-main=""
             tabIndex={tab}
-            aria-label={labels.enlarge(card.name)}
+            // The card's own stop, named for the card as on Merge (eval G-7): Enter enlarges it, the
+            // arrow keys move between cards and Alt with an arrow moves it.
+            aria-label={card.accessibleName}
             aria-describedby="ip-files-hint"
             disabled={card.status !== "ready"}
             onFocus={() => setActiveKey(card.key)}
