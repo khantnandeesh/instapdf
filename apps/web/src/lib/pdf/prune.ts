@@ -145,10 +145,24 @@ export function createPruner(ctx: PDFContext, pages: readonly PDFPage[]): Pruner
       throw e;
     }
   };
-  const addNames = (s: PDFStream, used: Set<string>) => {
-    const before = used.size;
-    for (const n of namesOf(s)) used.add(n);
-    return used.size !== before;
+  /** Decoded key -> entry. Keys are unique once decoded (PDFName pools by decoded value). */
+  type Keyed = { entries: Map<string, { key: PDFName; value: PDFObject; at: number }> };
+  /** A dict's entries by decoded key, read once per pruner (big shared dicts are hit by every page). */
+  const keyedCache = new WeakMap<PDFDict, Keyed>();
+  const keyed = (dict: PDFDict): Keyed => {
+    let k = keyedCache.get(dict);
+    if (!k) {
+      const entries: Keyed["entries"] = new Map();
+      dict.entries().forEach(([key, value], at) => entries.set(key.decodeText(), { key, value, at }));
+      k = { entries };
+      keyedCache.set(dict, k);
+    }
+    return k;
+  };
+  const subDict = (res: PDFDict, cat: string): PDFDict | undefined => {
+    const e = keyed(res).entries.get(cat);
+    const sub = e && ctx.lookup(e.value);
+    return sub instanceof PDFDict ? sub : undefined;
   };
 
   /** Streams of a resource that are drawn with the caller's resources (it has no /Resources of its own). */
@@ -172,28 +186,35 @@ export function createPruner(ctx: PDFContext, pages: readonly PDFPage[]): Pruner
     return [];
   };
 
+  const FOLLOWED = ["XObject", "Font", "Pattern", "ExtGState"];
+
   /**
-   * Scans `streams` into `used`, then follows used entries of `res` that draw
-   * with these same resources (resource-less forms, Type 3 glyphs, patterns,
-   * soft mask groups) until nothing new turns up. Every pass either follows
-   * a resource not followed before or stops, so this ends after at most one
-   * pass per resource entry.
+   * Scans `streams` into `used`, and follows entries of `res` that draw with
+   * these same resources (resource-less forms, Type 3 glyphs, patterns, soft
+   * mask groups) as their names are first found: a worklist, so each name and
+   * each resource is handled once, whatever the order of a chain.
    */
   const scanInto = (streams: PDFStream[], res: PDFDict, used: Set<string>) => {
-    for (const s of streams) addNames(s, used);
+    const subs = FOLLOWED.map((cat) => [cat, subDict(res, cat)] as const).filter((x): x is readonly [string, PDFDict] => !!x[1]);
     const followed = new Set<PDFObject>();
-    for (let changed = true; changed; ) {
-      changed = false;
-      for (const cat of ["XObject", "Font", "Pattern", "ExtGState"]) {
-        const sub = res.lookup(N(cat));
-        if (!(sub instanceof PDFDict)) continue;
-        for (const [name, raw] of sub.entries()) {
-          if (!used.has(name.decodeText())) continue;
-          const value = ctx.lookup(raw);
-          if (!value || followed.has(value)) continue;
-          followed.add(value);
-          for (const s of innerStreams(cat, value)) if (addNames(s, used)) changed = true;
-        }
+    const queue: string[] = [];
+    const add = (s: PDFStream) => {
+      for (const n of namesOf(s)) {
+        if (used.has(n)) continue;
+        used.add(n);
+        queue.push(n);
+      }
+    };
+    for (const s of streams) add(s);
+    while (queue.length) {
+      const name = queue.pop()!;
+      for (const [cat, sub] of subs) {
+        const entry = keyed(sub).entries.get(name);
+        if (!entry) continue;
+        const value = ctx.lookup(entry.value);
+        if (!value || followed.has(value)) continue;
+        followed.add(value);
+        for (const s of innerStreams(cat, value)) add(s);
       }
     }
   };
@@ -206,21 +227,21 @@ export function createPruner(ctx: PDFContext, pages: readonly PDFPage[]): Pruner
   const filter = (res: PDFDict, used: Set<string>, depth: number): PDFDict | undefined => {
     const out = ctx.obj({}) as PDFDict;
     let changed = false;
-    for (const [key, raw] of res.entries()) {
+    for (const [cat, { key, value: raw }] of keyed(res).entries) {
       const sub = ctx.lookup(raw);
-      if (!CATEGORIES.has(key.decodeText()) || !(sub instanceof PDFDict)) {
+      const all = sub instanceof PDFDict ? keyed(sub) : undefined;
+      if (!CATEGORIES.has(cat) || !all) {
         out.set(key, raw);
         continue;
       }
-      const isXObject = key.decodeText() === "XObject";
+      const isXObject = cat === "XObject";
       const kept = ctx.obj({}) as PDFDict;
-      let dropped = false;
+      // Walk the smaller side (a page usually uses a few names of a big shared dict), in source order.
+      const names = used.size < all.entries.size ? [...used].filter((n) => all.entries.has(n)) : [...all.entries.keys()].filter((n) => used.has(n));
+      const hits = names.map((n) => all.entries.get(n)!).sort((a, b) => a.at - b.at);
+      const dropped = hits.length < all.entries.size;
       let swapped = false;
-      for (const [name, value] of sub.entries()) {
-        if (!used.has(name.decodeText())) {
-          dropped = true;
-          continue;
-        }
+      for (const { key: name, value } of hits) {
         let v: PDFObject = value;
         if (isXObject && value instanceof PDFRef) {
           const replacement = prunedForm(value, depth + 1);
@@ -232,7 +253,7 @@ export function createPruner(ctx: PDFContext, pages: readonly PDFPage[]): Pruner
       if (!dropped && !swapped) out.set(key, raw);
       else {
         changed = true;
-        if (kept.entries().length) out.set(key, kept);
+        if (hits.length) out.set(key, kept);
       }
     }
     return changed ? out : undefined;

@@ -260,4 +260,48 @@ describe("createPruner (I-1)", () => {
     for (const i of [0, 1, 2]) expect(keysOf(pruner.forPage(i), "XObject")).toContain("Im3");
     expect(reads).toBe(1);
   });
+
+  it("round 2 #3: a big shared resource dict decodes its keys once per pruner, not once per page", async () => {
+    const doc = await PDFDocument.create();
+    const ctx = doc.context;
+    const x: Record<string, PDFRef> = {};
+    for (let i = 0; i < 400; i++) x[`Im${i}`] = image(doc, i % 255);
+    const shared = ctx.register(ctx.obj({ XObject: ctx.obj(x) }));
+    for (let i = 0; i < 40; i++) {
+      const p = doc.addPage([100, 100]);
+      p.node.set(N("Resources"), shared);
+      p.node.set(N("Contents"), ctx.register(ctx.stream(`/Im${i} Do`)));
+    }
+    const loaded = await reload(doc);
+    const pruner = createPruner(loaded.context, loaded.getPages());
+    const spy = vi.spyOn(PDFName.prototype, "decodeText");
+    try {
+      for (let i = 0; i < 40; i++) expect(keysOf(pruner.forPage(i), "XObject")).toEqual([`Im${i}`]);
+      // 400 keys + the category names; it was 40 pages x 400 keys x 2 before.
+      expect(spy.mock.calls.length).toBeLessThan(2_000);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("round 2 #3: a reverse chain of forms is followed in one pass over the resources", async () => {
+    const { doc } = await sharedDoc(["/F0 Do", "/Im1 Do"], (d) => {
+      const o: Record<string, PDFRef> = {};
+      for (let i = 299; i >= 0; i--) o[`F${i}`] = form(d, i === 299 ? "/Im2 Do" : `/F${i + 1} Do`);
+      return o;
+    });
+    const loaded = await reload(doc);
+    const pruner = createPruner(loaded.context, loaded.getPages());
+    const spy = vi.spyOn(PDFDict.prototype, "entries");
+    try {
+      const kept = keysOf(pruner.forPage(0), "XObject");
+      expect(kept).toContain("Im2");
+      expect(kept).toHaveLength(301);
+      // Each resource dict is listed a few times, not once per link of the chain.
+      expect(spy.mock.calls.length).toBeLessThan(30);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
+
