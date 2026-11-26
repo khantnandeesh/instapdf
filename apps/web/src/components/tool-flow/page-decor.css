@@ -207,3 +207,21 @@
     outline: 2px dashed ButtonText;
   }
 }
+
+/* The page grid is its own stacking layer: discs, badges, marks and cuts stay under the sticky tools row. */
+.ip-page-grid {
+  isolation: isolate;
+}
+/* Below 1024 px the part disc leads the tile's number line, off the page (PT-1 rule 6). */
+.ip-part-disc--line {
+  display: inline-grid;
+  margin-inline-end: 6px;
+  vertical-align: middle;
+}
+/* Two columns below 640 px: the second column's mark sits on its tile's edge, inside the panel, not
+   centred in a gap that isn't there (the row wraps there). */
+@media (max-width: 639px) {
+  .ip-tile:nth-child(2n) > .ip-split-slot {
+    right: calc(var(--ip-tap-min) / -2);
+  }
+}

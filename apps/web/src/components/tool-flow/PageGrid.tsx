@@ -121,86 +121,94 @@ export function PageGrid({
       <span id="ip-grid-hint" className="sr-only">
         Use arrow keys to move between pages.{gridHint !== undefined ? (gridHint ? ` ${gridHint}` : "") : onPageKey ? " Press [ or ] to rotate the page." : ""}
       </span>
-      {files.map((file) => (
-        <section key={file.id} aria-label={showHeaders ? file.name : undefined}>
-          {(showHeaders || file.status !== "ready") && (
-            <div className="mb-2 flex h-10 items-center gap-2">
-              {file.status === "loading" && <Spinner size={16} label={`Reading ${file.name}`} className="text-brand-strong" />}
-              {file.status === "locked" && <LockIcon size={16} className="text-muted" />}
-              <span className="min-w-0 truncate font-bold text-ink" title={file.name}>
-                {file.status === "loading" ? copy.reading(file.name) : file.name}
-              </span>
-              <span className="shrink-0 text-sm text-muted tabular-nums">
-                {file.status === "ready" ? `· ${copy.pages(file.pageCount)}` : file.status === "locked" ? "· Password needed" : ""}
-              </span>
-              {showHeaders && (
-                <IconButton
-                  label={`Remove ${file.name}`}
-                  size="sm"
-                  className="ms-auto"
-                  icon={<CloseIcon size={18} />}
-                  onClick={() => onRemove(file)}
-                />
-              )}
-            </div>
-          )}
-          {file.status === "ready" && file.pages && (
-            <div
-              role="list"
-              aria-label={showHeaders ? `Pages of ${file.name}` : "Pages"}
-              className={cx(
-                "ip-tile-grid",
-                // Split's marks sit in the gaps (--ip-grid-gap follows the grid's gap: 12px, then
-                // --ip-tile-gap from 640 px); px-2 keeps the last column's mark inside the grid (spec F4/F5
-                // UI P-6, "Mark geometry").
-                renderGap && "px-2 [--ip-grid-gap:12px] sm:[--ip-grid-gap:var(--ip-tile-gap)]",
-                dimmed && "opacity-60 transition-opacity duration-(--dur-base)",
-              )}
-            >
-              {file.pages.map((size, i) => {
-                const d = decorate(file, i);
-                const isActive = flat[activeIdx]?.fileId === file.id && flat[activeIdx]?.index === i;
-                return (
-                  <PageTile
-                    key={i}
-                    fileId={file.id}
-                    index={i}
-                    pageCount={file.pageCount}
-                    size={size}
-                    pendingDelta={d.pendingDelta}
-                    inScope={d.inScope}
-                    active={isActive}
-                    dimmed={dimmed}
-                    decor={d}
-                    compact={compact}
-                    actions={
-                      corner ? undefined : (
-                        <>
-                          {renderActions?.(file, i, isActive ? 0 : -1)}
-                          {withEnlarge && enlarge(file, i, isActive)}
-                        </>
-                      )
-                    }
-                    corner={corner ? enlarge(file, i, isActive, true) : undefined}
-                    // Below 1024 px nothing is drawn over the page (berrypdf.md "Page tiles", PT-1 rule 6):
-                    // a toggle tile's Enlarge moves to the row under the page; Split's tile opens the preview itself.
-                    cornerRow={onTileActivate ? enlarge(file, i, isActive) : undefined}
-                    gap={renderGap?.(file, i, isActive ? 0 : -1)}
-                    onFocus={() => setActive({ fileId: file.id, index: i })}
-                    onOpen={(e: MouseEvent<HTMLButtonElement>) => {
-                      if (!onTileActivate) return onOpen(file, i);
-                      // Keyboard clicks (detail 0) are handled in onKeyDown, with their Shift state.
-                      if (e.detail === 0) return;
-                      onTileActivate(file, i, { shift: e.shiftKey });
-                    }}
-                    onKeyDown={(e) => onKeyDown(e, file, i)}
+      {files.map((file) => {
+        // Split's marks, rendered once per tile; every tile of a grid with marks gets the 44px number line
+        // below 1024 px, so the lines stay level.
+        const gaps = renderGap && file.pages?.map((_, i) => renderGap(file, i, flat[activeIdx]?.fileId === file.id && flat[activeIdx]?.index === i ? 0 : -1));
+        const lined = !!gaps?.some((g) => g != null);
+        return (
+          <section key={file.id} aria-label={showHeaders ? file.name : undefined}>
+            {(showHeaders || file.status !== "ready") && (
+              <div className="mb-2 flex h-10 items-center gap-2">
+                {file.status === "loading" && <Spinner size={16} label={`Reading ${file.name}`} className="text-brand-strong" />}
+                {file.status === "locked" && <LockIcon size={16} className="text-muted" />}
+                <span className="min-w-0 truncate font-bold text-ink" title={file.name}>
+                  {file.status === "loading" ? copy.reading(file.name) : file.name}
+                </span>
+                <span className="shrink-0 text-sm text-muted tabular-nums">
+                  {file.status === "ready" ? `· ${copy.pages(file.pageCount)}` : file.status === "locked" ? "· Password needed" : ""}
+                </span>
+                {showHeaders && (
+                  <IconButton
+                    label={`Remove ${file.name}`}
+                    size="sm"
+                    className="ms-auto"
+                    icon={<CloseIcon size={18} />}
+                    onClick={() => onRemove(file)}
                   />
-                );
-              })}
-            </div>
-          )}
-        </section>
-      ))}
+                )}
+              </div>
+            )}
+            {file.status === "ready" && file.pages && (
+              <div
+                role="list"
+                aria-label={showHeaders ? `Pages of ${file.name}` : "Pages"}
+                className={cx(
+                  // ip-page-grid: its own stacking layer, so badges, marks and cuts stay under the sticky tools row.
+                  "ip-tile-grid ip-page-grid",
+                  // Split's marks sit in the gaps (--ip-grid-gap follows the grid's gap: 12px, then
+                  // --ip-tile-gap from 640 px); px-2 keeps the last column's mark inside the grid (spec F4/F5
+                  // UI P-6, "Mark geometry").
+                  renderGap && "px-2 [--ip-grid-gap:12px] sm:[--ip-grid-gap:var(--ip-tile-gap)]",
+                  dimmed && "opacity-60 transition-opacity duration-(--dur-base)",
+                )}
+              >
+                {file.pages.map((size, i) => {
+                  const d = decorate(file, i);
+                  const isActive = flat[activeIdx]?.fileId === file.id && flat[activeIdx]?.index === i;
+                  return (
+                    <PageTile
+                      key={i}
+                      fileId={file.id}
+                      index={i}
+                      pageCount={file.pageCount}
+                      size={size}
+                      pendingDelta={d.pendingDelta}
+                      inScope={d.inScope}
+                      active={isActive}
+                      dimmed={dimmed}
+                      decor={d}
+                      compact={compact}
+                      actions={
+                        corner ? undefined : (
+                          <>
+                            {renderActions?.(file, i, isActive ? 0 : -1)}
+                            {withEnlarge && enlarge(file, i, isActive)}
+                          </>
+                        )
+                      }
+                      corner={corner ? enlarge(file, i, isActive, true) : undefined}
+                      // Below 1024 px nothing is drawn over the page (berrypdf.md "Page tiles", PT-1 rule 6):
+                      // a toggle tile's Enlarge moves to the row under the page; Split's tile opens the preview itself.
+                      cornerRow={onTileActivate ? enlarge(file, i, isActive) : undefined}
+                      gap={gaps?.[i]}
+                      numberLine={lined}
+                      onFocus={() => setActive({ fileId: file.id, index: i })}
+                      onOpen={(e: MouseEvent<HTMLButtonElement>) => {
+                        if (!onTileActivate) return onOpen(file, i);
+                        // Keyboard clicks (detail 0) are handled in onKeyDown, with their Shift state.
+                        if (e.detail === 0) return;
+                        onTileActivate(file, i, { shift: e.shiftKey });
+                      }}
+                      onKeyDown={(e) => onKeyDown(e, file, i)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }

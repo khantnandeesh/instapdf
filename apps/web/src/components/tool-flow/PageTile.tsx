@@ -14,6 +14,23 @@ export { pageBoxStyle, pageTransform, TILE_ASPECT } from "./page-box";
 /** The page-tool fields of a decoration (spec F4/F5 UI P-6); Rotate passes none of them. */
 export type TileDecor = Omit<PageDecoration, "pendingDelta" | "inScope">;
 
+// Split: the part number on the first tile of each part (the mp-step__n look).
+function disc(n: number, place: string) {
+  return (
+    <span
+      key={n}
+      aria-hidden="true"
+      data-testid="part-disc"
+      className={cx(
+        "ip-badge-in pointer-events-none size-(--ip-part-disc) place-items-center rounded-full bg-brand-soft font-display text-[13px] leading-none font-semibold text-brand-strong tabular-nums ring-2 ring-white",
+        place,
+      )}
+    >
+      {n}
+    </span>
+  );
+}
+
 export function PageTile({
   fileId,
   index,
@@ -32,6 +49,7 @@ export function PageTile({
   corner,
   cornerRow,
   gap,
+  numberLine,
 }: {
   fileId: string;
   index: number;
@@ -55,6 +73,8 @@ export function PageTile({
   cornerRow?: ReactNode;
   /** Drawn in the grid gap after the tile (Split's mark). */
   gap?: ReactNode;
+  /** Below 1024 px: the 44px number line the gap marks sit level with (every tile of a grid with marks). */
+  numberLine?: boolean;
 }) {
   const badge = formatDelta(pendingDelta);
   const label = decor?.label ?? `Page ${index + 1} of ${pageCount}, ${describeDelta(pendingDelta)}`;
@@ -108,17 +128,7 @@ export function PageTile({
             {badge}
           </span>
         )}
-        {part?.first && (
-          // Split: the part number on the first tile of each part (the mp-step__n look).
-          <span
-            key={part.n}
-            aria-hidden="true"
-            data-testid="part-disc"
-            className="ip-badge-in pointer-events-none absolute top-1.5 left-1.5 z-[1] grid size-(--ip-part-disc) place-items-center rounded-full bg-brand-soft font-display text-[13px] leading-none font-semibold text-brand-strong tabular-nums ring-2 ring-white"
-          >
-            {part.n}
-          </span>
-        )}
+        {part?.first && !compact && disc(part.n, "absolute top-1.5 left-1.5 z-[1] grid")}
         {inScope && (
           <span className={cx("pointer-events-none absolute top-1.5 right-1.5 z-[1] grid size-[22px] place-items-center rounded-full bg-leaf text-white ring-2 ring-white", picked && "ip-badge-in")}>
             <CheckIcon size={14} />
@@ -154,8 +164,10 @@ export function PageTile({
         )}
       </div>
       {/* Page number in Fredoka 600, muted (5.19:1 on the cream work area); Split adds the part. */}
-      {/* Below 1024 px a tile with a gap mark (Split) gets a 44px number line: the marks sit level with it, off the page (PT-1 rule 6). */}
-      <span className={cx("ip-tile__n max-w-full truncate tabular-nums", compact && gap ? "h-11 leading-11" : "h-5")} aria-hidden="true">
+      {/* Below 1024 px a grid with gap marks (Split) gives every tile a 44px number line: the marks sit level with it, off the
+          page (PT-1 rule 6), and the part disc leads it instead of sitting on the page. */}
+      <span className={cx("ip-tile__n max-w-full truncate tabular-nums", compact && numberLine ? "h-11 leading-11" : "h-5")} aria-hidden="true">
+        {part?.first && compact && disc(part.n, "ip-part-disc--line")}
         {index + 1}
         {part && <span data-testid="part-label"> · Part {part.n}</span>}
       </span>
