@@ -150,9 +150,12 @@ for (const [project, sizes] of [
             await expectClean(page, "loaded, pages view");
           }
           // The bigger page view (a dialog).
-          const pageButton = page.getByRole("button", { name: /^Page 1 of/ });
+          // A tile that toggles (Extract, Delete: aria-pressed) does not open the preview; its corner Enlarge does.
+          const pageButton = page.getByRole("button", { name: /^Page 1( of|,)/ }).and(page.locator(":not([aria-pressed])"));
+          const enlarge = page.getByRole("button", { name: "Enlarge page 1", exact: true });
           const card = page.getByTestId("card-main").first();
           if (await pageButton.count()) await pageButton.first().click();
+          else if (await enlarge.count()) await enlarge.first().click();
           else if (await card.isVisible()) await card.click();
           else {
             const tile = page.getByTestId("page-tile").first();

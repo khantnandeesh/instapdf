@@ -49,6 +49,19 @@ export type PageDecoration = {
   /** Pending display rotation in degrees (unbounded, for the CSS transform). */
   pendingDelta: number;
   inScope: boolean;
+  // ---- page tools (spec F4/F5 UI P-6); Rotate sets none of them ----
+  /** Extract: the page is picked (outline + tick badge). */
+  picked?: boolean;
+  /** Delete: the page is marked for removal (dimmed, trash badge, number struck through). */
+  marked?: boolean;
+  /** Split: the part that holds the page, and whether the page starts it (number disc). */
+  part?: { n: number; first: boolean };
+  /** Split: the page is in no part (dashed edge, dimmed). */
+  leftOut?: boolean;
+  /** The tile's accessible name, when the tool names it (default "Page n of N, rotation"). */
+  label?: string;
+  /** Toggle tiles (Extract, Delete): `aria-pressed` on the tile button. */
+  pressed?: boolean;
 };
 
 /** Context handed to the tool's options and page actions. */

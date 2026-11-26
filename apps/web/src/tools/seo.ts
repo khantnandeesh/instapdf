@@ -346,6 +346,112 @@ export const seoContent: Record<string, ToolSeoContent> = {
     ],
     related: ["split-pdf", "organize-pdf", "combine-reorder-pdf", "compress-pdf", "jpg-to-pdf", "rotate-pdf"],
   },
+  "split-pdf": {
+    howTo: "How to split a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop one or more PDF files on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Choose how to split", text: "Split every page, every few pages, into spreads, or into your own ranges such as 1-4, 5-10." },
+      { name: "Check the parts", text: "The pages show each part and every cut. Click the scissors between two pages to add or remove a cut." },
+      { name: "Download", text: "Select Split and download the parts. Several parts come back as one ZIP, and each part can be saved on its own." },
+    ],
+    faq: [
+      {
+        q: "How do I split a PDF into separate files?",
+        a: "Add the PDF, choose Every page, Every N pages, Spreads or Custom ranges, then select Split. Each part becomes its own PDF, and several parts download together as a ZIP.",
+      },
+      {
+        q: "Can I choose exactly where to split?",
+        a: "Yes. Type ranges such as 1-4, 5-10 (one file per range), or click the scissors between two pages. You can also rename each part under More options.",
+      },
+      {
+        q: "Does splitting keep bookmarks, links and quality?",
+        a: "Pages are copied, not re-rendered, so text, images and fonts stay exactly as they were. Each part keeps the bookmarks that point into it, unless you turn on Remove bookmarks.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. Splitting runs in your browser, so your files stay on your device.",
+      },
+      {
+        q: "Can I split a password-protected PDF?",
+        a: "Yes. Enter the password when asked. The parts are saved without a password.",
+      },
+      {
+        q: "How large a PDF can I split?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up and no watermark.",
+      },
+    ],
+    related: ["extract-pdf-pages", "delete-pdf-pages", "merge-pdf", "organize-pdf", "rotate-pdf", "compress-pdf"],
+  },
+  "extract-pdf-pages": {
+    howTo: "How to extract pages from a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop one or more PDF files on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Pick the pages", text: "Click the pages to keep, pick Odd or Even, or type ranges such as 1-3, 5, 8-last." },
+      { name: "Download", text: "Select Extract and download a new PDF with only those pages, in their original order." },
+    ],
+    faq: [
+      {
+        q: "How do I extract pages from a PDF?",
+        a: "Add the PDF, click the pages you want or type them, for example 2-5, 9, then select Extract. You get a new PDF with only those pages.",
+      },
+      {
+        q: "Can I select a range of pages quickly?",
+        a: "Yes. Click one page and Shift+click another to pick everything between them, or type a range. The words odd, even and last work too.",
+      },
+      {
+        q: "Does extracting pages reduce quality?",
+        a: "No. Pages are copied, not re-rendered. Bookmarks that point to a kept page come along, unless you turn on Remove bookmarks.",
+      },
+      {
+        q: "Can I extract pages from several PDFs at once?",
+        a: "Yes. The same pages are taken from every file, or you can click pages per file. Each file gives its own PDF, and they download together as a ZIP.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. Extracting runs in your browser, so your files stay on your device.",
+      },
+      {
+        q: "Is there a page or size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up and no watermark.",
+      },
+    ],
+    related: ["split-pdf", "delete-pdf-pages", "organize-pdf", "merge-pdf", "rotate-pdf"],
+  },
+  "delete-pdf-pages": {
+    howTo: "How to delete pages from a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop one or more PDF files on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Mark the pages to delete", text: "Click each page to remove, or type them, for example 2, 5-7, last. Marked pages stay in view, so one more click brings a page back." },
+      { name: "Download", text: "Select Delete and download the PDF without those pages." },
+    ],
+    faq: [
+      {
+        q: "How do I delete pages from a PDF?",
+        a: "Add the PDF, click the pages you want gone (or type them), then select Delete. You download the same PDF without those pages.",
+      },
+      {
+        q: "Can I undo a page I marked by mistake?",
+        a: "Yes. Marked pages stay in place, dimmed with a bin badge. Click one again to keep it, or clear all marks at once.",
+      },
+      {
+        q: "Can I delete the last page of several PDFs at once?",
+        a: "Yes. Add the files and type last. Each file loses only its own last page, whatever its length.",
+      },
+      {
+        q: "Does deleting pages change the rest of the PDF?",
+        a: "No. The other pages are copied as they are, and bookmarks to them keep working. Bookmarks to a deleted page are dropped.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. Deleting pages runs in your browser, so your files stay on your device.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up and no watermark.",
+      },
+    ],
+    related: ["extract-pdf-pages", "split-pdf", "organize-pdf", "rotate-pdf", "merge-pdf", "compress-pdf"],
+  },
   "rotate-pdf": {
     howTo: "How to rotate a PDF",
     steps: [

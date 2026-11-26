@@ -52,18 +52,33 @@ async function expectInViewport(page: Page, el: Locator, what: string) {
 }
 
 /**
- * Opens the bigger view of the first page. Tools on the shared page grid have a "Page 1 of N" tile
- * button; Merge opens it from its file card (files view) or a page tile's More menu (pages view).
+ * Opens the bigger view of the first page. Tools on the shared page grid have a "Page 1 …" tile
+ * button that opens it (Rotate "Page 1 of N", Split "Page 1, part 1 of N"); where the tile toggles
+ * the page instead (Extract, Delete: it carries aria-pressed), its "Enlarge page 1" button opens it
+ * (spec F4/F5 UI decision 12). Merge opens it from its file card (files view) or a page tile's More
+ * menu (pages view).
  */
 async function openFirstPagePreview(page: Page) {
-  const pageButton = page.getByRole("button", { name: /^Page 1 of/ });
+  const pageButton = page.getByRole("button", { name: /^Page 1\b/ }).and(page.locator("[data-tile-button]:not([aria-pressed])"));
   if (await pageButton.count()) return pageButton.first().click();
+  const enlarge = page.getByRole("button", { name: "Enlarge page 1", exact: true });
+  if (await enlarge.count()) return enlarge.first().click();
   const card = page.getByTestId("card-main").first();
   if (await card.isVisible()) return card.click();
   const tile = page.getByTestId("page-tile").first();
   await tile.hover();
   await tile.getByTestId("tile-more").click();
   await page.getByRole("menuitem", { name: "Enlarge" }).click();
+}
+
+/**
+ * Tools whose primary waits for a choice (Extract: pick a page; Delete: mark one) get one: the first
+ * toggle tile (spec F4/F5 UI decision 12). Other tools run as loaded.
+ */
+async function makeRunnable(page: Page) {
+  if (await page.getByTestId("primary-action").isEnabled()) return;
+  await page.locator("[data-tile-button][aria-pressed]").first().click();
+  await expect(page.getByTestId("primary-action")).toBeEnabled();
 }
 
 async function open(page: Page, slug: string) {
@@ -166,6 +181,7 @@ for (const tool of usable) {
           )
           .toBe(true);
 
+        await makeRunnable(page);
         await page.getByTestId("primary-action").click();
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "done", { timeout: 30_000 });
         // The result scrolls the page back to the top: wait for the result to settle.
@@ -203,6 +219,7 @@ for (const tool of usable) {
         await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded, scrolled)");
 
+        await makeRunnable(page);
         await page.getByTestId("primary-action").click();
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "done", { timeout: 30_000 });
         await expect(async () => expectInViewport(page, page.getByRole("link", { name: "Download" }), "Download (result)")).toPass({ timeout: 5_000 });

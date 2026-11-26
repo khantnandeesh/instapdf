@@ -28,7 +28,7 @@ import { FilePicker, type FilePickerHandle } from "./FilePicker";
 import { LimitsNote, PrivacyNote } from "./notes";
 import { NoticeStack, type FlowNotice } from "./NoticeStack";
 import { OwnerPermissionNotice } from "./OwnerPermissionNotice";
-import type { PageActionsRenderer } from "./PageGrid";
+import type { PageActionsRenderer, PageKeyHandler, TileActivate } from "./PageGrid";
 import type { PreviewTarget } from "./PagePreviewDialog";
 import { createVisibilityWatcher, ThumbContext } from "./Thumbnail";
 import { ToolIntro } from "./ToolIntro";
@@ -91,7 +91,7 @@ export type ToolFlowProps = {
   /** Per-page action buttons (before the shared "Enlarge page"). */
   renderPageActions?: PageActionsRenderer;
   /** Tile keyboard shortcuts; return true when handled. */
-  onPageKey?: (file: LoadedFile, index: number, key: string) => boolean;
+  onPageKey?: PageKeyHandler;
   /** Extra status text when ready (e.g. "No changes yet"). */
   readyNote?: string;
   /** Reason the primary is disabled in the ready state, if any. */
@@ -141,6 +141,18 @@ export type ToolFlowProps = {
    * (Merge: properties the output will not keep).
    */
   inspectPdf?: () => Promise<PdfInspector>;
+
+  // ---- page tools (spec F4/F5 UI P-4). Rotate and Merge use none of them. ----
+  /** The primary's label while it can run ("Split into 3 files"); the plain action label otherwise. */
+  primaryLabel?: () => string;
+  /** A tile click (and Enter / Space) toggles the page instead of opening the preview (Extract, Delete). */
+  onTileActivate?: TileActivate;
+  /** Drawn in the grid gap after each tile (Split's marks). */
+  renderGap?: (file: LoadedFile, index: number, tabIndex: number) => ReactNode;
+  /** The grid's keyboard hint after "Use arrow keys to move between pages." */
+  gridHint?: string;
+  /** The dock's More options trigger: after the options, beside the primary on phones. */
+  renderMore?: (ctx: FlowContext) => ReactNode;
 };
 
 export function ToolFlow({
@@ -168,6 +180,11 @@ export function ToolFlow({
   apiRef,
   onFilesChange,
   inspectPdf,
+  primaryLabel,
+  onTileActivate,
+  renderGap,
+  gridHint,
+  renderMore,
 }: ToolFlowProps) {
   const flow = tool.flow;
   const router = useRouter();
@@ -807,9 +824,19 @@ export function ToolFlow({
   const accept = acceptAttribute(flow.accept);
   const ownerFile = ownerFor ? readyFiles.find((f) => f.id === ownerFor) : undefined;
 
+  // Page tools state the outcome while the primary can run (I-7, AC-545); the plain verb otherwise.
+  const actionText = canPrimary && primaryLabel ? primaryLabel() : flow.actionLabel;
   const primary = (
-    <Button variant="primary" size="lg" className="w-full" disabled={!canPrimary} aria-describedby={statusId} onClick={run} data-testid="primary-action">
-      {flow.actionLabel}
+    <Button
+      variant="primary"
+      size="lg"
+      className={primaryLabel ? "w-full max-[359px]:px-4" : "w-full"}
+      disabled={!canPrimary}
+      aria-describedby={statusId}
+      onClick={run}
+      data-testid="primary-action"
+    >
+      {actionText}
     </Button>
   );
 
@@ -967,6 +994,9 @@ export function ToolFlow({
                         decorate={decorate}
                         renderActions={renderPageActions}
                         onPageKey={onPageKey}
+                        onTileActivate={onTileActivate}
+                        renderGap={renderGap}
+                        gridHint={gridHint}
                         onRemove={(f) => removeFile(f.id)}
                         onOpen={(f, i) =>
                           setPreview({ items: Array.from({ length: f.pageCount }, (_, k) => ({ fileId: f.id, index: k, rotation: decorate(f, k).pendingDelta })), at: i })
@@ -1007,6 +1037,7 @@ export function ToolFlow({
             layout={state === "empty" ? "side" : "bar"}
             optionsDisabled={optionsDisabled}
             options={renderOptions(ctx)}
+            more={renderMore?.(ctx)}
             density={flow.optionsDensity}
             sheet={{
               title: `${tool.name} options`,
@@ -1025,7 +1056,7 @@ export function ToolFlow({
                       void run();
                     }}
                   >
-                    {flow.actionLabel}
+                    {actionText}
                   </Button>
                 </>
               ),

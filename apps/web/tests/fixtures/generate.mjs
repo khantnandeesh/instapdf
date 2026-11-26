@@ -417,3 +417,28 @@ await writeFile(join(here, "corrupt.pdf"), "This is not a PDF file, only plain t
 await writeFile(join(here, "empty.pdf"), new Uint8Array(0));
 await writeFile(join(here, "notes.txt"), "Plain text notes. Not a PDF.\n");
 console.log("corrupt.pdf, empty.pdf, notes.txt written");
+
+// ---- F4 page tools (spec F4/F5 §7) ----
+{
+  // 12 A4 pages "Twelve 1".."Twelve 12"; outline Intro → p1, Middle → p5 (child Detail → p6), End → p10.
+  const twelve = await textDoc([595, 842], Array.from({ length: 12 }, (_, i) => `Twelve ${i + 1}`), null);
+  addOutline(twelve, [
+    { title: "Intro", page: 0 },
+    { title: "Middle", page: 4, children: [{ title: "Detail", page: 5 }] },
+    { title: "End", page: 9 },
+  ]);
+  await save("twelve.pdf", twelve);
+  // 250 pages "Big 1".."Big 250" (above the reference's 200-page cap).
+  await save("big-250.pdf", await textDoc([595, 842], Array.from({ length: 250 }, (_, i) => `Big ${i + 1}`), null));
+  // The spec's 4-page mixed-sizes file. Named apart from F1's 3-page mixed-sizes.pdf, which other suites read.
+  const mixed = await PDFDocument.create({ updateMetadata: false });
+  mixed.setCreationDate(FIXED_DATE);
+  mixed.setModificationDate(FIXED_DATE);
+  const font = await mixed.embedFont(StandardFonts.Helvetica);
+  [[595, 842], [792, 612], [420, 595], [595, 842]].forEach(([w, h], i) => {
+    const page = mixed.addPage([w, h]);
+    page.drawText(`Mixed ${i + 1}`, { x: 40, y: h - 60, size: 24, font });
+    if (i === 3) page.setRotation(degrees(90));
+  });
+  await save("mixed-sizes-f4.pdf", mixed);
+}

@@ -39,6 +39,11 @@ export const copy = {
   readingCount: (n: number) => `Reading ${plural(n, "file")}`,
   fileReady: (name: string, pages: number) => `${name} ready, ${plural(pages, "page")}`,
   pages: (n: number) => plural(n, "page"),
+  files: (n: number) => plural(n, "file"),
+  /** ZIP result (spec F4/F5 UI P-13). */
+  showAll: (n: number) => `Show all ${n.toLocaleString("en")}`,
+  downloadEntry: (name: string) => `Download ${name}`,
+  downloadedEntry: (name: string) => `Downloaded ${name}`,
   errorImage: (name: string) => `${name} couldn't be read as an image.`,
   errorPixels: (name: string) => `${name} is larger than 50 megapixels, the limit for images.`,
   preparingFonts: "Preparing fonts…",

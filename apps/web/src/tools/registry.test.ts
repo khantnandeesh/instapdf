@@ -46,11 +46,11 @@ describe("flow config", () => {
     expect(merge.flow.outputName(["alpha.pdf", "bravo.pdf"])).toBe("alpha_merged.pdf");
   });
   it("keeps every other tool planned", () => {
-    expect(tools.filter((t) => t.status !== "planned").map((t) => t.slug)).toEqual(["merge-pdf", "rotate-pdf"]);
+    expect(tools.filter((t) => t.status !== "planned").map((t) => t.slug)).toEqual(["merge-pdf", "split-pdf", "extract-pdf-pages", "delete-pdf-pages", "rotate-pdf"]);
   });
-  it("offers Merge and Rotate to continue with a PDF output and nothing for a ZIP (F3 AC-43 adapted)", async () => {
+  it("offers the usable PDF tools to continue with a PDF output and nothing for a ZIP (F3 AC-43, F4 AC-412)", async () => {
     const { continueTargets } = await import("./registry");
-    expect(continueTargets("application/pdf").map((t) => t.slug)).toEqual(["merge-pdf", "rotate-pdf"]);
+    expect(continueTargets("application/pdf").map((t) => t.slug)).toEqual(["merge-pdf", "split-pdf", "extract-pdf-pages", "delete-pdf-pages", "rotate-pdf"]);
     expect(continueTargets("application/zip")).toEqual([]);
   });
 });
@@ -98,15 +98,15 @@ describe("catalogue fields (F2)", () => {
   it("orders the Popular row usable first, then planned, in the fixed order (AC-11)", () => {
     expect(popularTools().map((t) => t.slug)).toEqual([
       "rotate-pdf",
+      "delete-pdf-pages",
       "merge-pdf",
+      "split-pdf",
+      "extract-pdf-pages",
       "pdf-editor",
       "compress-pdf",
-      "delete-pdf-pages",
-      "split-pdf",
       "crop-pdf",
       "sign-pdf",
       "pdf-to-word",
-      "extract-pdf-pages",
     ]);
     const ranks = tools.filter((t) => t.popularRank !== undefined).map((t) => t.popularRank);
     expect(new Set(ranks).size).toBe(ranks.length);
@@ -115,7 +115,7 @@ describe("catalogue fields (F2)", () => {
     const s = shortcutTools();
     expect(s.length).toBeLessThanOrEqual(5);
     for (const t of s) expect(isUsable(t)).toBe(true);
-    expect(s.map((t) => t.slug)).toEqual(["rotate-pdf", "merge-pdf"]);
+    expect(s.map((t) => t.slug)).toEqual(["rotate-pdf", "delete-pdf-pages", "merge-pdf", "split-pdf", "extract-pdf-pages"]);
   });
   it("features the editor (H-11 item 7)", () => {
     expect(featured).toBe("pdf-editor");
