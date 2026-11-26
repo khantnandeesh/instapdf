@@ -41,7 +41,7 @@ InstaPDF is a fast, private online PDF toolkit. Sejda (https://www.sejda.com) is
 - `docs/process/workflow.md`: the pipeline, gates and conventions.
 - `docs/process/backlog.md`: ordered feature list and status.
 - `docs/seo/`: SEO strategy, competitor teardown and keyword plan.
-- `.claude/skills/`: vetted third-party skills (UI design, web-interface guidelines, React performance), pinned with checksums; see its `README.md` for sources, licences and house overrides.
+- `.claude/skills/`: vetted third-party skills (UI design, web-interface guidelines, React performance, SEO, Core Web Vitals), pinned with checksums; see its `README.md` for sources, licences and house overrides.
 
 ## Definition of done (every feature)
 

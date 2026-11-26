@@ -1,5 +1,17 @@
+c122223ac43e86421958e18623979942c21b642951e2e3736dcb63eff13587c3  ./core-web-vitals/LICENSE
+731aa78c0347e8b3e191b75962175bee058ce73817278e610ac0fe546e685914  ./core-web-vitals/SKILL.md
+c4fa0cd6311720b413018471a6ac9240e87db52af3b6e306ffb6684491f15898  ./core-web-vitals/references/CLS.md
+7d40cf6053e9bb8a8a77e02da7c6b25aa8e6c1c092b48d8f9c8f30e9b25cf3a7  ./core-web-vitals/references/INP.md
+522054d44b7a55409cbde511e8d365f7fa52399dd1e72b8d6b44a92ecddca81f  ./core-web-vitals/references/LCP.md
 0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594  ./frontend-design/LICENSE.txt
 d91970639e9f5c37682ac7ab60094d35f1c7c1f38d731bd56396563aee10c1d3  ./frontend-design/SKILL.md
+c122223ac43e86421958e18623979942c21b642951e2e3736dcb63eff13587c3  ./performance/LICENSE
+b0c220185d88c61f7770eb127d8facf86c86d2dd1fd82b86e15a4965a0137265  ./performance/SKILL.md
+128f6f20c6c8fb55fcccd8b259cf680811022cf262dc55b03e9d623bcb555a99  ./performance/references/MEASUREMENT.md
+a2bdf660ecb23098afbadfb83254d39cef10c0da82938225f61271bad3f81b19  ./performance/references/RUM.md
+c122223ac43e86421958e18623979942c21b642951e2e3736dcb63eff13587c3  ./seo/LICENSE
+57cd16566c2c706186b643644dec2884da89c42f296843364c65a40a4d566ae6  ./seo/SKILL.md
+3e03876f41d223c89dfdbc0a0fe3668454e5d8819aad5379f4541fbf0bd67e17  ./seo/references/STRUCTURED-DATA.md
 fc93e7421177bbf869cce892bc60a6c83a4517d974bc3bf65c4e2c1e58a6ccf6  ./vercel-react-best-practices/AGENTS.md
 5f997943ed3fc7a2ff47929be349389b0e17f794efe5d6df185a83344e1e1551  ./vercel-react-best-practices/LICENSE
 9eafb2123d3b8b2aef41fba0db2648a3f4f49996f8c7c8bb2c86263befd8b48a  ./vercel-react-best-practices/README.md

@@ -83,7 +83,8 @@ Strategy: `docs/seo/strategy.md`; keywords: `docs/seo/keyword-plan.md`. The auto
 - [ ] `opengraph-image.tsx` in the tool's route folder (one line with `ogImage`); the card looks right.
 - [ ] Guide starts below the first screen on desktop and phone; nothing new above the fold. *(automated)*
 - [ ] Budgets on a phone: ≤ 170 KB JS, LCP ≤ 2.5 s, CLS ≤ 0.1 *(automated)*; Lighthouse SEO = 100 and performance ≥ 90 mobile *(evaluator)*.
-- [ ] Rich Results Test shows WebApplication, BreadcrumbList, HowTo and FAQPage with no errors *(evaluator, once on a public URL)*.
+- [ ] Rich Results Test shows WebApplication and BreadcrumbList with no errors, and the Schema.org validator passes the HowTo and FAQPage markup *(evaluator, once on a public URL)*. Google retired the HowTo (Sept 2023) and FAQ (7 May 2026) rich results, so the Rich Results Test no longer reports them.
+- [ ] `seo` and `core-web-vitals` skills (`.claude/skills/`) run on the tool page; no open crawl, index, canonical, structured-data or CWV finding.
 - [ ] Variant pages from the keyword plan that this tool enables are listed in the backlog.
 
 ## CI: what runs where
