@@ -61,7 +61,8 @@ export function contentSecurityPolicy({ scriptHashes = [], dev = false }: CspOpt
  * when they end in "/", exactly otherwise):
  * - Dropbox Chooser: its one script; downloads from the direct-link host.
  * - Google: GIS token client + gapi (and the picker module from /_/scs/); the Picker and GIS
- *   frames; Drive v3 file downloads and the Drive upload endpoint (save).
+ *   frames; Drive v3 about.get (the token's account, for the Picker), file downloads and the
+ *   Drive upload endpoint (save).
  * - OneDrive: MSAL is bundled (no third-party script); token endpoint, Graph, the download-URL
  *   hosts, and the File Picker v8 frame, started with a form POST. Personal accounts first.
  * - mock (CI/e2e only): nothing beyond our own origin.
@@ -70,8 +71,10 @@ export const CLOUD_ALLOW: Record<"google" | "dropbox" | "onedrive" | "mock", { s
   dropbox: { script: ["https://www.dropbox.com/static/api/2/dropins.js"], connect: ["https://dl.dropboxusercontent.com"], frame: [], form: [] },
   google: {
     script: ["https://apis.google.com/js/api.js", "https://apis.google.com/_/scs/", "https://accounts.google.com/gsi/client"],
-    connect: ["https://www.googleapis.com/drive/v3/files", "https://www.googleapis.com/drive/v3/files/", "https://www.googleapis.com/upload/drive/v3/files", "https://accounts.google.com/gsi/"],
-    frame: ["https://docs.google.com/picker", "https://accounts.google.com/gsi/"],
+    connect: ["https://www.googleapis.com/drive/v3/about", "https://www.googleapis.com/drive/v3/files", "https://www.googleapis.com/drive/v3/files/", "https://www.googleapis.com/upload/drive/v3/files", "https://accounts.google.com/gsi/"],
+    // Whole hosts, as Google's own Picker sample does: the Picker frame moves between docs, drive
+    // and accounts pages (sign-in, account switch, upload), which path-limited sources may not cover.
+    frame: ["https://docs.google.com", "https://drive.google.com", "https://accounts.google.com"],
     form: [],
   },
   onedrive: {

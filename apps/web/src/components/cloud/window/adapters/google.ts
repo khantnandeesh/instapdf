@@ -11,12 +11,12 @@ import type { Adapter, AdapterCtx, Picked } from "./types";
 import { exportName, exportUrl, isNative, nativeMimes } from "./native";
 import { CloudError, loadScript, xhrUpload } from "./types";
 
-type TokenResponse = { access_token?: string; error?: string };
+type TokenResponse = { access_token?: string; expires_in?: number | string; error?: string };
 type Gis = {
   accounts: {
     oauth2: {
       initTokenClient: (o: { client_id: string; scope: string; callback: (r: TokenResponse) => void; error_callback?: (e: { type?: string }) => void }) => {
-        requestAccessToken: (o?: { prompt?: string }) => void;
+        requestAccessToken: (o?: { prompt?: string; login_hint?: string }) => void;
       };
     };
   };
@@ -68,22 +68,61 @@ export function findPickerResponse(data: unknown, depth = 0): { action: string; 
   return null;
 }
 
+/**
+ * The Picker frame URL. toUri() drops the app ID (build() sends it as `appId`); without it Drive
+ * does not grant this app drive.file access to the files picked, so the download would 404.
+ * `authuser` pins the Picker to the token's account: in a browser signed in to several Google
+ * accounts it otherwise uses the default account's session, which is not the token's
+ * (PickerBuilder.setAuthUser does the same, but it is undocumented). Parameters are appended,
+ * so the rest of toUri()'s query stays byte for byte.
+ */
+export function pickerUrl(base: string, { appId = "", authUser = "" }: { appId?: string; authUser?: string } = {}): string {
+  const cut = base.indexOf("#");
+  let url = cut < 0 ? base : base.slice(0, cut); // parameters go before any #fragment
+  const hash = cut < 0 ? "" : base.slice(cut);
+  const has = new URL(url).searchParams;
+  const add = (k: string, v: string) => {
+    if (v && !has.has(k)) url += `${url.includes("?") ? "&" : "?"}${k}=${encodeURIComponent(v)}`;
+  };
+  add("appId", appId);
+  add("authuser", authUser);
+  return url + hash;
+}
+
+/** The email of the account a drive.file token belongs to (Drive about.get), or "" if unknown. */
+async function tokenEmail(token: string): Promise<string> {
+  try {
+    const r = await fetch("https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)", {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(4000), // never hold the Picker back: it opens without authuser
+    });
+    if (!r.ok) return "";
+    const j = (await r.json()) as { user?: { emailAddress?: string } };
+    return typeof j.user?.emailAddress === "string" ? j.user.emailAddress : "";
+  } catch {
+    return "";
+  }
+}
+
 export function createAdapter(ctx: AdapterCtx): Adapter {
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY ?? "";
   const appId = process.env.NEXT_PUBLIC_GOOGLE_APP_ID ?? "";
   const g = () => (window as Window & { google?: Gis }).google;
   let token: string | null = null; // memory only (spec AC-129)
+  let expires = 0; // ms epoch; a minute early so a save never starts on a dying token
+  let email = ""; // the token's account, for the Picker's authuser
   let pending: { resolve: (t: string) => void; reject: (e: unknown) => void } | null = null;
   let client: ReturnType<Gis["accounts"]["oauth2"]["initTokenClient"]> | null = null;
 
   const getToken = (): Promise<string> =>
     new Promise((resolve, reject) => {
-      if (token) return resolve(token);
+      if (token && Date.now() < expires) return resolve(token);
+      token = null;
       if (!client) return reject(new CloudError("unreachable"));
       pending = { resolve, reject };
       ctx.setPhase("signing");
-      client.requestAccessToken({ prompt: "" }); // synchronously inside the tap
+      client.requestAccessToken(email ? { prompt: "", login_hint: email } : { prompt: "" }); // synchronously inside the tap; a renewal stays on the same account
     });
 
   return {
@@ -102,6 +141,8 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
           if (r.error || !r.access_token) p?.reject(new CloudError("denied"));
           else {
             token = r.access_token;
+            email = ""; // re-read: the user may have chosen another account
+            expires = Date.now() + (Number(r.expires_in) || 3600) * 1000 - 60_000;
             p?.resolve(token);
           }
         },
@@ -136,7 +177,9 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
       b.setAppId(appId);
       b.setOrigin(window.location.origin);
       if (ctx.params.multiple) b.enableFeature(gp.Feature.MULTISELECT_ENABLED);
-      const url = b.toUri();
+      email ||= await tokenEmail(t); // memory only, like the token
+      if (email && typeof b.setAuthUser === "function") b.setAuthUser(email);
+      const url = pickerUrl(b.toUri(), { appId, authUser: email });
       ctx.setPhase("picking");
       const frame = await ctx.frame({ url }, "Google Drive");
       return new Promise<Picked[] | "cancel">((resolve) => {
