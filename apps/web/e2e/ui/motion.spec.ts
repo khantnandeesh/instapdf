@@ -729,6 +729,7 @@ for (const size of SIZES) {
       "/merge-pdf",
       "/rotate-pdf",
       "/split-pdf",
+      "/split-pdf-by-bookmarks",
       "/edit-pdf",
     ]) {
       test(`7: ${path} is still 5s after load`, async ({ page }) => {

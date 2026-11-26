@@ -27,6 +27,8 @@ for (const tool of usable) {
         window.scrollTo({ top: 600, behavior: "smooth" });
       }).observe(flow, { attributes: true, attributeFilter: ["data-state"] });
     });
+    // Extract and Delete wait for a choice: pick (or mark) the first page (spec F4/F5 UI decision 12).
+    if (!(await page.getByTestId("primary-action").isEnabled())) await page.locator("[data-tile-button][aria-pressed]").first().click();
     await page.getByTestId("primary-action").click();
     await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "done", { timeout: 30_000 });
     // The page must be tall enough for the smooth scroll to go somewhere, or the test proves nothing.

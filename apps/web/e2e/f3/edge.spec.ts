@@ -443,7 +443,7 @@ test("AC-77: the catalogue card and the menu entry link to /merge-pdf with Beta,
   await expect(page).toHaveURL(/\/merge-pdf$/);
   await expect(page.getByTestId("coming-soon")).toHaveCount(0);
   await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
-  // A planned tool still renders the coming-soon page (F2's planned-tool tests use split-pdf).
-  await page.goto("/split-pdf");
+  // A planned tool still renders the coming-soon page (F2's planned-tool tests use split-pdf-by-bookmarks).
+  await page.goto("/split-pdf-by-bookmarks");
   await expect(page.getByTestId("coming-soon")).toBeVisible();
 });
