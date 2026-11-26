@@ -128,3 +128,31 @@ test("AC-139: local, Google Drive, Dropbox and OneDrive files merge in card orde
   expect(texts[5]).toContain("Echo");
   void chooseMenu;
 });
+
+for (const [path, w, h] of [
+  ["/merge-pdf", 320, 568],
+  ["/rotate-pdf", 320, 568],
+  ["/merge-pdf", 360, 640],
+  ["/rotate-pdf", 360, 640],
+  ["/merge-pdf", 390, 664],
+  ["/rotate-pdf", 390, 664],
+] as const) {
+  test(`AC-155: at ${w}x${h} ${path}'s drop card, split button and row fit the viewport (no clipping)`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    if (path !== "/merge-pdf") await page.goto(path);
+    await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
+    await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
+    const box = async (sel: string) => (await page.locator(sel).first().boundingBox())!;
+    const card = await box("[data-testid=drop-card] .mp-dropcard");
+    // The card sits inside the screen with the page's own gutter, and everything it holds sits inside it.
+    expect(card.x, "card's left edge").toBeGreaterThanOrEqual(0);
+    expect(card.x + card.width, "card's right edge").toBeLessThanOrEqual(w);
+    for (const sel of [".ip-split", "[data-testid=cloud-caret]", "[data-testid=cloud-row]"]) {
+      const b = await box(sel);
+      expect(b.x, `${sel} left`).toBeGreaterThanOrEqual(card.x);
+      expect(b.x + b.width, `${sel} right`).toBeLessThanOrEqual(card.x + card.width);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await expect(page.getByTestId("cloud-caret")).toBeInViewport({ ratio: 1 });
+  });
+}

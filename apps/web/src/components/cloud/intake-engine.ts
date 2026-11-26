@@ -34,6 +34,8 @@ type SessionState = {
   stopped: Set<string>;
   /** At most this many distinct files per request (1 for a single-file tool). */
   cap: number;
+  /** The window closed for "Choose from this device": focus goes to the tool's picker, wherever it was. */
+  device?: boolean;
 };
 
 export type Begin = {
@@ -131,7 +133,7 @@ export function createIntake(host: CloudHub) {
       // Back to where it was: focus the control that opened the window once this tab is in front.
       const back = () => {
         const t = s.trigger;
-        if (t?.isConnected && (document.activeElement === document.body || !document.activeElement)) t.focus();
+        if (t?.isConnected && (s.device || document.activeElement === document.body || !document.activeElement)) t.focus();
       };
       if (document.hasFocus()) back();
       else window.addEventListener("focus", back, { once: true });
@@ -265,6 +267,12 @@ export function createIntake(host: CloudHub) {
           showError(provider, code, again);
         },
         onDone: () => endSession(req, "done"),
+        // "Choose from this device" in a window that couldn't open: focus goes to the tool's own picker (when this tab is in front).
+        onDevice: () => {
+          const s = box.s;
+          const picker = d().devicePicker?.();
+          if (s && picker) Object.assign(s, { trigger: picker, device: true });
+        },
         onClosed: (reason) => endSession(req, reason),
         onGaveUp: () => {
           const s = box.s;
@@ -339,6 +347,22 @@ export function createIntake(host: CloudHub) {
       s.session.retry(e.id);
       update((prev) => prev.map((x) => (x.key === key ? { ...x, status: "downloading", loaded: 0 } : x)));
       d().announce(transferCopy.liveDownloading(e.name, e.provider));
+    },
+    /**
+     * Ends every pick still in progress without a word (the page took a file from somewhere else:
+     * the editor opened a local file): their windows close, their notices and download cards go.
+     */
+    abort() {
+      for (const [req, st] of sessions) {
+        // A pick that has handed its file over is finishing (its ack, the last used source): left alone.
+        if (st.gotFiles) continue;
+        st.session.cancel();
+        if (st.waitNotice) d().dismissNotice(st.waitNotice);
+        if (st.stoppedNotice) d().dismissNotice(st.stoppedNotice);
+        sessions.delete(req);
+        entries = entries.filter((e) => e.req !== req);
+      }
+      publish();
     },
     /** Closes every window this tab opened (the tool went away). */
     dispose() {

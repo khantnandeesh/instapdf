@@ -8,10 +8,10 @@ import type { Picked } from "./adapters/types";
 export type MockChoice = Picked[] | "cancel" | "denied" | "unreachable";
 
 /** Fixtures the mock can return (tests/fixtures, served by /cloud-mock/<name>). Sizes are reported by the server. */
-const FIXTURES = ["alpha.pdf", "bravo.pdf", "echo.pdf", "charlie.png", "notes.txt", "user-pw.pdf", "corrupt.pdf", "three-pages.pdf"];
+export const FIXTURES = ["alpha.pdf", "bravo.pdf", "echo.pdf", "charlie.png", "notes.txt", "user-pw.pdf", "corrupt.pdf", "three-pages.pdf"];
 const MB = 1024 * 1024;
 
-function item(id: string, fixture: string, opts: { as?: string; slow?: boolean; fail?: boolean; size?: number; status?: number; reason?: string; native?: boolean } = {}): Picked {
+export function item(id: string, fixture: string, opts: { as?: string; slow?: boolean; fail?: boolean; size?: number; status?: number; reason?: string; native?: boolean } = {}): Picked {
   // A "Google document" arrives as an exported PDF, like the real Drive adapter (AC-141).
   const name = opts.native ? exportName(opts.as ?? fixture) : (opts.as ?? fixture);
   return {
@@ -36,7 +36,8 @@ function item(id: string, fixture: string, opts: { as?: string; slow?: boolean; 
 
 /**
  * The mock provider's own "picker" (CI only): pick fixtures, plus the states tests need
- * (spec §7: slow download, mid-download failure, a 403 file, a 101 MB file, denied, unreachable).
+ * (spec §7: slow download, mid-download failure, a 403 file, a 101 MB file, denied, unreachable; a
+ * failed sign-in, and a picker that stays silent like Google's own sign-in page inside it).
  */
 export function MockPicker({ multiple, onChoose }: { multiple: boolean; onChoose: (c: MockChoice) => void }) {
   const [sel, setSel] = useState<string[]>([]);

@@ -5,13 +5,13 @@
  */
 import { buildNames } from "@/lib/cloud/names";
 
-/** The caret's names: this build's providers ("Google Drive, Dropbox or OneDrive"). */
+/** The carets' names; the toolbar's lists this build's providers ("Google Drive, Dropbox or OneDrive"). */
 export const cloudCopy = {
-  caret: () => `Choose from ${buildNames()}`,
+  /** The empty state's caret: it opens the source menu, so it is not named like a row button ("Choose from Google Drive"). */
+  caret: () => "More ways to add files",
   caretToolbar: (replace: boolean) => `${replace ? "Replace" : "Add files"} from ${buildNames()}`,
   rowLabel: "Cloud storage",
   lastUsed: " (last used)",
-  lastUsedTitle: "Last used",
   offline: "You're offline.",
   /** `name`: a provider's name, or this build's list of them (the caret). */
   offlineBody: (name: string) => `${name} needs a connection. Files on this device still work.`,

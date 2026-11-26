@@ -50,6 +50,8 @@ export type FromWindow =
   | { t: "failed"; id: string; name: string }
   | { t: "done" }
   | { t: "cancel" }
+  /** The person chose "Choose from this device" in the window (Google couldn't open Drive): it closes, the tool offers its own picker. */
+  | { t: "device" }
   | { t: "error"; code: ErrorCode }
   | { t: "saveProgress"; loaded: number; total: number }
   | { t: "saved"; name: string; link?: string }
@@ -96,6 +98,7 @@ export function parseFromWindow(data: unknown, req: string): FromWindow | null {
     case "hb":
     case "done":
     case "cancel":
+    case "device":
       return { t: m.t };
     case "progress":
       if (!isId(m.id) || !isText(m.name) || !isCount(m.loaded) || !isCount(m.total)) return null;

@@ -505,7 +505,8 @@ export function ToolFlow({
     [announce, beforeIntake, copyOverrides?.errorType, flow, flushProblems, loadFile, onFilesAdded, pushNotice, removeFile, sortIntake, updateFiles],
   );
 
-  if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1") cloud!.deps = { tool, announce, intake, pushNotice, dismissNotice, sortIntake, errorType: copyOverrides?.errorType, files };
+  if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1")
+    cloud!.deps = { tool, announce, intake, pushNotice, dismissNotice, sortIntake, errorType: copyOverrides?.errorType, files, devicePicker: () => picker.current?.element ?? null };
 
   // ---- password queue ------------------------------------------------------
   const currentLocked = lockedFiles[0];

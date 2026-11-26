@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 import engine from "./public/engine/manifest.json";
 import { ACCEPTS_BR, ACCEPTS_GZIP } from "./src/lib/editor/accept-encoding";
 import { cloudSourcesOn, configuredProviders, providerList } from "./src/lib/cloud/providers";
-import { baseSecurityHeaders, CLOUD_COOP, contentSecurityPolicy, TOOL_PAGE_COOP } from "./src/lib/security/csp";
+import { baseSecurityHeaders, CLOUD_COOP, CLOUD_REFERRER, contentSecurityPolicy, TOOL_PAGE_COOP } from "./src/lib/security/csp";
 import { FONT_LIBRARY_PATHS, fontsOrigin } from "./scripts/font-library/origin.mjs";
 
 /**
@@ -72,11 +72,13 @@ const nextConfig: NextConfig = {
     if (!CLOUD_ON) {
       config.plugins.push(
         new webpack.NormalModuleReplacementPlugin(/[\\/]cloud[\\/]tool-cloud$/, join(__dirname, "src/components/cloud/tool-cloud.off.ts")),
+        // The editor's landing (F23 E6) the same way.
+        new webpack.NormalModuleReplacementPlugin(/[\\/]cloud[\\/]editor-cloud$/, join(__dirname, "src/components/cloud/editor-cloud.off.ts")),
         new webpack.NormalModuleReplacementPlugin(/[\\/]cloud[\\/]window[\\/]CloudWindow$/, join(__dirname, "src/components/cloud/window/CloudWindow.off.tsx")),
       );
       // Nothing reads the no-op module (every use sits behind the flag): it does nothing when loaded, so it
       // is left out entirely and the tool pages are main's chunks byte for byte.
-      config.module.rules.push({ test: /[\\/]cloud[\\/]tool-cloud\.off\.ts$/, sideEffects: false });
+      config.module.rules.push({ test: /[\\/]cloud[\\/](tool|editor)-cloud\.off\.ts$/, sideEffects: false });
     }
     return config;
   },
@@ -104,6 +106,8 @@ const nextConfig: NextConfig = {
       { source: "/:path((?!cloud/).*)", headers: [{ key: "Cross-Origin-Opener-Policy", value: TOOL_PAGE_COOP }] },
       // Each cloud window sets its own COOP (src/lib/security/csp.ts CLOUD_COOP); its CSP comes from the middleware.
       ...Object.entries(CLOUD_COOP).map(([route, value]) => ({ source: `/cloud/${route}`, headers: [{ key: "Cross-Origin-Opener-Policy", value }] })),
+      // After the base headers, so it wins (the last rule setting a key does).
+      ...Object.entries(CLOUD_REFERRER).map(([route, value]) => ({ source: `/cloud/${route}`, headers: [{ key: "Referrer-Policy", value }] })),
       // Content-addressed library files never change; manifest.json names the current ones.
       { source: "/fonts/lib/:dir(index|families|fonts)/:path*", headers: [immutable] },
       { source: "/fonts/lib/manifest.json", headers: [{ key: "Cache-Control", value: "public, max-age=300" }] },

@@ -115,6 +115,13 @@ export class WindowLink {
     this.close();
   }
 
+  /** "Choose from this device": the tool takes over with its own picker; this window closes. */
+  device() {
+    if (this.finished) return;
+    this.send({ t: "device" });
+    this.close();
+  }
+
   close() {
     if (this.finished) return;
     this.finished = true;

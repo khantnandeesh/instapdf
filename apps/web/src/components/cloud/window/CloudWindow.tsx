@@ -14,6 +14,7 @@ import { WindowLink } from "@/lib/cloud/window-link";
 import { transferCopy } from "../transfer-copy";
 import { ProviderArt } from "../marks";
 import { MockPicker, type MockChoice } from "./MockPicker";
+import * as onepick from "./adapters/onepick";
 import * as dropbox from "./adapters/dropbox";
 import * as google from "./adapters/google";
 import * as onedrive from "./adapters/onedrive";
@@ -30,8 +31,12 @@ type View =
   | { k: "frame"; spec: FrameSpec; title: string }
   | { k: "rows" }
   | { k: "done" }
+  /** Cancelled, but the browser kept the window open (window.close() refused): say it can be closed. */
+  | { k: "closed" }
   | { k: "denied" }
   | { k: "unreachable" }
+  /** Save mode: Google's sign-in popup didn't work here. The tool has been told; this window says why and offers Close window. */
+  | { k: "signin" }
   | { k: "lost" }
   | { k: "invalid" }
   | { k: "saving"; name: string; pct: number }
@@ -106,7 +111,13 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
     link.current?.cancel();
     finished.current = true;
     window.close();
-    setTimeout(() => setCanClose(true), 300);
+    setTimeout(() => {
+      setCanClose(true);
+      // Still here (the browser refused to close it, e.g. after a round trip to the provider): never
+      // leave a spinner or a dead button behind.
+      const k = viewRef.current.k;
+      if (k !== "done" && k !== "saved") setView({ k: "closed" });
+    }, 300);
   }, []);
 
   // ---- downloads ---------------------------------------------------------------------------------
@@ -215,7 +226,9 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
     const code = e instanceof CloudError ? e.code : "unreachable";
     // A sign-in that was to leave the page failed instead: the heartbeat resumes, so the tool hears this.
     link.current?.back();
-    link.current?.send({ t: "error", code });
+    // A failed sign-in (Save's GIS popup): the tool's save fails with its own Try again; this window says why.
+    link.current?.send({ t: "error", code: code === "signin" ? "unknown" : code });
+    if (code === "signin") return setView({ k: "signin" });
     setView({ k: code === "denied" ? "denied" : "unreachable" });
   }, []);
 
@@ -270,6 +283,12 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
     try {
       window.opener = null;
     } catch {}
+    // Back from Google's top-level picker on the bare redirect URL: the window's own URL comes back
+    // (replaceState, no reload) and the hash with its token is gone before anything reads it.
+    if ((route === "google" || route === "mock") && onepick.isReturn(window.location.hash, route) && !onepick.takeReturn(route)) {
+      setView({ k: "invalid" });
+      return;
+    }
     if ((route === "onedrive" || route === "mock") && isSignInResponse(window.location.hash, window.location.search)) {
       // Back from a full-page sign-in on the bare redirect URL: hand the response over and return to
       // the window's own URL (with its request), where the adapter finishes the sign-in.
@@ -389,7 +408,7 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
   // Focus: the berry button on arrival (an Enter press is the gesture the SDK needs), the h1 when done.
   useEffect(() => {
     if (view.k === "before" && ready) primary.current?.focus();
-    else if (view.k === "done" || view.k === "saved" || view.k === "lost" || view.k === "denied" || view.k === "unreachable") heading.current?.focus();
+    else if (view.k === "done" || view.k === "saved" || view.k === "closed" || view.k === "lost" || view.k === "denied" || view.k === "unreachable" || view.k === "signin") heading.current?.focus();
   }, [view.k, ready]);
 
   // A form-POSTed picker (OneDrive v8) is submitted once its iframe exists.
@@ -447,7 +466,7 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
           {mark}
           {h1(name)}
           {params?.mode === "save" && saveFile.current && <p className="ip-cw__text">{saveFile.current.name}</p>}
-          <Button ref={primary} variant="primary" size="lg" className="ip-cw__btn" busy={!ready} disabled={!params} onClick={start} data-testid="cloud-open">
+          <Button ref={primary} variant="primary" size="lg" className="ip-cw__btn" busy={!ready} disabled={!params} onClick={() => start()} data-testid="cloud-open">
             {provider ? windowCopy.open(provider) : ""}
           </Button>
           {privacy}
@@ -529,6 +548,15 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
         </>
       );
       break;
+    case "closed":
+      body = (
+        <>
+          {mark}
+          {h1(name)}
+          <p className="ip-cw__text">{windowCopy.canClose}</p>
+        </>
+      );
+      break;
     case "saving":
       body = (
         <>
@@ -553,6 +581,35 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
           </span>
           {provider && h1(windowCopy.savedTitle(provider))}
           <p className="ip-cw__text">{canClose ? windowCopy.canClose : windowCopy.closesItself}</p>
+        </>
+      );
+      break;
+    case "signin":
+      body = (
+        <>
+          {mark}
+          {provider && h1(windowCopy.blockedTitle(provider))}
+          {canClose ? (
+            <p className="ip-cw__text">{windowCopy.canClose}</p>
+          ) : (
+            <>
+              <p className="ip-cw__text">
+                {provider === "google" ? windowCopy.blockedGoogle : windowCopy.blockedOther}
+                {provider === "google" && (
+                  <>
+                    {" "}
+                    <a href={windowCopy.blockedHelpUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-link underline underline-offset-2">
+                      {windowCopy.blockedHelp}
+                    </a>
+                  </>
+                )}
+              </p>
+              {/* The tool's save has failed with its own Try again: here, only a way out. */}
+              <Button variant="outline" onClick={cancelAndClose} data-testid="cloud-close">
+                {windowCopy.closeWindow}
+              </Button>
+            </>
+          )}
         </>
       );
       break;
