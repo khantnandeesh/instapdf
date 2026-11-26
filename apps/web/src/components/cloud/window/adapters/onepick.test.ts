@@ -27,10 +27,16 @@ describe("parse", () => {
 });
 
 describe("isReturn", () => {
-  it("only a response for this route's state", () => {
+  it("any token (so it never stays in the URL), or an error for this route", () => {
     expect(onepick.isReturn(`#access_token=T&state=${STATE}`, "google")).toBe(true);
     expect(onepick.isReturn(`#error=access_denied&state=${STATE}`, "google")).toBe(true);
-    expect(onepick.isReturn(`#access_token=T&state=${STATE}`, "mock")).toBe(false);
+    // A token with another state, or none, is still taken off the URL (and then refused).
+    expect(onepick.isReturn(`#access_token=T&state=${STATE}`, "mock")).toBe(true);
+    expect(onepick.isReturn("#access_token=T", "google")).toBe(true);
+    // Every error on /cloud/google; on the mock only its own (its OneDrive-style errors go to completeRedirect).
+    expect(onepick.isReturn("#error=access_denied", "google")).toBe(true);
+    expect(onepick.isReturn("#error=access_denied&state=6f1c2a8e-3b4d-4e5f-8a9b-000000000001", "mock")).toBe(false);
+    expect(onepick.isReturn("#error=access_denied&state=mock.x", "mock")).toBe(true);
     // OneDrive-style sign-in responses (state = the request ID) are not onepick returns.
     expect(onepick.isReturn("#code=MOCK&state=6f1c2a8e-3b4d-4e5f-8a9b-000000000001", "mock")).toBe(false);
     expect(onepick.isReturn("", "google")).toBe(false);
@@ -91,6 +97,25 @@ describe("start and takeReturn (the round trip)", () => {
     expect(onepick.takeReturn("google")).toBe(false);
     expect(href).toBe("https://berrypdf.test/cloud/google");
     expect(onepick.take()).toBeNull();
+  });
+
+  it("calls leaving just before it goes, never when the nonce can't be kept (storage blocked)", () => {
+    const leaving = vi.fn();
+    void onepick.start("https://accounts.google.com/x", "google", leaving);
+    expect(leaving).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledTimes(1);
+    leaving.mockClear();
+    assign.mockClear();
+    vi.stubGlobal("sessionStorage", {
+      getItem: () => null,
+      setItem: () => {
+        throw new DOMException("blocked", "SecurityError");
+      },
+      removeItem: () => {},
+    });
+    expect(() => onepick.start("https://accounts.google.com/x", "google", leaving)).toThrow(expect.objectContaining({ code: "unreachable" }));
+    expect(leaving).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it("a saved URL from another window or route is never restored", () => {

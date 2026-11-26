@@ -5,6 +5,7 @@
  * asked for in localStorage["berrypdf:cloud-mock-log"] (no tokens, no file bytes: names and hashes).
  */
 import { FIXTURES, item } from "../MockPicker";
+import { onepickParams } from "./google";
 import * as onepick from "./onepick";
 import type { Adapter, AdapterCtx } from "./types";
 import { CloudError } from "./types";
@@ -20,7 +21,8 @@ export const MOCK_REDIRECT_KEY = "berrypdf:cloud-mock-redirect";
 /**
  * With MOCK_REDIRECT_KEY "onepick", picking goes the way of Google's top-level picker (onepick.ts):
  * out to "Google" and back to the bare /cloud/mock URL with a hash. This key says what comes back:
- * fixture names joined by "," (picked), "denied", "empty", or "badstate" (a state that isn't ours).
+ * fixture names joined by "," (picked), "denied" (Google's answer when its picker is closed),
+ * "empty", or "badstate" (a state that isn't ours).
  */
 export const MOCK_ONEPICK_KEY = "berrypdf:cloud-mock-onepick";
 const SIGNED_KEY = "berrypdf:cloud-mock-signed";
@@ -54,6 +56,8 @@ export type MockLog = {
   requests: { provider: string; multiple: boolean; accept: string[]; mode: string }[];
   downloads: string[];
   saved: { provider: string; name: string; size: number; sha256: string }[];
+  /** The picker parameters each onepick trip sent (built by google.ts's onepickParams). */
+  onepick?: Record<string, string>[];
 };
 
 export function readLog(): MockLog {
@@ -71,8 +75,11 @@ export function writeLog(fn: (l: MockLog) => void) {
   } catch {}
 }
 
-/** What "Google" sends back to the bare redirect URL (IDs are fixture indexes, like Drive's opaque IDs). */
-function onepickHash(outcome: string, state: string): string {
+/**
+ * What "Google" sends back to the bare redirect URL (IDs are fixture indexes, like Drive's opaque IDs).
+ * Like Google's picker, it returns one file unless it was asked with `allow_multiple`.
+ */
+function onepickHash(outcome: string, state: string, sent: Record<string, string>): string {
   const p = new URLSearchParams({ state: outcome === "badstate" ? "mock.00000000-0000-4000-8000-000000000000" : state });
   if (outcome === "denied") p.set("error", "access_denied");
   else {
@@ -81,7 +88,7 @@ function onepickHash(outcome: string, state: string): string {
     p.set("expires_in", "3599");
     p.set("scope", "https://www.googleapis.com/auth/drive.file");
     const ids = outcome === "empty" || outcome === "badstate" ? [] : outcome.split(",").map((f) => String(FIXTURES.indexOf(f.trim())));
-    p.set("picked_file_ids", (outcome === "badstate" ? ["0"] : ids).join(","));
+    p.set("picked_file_ids", (outcome === "badstate" ? ["0"] : sent.allow_multiple === "true" ? ids : ids.slice(0, 1)).join(","));
   }
   return p.toString();
 }
@@ -117,11 +124,12 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
           try {
             outcome = localStorage.getItem(MOCK_ONEPICK_KEY) ?? outcome;
           } catch {}
-          ctx.leaving();
-          return onepick.start((state) => `/cloud/mock#${onepickHash(outcome, state)}`, "mock");
+          const sent = onepickParams(ctx.params);
+          writeLog((l) => (l.onepick ??= []).push(sent));
+          return onepick.start((state) => `/cloud/mock#${onepickHash(outcome, state, sent)}`, "mock", () => ctx.leaving());
         }
-        if (r.kind === "empty") return "cancel";
-        if (r.kind === "denied") throw new CloudError("denied");
+        // As google.ts: closing Google's picker comes back as access_denied, so it is a cancel.
+        if (r.kind === "empty" || r.kind === "denied") return "cancel";
         if (r.kind !== "picked") throw new CloudError("unreachable");
         token = r.token;
         return r.ids.map((n, i) => item(`f${i + 1}`, FIXTURES[Number(n)] ?? "alpha.pdf"));

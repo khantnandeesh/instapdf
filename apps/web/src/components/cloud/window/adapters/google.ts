@@ -8,10 +8,11 @@
  * as PDF) in this window; only their bytes go to the tool tab.
  * Save: a Google Identity Services token (popup, drive.file), then a multipart upload into a
  * "BerryPDF" folder the app creates (drive.file sees only that).
- * [V] 26 Nov 2026: onepick round trip and alt=media download on staging with a real account.
+ * [V] 26 Nov 2026: onepick round trip and alt=media download on staging with a real account; the
+ * picker's type filter and multi-select; closing the picker returns `error=access_denied`.
  */
 import type { Adapter, AdapterCtx, Picked } from "./types";
-import { exportName, exportUrl, isNative } from "./native";
+import { exportName, exportUrl, isNative, nativeMimes } from "./native";
 import * as onepick from "./onepick";
 import { CloudError, loadScript, xhrUpload } from "./types";
 
@@ -29,8 +30,33 @@ type Gis = {
 const SCOPE = "https://www.googleapis.com/auth/drive.file";
 const FILES = "https://www.googleapis.com/drive/v3/files";
 
+/** The tool's accepted extensions as the picker's MIME filter. */
+const MIME: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".bmp": "image/bmp",
+  ".webp": "image/webp",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff",
+};
+
+/**
+ * What the picker is asked for, from the tool's request (Google's desktop picker guide, "OAuth 2.0
+ * parameters"): `mimetypes` shows only the types the tool takes (PDF tools also see Docs, Sheets and
+ * Slides, exported as PDF), and `allow_multiple` only where the tool takes several files, so
+ * single-file tools get a single-select picker. [V] 26 Nov 2026: both carried through to Google's
+ * picker, which then listed only PDFs and was titled "Select items".
+ */
+export function onepickParams({ multiple, accept }: { multiple: boolean; accept: readonly string[] }): Record<string, string> {
+  const mimes = [...new Set([...accept.map((e) => MIME[e]).filter((m): m is string => !!m), ...nativeMimes(accept)])];
+  return { ...(multiple ? { allow_multiple: "true" } : {}), ...(mimes.length ? { mimetypes: mimes.join(",") } : {}) };
+}
+
 /** Google's OAuth page that ends in its own Drive picker (the window adds `state`). */
-export function onepickUrl(clientId: string, origin: string): string {
+export function onepickUrl(clientId: string, origin: string, tool: { multiple: boolean; accept: readonly string[] }): string {
   const u = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   u.searchParams.set("client_id", clientId);
   u.searchParams.set("response_type", "token");
@@ -39,18 +65,22 @@ export function onepickUrl(clientId: string, origin: string): string {
   // Google asks which files the app may open: that consent is the picker itself.
   u.searchParams.set("prompt", "consent");
   u.searchParams.set("trigger_onepick", "true");
+  for (const [k, v] of Object.entries(onepickParams(tool))) u.searchParams.set(k, v);
   return u.toString();
 }
 
 type Meta = { id: string; name?: string; mimeType?: string; size?: string };
 
-/** The picked IDs as rows: name, type and size come from files.get (drive.file covers picked files). */
+/**
+ * The picked IDs as rows: name, type and size come from files.get (drive.file covers picked files).
+ * `supportsAllDrives` lets a file picked from a shared drive be found (Drive's shared-drive guide).
+ */
 export async function pickedFiles(token: string, ids: string[], get: typeof fetch = fetch): Promise<Picked[]> {
   const auth = { Authorization: `Bearer ${token}` };
   const metas = await Promise.all(
     ids.map(async (id): Promise<Meta | null> => {
       try {
-        const r = await get(`${FILES}/${encodeURIComponent(id)}?fields=id,name,mimeType,size`, { headers: auth });
+        const r = await get(`${FILES}/${encodeURIComponent(id)}?fields=id,name,mimeType,size&supportsAllDrives=true`, { headers: auth });
         return r.ok ? ((await r.json()) as Meta) : null;
       } catch {
         return null;
@@ -74,7 +104,7 @@ export async function pickedFiles(token: string, ids: string[], get: typeof fetc
       id: fid,
       name,
       size: Number(d.size) || 0,
-      request: async () => ({ url: `${FILES}/${encodeURIComponent(id)}?alt=media`, headers: auth, name, type: d.mimeType, total: Number(d.size) || undefined }),
+      request: async () => ({ url: `${FILES}/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`, headers: auth, name, type: d.mimeType, total: Number(d.size) || undefined }),
     };
   });
 }
@@ -129,16 +159,15 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
     },
     pick: async () => {
       const r = onepick.take();
-      if (!r) {
-        ctx.leaving();
-        return onepick.start(onepickUrl(clientId, window.location.origin), "google");
-      }
-      if (r.kind === "empty") return "cancel";
-      if (r.kind === "denied") throw new CloudError("denied");
+      if (!r) return onepick.start(onepickUrl(clientId, window.location.origin, ctx.params), "google", () => ctx.leaving());
+      // Closing Google's picker comes back as `error=access_denied`, the same as declining its
+      // consent ([V] 26 Nov 2026), so both are a cancel: the window closes quietly (AC-142).
+      if (r.kind === "empty" || r.kind === "denied") return "cancel";
       // A state that isn't ours (or a broken response): its token is never used.
       if (r.kind !== "picked") throw new CloudError("unreachable");
       ctx.setPhase("connecting");
-      return pickedFiles(r.token, r.ids);
+      // A single-file tool asked for one file; anything extra is never looked up.
+      return pickedFiles(r.token, ctx.params.multiple ? r.ids : r.ids.slice(0, 1));
     },
     save: async (file, onProgress) => {
       const t = await getToken();

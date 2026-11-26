@@ -25,8 +25,6 @@ export type CloudEnv = {
   production?: boolean;
   dropboxAppKey?: string;
   googleClientId?: string;
-  googleApiKey?: string;
-  googleAppId?: string;
   onedriveClientId?: string;
 };
 
@@ -37,8 +35,6 @@ export function readCloudEnv(): CloudEnv {
     production: process.env.NODE_ENV === "production",
     dropboxAppKey: process.env.NEXT_PUBLIC_DROPBOX_APP_KEY,
     googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-    googleApiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
-    googleAppId: process.env.NEXT_PUBLIC_GOOGLE_APP_ID,
     onedriveClientId: process.env.NEXT_PUBLIC_ONEDRIVE_CLIENT_ID,
   };
 }
@@ -58,7 +54,7 @@ export function mockActive(env: CloudEnv = readCloudEnv()): boolean {
 
 function hasKeys(p: CloudProvider, env: CloudEnv): boolean {
   if (p === "dropbox") return set(env.dropboxAppKey);
-  if (p === "google") return set(env.googleClientId) && set(env.googleApiKey) && set(env.googleAppId);
+  if (p === "google") return set(env.googleClientId); // onepick needs only the OAuth client
   return set(env.onedriveClientId);
 }
 

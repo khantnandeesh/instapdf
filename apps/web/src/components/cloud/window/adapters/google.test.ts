@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { onepickUrl, pickedFiles } from "./google";
+import { onepickParams, onepickUrl, pickedFiles } from "./google";
 import { CloudError } from "./types";
 
 describe("onepickUrl", () => {
+  const PDF_MULTI = { multiple: true, accept: [".pdf"] };
+  const NATIVE = "application/vnd.google-apps.document,application/vnd.google-apps.spreadsheet,application/vnd.google-apps.presentation";
+
   it("asks Google for its own picker with drive.file only, back to the bare window URL", () => {
-    const u = new URL(onepickUrl("cid.apps.googleusercontent.com", "https://berrypdf.test"));
+    const u = new URL(onepickUrl("cid.apps.googleusercontent.com", "https://berrypdf.test", PDF_MULTI));
     expect(u.origin + u.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
     expect(Object.fromEntries(u.searchParams)).toEqual({
       client_id: "cid.apps.googleusercontent.com",
@@ -13,7 +16,24 @@ describe("onepickUrl", () => {
       redirect_uri: "https://berrypdf.test/cloud/google",
       prompt: "consent",
       trigger_onepick: "true",
+      allow_multiple: "true",
+      mimetypes: `application/pdf,${NATIVE}`,
     });
+  });
+
+  it("filters to the tool's types and allows several files only where the tool takes them", () => {
+    // Merge, Rotate…: several PDFs (and Google documents, exported as PDF).
+    expect(onepickParams(PDF_MULTI)).toEqual({ allow_multiple: "true", mimetypes: `application/pdf,${NATIVE}` });
+    // A single-file PDF tool (the editor, Split…): a single-select picker.
+    expect(onepickParams({ multiple: false, accept: [".pdf"] })).toEqual({ mimetypes: `application/pdf,${NATIVE}` });
+    // An image tool: image types only, no Google documents; .jpg and .jpeg share one type.
+    expect(onepickParams({ multiple: true, accept: [".jpg", ".jpeg", ".png", ".tif", ".tiff"] })).toEqual({
+      allow_multiple: "true",
+      mimetypes: "image/jpeg,image/png,image/tiff",
+    });
+    // An extension with no known type adds nothing (the window still checks names after the pick).
+    expect(onepickParams({ multiple: false, accept: [".xyz"] })).toEqual({});
+    expect(new URL(onepickUrl("c", "https://b.test", { multiple: false, accept: [".pdf"] })).searchParams.has("allow_multiple")).toBe(false);
   });
 });
 
@@ -31,12 +51,14 @@ describe("pickedFiles", () => {
     const [f, d, gone] = await pickedFiles("T0K", ["a1", "d1", "zz"], get);
     expect(f).toMatchObject({ id: "f1", name: "Report.pdf", size: 2048 });
     expect(await f!.request()).toEqual({
-      url: "https://www.googleapis.com/drive/v3/files/a1?alt=media",
+      url: "https://www.googleapis.com/drive/v3/files/a1?alt=media&supportsAllDrives=true",
       headers: { Authorization: "Bearer T0K" },
       name: "Report.pdf",
       type: "application/pdf",
       total: 2048,
     });
+    // Metadata is asked for with supportsAllDrives, so shared-drive files are found.
+    expect(vi.mocked(get).mock.calls.map(([u]) => String(u))).toContain("https://www.googleapis.com/drive/v3/files/a1?fields=id,name,mimeType,size&supportsAllDrives=true");
     // A Google document arrives exported as a PDF (AC-141).
     expect(d).toMatchObject({ id: "f2", name: "Plan.pdf", native: true });
     expect((await d!.request()).url).toBe("https://www.googleapis.com/drive/v3/files/d1/export?mimeType=application%2Fpdf");

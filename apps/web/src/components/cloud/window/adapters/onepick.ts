@@ -9,9 +9,12 @@
  * The round trip keeps only a random nonce and the window's own URL in sessionStorage. On return,
  * `takeReturn` runs before anything else: it puts the window's own URL back with
  * history.replaceState (no reload, so the hash and its token never stay in the address bar or
- * history), checks the nonce, and holds the response in this module's memory for the adapter.
+ * history; the app router has already copied the URL into memory, but nothing stores or sends it),
+ * checks the nonce, and holds the response in this module's memory for the adapter.
  * The mock provider uses the same code for its e2e round trip.
  */
+import { CloudError } from "./types";
+
 const KEY = "berrypdf:cloud-onepick";
 
 export type OnepickResult =
@@ -36,28 +39,41 @@ const read = (): Saved | null => {
 
 /**
  * Leaves for the provider with a fresh `state` (`route.nonce`). `url` is the provider's page (this
- * adds `state`), or a function building the URL from the state (the mock). Never resolves.
+ * adds `state`), or a function building the URL from the state (the mock). `leaving` runs just
+ * before the navigation. Never resolves. When the nonce can't be kept (site storage blocked), the
+ * return could never be checked, so the window stays and reports "unreachable" instead of sending
+ * the person through Google's pages for nothing.
  */
-export function start(url: string | ((state: string) => string), route: string): Promise<never> {
+export function start(url: string | ((state: string) => string), route: string, leaving?: () => void): Promise<never> {
   const nonce = crypto.randomUUID();
   const state = `${route}.${nonce}`;
+  const saved = JSON.stringify({ nonce, back: location.href } satisfies Saved);
   try {
-    sessionStorage.setItem(KEY, JSON.stringify({ nonce, back: location.href } satisfies Saved));
-  } catch {}
+    sessionStorage.setItem(KEY, saved);
+    if (sessionStorage.getItem(KEY) !== saved) throw new Error("not kept");
+  } catch {
+    throw new CloudError("unreachable");
+  }
   let to: string;
   if (typeof url === "string") {
     const u = new URL(url, location.href);
     u.searchParams.set("state", state);
     to = u.toString();
   } else to = url(state);
+  leaving?.();
   location.assign(to);
   return new Promise<never>(() => {});
 }
 
-/** The bare redirect URL carries a onepick response (or an error for one) for this route. */
+/**
+ * The URL's hash is (or looks like) a onepick response for this route: any access token, whatever
+ * its state (so a stray or forged token never stays in the address bar), or an error for this route.
+ * On /cloud/google every error is ours; the mock's other errors belong to its OneDrive-style sign-in.
+ */
 export function isReturn(hash: string, route: string): boolean {
   const p = new URLSearchParams(hash.replace(/^#/, ""));
-  return (p.get("state") ?? "").startsWith(`${route}.`) && (p.has("access_token") || p.has("error"));
+  if (p.has("access_token")) return true;
+  return p.has("error") && (route === "google" || (p.get("state") ?? "").startsWith(`${route}.`));
 }
 
 /**

@@ -65,6 +65,7 @@ export async function mockLog(page: Page) {
     requests: { provider: string; multiple: boolean; accept: string[]; mode: string }[];
     downloads: string[];
     saved: { provider: string; name: string; size: number; sha256: string }[];
+    onepick?: Record<string, string>[];
   } | null);
 }
 

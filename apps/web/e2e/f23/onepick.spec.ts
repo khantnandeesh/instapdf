@@ -5,6 +5,7 @@
  * hash (and its token) never stays in the address bar, and a state that isn't the window's is refused.
  */
 import { expect, test, type Page } from "@playwright/test";
+import { isPhoneToolbar, openMerge, pickMerge, showPages } from "../f3/support";
 import { closed, flow, mockLog, needsCloud, openRotate, openWindow, rowButton, tiles } from "./support";
 
 needsCloud();
@@ -36,6 +37,8 @@ test("several files picked in Google's picker arrive; the token never stays in t
   await closed(win);
   const log = (await mockLog(page))!;
   expect(log.downloads).toEqual(expect.arrayContaining(["alpha.pdf", "bravo.pdf"]));
+  // Google was asked for several files of the tool's types (google.ts onepickParams, AC-134/135).
+  expect(log.onepick!.at(-1)).toMatchObject({ allow_multiple: "true", mimetypes: expect.stringMatching(/^application\/pdf,/) });
   // …and nothing the tool tab can read holds the token.
   expect(JSON.stringify(log)).not.toContain("MOCK-TOKEN-F23");
 });
@@ -48,12 +51,28 @@ test("the window's own URL comes back at once, without the hash", async ({ page 
   await expect(flow(page)).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
 });
 
-test("Google says access was denied: our own 'Access wasn't given', nothing added", async ({ page }) => {
+test("the picker closed (Google answers access_denied): a quiet cancel, nothing added", async ({ page }) => {
+  // Google sends the same error for closing its picker as for declining consent, so both are a cancel (AC-142).
   const { win } = await onepick(page, "denied");
-  await expect(win.getByTestId("cloud-window")).toHaveAttribute("data-view", "denied", { timeout: 10_000 });
-  await expect(win.getByRole("heading", { name: "Access wasn't given" })).toBeVisible();
-  expect(new URL(win.url()).hash).toBe("");
+  await closed(win);
   await expect(tiles(page)).toHaveCount(0);
+  expect((await mockLog(page))!.downloads).toEqual([]);
+});
+
+test("a single-file pick asks Google for one file only, and only one arrives", async ({ page }) => {
+  await openMerge(page);
+  test.skip(isPhoneToolbar(page), "desktop Add pages menu; phones open the same window from the Add menu");
+  await pickMerge(page, "alpha.pdf");
+  await showPages(page);
+  await page.evaluate(([k, v, ko, vo]) => (localStorage.setItem(k, v), localStorage.setItem(ko, vo)), [REDIRECT, "onepick", OUTCOME, "bravo.pdf,echo.pdf"]);
+  await page.getByRole("button", { name: "Add pages", exact: true }).click();
+  const win = await openWindow(page, () => page.getByRole("menuitem", { name: /^Google Drive/ }).click());
+  await win.getByTestId("cloud-open").click();
+  await expect(page.getByRole("dialog")).toContainText("Add pages from bravo.pdf", { timeout: 15_000 });
+  const log = (await mockLog(page))!;
+  expect(log.onepick!.at(-1)).not.toHaveProperty("allow_multiple");
+  expect(log.onepick!.at(-1)!.mimetypes).toContain("application/pdf");
+  expect(log.downloads).not.toContain("echo.pdf");
 });
 
 test("a response whose state isn't this window's is refused and its token never used", async ({ page }) => {

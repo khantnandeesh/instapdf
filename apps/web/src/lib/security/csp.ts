@@ -109,17 +109,17 @@ export function cloudPolicy(route: CloudRouteName, { scriptHashes = [], dev = fa
 }
 
 /**
- * COOP of each cloud window. Dropbox and Google return results from a nested popup to this
- * window, which needs `same-origin-allow-popups` (research §2.1). OneDrive signs in by a full-page
- * redirect (MSAL `loginRedirect`, no popup, no redirect bridge page) and hosts the picker in an
- * iframe, so it keeps `same-origin`. The mock mirrors Google.
- */
-/**
  * Referrer-Policy of each cloud window that leaves for its provider by navigation: the Google
  * window's own URL carries its request, so its address goes nowhere (the base policy elsewhere).
  */
 export const CLOUD_REFERRER: Partial<Record<CloudRouteName, string>> = { google: "no-referrer", mock: "no-referrer" };
 
+/**
+ * COOP of each cloud window. Dropbox, and Google when saving (its sign-in popup), return results from a nested popup to this
+ * window, which needs `same-origin-allow-popups` (research §2.1). OneDrive signs in by a full-page
+ * redirect (MSAL `loginRedirect`, no popup, no redirect bridge page) and hosts the picker in an
+ * iframe, so it keeps `same-origin`. The mock mirrors Google.
+ */
 export const CLOUD_COOP: Record<CloudRouteName, string> = {
   dropbox: "same-origin-allow-popups",
   google: "same-origin-allow-popups",
