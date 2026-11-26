@@ -186,14 +186,14 @@ test("AC-501: one file shows the view toggle; the files view shows one card with
 });
 
 // Lead decision (integration): a card ends where a file's page numbers go backwards (segmentsOf).
-test("AC-501: after moving A12 to the front the files view shows 2 cards (page 12; pages 1–11)", async ({ page }) => {
+test("AC-501: after moving A12 to the front the files view shows 2 cards (page 12 of 12; pages 1–11 of 12)", async ({ page }) => {
   await pickF5(page, "twelve.pdf");
   await tileAction(page, "A12", "Move to position…");
   await page.getByRole("dialog").getByRole("spinbutton").or(page.getByRole("dialog").getByRole("textbox")).first().fill("1");
   await page.getByRole("dialog").getByRole("button", { name: "Move", exact: true }).click();
   await showFiles(page);
   await expect(page.getByTestId("file-card")).toHaveCount(2);
-  await expect(page.getByTestId("file-meta")).toHaveText(["Page 12 of 12", "Pages 1–11 of 12"]);
+  await expect(page.getByTestId("file-meta")).toHaveText(["page 12 of 12", "pages 1–11 of 12"]);
   // Back at the end, the file is one card again.
   await page.getByRole("radio", { name: "Pages", exact: true }).click();
   await tileAction(page, "A12", "Move to position…");
