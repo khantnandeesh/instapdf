@@ -66,7 +66,7 @@ test("AC-513: its own h1, title, description and canonical", async ({ page }) =>
   expect(new URL((await page.locator('link[rel="canonical"]').getAttribute("href"))!).pathname).toBe("/combine-reorder-pdf");
 });
 
-test("I-10: Combine & reorder has Undo│Redo in the bar; Merge keeps its single undo (F3 AC-79)", async ({ page }) => {
+test("I-10: Combine & reorder and Merge have Undo│Redo in the bar", async ({ page }) => {
   await open(page, "combine-reorder-pdf");
   await pickF5(page, "alpha.pdf", "bravo.pdf");
   await tileMain(page, "B2").focus();
@@ -84,5 +84,13 @@ test("I-10: Combine & reorder has Undo│Redo in the bar; Merge keeps its single
   await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
   await pickF5(page, "alpha.pdf", "bravo.pdf");
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
-  await expect(page.getByTestId("history")).toHaveCount(0);
+  await expect(page.getByTestId("history")).toBeVisible();
+  await page.getByRole("radio", { name: "Pages", exact: true }).click();
+  await tileMain(page, "B2").focus();
+  await page.keyboard.press("Alt+Home");
+  expect((await tileLabels(page))[0]).toBe("B2");
+  await undoButton(page).click();
+  expect(await tileLabels(page)).toEqual(["A1", "A2", "A3", "B1", "B2"]);
+  await redoButton(page).click();
+  expect((await tileLabels(page))[0]).toBe("B2");
 });

@@ -7,11 +7,11 @@ import { useRouter } from "next/navigation";
 import { cloneElement, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { setHandoff, takeHandoff } from "@/lib/pdf/handoff";
 import { openPdf, readPageSizes, type OpenedPdf } from "@/lib/pdf/pdfjs";
-import { ThumbnailRenderer } from "@/lib/pdf/thumbnails";
+import { LazyThumbnails } from "@/lib/pdf/thumbs-lazy";
 import { USER_ERROR } from "@/lib/pdf/user-error";
 import { disposeWorker } from "@/lib/pdf/worker-client";
 import { acceptAttribute, fitsPageBudget, screenFiles } from "@/lib/pdf/validation";
-import { exceedsPixelCap, imageFormatOfName, imagePageSize, probeImage, sniffFormat } from "@/lib/pdf/images";
+import { imageFormatOfName } from "@/lib/pdf/image-names";
 import { continueTargets, type FlowTool } from "@/tools/registry";
 import { Button } from "../ui/Button";
 import { BerryLoader } from "../berry/Berry";
@@ -52,6 +52,9 @@ const lazyParts = {
   // Only needed once files are in (the leave prompt, the options sheet): out of the first load.
   leave: () => import("./LeaveGuard"),
   dialog: () => import("../ui/Dialog"),
+  // The thumbnail renderer (LazyThumbnails fetches the same chunk) and the picture header helpers.
+  thumbs: () => import("@/lib/pdf/thumbnails"),
+  images: () => import("@/lib/pdf/images"),
 };
 const loadLazyParts = () => void Promise.all(Object.values(lazyParts).map((load) => load())).catch(() => {});
 const PageGrid = dynamic(() => lazyParts.pageGrid().then((m) => m.PageGrid), { ssr: false });
@@ -244,7 +247,8 @@ export function ToolFlow({
 
   // pdf.js documents (kept outside React state) and the thumbnail renderer.
   const docs = useRef(new Map<string, OpenedPdf>());
-  const renderer = useMemo(() => (typeof window === "undefined" ? null : new ThumbnailRenderer()), []);
+  // Fetched with the first file (or on intent), never in the tool's first load.
+  const renderer = useMemo(() => (typeof window === "undefined" ? null : new LazyThumbnails()), []);
   const [watcher, setWatcher] = useState<ReturnType<typeof createVisibilityWatcher> | null>(null);
   // The parts needed once a file is in: fetched at the first sign of intent (the file chooser or
   // the drag hides the load), when files arrive without one (a hand-off), or after 4 s (intent.ts).
@@ -382,6 +386,7 @@ export function ToolFlow({
       }
       if (imageFormatOfName(entry.name)) {
         // Pictures (Merge): sizes from the header, no decode; each image (or TIFF frame) is one A4 page.
+        const { exceedsPixelCap, imagePageSize, probeImage, sniffFormat } = await import("@/lib/pdf/images");
         const format = sniffFormat(bytes);
         let frames: { width: number; height: number }[] | null = null;
         let tooLarge = false;

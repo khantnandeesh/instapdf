@@ -9,7 +9,7 @@ import { mergedName } from "@/lib/pdf/naming";
 import { flowTool } from "@/tools/registry";
 import { mergeCopy as c } from "./copy";
 import { MergeOptions } from "./MergeOptions";
-import type { FullHistory } from "./full-history";
+import { fullHistory } from "./full-history";
 import { MenuButton, SortGlyph, toolbarButton, usePageWorkspace } from "./workspace";
 import { AddMenus, EditorDialogs, EditWorkspace, usePrefetchEditing } from "./editing";
 
@@ -17,13 +17,13 @@ import { AddMenus, EditorDialogs, EditWorkspace, usePrefetchEditing } from "./ed
 export type MergeSlug = "merge-pdf" | "combine-reorder-pdf";
 
 /**
- * Merge, and Combine & reorder (the same tool opening in the pages view, with full undo / redo,
- * spec F4/F5 §3f, I-10). Both remember their options in the same place (`berrypdf:merge-options`).
+ * Merge, and Combine & reorder (the same tool opening in the pages view, spec F4/F5 §3f). Both
+ * have full undo / redo (I-10, AC-549, AC-550; F3 AC-79's undo notice stays) and remember their
+ * options in the same place (`berrypdf:merge-options`).
  */
-export function MergeTool({ slug = "merge-pdf", history }: { slug?: MergeSlug; history?: FullHistory }) {
+export function MergeTool({ slug = "merge-pdf" }: { slug?: MergeSlug }) {
   const tool = flowTool(slug);
-  // Merge keeps F3's single undo (its specs assert it); CombineTool passes the full history.
-  const ws = usePageWorkspace({ tool, history });
+  const ws = usePageWorkspace({ tool, history: fullHistory });
   usePrefetchEditing();
   const [options, setOptions] = useState<Options>(defaultMergeOptions);
 

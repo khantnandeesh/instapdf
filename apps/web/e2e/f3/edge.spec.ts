@@ -223,15 +223,20 @@ test.describe("undo", () => {
     expect(await words(out.bytes)).toEqual(["Alpha 1", "Alpha 2", "Alpha 3", "Echo 1", "Bravo 1", "Bravo 2"]);
   });
 
-  test("AC-79: undo is single level: two removals, Undo brings back only the last one", async ({ page }) => {
+  test("AC-79, AC-549: two removals: the notice undoes the last one, Ctrl+Z then the first (full history, I-10)", async ({ page }) => {
     await pickMerge(page, "alpha.pdf", "bravo.pdf", "echo.pdf");
     await cardAction(page, "alpha.pdf", "Remove");
     await cardAction(page, "echo.pdf", "Remove");
+    // The newer remove replaces the notice (one notice at a time).
     await expect(notice(page, "Removed alpha.pdf.")).toHaveCount(0);
     await notice(page, "Removed echo.pdf.").getByRole("button", { name: "Undo" }).click();
     expect(await cardNames(page)).toEqual(["bravo.pdf", "echo.pdf"]);
-    await expect(page.getByRole("button", { name: "Undo" })).toHaveCount(0);
-    await page.keyboard.press("ControlOrMeta+z"); // nothing left to undo
+    await expect(notice(page, "Removed echo.pdf.")).toHaveCount(0);
+    // The history goes one step further back: alpha.pdf returns at position 1.
+    await page.getByTestId("history").getByRole("button", { name: "Undo" }).click();
+    expect(await cardNames(page)).toEqual(["alpha.pdf", "bravo.pdf", "echo.pdf"]);
+    // Redo replays the first removal.
+    await page.keyboard.press("ControlOrMeta+Shift+z");
     expect(await cardNames(page)).toEqual(["bravo.pdf", "echo.pdf"]);
     const out = await runAndDownload(page);
     expect(await words(out.bytes)).toEqual(["Bravo 1", "Bravo 2", "Echo 1"]);

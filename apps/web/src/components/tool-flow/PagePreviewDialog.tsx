@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ThumbnailRenderer } from "@/lib/pdf/thumbnails";
+import type { Thumbs } from "@/lib/pdf/thumbs-lazy";
 import { Dialog } from "../ui/Dialog";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "../ui/icons";
 import { fitPage, keyTarget, neighbours, readGesture, renderSize, type Size } from "./preview-fit";
@@ -34,7 +34,7 @@ export function PagePreviewDialog({
   fallbackFocus,
 }: {
   target: PreviewTarget | null;
-  renderer: ThumbnailRenderer | null;
+  renderer: Thumbs | null;
   onNavigate: (at: number) => void;
   onClose: () => void;
   fallbackFocus: () => HTMLElement | null;

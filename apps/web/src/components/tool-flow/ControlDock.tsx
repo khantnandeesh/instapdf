@@ -64,8 +64,8 @@ export function ControlDock({
   density?: "compact" | "full";
   sheet?: { title: string; badge?: string; footer: (close: () => void) => ReactNode };
   /**
-   * Bar layout only: controls after the options and before the status (F5 Undo│Redo, spec F4/F5
-   * P-3). On phones they share the options row, or the primary's row when there are no options.
+   * Bar layout: controls after the options and before the status (F5 Undo│Redo, spec F4/F5 P-3).
+   * Below 640 px they share the options row, or the primary's row when there are no options.
    */
   start?: ReactNode;
   /**
@@ -82,12 +82,9 @@ export function ControlDock({
   const side = layout === "side";
   // "full" density: inline options only in the side panel from 1024 px (the SSR render keeps them,
   // hidden below lg by CSS); everywhere else an Options button opens the same options in a sheet.
-  const hasOptions = options != null && options !== false;
-  const inline = hasOptions && (!full || (side && desktop !== false));
+  const inline = options != null && options !== false && (!full || (side && desktop !== false));
   const sheetMode = full && (!side || desktop !== true);
-  const lead = !side && start != null;
-  // One row on phones too: no options, only Undo│Redo beside the primary (Organize, spec P-3).
-  const oneRow = lead && !hasOptions && !full;
+  const noOptions = !inline && !sheetMode;
   useEffect(() => {
     if (side && desktop) setSheetOpen(false);
   }, [desktop, side]);
@@ -127,75 +124,61 @@ export function ControlDock({
     >
       <div
         className={[
-          oneRow ? "flex flex-row items-center gap-2 sm:gap-4" : "flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4",
-          more ? "max-sm:flex-row max-sm:flex-wrap max-sm:items-center max-sm:[&>[data-testid=dock-options]]:basis-full" : "",
+          "flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4",
+          more || start ? "max-sm:flex-row max-sm:flex-wrap max-sm:items-center" : "",
+          more ? "max-sm:[&>[data-testid=dock-options]]:basis-full" : "",
           side ? "lg:flex-1 lg:flex-col lg:items-stretch" : "lg:mx-auto lg:max-w-[1216px] lg:gap-8",
         ].join(" ")}
       >
-        {(() => {
-          const optionEls = (
-            <>
-              {inline &&
-                (full ? (
-                  // Side panel only (hidden below lg). Full height, no inner scroller (design rule "One scroller").
-                  <fieldset disabled={optionsDisabled} className="min-w-0 max-lg:hidden" data-testid="dock-options">
-                    <legend className="sr-only">{label}</legend>
-                    <h2 className="sr-only">Options</h2>
-                    {options}
-                  </fieldset>
-                ) : (
-                  <fieldset disabled={optionsDisabled} className={lead ? "min-w-0 flex-1" : "min-w-0 sm:flex-1"} data-testid="dock-options">
-                    <legend className="sr-only">{label}</legend>
-                    {/* No visible title (minimal text); kept for heading navigation. */}
-                    <h2 className="sr-only">Options</h2>
-                    {options}
-                  </fieldset>
-                ))}
-              {sheetMode && (
-                <Button
-                  ref={optionsButton}
-                  variant="secondary"
-                  className={side ? "sm:flex-1 lg:hidden" : lead ? "min-w-0 flex-1 lg:flex-none" : "sm:flex-1 lg:flex-none"}
-                  aria-haspopup="dialog"
-                  aria-expanded={sheetOpen}
-                  aria-label={sheet?.badge ? `Options, ${sheet.badge}` : "Options"}
-                  onClick={() => setSheetOpen(true)}
-                  data-testid="options-button"
-                  iconStart={
-                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-                      <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
-                      <circle cx="16" cy="7" r="2" fill="currentColor" fillOpacity={0.2} />
-                      <circle cx="10" cy="17" r="2" fill="currentColor" fillOpacity={0.2} />
-                    </svg>
-                  }
-                >
-                  Options
-                  <span className="inline-flex min-w-[84px] justify-start" aria-hidden="true">
-                    {sheet?.badge && <span className="mp-tag mp-tag--sm">{sheet.badge}</span>}
-                  </span>
-                </Button>
-              )}
-            </>
-          );
-          if (!lead) return optionEls;
-          const startEl = (
-            <div className="flex shrink-0 items-center" data-testid="dock-start">
-              {start}
-            </div>
-          );
-          // Phones: [options · start] over the primary, or [start · primary] in one row (oneRow).
-          return oneRow ? (
-            <>
-              {startEl}
-              <span aria-hidden="true" className="hidden sm:block sm:flex-1" />
-            </>
+        {inline &&
+          (full ? (
+            // Side panel only (hidden below lg). Full height, no inner scroller (design rule "One scroller").
+            <fieldset disabled={optionsDisabled} className="min-w-0 max-lg:hidden" data-testid="dock-options">
+              <legend className="sr-only">{label}</legend>
+              <h2 className="sr-only">Options</h2>
+              {options}
+            </fieldset>
           ) : (
-            <div className="flex min-w-0 items-center gap-2 sm:contents">
-              {optionEls}
-              {startEl}
-            </div>
-          );
-        })()}
+            <fieldset
+              disabled={optionsDisabled}
+              className={start ? "min-w-0 flex-1" : "min-w-0 sm:flex-1"}
+              data-testid="dock-options"
+            >
+              <legend className="sr-only">{label}</legend>
+              {/* No visible title (minimal text); kept for heading navigation. */}
+              <h2 className="sr-only">Options</h2>
+              {options}
+            </fieldset>
+          ))}
+        {sheetMode && (
+          <Button
+            ref={optionsButton}
+            variant="secondary"
+            className={side ? "sm:flex-1 lg:hidden" : start ? "min-w-0 flex-1 lg:flex-none" : "sm:flex-1 lg:flex-none"}
+            aria-haspopup="dialog"
+            aria-expanded={sheetOpen}
+            aria-label={sheet?.badge ? `Options, ${sheet.badge}` : "Options"}
+            onClick={() => setSheetOpen(true)}
+            data-testid="options-button"
+            iconStart={
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+                <circle cx="16" cy="7" r="2" fill="currentColor" fillOpacity={0.2} />
+                <circle cx="10" cy="17" r="2" fill="currentColor" fillOpacity={0.2} />
+              </svg>
+            }
+          >
+            Options
+            <span className="inline-flex min-w-[84px] justify-start" aria-hidden="true">
+              {sheet?.badge && <span className="mp-tag mp-tag--sm">{sheet.badge}</span>}
+            </span>
+          </Button>
+        )}
+        {start && (
+          <div className="flex shrink-0 items-center" data-testid="dock-start">
+            {start}
+          </div>
+        )}
         {more && (
           <div className={["flex shrink-0 items-center", side ? "lg:self-start" : ""].join(" ")} data-testid="dock-more">
             {more}
@@ -205,7 +188,9 @@ export function ControlDock({
         <div
           className={[
             "flex shrink-0 flex-col gap-2 sm:min-w-[200px]",
-            oneRow || more ? "max-sm:min-w-0 max-sm:flex-1" : !side && !hasOptions && !full && !lead ? "sm:ms-auto" : "",
+            // Below 640 px: beside More options or a lone Undo│Redo; under the options row when Undo│Redo shares it.
+            more || (start && noOptions) ? "max-sm:min-w-0 max-sm:flex-1" : start ? "max-sm:basis-full" : "",
+            !side && noOptions ? "sm:ms-auto" : "",
             side
               ? // Side panel: pinned to the bottom of the screen while the options run past the fold (sticky, so
                 // the page stays the only scroller), resting at the panel's bottom once they end. It covers the

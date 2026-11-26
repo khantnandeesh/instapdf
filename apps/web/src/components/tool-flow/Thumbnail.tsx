@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import type { ThumbnailRenderer } from "@/lib/pdf/thumbnails";
+import type { Thumbs } from "@/lib/pdf/thumbs-lazy";
 import { cx } from "../ui/cx";
 
 type Watch = (el: Element, onChange: (near: boolean, far: boolean, top: number) => void) => () => void;
@@ -55,7 +55,7 @@ export function createVisibilityWatcher(root: Element | null = null): { watch: W
   };
 }
 
-export const ThumbContext = createContext<{ renderer: ThumbnailRenderer | null; watch: Watch | null; renderSize: number }>({
+export const ThumbContext = createContext<{ renderer: Thumbs | null; watch: Watch | null; renderSize: number }>({
   renderer: null,
   watch: null,
   renderSize: 160,
