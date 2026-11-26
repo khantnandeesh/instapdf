@@ -8,10 +8,10 @@ import type { Picked } from "./adapters/types";
 export type MockChoice = Picked[] | "cancel" | "denied" | "unreachable";
 
 /** Fixtures the mock can return (tests/fixtures, served by /cloud-mock/<name>). Sizes are reported by the server. */
-const FIXTURES = ["alpha.pdf", "bravo.pdf", "echo.pdf", "charlie.png", "notes.txt", "user-pw.pdf", "corrupt.pdf", "three-pages.pdf"];
+export const FIXTURES = ["alpha.pdf", "bravo.pdf", "echo.pdf", "charlie.png", "notes.txt", "user-pw.pdf", "corrupt.pdf", "three-pages.pdf"];
 const MB = 1024 * 1024;
 
-function item(id: string, fixture: string, opts: { as?: string; slow?: boolean; fail?: boolean; size?: number; status?: number; reason?: string; native?: boolean } = {}): Picked {
+export function item(id: string, fixture: string, opts: { as?: string; slow?: boolean; fail?: boolean; size?: number; status?: number; reason?: string; native?: boolean } = {}): Picked {
   // A "Google document" arrives as an exported PDF, like the real Drive adapter (AC-141).
   const name = opts.native ? exportName(opts.as ?? fixture) : (opts.as ?? fixture);
   return {

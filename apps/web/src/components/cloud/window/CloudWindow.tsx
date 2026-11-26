@@ -14,6 +14,7 @@ import { WindowLink } from "@/lib/cloud/window-link";
 import { transferCopy } from "../transfer-copy";
 import { ProviderArt } from "../marks";
 import { MockPicker, type MockChoice } from "./MockPicker";
+import * as onepick from "./adapters/onepick";
 import * as dropbox from "./adapters/dropbox";
 import * as google from "./adapters/google";
 import * as onedrive from "./adapters/onedrive";
@@ -30,6 +31,8 @@ type View =
   | { k: "frame"; spec: FrameSpec; title: string }
   | { k: "rows" }
   | { k: "done" }
+  /** Cancelled, but the browser kept the window open (window.close() refused): say it can be closed. */
+  | { k: "closed" }
   | { k: "denied" }
   | { k: "unreachable" }
   | { k: "lost" }
@@ -106,7 +109,13 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
     link.current?.cancel();
     finished.current = true;
     window.close();
-    setTimeout(() => setCanClose(true), 300);
+    setTimeout(() => {
+      setCanClose(true);
+      // Still here (the browser refused to close it, e.g. after a round trip to the provider): never
+      // leave a spinner or a dead button behind.
+      const k = viewRef.current.k;
+      if (k !== "done" && k !== "saved") setView({ k: "closed" });
+    }, 300);
   }, []);
 
   // ---- downloads ---------------------------------------------------------------------------------
@@ -270,6 +279,12 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
     try {
       window.opener = null;
     } catch {}
+    // Back from Google's top-level picker on the bare redirect URL: the window's own URL comes back
+    // (replaceState, no reload) and the hash with its token is gone before anything reads it.
+    if ((route === "google" || route === "mock") && onepick.isReturn(window.location.hash, route) && !onepick.takeReturn(route)) {
+      setView({ k: "invalid" });
+      return;
+    }
     if ((route === "onedrive" || route === "mock") && isSignInResponse(window.location.hash, window.location.search)) {
       // Back from a full-page sign-in on the bare redirect URL: hand the response over and return to
       // the window's own URL (with its request), where the adapter finishes the sign-in.
@@ -389,7 +404,7 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
   // Focus: the berry button on arrival (an Enter press is the gesture the SDK needs), the h1 when done.
   useEffect(() => {
     if (view.k === "before" && ready) primary.current?.focus();
-    else if (view.k === "done" || view.k === "saved" || view.k === "lost" || view.k === "denied" || view.k === "unreachable") heading.current?.focus();
+    else if (view.k === "done" || view.k === "saved" || view.k === "closed" || view.k === "lost" || view.k === "denied" || view.k === "unreachable") heading.current?.focus();
   }, [view.k, ready]);
 
   // A form-POSTed picker (OneDrive v8) is submitted once its iframe exists.
@@ -526,6 +541,15 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
           </span>
           {h1(windowCopy.addedTo(params?.tool ?? "BerryPDF"))}
           <p className="ip-cw__text">{canClose ? windowCopy.canClose : windowCopy.closesItself}</p>
+        </>
+      );
+      break;
+    case "closed":
+      body = (
+        <>
+          {mark}
+          {h1(name)}
+          <p className="ip-cw__text">{windowCopy.canClose}</p>
         </>
       );
       break;
