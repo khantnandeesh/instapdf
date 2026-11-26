@@ -60,7 +60,8 @@ async function openFirstPagePreview(page: Page) {
   if (await pageButton.count()) return pageButton.first().click();
   const card = page.getByTestId("card-main").first();
   if (await card.isVisible()) return card.click();
-  const tile = page.getByTestId("page-tile").first();
+  // The whole tile: below 1024 px its More button sits in the row under the page (PT-1 rule 6).
+  const tile = page.locator("[data-uid]").first();
   await tile.hover();
   await tile.getByTestId("tile-more").click();
   await page.getByRole("menuitem", { name: "Enlarge" }).click();

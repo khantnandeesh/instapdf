@@ -3,7 +3,7 @@ import "./page-edit.css";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { flip } from "@/lib/motion/flow";
-import { pageBoxStyle } from "@/components/tool-flow/PageTile";
+import { pageBoxStyle, pageTransform } from "@/components/tool-flow/page-box";
 import { PageThumb } from "@/components/tool-flow/Thumbnail";
 import { Button } from "@/components/ui/Button";
 import { cx } from "@/components/ui/cx";
@@ -12,6 +12,7 @@ import { CheckIcon, FileIcon, LockIcon, PlusIcon, RotateLeftIcon, RotateRightIco
 import { MenuButton, type MenuButtonHandle, type MenuEntry } from "@/components/ui/Menu";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatDelta } from "@/lib/pdf/rotation";
+import { rowSlots, useTileRow } from "@/components/tool-flow/useTileRow";
 import type { MoveStep, PageSize } from "@/lib/page-list";
 import { editCopy as c } from "@/tools/merge/copy-edit";
 import { gridColumns, loadDrag, moveStepFor, navTarget, useSettled } from "./grid-keys";
@@ -59,6 +60,8 @@ export type PageGridLabels = {
   pagesHere: string;
   blankHere: string;
   rotateLeft: string;
+  rotateRight: string;
+  remove: string;
   duplicate: (n: number) => string;
   moveTo: (n: number) => string;
   moveEarlier: string;
@@ -93,6 +96,8 @@ export const pageLabels: PageGridLabels = {
   pagesHere: c.pagesHere,
   blankHere: c.blankHere,
   rotateLeft: c.rotateLeftItem,
+  rotateRight: c.rotateRightItem,
+  remove: c.removeItem,
   duplicate: c.duplicate,
   moveTo: c.moveTo,
   moveEarlier: c.moveEarlierItem,
@@ -167,7 +172,9 @@ export default function EditablePageGrid({
   const settled = useSettled();
   const menus = useRef(new Map<string, MenuButtonHandle | null>());
   const active = Math.max(0, tiles.findIndex((t) => t.uid === activeUid));
-  const narrow = useNarrow();
+  // Below 1024 px the controls sit in a row under the page (PT-1 rule 6): as many as fit, the rest in More.
+  const { compact, width } = useTileRow(list);
+  const rowActions = (["rotate-right", "remove", "rotate-left"] as const).slice(0, compact ? Math.max(0, rowSlots(width + 8) - 1) : 3);
 
   const focusTile = (i: number) => {
     const t = tiles[Math.max(0, Math.min(tiles.length - 1, i))];
@@ -267,7 +274,9 @@ export default function EditablePageGrid({
     <span
       data-no-drag=""
       className={cx(
-        "absolute top-1/2 z-10 -translate-y-1/2",
+        "absolute z-10",
+        // In the gap, level with the page's middle; below 1024 px level with the label line under the page.
+        compact ? "bottom-[76px] translate-y-1/2" : "top-[calc(var(--ip-tile-pad)+var(--ip-thumb-size)*0.7071)] -translate-y-1/2",
         side === "start" ? "-left-1.5 -translate-x-1/2 sm:-left-2" : "-right-1.5 translate-x-1/2 sm:-right-2",
       )}
     >
@@ -307,7 +316,7 @@ export default function EditablePageGrid({
         aria-describedby="ip-pages-hint"
         data-settled={settled || undefined}
         className={cx(
-          "mp-rise-tiles grid grid-cols-2 gap-3 px-2 sm:grid-cols-[repeat(auto-fill,calc(var(--ip-thumb-size)+32px))] sm:gap-5",
+          "mp-rise-tiles ip-tile-grid px-2 max-lg:px-3",
           dimmed && "opacity-60 transition-opacity duration-(--dur-base)",
         )}
         data-testid="page-grid"
@@ -318,7 +327,9 @@ export default function EditablePageGrid({
           const badge = formatDelta(t.rotation);
           const count = t.selected ? selectionCount : 1;
           const moreItems: MenuEntry[] = [
-            ...(narrow ? [{ id: "rotate-left", label: labels.rotateLeft, onSelect: () => onAction(t.uid, "rotate-left", null) }] : []),
+            ...(["rotate-right", "remove", "rotate-left"] as const)
+              .filter((a) => !rowActions.includes(a))
+              .map((a) => ({ id: a, label: a === "remove" ? labels.remove : a === "rotate-left" ? labels.rotateLeft : labels.rotateRight, onSelect: () => onAction(t.uid, a, null) })),
             { id: "duplicate", label: labels.duplicate(count), onSelect: () => onAction(t.uid, "duplicate", null) },
             { id: "move-to", label: labels.moveTo(count), onSelect: () => onAction(t.uid, "move-to", null) },
             { id: "move-earlier", label: labels.moveEarlier, disabled: i === 0, onSelect: () => onAction(t.uid, "move-earlier", null) },
@@ -330,15 +341,62 @@ export default function EditablePageGrid({
             { separator: true },
             { id: "enlarge", label: labels.enlarge, disabled: t.blank, onSelect: () => onAction(t.uid, "enlarge", null) },
           ];
+          const actionButton = (a: "rotate-left" | "rotate-right" | "remove") => (
+            <IconButton
+              key={a}
+              label={a === "remove" ? labels.removeTile(t.label) : a === "rotate-left" ? labels.rotateTileLeft(t.label) : labels.rotateTileRight(t.label)}
+              variant="soft"
+              tabIndex={tab}
+              className="max-lg:size-11"
+              icon={
+                a === "rotate-left" ? (
+                  <RotateLeftIcon size={16} />
+                ) : a === "rotate-right" ? (
+                  <RotateRightIcon size={16} />
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                  </svg>
+                )
+              }
+              onClick={(e) => onAction(t.uid, a, e.currentTarget)}
+            />
+          );
+          const more = (
+            <MenuButton
+              ref={(h) => {
+                menus.current.set(t.uid, h);
+              }}
+              label={labels.more(t.label)}
+              items={moreItems}
+              placement="bottom-end"
+              tabIndex={tab}
+              className="mp-iconbtn relative before:absolute before:size-11 before:content-[''] max-lg:size-11"
+              data-testid="tile-more"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+                <circle cx="5" cy="12" r="1.75" />
+                <circle cx="12" cy="12" r="1.75" />
+                <circle cx="19" cy="12" r="1.75" />
+              </svg>
+            </MenuButton>
+          );
+          const selectMark = t.selected ? (
+            <span className="mp-tick-in grid size-[22px] place-items-center rounded-full bg-leaf text-white ring-2 ring-white">
+              <CheckIcon size={14} />
+            </span>
+          ) : (
+            <span className="size-[22px] rounded-full border-[1.5px] border-field-line bg-surface-raised shadow-menu" />
+          );
           return (
-            // BerryPDF PagePreview tray: the page on a pink tray, its label below in Fredoka; a selected page gets the berry ring and a leaf tick.
-            <div key={t.uid} role="listitem" className="group/tile mp-tray relative flex min-w-0 flex-col items-center gap-2 max-sm:p-2" data-selected={t.selected || undefined} data-uid={t.uid} data-flip>
+            // Page tile (berrypdf.md "Page tiles"): the page fills the tile, its label below in Fredoka; a selected page gets the berry outline and a leaf tick.
+            <div key={t.uid} role="listitem" className="group/tile ip-tile relative flex min-w-0 flex-col items-center gap-1.5" data-selected={t.selected || undefined} data-uid={t.uid} data-flip>
               {i === 0 && insertPoint(0, labels.insertStart, tab, "start")}
               <div
                 data-tile-box=""
                 onPointerDown={(e) => onPointerDown(e, t)}
                 className={cx(
-                  "ip-no-callout relative grid aspect-square w-(--ip-thumb-size) touch-pan-y place-items-center rounded-[10px] max-sm:w-full",
+                  "ip-no-callout ip-tile__box relative grid touch-pan-y place-items-center rounded-[10px]",
                   "transition-opacity duration-(--dur-base)",
                   dragging.has(t.uid) && "opacity-40 outline-2 outline-offset-2 outline-brand outline-dashed",
                 )}
@@ -348,7 +406,7 @@ export default function EditablePageGrid({
               >
                 <span
                   className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
-                  style={{ ...pageBoxStyle(t.size), transform: `rotate(${t.rotation}deg)` }}
+                  style={{ ...pageBoxStyle(t.size), transform: pageTransform(t.size, t.rotation) }}
                 >
                   {t.blank ? (
                     <span className="absolute inset-2 flex flex-col items-center justify-center gap-1 rounded-sm border-[1.5px] border-dashed border-brand-tint-border text-help text-on-paper-muted">
@@ -378,7 +436,7 @@ export default function EditablePageGrid({
                     onSelect(t.uid, { toggle: e.ctrlKey || e.metaKey, range: e.shiftKey });
                   }}
                   onKeyDown={(e) => onKeyDown(e, i)}
-                  className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-3"
+                  className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-1"
                   data-testid="tile-main"
                 />
                 {badge && (
@@ -386,7 +444,7 @@ export default function EditablePageGrid({
                     {badge}
                   </span>
                 )}
-                {t.status === "ready" && (
+                {t.status === "ready" && !compact && (
                   <span
                     aria-hidden="true"
                     data-no-drag=""
@@ -396,16 +454,10 @@ export default function EditablePageGrid({
                       !t.selected && "opacity-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100",
                     )}
                   >
-                    {t.selected ? (
-                      <span className="mp-tick-in grid size-[22px] place-items-center rounded-full bg-leaf text-white ring-2 ring-white">
-                        <CheckIcon size={14} />
-                      </span>
-                    ) : (
-                      <span className="size-[22px] rounded-full border-[1.5px] border-field-line bg-surface-raised shadow-menu" />
-                    )}
+                    {selectMark}
                   </span>
                 )}
-                {t.status === "ready" && !dimmed && (
+                {t.status === "ready" && !dimmed && !compact && (
                   <div
                     data-no-drag=""
                     className={cx(
@@ -413,43 +465,49 @@ export default function EditablePageGrid({
                       "opacity-0 transition-opacity duration-(--dur-base) group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 has-[[aria-expanded=true]]:opacity-100 [@media(hover:none)]:opacity-100",
                     )}
                   >
-                    {!narrow && <IconButton label={labels.rotateTileLeft(t.label)} variant="soft" tabIndex={tab} className="max-lg:size-11" icon={<RotateLeftIcon size={16} />} onClick={(e) => onAction(t.uid, "rotate-left", e.currentTarget)} />}
-                    <IconButton label={labels.rotateTileRight(t.label)} variant="soft" tabIndex={tab} className="max-lg:size-11" icon={<RotateRightIcon size={16} />} onClick={(e) => onAction(t.uid, "rotate-right", e.currentTarget)} />
-                    <IconButton
-                      label={labels.removeTile(t.label)}
-                      variant="soft"
-                      tabIndex={tab}
-                      className="max-lg:size-11"
-                      icon={
-                        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
-                        </svg>
-                      }
-                      onClick={(e) => onAction(t.uid, "remove", e.currentTarget)}
-                    />
-                    <MenuButton
-                      ref={(h) => {
-                        menus.current.set(t.uid, h);
-                      }}
-                      label={labels.more(t.label)}
-                      items={moreItems}
-                      placement="bottom-end"
-                      tabIndex={tab}
-                      className="mp-iconbtn relative before:absolute before:size-11 before:content-[''] max-lg:size-11"
-                      data-testid="tile-more"
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-                        <circle cx="5" cy="12" r="1.75" />
-                        <circle cx="12" cy="12" r="1.75" />
-                        <circle cx="19" cy="12" r="1.75" />
-                      </svg>
-                    </MenuButton>
+                    {actionButton("rotate-left")}
+                    {actionButton("rotate-right")}
+                    {actionButton("remove")}
+                    {more}
                   </div>
                 )}
               </div>
-              <span className="mp-tray__n h-5 tabular-nums" aria-hidden="true" data-testid="tile-label">
-                {t.label}
-              </span>
+              {compact ? (
+                // Below 1024 px nothing sits on the page (PT-1 rule 6): the selection mark and the label
+                // share a line (the insert points sit in the gaps at its height), the actions a row below.
+                <>
+                  <div className="flex h-11 w-full items-center px-4">
+                    {t.status === "ready" ? (
+                      <span
+                        aria-hidden="true"
+                        data-no-drag=""
+                        onClick={() => onSelect(t.uid, { toggle: true, range: false })}
+                        className="grid size-11 shrink-0 cursor-pointer place-items-center"
+                        data-testid="tile-select"
+                      >
+                        {selectMark}
+                      </span>
+                    ) : (
+                      <span className="size-11 shrink-0" />
+                    )}
+                    <span className="ip-tile__n min-w-0 flex-1 truncate text-center tabular-nums" aria-hidden="true" data-testid="tile-label">
+                      {t.label}
+                    </span>
+                  </div>
+                  <div data-no-drag="" className="-mx-1 flex h-11 items-center justify-center" data-testid="tile-row">
+                    {t.status === "ready" && !dimmed && (
+                      <>
+                        {rowActions.map(actionButton)}
+                        {more}
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <span className="ip-tile__n h-5 tabular-nums" aria-hidden="true" data-testid="tile-label">
+                  {t.label}
+                </span>
+              )}
               {insertPoint(i + 1, labels.insertAfter(t.label), tab, "end")}
             </div>
           );
@@ -506,17 +564,4 @@ export default function EditablePageGrid({
       )}
     </div>
   );
-}
-
-/** True below 640 px (Rotate left moves into the More menu there). */
-function useNarrow(): boolean {
-  const [narrow, setNarrow] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)");
-    const on = () => setNarrow(mq.matches);
-    on();
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-  return narrow;
 }

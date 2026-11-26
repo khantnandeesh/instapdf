@@ -34,6 +34,7 @@ import {
   tileMain,
   chooseAddPages,
 } from "./support";
+import { cardAction } from "../support/flow";
 
 const live = (page: Page) => page.locator("[aria-live=polite]").first();
 const words = async (bytes: Uint8Array) => (await textsOf(bytes)).map(firstWord);
@@ -224,8 +225,8 @@ test.describe("undo", () => {
 
   test("AC-79: undo is single level: two removals, Undo brings back only the last one", async ({ page }) => {
     await pickMerge(page, "alpha.pdf", "bravo.pdf", "echo.pdf");
-    await page.getByRole("button", { name: "Remove alpha.pdf" }).click();
-    await page.getByRole("button", { name: "Remove echo.pdf" }).click();
+    await cardAction(page, "alpha.pdf", "Remove");
+    await cardAction(page, "echo.pdf", "Remove");
     await expect(notice(page, "Removed alpha.pdf.")).toHaveCount(0);
     await notice(page, "Removed echo.pdf.").getByRole("button", { name: "Undo" }).click();
     expect(await cardNames(page)).toEqual(["bravo.pdf", "echo.pdf"]);
@@ -392,7 +393,7 @@ test.describe("dark mode", () => {
     await expectNoSeriousAxeViolations(page, "dark: empty");
     await pickMerge(page, "alpha.pdf", "bravo.pdf", "charlie.png");
     await expectNoSeriousAxeViolations(page, "dark: files view");
-    await page.getByRole("button", { name: "Remove charlie.png" }).click();
+    await cardAction(page, "charlie.png", "Remove");
     await expect(notice(page, "Removed charlie.png.")).toBeVisible();
     await expectNoSeriousAxeViolations(page, "dark: undo notice");
     await showPages(page);

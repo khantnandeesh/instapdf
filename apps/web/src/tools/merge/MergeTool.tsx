@@ -661,8 +661,9 @@ export function MergeTool() {
 
   // BerryPDF EditorToolbar: blueberry editing tools, like "Add files" beside them.
   const toolbarButton = "mp-btn mp-btn--tool whitespace-nowrap max-sm:size-11 max-sm:px-0";
-  // The phone Add menu: + and the word "Add", 44 px tall (the only add control below 640 px).
-  const phoneAddButton = "mp-btn mp-btn--tool shadow-glow h-11 gap-1.5 whitespace-nowrap px-3.5";
+  // The phone Add menu: + and the word "Add", 44 px tall (the only add control below 640 px); below
+  // 360 px just the + (named "Add" by its aria-label), so the toolbar fits a 320 px screen.
+  const phoneAddButton = "mp-btn mp-btn--tool shadow-glow h-11 gap-1.5 whitespace-nowrap px-3.5 max-[359px]:w-11 max-[359px]:px-0";
 
   const renderWorkspace = (w: WorkspaceContext) => (
     <>
@@ -816,7 +817,7 @@ export function MergeTool() {
                 data-testid="add-menu"
               >
                 <PlusIcon size={18} />
-                <span>{c.add}</span>
+                <span className="max-[359px]:sr-only">{c.add}</span>
               </MenuButton>
             </span>
           </>

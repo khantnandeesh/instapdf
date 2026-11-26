@@ -18,7 +18,7 @@
  * 10. Focus never drops to <body> while the work area leaves for the result, and back (review S1, T12).
  */
 import { expect, test, type Page } from "@playwright/test";
-import { fx } from "../support/flow";
+import { cardAction, fx } from "../support/flow";
 
 const SIZES = [
   { name: "phone", width: 390, height: 844, project: "mobile" },
@@ -535,9 +535,7 @@ for (const size of SIZES) {
       await page.waitForTimeout(400);
       if (size.project === "desktop")
         await page.getByTestId("file-card").first().hover();
-      await page
-        .getByRole("button", { name: "Enlarge alpha.pdf" })
-        .click({ force: size.project !== "desktop" });
+      await cardAction(page, "alpha.pdf", "Enlarge");
       await expect(page.locator("dialog[open]")).toBeVisible();
       await page.waitForTimeout(400);
       await page.keyboard.press("Escape");
@@ -573,9 +571,7 @@ for (const size of SIZES) {
 
       if (size.project === "desktop")
         await page.getByTestId("file-card").first().hover();
-      await page
-        .getByRole("button", { name: "Enlarge alpha.pdf" })
-        .click({ force: size.project !== "desktop" });
+      await cardAction(page, "alpha.pdf", "Enlarge");
       await expect(page.locator("dialog[open]")).toBeVisible();
       await page.waitForTimeout(400);
       await armExitWatch(page, "dialog");
@@ -610,8 +606,7 @@ for (const size of SIZES) {
       await expect(sort).toBeFocused();
 
       if (size.project === "desktop") await page.getByTestId("file-card").first().hover();
-      const enlarge = page.getByRole("button", { name: "Enlarge alpha.pdf" });
-      await enlarge.click({ force: size.project !== "desktop" });
+      const enlarge = await cardAction(page, "alpha.pdf", "Enlarge");
       await expect(page.locator("dialog[open]")).toBeVisible();
       await page.waitForTimeout(400);
       await armLeaveWatch(page, "dialog[open]");
@@ -658,10 +653,11 @@ for (const size of SIZES) {
       await primeEngine(page, hits);
       await addMergeFiles(page);
       if (size.project === "desktop") await page.getByTestId("file-card").first().hover();
-      const enlarge = page.getByRole("button", { name: "Enlarge alpha.pdf" });
-      await enlarge.click({ force: size.project !== "desktop" });
+      const enlarge = await cardAction(page, "alpha.pdf", "Enlarge");
       await expect(page.locator("dialog[open]")).toBeVisible();
       await page.waitForTimeout(400);
+      // The control that opened the preview (the Enlarge button, or the page itself where the card folds it).
+      await enlarge.evaluate((e) => e.setAttribute("data-reopen", ""));
       const midExit = await page.evaluate(async () => {
         const d = document.querySelector<HTMLDialogElement>("dialog[open]")!;
         d.dataset.probe = "";
@@ -670,7 +666,7 @@ for (const size of SIZES) {
         d.dispatchEvent(new Event("cancel", { cancelable: true }));
         for (let i = 0; i < 100 && d.open; i++) await Promise.resolve();
         const leaving = !d.open && d.hasAttribute("data-leaving") && d.inert && (window as unknown as { __motionLive: number }).__motionLive > 0;
-        document.querySelector<HTMLButtonElement>("button[aria-label='Enlarge alpha.pdf']")!.click();
+        document.querySelector<HTMLButtonElement>("[data-reopen]")!.click();
         return leaving;
       });
       expect(midExit, "the dialog was mid-exit when it reopened").toBe(true);
