@@ -261,7 +261,8 @@ async function hold(page: Page, pattern: RegExp) {
   const gate = new Promise<void>((r) => (open = r));
   await page.route(pattern, async (route) => {
     await gate;
-    await route.continue();
+    // A worker terminated while held (Cancel) has already dropped its request.
+    await route.continue().catch(() => {});
   });
   return { release: () => open(), stop: () => page.unroute(pattern) };
 }
@@ -390,6 +391,8 @@ test.describe("shots", () => {
       test.skip(info.project.name !== "desktop", "one engine");
       test.setTimeout(90_000);
       await page.setViewportSize({ width: vp[0], height: vp[1] });
+      // Held from the start: the build worker may be warmed while idle, before Download is pressed.
+      const build = await hold(page, /berry-build\.[^/]*\.js/);
       await open(page, "/edit-pdf");
       await shot(page, "edit-pdf-empty", vp);
       await page.getByTestId("editor-input").setInputFiles("../../tests/parity/editor/report-form-3p.pdf");
@@ -408,12 +411,12 @@ test.describe("shots", () => {
       await page.waitForTimeout(300);
       await shot(page, "edit-pdf-selection", vp);
       await page.keyboard.press("Escape");
-      const build = await hold(page, /berry-build\.[^/]*\.js/);
+      const downloaded = page.waitForEvent("download", { timeout: 30_000 });
       await page.getByRole("button", { name: "Download PDF" }).click();
       await expect(page.getByTestId("processing")).toBeVisible();
       await shot(page, "edit-pdf-downloading", vp);
       build.release();
-      await page.waitForEvent("download", { timeout: 30_000 });
+      await downloaded;
       await expect(page.getByTestId("download")).toHaveText("Downloaded");
       await page.waitForTimeout(300);
       await shot(page, "edit-pdf-downloaded", vp);
