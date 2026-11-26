@@ -5,10 +5,11 @@
  *
  *   node scripts/gen-tool-icons.mjs
  *
- * Writes (both committed, both server-safe: no hooks, no "use client"):
+ * Writes (all committed, all server-safe: no hooks, no "use client"):
  *   src/tools/tool-icon-names.ts   the tool icon names (and the ToolIconName type)
  *   src/tools/tool-icons.tsx       <ToolIcon name=...>: one inline SVG per tool icon
  *   src/components/ui/icons.tsx    the interface icons (FileIcon, CloseIcon, ...)
+ *   src/components/ui/page-tool-icons.tsx   the icons only the F5 page tools draw (kept out of the shared chunk)
  *
  * Only path data is vendored, so @phosphor-icons/core stays an exact-pinned devDependency and
  * nothing is added to the client bundle at runtime. The build fails here if a name goes missing.
@@ -108,6 +109,18 @@ const UI_ICONS = {
   LeafIcon: "leaf",
 };
 
+/**
+ * Icons only the F5 page tools draw, after a file is in (spec F4/F5 P-4: history, Organize's menus).
+ * They go to their own module: icons.tsx sits in a chunk every route loads, so each icon there costs
+ * every page's first load (P-12).
+ */
+const PAGE_TOOL_ICONS = {
+  RedoIcon: "arrow-u-up-right@bold",
+  SelectAllIcon: "selection-all@bold",
+  TrashIcon: "trash@bold",
+  DotsThreeIcon: "dots-three@bold",
+};
+
 /** "name" is the duotone weight; "name@bold" picks another weight. */
 const iconFile = (n) => {
   const [name, weight = "duotone"] = n.split("@");
@@ -118,7 +131,7 @@ const license = readFileSync(join(pkgDir, "LICENSE"), "utf8").trim();
 const camel = (name) => name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 const esc = (v) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
-const all = [...new Set([...TOOL_ICONS, ...Object.values(UI_ICONS)])];
+const all = [...new Set([...TOOL_ICONS, ...Object.values(UI_ICONS), ...Object.values(PAGE_TOOL_ICONS)])];
 const missing = all.filter((n) => {
   try {
     readFileSync(iconFile(n));
@@ -215,7 +228,22 @@ ${Object.entries(UI_ICONS)
   .join("\n")}
 `;
 
+const pageToolIcons = `${header}
+import type { IconComponent } from "./icons";
+
+/** Phosphor frame: 256 grid, currentColor, decorative (aria-hidden). */
+const frame = (size = 20, rest: object, children: React.ReactNode) => (
+  <svg width={size} height={size} viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" focusable="false" {...rest}>
+    {children}
+  </svg>
+);
+${Object.entries(PAGE_TOOL_ICONS)
+  .map(([comp, n]) => `\n/** Phosphor ${iconLabel(n)}. */\nexport const ${comp}: IconComponent = ({ size, ...p }) => frame(size, p, <>${shapesOf(n)}</>);`)
+  .join("\n")}
+`;
+
 writeFileSync(join(here, "../src/tools/tool-icon-names.ts"), names);
+writeFileSync(join(here, "../src/components/ui/page-tool-icons.tsx"), pageToolIcons);
 writeFileSync(join(here, "../src/tools/tool-icons.tsx"), toolIcons);
 writeFileSync(join(here, "../src/components/ui/icons.tsx"), uiIcons);
-console.log(`gen-tool-icons: wrote ${TOOL_ICONS.length} tool icons and ${Object.keys(UI_ICONS).length} interface icons from @phosphor-icons/core ${pkg.version}`);
+console.log(`gen-tool-icons: wrote ${TOOL_ICONS.length} tool icons and ${Object.keys(UI_ICONS).length + Object.keys(PAGE_TOOL_ICONS).length} interface icons from @phosphor-icons/core ${pkg.version}`);

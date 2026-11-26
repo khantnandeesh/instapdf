@@ -24,9 +24,11 @@ export const FilePicker = forwardRef<
     sources?: ReactNode;
     disabled?: boolean;
     className?: string;
+    /** Classes for the label (for example `max-[399px]:sr-only` for an icon-only button on narrow screens). */
+    labelClassName?: string;
     inputTestId?: string;
   }
->(function FilePicker({ accept, multiple, onFiles, label, variant = "primary", size = "lg", icon, sources, disabled, className, inputTestId }, ref) {
+>(function FilePicker({ accept, multiple, onFiles, label, variant = "primary", size = "lg", icon, sources, disabled, className, labelClassName, inputTestId }, ref) {
   const input = useRef<HTMLInputElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   useImperativeHandle(ref, () => ({
@@ -50,7 +52,7 @@ export const FilePicker = forwardRef<
         onFocus={prefetchPdfjs}
         onClick={() => input.current?.click()}
       >
-        {label}
+        {labelClassName ? <span className={labelClassName}>{label}</span> : label}
       </Button>
       {sources}
       <input

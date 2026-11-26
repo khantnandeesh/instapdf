@@ -111,8 +111,13 @@ export type ToolFlowProps = {
   sortIntake?: (files: File[]) => File[];
   /** Called right after a batch is accepted, before any file is parsed. `tag` is what `api.intake` was given. */
   onFilesAdded?: (entries: LoadedFile[], tag: unknown) => void;
-  /** Called at the start of every intake, before the file count is checked. */
-  beforeIntake?: () => void;
+  /** Called at the start of every intake (with the incoming files), before the file count is checked. */
+  beforeIntake?: (incoming: File[]) => void;
+  /**
+   * Files kept loaded only so an undo or redo can bring them back (F5 history). They are not in the
+   * task, so they do not count toward the file, size or page caps of a new pick.
+   */
+  heldFiles?: () => ReadonlySet<string>;
   /** Show the empty state even though files are held (e.g. kept only for an undo). */
   workspaceEmpty?: boolean;
   /** Status text in the ready state (default "{pages} pages · {files} files"). */
@@ -120,12 +125,19 @@ export type ToolFlowProps = {
   /** Show the view toggle from one file (Merge) instead of two. */
   viewToggleFromOneFile?: boolean;
   /**
-   * Below 640 px the toolbar's Add files button is hidden, because the tool's own
+   * Below 1024 px the toolbar's Add files button is hidden, because the tool's own
    * one-button Add menu (in `toolbarEnd`, which calls `api.openPicker`) replaces it
-   * (Merge, spec F3 M-3). Returns that menu's trigger, which then takes the focus
-   * moves that would go to Add files.
+   * (Merge, spec F3 M-3; from 1023 px down since F4/F5 P-3, so the toolbar never scrolls
+   * sideways). Returns that menu's trigger, which then takes the focus moves that would go to Add files.
    */
   phoneAddMenu?: () => HTMLElement | null;
+  /**
+   * "bar": no side panel before the first file (Organize, Alternate: nothing to set yet, spec F4/F5
+   * P-11 #9). The drop card fills the pages slot and the bottom bar shows from the first paint.
+   */
+  emptyLayout?: "side" | "bar";
+  /** Controls in the bottom bar after the options (F5 Undo│Redo). */
+  dockStart?: (ctx: FlowContext) => ReactNode;
   /** Merge's own wording for the empty state and the wrong-type error. */
   copyOverrides?: { pickerButton?: string; pickerHint?: string; limits?: string; limitsFull?: string; statusEmpty?: string; errorType?: (name: string) => string };
   /** Chip on the Options button below 1024 px ("2 changed"), for `optionsDensity: "full"`. */
@@ -159,10 +171,13 @@ export function ToolFlow({
   sortIntake,
   onFilesAdded,
   beforeIntake,
+  heldFiles,
   workspaceEmpty,
   readyStatus,
   viewToggleFromOneFile,
   phoneAddMenu,
+  emptyLayout = "side",
+  dockStart,
   copyOverrides,
   optionsBadge,
   apiRef,
@@ -181,6 +196,13 @@ export function ToolFlow({
     setFilesState(filesRef.current);
   }, []);
   const patchFile = useCallback((id: string, patch: Partial<LoadedFile>) => updateFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f))), [updateFiles]);
+  const heldRef = useRef(heldFiles);
+  heldRef.current = heldFiles;
+  /** The files of the task: all but those kept only for undo (they count toward no cap). */
+  const inTask = useCallback((list: LoadedFile[]) => {
+    const held = heldRef.current?.();
+    return held?.size ? list.filter((f) => !held.has(f.id)) : list;
+  }, []);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const phaseRef = useRef<Phase>("idle");
@@ -288,6 +310,8 @@ export function ToolFlow({
   const showViewToggle = files.length > 1 || (!!viewToggleFromOneFile && files.length > 0);
   const view = showViewToggle ? (viewChoice ?? flow.defaultView) : "pages";
   const optionsDisabled = !(state === "ready" || state === "error");
+  /** The empty state's side panel (from 1024 px), unless the tool asks for the bar from the start. */
+  const sidePanel = state === "empty" && emptyLayout === "side";
   const statusText =
     state === "empty"
       ? (copyOverrides?.statusEmpty ?? copy.statusEmpty)
@@ -362,7 +386,7 @@ export function ToolFlow({
         if (tooLarge) return reject(copy.errorPixels(entry.name));
         if (!format || !frames?.length) return reject(copy.errorImage(entry.name));
         if (frames.some((f) => exceedsPixelCap(f.width, f.height))) return reject(copy.errorPixels(entry.name));
-        const otherPages = filesRef.current.filter((f) => f.id !== id).reduce((sum, f) => sum + f.pageCount, 0);
+        const otherPages = inTask(filesRef.current).filter((f) => f.id !== id).reduce((sum, f) => sum + f.pageCount, 0);
         if (!fitsPageBudget(otherPages, frames.length, flow.maxTotalPages)) return reject(copy.errorPages(entry.name, flow.maxTotalPages));
         renderer?.registerImage(id, entry.source, format, frames);
         patchFile(id, { status: "ready", kind: "image", pageCount: frames.length, pages: frames.map((f) => imagePageSize(f.width, f.height)) });
@@ -387,7 +411,7 @@ export function ToolFlow({
         return "locked";
       }
       const { pdf } = result;
-      const otherPages = filesRef.current.filter((f) => f.id !== id).reduce((s, f) => s + f.pageCount, 0);
+      const otherPages = inTask(filesRef.current).filter((f) => f.id !== id).reduce((s, f) => s + f.pageCount, 0);
       if (!fitsPageBudget(otherPages, pdf.pageCount, flow.maxTotalPages)) {
         void pdf.task.destroy();
         problems.push(copy.errorPages(entry.name, flow.maxTotalPages));
@@ -420,7 +444,7 @@ export function ToolFlow({
           .catch(() => {});
       return "ok";
     },
-    [announce, flow.maxTotalPages, inspectPdf, patchFile, pushNotice, removeFile, renderer],
+    [announce, flow.maxTotalPages, inTask, inspectPdf, patchFile, pushNotice, removeFile, renderer],
   );
 
   const flushProblems = useCallback(
@@ -455,7 +479,7 @@ export function ToolFlow({
       if (phaseRef.current === "processing" || phaseRef.current === "done") return;
       if (!incomingRaw.length) return;
       const incoming = sortIntake ? sortIntake(incomingRaw) : incomingRaw;
-      beforeIntake?.();
+      beforeIntake?.(incoming);
       if (!flow.multiFile && filesRef.current.length > 0 && !opts.replace) {
         setPendingReplace(incoming);
         return;
@@ -469,8 +493,8 @@ export function ToolFlow({
       const screened = screenFiles(
         incoming,
         { accept: flow.accept, multiFile: flow.multiFile, maxFiles: flow.maxFiles, maxFileBytes: flow.maxFileBytes, maxTotalBytes: flow.maxTotalBytes },
-        filesRef.current.length,
-        filesRef.current.reduce((sum, f) => sum + f.size, 0),
+        inTask(filesRef.current).length,
+        inTask(filesRef.current).reduce((sum, f) => sum + f.size, 0),
       );
       const mb = (bytes: number) => Math.round(bytes / 1024 / 1024);
       const problems = screened.rejected.map((r) =>
@@ -502,7 +526,7 @@ export function ToolFlow({
       for (const e of entries) await loadFile(e.id, undefined, problems);
       flushProblems(problems);
     },
-    [announce, beforeIntake, copyOverrides?.errorType, flow, flushProblems, loadFile, onFilesAdded, pushNotice, removeFile, sortIntake, updateFiles],
+    [announce, beforeIntake, copyOverrides?.errorType, flow, flushProblems, inTask, loadFile, onFilesAdded, pushNotice, removeFile, sortIntake, updateFiles],
   );
 
   if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1") cloud!.deps = { tool, announce, intake, pushNotice, dismissNotice, sortIntake, errorType: copyOverrides?.errorType, files };
@@ -834,7 +858,10 @@ export function ToolFlow({
       label={flow.multiFile ? "Add files" : "Replace file"}
       variant="tool"
       size="sm"
-      className={phoneAddMenu ? "shadow-glow max-sm:hidden" : "shadow-glow"}
+      // Without an Add menu, a multi-file tool's picker drops its word below 400 px (a 44 px icon button,
+      // its name kept for assistive tech) so the tools row stays one row (F4/F5 P-3, Alternate & mix).
+      className={phoneAddMenu ? "shadow-glow max-lg:hidden" : flow.multiFile ? "shadow-glow max-[399px]:size-11 max-[399px]:px-0" : "shadow-glow"}
+      labelClassName={!phoneAddMenu && flow.multiFile ? "max-[399px]:sr-only" : undefined}
       icon={<PlusIcon size={16} />}
       disabled={state === "processing"}
       onFiles={(f, t) => void intake(f, t, { replace: !flow.multiFile })}
@@ -873,10 +900,10 @@ export function ToolFlow({
         // with its options. When the panel runs past the fold the page scrolls (never the panel), the drop
         // area stays in view (sticky) and the primary stays pinned at the bottom of the screen.
         // Loaded: the pages take the full width down to the compact bottom bar.
-        <div ref={workArea} className={state === "empty" ? "lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]" : undefined}>
-          <section aria-label="Your files" className={state === "empty" ? "min-w-0 lg:sticky lg:top-[calc(var(--ip-header-h)+16px)]" : "min-w-0"}>
+        <div ref={workArea} className={sidePanel ? "lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]" : undefined}>
+          <section aria-label="Your files" className={sidePanel ? "min-w-0 lg:sticky lg:top-[calc(var(--ip-header-h)+16px)]" : "min-w-0"}>
             {state === "empty" ? (
-              <DropCard>
+              <DropCard fill={emptyLayout === "bar" ? "pages" : "work"}>
                 {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
                   ? cloneElement(introPicker(), { sources: <CloudCaret hub={cloud!} look="primary" /> })
                   : introPicker()}
@@ -903,10 +930,12 @@ export function ToolFlow({
                     <SegmentedControl
                       look="tabs"
                       label="View"
+                      // Below 360 px tighter tabs keep the tools row to one row (F4/F5 P-3).
+                      className="shrink-0 max-[359px]:[&_.mp-tab]:px-3.5"
                       value={view}
                       onChange={setViewChoice}
                       options={
-                        flow.defaultView === "files"
+                        flow.defaultView === "files" || viewToggleFromOneFile
                           ? [
                               { value: "files", label: "Files" },
                               { value: "pages", label: "Pages" },
@@ -936,7 +965,7 @@ export function ToolFlow({
                     {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
                       ? cloneElement(toolbarPicker(), {
                           sources: (
-                            <CloudCaret hub={cloud!} look="tool" className={phoneAddMenu ? "max-sm:hidden" : undefined} disabled={state === "processing"} />
+                            <CloudCaret hub={cloud!} look="tool" className={phoneAddMenu ? "max-lg:hidden" : undefined} disabled={state === "processing"} />
                           ),
                         })
                       : toolbarPicker()}
@@ -1004,7 +1033,8 @@ export function ToolFlow({
 
           <ControlDock
             label={`${tool.name} options`}
-            layout={state === "empty" ? "side" : "bar"}
+            layout={sidePanel ? "side" : "bar"}
+            start={dockStart?.(ctx)}
             optionsDisabled={optionsDisabled}
             options={renderOptions(ctx)}
             density={flow.optionsDensity}

@@ -14,7 +14,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { formatDelta } from "@/lib/pdf/rotation";
 import type { MoveStep, PageSize } from "@/lib/page-list";
 import { editCopy as c } from "@/tools/merge/copy-edit";
-import { gridColumns, loadDrag, moveStepFor, navTarget, useSettled } from "./grid-keys";
+import { gridColumns, loadDragFor, moveStepFor, navTarget, useSettled, useWarmDrag } from "./grid-keys";
 import { buildTiles, type ListModel } from "./view-model";
 
 export type TileView = {
@@ -123,7 +123,7 @@ export default function EditablePageGrid({
   model,
   selection,
   inserted,
-  labels = pageLabels,
+  labels: labelsIn,
   focusUid,
   dimmed,
   selectionCount,
@@ -138,11 +138,13 @@ export default function EditablePageGrid({
   onRemoveSelection,
   onDragState,
   listRef,
+  readOnly = false,
 }: {
   model: ListModel;
   selection: ReadonlySet<string>;
   inserted: ReadonlySet<string>;
-  labels?: PageGridLabels;
+  /** Wording that differs from Merge's (Organize, Alternate's result view). */
+  labels?: Partial<PageGridLabels>;
   focusUid: { uid: string; tick: number; onMount: boolean } | null;
   dimmed: boolean;
   selectionCount: number;
@@ -158,13 +160,21 @@ export default function EditablePageGrid({
   onDragState: (s: { phase: "start" | "cancel"; label: string; count: number }) => void;
   /** The list element (the [data-flip-root] the owner FLIPs, e.g. on Sort). */
   listRef?: RefObject<HTMLDivElement | null>;
+  /**
+   * A result to look at, not to edit (Alternate's Pages view, spec F4/F5 P-3): no drag, insert
+   * points, add tile, selection or page actions; a click or Enter opens the preview ("enlarge").
+   */
+  readOnly?: boolean;
 }) {
+  const labels: PageGridLabels = labelsIn ? { ...pageLabels, ...labelsIn } : pageLabels;
   const tiles = useMemo(() => buildTiles(model, selection, inserted), [model.pages, model.sources, model.files, selection, inserted]); // eslint-disable-line react-hooks/exhaustive-deps
   const ownList = useRef<HTMLDivElement>(null);
   const list = listRef ?? ownList;
   const [activeUid, setActiveUid] = useState<string | null>(null);
   const [dragging, setDragging] = useState<Set<string>>(new Set());
   const settled = useSettled();
+  // Warm the drag module once the grid is on screen (Organize opens on this grid, never on the files view).
+  useWarmDrag();
   const menus = useRef(new Map<string, MenuButtonHandle | null>());
   const active = Math.max(0, tiles.findIndex((t) => t.uid === activeUid));
   const narrow = useNarrow();
@@ -191,6 +201,17 @@ export default function EditablePageGrid({
 
   function onKeyDown(e: KeyboardEvent<HTMLButtonElement>, i: number) {
     const tile = tiles[i];
+    if (readOnly) {
+      const to = navTarget(e.key, i, tiles.length, gridColumns(list.current));
+      if (to !== null && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        focusTile(to);
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onAction(tile.uid, "enlarge", e.currentTarget);
+      }
+      return;
+    }
     const step = moveStepFor(e);
     if (step) {
       e.preventDefault(); // Alt+Left is "Back" in some browsers
@@ -228,13 +249,13 @@ export default function EditablePageGrid({
   }
 
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>, tile: TileView) {
-    if (dimmed || tile.status !== "ready" || (e.pointerType === "mouse" && e.button !== 0)) return;
+    if (readOnly || dimmed || tile.status !== "ready" || (e.pointerType === "mouse" && e.button !== 0)) return;
     if ((e.target as HTMLElement).closest("[data-no-drag]")) return;
     const native = e.nativeEvent;
     const box = e.currentTarget;
     const moving = tile.selected ? tiles.filter((t) => t.selected).map((t) => t.uid) : [tile.uid];
-    void loadDrag().then(({ beginDrag }) =>
-      beginDrag({
+    void loadDragFor(native).then((m) =>
+      m?.beginDrag({
         event: native,
         source: box,
         container: list.current!,
@@ -333,7 +354,7 @@ export default function EditablePageGrid({
           return (
             // BerryPDF PagePreview tray: the page on a pink tray, its label below in Fredoka; a selected page gets the berry ring and a leaf tick.
             <div key={t.uid} role="listitem" className="group/tile mp-tray relative flex min-w-0 flex-col items-center gap-2 max-sm:p-2" data-selected={t.selected || undefined} data-uid={t.uid} data-flip>
-              {i === 0 && insertPoint(0, labels.insertStart, tab, "start")}
+              {i === 0 && !readOnly && insertPoint(0, labels.insertStart, tab, "start")}
               <div
                 data-tile-box=""
                 onPointerDown={(e) => onPointerDown(e, t)}
@@ -369,13 +390,14 @@ export default function EditablePageGrid({
                   data-main=""
                   tabIndex={tab}
                   aria-label={t.accessibleName}
-                  aria-pressed={t.selected}
+                  aria-pressed={readOnly ? undefined : t.selected}
                   aria-describedby="ip-pages-hint"
                   disabled={t.status !== "ready"}
                   onFocus={() => setActiveUid(t.uid)}
                   onClick={(e) => {
                     if (e.detail === 0) return; // keyboard handled in onKeyDown
-                    onSelect(t.uid, { toggle: e.ctrlKey || e.metaKey, range: e.shiftKey });
+                    if (readOnly) onAction(t.uid, "enlarge", e.currentTarget);
+                    else onSelect(t.uid, { toggle: e.ctrlKey || e.metaKey, range: e.shiftKey });
                   }}
                   onKeyDown={(e) => onKeyDown(e, i)}
                   className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-3"
@@ -386,7 +408,7 @@ export default function EditablePageGrid({
                     {badge}
                   </span>
                 )}
-                {t.status === "ready" && (
+                {t.status === "ready" && !readOnly && (
                   <span
                     aria-hidden="true"
                     data-no-drag=""
@@ -405,7 +427,7 @@ export default function EditablePageGrid({
                     )}
                   </span>
                 )}
-                {t.status === "ready" && !dimmed && (
+                {t.status === "ready" && !dimmed && !readOnly && (
                   <div
                     data-no-drag=""
                     className={cx(
@@ -450,10 +472,11 @@ export default function EditablePageGrid({
               <span className="mp-tray__n h-5 tabular-nums" aria-hidden="true" data-testid="tile-label">
                 {t.label}
               </span>
-              {insertPoint(i + 1, labels.insertAfter(t.label), tab, "end")}
+              {!readOnly && insertPoint(i + 1, labels.insertAfter(t.label), tab, "end")}
             </div>
           );
         })}
+        {!readOnly && (
         <div role="listitem" className="flex min-w-0 flex-col" data-flip>
           <MenuButton
             label={labels.addAtEnd}
@@ -473,12 +496,13 @@ export default function EditablePageGrid({
             </span>
           </MenuButton>
         </div>
+        )}
       </div>
-      {selectionCount > 0 && !dimmed && (
+      {selectionCount > 0 && !dimmed && !readOnly && (
         <div
           role="toolbar"
           aria-label={labels.selectionBar}
-          className="mp-rise-in fixed bottom-[calc(var(--ip-dock-actual,0px)+12px)] left-1/2 z-(--ip-z-selbar) flex h-(--ip-selbar-h) -translate-x-1/2 items-center gap-1.5 rounded-panel border-[1.5px] border-sand bg-surface-raised px-2.5 shadow-menu lg:bottom-6 lg:left-[calc(50%-var(--ip-dock-w)/2)]"
+          className="mp-rise-in fixed bottom-[calc(var(--ip-dock-actual,0px)+12px)] left-1/2 z-(--ip-z-selbar) flex h-(--ip-selbar-h) -translate-x-1/2 items-center gap-1.5 rounded-panel border-[1.5px] border-sand bg-surface-raised px-2.5 shadow-menu"
           data-testid="selection-bar"
           onKeyDown={(e) => {
             if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;

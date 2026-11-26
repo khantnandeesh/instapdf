@@ -3,7 +3,7 @@
  * `ref` is the matching Sejda slug, used only by the parity evaluator.
  * `runtime`: "client" = processed in the browser, nothing uploaded; "server" = processing worker.
  */
-import { mergedName, pdfOutputName, zipName } from "../lib/pdf/naming";
+import { mergedName, mixedName, organizedName, pdfOutputName, zipName } from "../lib/pdf/naming";
 import type { ToolIconName } from "./tool-icon-names";
 
 export type ToolCategory =
@@ -187,6 +187,32 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
         // Always one PDF, named after the first file in the output (spec F3 §6).
         outputName: (inputs) => mergedName(inputs[0]),
       },
+    ),
+  },
+  // F5 page tools (spec F4/F5 §0d): PDFs and images, 50 files, the F1 size and page caps.
+  "organize-pdf": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "organize-pdf",
+      // "Save PDF": the output is one edited copy (spec P-11 #10).
+      { title: "Organize PDF", actionLabel: "Save PDF", progressLabel: "Saving" },
+      { accept: PDF_AND_IMAGES, maxFiles: 50, defaultView: "pages", outputName: (inputs) => organizedName(inputs[0]) },
+    ),
+  },
+  "combine-reorder-pdf": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "combine-reorder-pdf",
+      { title: "Combine & reorder PDF pages", actionLabel: "Merge PDFs", progressLabel: "Merging" },
+      { accept: PDF_AND_IMAGES, maxFiles: 50, defaultView: "pages", optionsDensity: "full", outputName: (inputs) => mergedName(inputs[0]) },
+    ),
+  },
+  "alternate-mix-pdf": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "alternate-mix-pdf",
+      { title: "Alternate & mix PDF", actionLabel: "Mix PDFs", progressLabel: "Mixing" },
+      { accept: PDF_AND_IMAGES, maxFiles: 50, defaultView: "files", outputName: (inputs) => mixedName(inputs[0]) },
     ),
   },
 };

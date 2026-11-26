@@ -50,6 +50,45 @@ export function loadDrag() {
   return dragModule;
 }
 
+/**
+ * The drag module for a press that began with `down`, or null when that press already ended (or was
+ * cancelled) before the module arrived: a quick click must never turn into a drag that the next
+ * mouse move would lift and the next click would drop.
+ */
+export function loadDragFor(down: PointerEvent): Promise<typeof import("./drag") | null> {
+  let released = false;
+  const end = (e: PointerEvent) => {
+    if (e.pointerId === down.pointerId) released = true;
+  };
+  window.addEventListener("pointerup", end, true);
+  window.addEventListener("pointercancel", end, true);
+  const stop = () => {
+    window.removeEventListener("pointerup", end, true);
+    window.removeEventListener("pointercancel", end, true);
+  };
+  return loadDrag().then(
+    (m) => {
+      stop();
+      return released ? null : m;
+    },
+    (err) => {
+      stop();
+      throw err;
+    },
+  );
+}
+
+/** Warms the drag module once a grid is on screen (on idle). */
+export function useWarmDrag() {
+  useEffect(() => {
+    const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
+    const t = idle ? idle(() => void loadDrag()) : setTimeout(() => void loadDrag(), 1000);
+    return () => {
+      if (!idle) clearTimeout(t as ReturnType<typeof setTimeout>);
+    };
+  }, []);
+}
+
 /** False for the grid's first 700 ms (while its tiles rise in, staggered), then true. */
 export function useSettled(): boolean {
   const [settled, setSettled] = useState(false);

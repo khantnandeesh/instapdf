@@ -456,6 +456,15 @@
   --ip-sheet-max-h: 85dvh; /* options bottom sheet below 1024px */
 }
 
+/*
+ * F5 page tools additions (docs/specs/f4-f5-page-tools.md, P-2). No existing token value is changed.
+ */
+:root {
+  --ip-mix-card-min: 330px; /* Alternate's wide file card: 3 per row at 1366, 1 below 640 */
+  --ip-stepper-field-w: 56px; /* NumberStepper's text field */
+  --ip-bubble-gap: 8px; /* FieldBubble above its field */
+}
+
 @theme inline {
   --color-on-paper-muted: var(--ip-on-paper-muted);
 }

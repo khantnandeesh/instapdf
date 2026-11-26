@@ -381,6 +381,115 @@ export const seoContent: Record<string, ToolSeoContent> = {
     ],
     related: ["organize-pdf", "delete-pdf-pages", "merge-pdf", "split-pdf", "crop-pdf", "compress-pdf"],
   },
+  "organize-pdf": {
+    howTo: "How to organize PDF pages",
+    steps: [
+      { name: "Add your files", text: "Drop one or more PDFs or images on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Arrange the pages", text: "Drag pages into order, rotate, duplicate or remove them, and add blank pages or pages from another file." },
+      { name: "Save", text: "Select Save PDF and download one PDF with the pages in the order you set." },
+    ],
+    faq: [
+      {
+        q: "How do I rearrange pages in a PDF?",
+        a: "Add the PDF and drag each page to its new place. You can also select several pages and move them together, or move a page to a numbered position.",
+      },
+      {
+        q: "Can I reverse the page order?",
+        a: "Yes. Sort, then Reverse order turns the whole document around. With pages selected, only those pages swap places, end for end.",
+      },
+      {
+        q: "My scanner made all the fronts, then all the backs. Can I fix the order?",
+        a: "Yes. Sort, then Two-sided scan order puts a scan of all fronts followed by all backs in reverse into the right order: front 1, back 1, front 2 and so on.",
+      },
+      {
+        q: "Can I undo a change?",
+        a: "Yes. Undo and Redo step back and forward through every change, and Ctrl+Z works too.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. Organizing runs in your browser, so your files stay on your device.",
+      },
+      {
+        q: "Are bookmarks kept?",
+        a: "Yes. Bookmarks follow their pages when you move them, and the links inside the document keep working.",
+      },
+      {
+        q: "How many pages can I organize?",
+        a: "Up to 50 files at a time, up to 100 MB each, 500 MB and 1,000 pages in total. It is free, with no sign-up and no watermark.",
+      },
+    ],
+    related: ["merge-pdf", "combine-reorder-pdf", "delete-pdf-pages", "rotate-pdf", "alternate-mix-pdf", "split-pdf"],
+  },
+  "combine-reorder-pdf": {
+    howTo: "How to combine and reorder PDF pages",
+    steps: [
+      { name: "Add your files", text: "Drop PDFs and images on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Reorder the pages", text: "Every page of every file shows at once. Drag pages between files, rotate or remove them." },
+      { name: "Combine and save", text: "Pick any options, select Merge PDFs and download one PDF with your pages in order." },
+    ],
+    faq: [
+      {
+        q: "How do I combine pages from different PDFs in any order?",
+        a: "Add the files and drag their pages into the order you want. Pages from different files can sit side by side, then Merge PDFs saves them as one document.",
+      },
+      {
+        q: "Can I take only some pages from a file?",
+        a: "Yes. Remove the pages you don't need, or use Add pages to pick just a few pages from another file.",
+      },
+      {
+        q: "Can I undo a change?",
+        a: "Yes. Undo and Redo step back and forward through every change, and Ctrl+Z works too.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. Everything runs in your browser, so your files stay on your device.",
+      },
+      {
+        q: "Can I add images too?",
+        a: "Yes. JPG, PNG, GIF, BMP, WebP and TIFF images become pages, each on its own page.",
+      },
+      {
+        q: "How many files can I combine?",
+        a: "Up to 50 files at a time, up to 100 MB each, 500 MB and 1,000 pages in total. It is free, with no sign-up and no watermark.",
+      },
+    ],
+    related: ["merge-pdf", "organize-pdf", "alternate-mix-pdf", "split-pdf", "jpg-to-pdf", "rotate-pdf"],
+  },
+  "alternate-mix-pdf": {
+    howTo: "How to alternate pages from two PDFs",
+    steps: [
+      { name: "Add two or more files", text: "Drop the PDFs or images on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Set each file", text: "Put the files in order, read any of them in reverse, and choose how many pages each gives per turn." },
+      { name: "Mix and save", text: "Check the result in the Pages view, select Mix PDFs and download one PDF." },
+    ],
+    faq: [
+      {
+        q: "How do I combine odd and even pages into one PDF?",
+        a: "Add the file with the odd pages first and the file with the even pages second, then select Mix PDFs. The pages alternate: 1 from the first file, 1 from the second, and so on.",
+      },
+      {
+        q: "My back pages were scanned in reverse. What do I do?",
+        a: "Set that file to Reverse. It is then read from its last page to its first, so the pages still come out in order.",
+      },
+      {
+        q: "Can I take more than one page at a time from a file?",
+        a: "Yes. Pages per turn sets how many pages each file gives before the next file's turn. When one file runs out, the rest of the other follows at the end.",
+      },
+      {
+        q: "Can I put the same page between every group, like a separator?",
+        a: "Yes. A one-page file has a Repeat switch, on by default: its page then comes back every round, but never after the last real page.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. Mixing runs in your browser, so your files stay on your device.",
+      },
+      {
+        q: "How many files can I mix?",
+        a: "Up to 50 files at a time, up to 100 MB each, 500 MB and 1,000 pages in total. It is free, with no sign-up and no watermark.",
+      },
+    ],
+    related: ["merge-pdf", "organize-pdf", "combine-reorder-pdf", "split-pdf", "rotate-pdf"],
+  },
 };
 
 /** Page title for a tool: `${title} | BerryPDF`. */

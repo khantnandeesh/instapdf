@@ -49,6 +49,8 @@ export const editCopy = {
   pagesLabel: "Pages in merge order",
   pickerTitle: (name: string) => `Add pages from ${name}`,
   pickerHelp: (where: string) => `They go ${where}.`,
+  /** Organize's picker on a loaded file: pages already in the list (F4/F5 §3e). */
+  inUse: "In use",
   selectAll: "Select all",
   selectNone: "Select none",
   ofSelected: (count: number, total: number) => `${n(count)} of ${n(total)} selected`,

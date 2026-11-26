@@ -21,12 +21,19 @@ const BUDGET_KB = {
   "/page": [120, 126],
   "/merge-pdf/page": [150, 160],
   "/rotate-pdf/page": [141, 151],
+  // F5 page tools (spec F4/F5 UI P-12).
+  "/organize-pdf/page": [150, 160],
+  "/combine-reorder-pdf/page": [150, 160],
+  "/alternate-mix-pdf/page": [148, 158],
 };
 /** Cloud-on builds carry the F23 source caret and row (~0.9 KB entry, ~2 KB phone), accepted by the lead 24 Nov. */
 const CLOUD_BUDGET_KB = {
   ...BUDGET_KB,
   "/merge-pdf/page": [152, 162],
   "/rotate-pdf/page": [143, 153],
+  "/organize-pdf/page": [152, 162],
+  "/combine-reorder-pdf/page": [152, 162],
+  "/alternate-mix-pdf/page": [150, 160],
 };
 
 const dir = process.argv[2] ?? process.cwd();

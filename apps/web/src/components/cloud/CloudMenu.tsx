@@ -21,6 +21,9 @@ export type MenuItem = {
   onSelect: () => void;
   /** An in-place submenu: choosing the item swaps the list, with "Back" first (F23 U-4). */
   submenu?: MenuEntry[];
+  /** As in ui/Menu (F5 Organize's menus pass through here in cloud builds): the accessible name, and a tooltip + description. */
+  ariaLabel?: string;
+  hint?: string;
 };
 
 export type MenuEntry = MenuItem | { separator: true } | { note: string } | { group: string; items: MenuEntry[] };
@@ -287,7 +290,7 @@ export const MenuButton = forwardRef<
         className={cx("mp-menu ip-cmenu fixed m-0 max-w-[calc(100vw-32px)] min-w-[220px] p-1.5 text-ink", popupClassName)}
       >
         <div id={menuId} role="menu" aria-label={subParent ? subParent.label : label} aria-describedby={footnote ? footId : undefined}>
-          {renderEntries(items, sheet, (entry) => {
+          {renderEntries(items, sheet, menuId, (entry) => {
             if (entry.id === "__back") return leaveSub();
             if (entry.submenu) return enterSub(entry.id);
             hide(true);
@@ -318,7 +321,7 @@ function findItem(entries: MenuEntry[], id: string): MenuItem | undefined {
   return undefined;
 }
 
-function renderEntries(entries: MenuEntry[], sheet: boolean, choose: (item: MenuItem) => void): ReactNode {
+function renderEntries(entries: MenuEntry[], sheet: boolean, menuId: string, choose: (item: MenuItem) => void): ReactNode {
   return entries.map((entry, i) =>
     isItem(entry) ? (
       <button
@@ -328,6 +331,9 @@ function renderEntries(entries: MenuEntry[], sheet: boolean, choose: (item: Menu
         tabIndex={-1}
         data-id={entry.id}
         aria-haspopup={entry.submenu ? "menu" : undefined}
+        aria-label={entry.ariaLabel}
+        aria-describedby={entry.hint ? `${menuId}-${entry.id}-hint` : undefined}
+        title={entry.hint}
         disabled={entry.disabled}
         className={cx(
           "flex h-11 w-full items-center gap-2 rounded-[9px] px-3 text-start text-[15px] whitespace-nowrap outline-none [@media(pointer:fine)]:lg:h-10",
@@ -339,6 +345,11 @@ function renderEntries(entries: MenuEntry[], sheet: boolean, choose: (item: Menu
         {entry.icon && <span className="shrink-0 text-muted">{entry.icon}</span>}
         {entry.label}
         {entry.srHint && <span className="sr-only">{entry.srHint}</span>}
+        {entry.hint && (
+          <span id={`${menuId}-${entry.id}-hint`} hidden>
+            {entry.hint}
+          </span>
+        )}
         {(entry.trailing || entry.submenu) && <span className="ms-auto ps-4 text-muted">{entry.trailing ?? <SubmenuIcon />}</span>}
       </button>
     ) : "separator" in entry ? (
@@ -348,7 +359,7 @@ function renderEntries(entries: MenuEntry[], sheet: boolean, choose: (item: Menu
         <div aria-hidden="true" className="ip-menu-group px-3 pt-2 pb-1 font-display text-[13px] font-semibold text-muted">
           {entry.group}
         </div>
-        {renderEntries(entry.items, sheet, choose)}
+        {renderEntries(entry.items, sheet, menuId, choose)}
       </div>
     ) : (
       <p key={`n${i}`} className="px-3 py-2 text-help text-muted">

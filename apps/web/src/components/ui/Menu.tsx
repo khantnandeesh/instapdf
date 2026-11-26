@@ -1,12 +1,24 @@
 "use client";
-import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, forwardRef, useCallback, useEffect, useId, useImperativeHandle, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { popoverLeaving } from "@/lib/motion";
 import { cx } from "./cx";
 
 export type MenuEntry =
-  | { id: string; label: string; icon?: ReactNode; disabled?: boolean; onSelect: () => void }
+  | {
+      id: string;
+      label: string;
+      icon?: ReactNode;
+      disabled?: boolean;
+      onSelect: () => void;
+      /** Accessible name when it says more than the visible label (which it must contain, WCAG 2.5.3). */
+      ariaLabel?: string;
+      /** A short explanation: the item's tooltip and its accessible description. */
+      hint?: string;
+    }
   | { separator: true }
-  | { note: string };
+  | { note: string }
+  /** A section title inside one menu (the phone "Page tools" menu). */
+  | { heading: string };
 
 const isItem = (e: MenuEntry): e is Extract<MenuEntry, { id: string }> => "id" in e;
 
@@ -196,12 +208,15 @@ export const MenuButton = forwardRef<
       >
         {items.map((entry, i) =>
           isItem(entry) ? (
+            <Fragment key={entry.id}>
             <button
-              key={entry.id}
               type="button"
               role="menuitem"
               tabIndex={-1}
               disabled={entry.disabled}
+              aria-label={entry.ariaLabel}
+              aria-describedby={entry.hint ? `${menuId}-${entry.id}-hint` : undefined}
+              title={entry.hint}
               className={cx(
                 "flex h-11 w-full items-center gap-2 rounded-[9px] px-3 text-start text-[15px] whitespace-nowrap outline-none [@media(pointer:fine)]:lg:h-10",
                 "transition-colors duration-(--dur-base) hover:bg-band hover:text-brand-strong focus:bg-band focus:text-brand-strong disabled:text-muted disabled:opacity-60",
@@ -214,8 +229,18 @@ export const MenuButton = forwardRef<
               {entry.icon && <span className="shrink-0 text-muted">{entry.icon}</span>}
               {entry.label}
             </button>
+            {entry.hint && (
+              <span id={`${menuId}-${entry.id}-hint`} hidden>
+                {entry.hint}
+              </span>
+            )}
+            </Fragment>
           ) : "separator" in entry ? (
             <div key={`s${i}`} role="separator" className="mx-2 my-1 h-[1.5px] bg-sand" />
+          ) : "heading" in entry ? (
+            <p key={`h${i}`} role="presentation" className="px-3 pt-2 pb-1 font-display text-help font-semibold text-muted">
+              {entry.heading}
+            </p>
           ) : (
             <p key={`n${i}`} className="px-3 py-2 text-help text-muted">
               {entry.note}

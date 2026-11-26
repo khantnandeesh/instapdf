@@ -1,6 +1,6 @@
 "use client";
 import "./page-edit.css";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { flip } from "@/lib/motion/flow";
 import { pageBoxStyle } from "@/components/tool-flow/PageTile";
@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { formatDelta } from "@/lib/pdf/rotation";
 import type { MoveStep, PageSize } from "@/lib/page-list";
 import { editCopy as c } from "@/tools/merge/copy-edit";
-import { gridColumns, loadDrag, moveStepFor, navTarget, useSettled } from "./grid-keys";
+import { gridColumns, loadDragFor, moveStepFor, navTarget, useSettled, useWarmDrag } from "./grid-keys";
 import { buildCards, type ListModel } from "./view-model";
 
 export type CardView = {
@@ -78,9 +78,12 @@ export function SegmentGrid({
   onAddFiles,
   onDragState,
   listRef,
+  variant = "edit",
+  renderSettings,
 }: {
   model: ListModel;
-  labels?: SegmentGridLabels;
+  /** Wording that differs from Merge's. */
+  labels?: Partial<SegmentGridLabels>;
   sourceCount?: number;
   /** Focus the card holding this page uid after the next render. */
   focusUid: { uid: string; tick: number; onMount: boolean } | null;
@@ -94,8 +97,15 @@ export function SegmentGrid({
   onDragState: (s: { phase: "start" | "cancel"; name: string }) => void;
   /** The list element (the [data-flip-root] the owner FLIPs, e.g. on Sort). */
   listRef?: RefObject<HTMLDivElement | null>;
+  /**
+   * "mix": Alternate's wide cards (spec F4/F5 P-3): thumbnail tray with the letter and remove,
+   * name and count, the card's own settings (`renderSettings`) and move earlier / later. No rotate.
+   */
+  variant?: "edit" | "mix";
+  renderSettings?: (card: CardView) => ReactNode;
 }) {
-  const labels = labelsIn ?? segmentLabels(sourceCount);
+  const mix = variant === "mix";
+  const labels: SegmentGridLabels = { ...segmentLabels(sourceCount), ...labelsIn };
   const cards = useMemo(() => buildCards(model), [model.pages, model.sources, model.files]); // eslint-disable-line react-hooks/exhaustive-deps
   const ownList = useRef<HTMLDivElement>(null);
   const list = listRef ?? ownList;
@@ -127,13 +137,7 @@ export function SegmentGrid({
   }, [focusUid]);
 
   // Warm the drag module once the grid is on screen.
-  useEffect(() => {
-    const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
-    const t = idle ? idle(() => void loadDrag()) : setTimeout(() => void loadDrag(), 1000);
-    return () => {
-      if (!idle) clearTimeout(t as ReturnType<typeof setTimeout>);
-    };
-  }, []);
+  useWarmDrag();
 
   function onKeyDown(e: KeyboardEvent<HTMLButtonElement>, i: number) {
     const card = cards[i];
@@ -152,7 +156,7 @@ export function SegmentGrid({
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
       moved(() => onRemove(card.key));
-    } else if (e.key === "[" || e.key === "]") {
+    } else if (!mix && (e.key === "[" || e.key === "]")) {
       e.preventDefault();
       onRotate(card.key, e.key === "]" ? 90 : -90);
     }
@@ -163,8 +167,8 @@ export function SegmentGrid({
     if ((e.target as HTMLElement).closest("[data-no-drag]")) return;
     const native = e.nativeEvent;
     const box = e.currentTarget;
-    void loadDrag().then(({ beginDrag }) =>
-      beginDrag({
+    void loadDragFor(native).then((m) =>
+      m?.beginDrag({
         event: native,
         source: box,
         container: list.current!,
@@ -186,6 +190,97 @@ export function SegmentGrid({
     );
   }
 
+  /**
+   * Alternate's wide card (PT-1, "The page is the tile"): the page itself, page-shaped and filling its
+   * column, with no fill around it; the letter, name and count under it; the move and remove buttons in
+   * a row of their own (never drawn over the page); the card's settings beside it (from 640 px) or under
+   * it. The card is grouped by an outline, never a filled block.
+   */
+  const mixCard = (card: CardView, i: number, tab: number) => {
+    const size = card.thumbSize;
+    return (
+      <div
+        key={card.key}
+        role="listitem"
+        aria-label={`${card.name}, ${card.letter}, ${card.meta}`}
+        className="group/card grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-[14px] border-[1.5px] border-sand p-3 [grid-template-areas:'thumb_ctrl'_'name_name'_'set_set'] sm:grid-cols-[128px_minmax(0,1fr)] sm:gap-x-4 sm:[grid-template-areas:'thumb_set'_'name_set'_'ctrl_set']"
+        data-card-key={card.key}
+        data-testid="file-card"
+        data-flip
+      >
+        <div
+          data-card-box=""
+          onPointerDown={(e) => onPointerDown(e, card)}
+          className={cx(
+            "ip-no-callout relative w-full touch-pan-y self-start [grid-area:thumb]",
+            "transition-opacity duration-(--dur-base)",
+            dragKey === card.key && "opacity-40 outline-2 outline-offset-2 outline-brand outline-dashed",
+          )}
+        >
+          <span className="relative grid w-full place-items-center overflow-hidden rounded-[4px] bg-paper shadow-paper" style={{ aspectRatio: size ? `${size.width} / ${size.height}` : "1 / 1.4142" }}>
+            {card.status === "ready" && card.fileId && size ? (
+              <PageThumb fileId={card.fileId} index={card.thumbIndex} />
+            ) : card.status === "loading" ? (
+              <Spinner size={20} label={`Reading ${card.name}`} className="text-brand-strong" />
+            ) : card.status === "locked" ? (
+              <LockIcon size={24} className="text-muted" />
+            ) : null}
+          </span>
+          <button
+            type="button"
+            data-main=""
+            tabIndex={tab}
+            aria-label={labels.enlarge(card.name)}
+            aria-describedby="ip-files-hint"
+            disabled={card.status !== "ready"}
+            onFocus={() => setActiveKey(card.key)}
+            onClick={() => onPreview(card.key)}
+            onKeyDown={(e) => onKeyDown(e, i)}
+            className="absolute inset-0 rounded-[4px] focus-visible:outline-offset-1"
+            data-testid="card-main"
+          />
+        </div>
+        <div className="flex min-w-0 flex-col [grid-area:name]">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span aria-hidden="true" className="font-display text-[13px] font-semibold text-muted" data-testid="source-badge">
+              {card.letter}
+            </span>
+            <span className="truncate font-display text-[15px] leading-5 font-semibold text-ink" title={card.name} data-testid="file-name">
+              {card.name}
+            </span>
+          </span>
+          <span className="truncate text-help text-muted tabular-nums" data-testid="file-meta">
+            {card.meta}
+          </span>
+        </div>
+        <div className="-mx-1 flex items-center gap-1 self-start [grid-area:ctrl] sm:self-end">
+          <IconButton
+            label={labels.moveEarlier(card.name)}
+            size="sm"
+            tabIndex={tab}
+            className="max-lg:size-11"
+            disabled={i === 0 || dimmed}
+            icon={<ChevronLeftIcon size={16} />}
+            onClick={() => moved(() => onMove(card.key, "earlier"))}
+          />
+          <IconButton
+            label={labels.moveLater(card.name)}
+            size="sm"
+            tabIndex={tab}
+            className="max-lg:size-11"
+            disabled={i === cards.length - 1 || dimmed}
+            icon={<ChevronRightIcon size={16} />}
+            onClick={() => moved(() => onMove(card.key, "later"))}
+          />
+          <IconButton label={labels.remove(card.name)} size="sm" tabIndex={tab} data-no-drag="" className="max-lg:size-11" icon={<CloseIcon size={16} />} onClick={() => moved(() => onRemove(card.key))} />
+        </div>
+        <div className="flex min-w-0 flex-col gap-2 [grid-area:set]" data-no-drag="" data-testid="card-settings">
+          {card.status === "ready" && renderSettings?.(card)}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <span id="ip-files-hint" className="sr-only">
@@ -199,7 +294,9 @@ export function SegmentGrid({
         aria-describedby="ip-files-hint"
         data-settled={settled || undefined}
         className={cx(
-          "mp-rise-tiles grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,calc(var(--ip-thumb-size)+32px))] sm:gap-5",
+          mix
+            ? "mp-rise-tiles grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(min(var(--ip-mix-card-min),100%),1fr))] sm:gap-5"
+            : "mp-rise-tiles grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,calc(var(--ip-thumb-size)+32px))] sm:gap-5",
           dimmed && "opacity-60 transition-opacity duration-(--dur-base)",
         )}
         data-testid="segment-grid"
@@ -208,6 +305,7 @@ export function SegmentGrid({
           const isActive = i === active;
           const tab = isActive ? 0 : -1;
           const badge = formatDelta(card.rotation);
+          if (mix) return mixCard(card, i, tab);
           // BerryPDF PagePreview tray: the file's first page on a pink tray, its name in Fredoka below.
           return (
             <div key={card.key} role="listitem" className="group/card mp-tray flex min-w-0 flex-col gap-1 max-sm:p-2" data-card-key={card.key} data-testid="file-card" data-flip>
@@ -310,7 +408,8 @@ export function SegmentGrid({
             disabled={dimmed}
             title={labels.addFiles}
             className={cx(
-              "group/add grid aspect-square w-full place-items-center rounded-tray border-2 border-dashed border-brand-tint-border bg-surface-raised/60 text-brand-strong",
+              mix ? "group/add grid h-full min-h-[120px] w-full place-items-center sm:min-h-[200px]" : "group/add grid aspect-square w-full place-items-center",
+              "rounded-tray border-2 border-dashed border-brand-tint-border bg-surface-raised/60 text-brand-strong",
               "transition-[background-color,border-color,transform] duration-(--dur-base) hover:-translate-y-0.5 hover:border-brand hover:bg-brand-tint active:translate-y-0 disabled:opacity-50",
             )}
             data-testid="add-tile"
