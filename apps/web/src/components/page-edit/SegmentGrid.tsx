@@ -11,6 +11,8 @@ import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, EnlargeIcon, LockIcon, Pl
 import { Kbd } from "@/components/ui/Kbd";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatDelta } from "@/lib/pdf/rotation";
+import { MenuButton, type MenuEntry } from "@/components/ui/Menu";
+import { rowSlots, useTileRow } from "@/components/tool-flow/useTileRow";
 import type { MoveStep, PageSize } from "@/lib/page-list";
 import { editCopy as c } from "@/tools/merge/copy-edit";
 import { gridColumns, loadDrag, moveStepFor, navTarget, useSettled } from "./grid-keys";
@@ -42,6 +44,9 @@ export type SegmentGridLabels = {
   rotateRight: (name: string) => string;
   enlarge: (name: string) => string;
   remove: (name: string) => string;
+  more: (name: string) => string;
+  /** Short menu items for actions that fold into More below 1024 px. */
+  items: { rotateLeft: string; rotateRight: string; enlarge: string; remove: string };
   addFiles: string;
 };
 
@@ -56,6 +61,8 @@ export const segmentLabels = (sourceCount: number): SegmentGridLabels => ({
   rotateRight: c.rotateRight,
   enlarge: c.enlarge,
   remove: c.remove,
+  more: c.pageMore,
+  items: { rotateLeft: c.rotateLeftItem, rotateRight: c.rotateRightItem, enlarge: c.enlargeItem, remove: c.removeItem },
   addFiles: c.addFilesTile(sourceCount),
 });
 
@@ -105,6 +112,12 @@ export function SegmentGrid({
   const active = Math.max(0, cards.findIndex((c) => c.key === activeKey));
   // A keyboard move, the arrow buttons or a removal: the cards FLIP to their new slots (200ms, T9, T10).
   const moved = (change: () => void) => flip(list.current, () => flushSync(change), "reorder");
+  // Below 1024 px the card's controls sit in its bottom row, never on the page (PT-1 rule 6): between
+  // the move arrows, as many as fit, and More for the rest.
+  const { compact, width } = useTileRow(list);
+  const midSlots = rowSlots(width + 8) - 2;
+  const order = ["rotate-right", "remove", "rotate-left", "enlarge"] as const;
+  const rowActions = compact ? (midSlots >= order.length ? [...order] : order.slice(0, Math.max(0, midSlots - 1))) : [];
 
   const focusCard = (i: number) => {
     const c = cards[Math.max(0, Math.min(cards.length - 1, i))];
@@ -208,6 +221,25 @@ export function SegmentGrid({
           const isActive = i === active;
           const tab = isActive ? 0 : -1;
           const badge = formatDelta(card.rotation);
+          const action = (a: (typeof order)[number]) => (
+            <IconButton
+              key={a}
+              label={a === "remove" ? labels.remove(card.name) : a === "enlarge" ? labels.enlarge(card.name) : a === "rotate-left" ? labels.rotateLeft(card.name) : labels.rotateRight(card.name)}
+              variant="soft"
+              tabIndex={tab}
+              disabled={a === "remove" ? false : card.status !== "ready" || dimmed}
+              className="max-lg:size-11"
+              icon={a === "remove" ? <CloseIcon size={16} /> : a === "enlarge" ? <EnlargeIcon size={16} /> : a === "rotate-left" ? <RotateLeftIcon size={16} /> : <RotateRightIcon size={16} />}
+              onClick={() => (a === "remove" ? moved(() => onRemove(card.key)) : a === "enlarge" ? onPreview(card.key) : onRotate(card.key, a === "rotate-left" ? -90 : 90))}
+            />
+          );
+          const folded = order.filter((a) => !rowActions.includes(a));
+          const moreItems: MenuEntry[] = folded.map((a) => ({
+            id: a,
+            label: labels.items[a === "rotate-left" ? "rotateLeft" : a === "rotate-right" ? "rotateRight" : a],
+            disabled: a !== "remove" && (card.status !== "ready" || !!dimmed),
+            onSelect: () => (a === "remove" ? moved(() => onRemove(card.key)) : a === "enlarge" ? onPreview(card.key) : onRotate(card.key, a === "rotate-left" ? -90 : 90)),
+          }));
           // Page tile (berrypdf.md "Page tiles"): the file's first page fills the tile, its name in Fredoka below.
           return (
             <div key={card.key} role="listitem" className="group/card ip-tile flex min-w-0 flex-col gap-1" data-card-key={card.key} data-testid="file-card" data-flip>
@@ -251,6 +283,7 @@ export function SegmentGrid({
                   </span>
                   {badge && <span className="rounded-pill bg-surface-raised px-2 py-1 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">{badge}</span>}
                 </span>
+                {!compact && (
                 <IconButton
                   label={labels.remove(card.name)}
                   variant="soft"
@@ -260,7 +293,8 @@ export function SegmentGrid({
                   icon={<CloseIcon size={16} />}
                   onClick={() => moved(() => onRemove(card.key))}
                 />
-                {card.status === "ready" && !dimmed && (
+                )}
+                {card.status === "ready" && !dimmed && !compact && (
                   <div
                     data-no-drag=""
                     className={cx(
@@ -268,9 +302,9 @@ export function SegmentGrid({
                       "opacity-0 transition-opacity duration-(--dur-base) group-hover/card:opacity-100 group-focus-within/card:opacity-100 [@media(hover:none)]:opacity-100",
                     )}
                   >
-                    <IconButton label={labels.rotateLeft(card.name)} variant="soft" tabIndex={tab} className="max-lg:size-11" icon={<RotateLeftIcon size={16} />} onClick={() => onRotate(card.key, -90)} />
-                    <IconButton label={labels.rotateRight(card.name)} variant="soft" tabIndex={tab} className="max-lg:size-11" icon={<RotateRightIcon size={16} />} onClick={() => onRotate(card.key, 90)} />
-                    <IconButton label={labels.enlarge(card.name)} variant="soft" tabIndex={tab} className="max-lg:size-11" icon={<EnlargeIcon size={16} />} onClick={() => onPreview(card.key)} />
+                    {action("rotate-left")}
+                    {action("rotate-right")}
+                    {action("enlarge")}
                   </div>
                 )}
               </div>
@@ -290,6 +324,27 @@ export function SegmentGrid({
                   icon={<ChevronLeftIcon size={16} />}
                   onClick={() => moved(() => onMove(card.key, "earlier"))}
                 />
+                {compact && (
+                  <span data-no-drag="" className="flex items-center" data-testid="card-row">
+                    {rowActions.map(action)}
+                    {folded.length > 0 && (
+                      <MenuButton
+                        label={labels.more(card.name)}
+                        items={moreItems}
+                        placement="bottom-end"
+                        tabIndex={tab}
+                        className="mp-iconbtn relative size-11"
+                        data-testid="card-more"
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+                          <circle cx="5" cy="12" r="1.75" />
+                          <circle cx="12" cy="12" r="1.75" />
+                          <circle cx="19" cy="12" r="1.75" />
+                        </svg>
+                      </MenuButton>
+                    )}
+                  </span>
+                )}
                 <IconButton
                   label={labels.moveLater(card.name)}
                   size="sm"

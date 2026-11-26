@@ -22,6 +22,7 @@ import {
   tileMain,
   chooseAddPages,
 } from "./support";
+import { cardAction } from "../support/flow";
 
 /** Presses Shift+Tab until `target` has focus. */
 async function backTabTo(page: Page, target: ReturnType<Page["locator"]>, max = 40) {
@@ -279,7 +280,7 @@ test("first-load: pdf-lib and the merge engine never load on the main page", asy
 
 test("AC-79: Ctrl+Z restores, focus returns to the restored card", async ({ page }) => {
   await pickMerge(page, "alpha.pdf", "bravo.pdf");
-  await page.getByRole("button", { name: "Remove alpha.pdf" }).click();
+  await cardAction(page, "alpha.pdf", "Remove");
   expect(await cardNames(page)).toEqual(["bravo.pdf"]);
   await page.keyboard.press("ControlOrMeta+z");
   expect(await cardNames(page)).toEqual(["alpha.pdf", "bravo.pdf"]);

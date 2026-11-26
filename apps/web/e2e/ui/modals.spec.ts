@@ -19,7 +19,7 @@
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { chooseAddPages } from "../f3/support";
-import { fx } from "../support/flow";
+import { cardAction, fx } from "../support/flow";
 
 const SIZES = [
   { name: "phone", width: 390, height: 844, project: "mobile" },
@@ -64,7 +64,7 @@ async function expectNormalButtons(dialog: Locator, where: string, desktop: bool
 /** Opens Merge's preview of sixty-pages.pdf and waits for the page to be drawn. */
 async function openMergePreview(page: Page, desktop: boolean) {
   if (desktop) await page.getByTestId("file-card").first().hover();
-  await page.getByRole("button", { name: "Enlarge sixty-pages.pdf" }).click({ force: !desktop });
+  await cardAction(page, "sixty-pages.pdf", "Enlarge");
   await expect(openDialog(page).getByTestId("page-preview-page").locator("canvas")).toBeVisible();
 }
 
@@ -153,7 +153,7 @@ for (const size of SIZES) {
       await openTool(page, "merge-pdf", ["sixty-pages.pdf", "alpha.pdf"]);
       await ready(page);
       if (size.project === "desktop") await page.getByTestId("file-card").first().hover();
-      await page.getByRole("button", { name: "Enlarge sixty-pages.pdf" }).click({ force: size.project === "mobile" });
+      await cardAction(page, "sixty-pages.pdf", "Enlarge");
       const dialog = openDialog(page);
       const paper = dialog.getByTestId("page-preview-page");
       await expect(paper.locator("canvas")).toBeVisible();

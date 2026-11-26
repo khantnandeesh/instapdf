@@ -569,6 +569,12 @@
       background-color var(--dur-base),
       color var(--dur-base);
   }
+  /* 320-359 px phones: narrower tabs so a tool's toolbar row fits (page tiles, owner 2026-11-26). */
+  @media (max-width: 359px) {
+    .mp-tab {
+      padding-inline: 12px;
+    }
+  }
   .mp-tab:hover {
     color: var(--brand-strong);
   }

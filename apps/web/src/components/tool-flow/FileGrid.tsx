@@ -37,13 +37,17 @@ export function FileCard({ file, onRemove }: { file: LoadedFile; onRemove: () =>
         <IconButton
           label={`Remove ${file.name}`}
           variant="soft"
-          className="absolute top-0 right-0 bg-surface-raised shadow-menu"
+          className="absolute top-0 right-0 bg-surface-raised shadow-menu max-lg:hidden"
           icon={<CloseIcon size={18} />}
           onClick={onRemove}
         />
       </div>
-      <span className="mt-0.5 truncate text-sm font-bold text-ink" title={file.name}>
-        {file.name}
+      {/* Below 1024 px the remove button sits beside the name, never on the page (PT-1 rule 6). */}
+      <span className="mt-0.5 flex min-w-0 items-center gap-1">
+        <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink" title={file.name}>
+          {file.name}
+        </span>
+        <IconButton label={`Remove ${file.name}`} variant="soft" className="size-11 shrink-0 lg:hidden" icon={<CloseIcon size={18} />} onClick={onRemove} />
       </span>
       <span className="text-sm text-muted tabular-nums" data-testid="file-meta">
         {meta}

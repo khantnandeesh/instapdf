@@ -22,6 +22,7 @@ export function PageTile({
   onOpen,
   onKeyDown,
   dimmed,
+  compact,
 }: {
   fileId: string;
   index: number;
@@ -35,6 +36,8 @@ export function PageTile({
   onOpen: () => void;
   onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => void;
   dimmed?: boolean;
+  /** Below 1024 px: the actions sit in a row under the page, never on it (PT-1 rule 6). */
+  compact?: boolean;
 }) {
   const badge = formatDelta(pendingDelta);
   const label = `Page ${index + 1} of ${pageCount}, ${describeDelta(pendingDelta)}`;
@@ -81,7 +84,7 @@ export function PageTile({
             <CheckIcon size={14} />
           </span>
         )}
-        {actions && !dimmed && (
+        {actions && !dimmed && !compact && (
           <div
             className={cx(
               "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1.5 rounded-lg border-[1.5px] border-sand bg-surface-raised p-1.5 shadow-menu",
@@ -96,6 +99,11 @@ export function PageTile({
       <span className="ip-tile__n h-5 tabular-nums" aria-hidden="true">
         {index + 1}
       </span>
+      {compact && (
+        <div className="flex h-11 items-center justify-center gap-2.5" data-testid="tile-row">
+          {actions && !dimmed ? actions : null}
+        </div>
+      )}
     </div>
   );
 }

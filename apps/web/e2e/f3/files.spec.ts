@@ -19,6 +19,7 @@ import {
   run,
   textsOf,
 } from "./support";
+import { cardAction } from "../support/flow";
 
 test.beforeEach(async ({ page }) => {
   await openMerge(page);
@@ -205,7 +206,7 @@ test("AC-15, AC-79: remove a card, undo it, and removing the last card empties t
   await pickMerge(page, "alpha.pdf", "bravo.pdf", "echo.pdf");
   await card(page, "bravo.pdf").hover();
   await page.getByRole("button", { name: "Rotate bravo.pdf right" }).click();
-  await page.getByRole("button", { name: "Remove bravo.pdf" }).click();
+  await cardAction(page, "bravo.pdf", "Remove");
   expect(await cardNames(page)).toEqual(["alpha.pdf", "echo.pdf"]);
   const notice = page.getByTestId("notice").filter({ hasText: "Removed bravo.pdf." });
   await expect(notice).toBeVisible();
@@ -222,7 +223,7 @@ test("AC-15, AC-79: remove a card, undo it, and removing the last card empties t
   expect((await textsOf(out.bytes)).map(firstWord)).toEqual(["Alpha 1", "Alpha 2", "Alpha 3", "Bravo 1", "Bravo 2", "Echo 1"]);
 
   await page.getByRole("button", { name: "Back to options" }).click();
-  for (const n of ["alpha.pdf", "bravo.pdf", "echo.pdf"]) await page.getByRole("button", { name: `Remove ${n}` }).click();
+  for (const n of ["alpha.pdf", "bravo.pdf", "echo.pdf"]) await cardAction(page, n, "Remove");
   await expect(flow(page)).toHaveAttribute("data-state", "empty");
   await page.keyboard.press("Control+z");
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
@@ -232,7 +233,7 @@ test("AC-15, AC-79: remove a card, undo it, and removing the last card empties t
 test("AC-16: Enlarge on a card previews its page 1, and Next shows page 2", async ({ page }) => {
   await pickMerge(page, "alpha.pdf", "bravo.pdf");
   await card(page, "alpha.pdf").hover();
-  await page.getByRole("button", { name: "Enlarge alpha.pdf" }).click();
+  await cardAction(page, "alpha.pdf", "Enlarge");
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("Page 1 of 3");
   await dialog.getByRole("button", { name: "Next" }).click();

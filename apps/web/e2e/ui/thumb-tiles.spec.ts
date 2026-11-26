@@ -1,8 +1,9 @@
 /**
  * Page tiles rule (docs/design/berrypdf.md "Page tiles", owner 2026-11-26): the page fills at least
  * 90% of its tile's width (--ip-tile-fill), the tile's edge is at most 8px each side, and the tile has
- * no filled background (no pink tray). Checked at 1280x800 and 390x844 on Rotate, Merge's files view
- * and Merge's pages view, with A4 portrait pages (the common and the narrowest case the rule covers).
+ * no filled background (no pink tray). Checked at 1280x800, 390x844 and 320x568 on Rotate, Merge's files
+ * view and Merge's pages view, with A4 portrait pages (the common and the narrowest case the rule covers).
+ * Below 1024 px no control may sit on a page (rule 6), and Merge's toolbar fits a 320 px screen.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { fx } from "../support/flow";
@@ -35,11 +36,35 @@ async function breaches(page: Page, item: string, visual: string, what: string) 
 
 async function check(page: Page, item: string, visual: string, what: string) {
   await expect.poll(() => breaches(page, item, visual, what), { timeout: 5000 }).toEqual([]);
+  if ((page.viewportSize()?.width ?? 1280) < 1024) await expect.poll(() => onPage(page, visual, what), { timeout: 5000 }).toEqual([]);
+}
+
+/**
+ * PT-1 rule 6 below 1024 px: every control in the grid (buttons, menu triggers, insert points, the
+ * selection mark) is clear of every page. The tile's own main button is the page itself and is skipped.
+ */
+async function onPage(page: Page, visual: string, what: string) {
+  return page.evaluate(
+    ({ visual, what }) => {
+      const grid = document.querySelector("[data-testid=page-grid], [data-testid=segment-grid], [data-testid=file-grid]")!;
+      const pages = [...grid.querySelectorAll(visual)].map((e) => e.getBoundingClientRect());
+      const controls = [...grid.querySelectorAll<HTMLElement>("button, [data-testid=tile-select]")].filter(
+        (e) => !e.matches("[data-main], [data-tile-button], [data-testid=add-tile]") && e.getClientRects().length > 0,
+      );
+      const hit = (a: DOMRect, b: DOMRect) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+      return controls.flatMap((c) => {
+        const r = c.getBoundingClientRect();
+        return pages.some((p) => hit(r, p)) ? [`${what}: "${c.getAttribute("aria-label") ?? c.dataset.testid}" is on a page`] : [];
+      });
+    },
+    { visual, what },
+  );
 }
 
 for (const [w, h] of [
   [1280, 800],
   [390, 844],
+  [320, 568],
 ] as const) {
   test.describe(`page tiles at ${w}x${h}`, () => {
     test.use({ viewport: { width: w, height: h } });
@@ -61,6 +86,21 @@ for (const [w, h] of [
       await page.getByRole("radio", { name: "Pages" }).click();
       await expect(page.locator("[data-uid] [data-tile-box] > span:first-child")).toHaveCount(6);
       await check(page, "[data-uid]", "[data-tile-box] > span:first-child", "merge pages");
+      // The tools row fits the panel: nothing runs past its edge and no two controls overlap.
+      const row = await page
+        .getByRole("radiogroup", { name: "View" })
+        .locator("xpath=..")
+        .evaluate((bar) => {
+          const box = bar.getBoundingClientRect();
+          // The view switch counts as one control; buttons inside it are its options.
+          const kids = [...bar.querySelectorAll<HTMLElement>("[role=radiogroup], button")].filter((e) => e.getClientRects().length > 0 && (e.matches("[role=radiogroup]") || !e.closest("[role=radiogroup]")));
+          const rects = kids.map((e) => e.getBoundingClientRect());
+          const out = rects.filter((r) => r.left < box.left - 0.5 || r.right > box.right + 0.5).length;
+          let overlaps = 0;
+          for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) if (rects[i].left < rects[j].right - 0.5 && rects[j].left < rects[i].right - 0.5 && rects[i].top < rects[j].bottom - 0.5 && rects[j].top < rects[i].bottom - 0.5) overlaps++;
+          return { out, overlaps, scroll: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+        });
+      expect(row, "merge toolbar fits").toEqual({ out: 0, overlaps: 0, scroll: 0 });
     });
   });
 }

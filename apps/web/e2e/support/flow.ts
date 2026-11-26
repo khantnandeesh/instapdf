@@ -140,3 +140,28 @@ export async function startOver(page: Page) {
   await page.getByRole("button", { name: "Start over" }).click();
   await expect(flow(page)).toHaveAttribute("data-state", "empty");
 }
+
+/**
+ * A Merge file card's action. Below 1024 px a card shows only the buttons that fit in the row under its
+ * page and folds the rest into its More menu (berrypdf.md "Page tiles" PT-1 rule 6), so: the card's own
+ * button when it shows one, else the More menu item; Enlarge falls back to a tap on the page, which opens
+ * the same preview. Returns the control that had focus, for focus-return checks.
+ */
+export async function cardAction(page: Page, file: string, action: "Remove" | "Enlarge" | "Rotate left" | "Rotate right"): Promise<Locator> {
+  const name = action === "Remove" || action === "Enlarge" ? `${action} ${file}` : `Rotate ${file} ${action === "Rotate left" ? "left" : "right"}`;
+  const button = page.getByRole("button", { name, exact: true });
+  if (await button.isVisible()) {
+    await button.click();
+    return button;
+  }
+  const card = page.getByTestId("file-card").filter({ has: page.getByTestId("file-name").getByText(file, { exact: true }) });
+  if (action === "Enlarge") {
+    const main = card.getByTestId("card-main");
+    await main.click();
+    return main;
+  }
+  const more = card.getByTestId("card-more");
+  await more.click();
+  await page.getByRole("menuitem", { name: action, exact: true }).click();
+  return more;
+}
