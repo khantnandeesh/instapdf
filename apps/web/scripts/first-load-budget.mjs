@@ -21,14 +21,17 @@ const BUDGET_KB = {
   "/page": [120, 126],
   "/merge-pdf/page": [150, 160],
   "/rotate-pdf/page": [141, 151],
-  // The editor's landing (F16 AC-86): the landing tool budget of 150 kB; its shell, pdf.js and engine are the editor JS budget below.
-  "/edit-pdf/page": [150, 160],
+  // The editor's landing (F16 AC-86), measured 124 / 140 on 26 Nov plus ~2 kB (the landing tool cap is 150);
+  // its shell, pdf.js and engine are the editor JS budget below.
+  "/edit-pdf/page": [126, 142],
 };
 /** Cloud-on builds carry the F23 source caret and row (~0.9 KB entry, ~2 KB phone), accepted by the lead 24 Nov. */
 const CLOUD_BUDGET_KB = {
   ...BUDGET_KB,
   "/merge-pdf/page": [152, 162],
   "/rotate-pdf/page": [143, 153],
+  // The editor's landing with the F23 caret, row and intake (E6): measured 128 / 144 on 26 Nov plus ~2 kB.
+  "/edit-pdf/page": [130, 146],
 };
 
 const dir = process.argv[2] ?? process.cwd();

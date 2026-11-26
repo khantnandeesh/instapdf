@@ -71,6 +71,8 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
   const [live, setLive] = useState("");
   /** The tool tab stopped answering while this window is busy: a banner, cleared when it answers again. */
   const [toolLost, setToolLost] = useState(false);
+  /** Save mode: a failed sign-in is the tool's to show (it offers Try again), not this window's. */
+  const saving = useRef(false);
   /** The pick in progress: a pick started again (Try again) makes the older one's answer void. */
   const pickGen = useRef(0);
   const viewRef = useRef<View>(view);
@@ -219,9 +221,11 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
     const code = e instanceof CloudError ? e.code : "unreachable";
     // A sign-in that was to leave the page failed instead: the heartbeat resumes, so the tool hears this.
     link.current?.back();
-    // A failed sign-in is put right here (Try again, Choose from this device): the tool keeps waiting.
+    // A failed sign-in while picking is put right here (Try again, Choose from this device): the tool keeps
+    // waiting. While saving, the tool is told (its save fails with its own Try again) and this window says why.
+    if (code === "signin" && !saving.current) return setView({ k: "signin" });
+    link.current?.send({ t: "error", code: code === "signin" ? "unknown" : code });
     if (code === "signin") return setView({ k: "signin" });
-    link.current?.send({ t: "error", code });
     setView({ k: code === "denied" ? "denied" : "unreachable" });
   }, []);
 
@@ -296,6 +300,7 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
       return;
     }
     setParams(prm);
+    saving.current = prm.mode === "save";
     document.title = windowCopy.windowTitle(prm.provider);
     const l = new WindowLink(prm.req, {
       onCancel: () => {
@@ -599,12 +604,21 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
                   </>
                 )}
               </p>
-              <Button variant="primary" size="lg" className="ip-cw__btn" onClick={() => start()} data-testid="cloud-signin-retry">
-                {transferCopy.tryAgain}
-              </Button>
-              <Button variant="line" onClick={chooseDevice} data-testid="cloud-choose-device">
-                {windowCopy.chooseDevice}
-              </Button>
+              {params?.mode === "save" ? (
+                // The tool's save has failed with its own Try again: here, only a way out.
+                <Button variant="outline" onClick={cancelAndClose} data-testid="cloud-close">
+                  {windowCopy.closeWindow}
+                </Button>
+              ) : (
+                <>
+                  <Button variant="primary" size="lg" className="ip-cw__btn" onClick={() => start()} data-testid="cloud-signin-retry">
+                    {transferCopy.tryAgain}
+                  </Button>
+                  <Button variant="line" onClick={chooseDevice} data-testid="cloud-choose-device">
+                    {windowCopy.chooseDevice}
+                  </Button>
+                </>
+              )}
             </>
           )}
         </>

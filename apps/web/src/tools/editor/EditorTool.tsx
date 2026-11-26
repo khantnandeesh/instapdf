@@ -53,6 +53,10 @@ export function EditorTool() {
   const [locked, setLocked] = useState<{ name: string; bytes: Uint8Array; attempt: number; error?: string } | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const picker = useRef<FilePickerHandle>(null);
+  // F23: ends the landing's cloud picks when a file comes from elsewhere (set below, with the cloud hub).
+  const cancelCloud = useRef<(() => void) | undefined>(undefined);
+  // A file is on its way in (set at once, before any state update lands): a cloud file arriving now is not opened over it.
+  const opening = useRef(false);
   const open = !!(opened && Shell);
 
   const say = useCallback((text: string) => setNotice({ text, key: Date.now() }), []);
@@ -91,19 +95,25 @@ export function EditorTool() {
     setShell(() => mod.EditorShell);
     setOpened({ name, bytes, pdf: res.pdf, password, key: Date.now() });
     setNotice(null);
+    // A document is open: any cloud pick still in progress ends (its window closes).
+    cancelCloud.current?.();
   }, [say]);
 
   const openFile = useCallback(
-    async (file: File) => {
+    async (file: File, from: "local" | "cloud" = "local") => {
+      // A local pick, drop or paste wins over a cloud pick still in progress: that one ends now.
+      if (from === "local") cancelCloud.current?.();
       if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") return say(copy.errorType(file.name));
       if (file.size > MAX_BYTES) return say(copy.errorSize(file.name, 200));
       if (!file.size) return say(copy.errorCorrupt(file.name));
       setBusy(true);
+      opening.current = true;
       try {
         await finish(file.name, new Uint8Array(await file.arrayBuffer()));
       } catch {
         say(copy.errorCorrupt(file.name));
       } finally {
+        opening.current = false;
         setBusy(false);
       }
     },
@@ -112,9 +122,16 @@ export function EditorTool() {
 
   // A PDF picked from a cloud goes through the same open path as a local pick.
   // eslint-disable-next-line react-hooks/rules-of-hooks -- the flag is a build-time constant: the same call on every render
-  const cloud = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? useEditorCloud((f) => void openFile(f), () => picker.current?.element ?? null) : null;
+  const cloud = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? useEditorCloud(
+        (f) => void openFile(f, "cloud"),
+        // Never over a file that is opening, a password being asked for, or an open document.
+        () => !opening.current && !busy && !locked && !opened,
+        () => picker.current?.element ?? null,
+      ) : null;
+  if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1") cancelCloud.current = cloud!.cancel;
 
   const openBlank = useCallback(async () => {
+    cancelCloud.current?.();
     setBusy(true);
     try {
       await finish("blank.pdf", blankPdf(defaultPaper(navigator.language)));
@@ -225,7 +242,8 @@ export function EditorTool() {
         // The cloud download's line sits over the same reserved slot (never moves the page), outside the live region.
         <div className="relative">
           {status}
-          {!open && <EditorCloudStatus cloud={cloud!} line={!notice} />}
+          {/* Its notices show over the open editor too (a cloud file that arrived too late says so). */}
+          <EditorCloudStatus cloud={cloud!} line={!notice && !open} />
         </div>
       ) : (
         status

@@ -4,31 +4,59 @@
  * its iframe shows "You must sign in…" and posts nothing at all. We can't read that page (another
  * origin), so silence after the frame's load is the signal for the window's failure state.
  */
+
+export type PickerWatch = {
+  /** The frame's load event: the countdown starts, unless the picker has already spoken. */
+  loaded: () => void;
+  /** Stops listening and any countdown (the pick ended, or the window gave up on it). */
+  stop: () => void;
+};
+
 /**
- * Calls `onQuiet` when the picker frame has posted nothing to this window for `ms` after its load
- * event (Google's own sign-in page inside the picker posts nothing; a working picker posts its
- * "loaded" callback at once). Any message from the frame's origin and window counts as alive.
- * Start it from the iframe's load event. Returns a stop function.
+ * Listens from the moment the picker frame exists, so a "loaded" message posted before the frame's
+ * own load event is not missed. `loaded()` (call it on that load event) starts a countdown of `ms`
+ * only if nothing has arrived yet; `onQuiet` runs if it ends with still nothing. Any message from
+ * `origin` and the frame's window counts. Everything stops once a message arrives or the countdown
+ * fires.
  */
-export function pickerWatchdog(o: { target: Pick<Window, "addEventListener" | "removeEventListener">; frame: { contentWindow: unknown } | null; origin: string; ms: number; onQuiet: () => void; setTimer?: (f: () => void, ms: number) => unknown; clearTimer?: (t: unknown) => void }) {
+export function pickerWatchdog(o: {
+  target: Pick<Window, "addEventListener" | "removeEventListener">;
+  frame: { contentWindow: unknown } | null;
+  origin: string;
+  ms: number;
+  onQuiet: () => void;
+  setTimer?: (f: () => void, ms: number) => unknown;
+  clearTimer?: (t: unknown) => void;
+}): PickerWatch {
   const set = o.setTimer ?? ((f, ms) => setTimeout(f, ms));
   const clear = o.clearTimer ?? ((t) => clearTimeout(t as ReturnType<typeof setTimeout>));
-  let timer: unknown = set(() => {
-    timer = null;
-    o.onQuiet();
-  }, o.ms);
-  const onMessage = (e: Event) => {
-    const m = e as MessageEvent;
-    if (m.origin !== o.origin || (o.frame && m.source !== o.frame.contentWindow)) return;
-    stop();
-  };
+  let heard = false;
+  let done = false;
+  let timer: unknown = null;
   const stop = () => {
+    done = true;
     if (timer != null) clear(timer);
     timer = null;
     o.target.removeEventListener("message", onMessage);
   };
+  const onMessage = (e: Event) => {
+    const m = e as MessageEvent;
+    if (m.origin !== o.origin || (o.frame && m.source !== o.frame.contentWindow)) return;
+    heard = true;
+    stop();
+  };
   o.target.addEventListener("message", onMessage);
-  return stop;
+  return {
+    loaded: () => {
+      if (heard || done || timer != null) return;
+      timer = set(() => {
+        timer = null;
+        stop();
+        o.onQuiet();
+      }, o.ms);
+    },
+    stop,
+  };
 }
 
 /** How long the picker may stay silent after its load before the window shows the failure state. */

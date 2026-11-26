@@ -31,70 +31,92 @@ describe("Google sign-in failures (what the /cloud/google window can detect)", (
 describe("pickerWatchdog (Google's blocked picker posts nothing)", () => {
   it("waits about 6 s after the frame's load", () => expect(PICKER_QUIET_MS).toBe(6000));
 
-  it("on the clock: silent for the whole wait fires once; a message just before the end does not", () => {
+  const ORIGIN = "https://docs.google.com";
+  const setup = () => {
+    const target = new EventTarget();
+    const frame = { contentWindow: {} };
+    const onQuiet = vi.fn();
+    const watch = pickerWatchdog({ target: target as unknown as Window, frame, origin: ORIGIN, ms: PICKER_QUIET_MS, onQuiet });
+    const post = (origin = ORIGIN, source: unknown = frame.contentWindow) =>
+      target.dispatchEvent(Object.assign(new Event("message"), { origin, source, data: JSON.stringify({ action: "loaded" }) }));
+    return { watch, onQuiet, post };
+  };
+
+  it("silent for the whole wait after the load: fires once, then stops listening", () => {
     vi.useFakeTimers();
     try {
-      const target = new EventTarget();
-      const frame = { contentWindow: {} };
-      const quiet = vi.fn();
-      pickerWatchdog({ target: target as unknown as Window, frame, origin: "https://docs.google.com", ms: PICKER_QUIET_MS, onQuiet: quiet });
+      const w = setup();
+      w.watch.loaded();
       vi.advanceTimersByTime(PICKER_QUIET_MS - 1);
-      expect(quiet).not.toHaveBeenCalled();
+      expect(w.onQuiet).not.toHaveBeenCalled();
       vi.advanceTimersByTime(1);
-      expect(quiet).toHaveBeenCalledOnce();
-
-      const alive = vi.fn();
-      pickerWatchdog({ target: target as unknown as Window, frame, origin: "https://docs.google.com", ms: PICKER_QUIET_MS, onQuiet: alive });
-      vi.advanceTimersByTime(PICKER_QUIET_MS - 100);
-      // The picker's "loaded" callback, as toUri() pickers post it.
-      target.dispatchEvent(Object.assign(new Event("message"), { origin: "https://docs.google.com", source: frame.contentWindow, data: JSON.stringify({ action: "loaded" }) }));
-      vi.advanceTimersByTime(10_000);
-      expect(alive).not.toHaveBeenCalled();
+      expect(w.onQuiet).toHaveBeenCalledOnce();
+      // Stopped when it fired: a late message or a second load does nothing more.
+      w.post();
+      w.watch.loaded();
+      vi.advanceTimersByTime(PICKER_QUIET_MS * 2);
+      expect(w.onQuiet).toHaveBeenCalledOnce();
     } finally {
       vi.useRealTimers();
     }
   });
 
-  const setup = () => {
-    const target = new EventTarget();
-    const frame = { contentWindow: {} };
-    const onQuiet = vi.fn();
-    let fire: (() => void) | null = null;
-    const clearTimer = vi.fn(() => (fire = null));
-    const stop = pickerWatchdog({ target: target as unknown as Window, frame, origin: "https://docs.google.com", ms: 8000, onQuiet, setTimer: (f: () => void) => (fire = f), clearTimer });
-    const post = (origin: string, source: unknown) => target.dispatchEvent(Object.assign(new Event("message"), { origin, source }));
-    return { frame, onQuiet, post, stop, fire: () => fire?.() };
-  };
-
-  it("a picker that stays silent gets the way out", () => {
-    const w = setup();
-    w.fire();
-    expect(w.onQuiet).toHaveBeenCalledOnce();
+  it("a message before the frame's load (the picker's early \"loaded\") means no countdown at all", () => {
+    vi.useFakeTimers();
+    try {
+      const w = setup();
+      w.post();
+      w.watch.loaded();
+      vi.advanceTimersByTime(PICKER_QUIET_MS * 3);
+      expect(w.onQuiet).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it("any message from the picker frame counts as alive", () => {
-    const w = setup();
-    w.post("https://docs.google.com", w.frame.contentWindow);
-    w.fire();
-    expect(w.onQuiet).not.toHaveBeenCalled();
+  it("a message during the countdown stops it", () => {
+    vi.useFakeTimers();
+    try {
+      const w = setup();
+      w.watch.loaded();
+      vi.advanceTimersByTime(PICKER_QUIET_MS - 100);
+      w.post();
+      vi.advanceTimersByTime(10_000);
+      expect(w.onQuiet).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it("messages from another origin or another frame don't", () => {
-    const w = setup();
-    w.post("https://evil.example", w.frame.contentWindow);
-    w.post("https://docs.google.com", {});
-    w.fire();
-    expect(w.onQuiet).toHaveBeenCalledOnce();
+  it("messages from another origin or another frame don't count", () => {
+    vi.useFakeTimers();
+    try {
+      const w = setup();
+      w.post("https://evil.example");
+      w.post(ORIGIN, {});
+      w.watch.loaded();
+      vi.advanceTimersByTime(PICKER_QUIET_MS);
+      expect(w.onQuiet).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it("stop() cancels it", () => {
-    const w = setup();
-    w.stop();
-    w.fire();
-    expect(w.onQuiet).not.toHaveBeenCalled();
+  it("nothing counts down before the load, and stop() cancels it", () => {
+    vi.useFakeTimers();
+    try {
+      const w = setup();
+      vi.advanceTimersByTime(PICKER_QUIET_MS * 3);
+      expect(w.onQuiet).not.toHaveBeenCalled();
+      w.watch.loaded();
+      w.watch.stop();
+      vi.advanceTimersByTime(PICKER_QUIET_MS * 3);
+      expect(w.onQuiet).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
-
 
 const BASE = "https://docs.google.com/picker?protocol=gadgets&origin=https%3A%2F%2Fberrypdf.test&oauth_token=ya29.a(b)&developerKey=K&nav=((%22all%22%2Cnull))";
 

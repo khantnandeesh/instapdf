@@ -264,6 +264,21 @@ describe("openCloudWindow (tool tab)", () => {
     win.close();
   });
 
+  it("'device' (Choose from this device) calls onDevice, then onClosed('cancel'), and ends the session", async () => {
+    const calls: string[] = [];
+    const s = openCloudWindow(
+      "mock",
+      params,
+      { onDevice: () => calls.push("device"), onClosed: (r) => calls.push(`closed:${r}`) },
+      { Channel, open: () => ({ close() {} }) as Window, hidden: () => false },
+    )!;
+    const win = peer();
+    win.postMessage(wrap("window", REQ, { t: "device" }));
+    await vi.waitFor(() => expect(calls).toEqual(["device", "closed:cancel"]));
+    expect(s.ended).toBe(true);
+    win.close();
+  });
+
   it("sends the file to save only after the window is ready", async () => {
     const s = openCloudWindow("mock", { ...params, mode: "save" }, {}, { Channel, open: () => ({ close() {} }) as Window, hidden: () => false })!;
     const win = peer();

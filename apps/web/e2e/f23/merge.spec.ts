@@ -132,6 +132,9 @@ test("AC-139: local, Google Drive, Dropbox and OneDrive files merge in card orde
 for (const [path, w, h] of [
   ["/merge-pdf", 320, 568],
   ["/rotate-pdf", 320, 568],
+  ["/merge-pdf", 360, 640],
+  ["/rotate-pdf", 360, 640],
+  ["/merge-pdf", 390, 664],
   ["/rotate-pdf", 390, 664],
 ] as const) {
   test(`AC-155: at ${w}x${h} ${path}'s drop card, split button and row fit the viewport (no clipping)`, async ({ page }) => {

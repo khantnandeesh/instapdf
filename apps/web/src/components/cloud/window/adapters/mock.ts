@@ -89,7 +89,7 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
       const r = await ctx.mockPick!();
       if (r !== "quiet") return r;
       // A picker that posts nothing, as Google's does when it is blocked: the same check as the Google window.
-      pickerWatchdog({ target: window, frame: null, origin: "https://docs.google.com", ms: PICKER_QUIET_MS, onQuiet: () => ctx.trouble?.() });
+      pickerWatchdog({ target: window, frame: null, origin: "https://docs.google.com", ms: PICKER_QUIET_MS, onQuiet: () => ctx.trouble?.() }).loaded();
       return new Promise<never>(() => {});
     },
     save: async (file, onProgress) => {

@@ -348,6 +348,22 @@ export function createIntake(host: CloudHub) {
       update((prev) => prev.map((x) => (x.key === key ? { ...x, status: "downloading", loaded: 0 } : x)));
       d().announce(transferCopy.liveDownloading(e.name, e.provider));
     },
+    /**
+     * Ends every pick still in progress without a word (the page took a file from somewhere else:
+     * the editor opened a local file): their windows close, their notices and download cards go.
+     */
+    abort() {
+      for (const [req, st] of sessions) {
+        // A pick that has handed its file over is finishing (its ack, the last used source): left alone.
+        if (st.gotFiles) continue;
+        st.session.cancel();
+        if (st.waitNotice) d().dismissNotice(st.waitNotice);
+        if (st.stoppedNotice) d().dismissNotice(st.stoppedNotice);
+        sessions.delete(req);
+        entries = entries.filter((e) => e.req !== req);
+      }
+      publish();
+    },
     /** Closes every window this tab opened (the tool went away). */
     dispose() {
       for (const s of sessions.values()) s.session.cancel();

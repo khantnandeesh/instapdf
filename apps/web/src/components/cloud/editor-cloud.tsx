@@ -19,13 +19,25 @@ const editorTool = { flow: EDITOR_CLOUD_FLOW } as const;
 
 let seq = 0;
 
-export type EditorCloud = { hub: CloudHub; notices: FlowNotice[]; dismiss: (id: string) => void; message: string };
+export type EditorCloud = {
+  hub: CloudHub;
+  notices: FlowNotice[];
+  dismiss: (id: string) => void;
+  message: string;
+  /** Ends every cloud pick in progress (a local file, a drop, a paste or a blank page came first). */
+  cancel: () => void;
+};
+
+/** A cloud file that arrived after another file took the editor: never opened over it. */
+const notOpened = (name: string) => `${name} wasn't opened: another PDF is already open.`;
 
 /**
  * The landing's cloud hub. `open` is the editor's own open path (type, size and password checks, then
  * focus mode); the intake has already screened the type and size against EDITOR_CLOUD_FLOW.
+ * `canOpen`: false while a file is opening, a password is asked for, or a document is open. A cloud
+ * file that arrives then is dropped with a notice: it never replaces a document or its edits.
  */
-export function useEditorCloud(open: (file: File) => void, devicePicker: () => HTMLElement | null): EditorCloud {
+export function useEditorCloud(open: (file: File) => void, canOpen: () => boolean, devicePicker: () => HTMLElement | null): EditorCloud {
   const hub = useCloud();
   const [notices, setNotices] = useState<FlowNotice[]>([]);
   const [message, setMessage] = useState("");
@@ -44,6 +56,10 @@ export function useEditorCloud(open: (file: File) => void, devicePicker: () => H
     intake: async (files) => {
       const file = files[0];
       if (!file) return;
+      if (!canOpen()) {
+        pushNotice({ tone: "warning", title: notOpened(file.name), timeoutMs: 8000 });
+        return;
+      }
       // A file that arrives clears the landing's other notices, as a local pick does in the tool flow.
       setNotices((prev) => prev.filter((n) => n.sticky && n.tone !== "info"));
       open(file);
@@ -52,7 +68,8 @@ export function useEditorCloud(open: (file: File) => void, devicePicker: () => H
     devicePicker,
   };
   hub.deps = deps;
-  return { hub, notices, dismiss, message };
+  const cancel = useCallback(() => hub.intake?.abort(), [hub]);
+  return { hub, notices, dismiss, message, cancel };
 }
 
 /** The caret half of "Open PDF" (FilePicker's `sources` slot). */
@@ -70,7 +87,7 @@ export function EditorCloudRow({ cloud }: { cloud: EditorCloud }) {
  * reserved, so nothing moves): "Getting 1 file from Google Drive… 42%" with a progress bar. Plus the
  * floating notices (waiting, blocked, unreachable, denied, skipped) and the live region.
  */
-export function EditorCloudStatus({ cloud, line = true }: { cloud: EditorCloud; /** False while the landing shows its own notice in the slot. */ line?: boolean }) {
+export function EditorCloudStatus({ cloud, line = true }: { cloud: EditorCloud; /** False while the landing shows its own notice in the slot, or the editor is open. */ line?: boolean }) {
   const d = line ? cloud.hub.s.downloads.find((x) => x.status !== "failed") : undefined;
   const pct = d && d.total ? Math.min(100, Math.round((d.loaded / d.total) * 100)) : 0;
   return (

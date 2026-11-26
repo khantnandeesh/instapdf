@@ -7,7 +7,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { expectNoSeriousAxeViolations, settled } from "../support/axe";
-import { caret, cloudRow, closed, mockLog, mockPick, needsCloud, openWindow, reachPicker, recordRequests, rowButton } from "./support";
+import { caret, cloudRow, closed, mockLog, mockPick, needsCloud, openWindow, passwordField, reachPicker, recordRequests, rowButton } from "./support";
 
 needsCloud();
 
@@ -170,6 +170,44 @@ test("E6: when Google couldn't open, Choose from this device closes the window a
   await page.bringToFront();
   await expect(openPdf(page)).toBeFocused();
   await expect(editor(page)).toHaveAttribute("data-state", "empty");
+});
+
+test("E6: a local file opened while a cloud pick is in progress wins; the cloud pick ends and never replaces it", async ({ page }) => {
+  await openEditor(page);
+  // 1. The window is open, nothing picked yet: a local pick closes it.
+  const win = await openWindow(page, () => rowButton(page, "Google Drive").click());
+  await reachPicker(win);
+  await page.getByTestId("editor-input").setInputFiles("tests/fixtures/bravo.pdf");
+  await expect(editor(page)).toHaveAttribute("data-state", "open", { timeout: 20_000 });
+  await expect(page.getByTestId("file-menu")).toHaveAccessibleName("File: bravo.pdf");
+  await closed(win); // cancelled: nothing more can come from it
+  await expect(page.getByText("Waiting for Google Drive…")).toBeHidden();
+
+  // 2. A file already downloading from the cloud when a local file opens: the download stops, the local file stays.
+  await openEditor(page);
+  const win2 = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  await mockPick(win2, ["alpha.pdf"], { slow: "alpha.pdf" });
+  await expect(page.getByTestId("editor-cloud-status")).toBeVisible();
+  await page.getByTestId("editor-input").setInputFiles("tests/fixtures/bravo.pdf");
+  await expect(page.getByTestId("file-menu")).toHaveAccessibleName("File: bravo.pdf", { timeout: 20_000 });
+  await closed(win2);
+  await page.waitForTimeout(3000); // longer than the slow download would have taken
+  await expect(page.getByTestId("file-menu")).toHaveAccessibleName("File: bravo.pdf");
+  expect(await page.evaluate(() => localStorage.getItem("berrypdf:cloud-last"))).not.toBe("dropbox");
+});
+
+test("E6, AC-149: a password-protected PDF from the cloud opens the editor's password dialog", async ({ page }) => {
+  await openEditor(page);
+  const win = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  await mockPick(win, ["user-pw.pdf"]);
+  await closed(win);
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("user-pw.pdf");
+  await expect(passwordField(page)).toBeFocused();
+  await passwordField(page).fill("test");
+  await dialog.getByRole("button", { name: "Unlock" }).click();
+  await expect(editor(page)).toHaveAttribute("data-state", "open", { timeout: 20_000 });
+  await expect(page.getByTestId("file-menu")).toHaveAccessibleName("File: user-pw.pdf");
 });
 
 test("E6: a wrong file from the cloud gets the editor's message and the landing stays", async ({ page }) => {

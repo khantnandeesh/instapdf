@@ -247,16 +247,12 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
       const url = pickerUrl(b.toUri(), { appId, authUser: email });
       ctx.setPhase("picking");
       const frame = await ctx.frame({ url }, "Google Drive");
-      // Google's "You must sign in" page inside the picker can't be read: a picker silent after its load is the failure state.
-      let stopWatch = () => {};
-      frame?.addEventListener(
-        "load",
-        () => {
-          stopWatch();
-          stopWatch = pickerWatchdog({ target: window, frame, origin: "https://docs.google.com", ms: PICKER_QUIET_MS, onQuiet: () => ctx.trouble?.() });
-        },
-        { once: true },
-      );
+      // Google's "You must sign in" page inside the picker can't be read: a picker silent after its load is the
+      // failure state. Listening starts now, so a message posted before the frame's load still counts.
+      const watch = pickerWatchdog({ target: window, frame, origin: "https://docs.google.com", ms: PICKER_QUIET_MS, onQuiet: () => ctx.trouble?.() });
+      if (frame) frame.addEventListener("load", () => watch.loaded(), { once: true });
+      else watch.loaded();
+      const stopWatch = watch.stop;
       return new Promise<Picked[] | "cancel">((resolve) => {
         const onMessage = (e: MessageEvent) => {
           if (e.origin !== "https://docs.google.com" || (frame && e.source !== frame.contentWindow)) return;
