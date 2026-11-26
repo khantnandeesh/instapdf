@@ -35,6 +35,7 @@ export function NumberStepper({
   min = 1,
   max = 9999,
   under,
+  onEnter,
   className,
 }: {
   /** The field's text (the caller validates it with stepperValue). */
@@ -50,6 +51,8 @@ export function NumberStepper({
   /** Outside the dock (Alternate's file cards): the error is a line under the stepper, covering nothing, in a row
    *  kept free for it, so the card never jumps when it appears (visual gate round 2). */
   under?: boolean;
+  /** Enter: run with the number as typed. The tool checks it (live) and runs only when it is valid. */
+  onEnter?: () => void;
   className?: string;
 }) {
   const id = useId();
@@ -68,6 +71,16 @@ export function NumberStepper({
   const atMax = (stepperValue(value, min, max) ?? 0) >= max;
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && onEnter && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      if (!valid) {
+        setShown(true);
+        shakeElement(field.current);
+      }
+      // The tool decides from the number as typed (its live state), which this render may not show yet.
+      onEnter();
+      return;
+    }
     const delta = e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : e.key === "PageUp" ? 10 : e.key === "PageDown" ? -10 : 0;
     if (!delta) return;
     e.preventDefault();

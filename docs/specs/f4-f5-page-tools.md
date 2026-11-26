@@ -275,7 +275,7 @@ Common to all: pages are **copied** with pdf-lib, not re-rendered. Content strea
 
 ### 6d. Organize
 
-- One PDF, the page list order exactly. Name: `<first source's base name>_organized.pdf`. *Reference:* the hidden output-name field holds `<first>_merged.pdf` before the run, even with one file (`organize-log.json`). We use a name that says what happened (§8 decision 9). Combine & reorder keeps Merge's `<first>_merged.pdf`.
+- One PDF, the page list order exactly. Name: `<first source's base name>_organized.pdf`, where the first source is the **first file loaded** that still has a page in the output (not the file of the current first page), so moving, rotating, sorting or reversing pages never changes the name (eval G-6). *Reference:* the hidden output-name field holds `<first>_merged.pdf` before the run, even with one file (`organize-log.json`). We use a name that says what happened (§8 decision 9). Combine & reorder keeps Merge's `<first>_merged.pdf`.
 - Bookmarks kept and following edits; blank pages as in Merge (size of the page in front).
 
 ### 6e. Alternate & mix
@@ -382,7 +382,7 @@ Fixtures (QA generates them in `tests/fixtures/` with a script, no third-party c
 - **AC-496 (P1) (ref)** Remove ▾ → Keep only `twelve.pdf` leaves A1–A12. The undo notice's Undo brings B1–B3 back at the end.
 - **AC-497 (P1) (ref)** Remove ▾ → Remove all returns to the empty state and shows an Undo notice. Undo restores all 15 tiles in order.
 - **AC-498 (P0) (ref)** After removing A5, Add pages → From a loaded file → `twelve.pdf` opens the page picker with 12 tiles, every one marked "in use" except A5. Picking A5 and confirming puts it at the end. Running gives 15 pages, the last with the text "Twelve 5".
-- **AC-499 (P0) (ours)** Running with no edits gives one PDF named `twelve_organized.pdf` with 15 pages (Twelve 1–12, Page 1–3), all `/Rotate 0`, not encrypted.
+- **AC-499 (P0) (ours)** Running with no edits gives one PDF named `twelve_organized.pdf` with 15 pages (Twelve 1–12, Page 1–3), all `/Rotate 0`, not encrypted. The name follows the first file loaded, not the current first page: after Sort ▾ → Reverse (B3 first) the output is still `twelve_organized.pdf`; only when every page of `twelve.pdf` is removed does it take the next loaded file's name (`three-pages_organized.pdf`).
 - **AC-500 (P1) (ours)** After moving A12 to the front, the output outline is "Intro" → page 2, "Middle" → page 6 (child "Detail" → page 7) and "End" → page 11.
 - **AC-501 (P1) (ours)** With only `twelve.pdf` loaded the view toggle is shown, and the Files view shows one card with 12 pages. After moving A12 to the front it shows 2 cards (page 12; pages 1–11).
 - **AC-502 (P1) (ours)** `charlie.png` + `twelve.pdf` gives 13 tiles; running gives 13 pages, the first holding one image.
@@ -1046,6 +1046,7 @@ DOM order follows this visual order (the bar is last in the DOM). The empty side
 | Arrows, Home / End, PageUp / PageDown | grid | Move the tile focus (F1) |
 | Enter | Split tile, Alternate result tile | Open the preview |
 | Space / Enter | Extract / Delete tile | Toggle pick / mark |
+| Enter | Parts / pages field, Pages per file, a card's pages per turn | Runs, as the primary would, with the text exactly as typed (a paste then Enter at once included, eval G-3); while the text is invalid it shows its message and does not run |
 | Shift+Space, Shift+click | Extract / Delete | Extend from the last toggled tile |
 | Ctrl/Cmd+click | Extract / Delete | Toggle (same as click) |
 | Delete / Backspace | Delete tile | Toggle the mark (AC-470) |

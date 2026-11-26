@@ -4,11 +4,12 @@ import { selectCopy } from "@/components/page-select/copy";
 import { planFiles, useDebouncedAnnounce, useRemembered } from "@/components/page-select/hooks";
 import { usePageSelection } from "@/components/page-select/usePageSelection";
 import { MoreOptions } from "@/components/page-select/MoreOptions";
-import { RangeField } from "@/components/page-select/RangeField";
+import { RangeField, type RangeFieldHandle } from "@/components/page-select/RangeField";
 import { Step, StripGlyph } from "@/components/page-select/Step";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
 import type { FlowApi, ProcessFn } from "@/components/tool-flow/types";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { USER_ERROR } from "@/lib/pdf/user-error";
 import { flowTool } from "@/tools/registry";
 import { extractCopy as c } from "./copy";
 
@@ -35,7 +36,8 @@ export function ExtractTool() {
     const picked = files.reduce((n, f) => n + (state.sets[f.id]?.length ?? 0), 0);
     if (files.length) announce(c.live(picked, files.reduce((n, f) => n + f.pageCount, 0)));
   });
-  const [opts, setOpts] = useRemembered("extract-pdf-pages", defaults, check);
+  const [opts, setOpts, optsLive] = useRemembered("extract-pdf-pages", defaults, check);
+  const field = useRef<RangeFieldHandle>(null);
 
   const errorText = s.errorText;
 
@@ -57,10 +59,19 @@ export function ExtractTool() {
 
   // The planner is only needed for the run (kept out of the first load, spec UI P-12).
   const process: ProcessFn = async (files, signal, onProgress) => {
+    // The selection as typed (eval G-3): read live, not from this render.
+    const now = s.current();
+    if (now.errorText) throw new Error(USER_ERROR + now.errorText);
     const { planExtract } = await import("@/lib/page-plans");
-    const run = planExtract(planFiles(files), s.state.sets, { pattern: opts.pattern });
+    const run = planExtract(planFiles(files), now.state.sets, { pattern: optsLive.current.pattern });
     const { runPlan } = await import("@/components/page-select/job");
-    return runPlan("extract", run, files, opts.removeBookmarks, signal, onProgress);
+    return runPlan("extract", run, files, optsLive.current.removeBookmarks, signal, onProgress);
+  };
+  /** Enter in the field: run when the pages as typed pick something. */
+  const submit = () => {
+    const now = s.current();
+    if (now.errorText) return field.current?.shake();
+    if (now.count > 0) apiRef.current?.submit();
   };
 
   return (
@@ -114,6 +125,7 @@ export function ExtractTool() {
             className="shrink-0 dock-bar:w-auto dock-bar:gap-1.5 max-sm:dock-bar:[&>button]:px-2"
           />
           <RangeField
+            ref={field}
             label={c.field}
             value={s.state.text}
             placeholder={c.placeholder}
@@ -124,6 +136,7 @@ export function ExtractTool() {
             onChange={s.type}
             onBlur={s.blur}
             onClear={s.clear}
+            onEnter={submit}
             className="min-w-0 flex-1 dock-bar:lg:w-[190px] dock-bar:lg:flex-none dock-bar:xl:w-[300px] max-[399px]:basis-full"
           />
         </div>

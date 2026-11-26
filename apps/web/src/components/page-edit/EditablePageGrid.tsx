@@ -3,7 +3,7 @@ import "./page-edit.css";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { flip } from "@/lib/motion/flow";
-import { pageBoxStyle, pageTransform } from "@/components/tool-flow/page-box";
+import { pageBoxStyle, pageTransform, pageTurnScale } from "@/components/tool-flow/page-box";
 import { PageThumb } from "@/components/tool-flow/Thumbnail";
 import { Button } from "@/components/ui/Button";
 import { cx } from "@/components/ui/cx";
@@ -435,7 +435,7 @@ export default function EditablePageGrid({
                       {labels.blankName}
                     </span>
                   ) : t.status === "ready" && t.fileId ? (
-                    <PageThumb fileId={t.fileId} index={t.sourceIndex} />
+                    <PageThumb fileId={t.fileId} index={t.sourceIndex} scale={pageTurnScale(t.size, t.rotation)} />
                   ) : (
                     <span className="grid h-full w-full place-items-center bg-band">
                       {t.status === "locked" ? <LockIcon size={24} className="text-muted" /> : <Spinner size={20} label={t.accessibleName} className="text-brand-strong" />}

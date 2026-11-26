@@ -516,7 +516,12 @@ export function usePageWorkspace({ tool, history: full }: { tool: FlowTool; hist
   // ---- run ----
   /** Writes `list` (the page list, or Alternate's interleaved order) as one PDF in the worker. */
   const runList =
-    (list: () => readonly Pick<PageRef, "sourceId" | "sourceIndex" | "rotation" | "size">[], options: () => MergeOptions, name: (first: string | undefined) => string): ProcessFn =>
+    (
+      list: () => readonly Pick<PageRef, "sourceId" | "sourceIndex" | "rotation" | "size">[],
+      options: () => MergeOptions,
+      /** The output's name from the first page's file name; `used` is the files in the output, in page order. */
+      name: (first: string | undefined, used: readonly string[]) => string,
+    ): ProcessFn =>
     async (ready, signal, onProgress) => {
       const pagesOut = list();
       const ids = sourcesInOrder(pagesOut as PageRef[]);
@@ -528,7 +533,7 @@ export function usePageWorkspace({ tool, history: full }: { tool: FlowTool; hist
       const out = await runInWorker(
         {
           kind: "merge",
-          name: name(sourcesRef.current[ids[0]]?.name),
+          name: name(sourcesRef.current[ids[0]]?.name, ids),
           sources: srcs,
           pages: pagesOut.map((p) => ({ sourceId: p.sourceId, sourceIndex: p.sourceIndex, rotation: p.rotation, size: p.sourceId ? undefined : p.size })),
           options: options(),
@@ -541,7 +546,7 @@ export function usePageWorkspace({ tool, history: full }: { tool: FlowTool; hist
   // Prefetch the workspace chunks at the first sign of intent (a pointer, key, focus or drag: the
   // file chooser then hides the load) or after 4 s, so the first pick never waits for them and the
   // first load stays within the phone JS budget (SEO checklist).
-  useEffect(() => onIntent(() => void Promise.all([loadSegmentGrid(), prefetchMenu()]).catch(() => {})), []);
+  useEffect(() => onIntent(() => void Promise.all([loadSegmentGrid(), prefetchMenu(), inspectPdf()]).catch(() => {})), []);
 
   // Load the pages view chunk on idle once there is something to show.
   useEffect(() => {

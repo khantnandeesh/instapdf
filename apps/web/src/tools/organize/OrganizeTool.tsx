@@ -112,7 +112,9 @@ export function OrganizeTool() {
         process={ws.runList(
           () => pagesRef.current,
           () => ORGANIZE_OPTIONS,
-          organizedName,
+          // The first file loaded that still has a page in the output (eval G-6): `sources` keeps the
+          // files in load order, so moving, rotating or reversing pages never changes the name.
+          (first, used) => organizedName(sourcesRef.current[Object.keys(sourcesRef.current).find((id) => used.includes(id)) ?? ""]?.name ?? first),
         )}
         copyOverrides={{ pickerButton: mergeCopy.pickerButton, pickerHint: mergeCopy.pickerHint, limits: mergeCopy.limits, limitsFull: mergeCopy.limitsFull, statusEmpty: mergeCopy.statusEmpty, errorType: mergeCopy.errorType }}
         readyStatus={() => o.status(ws.readyPages.length, ws.sourceCount)}

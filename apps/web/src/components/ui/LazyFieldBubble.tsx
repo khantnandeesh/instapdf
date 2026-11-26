@@ -1,4 +1,9 @@
 "use client";
+// The bubble's stylesheet ships with the page, not with the lazy chunk (eval G-3). Next renders a lazy
+// chunk's CSS as a React <link precedence>, and React holds every commit on the page until such a
+// stylesheet has loaded: fetched when a field mounts (Split's Parts, Every N), it kept the typed text
+// from committing, so a fill followed at once by Enter or the primary ran with the previous parts.
+import "./field-bubble.css";
 import dynamic from "next/dynamic";
 import { useEffect, type ComponentProps } from "react";
 import type { FieldBubble } from "./FieldBubble";

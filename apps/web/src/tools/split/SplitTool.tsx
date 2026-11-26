@@ -1,9 +1,9 @@
 "use client";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import { selectCopy } from "@/components/page-select/copy";
-import { planFiles, useDebouncedAnnounce, useLazyModule, useRemembered } from "@/components/page-select/hooks";
+import { planFiles, useDebouncedAnnounce, useLazyModule, useLiveState, useRemembered } from "@/components/page-select/hooks";
 import { MoreOptions } from "@/components/page-select/MoreOptions";
-import { RangeField } from "@/components/page-select/RangeField";
+import { RangeField, type RangeFieldHandle } from "@/components/page-select/RangeField";
 import type { SelFile } from "@/components/page-select/selection";
 import { Step, StripGlyph } from "@/components/page-select/Step";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
@@ -12,6 +12,7 @@ import { ScissorsIcon } from "@/components/ui/icons";
 import { NumberStepper } from "@/components/ui/NumberStepper";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Select } from "@/components/ui/Select";
+import { USER_ERROR } from "@/lib/pdf/user-error";
 import { flowTool } from "@/tools/registry";
 import { splitCopy as c } from "./copy";
 import { clearParts, DEFAULT_N, DEFAULT_PATTERN, initialSplit, setKind as withKind, setN, typeParts, type SplitKind, type SplitState } from "./state";
@@ -56,10 +57,12 @@ export function SplitTool() {
   const apiRef = useRef<FlowApi | null>(null);
   const announce = useDebouncedAnnounce(apiRef);
   const selectId = useId();
-  const [files, setFiles] = useState<SelFile[]>([]);
-  const [split, setSplit] = useState<SplitState>(initialSplit);
-  const [renames, setRenames] = useState<Record<string, string>>({});
-  const [opts, setOpts] = useRemembered("split-pdf", defaults, check, (stored) =>
+  const [files, setFiles, filesLive] = useLiveState<SelFile[]>([]);
+  // Live state (eval G-3): the run and Enter read the parts as typed, even before React shows them.
+  const [split, setSplit, splitLive] = useLiveState<SplitState>(initialSplit);
+  const [renames, setRenames, renamesLive] = useLiveState<Record<string, string>>({});
+  const partsField = useRef<RangeFieldHandle>(null);
+  const [opts, setOpts, optsLive] = useRemembered("split-pdf", defaults, check, (stored) =>
     setSplit((s) => ({ ...s, ...(stored.kind ? { kind: stored.kind } : {}), ...(stored.nText ? { nText: stored.nText } : {}) })),
   );
   const user = useRef(false);
@@ -67,14 +70,15 @@ export function SplitTool() {
   const onFilesChange = useCallback((all: LoadedFile[]) => {
     const next = planFiles(all);
     setFiles((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
-  }, []);
+  }, [setFiles]);
 
-  const change = (next: SplitState) => {
+  /** A user's change, worked out from the live settings (never from this render's, which may be behind). */
+  const change = (fn: (s: SplitState) => SplitState) => {
     user.current = true;
-    setSplit(next);
+    setSplit(fn);
   };
   const setKind = (kind: SplitKind) => {
-    change(withKind(split, kind));
+    change((s) => withKind(s, kind));
     setOpts({ kind });
   };
 
@@ -101,10 +105,24 @@ export function SplitTool() {
   const changed = (opts.pattern !== DEFAULT_PATTERN ? 1 : 0) + (opts.removeBookmarks ? 1 : 0) + (plan?.documents.some((d) => d.key in renames) ? 1 : 0);
 
   const process: ProcessFn = async (ready, signal, onProgress) => {
-    const run = (m ?? (await loadModel())).splitPlan(split, planFiles(ready), { pattern: opts.pattern, renames });
-    if (!run) throw new Error("Split settings are invalid");
+    const model = m ?? (await loadModel());
+    const s = splitLive.current;
+    const planned = planFiles(ready);
+    const run = model.splitPlan(s, planned, { pattern: optsLive.current.pattern, renames: renamesLive.current });
+    if (!run) {
+      const bad = model.splitProblem(s, planned);
+      throw new Error(USER_ERROR + (bad && "field" in bad ? model.rangeErrorText(bad.field, planned.map((f) => f.pageCount)) : selectCopy.stepperError));
+    }
     const { runPlan } = await import("@/components/page-select/job");
-    return runPlan("split", run, ready, opts.removeBookmarks, signal, onProgress);
+    return runPlan("split", run, ready, optsLive.current.removeBookmarks, signal, onProgress);
+  };
+  /** Enter in the Parts or N field: run when the settings as typed make files. */
+  const submit = () => {
+    const s = splitLive.current;
+    const fs = filesLive.current;
+    if (!m || !fs.length) return;
+    if (m.splitProblem(s, fs)) return partsField.current?.shake();
+    if (m.splitPlan(s, fs)?.documents.length) apiRef.current?.submit();
   };
 
   return (
@@ -148,7 +166,7 @@ export function SplitTool() {
                 tabIndex={tabIndex}
                 data-testid="split-mark"
                 onClick={() => {
-                  change(m.toggleMark(split, files, file.id, index));
+                  change((s) => m.toggleMark(s, filesLive.current, file.id, index));
                   setOpts({ kind: "custom" });
                 }}
               >
@@ -203,13 +221,14 @@ export function SplitTool() {
                     <NumberStepper
                       value={split.nText}
                       onChange={(nText) => {
-                        change(setN(split, nText));
+                        change((s) => setN(s, nText));
                         if (/^\d{1,4}$/.test(nText.trim())) setOpts({ nText: nText.trim() });
                       }}
                       label={c.perFile}
                       decLabel={c.fewer}
                       incLabel={c.more}
                       error={selectCopy.stepperError}
+                      onEnter={submit}
                     />
                   </div>
                 </>
@@ -218,6 +237,7 @@ export function SplitTool() {
                 <>
                   <Step n={2}>{c.parts}</Step>
                   <RangeField
+                    ref={partsField}
                     label={c.parts}
                     value={split.text}
                     placeholder={c.placeholder}
@@ -225,9 +245,10 @@ export function SplitTool() {
                     error={fieldError}
                     clearLabel={selectCopy.clearParts}
                     canClear={!!split.text || Object.keys(split.perFile).length > 0}
-                    onChange={(text) => change(typeParts(split, text))}
-                    onBlur={() => setSplit((s) => (m ? m.blurParts(s, files) : s))}
-                    onClear={() => change(clearParts(split))}
+                    onChange={(text) => change((s) => typeParts(s, text))}
+                    onBlur={() => setSplit((s) => (m ? m.blurParts(s, filesLive.current) : s))}
+                    onClear={() => change(clearParts)}
+                    onEnter={submit}
                     className="min-w-0 flex-1 dock-bar:lg:w-[190px] dock-bar:lg:flex-none dock-bar:xl:w-[300px]"
                   />
                 </>
