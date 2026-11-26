@@ -1,5 +1,6 @@
 # F16 E3 forms: parity evaluation (step 8)
 
+- **Verdict (updated 26 Nov 2026): PASS.** M2 is now a tie: a real Google Drive pick opens in the editor on staging 3c99764 (see "M2 re-check" at the end). No forms re-run was needed, as recorded on 24 Nov.
 - **Verdict (updated 2026-11-24 20:25 UTC, staging bc02fa1): FAIL on M2 only.** No forms blocker remains: every AC passes (24 / 24, all P0) and every forms gap that blocked the first run is fixed. **M12 is now a win** (re-measured on bc02fa1, see "M12 re-measure" below). The gate still fails on one micro-check lose that this feature does not own: **M2** (no cloud or URL source, owned by the cloud pickers work, behind a flag until the owner creates the OAuth apps). The owner has not waived it. Once M2 lands, the verdict becomes PASS without a forms re-run (lead, 2026-11-24: no waiver).
 - Re-evaluation verdict (18:14–18:40 UTC, staging 3fc9e65): FAIL on M2 and M12 (cross-cutting only). Details are in the re-evaluation section below.
 - First run verdict (16:01–16:40 UTC, staging 341fa82): FAIL.
@@ -331,3 +332,9 @@ None recorded.
 
 - Sejda outputs and screenshots are cached in `/mnt/project-files/evals-cache/f16-forms/` (`sejda-t1-fill.pdf`, `sejda-t2-create.pdf`, `sejda-t3-detect.pdf`, `sejda-runs.json`). Reuse them. A re-evaluation needs no new Sejda task unless the reference changes.
 - To re-check, re-run the same BerryPDF flows with the fixtures above, the pikepdf/pdf.js/PDFium checks and the viewport script. Every gap above has a reproducible check.
+
+## M2 re-check (26 Nov 2026, staging 3c99764)
+
+Re-check of M2 (upload start) on staging, 26 Nov 2026, under the cloud pass rule: a pass needs a real file picked from the provider and landing in the tool, in the owner's already signed-in Chrome, with no password typed. Neither the sign-in screen nor `/cloud/mock` counts. The raw screenshots stay in `/mnt/project-files/evals-cache/m2-cloud-recheck/real-pick/` (not in git, because they show the owner's Drive), and its README has the steps.
+
+This eval already said that once M2 landed the verdict would become PASS with no forms re-run (lead, 24 Nov). The `/edit-pdf` landing that forms use now opens a real Google Drive pick in the editor (screenshots 30–34). **M2 is a tie, and the verdict is PASS.** The open P2 items (G-19, G-22, G-24) are unchanged.

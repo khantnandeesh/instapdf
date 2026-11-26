@@ -1,5 +1,6 @@
 # Evaluation: F16 PDF editor, phase E1 (round 2)
 
+- **Verdict (updated 26 Nov 2026): PASS.** M2 was the only gate still failing. It is now a tie: a real Google Drive pick opens in the editor on staging 3c99764 (see "M2 re-check" at the end).
 - **Verdict: FAIL.** The only gate still failing is the micro-check gate: **M2 (upload start) is a lose**, with no owner waiver on record. Every other gate now clears: **P0 21/21**, **all ACs 60/62 (96.8%)**, Lighthouse mobile performance **96** (median of 4), and **0 critical** axe issues. M12 is no longer a lose: desktop now ties the reference and phone wins. Two ACs still fail, neither of them P0: **AC-51** (P1, editor JS over 250 KB gzip) and **AC-66** (P2, no recent images).
 - Evaluated: 2026-11-25, 18:45–19:10 UTC, by parity-evaluator. This is a re-evaluation of the round-1 FAIL of 2026-11-24.
 - Spec: `docs/specs/f16-pdf-editor.md` at `origin/main` `da7cede`. The E1-mapped AC set is the same as round 1: 62 judged ACs (21 P0, 37 P1, 4 P2); AC-1b is N/A in E1.
@@ -220,3 +221,15 @@ New this round:
 ## Owner waiver
 
 None on record. M2 is therefore counted as a lose.
+
+## M2 re-check (26 Nov 2026, staging 3c99764, after PR #67)
+
+Re-check of M2 (upload start) on staging, 26 Nov 2026, under the cloud pass rule: a pass needs a real file picked from the provider and landing in the tool, in the owner's already signed-in Chrome, with no password typed. Neither the sign-in screen nor `/cloud/mock` counts. The raw screenshots stay in `/mnt/project-files/evals-cache/m2-cloud-recheck/real-pick/` (not in git, because they show the owner's Drive), and its README has the steps.
+
+- `/edit-pdf` gets the shared cloud row and menu. Google's picker opened single-select and PDF-only, titled "Select an item".
+- Closing the picker closed our window and left the landing page unchanged, with no notice (screenshot 31).
+- A real Drive PDF came back with no token left in the URL. The window closed itself, and the PDF opened in the editor with its page drawn, with nothing uploaded (screenshots 32–34).
+- **Result: M2 is now a tie.** Google Drive works end to end. Dropbox and OneDrive are built but not yet verified with a real pick, because those accounts aren't signed in. We still have no "Web address (URL)" source, which the reference offers, and no upload of any kind.
+- The fix this eval asked for ("Ship the F23 cloud pickers to staging for `/edit-pdf`") is done, so **the verdict becomes PASS.**
+- AC-51 and AC-66 were fixed in #61 (editor JS ~157 kB, recent images). Neither is P0, and neither was blocking.
+- Follow-ups, not blocking: a URL source (the M2 win path), and the Dropbox and OneDrive real picks.

@@ -12,7 +12,6 @@ export const cloudCopy = {
   caretToolbar: (replace: boolean) => `${replace ? "Replace" : "Add files"} from ${buildNames()}`,
   rowLabel: "Cloud storage",
   lastUsed: " (last used)",
-  lastUsedTitle: "Last used",
   offline: "You're offline.",
   /** `name`: a provider's name, or this build's list of them (the caret). */
   offlineBody: (name: string) => `${name} needs a connection. Files on this device still work.`,
