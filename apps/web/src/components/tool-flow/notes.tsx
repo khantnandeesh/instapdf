@@ -11,13 +11,17 @@ export function LimitsNote({ text, full }: { text: string; full: string }) {
   );
 }
 
-/** Browser tools only: server tools get their own copy in F6 and no result variant. */
+/** The privacy line under the picker and on the result (F25 AC-603): honest for server tools too. */
+export function privacyText(runtime: "client" | "server", context: "intro" | "result"): string {
+  if (runtime === "server") return context === "intro" ? copy.privacyIntroServer : copy.privacyResultServer;
+  return context === "intro" ? copy.privacyIntro : copy.privacyResult;
+}
+
 export function PrivacyNote({ runtime, context }: { runtime: "client" | "server"; context: "intro" | "result" }) {
-  if (runtime !== "client") return null;
   return (
     <p className="flex items-center gap-2 text-sm text-ink" data-testid={`privacy-${context}`}>
       <ShieldIcon size={18} className="shrink-0 text-brand-strong" />
-      {context === "intro" ? copy.privacyIntro : copy.privacyResult}
+      {privacyText(runtime, context)}
     </p>
   );
 }

@@ -1,6 +1,7 @@
 import type { Permission } from "@/tools/registry";
 import type { PageSize } from "@/lib/pdf/pdfjs";
 import type { ReactNode } from "react";
+import type { PillProgress } from "./announce";
 
 export type FileStatus = "loading" | "locked" | "ready";
 
@@ -41,8 +42,16 @@ export type ToolOutput = {
 
 export type FlowState = "empty" | "loading" | "password" | "ready" | "processing" | "done" | "error";
 
-/** `phase` "fonts" shows "Preparing fonts…" with an indeterminate bar until the next call without it. */
-export type ProcessFn = (files: ReadyFile[], signal: AbortSignal, onProgress: (fraction: number, phase?: "fonts" | "pages") => void) => Promise<ToolOutput>;
+/**
+ * `phase` "fonts" shows "Preparing fonts…" with an indeterminate bar until the next call without it.
+ * `job` (F25 §6): a server tool reports its upload / queue / work phases and registers what Cancel does.
+ */
+export type ProcessFn = (
+  files: ReadyFile[],
+  signal: AbortSignal,
+  onProgress: (fraction: number, phase?: "fonts" | "pages") => void,
+  job: { onPhase: (p: PillProgress) => void; onCancel: (cancel: () => Promise<boolean>) => void },
+) => Promise<ToolOutput>;
 
 /** What the tool tells the grid about one page. */
 export type PageDecoration = {

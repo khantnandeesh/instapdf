@@ -42,6 +42,11 @@ export type ToolFlowConfig = {
   /** Progress label, e.g. "Rotating" (shown as "Rotating… 42%"). */
   progressLabel: string;
   optionsDensity: "compact" | "full";
+  /**
+   * "settings" (F25 §4): a tool whose options are numbered steps (Compress, Protect, Watermark…). From
+   * 1024px they live in a side panel beside the stage and the top row holds only the action slot.
+   */
+  layout?: "settings";
   /** Output file name for these input names (one PDF, or a ZIP for several). */
   outputName: (inputs: string[]) => string;
 };

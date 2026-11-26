@@ -157,7 +157,6 @@ export function AlternateTool() {
       <ToolFlow
         tool={tool}
         {...ws.flowProps}
-        emptyLayout="bar"
         process={ws.runList(
           () => result,
           () => ALTERNATE_OPTIONS,

@@ -7,15 +7,15 @@ import { Floaties, Sticker } from "../berry/Berry";
  * leaf-cornered card (white surfaces stay solid, so the grid never runs behind the words) that
  * holds only the large upload button and two or three short muted lines (drop hint, limits, privacy).
  * The card pops in, then its outline breathes gently (mp-dropcard) to invite a drop.
- * From 1024 px the area is exactly as tall as the options panel (--ip-work-h), so the first
- * screen holds both and ends inside the viewport. The whole page stays the drop target. The decoration is aria-hidden, ignores the pointer and
- * never takes focus.
+ * F25 §2: the one empty state of every tool, the editor included. No options panel and no dock beside it:
+ * the card is centred, both ways, in --ip-work-h from 1024 px, and in the screen under the head below
+ * that (at least 300px). The whole page stays the drop target. The decoration is aria-hidden, ignores the
+ * pointer and never takes focus.
  */
-export function DropCard({ children, fill = "work" }: { children: ReactNode; fill?: "work" | "pages" }) {
+export function DropCard({ children }: { children: ReactNode }) {
   return (
     <div
-      // "pages": no side panel (ToolFlow emptyLayout="bar"), so the card fills the pages slot above the bar.
-      className={`mp-empty grid min-h-[300px] place-items-center px-[15px] py-10 max-[399px]:px-0 ${fill === "pages" ? "lg:h-(--ip-pages-h)" : "lg:h-(--ip-work-h)"} lg:min-h-0 lg:py-6`}
+      className="mp-empty grid min-h-[max(300px,calc(100dvh-var(--ip-header-h)-92px))] place-items-center px-[15px] py-6 max-[399px]:px-0 lg:h-(--ip-work-h) lg:min-h-0 lg:py-6"
       data-testid="drop-card"
     >
       <Floaties set="empty" />

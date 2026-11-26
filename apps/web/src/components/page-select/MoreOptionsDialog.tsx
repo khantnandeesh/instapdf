@@ -1,8 +1,16 @@
 "use client";
 import "../ui/dialog.css";
-import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
+import { Popover } from "../ui/Popover";
 import { Switch } from "../ui/Switch";
 import { dialogCopy } from "./dialog-copy";
 
@@ -16,23 +24,61 @@ export type MoreOptionsContent = {
   bookmarks: { value: boolean; onChange: (value: boolean) => void };
 };
 
-/** Below 640 px the dialog is a bottom sheet. */
-function usePhone(): boolean {
-  const [phone, setPhone] = useState(false);
+function useMedia(query: string): boolean {
+  const [on, setOn] = useState(false);
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)");
-    const on = () => setPhone(mq.matches);
-    on();
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-  return phone;
+    const mq = window.matchMedia(query);
+    const sync = () => setOn(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [query]);
+  return on;
 }
 
-export function MoreOptionsDialog({ open, onClose, returnFocusRef, content }: { open: boolean; onClose: () => void; returnFocusRef: RefObject<HTMLElement | null>; content: MoreOptionsContent }) {
-  const phone = usePhone();
+/**
+ * Below 640 px a bottom sheet, 640-1023 px a dialog, and from 1024 px (F25 §3.3) a non-modal popover under
+ * the More options button in the top row (the trigger's wrapper is `relative`). Same content and testids.
+ */
+export function MoreOptionsDialog({
+  open,
+  onClose,
+  returnFocusRef,
+  content,
+}: {
+  open: boolean;
+  onClose: () => void;
+  returnFocusRef: RefObject<HTMLElement | null>;
+  content: MoreOptionsContent;
+}) {
+  // Below 640 px the dialog is a bottom sheet.
+  const phone = useMedia("(max-width: 639px)");
+  const wide = useMedia("(min-width: 1024px)");
   const id = useId();
   const tipId = `${id}-tip`;
+  const body = <MoreOptionsBody id={id} tipId={tipId} content={content} />;
+  if (wide)
+    return (
+      <Popover
+        open={open}
+        onClose={onClose}
+        trigger={returnFocusRef}
+        label={dialogCopy.title}
+        footer={
+          <Button
+            variant="primary"
+            onClick={() => {
+              onClose();
+              returnFocusRef.current?.focus();
+            }}
+          >
+            {dialogCopy.done}
+          </Button>
+        }
+      >
+        {body}
+      </Popover>
+    );
   // Changes apply at once; Done, Escape and the backdrop only close it.
   return (
     <Dialog
@@ -45,37 +91,68 @@ export function MoreOptionsDialog({ open, onClose, returnFocusRef, content }: { 
       closeOnBackdrop
       returnFocusRef={returnFocusRef}
       footer={
-        <Button variant="primary" className={phone ? "flex-1" : undefined} onClick={onClose}>
+        <Button
+          variant="primary"
+          className={phone ? "flex-1" : undefined}
+          onClick={onClose}
+        >
           {dialogCopy.done}
         </Button>
       }
     >
-      <div className="flex flex-col gap-5" data-testid="more-options-dialog">
-        {content.parts && <PartsList rows={content.parts.rows} onRename={content.parts.onRename} />}
-        {content.pattern && (
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={`${id}-pattern`} className="text-sm font-semibold text-ink">
-              {dialogCopy.namePattern}
-            </label>
-            <input
-              id={`${id}-pattern`}
-              type="text"
-              autoComplete="off"
-              spellCheck={false}
-              value={content.pattern.value}
-              title={dialogCopy.namePatternTip}
-              aria-describedby={tipId}
-              onChange={(e) => content.pattern!.onChange(e.target.value)}
-              className="ip-field h-11 w-full px-3.5 text-[15px]"
-            />
-            <span id={tipId} className="sr-only">
-              {dialogCopy.namePatternTip}
-            </span>
-          </div>
-        )}
-        <Switch id={`${id}-bookmarks`} label={dialogCopy.removeBookmarks} checked={content.bookmarks.value} onChange={content.bookmarks.onChange} />
-      </div>
+      {body}
     </Dialog>
+  );
+}
+
+function MoreOptionsBody({
+  id,
+  tipId,
+  content,
+}: {
+  id: string;
+  tipId: string;
+  content: MoreOptionsContent;
+}) {
+  return (
+    <div className="flex flex-col gap-5" data-testid="more-options-dialog">
+      {content.parts && (
+        <PartsList
+          rows={content.parts.rows}
+          onRename={content.parts.onRename}
+        />
+      )}
+      {content.pattern && (
+        <div className="flex flex-col gap-1.5">
+          <label
+            htmlFor={`${id}-pattern`}
+            className="text-sm font-semibold text-ink"
+          >
+            {dialogCopy.namePattern}
+          </label>
+          <input
+            id={`${id}-pattern`}
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            value={content.pattern.value}
+            title={dialogCopy.namePatternTip}
+            aria-describedby={tipId}
+            onChange={(e) => content.pattern!.onChange(e.target.value)}
+            className="ip-field h-11 w-full px-3.5 text-[15px]"
+          />
+          <span id={tipId} className="sr-only">
+            {dialogCopy.namePatternTip}
+          </span>
+        </div>
+      )}
+      <Switch
+        id={`${id}-bookmarks`}
+        label={dialogCopy.removeBookmarks}
+        checked={content.bookmarks.value}
+        onChange={content.bookmarks.onChange}
+      />
+    </div>
   );
 }
 
@@ -88,7 +165,13 @@ const VIRTUAL_FROM = 50;
  * cancels without closing the dialog), ".pdf" and the page range. Above 50 rows only the rows in
  * view of the dialog's own scroller are drawn (no nested scroller).
  */
-function PartsList({ rows, onRename }: { rows: PartRow[]; onRename: (key: string, name: string) => void }) {
+function PartsList({
+  rows,
+  onRename,
+}: {
+  rows: PartRow[];
+  onRename: (key: string, name: string) => void;
+}) {
   const list = useRef<HTMLOListElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   // A soft fade at an edge while there is more that way (tool-flow.css .ip-edge-fade), like the Page tools sheet.
@@ -97,7 +180,10 @@ function PartsList({ rows, onRename }: { rows: PartRow[]; onRename: (key: string
     if (!s) return;
     const edges = () => {
       s.toggleAttribute("data-more-up", s.scrollTop > 1);
-      s.toggleAttribute("data-more-down", s.scrollTop + s.clientHeight < s.scrollHeight - 1);
+      s.toggleAttribute(
+        "data-more-down",
+        s.scrollTop + s.clientHeight < s.scrollHeight - 1,
+      );
     };
     edges();
     s.addEventListener("scroll", edges, { passive: true });
@@ -108,7 +194,10 @@ function PartsList({ rows, onRename }: { rows: PartRow[]; onRename: (key: string
       ro.disconnect();
     };
   }, [rows.length]);
-  const [win, setWin] = useState<[number, number]>([0, Math.min(rows.length, VIRTUAL_FROM)]);
+  const [win, setWin] = useState<[number, number]>([
+    0,
+    Math.min(rows.length, VIRTUAL_FROM),
+  ]);
   const virtual = rows.length > VIRTUAL_FROM;
   useLayoutEffect(() => {
     if (!virtual) return;
@@ -116,10 +205,22 @@ function PartsList({ rows, onRename }: { rows: PartRow[]; onRename: (key: string
     const scroller = el?.closest<HTMLElement>('[data-ip-scroll="overlay"]');
     if (!el || !scroller) return;
     const update = () => {
-      const top = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
-      const from = Math.max(0, Math.floor((scroller.scrollTop - top) / ROW_H) - OVERSCAN);
-      const to = Math.min(rows.length, Math.ceil((scroller.scrollTop - top + scroller.clientHeight) / ROW_H) + OVERSCAN);
-      setWin((w) => (w[0] === from && w[1] === to ? w : [from, Math.max(from, to)]));
+      const top =
+        el.getBoundingClientRect().top -
+        scroller.getBoundingClientRect().top +
+        scroller.scrollTop;
+      const from = Math.max(
+        0,
+        Math.floor((scroller.scrollTop - top) / ROW_H) - OVERSCAN,
+      );
+      const to = Math.min(
+        rows.length,
+        Math.ceil((scroller.scrollTop - top + scroller.clientHeight) / ROW_H) +
+          OVERSCAN,
+      );
+      setWin((w) =>
+        w[0] === from && w[1] === to ? w : [from, Math.max(from, to)],
+      );
     };
     update();
     scroller.addEventListener("scroll", update, { passive: true });
@@ -134,7 +235,10 @@ function PartsList({ rows, onRename }: { rows: PartRow[]; onRename: (key: string
   return (
     <section aria-labelledby="ip-parts-title">
       <h3 id="ip-parts-title" className="mb-1.5 text-sm font-semibold text-ink">
-        {dialogCopy.files} <span className="text-muted tabular-nums">{rows.length.toLocaleString("en")}</span>
+        {dialogCopy.files}{" "}
+        <span className="text-muted tabular-nums">
+          {rows.length.toLocaleString("en")}
+        </span>
       </h3>
       {/* About five rows, then the list scrolls inside, so the name pattern, bookmarks and Done stay in view.
           In the phone sheet the cap also follows the screen height (the sheet is --ip-sheet-max-h tall; its title
@@ -155,7 +259,12 @@ function PartsList({ rows, onRename }: { rows: PartRow[]; onRename: (key: string
           style={virtual ? { height: rows.length * ROW_H } : undefined}
         >
           {rows.slice(from, to).map((r, i) => (
-            <PartRowItem key={r.key} row={r} onRename={onRename} top={virtual ? (from + i) * ROW_H : undefined} />
+            <PartRowItem
+              key={r.key}
+              row={r}
+              onRename={onRename}
+              top={virtual ? (from + i) * ROW_H : undefined}
+            />
           ))}
         </ol>
       </div>
@@ -167,7 +276,15 @@ function stemOf(name: string) {
   return name.replace(/\.pdf$/i, "");
 }
 
-function PartRowItem({ row, onRename, top }: { row: PartRow; onRename: (key: string, name: string) => void; top?: number }) {
+function PartRowItem({
+  row,
+  onRename,
+  top,
+}: {
+  row: PartRow;
+  onRename: (key: string, name: string) => void;
+  top?: number;
+}) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(stemOf(row.name));
   const field = useRef<HTMLInputElement>(null);
@@ -190,10 +307,17 @@ function PartRowItem({ row, onRename, top }: { row: PartRow; onRename: (key: str
   return (
     <li
       className="flex h-11 items-center gap-2.5 text-[15px] tabular-nums"
-      style={top !== undefined ? { position: "absolute", top, left: 0, right: 0 } : undefined}
+      style={
+        top !== undefined
+          ? { position: "absolute", top, left: 0, right: 0 }
+          : undefined
+      }
       data-testid="part-row"
     >
-      <span aria-hidden="true" className="grid size-6 shrink-0 place-items-center rounded-full bg-brand-soft font-display text-[13px] font-semibold text-brand-strong">
+      <span
+        aria-hidden="true"
+        className="grid size-6 shrink-0 place-items-center rounded-full bg-brand-soft font-display text-[13px] font-semibold text-brand-strong"
+      >
         {row.n}
       </span>
       <span className="flex min-w-0 flex-1 items-center">

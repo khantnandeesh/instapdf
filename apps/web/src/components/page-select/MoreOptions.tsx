@@ -9,7 +9,10 @@ import type { MoreOptionsContent } from "./MoreOptionsDialog";
 // The dialog and the parts list are not in the first load (spec F4/F5 UI P-12): a lazy chunk,
 // fetched when the trigger is hovered or focused.
 const loadDialog = () => import("./MoreOptionsDialog");
-const MoreOptionsDialog = dynamic(() => loadDialog().then((m) => m.MoreOptionsDialog), { ssr: false });
+const MoreOptionsDialog = dynamic(
+  () => loadDialog().then((m) => m.MoreOptionsDialog),
+  { ssr: false },
+);
 const prefetch = () => void loadDialog().catch(() => {});
 
 /**
@@ -17,12 +20,23 @@ const prefetch = () => void loadDialog().catch(() => {});
  * "More options" with a "{n} changed" chip; in the bar below 1440 px and below 1024 px it is a 44px
  * icon button with a tooltip, and on phones a bare 44px icon beside the primary.
  */
-export function MoreOptions({ changed, disabled, content }: { changed: number; disabled?: boolean; content: MoreOptionsContent }) {
+export function MoreOptions({
+  changed,
+  disabled,
+  content,
+}: {
+  changed: number;
+  disabled?: boolean;
+  content: MoreOptionsContent;
+}) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
-  const name = changed ? `${selectCopy.more}, ${selectCopy.moreChanged(changed)}` : selectCopy.more;
+  const name = changed
+    ? `${selectCopy.more}, ${selectCopy.moreChanged(changed)}`
+    : selectCopy.more;
   return (
-    <>
+    // `relative`: from 1024 px the popover hangs under the button, right-aligned to it (F25 §3.3).
+    <span className="relative inline-flex">
       <Button
         ref={trigger}
         variant="soft"
@@ -33,7 +47,7 @@ export function MoreOptions({ changed, disabled, content }: { changed: number; d
         data-testid="more-options"
         onPointerEnter={prefetch}
         onFocus={prefetch}
-        onClick={() => setOpen(true)}
+        onClick={() => setOpen((o) => !o)}
         className="ip-more-trigger group/more relative h-11 dock-bar:max-[1439px]:size-11 dock-bar:max-[1439px]:px-0 max-sm:size-11! max-sm:px-0"
         iconStart={<SlidersIcon size={18} />}
       >
@@ -42,11 +56,17 @@ export function MoreOptions({ changed, disabled, content }: { changed: number; d
         </span>
         {changed > 0 && (
           <>
-            <span aria-hidden="true" className="mp-tag mp-tag--sm dock-bar:max-[1439px]:hidden">
+            <span
+              aria-hidden="true"
+              className="mp-tag mp-tag--sm dock-bar:max-[1439px]:hidden"
+            >
               {selectCopy.moreChanged(changed)}
             </span>
             {/* Icon-only: a small berry dot says something is changed. */}
-            <span aria-hidden="true" className="absolute top-1.5 right-1.5 hidden size-2 rounded-full bg-brand ring-2 ring-white dock-bar:max-[1439px]:block" />
+            <span
+              aria-hidden="true"
+              className="absolute top-1.5 right-1.5 hidden size-2 rounded-full bg-brand ring-2 ring-white dock-bar:max-[1439px]:block"
+            />
           </>
         )}
         <span
@@ -56,7 +76,12 @@ export function MoreOptions({ changed, disabled, content }: { changed: number; d
           {selectCopy.more}
         </span>
       </Button>
-      <MoreOptionsDialog open={open} onClose={() => setOpen(false)} returnFocusRef={trigger} content={content} />
-    </>
+      <MoreOptionsDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        returnFocusRef={trigger}
+        content={content}
+      />
+    </span>
   );
 }

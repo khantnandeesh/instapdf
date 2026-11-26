@@ -1,0 +1,64 @@
+"use client";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+
+/**
+ * A non-modal popover under its trigger, right-aligned to it (F25 §3.3, More options from 1024px):
+ * white, panel corners, the menu shadow. Its body is the only scroller in it (`data-ip-scroll="overlay"`),
+ * capped to the screen under the row. Focus goes to its first control; Escape, a click outside or the
+ * trigger again close it, and focus returns to the trigger. The trigger's wrapper must be `relative`.
+ */
+export function Popover({
+  open,
+  onClose,
+  trigger,
+  label,
+  testId,
+  footer,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  trigger: RefObject<HTMLElement | null>;
+  label: string;
+  testId?: string;
+  footer?: ReactNode;
+  children: ReactNode;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    if (!open) return;
+    const el = box.current;
+    el?.querySelector<HTMLElement>("input:not([disabled]), select:not([disabled]), textarea, button:not([disabled]), [tabindex]:not([tabindex='-1'])")?.focus();
+    const shut = (refocus: boolean) => {
+      close.current();
+      if (refocus) trigger.current?.focus();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      shut(true);
+    };
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (el?.contains(t) || trigger.current?.contains(t)) return;
+      shut(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onDown, true);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onDown, true);
+    };
+  }, [open, trigger]);
+  if (!open) return null;
+  return (
+    <div ref={box} role="dialog" aria-modal="false" aria-label={label} className="ip-popover" data-testid={testId}>
+      <div className="ip-popover__body" data-ip-scroll="overlay">
+        {children}
+      </div>
+      {footer && <div className="ip-popover__foot">{footer}</div>}
+    </div>
+  );
+}
