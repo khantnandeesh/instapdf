@@ -61,6 +61,9 @@ test("E6, AC-121, AC-153: the caret opens the same provider menu by keyboard; Es
   await openPdf(page).focus();
   await page.keyboard.press("Tab");
   await expect(caret(page)).toBeFocused();
+  // The real menu button takes over from the stand-in once the cloud chunk is here, keeping focus (lazy.spec.ts).
+  await expect(caret(page)).toHaveAttribute("aria-controls", /.+/, { timeout: 10_000 });
+  await expect(caret(page)).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(caret(page)).toHaveAttribute("aria-expanded", "true");
   const items = page.getByRole("menuitem");
