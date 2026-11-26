@@ -10,7 +10,9 @@
  * stay parsed next to the growing output.
  */
 export { USER_ERROR } from "./user-error";
-import { mergePdf, type MergeEnv, type MergeInput } from "./merge";
+import { buildDocuments, type BuildDocumentPlan } from "./build";
+import { mergePdf, type MergeEnv, type MergeInput, type MergeSourceInput } from "./merge";
+import type { MergeOptions } from "./merge-options";
 import { pdfOutputName, uniqueNames } from "./naming";
 import { rotatePdf } from "./rotate";
 import { createZipWriter } from "./zip";
@@ -26,7 +28,41 @@ export type RotateJob = {
 
 export type MergeJob = { kind: "merge"; name: string } & MergeInput;
 
-export type Job = RotateJob | MergeJob;
+/**
+ * Split, Extract and Delete (spec F4/F5 §0a.4): one operation, "copy these
+ * source pages, in this order, into new documents". One document downloads
+ * as that PDF; two or more as one ZIP named `zipName`.
+ */
+export type DocumentsJob = {
+  kind: "split" | "extract" | "delete";
+  sources: MergeSourceInput[];
+  documents: BuildDocumentPlan[];
+  zipName: string;
+  /** Remove bookmarks (spec §3a); everything else uses Merge's defaults. */
+  options?: Pick<MergeOptions, "bookmarks">;
+};
+
+export type Job = RotateJob | MergeJob | DocumentsJob;
+
+/**
+ * The job for a plan from lib/page-plans.ts: its documents and download name,
+ * with the loaded files as sources (PDFs).
+ */
+export function documentsJob(
+  kind: DocumentsJob["kind"],
+  plan: { documents: BuildDocumentPlan[]; download: { name: string } },
+  files: readonly (JobFile & { id: string })[],
+  options?: { removeBookmarks?: boolean },
+): DocumentsJob {
+  const used = new Set(plan.documents.flatMap((d) => d.pages.map((p) => p.sourceId)));
+  return {
+    kind,
+    sources: files.filter((f) => used.has(f.id)).map((f) => ({ id: f.id, name: f.name, kind: "pdf", source: f.source, password: f.password })),
+    documents: plan.documents.map((d) => ({ name: d.name, pages: d.pages })),
+    zipName: plan.download.name,
+    options: { bookmarks: options?.removeBookmarks ? "remove" : "keep" },
+  };
+}
 
 export type JobOutput = {
   name: string;
@@ -54,7 +90,43 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       return runRotate(job, onProgress);
     case "merge":
       return runMerge(job, onProgress, env);
+    case "split":
+    case "extract":
+    case "delete":
+      return runDocuments(job, onProgress, env);
   }
+}
+
+async function runDocuments(job: DocumentsJob, onProgress: ProgressFn, env: JobEnv): Promise<JobOutput> {
+  const names = uniqueNames(job.documents.map((d) => d.name));
+  const documents = job.documents.map((d, i) => ({ ...d, name: names[i] }));
+  const progress = (f: number) => onProgress(f, "pages");
+  if (documents.length === 1) {
+    const r = await buildDocuments({ sources: job.sources, documents, options: job.options }, env, progress);
+    const [doc] = r.documents;
+    return {
+      name: doc.name,
+      type: "application/pdf",
+      blob: new Blob([doc.bytes as Uint8Array<ArrayBuffer>], { type: "application/pdf" }),
+      pageCount: doc.pageCount,
+      wasEncrypted: r.wasEncrypted,
+      ...(r.warnings.length ? { warnings: r.warnings } : {}),
+    };
+  }
+  const zip = createZipWriter();
+  const entries: { name: string; pageCount: number }[] = [];
+  const r = await buildDocuments({ sources: job.sources, documents, options: job.options }, env, progress, (doc) => {
+    zip.add(doc.name, doc.bytes); // copied into the ZIP Blob; doc.bytes can be collected now
+    entries.push({ name: doc.name, pageCount: doc.pageCount });
+  });
+  return {
+    name: job.zipName,
+    type: "application/zip",
+    blob: zip.finish(),
+    entries,
+    wasEncrypted: r.wasEncrypted,
+    ...(r.warnings.length ? { warnings: r.warnings } : {}),
+  };
 }
 
 async function runMerge(job: MergeJob, onProgress: ProgressFn, env: JobEnv): Promise<JobOutput> {

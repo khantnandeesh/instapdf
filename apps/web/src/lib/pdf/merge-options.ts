@@ -26,6 +26,12 @@ export const defaultMergeOptions: MergeOptions = {
   forms: "rename",
 };
 
+/** Organize's fixed options (spec F4/F5 §3e): bookmarks follow edits, nothing added, fields merged with renamed duplicates. */
+export const ORGANIZE_OPTIONS: MergeOptions = { ...defaultMergeOptions, bookmarks: "keep", forms: "rename" };
+
+/** Alternate & mix's fixed options (spec §3g): no bookmarks (they would be out of order), fields as in Organize. */
+export const ALTERNATE_OPTIONS: MergeOptions = { ...defaultMergeOptions, bookmarks: "remove", forms: "rename" };
+
 const allowed: { [K in keyof MergeOptions]: readonly MergeOptions[K][] } = {
   toc: ["none", "names", "titles"],
   cover: [true, false],
