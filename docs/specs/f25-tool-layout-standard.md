@@ -159,7 +159,7 @@ The picker keeps its label: "Opening…" is removed.
 - `position: sticky; top: var(--ip-header-h)`.
 - Its ground is the page's grid paper (`--ip-bg` with the grid at `background-attachment: fixed`, so the lines line up). It looks the same pinned or not: no shadow, border or box appears when it sticks (`berrypdf.md` → "Sticky surfaces").
 - **h1:** the tool title, 24/28 Fredoka 600, `ink-black`, left, one line, never truncated. It is the same `h1` element as the empty state's centred head and switches on the frame the pages arrive, without animation (T5).
-- **Options:** the tool's compact one-row form (the existing `dock-bar:` forms), after a 1px sand divider.
+- **Options:** the tool's compact one-row form (the existing `dock-bar:` forms), after a 1px sand divider. A tool with no row options (Organize, Alternate & mix) renders no divider and no empty options box.
 - **More options:** a `soft` button with an icon and the label "More options". It sits after the inline options and is present only when the tool has folded options (§3.4). It opens one popover (§3.3).
 - **Undo│Redo:** where the tool has them (Organize, Merge, Combine), before the action slot.
 - **Action slot** (`ActionSlot`, new, shared with the editor): right-aligned. It reserves a fixed box, **340px wide from 1280 and 300px from 1024 to 1279, 48px tall**. At rest it holds the status line (right-aligned, muted 14/18, one line, tooltip if it truncates) and the berry primary, 48px. In the other states it holds the progress pill, the error or the done tick (§6). The box never changes size, so nothing shifts.
@@ -375,6 +375,7 @@ The browser tools use only `work`, then `done`.
 - **ToolFlow:** it calls `abort.current.abort()`. `runInWorker` rejects and terminates the worker; the next run spawns a fresh one.
 - **Editor download:** `buildInWorker` gains `{ signal }`. On abort it rejects and calls `disposeBuild()`, then `warmBuild()` on idle.
 - **Server jobs:** it calls `DELETE /jobs/{id}`, which removes the job from the queue, stops the worker task and deletes the upload. The client stops polling at once.
+- **Server phases are a UI contract only in this PR** (PM, 26 Nov). No job API exists yet. The pill's upload, queue, work and error phases and Cancel's `DELETE` are built against a typed client interface and tested with Playwright route mocks. `DELETE /jobs/{id}` (dequeue, stop, delete the upload) is a **requirement on the backend** for the first server tool, not code in this PR.
 
 **After Cancel:**
 - The slot returns to its rest content, pages un-dim and focus returns to the primary.
@@ -650,7 +651,7 @@ Each gets a one-line "superseded by F25 §n" note when this merges.
 
 The mockups exist at 1280 and 390 (`mockups/02-picker-B2-*`, `03-layout-C-*`, `04-layout-C-merge-1280`, `06-editor-E1-*`, `07-progress-A-*`, `08-result-*`, `09-editor-*`, `10-C-*`, `11-CP-*`).
 
-The builder captures **build** screenshots at **1366x657 and 390x664** for every state below. They go in `docs/specs/assets/f25/` and in the PR body:
+The builder captures **build** screenshots at **1280x632, 1366x657, 390x664 and 320x568** for every state below (the visual gate is 1280/390/320; at 320 check the 2-line `h1` plus the dock). They go in `docs/specs/assets/f25/` and in the PR body:
 - empty;
 - loading;
 - ready;
@@ -671,11 +672,12 @@ The tools are Delete, Split, Merge, Alternate, the settings fixture and Edit PDF
 - **No feature flag:** the layout is site-wide, and a half-migrated site would itself break the standard.
 - **AC-657.** No route keeps the old layout: `emptyLayout`, `ProcessingBar`'s dock usage, `processing-loader` and the editor's `position: fixed` shell are gone (grep test).
 - **AC-658.** Lighthouse CLS on `/delete-pdf-pages` and `/edit-pdf`, through load → pick → run → result, stays at 0.00 (the existing CWV check, extended to these flows).
-- **AC-659.** The evaluator's micro-comparison (mission.md) is re-run on Delete, Merge and Edit PDF after deploy to staging, with no lost check. The verdict is recorded in `docs/evals/f25-tool-layout-standard.md`.
+- **AC-659.** The evaluator's micro-comparison (mission.md) is re-run on Delete, Merge and Edit PDF after deploy to staging, with no lost check, **and the editor's E1 P0 ACs are re-checked on /edit-pdf**. The verdict is recorded in `docs/evals/f25-tool-layout-standard.md`.
+- **Editor guard (PM, 26 Nov).** Un-fixing the editor shell touches the top-priority editor. In this PR the whole editor e2e suite stays green with no test weakened, and `editor-js-budget` and the first-load budgets hold.
 
 ## 12. Questions, resolved in the thread (26 Nov)
 
-Resolved by the thread with the owner's standardisation rule; the owner can override any of them at the screenshot review.
+The PM agreed the spec on 26 Nov (Q1 to Q4 as resolved below, Q5 changed). Resolved by the thread with the owner's standardisation rule; the owner can override any of them at the screenshot review.
 
 
 1. **Result, ≥ 1024: where does Download sit?**
@@ -685,4 +687,4 @@ Resolved by the thread with the owner's standardisation rule; the owner can over
 2. **Merge's Files│Pages tabs:** the mockup puts them in the top row. This spec keeps them in the stage tools row, where every tool has its view tabs today and `thumb-tiles.spec.ts` measures them. Moving them is a small follow-up if wanted.
 3. **Editor properties panel:** decision 4 says "only when something is selected". This spec also opens it for an active tool with options (text, draw, shapes before placing), because those options lived in today's top slot. The alternative is a popover under the tool button.
 4. **Editor progress verb:** the mockup reads "Saving… 60%". This spec uses "Downloading… 60%", so the button keeps its name ("Download" → "Downloading" → "Downloaded") and it isn't confused with the device autosave chip's "Saving…".
-5. **"Start over" on error:** the slot has no room for it. This spec leaves it to the pages tools row (Remove all / ✕). Confirm, or add it to the NoticeStack error notice as an action.
+5. **"Start over" on error:** the slot has no room for it. **Resolved (PM):** the NoticeStack error notice carries a "Start over" action (the pages tools row keeps Remove all / ✕ too).
