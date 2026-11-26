@@ -37,6 +37,8 @@ function loadManifest(): CspManifest | null {
 
 export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
+  // F25 AC-623: test fixtures answer only on a server started for the e2e suite.
+  if (path.startsWith("/test-fixtures") && process.env.IP_TEST_FIXTURES !== "1") return new NextResponse("Not found", { status: 404 });
   // F23: a /cloud/<provider> window gets its own policy (its provider's hosts only); every other page the strict one.
   const cloud = cloudRouteOf(path);
   const policy = cloud

@@ -5,3 +5,4 @@
  */
 export { ControlDock } from "./ControlDock";
 export { ProgressPill, SlotError, SlotStatus, shortError } from "./ActionSlot";
+export { announcementFor } from "./announce";

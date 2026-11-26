@@ -1,3 +1,5 @@
+import { slotCopy } from "./slot-copy";
+
 /**
  * What the action pill says to screen readers while a job runs (F25 §6 "Screen readers"), as a pure
  * function so the throttle is unit-tested: every phase change; progress at most once per 10s and only
@@ -47,4 +49,20 @@ export function throttleAnnouncement(memo: AnnounceMemo, p: PillProgress, now: n
     if (crossed && now - memo.progressAt >= PROGRESS_EVERY_MS) return { say: { kind: "progress", percent: crossed }, memo: { ...memo, mark: crossed, progressAt: now } };
   }
   return { say: null, memo };
+}
+
+/**
+ * The words for one progress report, or null when the throttle says nothing now. `memo` null is a new
+ * run (its first phase, work, is said by the flow itself as the run starts). `verb` is the tool's
+ * progress label ("Deleting").
+ */
+export function announcementFor(memo: AnnounceMemo | null, p: PillProgress, now: number, verb: string): { text: string | null; memo: AnnounceMemo } {
+  const { say, memo: next } = throttleAnnouncement(memo ?? { ...freshMemo(), phase: "work" }, p, now);
+  let text: string | null = null;
+  if (say?.kind === "queue") text = slotCopy.queueText(say.position);
+  else if (say?.kind === "progress") text = `${p.phase === "upload" ? slotCopy.uploading : verb} ${say.percent}%`;
+  else if (say && p.phase === "upload") text = slotCopy.uploading;
+  else if (say && p.phase === "queue") text = p.position ? slotCopy.queueText(p.position) : slotCopy.inLine;
+  else if (say && p.phase === "work") text = verb;
+  return { text, memo: next };
 }

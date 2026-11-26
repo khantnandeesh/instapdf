@@ -1,16 +1,17 @@
 "use client";
 import "@/components/ui/dialog.css";
 import "./editor.css";
-import "@/components/berry/berry-loader.css";
 /**
  * Edit PDF (F16 E1): the route component. The landing is the shared F1 pieces only (title, drop
  * card, limits, privacy), so the route's first-load JS stays small (AC-86). The editor shell,
- * pdf.js and the engine are separate chunks, fetched on intent (pointer or focus on Open PDF,
- * a drag, idle after load; the engine not on Data Saver or 2g) or on the pick itself. Picking a file opens focus mode at once.
+ * pdf.js and the engine are separate chunks, fetched on intent (pointer or focus on Choose PDF,
+ * a drag, idle after load; the engine not on Data Saver or 2g) or on the pick itself. Picking a file
+ * shows the editor's layout at once with placeholders (F25 §2, E1), never "Opening…" on the button.
  */
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState, type ComponentType } from "react";
-import { Floaties } from "@/components/berry/Berry";
+import { DropCard } from "@/components/tool-flow/DropCard";
+import { ToolIntro } from "@/components/tool-flow/ToolIntro";
 import { DropOverlay } from "@/components/tool-flow/DropOverlay";
 import { FilePicker, type FilePickerHandle } from "@/components/tool-flow/FilePicker";
 import { LimitsNote, PrivacyNote } from "@/components/tool-flow/notes";
@@ -48,6 +49,8 @@ export function EditorTool() {
   const [opened, setOpened] = useState<Opened | null>(null);
   const [Shell, setShell] = useState<ComponentType<ShellProps> | null>(null);
   const [busy, setBusy] = useState(false);
+  // The file being opened: the editor's layout shows at once with its name (F25 §8 "opening").
+  const [pending, setPending] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; key: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [locked, setLocked] = useState<{ name: string; bytes: Uint8Array; attempt: number; error?: string } | null>(null);
@@ -108,6 +111,7 @@ export function EditorTool() {
       // A wrong file (type, size) leaves the cloud pick alone.
       if (from === "local") cancelCloud.current?.();
       setBusy(true);
+      setPending(file.name);
       opening.current = true;
       try {
         await finish(file.name, new Uint8Array(await file.arrayBuffer()));
@@ -116,6 +120,7 @@ export function EditorTool() {
       } finally {
         opening.current = false;
         setBusy(false);
+        setPending(null);
       }
     },
     [finish, say],
@@ -134,10 +139,12 @@ export function EditorTool() {
   const openBlank = useCallback(async () => {
     cancelCloud.current?.();
     setBusy(true);
+    setPending("blank.pdf");
     try {
       await finish("blank.pdf", blankPdf(defaultPaper(navigator.language)));
     } finally {
       setBusy(false);
+      setPending(null);
     }
   }, [finish]);
 
@@ -206,39 +213,50 @@ export function EditorTool() {
   return (
     <div data-testid="editor" data-state={open ? "open" : busy ? "opening" : "empty"} data-hydrated={hydrated || undefined}>
       <DropOverlay active={dragging && !open} mode="add" />
-      <div className="mp-intro flex items-center justify-center gap-3 pt-(--space-6) pb-(--space-5) sm:pt-(--space-7)">
-        <h1 className="text-page-title text-ink-black">Edit PDF</h1>
-        <Badge tone="beta">Beta</Badge>
-      </div>
-      <div className="mp-empty ed-landing grid place-items-center px-[15px] py-6" data-testid="drop-card">
-        <Floaties set="empty" />
-        <div className="mp-empty__in mp-dropcard relative w-full max-w-[440px] rounded-[16px_16px_28px_16px] border-[1.5px] border-sand bg-surface-raised px-6 pt-8 pb-7 shadow-card">
-          <div className="flex flex-col items-center gap-3 text-center">
-            <span onPointerEnter={() => void prefetchShell()} onFocus={() => void prefetchShell()} className={process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? "inline-flex max-sm:w-full" : "inline-flex"}>
-              <FilePicker
-                ref={picker}
-                accept=".pdf,application/pdf"
-                multiple={false}
-                label={busy ? "Opening…" : "Open PDF"}
-                disabled={busy}
-                icon={<FileUpBold size={20} />}
-                onFiles={(files) => void openFile(files[0])}
-                inputTestId="editor-input"
-                sources={process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? <EditorCloudCaret cloud={cloud!} /> : undefined}
-              />
-            </span>
-            {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && <EditorCloudRow cloud={cloud!} />}
-            <p className="text-sm text-muted">
-              or drop it here <span aria-hidden="true">·</span> <kbd className="font-ui">Ctrl+V</kbd>
-            </p>
-            <Button variant="plain" size="sm" iconStart={<FilePlusBold size={16} />} disabled={busy} onClick={() => void openBlank()} title="A blank A4 page (Letter in the US and Canada)">
-              Blank page
-            </Button>
-            <LimitsNote text="Up to 200 MB" full="One PDF up to 200 MB. No page, save or hourly limits." />
-            <PrivacyNote runtime="client" context="intro" />
+      {pending && !open ? (
+        // Opening (F25 §8): the editor's layout with placeholders, from the frame the file is picked.
+        <div className="ed-shell" data-testid="editor-opening" aria-busy="true">
+          <div className="ed-opening">
+            <header className="ed-top" role="group" aria-label="Document">
+              <h1 className="ed-title">Edit PDF</h1>
+              <Badge tone="beta">Beta</Badge>
+              <h2 className="ed-file truncate">{pending}</h2>
+            </header>
+            <div className="grid flex-1 place-items-center">
+              <span className="ed-loader" aria-label="Opening" role="progressbar" />
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        !open && (
+          <>
+            <ToolIntro title="Edit PDF" mark={<Badge tone="beta">Beta</Badge>} />
+            <DropCard>
+              <span onPointerEnter={() => void prefetchShell()} onFocus={() => void prefetchShell()} className={process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? "inline-flex max-sm:w-full" : "inline-flex"}>
+                <FilePicker
+                  ref={picker}
+                  accept=".pdf,application/pdf"
+                  multiple={false}
+                  label={copy.pickerButton(false)}
+                  disabled={busy}
+                  icon={<FileUpBold size={20} />}
+                  onFiles={(files) => void openFile(files[0])}
+                  inputTestId="editor-input"
+                  sources={process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? <EditorCloudCaret cloud={cloud!} /> : undefined}
+                />
+              </span>
+              {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && <EditorCloudRow cloud={cloud!} />}
+              <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copy.pickerHintOne}</p>
+              <Button variant="plain" size="sm" iconStart={<FilePlusBold size={16} />} disabled={busy} onClick={() => void openBlank()} title="A blank A4 page (Letter in the US and Canada)">
+                Start with a blank page
+              </Button>
+              <LimitsNote text="PDF. Up to 200 MB." full="One PDF up to 200 MB. No page, save or hourly limits." />
+              <PrivacyNote runtime="client" context="intro" />
+            </DropCard>
+          </>
+        )
+      )}
+      {open && opened && Shell && <Shell key={opened.key} name={opened.name} bytes={opened.bytes} pdf={opened.pdf} password={opened.password} onClose={close} onOpenFile={(f) => void openFile(f)} onBlank={() => void openBlank()} />}
       {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
         // The cloud download's line sits over the same reserved slot (never moves the page), outside the live region.
         <div className="relative">
@@ -265,7 +283,6 @@ export function EditorTool() {
         onSkip={() => setLocked(null)}
         fallbackFocus={() => picker.current?.element ?? null}
       />
-      {open && opened && Shell && <Shell key={opened.key} name={opened.name} bytes={opened.bytes} pdf={opened.pdf} password={opened.password} onClose={close} onOpenFile={(f) => void openFile(f)} onBlank={() => void openBlank()} />}
     </div>
   );
 }

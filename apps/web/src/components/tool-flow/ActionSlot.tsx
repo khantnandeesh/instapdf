@@ -4,7 +4,7 @@ import { forwardRef, type ReactNode, type Ref } from "react";
 import { cx } from "../ui/cx";
 import { CheckIcon, ErrorIcon } from "../ui/icons";
 import type { PillProgress } from "./announce";
-import { copy } from "./copy";
+import { slotCopy } from "./slot-copy";
 
 /**
  * The action slot (F25 §3, §6): the one place the action lives on every tool and in every state. A box
@@ -53,17 +53,17 @@ export const ProgressPill = forwardRef(function ProgressPill(
   const minutes = typeof etaSeconds === "number" && etaSeconds > 0 ? Math.max(1, Math.round(etaSeconds / 60)) : undefined;
   const label =
     phase === "done"
-      ? copy.done
+      ? slotCopy.done
       : phase === "queue"
-        ? copy.inLine
-        : note ?? (phase === "upload" ? copy.progress(copy.uploading, pct ?? 0) : pct === null ? `${verb}…` : copy.progress(verb, pct));
-  const second = phase === "upload" ? copy.keepTabOpen : phase === "queue" ? (minutes ? copy.queueEta(minutes) : copy.keepTabOpen) : null;
-  const valueText = phase === "queue" && position ? copy.queueText(position, minutes) : determinate ? `${pct}%` : undefined;
+        ? slotCopy.inLine
+        : note ?? (phase === "upload" ? slotCopy.progress(slotCopy.uploading, pct ?? 0) : pct === null ? `${verb}…` : slotCopy.progress(verb, pct));
+  const second = phase === "upload" ? slotCopy.keepTabOpen : phase === "queue" ? (minutes ? slotCopy.queueEta(minutes) : slotCopy.keepTabOpen) : null;
+  const valueText = phase === "queue" && position ? slotCopy.queueText(position, minutes) : determinate ? `${pct}%` : undefined;
   return (
     <div
       ref={ref}
       role="group"
-      aria-label={copy.pillGroup(action)}
+      aria-label={slotCopy.pillGroup(action)}
       tabIndex={-1}
       className="ip-pill"
       data-testid="processing"
@@ -95,13 +95,13 @@ export const ProgressPill = forwardRef(function ProgressPill(
       </span>
       {onCancel && phase !== "done" && (
         <button type="button" className="ip-pill__cancel" onClick={onCancel} data-testid="cancel">
-          {copy.cancel}
+          {slotCopy.cancel}
         </button>
       )}
       {phase !== "done" && (
         <span
           role="progressbar"
-          aria-label={note ?? (phase === "upload" ? copy.uploading : verb)}
+          aria-label={note ?? (phase === "upload" ? slotCopy.uploading : verb)}
           aria-valuemin={determinate ? 0 : undefined}
           aria-valuemax={determinate ? 100 : undefined}
           aria-valuenow={determinate ? pct! : undefined}
@@ -137,7 +137,7 @@ export const SlotError = forwardRef(function SlotError(
         </button>
       )}
       <button ref={ref} type="button" className="mp-btn ip-slot__main shrink-0" onClick={onRetry}>
-        {copy.tryAgain}
+        {slotCopy.tryAgain}
       </button>
     </div>
   );
@@ -146,5 +146,5 @@ export const SlotError = forwardRef(function SlotError(
 /** The first sentence of an error, when it is short enough for the slot; otherwise the generic line. */
 export function shortError(message: string): string {
   const first = message.split(/(?<=\.)\s/)[0] ?? "";
-  return first && first.length <= 30 ? first : copy.errorShort;
+  return first && first.length <= 30 ? first : slotCopy.errorShort;
 }

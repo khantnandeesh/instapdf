@@ -1,14 +1,15 @@
 "use client";
 /**
- * Editor chrome (U-E2): the glass top bar, the tool rail (≥ 1024) or the priority dock with More
- * (< 1024), the view pill, the save and privacy chips, and each page's header row.
+ * Editor chrome (U-E2, F25 E1): the editor bar under the site header (h1, file menu, the tools centred
+ * from 1024 px, Undo│Redo, Download in its action slot), the priority dock with More (< 1024), the view
+ * pill, the save and privacy chips, and each page's header row.
  * Icons only (Phosphor Bold, no boxes); names and shortcuts are in tooltips and accessible names.
  */
 import { FieldsChipSlot } from "@/tools/forms/lazy";
-import { useEffect, useId, useLayoutEffect, useState, type KeyboardEvent, type ReactNode } from "react";
-import Link from "next/link";
-import { BerryMark } from "@/components/berry/Berry";
+import { lazy, Suspense, useEffect, useId, useLayoutEffect, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { ActionSlot, ProgressPill, SlotError } from "@/components/tool-flow/ActionSlot";
 import { MenuButton, type MenuEntry } from "@/components/ui/Menu";
 import { cx } from "@/components/ui/cx";
 import * as H from "@/lib/editor/history";
@@ -20,7 +21,6 @@ import {
   CaretLeftBold,
   CaretRightBold,
   CheckBold,
-  CloseBold,
   CopyBold,
   DownloadBold,
   DrawBold,
@@ -33,7 +33,6 @@ import {
   MinusBold,
   MoreBold,
   PagesBold,
-  PanelBold,
   RedoBold,
   UndoBold,
   PlusBold,
@@ -53,7 +52,6 @@ import {
 } from "./icons";
 import { TextFieldIcon } from "@/tools/forms/icons";
 import { Pop } from "./Pop";
-import { ToolOptions } from "./Properties";
 import { useStore, type ToolId } from "./store";
 
 export type ToolDef = { id: ToolId; key: string; hint: string; icon: ReactNode };
@@ -101,7 +99,7 @@ function Tip({ id, className, children }: { id: string; className: string; child
   );
 }
 
-function ToolButton({ t, active, locked, disabled, onPick, tabIndex, side, label }: { t: ToolDef; active: boolean; locked: boolean; disabled: boolean; onPick: (lock: boolean) => void; tabIndex: number; side: "right" | "top"; label?: string }) {
+function ToolButton({ t, active, locked, disabled, onPick, tabIndex, side, label }: { t: ToolDef; active: boolean; locked: boolean; disabled: boolean; onPick: (lock: boolean) => void; tabIndex: number; side: "right" | "top" | "bottom"; label?: string }) {
   const name = TOOL_NAMES[t.id];
   const tip = useId();
   return (
@@ -150,27 +148,18 @@ function roving(e: KeyboardEvent<HTMLElement>, vertical: boolean) {
   items[next]?.focus();
 }
 
-export function ToolRail() {
-  const ctl = useCtl();
+/** The tools in the editor bar, centred (F25 E1, from 1024 px): one row, roving tabindex. */
+export function ToolBar() {
   const { tool, locked, readOnly, pick } = useTool();
-  const panel = useStore(ctl.store, (s) => s.panel);
-  const active = TOOLS.findIndex((t) => t.id === tool);
   return (
-    <nav className="ed-rail ed-glass" aria-label="Tools and pages">
-      <div role="toolbar" aria-label="Tools" aria-orientation="vertical" className="ed-rail__tools" onKeyDown={(e) => roving(e, true)} data-region="tools">
-        <span className="ed-rail__pill" aria-hidden="true" style={{ transform: `translateY(${active * 48}px)` }} />
-        {TOOLS.map((t) => (
-          <ToolButton key={t.id} t={t} active={tool === t.id} locked={locked} disabled={readOnly && t.id !== "select"} onPick={(l) => pick(t.id, l)} tabIndex={tool === t.id ? 0 : -1} side="right" />
-        ))}
-      </div>
-      <button type="button" className={cx("ed-tool", panel && "ed-tool--soft")} aria-pressed={panel} aria-label="Pages panel" title="Pages panel" onClick={() => ctl.store.set({ panel: !panel })}>
-        <PanelBold size={22} />
-      </button>
-    </nav>
+    <div role="toolbar" aria-label="Tools" aria-orientation="horizontal" className="ed-tools" onKeyDown={(e) => roving(e, false)} data-region="tools" data-testid="editor-tools">
+      {TOOLS.map((t) => (
+        <ToolButton key={t.id} t={t} active={tool === t.id} locked={locked} disabled={readOnly && t.id !== "select"} onPick={(l) => pick(t.id, l)} tabIndex={tool === t.id ? 0 : -1} side="bottom" />
+      ))}
+    </div>
   );
 }
 
-/** Priority dock + More (< 1024): never wider than the screen (AC-48, AC-98). */
 export function ToolDock({ onMore }: { onMore: () => void }) {
   const { tool, locked, readOnly, pick } = useTool();
   const [vw, setVw] = useState(390);
@@ -278,94 +267,124 @@ export function PrivacyChip({ short }: { short?: boolean }) {
   );
 }
 
+/**
+ * Download in the editor's action slot (F25 §6, §7): the berry button; while the file is made the
+ * progress pill ("Downloading…", Cancel); then "Downloaded" with a tick for 2.4s, and a small card
+ * under it. An error shows the short line and "Try again" in the same box.
+ */
 export function DownloadButton({ compact }: { compact?: boolean }) {
   const ctl = useCtl();
   const busy = useStore(ctl.store, (s) => s.busy === "save");
   // Encrypted input: the copy is saved without a password (re-encryption comes later). Read-only
   // files download unchanged, so they keep theirs.
   const noPassword = useStore(ctl.store, (s) => ctl.rt.wasEncrypted && !s.readOnly);
+  const hasCard = useStore(ctl.store, (s) => !!s.downloaded);
   const [done, setDone] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [edited, setEdited] = useState(false);
   const [name, setName] = useState(() => ctl.outputName());
   useEffect(() => {
     if (!done) return;
-    const t = setTimeout(() => setDone(false), 1500);
+    const t = setTimeout(() => setDone(false), 2400);
     return () => clearTimeout(t);
   }, [done]);
   const run = async (n?: string) => {
-    await ctl.download?.(n);
-    // Stopped for a line that couldn't be saved: no tick.
-    if (!ctl.store.get().lineEdit?.failed) setDone(true);
+    setFailed(false);
+    const r = await ctl.download?.(n);
+    if (r === "done") setDone(true);
+    else if (r === "failed") setFailed(true);
   };
   const warm = () => void import("@/lib/editor/build-client").then((m) => m.warmBuild());
   return (
     <span className="ed-download" onPointerEnter={warm} onPointerDown={warm} onFocus={warm}>
-      <Button variant="primary" size={compact ? "sm" : "md"} busy={busy} aria-label="Download PDF" aria-keyshortcuts="Control+S Meta+S" iconStart={done ? <CheckBold size={18} /> : <DownloadBold size={18} />} onClick={() => void run()} data-testid="download">
-        <span className="max-[359px]:sr-only">Download</span>
-      </Button>
+      <ActionSlot kind="editor">
+        {busy ? (
+          <ProgressPill state={{ phase: "work", verb: "Downloading" }} action="Download" onCancel={() => ctl.cancelDownload?.()} />
+        ) : failed && !compact ? (
+          <SlotError line="Couldn’t make the PDF." onRetry={() => void run()} />
+        ) : (
+          <>
+            <Button
+              variant="primary"
+              size={compact ? "sm" : "md"}
+              className="ip-slot__main min-w-0"
+              aria-label="Download PDF"
+              aria-keyshortcuts="Control+S Meta+S"
+              iconStart={done ? <CheckBold size={18} /> : <DownloadBold size={18} />}
+              onClick={() => void run()}
+              data-testid="download"
+              data-done={done || undefined}
+            >
+              <span className="max-[359px]:sr-only">{done ? "Downloaded" : "Download"}</span>
+            </Button>
+            {!compact && (
+              <Pop label="Save as" title="Save as" className="ed-download__more" trigger={<CaretDownBold size={14} />} panelClassName="w-[280px] p-4">
+                {(close) => (
+                  <form
+                    className="flex flex-col gap-3"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      close();
+                      void run(name);
+                    }}
+                  >
+                    <label className="flex flex-col gap-1 text-sm font-semibold text-ink">
+                      File name
+                      <input className="ed-field w-full" value={name} onChange={(e) => setName(e.target.value)} data-autofocus />
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        checked={edited}
+                        onChange={(e) => {
+                          setEdited(e.target.checked);
+                          setName(ctl.outputName(e.target.checked));
+                        }}
+                      />
+                      Add “-edited”
+                    </label>
+                    <Button variant="primary" size="sm" type="submit" iconStart={<DownloadBold size={16} />}>
+                      Download
+                    </Button>
+                  </form>
+                )}
+              </Pop>
+            )}
+          </>
+        )}
+      </ActionSlot>
       {noPassword && (
         <span className="ed-download__note" data-testid="no-password-note">
           The downloaded copy has no password.
         </span>
       )}
-      {!compact && (
-        <Pop label="Save as" title="Save as" className="ed-download__more" trigger={<CaretDownBold size={14} />} panelClassName="w-[280px] p-4">
-          {(close) => (
-            <form
-              className="flex flex-col gap-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                close();
-                void run(name);
-              }}
-            >
-              <label className="flex flex-col gap-1 text-sm font-semibold text-ink">
-                File name
-                <input className="ed-field w-full" value={name} onChange={(e) => setName(e.target.value)} data-autofocus />
-              </label>
-              <label className="flex items-center gap-2 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  checked={edited}
-                  onChange={(e) => {
-                    setEdited(e.target.checked);
-                    setName(ctl.outputName(e.target.checked));
-                  }}
-                />
-                Add “-edited”
-              </label>
-              <Button variant="primary" size="sm" type="submit" iconStart={<DownloadBold size={16} />}>
-                Download
-              </Button>
-            </form>
-          )}
-        </Pop>
+      {hasCard && (
+        <Suspense fallback={null}>
+          <DownloadCard />
+        </Suspense>
       )}
     </span>
   );
 }
 
-export function TopBar({ wide, fileMenu, onClose }: { wide: boolean; fileMenu: MenuEntry[]; onClose: () => void }) {
+// The card after a download (F25 §7) carries the registry for its Keep going chips: its own chunk.
+const DownloadCard = lazy(() => import("./DownloadCard").then((m) => ({ default: m.DownloadCard })));
+
+export function TopBar({ wide, fileMenu }: { wide: boolean; fileMenu: MenuEntry[] }) {
   const ctl = useCtl();
   return (
-    <header className="ed-top ed-glass" data-region="top" role="group" aria-label="Document">
-      {wide ? (
-        <Link href="/" className="ed-home" aria-label="BerryPDF home">
-          <BerryMark size={28} />
-        </Link>
-      ) : (
-        <button type="button" className="ed-ctl ed-ctl--top" aria-label="Close editor" title="Close" onClick={onClose}>
-          <CloseBold size={20} />
-        </button>
-      )}
+    <header className="ed-top" data-region="top" role="group" aria-label="Document">
+      <h1 className="ed-title">Edit PDF</h1>
+      <span className="ed-beta">
+        <Badge tone="beta">Beta</Badge>
+      </span>
       <MenuButton label={`File: ${ctl.rt.name}`} items={fileMenu} className="ed-file" data-testid="file-menu">
         <h2 className="truncate">{ctl.rt.name}</h2>
         <CaretDownBold size={12} className="shrink-0" />
       </MenuButton>
-      <div className="ed-top__slot">{wide && <ToolOptions />}</div>
+      <div className="ed-top__slot">{wide && <ToolBar />}</div>
       <FieldsChipSlot />
       <UndoRedo />
-      {wide && <PrivacyChip />}
       <DownloadButton compact={!wide} />
     </header>
   );

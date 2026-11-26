@@ -41,11 +41,29 @@ export function readFormsInWorker(bytes: Uint8Array, password?: string): Promise
   });
 }
 
-export function buildInWorker(input: BuildInput): Promise<Uint8Array> {
-  return request({ input }).then((r) => {
-    if (!("bytes" in r)) throw new Error("Unexpected reply");
-    return r.bytes;
-  });
+/**
+ * Builds the download in the worker. Aborting `signal` (F25 Cancel) stops the worker at once, rejects
+ * with an AbortError and starts a fresh warm worker for the next try.
+ */
+export function buildInWorker(input: BuildInput, opts: { signal?: AbortSignal } = {}): Promise<Uint8Array> {
+  const { signal } = opts;
+  if (signal?.aborted) return Promise.reject(new DOMException("Cancelled", "AbortError"));
+  const onAbort = () => {
+    disposeBuild();
+    warmBuild();
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
+  return request({ input })
+    .then(
+      (r) => {
+        if (!("bytes" in r)) throw new Error("Unexpected reply");
+        return r.bytes;
+      },
+      (e) => {
+        throw signal?.aborted ? new DOMException("Cancelled", "AbortError") : e;
+      },
+    )
+    .finally(() => signal?.removeEventListener("abort", onAbort));
 }
 
 type Ok = Extract<BuildResponse, { ok: true }>;

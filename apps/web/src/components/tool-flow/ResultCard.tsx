@@ -13,6 +13,7 @@ import { IconButton } from "../ui/IconButton";
 import { CheckIcon, DownloadIcon, DownloadSimpleIcon, FilesIcon, ShareIcon, ShieldIcon } from "../ui/icons";
 import { Notice } from "../ui/Notice";
 import { copy } from "./copy";
+import { slotCopy } from "./slot-copy";
 import { PrivacyNote } from "./notes";
 import type { ToolOutput } from "./types";
 import { cloudUi, loadCloud } from "../cloud/tool-cloud";
@@ -228,10 +229,10 @@ export function ResultCard({
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <button type="button" onClick={onBack} className="h-11 rounded-sm px-1 font-display text-[16px] font-medium text-brand-strong underline-offset-4 hover:underline">
-            {copy.backToEditing}
+            {slotCopy.backToEditing}
           </button>
           <Button variant="ghost" onClick={onStartOver}>
-            {copy.startOver}
+            {slotCopy.startOver}
           </Button>
         </div>
       </div>
@@ -386,7 +387,7 @@ function ResultPreview({ output }: { output: ToolOutput }) {
       {failed ? <FilesIcon size={64} className="text-brand-strong" /> : <span ref={host} className="ip-result__host" />}
       {isZip && count > 1 && (
         <span className="ip-result__counter" data-testid="result-counter">
-          {copy.partsCounter(count)}
+          {slotCopy.partsCounter(count)}
         </span>
       )}
     </div>

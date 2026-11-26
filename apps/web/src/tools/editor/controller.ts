@@ -302,7 +302,9 @@ export function createController(store: Store, rt: Runtime, ui: { announce: Anno
     pickImage: null as null | (() => void),
     /** Set by the shell: an image was placed on a page (kept among the recent ones, AC-66). */
     imagePlaced: null as null | ((assetId: string) => void),
-    download: null as null | ((name?: string) => void | Promise<void>),
+    /** Resolves with how the download ended (F25 §6: the slot shows the pill, then Downloaded or the error). */
+    download: null as null | ((name?: string) => void | Promise<"done" | "failed" | "cancelled" | "stopped" | void>),
+    cancelDownload: null as null | (() => void),
 
     // ---- existing text (engine) ----
     async showVersion(index: number) {

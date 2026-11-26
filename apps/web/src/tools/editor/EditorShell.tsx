@@ -1,14 +1,14 @@
 "use client";
 /**
- * The editor (focus mode, U-E2): fixed over the page with the rest of the page inert, its own
- * history entry (Back closes it), the canvas with every page, and the bars around it. Loaded as a
- * separate chunk once the user shows intent (AC-86).
+ * The editor (F25 E1): in the page under the sticky site header, filling the rest of the screen (the
+ * footer is not drawn while it is open), its own history entry (Back closes it), the canvas with every
+ * page, and the bars around it. Loaded as a separate chunk once the user shows intent (AC-86).
  */
 import { emptyForm } from "@/lib/forms/model";
 import { fieldKey, fieldTab, loadForms, nudgeAfterDownload } from "@/tools/forms/core";
 import { FormsChrome } from "@/tools/forms/lazy";
+import { useRouter } from "next/navigation";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import type { MenuEntry } from "@/components/ui/Menu";
@@ -37,7 +37,7 @@ import { fontLabel, resetDocFonts } from "./font-service";
 import { resetDocFaces } from "./doc-face";
 import { disposeMatcher } from "@/lib/font-library/match-client";
 import { FontNotice } from "./FontMenu";
-import { AnnotsToggle, DOCK_ORDER, MoreTools, PageChip, PageHeader, PrivacyChip, SaveChip, ToolDock, ToolRail, TopBar, TOOLS, ViewPill } from "./Chrome";
+import { AnnotsToggle, DOCK_ORDER, MoreTools, PageChip, PageHeader, PrivacyChip, SaveChip, ToolDock, TopBar, TOOLS, ViewPill } from "./Chrome";
 import { createController, TOOL_NAMES, type Controller, type Runtime, type Toast } from "./controller";
 import { BASE_SCALE, EditorContext, MAX_ZOOM, MIN_ZOOM, ZOOM_STEPS, useCtl } from "./context";
 import { BroomBold, CloseBold, FilePlusBold, FileUpBold, KeyboardBold, MinusBold, PlusBold, FitBold } from "./icons";
@@ -69,8 +69,9 @@ export type ShellProps = {
   onBlank: () => void;
 };
 
-const PANEL_KEY = "berrypdf:editor:panel";
 const KEYS_KEY = "berrypdf:editor:single-keys";
+/** Tools whose options show in the properties panel (Properties.tsx ToolOptions). */
+const PROPS_TOOLS = new Set<string>(["text", "mark", "draw", "shapes", "whiteout", "sign", "form"]);
 const readLocal = (k: string) => {
   try {
     return localStorage.getItem(k);
@@ -126,7 +127,8 @@ function initialState(pages: PageEntry[], wide: boolean): EditorState {
     lineEdit: null,
     fontNotice: null,
     busy: null,
-    panel: wide && (readLocal(PANEL_KEY) ?? (typeof innerWidth !== "undefined" && innerWidth >= 1600 ? "1" : "0")) === "1",
+    downloaded: null,
+    panel: wide,
     panelTab: "pages",
     wide,
     readOnly: false,
@@ -169,11 +171,6 @@ export function EditorShell(props: ShellProps) {
     put();
     return subscribeEngine(put);
   });
-  const [host] = useState(() => {
-    const el = document.createElement("div");
-    el.className = "ed-host";
-    return el;
-  });
   const [ctl, setCtl] = useState<Controller | null>(null);
   // How many named-only fonts the page draws in their twins, on the shell element (for tests).
   useEffect(() => {
@@ -213,20 +210,17 @@ export function EditorShell(props: ShellProps) {
   const [toast, setToast] = useState<Toast | null>(null);
   const [recovery, setRecovery] = useState<LoadedSession | null>(null);
 
-  // Focus mode: fixed over the page, everything else inert, the page under it does not scroll.
+  // E1 (F25 §5): the editor fills the screen under the sticky header; the page itself does not scroll
+  // (the footer is not drawn), and nothing else on the page is inert: the header stays usable.
   useLayoutEffect(() => {
-    document.body.appendChild(host);
-    const others = Array.from(document.body.children).filter((el) => el !== host && !el.hasAttribute("inert"));
-    others.forEach((el) => el.setAttribute("inert", ""));
+    window.scrollTo(0, 0);
     const html = document.documentElement;
     const prev = html.style.overflow;
     html.style.overflow = "hidden";
     return () => {
-      others.forEach((el) => el.removeAttribute("inert"));
       html.style.overflow = prev;
-      host.remove();
     };
-  }, [host]);
+  }, []);
 
   const say = useCallback((msg: string) => setAnnounce((a) => (a === msg ? `${msg} ` : msg)), []);
   const showToast = useCallback((t: Omit<Toast, "key">) => setToast({ ...t, key: Date.now() }), []);
@@ -296,7 +290,8 @@ export function EditorShell(props: ShellProps) {
         </EditorContext.Provider>
       ) : (
         <div className="ed-opening">
-          <header className="ed-top ed-glass" role="group" aria-label="Document">
+          <header className="ed-top" role="group" aria-label="Document">
+            <h1 className="ed-title">Edit PDF</h1>
             <h2 className="ed-file truncate">{props.name}</h2>
           </header>
           <div className="grid flex-1 place-items-center">
@@ -318,7 +313,7 @@ export function EditorShell(props: ShellProps) {
       </div>
     </div>
   );
-  return createPortal(body, host);
+  return body;
 }
 
 type FrameProps = ShellProps & {
@@ -341,7 +336,6 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   const wide = useStore(store, (s) => s.wide);
   const zoom = useStore(store, (s) => s.zoom);
   const fit = useStore(store, (s) => s.fit);
-  const panel = useStore(store, (s) => s.panel);
   const tool = useStore(store, (s) => s.tool);
   const placement = useStore(store, (s) => s.placement);
   const selectionObjs = useStore(store, (s) => {
@@ -388,7 +382,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   // ---- layout width ----
   useEffect(() => {
     const mq = matchMedia("(min-width: 1024px)");
-    const on = () => store.set({ wide: mq.matches, panel: mq.matches && store.get().panel });
+    const on = () => store.set({ wide: mq.matches, panel: mq.matches });
     mq.addEventListener("change", on);
     return () => mq.removeEventListener("change", on);
   }, [store]);
@@ -756,9 +750,11 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   }, [ctl, store, rt, remember]);
 
   // ---- download (AC-44) ----
+  // Cancel (F25 §6): stops the build worker; the edits and the document stay as they were.
+  const saveAbort = useRef<AbortController | null>(null);
   const download = useCallback(
-    async (name?: string, force = false) => {
-      if (store.get().busy === "save") return;
+    async (name?: string, force = false): Promise<"done" | "failed" | "cancelled" | "stopped"> => {
+      if (store.get().busy === "save") return "stopped";
       // A field property still being typed in the popover commits on blur: do that first.
       const typing = document.activeElement;
       if (typing instanceof HTMLElement && typing.closest(".bf-popover")) typing.blur();
@@ -772,7 +768,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       // (A save that failed just now has said why itself, with its own way out.)
       if (store.get().lineEdit?.failed) {
         if (kept) ctl.toast({ text: "The line you’re editing couldn’t be saved, so it isn’t in the file yet. Change it, or press Escape to leave it as it was.", tone: "danger", line: true });
-        return;
+        return "stopped";
       }
       // Added text with characters no font can print: say so before the file is made (AC-75).
       if (!force && !s.readOnly) {
@@ -780,9 +776,14 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         const [objs, form] = await Promise.all([missingInObjects(now.objects), missingInFormValues(now.forms, store.get().forms.original)]);
         const chars = [...new Set([...objs.chars, ...form.chars])];
         const unchecked = objs.unchecked || form.unchecked;
-        if (chars.length || unchecked) return setMissingAsk({ chars, unchecked, name });
+        if (chars.length || unchecked) {
+          setMissingAsk({ chars, unchecked, name });
+          return "stopped";
+        }
       }
-      store.set({ busy: "save" });
+      const controller = new AbortController();
+      saveAbort.current = controller;
+      store.set({ busy: "save", downloaded: null });
       const at = store.get().history.index;
       const doc = H.current(store.get().history);
       const file = name ?? ctl.outputName();
@@ -799,9 +800,9 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
             assets: plainAssets(rt.assets, assetsOf(doc.objects)),
             fonts: await buildFonts(doc.objects),
             forms: doc.forms ? { state: doc.forms, original: s.forms.original ?? emptyForm() } : undefined,
-          });
+          }, { signal: controller.signal });
         } catch (err) {
-          if (!isPristine(doc, s.forms.original ?? undefined)) throw err;
+          if (controller.signal.aborted || !isPristine(doc, s.forms.original ?? undefined)) throw err;
           out = base;
         }
         const url = URL.createObjectURL(new Blob([out as Uint8Array<ArrayBuffer>], { type: "application/pdf" }));
@@ -813,20 +814,28 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 30_000);
-        store.set({ downloadedAt: at });
         const empty = nudgeAfterDownload(ctl);
-        ctl.toast({ text: `Downloaded · ${file} · 0 B uploaded${rt.wasEncrypted && !s.readOnly ? " · no password" : ""}${empty ? ` · ${empty} required ${empty === 1 ? "field is" : "fields are"} empty` : ""}`, tone: "success" });
+        // No toast (F25 §7): the slot says "Downloaded" and a small card under it gives the details.
+        store.set({ downloadedAt: at, downloaded: { name: file, size: out.byteLength, noPassword: rt.wasEncrypted && !s.readOnly, empty, bytes: out, at } });
         ctl.announce(`Downloaded ${file}`);
+        return "done";
       } catch {
+        if (controller.signal.aborted) {
+          ctl.announce("Cancelled");
+          return "cancelled";
+        }
         ctl.toast({ text: "The PDF couldn’t be made. Your edits are still here; please try again.", tone: "danger" });
+        return "failed";
       } finally {
+        if (saveAbort.current === controller) saveAbort.current = null;
         store.set({ busy: null });
       }
     },
     [ctl, store, rt, original],
   );
   useEffect(() => {
-    ctl.download = (n) => void download(n);
+    ctl.cancelDownload = () => saveAbort.current?.abort();
+    ctl.download = (n) => download(n);
     return () => {
       ctl.download = null;
     };
@@ -960,6 +969,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     if ((history.state as { berryEditor?: boolean } | null)?.berryEditor) history.back();
     else onClose();
   }, [onClose]);
+  const unsavedNow = () => store.get().history.index !== store.get().downloadedAt && !isPristine(H.current(store.get().history), store.get().forms.original ?? undefined);
   const unsaved = () => store.get().history.index !== store.get().downloadedAt && !isPristine(H.current(store.get().history), store.get().forms.original ?? undefined);
   const requestOpen = (run: () => void, label: string) => (unsaved() ? setReplace({ run, label }) : run());
   const requestClose = useCallback(() => {
@@ -982,6 +992,40 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     window.addEventListener("popstate", pop);
     return () => window.removeEventListener("popstate", pop);
   }, [onClose, store]);
+
+  // ---- leaving by a site link (F25 AC-629): the header stays usable, so its links ask first ----
+  const router = useRouter();
+  const [leaveTo, setLeaveTo] = useState<string | null>(null);
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a || a.closest(".ed-shell") || a.target === "_blank" || a.hasAttribute("download")) return;
+      const url = new URL(a.href, location.href);
+      if (url.origin !== location.origin || !unsavedNow()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setLeaveTo(url.pathname + url.search + url.hash);
+    };
+    // Capture on the document: before Next's link handler, which listens on the app root.
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store]);
+  const leave = (to: string) => {
+    closing.current = true;
+    setLeaveTo(null);
+    router.push(to);
+  };
+  // The download card closes on the next edit (F25 §7).
+  useEffect(
+    () =>
+      store.subscribe(() => {
+        const s = store.get();
+        if (s.downloaded && s.history.index !== s.downloaded.at) store.set({ downloaded: null });
+      }),
+    [store],
+  );
 
   // ---- keyboard (U-E10) ----
   useEffect(() => {
@@ -1189,6 +1233,8 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
 
   const pageList = pages.map((p, i) => ({ p, i, first: pages.findIndex((x) => x.src === p.src) === i }));
   const strip = !wide && (selectionObjs.length > 0 || tool !== "select" || !!placement);
+  // The properties panel (F25 §5, from 1024 px): the active tool's options, only for a tool that has them.
+  const props = wide && PROPS_TOOLS.has(tool);
   // The strip hides itself when a tool has no options: what sits above it then sits on the dock.
   useLayoutEffect(() => {
     const mark = () => document.querySelector(".ed-frame-root")?.classList.toggle("ed-strip-empty", strip && !document.querySelector(".ed-strip :is(button, input)"));
@@ -1203,12 +1249,12 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
 
   return (
     <div className={cx("ed-frame-root", wide ? "ed-wide" : "ed-narrow", strip && "ed-has-strip")} data-tool={tool}>
-      <TopBar wide={wide} fileMenu={fileMenu} onClose={requestClose} />
+      <TopBar wide={wide} fileMenu={fileMenu} />
       <div className="ed-body">
-        {wide && <ToolRail />}
         {wide && (
-          <aside className={cx("ed-panel", panel && "ed-panel--open")} aria-label="Pages panel" hidden={!panel} data-region="panel">
-            {panel && <SidePanel onGo={goto} />}
+          // The page strip, always shown from 1024 px (F25 AC-626), beside the canvas.
+          <aside className="ed-panel ed-panel--open" aria-label="Pages" data-region="panel" data-testid="editor-strip">
+            <SidePanel onGo={goto} />
           </aside>
         )}
         <div className="ed-stage">
@@ -1249,6 +1295,11 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
           </ToastView>
         </div>
       </div>
+      {props && (
+        <aside className="ed-props" aria-label="Properties" data-testid="editor-props">
+          <ToolOptions />
+        </aside>
+      )}
       {!wide && (
         <div className="ed-bottom">
           {strip && (
@@ -1363,6 +1414,32 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
             </Button>
             <Button variant="primary" onClick={() => (setConfirm(null), finishClose())}>
               Close
+            </Button>
+          </>
+        }
+      />
+      <Dialog
+        open={!!leaveTo}
+        onClose={() => setLeaveTo(null)}
+        title="Close without downloading?"
+        description="Your changes stay on this device. Open the same file again to restore them."
+        footer={
+          <>
+            <Button variant="plain" onClick={() => setLeaveTo(null)} data-autofocus>
+              Cancel
+            </Button>
+            <Button variant="plain" onClick={() => leaveTo && leave(leaveTo)}>
+              Leave
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                const to = leaveTo;
+                setLeaveTo(null);
+                void download().then((r) => r === "done" && to && leave(to));
+              }}
+            >
+              Download anyway
             </Button>
           </>
         }

@@ -19,7 +19,7 @@ import { PlusIcon, UploadIcon } from "../ui/icons";
 import { LiveRegion } from "../ui/LiveRegion";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { Slider } from "../ui/Slider";
-import { freshMemo, throttleAnnouncement, type PillProgress } from "./announce";
+import type { AnnounceMemo, PillProgress } from "./announce";
 import { copy } from "./copy";
 import { DropCard } from "./DropCard";
 import { DropOverlay } from "./DropOverlay";
@@ -253,7 +253,7 @@ export function ToolFlow({
   const [pillDone, setPillDone] = useState(false);
   /** What Cancel does for a server job once it exists (sends DELETE); null for browser jobs. */
   const serverCancel = useRef<(() => Promise<boolean>) | null>(null);
-  const memo = useRef(freshMemo());
+  const memo = useRef<AnnounceMemo | null>(null);
   const errorNotice = useRef<string | null>(null);
   /** A processing error meant for the user (the job said what to do), shown instead of the generic one. */
   const [processMessage, setProcessMessage] = useState<string | null>(null);
@@ -637,14 +637,10 @@ export function ToolFlow({
   // 25/50/75% marks at most every 10s, the queue position at most every 30s and when it reaches 1.
   const sayProgress = useCallback(
     (p: PillProgress) => {
-      const { say, memo: next } = throttleAnnouncement(memo.current, p, performance.now());
+      if (!chrome) return;
+      const { text, memo: next } = chrome.announcementFor(memo.current, p, performance.now(), tool.flow.progressLabel);
       memo.current = next;
-      if (!say) return;
-      if (say.kind === "queue") announce(copy.queueText(say.position));
-      else if (say.kind === "progress") announce(`${p.phase === "upload" ? copy.uploading : tool.flow.progressLabel} ${say.percent}%`);
-      else if (p.phase === "upload") announce(copy.uploading);
-      else if (p.phase === "queue") announce(p.position ? copy.queueText(p.position) : copy.inLine);
-      else if (p.phase === "work") announce(tool.flow.progressLabel);
+      if (text) announce(text);
     },
     [announce, tool.flow.progressLabel],
   );
@@ -655,7 +651,7 @@ export function ToolFlow({
     const controller = new AbortController();
     abort.current = controller;
     serverCancel.current = null;
-    memo.current = { ...freshMemo(), phase: "work" };
+    memo.current = null;
     if (errorNotice.current) dismissNotice(errorNotice.current);
     errorNotice.current = null;
     setProgress(0);
@@ -1251,10 +1247,9 @@ export function ToolFlow({
             <aside
               aria-label={`${tool.name} options`}
               data-ip-options="side"
-              className="ip-dimmable flex min-h-(--ip-stage-h) flex-col rounded-[20px_20px_28px_20px] border-[1.5px] border-panel-border bg-surface-raised p-6 shadow-card"
-              {...dim}
+              className="flex min-h-(--ip-stage-h) flex-col rounded-[20px_20px_28px_20px] border-[1.5px] border-panel-border bg-surface-raised p-6 shadow-card"
             >
-              <fieldset disabled={optionsDisabled} className="min-w-0" data-testid="dock-options">
+              <fieldset disabled={optionsDisabled} className="ip-dimmable min-w-0" data-testid="dock-options" {...dim}>
                 <legend className="sr-only">{`${tool.name} options`}</legend>
                 <h2 className="sr-only">Options</h2>
                 {options}

@@ -52,31 +52,14 @@ export const copy = {
   errorImage: (name: string) => `${name} couldn't be read as an image.`,
   errorPixels: (name: string) => `${name} is larger than 50 megapixels, the limit for images.`,
   preparingFonts: "Preparing fonts…",
-  /** F25 §6: the action pill and the slot. */
-  cancel: "Cancel",
+  /** F25 §6: what the flow says when a run is cancelled or done (the pill's own words: slot-copy.ts). */
   cancelled: "Cancelled",
   cancelledBrowser: "Cancelled. Your file is unchanged.",
   cancelledServer: "Cancelled. Your upload was deleted.",
   cancelledServerLater: "Cancelled. Your upload will be deleted within 2 hours.",
-  keepTabOpen: "Keep this tab open.",
-  queueEta: (minutes: number) => `About ${minutes} min. Keep this tab open.`,
-  inLine: "in line",
-  uploading: "Uploading",
   done: "Done",
-  tryAgain: "Try again",
   startOver: "Start over",
-  errorShort: "That didn't work.",
-  backToEditing: "Back to editing",
-  pillGroup: (action: string) => `${action} progress`,
-  queueText: (n: number, minutes?: number) => `${ordinal(n)} in line${minutes ? `, about ${minutes} ${minutes === 1 ? "minute" : "minutes"}` : ""}`,
-  partsCounter: (n: number) => `1 / ${n.toLocaleString("en-US")} files`,
 };
-
-/** 1st, 2nd, 3rd, 4th, 11th, 12th, 13th, 21st... */
-export function ordinal(n: number): string {
-  const s = n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
-  return `${n}${n % 10 > 3 ? "th" : s}`;
-}
 
 export const permissionLabels: Record<Permission, string> = {
   copy: "Copy text and images",
