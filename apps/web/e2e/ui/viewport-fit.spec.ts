@@ -12,6 +12,14 @@ import { isUsable, tools } from "../../src/tools/registry";
 import { fx } from "../support/flow";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
+/** Tools with no options at all (F4/F5 §3e, §3g): their bar holds the status, history and primary only. */
+const NO_OPTIONS = new Set(["organize-pdf", "alternate-mix-pdf"]);
+/** Tools that need a second file before they can run (Alternate & mix mixes two or more). */
+const SECOND_FILE: Record<string, string> = { "alternate-mix-pdf": "three-pages.pdf" };
+/** Loads the test file (and a second one where the tool needs it). */
+async function loadFiles(page: Page, slug: string) {
+  await page.getByTestId("file-input").setInputFiles(SECOND_FILE[slug] ? [fx("sixty-pages.pdf"), fx(SECOND_FILE[slug])] : fx("sixty-pages.pdf"));
+}
 
 const DESKTOP: [number, number][] = [
   [1280, 632], // 1280x720 screen in a browser window
@@ -62,6 +70,8 @@ async function openFirstPagePreview(page: Page) {
   if (await card.isVisible()) return card.click();
   const tile = page.getByTestId("page-tile").first();
   await tile.hover();
+  // A read-only grid (Alternate's result order) has no More menu: the tile itself shows the page larger.
+  if (!(await tile.getByTestId("tile-more").count())) return page.getByTestId("tile-main").first().click();
   await tile.getByTestId("tile-more").click();
   await page.getByRole("menuitem", { name: "Enlarge" }).click();
 }
@@ -95,7 +105,9 @@ for (const tool of usable) {
         // primary stay pinned to the bottom of the screen.
         const dock = (await page.locator("[data-ip-dock]").boundingBox())!;
         expect(dock.y, "options panel starts on the first screen").toBeGreaterThanOrEqual(0);
-        expect(dock.y + 120, "options panel: its first option is on the first screen").toBeLessThanOrEqual(height);
+        // A tool with no options opens on the bottom bar instead of a side panel (F4/F5 P-3): it is all on screen.
+        if (NO_OPTIONS.has(tool.slug)) await expectInViewport(page, page.locator("[data-ip-dock]"), "bottom bar (empty state)");
+        else expect(dock.y + 120, "options panel: its first option is on the first screen").toBeLessThanOrEqual(height);
         await expectInViewport(page, page.getByTestId("drop-card"), "drop area");
         // Scroll the page to the end of the panel (every option read): the drop area and the primary stay in view.
         await page.evaluate(() => {
@@ -113,14 +125,15 @@ for (const tool of usable) {
         expect(title!.height, "tool title fits on one line (the head has a fixed height)").toBeLessThanOrEqual(44);
         await noHorizontalScroll(page);
 
-        await page.getByTestId("file-input").setInputFiles(fx("sixty-pages.pdf"));
+        await loadFiles(page, tool.slug);
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded)");
         // Loaded: the options fold into the compact bottom bar and the pages get most of the screen.
         await expect(page.locator("[data-ip-dock]")).toHaveAttribute("data-ip-dock", "bar");
         // A tool with few options shows them in the bar; one with many (density "full", Merge) shows
         // its Options button there, which opens them in a sheet.
-        await expectInViewport(page, page.locator("[data-ip-dock]").getByTestId("dock-options").or(page.getByTestId("options-button")), "options in the bottom bar");
+        if (NO_OPTIONS.has(tool.slug)) await expect(page.locator("[data-ip-dock]").getByTestId("dock-options").or(page.getByTestId("options-button"))).toHaveCount(0);
+        else await expectInViewport(page, page.locator("[data-ip-dock]").getByTestId("dock-options").or(page.getByTestId("options-button")), "options in the bottom bar");
         // Tools with a Files / Pages view (Merge opens on files): the pages checks below run on the pages.
         const pagesView = page.getByRole("radio", { name: "Pages", exact: true });
         if (await pagesView.count()) await pagesView.click();
@@ -193,7 +206,7 @@ for (const tool of usable) {
         }
         await noHorizontalScroll(page);
 
-        await page.getByTestId("file-input").setInputFiles(fx("sixty-pages.pdf"));
+        await loadFiles(page, tool.slug);
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded)");
         await openFirstPagePreview(page);

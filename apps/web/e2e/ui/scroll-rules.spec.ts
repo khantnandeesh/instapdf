@@ -157,8 +157,12 @@ for (const [project, sizes] of [
           else {
             const tile = page.getByTestId("page-tile").first();
             await tile.hover();
-            await tile.getByTestId("tile-more").click();
-            await page.getByRole("menuitem", { name: "Enlarge" }).click();
+            // A read-only grid (Alternate's result order) has no More menu: the tile itself shows the page larger.
+            if (!(await tile.getByTestId("tile-more").count())) await page.getByTestId("tile-main").first().click();
+            else {
+              await tile.getByTestId("tile-more").click();
+              await page.getByRole("menuitem", { name: "Enlarge" }).click();
+            }
           }
           await expect(page.getByRole("dialog")).toBeVisible();
           await expectClean(page, "page preview open");

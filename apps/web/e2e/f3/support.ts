@@ -33,12 +33,12 @@ export async function showFiles(page: Page) {
   await expect(page.getByTestId("segment-grid")).toBeVisible();
 }
 
-/** True when the viewport is below 640 px, where the toolbar has one "Add" menu (spec M-3). */
-export const isPhoneToolbar = (page: Page) => (page.viewportSize()?.width ?? 1280) < 640;
+/** The one "Add" menu replaces "Add files" and "Add pages" below 1024 px (F3 M-3, moved up from 640 px by F4/F5 P-3, decision 13). */
+export const isPhoneToolbar = (page: Page) => (page.viewportSize()?.width ?? 1280) < 1024;
 
 /**
  * Chooses "Pages from a file…" or "Blank page" from the toolbar: the "Add pages" menu at
- * ≥ 640 px, the one "Add" menu below (spec M-3, eval G-2). Same item names in both.
+ * ≥ 1024 px, the one "Add" menu below (spec M-3, eval G-2, F4/F5 P-3). Same item names in both.
  */
 export async function chooseAddPages(page: Page, item: "Pages from a file…" | "Blank page") {
   if (!cloudOn || item === "Blank page") return chooseMenu(page, isPhoneToolbar(page) ? "Add" : "Add pages", item);
