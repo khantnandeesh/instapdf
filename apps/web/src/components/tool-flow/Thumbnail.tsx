@@ -90,7 +90,8 @@ export function PageThumb({ fileId, index, className, scale = 1 }: { fileId: str
         have = device;
         if (want === size) want = 0;
         canvas.dataset.size = String(size);
-        canvas.className = el.firstChild ? "block h-full w-full" : "mp-thumb-in block h-full w-full";
+        // Out of flow: a canvas's own pixel ratio (whole pixels, rounded) must never size its box (CLS).
+        canvas.className = el.firstChild ? "absolute inset-0 block size-full" : "mp-thumb-in absolute inset-0 block size-full";
         el.replaceChildren(canvas);
         setRendered(true);
       });
@@ -145,7 +146,7 @@ export function PageThumb({ fileId, index, className, scale = 1 }: { fileId: str
     <span
       ref={host}
       data-rendered={rendered || undefined}
-      className={cx("block h-full w-full", rendered ? "bg-paper" : "ip-pulse bg-paper", className)}
+      className={cx("relative block h-full w-full", rendered ? "bg-paper" : "ip-pulse bg-paper", className)}
     />
   );
 }
