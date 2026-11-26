@@ -1,6 +1,6 @@
-/** F5 page tools, shared checks on all three routes. Spec: docs/specs/f4-f5-page-tools.md §7 (AC-480, AC-481, AC-483), UI P-3, P-12. */
+/** F5 page tools, shared checks on all three routes. Spec: docs/specs/f4-f5-page-tools.md §7 (AC-412 F5 part, AC-480, AC-481, AC-483), UI P-3, P-12. */
 import { expect, test } from "@playwright/test";
-import { f5fx, flow, open, pickF5, toolbarOverflow } from "./support";
+import { f5fx, flow, open, pick, pickF5, rotateRight, run, toolbarOverflow } from "./support";
 
 const routes = [
   { slug: "organize-pdf", h1: /Organize PDF/i },
@@ -48,3 +48,39 @@ for (const { slug, h1 } of routes) {
     });
   });
 }
+
+test("AC-412 (F5 part): Rotate continues to all six page tools; Organize, Combine & reorder and Alternate & mix open with the rotated file", async ({ page }) => {
+  const rotateThen = async () => {
+    await page.goto("/rotate-pdf");
+    await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
+    await pick(page, "three-pages.pdf");
+    await expect(flow(page)).toHaveAttribute("data-state", "ready");
+    await rotateRight(page).click();
+    await run(page);
+    return page.getByRole("heading", { name: "Keep going with this file" }).locator("..");
+  };
+  let keep = await rotateThen();
+  for (const name of ["Split", "Extract pages", "Delete pages", "Organize", "Combine & reorder", "Alternate & mix"]) await expect(keep.getByRole("button", { name, exact: true })).toBeVisible();
+  for (const [name, slug] of [
+    ["Organize", "organize-pdf"],
+    ["Combine & reorder", "combine-reorder-pdf"],
+    ["Alternate & mix", "alternate-mix-pdf"],
+  ] as const) {
+    if (slug !== "organize-pdf") keep = await rotateThen();
+    await keep.getByRole("button", { name, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/${slug}$`));
+    await expect(flow(page)).toHaveAttribute("data-state", "ready");
+    if (slug === "alternate-mix-pdf") {
+      // Alternate opens in its files view: one card with the rotated file's 3 pages (it waits for a second file).
+      await expect(page.getByTestId("file-card")).toHaveCount(1);
+      await expect(page.getByTestId("file-meta")).toHaveText(["3 pages"]);
+      await expect(page.getByTestId("primary-action")).toBeDisabled();
+    } else {
+      await expect(page.getByTestId("tile-label"), name).toHaveText(["A1", "A2", "A3"]);
+      // The loaded file is Rotate's output (pages turned, /Rotate 0 in the workspace): landscape on screen.
+      await expect(page.getByTestId("page-tile").first()).toHaveAttribute("data-rotation", "0");
+      const b = (await page.getByTestId("page-tile").first().locator(":scope > span").first().boundingBox())!;
+      expect(b.width, name).toBeGreaterThan(b.height);
+    }
+  }
+});

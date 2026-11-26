@@ -61,6 +61,12 @@ export async function twelvePdf(): Promise<Uint8Array> {
   return doc.save();
 }
 
+/** A4 pages with one label each, in order (`odd.pdf`, `short.pdf`, `duplex-scan.pdf` …). */
+export async function labelledPdf(labels: string[]): Promise<Uint8Array> {
+  const { doc } = await base(labels.length, (i) => labels[i - 1]);
+  return doc.save();
+}
+
 /** `three-pages.pdf`-like: "Page 1".."Page 3". */
 export async function threePagesPdf(): Promise<Uint8Array> {
   const { doc } = await base(3, (i) => `Page ${i}`);

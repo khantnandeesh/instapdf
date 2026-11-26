@@ -2,9 +2,9 @@
  * Helpers for the F5 page tools e2e suite (Organize, Combine & reorder, Alternate & mix).
  * Spec: docs/specs/f4-f5-page-tools.md §3e–§3g, §7, I-9, I-10, UI P-3 to P-8.
  *
- * The F5 fixtures that are not in tests/fixtures yet (twelve, odd, even, even-reversed, short,
- * separator, duplex-scan, duplex-scan-odd, the 4-page mixed-sizes) are generated in memory here,
- * with the same content the spec's fixture list gives them; QA's step adds them as files.
+ * The spec's F5 fixtures (odd, even, even-reversed, short, separator, duplex-scan, duplex-scan-odd)
+ * are files in tests/fixtures (tests/fixtures/generate-page-tools.mjs). twelve.pdf (with its outline),
+ * the 4-page mixed-sizes and rotated-last are generated in memory here.
  */
 import { readFile } from "node:fs/promises";
 import { expect, type Page } from "@playwright/test";
@@ -26,17 +26,8 @@ async function textDoc(labels: string[]): Promise<Uint8Array> {
   return doc.save();
 }
 
-const range = (from: number, to: number, step = 1) => Array.from({ length: Math.floor((to - from) / step) + 1 }, (_, i) => from + i * step);
-
 const makers: Record<string, () => Promise<Uint8Array>> = {
   "twelve.pdf": twelvePdf,
-  "odd.pdf": () => textDoc(range(1, 9, 2).map((n) => `Page ${n}`)),
-  "even.pdf": () => textDoc(range(2, 10, 2).map((n) => `Page ${n}`)),
-  "even-reversed.pdf": () => textDoc(range(2, 10, 2).reverse().map((n) => `Page ${n}`)),
-  "short.pdf": () => textDoc(["Short 1", "Short 2"]),
-  "separator.pdf": () => textDoc(["Separator"]),
-  "duplex-scan.pdf": () => textDoc(["Front 1", "Front 2", "Front 3", "Back 3", "Back 2", "Back 1"]),
-  "duplex-scan-odd.pdf": () => textDoc(["Front 1", "Front 2", "Front 3", "Back 2", "Back 1"]),
   "mixed-sizes-4.pdf": mixedSizesPdf,
   "rotated-last.pdf": async () => {
     const doc = await PDFDocument.load(await textDoc(["Rot 1", "Rot 2"]));
