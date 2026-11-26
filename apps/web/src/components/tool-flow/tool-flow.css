@@ -99,3 +99,109 @@ body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard {
 .ip-wait-in {
   animation: mp-fade-up var(--motion-quick) var(--ease-out) 300ms backwards;
 }
+
+/*
+ * Page trays and page tiles (berrypdf.md "Page tiles", PT-1). Moved out of globals.css so the tile rule
+ * ships only with tool routes (home CSS budget, e2e/f2/home.spec.ts AC-55). In the components layer, so
+ * utilities still win as they did in globals.css.
+ */
+@layer components {
+  .mp-tray {
+    background: var(--page-tray);
+    padding: 16px 16px 10px;
+    border-radius: var(--radius-tray);
+  }
+  .mp-tray[aria-selected="true"],
+  .mp-tray[data-selected] {
+    box-shadow: 0 0 0 2.5px var(--brand);
+  }
+  .mp-tray__n,
+  .ip-tile__n {
+    font: 600 13px/20px var(--font-display);
+    color: var(--muted);
+  }
+  /* Page tiles (berrypdf.md "Page tiles"): no tray, the page fills the tile; selection and hover are
+     an outline hugging the page, never a filled block. No text selection or iOS callout on a tile, so
+     a long press never raises selection handles over the page. */
+  .ip-tile-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  @media (min-width: 640px) {
+    .ip-tile-grid {
+      grid-template-columns: repeat(auto-fill, calc(var(--ip-thumb-size) + 2 * var(--ip-tile-pad)));
+      gap: var(--ip-tile-gap);
+    }
+  }
+  .ip-tile {
+    padding: var(--ip-tile-pad);
+    border-radius: var(--radius-md);
+    -webkit-touch-callout: none;
+    user-select: none;
+    transition: outline-color var(--dur-fast);
+  }
+  @media (hover: hover) {
+    .ip-tile:hover {
+      outline: 1.5px solid var(--mp-card-hover-border);
+    }
+  }
+  .ip-tile[data-selected] {
+    outline: 2.5px solid var(--brand);
+  }
+  .ip-tile__box {
+    aspect-ratio: var(--ip-tile-aspect);
+    width: 100%;
+  }
+  @media (min-width: 640px) {
+    .ip-tile__box {
+      width: var(--ip-thumb-size);
+    }
+  }
+  @media (forced-colors: active) {
+    .mp-tray[data-selected],
+    .ip-tile[data-selected] {
+      outline: 2px solid Highlight;
+    }
+  }
+}
+
+/* The drawn checkbox (PasswordDialog's "apply to all"); tool routes only, so out of globals.css. */
+@layer components {
+  /* Checkbox (FormControls): 22px, 7px radius; checked fills berry with a white tick. */
+  .mp-checkbox {
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    flex: none;
+    border: 1.5px solid var(--ip-field-line);
+    border-radius: 7px;
+    background: #fff;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-fast),
+      border-color var(--dur-fast),
+      transform var(--dur-lift);
+  }
+  .mp-checkbox:checked {
+    border-color: var(--brand);
+    background: var(--brand)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='11'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='M1.5 5.5l3.5 3.5 7.5-7.5'/%3E%3C/svg%3E")
+      no-repeat center;
+  }
+  .mp-checkbox:active {
+    transform: scale(0.9);
+  }
+  @media (forced-colors: active) {
+    /* Our drawn checkbox paints its tick as a white image on a berry fill, and forced colors
+       repaints the fill, so the tick vanishes. Hand the box back to the system checkbox, which
+       draws its checked state in system colours. */
+    .mp-checkbox,
+    .mp-checkbox:checked {
+      appearance: auto;
+      background: none;
+      border: 0;
+    }
+  }
+}
