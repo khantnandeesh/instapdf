@@ -1025,7 +1025,7 @@ Changes apply immediately. Done only closes the dialog. Escape and the backdrop 
 | Alternate, two files | Wide cards, defaults | `alternate-2-files-<x>` |
 | Alternate, separator | `twelve.pdf` 4 per turn + `separator.pdf` with Repeat on | `alternate-3-separator-<x>` |
 | Alternate, Pages view | Read-only result A1, B1, A2, B2… | `alternate-4-preview-<x>` |
-| Alternate, one file | Primary disabled; status "Add one more file to mix"; info notice "One file with all fronts, then all backs? Organize can put it in order." + "Open in Organize" | `alternate-5-one-file-<x>` |
+| Alternate, one file | Primary disabled; status "Add one more file to mix"; an info callout at the top of the workspace (both views, dismissible, gone once a second file is in) "One file with all fronts, then all backs? Organize can put it in order." + "Open in Organize". Inline, not a floating notice: it stays while one file is in, so floating it would cover the tools row or the card the whole time (visual gate, 2026-11-26) | `alternate-5-one-file-<x>` |
 | Alternate, per-turn invalid | Bubble on that card's stepper: "Use a whole number from 1"; primary disabled | (as `split-6`, on the card) |
 | Error / limit / wrong type | F1 notices (floating `NoticeStack`) and the F1 error panel with Retry; every setting kept | F1 (unchanged) |
 
@@ -1138,7 +1138,7 @@ Tokens and presets come from `docs/design/motion.md`. Everything is transform, o
 8. **SelectionBar position fix** in shared `page-edit` code (overlap at 1366x657 on `/merge-pdf` today). Merge's e2e that reads the bar's position, if any, follows it.
 9. **No side panel when empty on Organize and Alternate** (`ControlDock emptyLayout="bar"`). The panel would hold only a disabled button.
 10. **Organize's action reads "Save PDF"** ("Saving"). Its output is a single edited copy, so "Organize PDF" as a verb would read oddly on the button.
-11. **Alternate's one-file notice offers "Open in Organize"**, handing the file over the way Continue with does. Organize's Two-sided scan order then fixes it (I-9).
+11. **Alternate's one-file callout offers "Open in Organize"** (inline at the top of the workspace since the 2026-11-26 visual gate), handing the file over the way Continue with does. Organize's Two-sided scan order then fixes it (I-9).
 12. **`viewport-fit.spec.ts`** opens previews with the `/^Page 1 of/` tile button. On Extract and Delete the tile toggles instead, so the spec must click "Enlarge page 1" on those two routes.
 13. **Merge toolbar fixes** (P-3): one Add ▾ menu below 1024 (today `/merge-pdf` scrolls sideways from 640 to about 710 in the Pages view), and `shrink-0` plus an icon-only Add below 360. These are real bugs on a shipped route; fixing them here, in shared code, is the cheapest route.
 14. **Long `h1`s wrap on phones.** "Combine & reorder PDF pages" wraps at 390, and "Alternate & mix PDF" at 360. Both still fit, because the head grows but the bar is fixed. A shorter `h1` (for example "Combine PDF pages") would keep the head to one line, but it trades against the SEO keyword. This is the lead's call, with SEO.
@@ -1268,7 +1268,7 @@ The strings live in `tools/<slug>/copy.ts`, and the shared ones in `components/p
 | Result view (sr) | Result order · {label}, page {n} of {file} |
 | Primary / progress | Mix PDFs · Mixing |
 | Status | {pages} pages · {files} files · Add one more file to mix |
-| One-file notice | One file with all fronts, then all backs? Organize can put it in order. · Open in Organize |
+| One-file callout | One file with all fronts, then all backs? Organize can put it in order. · Open in Organize |
 | Empty status | Add files to start |
 
 **Result (ZIP)**

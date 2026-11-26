@@ -90,6 +90,22 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
   }
 }
 
+/* Floating notices (NoticeStack) never cover the site header or, once files are in, the tools row (view
+   tabs, Sort, Add files): they float under it. The row is 64px (ToolFlow); the head above it is
+   --ip-intro-h from 1024px and one 50px line below (the compact head above). Below 1024px the row sticks
+   under the header after a scroll, so the notice still clears it. */
+.ip-flow {
+  --ip-notice-top: calc(var(--ip-header-h) + 12px);
+}
+.ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) {
+  --ip-notice-top: calc(var(--ip-header-h) + 50px + 64px + 8px);
+}
+@media (min-width: 1024px) {
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) {
+    --ip-notice-top: calc(var(--ip-header-h) + var(--ip-intro-h) + 64px + 8px);
+  }
+}
+
 /* A focus move the page made after a mouse or touch pick (eval G-7): no ring until the next key
    press (components/ui/focus.ts removes the mark), the same as :focus-visible for a real click. */
 [data-quiet-focus]:focus-visible {

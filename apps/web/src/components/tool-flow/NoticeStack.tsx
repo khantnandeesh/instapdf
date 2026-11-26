@@ -8,7 +8,8 @@ export type FlowNotice = FlowNoticeInput;
 
 /**
  * Floating notices (never in the document flow, so they never move content), as BerryPDF
- * Alerts: top center under the site header (never over it), rising in 200ms from just above (CSS). A dismissed or expired notice
+ * Alerts: top center under the site header (never over it) and, once files are in, under the tools row too
+ * (--ip-notice-top, tool-flow.css), rising in 200ms from just above (CSS). A dismissed or expired notice
  * fades out in 120ms (lib/motion, inert at once) before it is removed. Newest first, three
  * visible, the rest behind "+N more". Errors never auto-dismiss.
  */
@@ -19,7 +20,7 @@ export function NoticeStack({ notices, onDismiss }: { notices: FlowNotice[]; onD
   const hidden = ordered.length - visible.length;
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 top-[calc(var(--ip-header-h)+12px)] z-30 flex justify-center px-4"
+      className="pointer-events-none fixed inset-x-0 top-[var(--ip-notice-top,calc(var(--ip-header-h)+12px))] z-30 flex justify-center px-4"
       onKeyDown={(e) => {
         if (e.key === "Escape" && expanded) setExpanded(false);
       }}

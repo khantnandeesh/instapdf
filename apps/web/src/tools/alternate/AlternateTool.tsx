@@ -1,12 +1,13 @@
 "use client";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CardView } from "@/components/page-edit/SegmentGrid";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
 import type { WorkspaceContext } from "@/components/tool-flow/types";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import type { MenuEntry } from "@/components/ui/Menu";
+import { Notice } from "@/components/ui/Notice";
 import { A4, isBlank, sortPages, type PageRef } from "@/lib/page-list";
 import { canMix, interleave, type MixCard } from "@/lib/mix-plan";
 import { parseCount } from "@/lib/plan-counts";
@@ -68,34 +69,25 @@ export function AlternateTool() {
   const mixable = canMix(cards);
 
   // ---- one file: offer Organize, whose two-sided scan order fixes a fronts-then-backs scan (P-11 #11) ----
+  // An inline callout at the top of the workspace (visual gate 2026-11-26): it stays while one file is
+  // in, so a floating notice would sit on the cards or the tools row the whole time.
   const single = cards.length === 1 && !pending && ws.segments.length === 1 ? cards[0].sourceId : null;
-  const notice = useRef<string | null>(null);
+  const [hintClosed, setHintClosed] = useState<string | null>(null);
   useEffect(() => {
     void loadMixSettings();
   }, []);
-  useEffect(() => {
-    const flow = ws.api.current;
-    if (!flow) return;
-    if (notice.current) {
-      flow.dismissNotice(notice.current);
-      notice.current = null;
-    }
-    if (!single) return;
-    notice.current = flow.pushNotice({
-      tone: "info",
-      title: a.oneFile,
-      sticky: true,
-      action: {
-        label: a.openOrganize,
-        onClick: () => {
-          const f = ws.filesById.get(single);
-          if (!f) return;
-          setHandoff("organize-pdf", [f.source instanceof File ? f.source : new File([f.source], f.name, { type: f.source.type })]);
-          router.push("/organize-pdf");
-        },
-      },
-    });
-  }, [single]); // eslint-disable-line react-hooks/exhaustive-deps
+  const openInOrganize = (id: string) => {
+    const f = ws.filesById.get(id);
+    if (!f) return;
+    setHandoff("organize-pdf", [f.source instanceof File ? f.source : new File([f.source], f.name, { type: f.source.type })]);
+    router.push("/organize-pdf");
+  };
+  const oneFileHint = (w: WorkspaceContext) =>
+    single && hintClosed !== single && !w.dimmed ? (
+      <div className="pt-1 pb-3" data-testid="one-file-hint">
+        <Notice tone="info" look="callout" title={a.oneFile} onDismiss={() => setHintClosed(single)} action={{ label: a.openOrganize, onClick: () => openInOrganize(single) }} />
+      </div>
+    ) : null;
 
   // ---- Sort ▾: name order of the cards (AC-529) ----
   const sortItems: MenuEntry[] = (["name-asc", "name-desc"] as const).map((k) => ({
@@ -112,51 +104,55 @@ export function AlternateTool() {
     return <MixSettings id={id} name={card.name} pageCount={count} mix={mixOf(id)} onChange={(patch) => patchMix(id, patch)} announce={ws.announce} />;
   };
 
-  const renderWorkspace = (w: WorkspaceContext) =>
-    w.view === "files" ? (
-      <SegmentGrid
-        variant="mix"
-        listRef={ws.gridList}
-        model={ws.viewModel}
-        labels={{ list: a.filesLabel, hint: a.filesHint }}
-        focusUid={ws.focus}
-        dimmed={w.dimmed}
-        sourceCount={ws.sourceCount}
-        onMove={(key, step) => ws.moveCard(key, ws.stepTarget(step))}
-        onDragTo={(key, gap) => ws.moveCard(key, (i) => (gap > i ? gap - 1 : gap))}
-        onRemove={ws.removeCard}
-        onRotate={noop}
-        onPreview={(key) => {
-          const seg = ws.segments.find((s) => s.key === key);
-          const first = seg?.pages.find((p) => !isBlank(p) && !p.pending);
-          if (seg && first) ws.api.current?.openPreview(seg.pages.map((p) => ({ fileId: p.sourceId!, index: p.sourceIndex, rotation: p.rotation })), 0);
-        }}
-        onAddFiles={() => w.api.openPicker()}
-        onDragState={(s) => ws.announce(s.phase === "start" ? mergeCopy.dragStart(s.name) : mergeCopy.dragCancel)}
-        renderSettings={settings}
-      />
-    ) : (
-      <EditablePageGrid
-        readOnly
-        model={{ pages: result, sources: ws.sources, files: ws.filesById }}
-        labels={{ list: a.resultLabel, hint: a.resultHint }}
-        selection={NO_SELECTION}
-        inserted={NO_SELECTION}
-        focusUid={null}
-        dimmed={w.dimmed}
-        selectionCount={0}
-        onSelect={noop}
-        onSelectAll={noop}
-        onClearSelection={noop}
-        onMove={noop}
-        onDragTo={noop}
-        onAction={(uid, action) => action === "enlarge" && ws.enlarge(uid, result)}
-        onInsert={noop}
-        onRotateSelection={noop}
-        onRemoveSelection={noop}
-        onDragState={noop}
-      />
-    );
+  const renderWorkspace = (w: WorkspaceContext) => (
+    <>
+      {oneFileHint(w)}
+      {w.view === "files" ? (
+        <SegmentGrid
+          variant="mix"
+          listRef={ws.gridList}
+          model={ws.viewModel}
+          labels={{ list: a.filesLabel, hint: a.filesHint }}
+          focusUid={ws.focus}
+          dimmed={w.dimmed}
+          sourceCount={ws.sourceCount}
+          onMove={(key, step) => ws.moveCard(key, ws.stepTarget(step))}
+          onDragTo={(key, gap) => ws.moveCard(key, (i) => (gap > i ? gap - 1 : gap))}
+          onRemove={ws.removeCard}
+          onRotate={noop}
+          onPreview={(key) => {
+            const seg = ws.segments.find((s) => s.key === key);
+            const first = seg?.pages.find((p) => !isBlank(p) && !p.pending);
+            if (seg && first) ws.api.current?.openPreview(seg.pages.map((p) => ({ fileId: p.sourceId!, index: p.sourceIndex, rotation: p.rotation })), 0);
+          }}
+          onAddFiles={() => w.api.openPicker()}
+          onDragState={(s) => ws.announce(s.phase === "start" ? mergeCopy.dragStart(s.name) : mergeCopy.dragCancel)}
+          renderSettings={settings}
+        />
+      ) : (
+        <EditablePageGrid
+          readOnly
+          model={{ pages: result, sources: ws.sources, files: ws.filesById }}
+          labels={{ list: a.resultLabel, hint: a.resultHint }}
+          selection={NO_SELECTION}
+          inserted={NO_SELECTION}
+          focusUid={null}
+          dimmed={w.dimmed}
+          selectionCount={0}
+          onSelect={noop}
+          onSelectAll={noop}
+          onClearSelection={noop}
+          onMove={noop}
+          onDragTo={noop}
+          onAction={(uid, action) => action === "enlarge" && ws.enlarge(uid, result)}
+          onInsert={noop}
+          onRotateSelection={noop}
+          onRemoveSelection={noop}
+          onDragState={noop}
+        />
+      )}
+    </>
+  );
 
   return (
     <>

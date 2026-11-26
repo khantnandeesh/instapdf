@@ -74,7 +74,7 @@ export function NumberStepper({
   }
 
   return (
-    <span className={cx("relative inline-flex items-center gap-1", className)} data-testid="number-stepper" data-fb-under={under ? "" : undefined}>
+    <span className={cx("relative items-center gap-1", under ? "inline-grid grid-cols-[auto_auto_auto]" : "inline-flex", className)} data-testid="number-stepper" data-fb-under={under ? "" : undefined}>
       <IconButton
         label={decLabel}
         variant="soft"

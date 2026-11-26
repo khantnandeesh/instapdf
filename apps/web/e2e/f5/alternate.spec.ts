@@ -129,16 +129,29 @@ test("AC-531: one file disables the primary and asks for another; a second enabl
   await pickF5(page, "odd.pdf");
   await expect(primary(page)).toBeDisabled();
   await expect(page.getByTestId("dock-status")).toHaveText("Add one more file to mix");
+  await expect(page.getByTestId("one-file-hint")).toBeVisible();
   await page.getByTestId("file-input").setInputFiles([await f5fx("even.pdf")]);
   await expect(page.getByTestId("file-card")).toHaveCount(2);
   await expect(primary(page)).toBeEnabled();
+  await expect(page.getByTestId("one-file-hint")).toHaveCount(0);
 });
 
 test("P-11 #11: one file offers Organize, which opens with that file", async ({ page }) => {
   await pickF5(page, "duplex-scan.pdf");
-  const notice = page.getByTestId("notice").filter({ hasText: "One file with all fronts, then all backs?" });
-  await expect(notice).toBeVisible();
-  await notice.getByRole("button", { name: "Open in Organize" }).click();
+  // An inline callout at the top of the workspace: it covers nothing (the tools row and the card stay
+  // clickable) and it stays in both views while one file is in.
+  const hint = page.getByTestId("one-file-hint");
+  await expect(hint).toContainText("One file with all fronts, then all backs? Organize can put it in order.");
+  await expect(page.getByTestId("notice")).toHaveCount(0);
+  const box = (await hint.boundingBox())!;
+  const tabs = (await page.getByRole("radiogroup", { name: "View" }).boundingBox())!;
+  const card = (await page.getByTestId("file-card").boundingBox())!;
+  expect(box.y, "the hint sits under the tools row").toBeGreaterThanOrEqual(tabs.y + tabs.height);
+  expect(card.y, "the card sits under the hint").toBeGreaterThanOrEqual(box.y + box.height);
+  await page.getByRole("radio", { name: "Pages", exact: true }).click();
+  await expect(hint).toBeVisible();
+  await page.getByRole("radio", { name: "Files", exact: true }).click();
+  await hint.getByRole("button", { name: "Open in Organize" }).click();
   await page.waitForURL(/\/organize-pdf$/);
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
   await expect(page.getByTestId("page-tile")).toHaveCount(6);

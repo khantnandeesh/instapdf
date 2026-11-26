@@ -124,12 +124,13 @@
 
   /* A NumberStepper outside the dock (data-fb-under, Alternate's cards): the error is a plain line under the
      stepper, in the flow, so it covers nothing (visual review 2026-11-26). */
-  [data-fb-under] {
-    flex-wrap: wrap;
-  }
+  /* The stepper is a three-column grid there (NumberStepper), so the buttons never wrap; the error line
+     spans it without widening it (width 0, min-width 100%). */
   [data-fb-under] .ip-fb {
     position: static;
-    flex-basis: 100%;
+    grid-column: 1 / -1;
+    width: 0;
+    min-width: 100%;
     pointer-events: auto;
   }
   [data-fb-under] .ip-fb__text {
