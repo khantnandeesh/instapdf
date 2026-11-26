@@ -356,7 +356,8 @@ function ResultPreview({ output }: { output: ToolOutput }) {
       const canvas = await renderPage(r.pdf.doc, 0, box);
       if (!alive) return;
       // Fit the whole page in the square (width and height auto, both capped): a portrait page is
-      // height-bound, a landscape one width-bound, and nothing is cropped.
+      // height-bound, a landscape one width-bound, and nothing is cropped. The host is a flex box of a
+      // definite size, so the canvas's max-height resolves (in a grid its auto row grew to the canvas).
       canvas.className = "ip-fade-in block h-auto max-h-full w-auto max-w-full shadow-paper";
       canvas.setAttribute("role", "img");
       canvas.setAttribute("aria-label", "Preview of page 1 of the result");
@@ -371,7 +372,7 @@ function ResultPreview({ output }: { output: ToolOutput }) {
   }, [output, isPdf]);
   return (
     <div className="mp-tray relative grid size-[200px] shrink-0 place-items-center p-4 sm:size-[240px]">
-      {isPdf ? <span ref={host} className="grid h-full w-full place-items-center" /> : <FilesIcon size={64} className="text-brand-strong" />}
+      {isPdf ? <span ref={host} className="flex h-full min-h-0 w-full min-w-0 items-center justify-center" /> : <FilesIcon size={64} className="text-brand-strong" />}
       {!ready && isPdf && <BerryLoader size="sm" className="absolute" />}
     </div>
   );
