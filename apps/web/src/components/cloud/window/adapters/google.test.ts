@@ -10,6 +10,12 @@ describe("pickerUrl", () => {
     expect(u.searchParams.get("authuser")).toBe("a.b+c@example.com");
   });
 
+  it("accepts the URL object the live toUri() returns", () => {
+    const obj = { toString: () => BASE };
+    expect(new URL(pickerUrl(obj, { appId: "9" })).searchParams.get("appId")).toBe("9");
+    expect(pickerUrl(obj)).toBe(BASE);
+  });
+
   it("leaves both out when unknown", () => {
     expect(pickerUrl(BASE, { appId: "", authUser: "" })).toBe(BASE);
     expect(pickerUrl(BASE)).toBe(BASE);
