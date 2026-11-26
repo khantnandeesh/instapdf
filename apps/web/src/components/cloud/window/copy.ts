@@ -30,7 +30,6 @@ export const windowCopy = {
   blockedOther: "Its sign-in didn't work in this window.",
   blockedHelp: "How to fix it",
   blockedHelpUrl: "https://support.google.com/drive/answer/13812413",
-  chooseDevice: "Choose from this device",
   lostTitle: "This window lost its tool",
   lostBanner: "Lost touch with the BerryPDF tab. Keep it open: this picks up again when it answers.",
   lostBody: "The BerryPDF tab that opened it was closed or reloaded. Close this window and start again from the tool.",

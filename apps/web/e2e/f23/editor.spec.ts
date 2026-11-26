@@ -160,18 +160,6 @@ test("E6, AC-136: a slow download shows its progress under the card, then the fi
   await expect(page.getByTestId("file-menu")).toHaveAccessibleName("File: alpha.pdf");
 });
 
-test("E6: when Google couldn't open, Choose from this device closes the window and focuses Open PDF", async ({ page }) => {
-  await openEditor(page);
-  const win = await openWindow(page, () => rowButton(page, "Google Drive").click());
-  await reachPicker(win);
-  await win.getByRole("button", { name: "Sign-in error" }).click();
-  await win.getByTestId("cloud-choose-device").click();
-  await closed(win);
-  await page.bringToFront();
-  await expect(openPdf(page)).toBeFocused();
-  await expect(editor(page)).toHaveAttribute("data-state", "empty");
-});
-
 test("E6: a local file opened while a cloud pick is in progress wins; the cloud pick ends and never replaces it", async ({ page }) => {
   await openEditor(page);
   // 1. The window is open, nothing picked yet: a local pick closes it.
@@ -194,6 +182,20 @@ test("E6: a local file opened while a cloud pick is in progress wins; the cloud 
   await page.waitForTimeout(3000); // longer than the slow download would have taken
   await expect(page.getByTestId("file-menu")).toHaveAccessibleName("File: bravo.pdf");
   expect(await page.evaluate(() => localStorage.getItem("berrypdf:cloud-last"))).not.toBe("dropbox");
+});
+
+test("E6: a wrong local file (not a PDF) leaves a cloud pick in progress alone; that pick then opens", async ({ page }) => {
+  await openEditor(page);
+  const win = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  await reachPicker(win);
+  await page.getByTestId("editor-input").setInputFiles("tests/fixtures/notes.txt");
+  await expect(page.getByRole("status").filter({ hasText: "notes.txt isn't a PDF" })).toBeVisible();
+  await win.waitForTimeout(500); // a cancel would have closed the window by now
+  expect(win.isClosed()).toBe(false);
+  await mockPick(win, ["alpha.pdf"]);
+  await closed(win);
+  await expect(editor(page)).toHaveAttribute("data-state", "open", { timeout: 20_000 });
+  await expect(page.getByTestId("file-menu")).toHaveAccessibleName("File: alpha.pdf");
 });
 
 test("E6, AC-149: a password-protected PDF from the cloud opens the editor's password dialog", async ({ page }) => {

@@ -101,11 +101,12 @@ export function EditorTool() {
 
   const openFile = useCallback(
     async (file: File, from: "local" | "cloud" = "local") => {
-      // A local pick, drop or paste wins over a cloud pick still in progress: that one ends now.
-      if (from === "local") cancelCloud.current?.();
       if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") return say(copy.errorType(file.name));
       if (file.size > MAX_BYTES) return say(copy.errorSize(file.name, 200));
       if (!file.size) return say(copy.errorCorrupt(file.name));
+      // A local PDF that passed the checks wins over a cloud pick still in progress: that one ends now.
+      // A wrong file (type, size) leaves the cloud pick alone.
+      if (from === "local") cancelCloud.current?.();
       setBusy(true);
       opening.current = true;
       try {

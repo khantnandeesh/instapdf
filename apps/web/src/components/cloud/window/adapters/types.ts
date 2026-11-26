@@ -23,14 +23,8 @@ export type AdapterCtx = {
   frame: (spec: FrameSpec | null, title?: string) => Promise<HTMLIFrameElement | null>;
   /** Before a full-page sign-in redirect (OneDrive). */
   leaving: () => void;
-  /**
-   * The provider's picker has said nothing since it loaded (Google: its own "You must sign in" page,
-   * which we can't read): the window shows its "couldn't open" state.
-   */
-  trouble?: () => void;
   /** Mock only: shows the test picker and resolves with what was chosen. */
-  /** "quiet": the test picker stays up and silent, like Google's blocked picker (the mock runs the real watchdog). */
-  mockPick?: () => Promise<Picked[] | "cancel" | "quiet">;
+  mockPick?: () => Promise<Picked[] | "cancel">;
 };
 
 export type Adapter = {
@@ -52,9 +46,8 @@ export const isSignInResponse = (hash: string, search: string) =>
   });
 
 /**
- * "signin": the provider's sign-in didn't work for this window (an expired or refused session, an
- * account without access). The window handles it itself, with Try again and Choose from this device;
- * the tool tab is not told (it keeps waiting, and the person can still cancel there).
+ * "signin": Google's sign-in popup for Save didn't work (blocked google.com cookies, another active
+ * account). The window shows its "couldn't open" state with Close window and tells the tool it failed.
  */
 export class CloudError extends Error {
   constructor(readonly code: "denied" | "unreachable" | "signin") {
