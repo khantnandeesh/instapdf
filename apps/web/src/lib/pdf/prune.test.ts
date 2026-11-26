@@ -1,5 +1,7 @@
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRef, PDFStream, StandardFonts } from "@cantoo/pdf-lib";
-import { describe, expect, it } from "vitest";
+import { deflateSync } from "node:zlib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, PDFRef, PDFStream, StandardFonts } from "@cantoo/pdf-lib";
+import { describe, expect, it, vi } from "vitest";
+import { buildDocuments } from "./build";
 import { renderPage } from "../forms/test-helpers";
 import { defaultMergeOptions } from "./merge-options";
 import { mergePdf } from "./merge";
@@ -34,9 +36,20 @@ const reload = async (doc: PDFDocument) => PDFDocument.load(await doc.save({ use
 
 describe("collectNames", () => {
   it("finds every name token, with #-escapes decoded", () => {
-    const used = new Set<PDFName>();
+    const used = new Set<string>();
     collectNames(new TextEncoder().encode("q /Im1 Do /F1 12 Tf/GS0 gs[/P0]scn /Im#202 Do (/InString) Tj % /InComment\n"), used);
-    for (const n of ["Im1", "F1", "GS0", "P0", "Im 2", "InString", "InComment"]) expect(used.has(N(n)), n).toBe(true);
+    for (const n of ["Im1", "F1", "GS0", "P0", "Im 2", "InString", "InComment"]) expect(used.has(n), n).toBe(true);
+  });
+  it("review 7: adds plain strings and never touches pdf-lib's global name pool", () => {
+    const spy = vi.spyOn(PDFName, "of");
+    try {
+      const used = new Set<string>();
+      collectNames(new TextEncoder().encode("/Unique9f3a1 Do /Other#20Name Do"), used);
+      expect(used.has("Unique9f3a1")).toBe(true);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
@@ -156,5 +169,95 @@ describe("createPruner (I-1)", () => {
     expect(keysOf(pruner.forPage(0), "Font")).toHaveLength(1);
     expect(keysOf(pruner.forPage(0), "XObject")).toEqual([]);
     expect(pruner.forPage(0)?.get(N("XObject"))).toBeUndefined();
+  });
+
+  it("review 1: a Flate content stream with a PNG predictor is not decodable by pdf-lib, so the page keeps everything", async () => {
+    const text = Buffer.from("q 100 0 0 100 0 0 cm /Im2 Do Q\n");
+    const cols = 8;
+    const rows: number[] = [];
+    let prev = new Uint8Array(cols);
+    for (let r = 0; r * cols < text.length; r++) {
+      const row = new Uint8Array(cols);
+      row.set(text.subarray(r * cols, r * cols + cols));
+      rows.push(2, ...row.map((b, i) => (b - prev[i]) & 255)); // PNG "Up"
+      prev = row;
+    }
+    const { doc } = await sharedDoc(["", "/Im1 Do"]);
+    const ctx = doc.context;
+    doc.getPage(0).node.set(N("Contents"), ctx.register(PDFRawStream.of(ctx.obj({ Filter: "FlateDecode", DecodeParms: { Predictor: 12, Columns: cols } } as never) as unknown as PDFDict, deflateSync(Buffer.from(rows)))));
+    // A predictor inside a filter array counts too.
+    doc.getPage(1).node.set(N("Contents"), ctx.register(PDFRawStream.of(ctx.obj({ Filter: ["FlateDecode"], DecodeParms: [{ Predictor: 2, Columns: cols }] } as never) as unknown as PDFDict, deflateSync(Buffer.from("/Im1 Do")))));
+    const loaded = await reload(doc);
+    const pruner = createPruner(loaded.context, loaded.getPages());
+    expect(pruner.forPage(0)).toBeUndefined();
+    expect(pruner.forPage(1)).toBeUndefined();
+  });
+
+  it("review 2: a chain of 70 resource-less forms (in reverse dictionary order) is followed to the end", async () => {
+    const { doc } = await sharedDoc(["/F0 Do", "/Im1 Do"], (d) => {
+      const o: Record<string, PDFRef> = {};
+      for (let i = 69; i >= 0; i--) o[`F${i}`] = form(d, i === 69 ? "/Im2 Do" : `/F${i + 1} Do`);
+      return o;
+    });
+    const loaded = await reload(doc);
+    const kept = keysOf(createPruner(loaded.context, loaded.getPages()).forPage(0), "XObject");
+    expect(kept).toContain("Im2");
+    expect(kept).toHaveLength(71); // F0..F69 and Im2
+  });
+
+  it("review 6: follows a soft mask group (ExtGState /SMask /G) that has no /Resources", async () => {
+    const { doc } = await sharedDoc(["/GS0 gs /Im1 Do", "/Im1 Do"]);
+    const ctx = doc.context;
+    const res = ctx.lookup(doc.getPage(0).node.get(N("Resources"))) as PDFDict;
+    res.set(N("ExtGState"), ctx.obj({ GS0: ctx.obj({ Type: "ExtGState", SMask: ctx.obj({ S: "Luminosity", G: form(doc, "/Im3 Do", { Group: { S: "Transparency" } }) }) }) } as never));
+    const loaded = await reload(doc);
+    expect(keysOf(createPruner(loaded.context, loaded.getPages()).forPage(0), "XObject")).toEqual(["Im1", "Im3"]);
+  });
+
+  it("review 6: a form or appearance whose /Resources is a dangling reference draws with the page's", async () => {
+    const { doc } = await sharedDoc(["/Fm Do", "/Im1 Do"], (d) => ({ Fm: form(d, "/Im3 Do", { Resources: PDFRef.of(9999) }) }));
+    const ctx = doc.context;
+    const ap = ctx.register(ctx.stream("/Im2 Do", { Type: "XObject", Subtype: "Form", BBox: [0, 0, 10, 10], Resources: PDFRef.of(9998) } as never));
+    doc.getPage(0).node.set(N("Annots"), ctx.obj([ctx.register(ctx.obj({ Type: "Annot", Subtype: "Square", Rect: [0, 0, 10, 10], AP: ctx.obj({ N: ap }) }))]));
+    const loaded = await reload(doc);
+    expect(keysOf(createPruner(loaded.context, loaded.getPages()).forPage(0), "XObject")).toEqual(["Fm", "Im2", "Im3"]);
+  });
+
+  it("review 4: malformed resources never fail the job; the page keeps what it has", async () => {
+    const make = async (mut: (d: PDFDocument) => void) => {
+      const d = await PDFDocument.create();
+      d.addPage().drawText("one");
+      d.addPage().drawText("two");
+      mut(d);
+      return d.save({ useObjectStreams: false });
+    };
+    const cases: ((d: PDFDocument) => void)[] = [
+      (d) => d.getPage(0).node.set(N("Resources"), d.context.register(d.context.obj([1, 2]))),
+      (d) => d.getPage(0).node.set(N("Resources"), PDFRef.of(9999)),
+      (d) => d.getPage(0).node.Resources()!.set(N("XObject"), d.context.register(d.context.obj(5))),
+      (d) => {
+        const p = d.getPage(0).node;
+        p.set(N("Contents"), d.context.obj([p.get(N("Contents"))!, 7]));
+      },
+    ];
+    for (const mut of cases) {
+      const bytes = await make(mut);
+      const loaded = await PDFDocument.load(bytes);
+      expect(() => createPruner(loaded.context, loaded.getPages()).forPage(0)).not.toThrow();
+      const r = await buildDocuments({ sources: [{ id: "x", name: "x.pdf", kind: "pdf", source: new Blob([bytes]) }], documents: [{ name: "a.pdf", pages: [{ sourceId: "x", sourceIndex: 0, rotation: 0 }] }] }, {}, () => {});
+      expect(r.documents[0].pageCount).toBe(1);
+    }
+  });
+
+  it("review 12: a stream shared by several pages is scanned once", async () => {
+    const { doc } = await sharedDoc(["/Fm Do", "/Fm Do /Im1 Do", "/Fm Do /Im2 Do"], (d) => ({ Fm: form(d, "/Im3 Do") }));
+    const loaded = await reload(doc);
+    const fm = loaded.context.lookup((loaded.context.lookup(loaded.getPage(0).node.get(N("Resources"))) as PDFDict).lookup(N("XObject"), PDFDict).get(N("Fm"))) as PDFRawStream;
+    let reads = 0;
+    const contents = fm.contents;
+    Object.defineProperty(fm, "contents", { get: () => (reads++, contents) });
+    const pruner = createPruner(loaded.context, loaded.getPages());
+    for (const i of [0, 1, 2]) expect(keysOf(pruner.forPage(i), "XObject")).toContain("Im3");
+    expect(reads).toBe(1);
   });
 });

@@ -5,7 +5,7 @@
  */
 import { readFile } from "node:fs/promises";
 import { unzipSync } from "fflate";
-import { PDFDict, PDFDocument, PDFName, PDFNumber, PDFStream } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, PDFStream, PDFString, StandardFonts } from "@cantoo/pdf-lib";
 import { beforeAll, describe, expect, it } from "vitest";
 import { parsePageRanges } from "../page-ranges";
 import { pagesPerFile, planAlternate, planDelete, planExtract, planSplit, type OutputPlan, type PlanFile } from "../page-plans";
@@ -14,7 +14,7 @@ import { buildDocuments, type BuiltDocument } from "./build";
 import { documentsJob, runJob } from "./jobs";
 import { mergePdf, type MergePageInput, type MergeSourceInput } from "./merge";
 import { ALTERNATE_OPTIONS, ORGANIZE_OPTIONS } from "./merge-options";
-import { linksOf, linksPdf, mixedSizesPdf, outlineOf, pageObjectCount, pageTexts, sharedResPdf, threePagesPdf, twelvePdf } from "./page-tool-fixtures";
+import { bigFont, linksOf, linksPdf, mixedSizesPdf, outlineOf, pageObjectCount, pageTexts, sharedResPdf, threePagesPdf, twelvePdf } from "./page-tool-fixtures";
 
 const fx: Record<string, Uint8Array> = {};
 beforeAll(async () => {
@@ -23,6 +23,7 @@ beforeAll(async () => {
   fx["mixed-sizes.pdf"] = await mixedSizesPdf();
   fx["shared-res.pdf"] = await sharedResPdf("shared");
   fx["inherited-res.pdf"] = await sharedResPdf("inherited");
+  fx["shared-res-form.pdf"] = await sharedResPdf("shared", { form: true });
   fx["links.pdf"] = await linksPdf();
   const repo = new URL("../../../tests/fixtures/", import.meta.url);
   for (const name of ["sixty-pages.pdf", "owner-restricted.pdf"]) fx[name] = new Uint8Array(await readFile(new URL(name, repo)));
@@ -205,6 +206,45 @@ describe("links (I-2)", () => {
     const doc = await plain((await extract("links.pdf", "1-5")).bytes);
     expect(doc.catalog.get(PDFName.of("Names"))).toBeUndefined();
   });
+  it("review 3: a /Dests name tree whose /Kids point back at itself does not hang", async () => {
+    const d = await PDFDocument.create();
+    const p1 = d.addPage();
+    d.addPage();
+    const ctx = d.context;
+    const rootRef = ctx.nextRef();
+    ctx.assign(rootRef, ctx.obj({ Kids: [rootRef, rootRef] }));
+    d.catalog.set(PDFName.of("Names"), ctx.obj({ Dests: rootRef }));
+    p1.node.set(PDFName.of("Annots"), ctx.obj([ctx.register(ctx.obj({ Type: "Annot", Subtype: "Link", Rect: [0, 0, 10, 10], Dest: PDFName.of("nowhere") }))]));
+    const outlineRef = ctx.nextRef();
+    const item = ctx.register(ctx.obj({ Title: PDFString.of("Loop"), Parent: outlineRef, Dest: PDFString.of("nowhere") }));
+    ctx.assign(outlineRef, ctx.obj({ Type: "Outlines", First: item, Last: item, Count: 1 }));
+    d.catalog.set(PDFName.of("Outlines"), outlineRef);
+    const bytes = await d.save();
+    const src: MergeSourceInput = { id: "x", name: "x.pdf", kind: "pdf", source: new Blob([bytes as Uint8Array<ArrayBuffer>]) };
+    const r = await buildDocuments({ sources: [src], documents: [{ name: "a.pdf", pages: [{ sourceId: "x", sourceIndex: 0, rotation: 0 }] }] }, {}, () => {});
+    expect(r.documents[0].pageCount).toBe(1);
+    const m = await mergePdf({ sources: [src], pages: all("x", 2), options: ORGANIZE_OPTIONS }, {}, () => {});
+    expect(m.pageCount).toBe(2);
+  });
+  it("review 8: named links resolve through one lookup table per source (10,000 named links in a flat tree)", async () => {
+    const d = await PDFDocument.create();
+    const ctx = d.context;
+    const P = 200;
+    const L = 50;
+    const pages = Array.from({ length: P }, () => d.addPage([200, 200]));
+    const names: unknown[] = [];
+    for (let i = 0; i < P * L; i++) names.push(PDFString.of(`dest${String(i).padStart(6, "0")}`), ctx.obj([pages[i % P].ref, PDFName.of("Fit")]));
+    d.catalog.set(PDFName.of("Names"), ctx.obj({ Dests: ctx.obj({ Names: ctx.obj(names as never) }) }));
+    pages.forEach((p, pi) =>
+      p.node.set(PDFName.of("Annots"), ctx.obj(Array.from({ length: L }, (_, k) => ctx.register(ctx.obj({ Type: "Annot", Subtype: "Link", Rect: [0, 0, 5, 5], Dest: PDFString.of(`dest${String(pi * L + k).padStart(6, "0")}`) }))))),
+    );
+    const bytes = await d.save();
+    const t0 = performance.now();
+    const r = await buildDocuments({ sources: [{ id: "x", name: "x.pdf", kind: "pdf", source: new Blob([bytes as Uint8Array<ArrayBuffer>]) }], documents: pages.map((_, i) => ({ name: `p${i}.pdf`, pages: [{ sourceId: "x", sourceIndex: i, rotation: 0 }] })) }, {}, () => {});
+    expect(performance.now() - t0).toBeLessThan(10_000); // quadratic lookups took about 30 s
+    // Page 1's link k points at page (k mod 200) + 1: only the one to page 1 itself stays.
+    expect(await linksOf(r.documents[0].bytes, 1)).toEqual([{ page: 1, view: ["Fit"] }]);
+  }, 60_000);
   it("Merge (Organize) gets the same link fixes", async () => {
     const r = await merge(["links.pdf"], all("links.pdf", 5));
     expect((await linksOf(r.bytes, 1)).map((l) => l.page ?? l.url)).toEqual([3, 5, 4, "https://example.org/"]);
@@ -248,6 +288,51 @@ describe("document info and layout (I-4)", () => {
 });
 
 describe("form fields follow their page (I-5)", () => {
+  it("review 5: the form's /DR is copied only into outputs that keep a field", async () => {
+    const d = await PDFDocument.create();
+    const font = await d.embedFont(StandardFonts.Helvetica);
+    for (let i = 0; i < 4; i++) d.addPage().drawText(`p${i + 1}`, { font, x: 50, y: 700 });
+    const f = d.getForm().createTextField("name");
+    f.setText("Ada");
+    f.addToPage(d.getPage(2), { x: 50, y: 500 });
+    const acro = d.catalog.lookup(PDFName.of("AcroForm"), PDFDict);
+    acro.set(PDFName.of("DR"), d.context.obj({ Font: d.context.obj({ BigF: bigFont(d, 300_000) }) }));
+    const bytes = await d.save();
+    const r = await buildDocuments({ sources: [{ id: "x", name: "x.pdf", kind: "pdf", source: new Blob([bytes as Uint8Array<ArrayBuffer>]) }], documents: [0, 1, 2, 3].map((i) => ({ name: `p${i}.pdf`, pages: [{ sourceId: "x", sourceIndex: i, rotation: 0 }] })) }, {}, () => {});
+    for (const [i, doc] of r.documents.entries()) {
+      const out = await PDFDocument.load(doc.bytes);
+      if (i === 2) {
+        expect(out.getForm().getTextField("name").getText()).toBe("Ada");
+        expect(out.catalog.lookup(PDFName.of("AcroForm"), PDFDict).lookup(PDFName.of("DR"), PDFDict).lookup(PDFName.of("Font"), PDFDict).get(PDFName.of("BigF"))).toBeDefined();
+      } else {
+        expect(out.catalog.get(PDFName.of("AcroForm")), doc.name).toBeUndefined();
+        expect(doc.bytes.length, doc.name).toBeLessThan(20_000);
+      }
+    }
+  });
+  it("review 5: widgets of pages not in the output are not copied through their field", async () => {
+    const d = await PDFDocument.create();
+    const ctx = d.context;
+    for (let i = 0; i < 3; i++) d.addPage([300, 300]);
+    const fieldRef = ctx.nextRef();
+    const widgets = [0, 2].map((pi, k) => {
+      const ap = ctx.register(ctx.stream(new Uint8Array(60_000).map((_, j) => (j * 31 + k) % 251), { Type: "XObject", Subtype: "Form", BBox: [0, 0, 100, 20], Resources: ctx.obj({}) }));
+      const w = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Widget", Rect: [10, 10, 110, 30], P: d.getPage(pi).ref, Parent: fieldRef, AP: ctx.obj({ N: ap }) }));
+      d.getPage(pi).node.set(PDFName.of("Annots"), ctx.obj([w]));
+      return w;
+    });
+    ctx.assign(fieldRef, ctx.obj({ FT: "Tx", T: PDFString.of("shared"), V: PDFString.of("x"), Kids: widgets }));
+    d.catalog.set(PDFName.of("AcroForm"), ctx.obj({ Fields: [fieldRef] }));
+    const bytes = await d.save({ useObjectStreams: false });
+    const r = await buildDocuments({ sources: [{ id: "x", name: "x.pdf", kind: "pdf", source: new Blob([bytes as Uint8Array<ArrayBuffer>]) }], documents: [{ name: "a.pdf", pages: [{ sourceId: "x", sourceIndex: 0, rotation: 0 }] }] }, {}, () => {});
+    const out = await PDFDocument.load(r.documents[0].bytes);
+    const widgetObjects = out.context.enumerateIndirectObjects().filter(([, o]) => o instanceof PDFDict && o.get(PDFName.of("Subtype")) === PDFName.of("Widget"));
+    expect(widgetObjects).toHaveLength(1);
+    expect(r.documents[0].bytes.length).toBeLessThan(bytes.length * 0.7);
+    const field = out.getForm().getTextField("shared");
+    expect(field.acroField.getWidgets()).toHaveLength(1);
+    expect(out.catalog.lookup(PDFName.of("AcroForm"), PDFDict).lookup(PDFName.of("Fields"), PDFArray).size()).toBe(1);
+  });
   it("AC-542: extract page 3 keeps 'name' = 'Ada' on page 1, fillable", async () => {
     const d = await extract("links.pdf", "3");
     const doc = await PDFDocument.load(d.bytes);
@@ -279,11 +364,13 @@ describe("resource pruning (I-1)", () => {
     return n;
   };
 
-  for (const name of ["shared-res.pdf", "inherited-res.pdf"]) {
+  for (const name of ["shared-res.pdf", "inherited-res.pdf", "shared-res-form.pdf"]) {
     it(`AC-536/AC-537: every page of ${name}: each entry under 15%, all together at most 1.25×, same render and text`, async () => {
       const docs = await split([name], { kind: "every" });
       const input = sizeOf(name);
-      for (const d of docs) expect(d.bytes.length / input, d.name).toBeLessThan(0.15);
+      // With a form, the part holding the field (page 3) also carries the form's /DR, 100 KB of font, kept whole.
+      for (const [i, d] of docs.entries()) expect((d.bytes.length - (name.includes("form") && i === 2 ? 100_000 : 0)) / input, d.name).toBeLessThan(0.15);
+      if (name.includes("form")) expect((await PDFDocument.load(docs[2].bytes)).getForm().getTextField("name").getText()).toBe("Ada");
       expect(docs.reduce((a, d) => a + d.bytes.length, 0)).toBeLessThanOrEqual(input * 1.25);
       for (const [i, d] of docs.entries()) {
         expect(await pageTexts(d.bytes)).toEqual([`Shared ${i + 1}`]);
