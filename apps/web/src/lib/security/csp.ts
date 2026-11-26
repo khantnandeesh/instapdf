@@ -60,9 +60,9 @@ export function contentSecurityPolicy({ scriptHashes = [], dev = false }: CspOpt
  * Each entry is exactly what the provider's flow needs (host-source paths match as prefixes
  * when they end in "/", exactly otherwise):
  * - Dropbox Chooser: its one script; downloads from the direct-link host.
- * - Google: GIS token client + gapi (and the picker module from /_/scs/); the Picker and GIS
- *   frames; Drive v3 about.get (the token's account, for the Picker), file downloads and the
- *   Drive upload endpoint (save).
+ * - Google: picking is Google's top-level picker (a navigation, which CSP doesn't limit), so only
+ *   Drive v3 file reads and downloads; saving adds the GIS token client (script and its frame) and
+ *   the Drive upload endpoint.
  * - OneDrive: MSAL is bundled (no third-party script); token endpoint, Graph, the download-URL
  *   hosts, and the File Picker v8 frame, started with a form POST. Personal accounts first.
  * - mock (CI/e2e only): nothing beyond our own origin.
@@ -70,11 +70,9 @@ export function contentSecurityPolicy({ scriptHashes = [], dev = false }: CspOpt
 export const CLOUD_ALLOW: Record<"google" | "dropbox" | "onedrive" | "mock", { script: string[]; connect: string[]; frame: string[]; form: string[] }> = {
   dropbox: { script: ["https://www.dropbox.com/static/api/2/dropins.js"], connect: ["https://dl.dropboxusercontent.com"], frame: [], form: [] },
   google: {
-    script: ["https://apis.google.com/js/api.js", "https://apis.google.com/_/scs/", "https://accounts.google.com/gsi/client"],
-    connect: ["https://www.googleapis.com/drive/v3/about", "https://www.googleapis.com/drive/v3/files", "https://www.googleapis.com/drive/v3/files/", "https://www.googleapis.com/upload/drive/v3/files", "https://accounts.google.com/gsi/"],
-    // Whole hosts, as Google's own Picker sample does: the Picker frame moves between docs, drive
-    // and accounts pages (sign-in, account switch, upload), which path-limited sources may not cover.
-    frame: ["https://docs.google.com", "https://drive.google.com", "https://accounts.google.com"],
+    script: ["https://accounts.google.com/gsi/client"],
+    connect: ["https://www.googleapis.com/drive/v3/files", "https://www.googleapis.com/drive/v3/files/", "https://www.googleapis.com/upload/drive/v3/files", "https://accounts.google.com/gsi/"],
+    frame: ["https://accounts.google.com/gsi/"],
     form: [],
   },
   onedrive: {
@@ -116,6 +114,12 @@ export function cloudPolicy(route: CloudRouteName, { scriptHashes = [], dev = fa
  * redirect (MSAL `loginRedirect`, no popup, no redirect bridge page) and hosts the picker in an
  * iframe, so it keeps `same-origin`. The mock mirrors Google.
  */
+/**
+ * Referrer-Policy of each cloud window that leaves for its provider by navigation: the Google
+ * window's own URL carries its request, so its address goes nowhere (the base policy elsewhere).
+ */
+export const CLOUD_REFERRER: Partial<Record<CloudRouteName, string>> = { google: "no-referrer", mock: "no-referrer" };
+
 export const CLOUD_COOP: Record<CloudRouteName, string> = {
   dropbox: "same-origin-allow-popups",
   google: "same-origin-allow-popups",

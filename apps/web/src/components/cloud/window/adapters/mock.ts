@@ -4,7 +4,10 @@
  * the fake token MOCK-TOKEN-F23 in memory only and never sends it anywhere, and records what it was
  * asked for in localStorage["berrypdf:cloud-mock-log"] (no tokens, no file bytes: names and hashes).
  */
+import { FIXTURES, item } from "../MockPicker";
+import * as onepick from "./onepick";
 import type { Adapter, AdapterCtx } from "./types";
+import { CloudError } from "./types";
 
 export const MOCK_TOKEN = "MOCK-TOKEN-F23";
 export const MOCK_LOG_KEY = "berrypdf:cloud-mock-log";
@@ -14,6 +17,12 @@ const FOLDER_KEY = "berrypdf:cloud-mock-folder";
  * and back; "hold" leaves for a page that never comes back (a sign-in page the person closes).
  */
 export const MOCK_REDIRECT_KEY = "berrypdf:cloud-mock-redirect";
+/**
+ * With MOCK_REDIRECT_KEY "onepick", picking goes the way of Google's top-level picker (onepick.ts):
+ * out to "Google" and back to the bare /cloud/mock URL with a hash. This key says what comes back:
+ * fixture names joined by "," (picked), "denied", "empty", or "badstate" (a state that isn't ours).
+ */
+export const MOCK_ONEPICK_KEY = "berrypdf:cloud-mock-onepick";
 const SIGNED_KEY = "berrypdf:cloud-mock-signed";
 const RETURN_KEY = "berrypdf:cloud-mock-return";
 
@@ -62,6 +71,21 @@ export function writeLog(fn: (l: MockLog) => void) {
   } catch {}
 }
 
+/** What "Google" sends back to the bare redirect URL (IDs are fixture indexes, like Drive's opaque IDs). */
+function onepickHash(outcome: string, state: string): string {
+  const p = new URLSearchParams({ state: outcome === "badstate" ? "mock.00000000-0000-4000-8000-000000000000" : state });
+  if (outcome === "denied") p.set("error", "access_denied");
+  else {
+    p.set("access_token", MOCK_TOKEN);
+    p.set("token_type", "Bearer");
+    p.set("expires_in", "3599");
+    p.set("scope", "https://www.googleapis.com/auth/drive.file");
+    const ids = outcome === "empty" || outcome === "badstate" ? [] : outcome.split(",").map((f) => String(FIXTURES.indexOf(f.trim())));
+    p.set("picked_file_ids", (outcome === "badstate" ? ["0"] : ids).join(","));
+  }
+  return p.toString();
+}
+
 export function createAdapter(ctx: AdapterCtx): Adapter {
   // Held like a real access token: in this window's memory only.
   let token: string | null = null;
@@ -79,9 +103,29 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
   };
   writeLog((l) => l.requests.push({ provider: ctx.params.provider, multiple: ctx.params.multiple, accept: ctx.params.accept, mode: ctx.params.mode ?? "pick" }));
   return {
-    needsTap: ctx.params.provider !== "onedrive",
+    needsTap: ctx.params.provider !== "onedrive" && !onepick.hasPending(), // back from onepick: straight on
     prepare: async () => {},
     pick: async () => {
+      let mode: string | null = null;
+      try {
+        mode = localStorage.getItem(MOCK_REDIRECT_KEY);
+      } catch {}
+      if (mode === "onepick") {
+        const r = onepick.take();
+        if (!r) {
+          let outcome = "alpha.pdf";
+          try {
+            outcome = localStorage.getItem(MOCK_ONEPICK_KEY) ?? outcome;
+          } catch {}
+          ctx.leaving();
+          return onepick.start((state) => `/cloud/mock#${onepickHash(outcome, state)}`, "mock");
+        }
+        if (r.kind === "empty") return "cancel";
+        if (r.kind === "denied") throw new CloudError("denied");
+        if (r.kind !== "picked") throw new CloudError("unreachable");
+        token = r.token;
+        return r.ids.map((n, i) => item(`f${i + 1}`, FIXTURES[Number(n)] ?? "alpha.pdf"));
+      }
       await signIn();
       token = MOCK_TOKEN;
       ctx.setPhase("picking");

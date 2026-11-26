@@ -14,6 +14,7 @@ import { WindowLink } from "@/lib/cloud/window-link";
 import { transferCopy } from "../transfer-copy";
 import { ProviderArt } from "../marks";
 import { MockPicker, type MockChoice } from "./MockPicker";
+import * as onepick from "./adapters/onepick";
 import * as dropbox from "./adapters/dropbox";
 import * as google from "./adapters/google";
 import * as onedrive from "./adapters/onedrive";
@@ -270,6 +271,12 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
     try {
       window.opener = null;
     } catch {}
+    // Back from Google's top-level picker on the bare redirect URL: the window's own URL comes back
+    // (replaceState, no reload) and the hash with its token is gone before anything reads it.
+    if ((route === "google" || route === "mock") && onepick.isReturn(window.location.hash, route) && !onepick.takeReturn(route)) {
+      setView({ k: "invalid" });
+      return;
+    }
     if ((route === "onedrive" || route === "mock") && isSignInResponse(window.location.hash, window.location.search)) {
       // Back from a full-page sign-in on the bare redirect URL: hand the response over and return to
       // the window's own URL (with its request), where the adapter finishes the sign-in.
