@@ -1,0 +1,195 @@
+/**
+ * F25 E1 editor layout (docs/specs/f25-tool-layout-standard.md §5, §7): AC-624–629, AC-650 and AC-651.
+ * The site header stays, the editor bar is slim, the strip is always there from 1024 px, the download
+ * says "Downloaded" in its slot with a small card under it (no toast), and leaving by a header link asks.
+ */
+import { readFile } from "node:fs/promises";
+import { expect, test, type Page } from "@playwright/test";
+
+const corpus = (name: string) => `../../tests/parity/editor/${name}`;
+
+async function open(page: Page, file = "report-form-3p.pdf") {
+  await page.goto("/edit-pdf");
+  await page.getByTestId("editor-input").setInputFiles(corpus(file));
+  await expect(page.getByTestId("editor")).toHaveAttribute("data-state", "open");
+  await expect(page.getByTestId("page-1")).toHaveAttribute("data-drawn", "true", { timeout: 15_000 });
+}
+
+/** Adds a text box on page 1, `dy` px below the page's top (each call in a test uses its own spot). */
+async function addText(page: Page, text: string, dy = 160) {
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("t");
+  const b = (await page.getByTestId("page-1").boundingBox())!;
+  await page.mouse.click(b.x + b.width * 0.3, b.y + dy);
+  await expect(page.getByTestId("text-input")).toBeFocused();
+  await page.keyboard.type(text);
+  await page.getByTestId("text-input").press("Escape");
+  await expect(page.getByTestId("text-input")).toHaveCount(0);
+}
+
+const downloadBtn = (page: Page) => page.getByRole("button", { name: "Download PDF" });
+
+for (const [width, height] of [
+  [1280, 632],
+  [390, 664],
+] as const) {
+  test(`AC-624 AC-628: at ${width}x${height} the site header stays usable, nothing is fixed or inert, and the canvas gets the rest`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await open(page);
+    const banner = page.getByRole("banner").first();
+    await expect(banner).toBeVisible();
+    await expect(banner.getByRole("link").first()).toBeVisible();
+    const fixedAncestor = await page.getByTestId("editor-shell").evaluate((el) => {
+      for (let n: Element | null = el; n; n = n.parentElement) if (getComputedStyle(n).position === "fixed") return n.className || n.tagName;
+      return "";
+    });
+    expect(fixedAncestor, "no ancestor of the editor is position: fixed").toBe("");
+    expect(await page.locator("main").evaluate((m) => (m as HTMLElement).inert)).toBe(false);
+    const canvas = (await page.getByTestId("canvas").boundingBox())!;
+    if (width >= 1024) expect(canvas.height).toBeGreaterThanOrEqual(632 - 72 - 56);
+    else {
+      const dock = (await page.getByTestId("dock").boundingBox())!;
+      expect(canvas.height).toBeGreaterThanOrEqual(height - 64 - 56 - dock.height - 1);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  });
+}
+
+test("AC-625: from 1024 the bar reads h1 Edit PDF + Beta, file menu, tools, Undo, Redo, Download; no rail. Below 1024: h1, file menu, Download and the dock", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 632 });
+  await open(page);
+  const top = page.locator(".ed-top");
+  const order = await top.evaluate((bar) => {
+    const pick = (sel: string) => bar.querySelector(sel)?.getBoundingClientRect().left ?? -1;
+    return [pick("h1"), pick(".ed-beta"), pick("[data-testid=file-menu]"), pick("[data-testid=editor-tools]"), pick("[aria-label=Undo]"), pick("[aria-label=Redo]"), pick("[data-testid=download]")];
+  });
+  for (const x of order) expect(x).toBeGreaterThanOrEqual(0);
+  for (let i = 1; i < order.length; i++) expect(order[i], `item ${i} follows item ${i - 1}`).toBeGreaterThan(order[i - 1]);
+  await expect(top.getByRole("heading", { level: 1 })).toHaveText("Edit PDF");
+  await expect(page.locator(".ed-rail")).toHaveCount(0);
+
+  await page.setViewportSize({ width: 390, height: 664 });
+  await expect(page.locator(".ed-top h1")).toBeVisible();
+  await expect(page.getByTestId("file-menu")).toBeVisible();
+  await expect(downloadBtn(page)).toBeVisible();
+  await expect(page.getByTestId("dock")).toBeVisible();
+  await expect(page.getByTestId("editor-tools")).toHaveCount(0);
+});
+
+test("AC-626: the page strip is shown on open at every width from 1024, beside the canvas, never inside it", async ({ page }) => {
+  for (const width of [1024, 1280, 1599, 1920]) {
+    await page.setViewportSize({ width, height: 768 });
+    await open(page);
+    const strip = page.getByTestId("editor-strip");
+    await expect(strip, `strip at ${width}`).toBeVisible();
+    const s = (await strip.boundingBox())!;
+    const c = (await page.getByTestId("page-1").boundingBox())!;
+    expect(s.x + s.width, `the strip ends before the first page at ${width}`).toBeLessThanOrEqual(c.x);
+    expect(await page.getByTestId("canvas").evaluate((el) => !!el.querySelector("[data-testid=editor-strip]"))).toBe(false);
+    await expect(page.locator("[data-region=panel]")).toHaveCount(1);
+  }
+});
+
+test("AC-627 (partial): no properties panel with nothing selected; selecting an object never moves it", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 632 });
+  await open(page);
+  await expect(page.getByTestId("editor-props")).toHaveCount(0);
+  await addText(page, "Hold still");
+  await page.keyboard.press("v");
+  await expect(page.getByTestId("editor-props")).toHaveCount(0);
+  const box = page.getByRole("group", { name: /Hold still/ });
+  const before = (await box.boundingBox())!;
+  await box.click();
+  const after = (await box.boundingBox())!;
+  expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(1);
+  // A tool with options shows them in the panel.
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("t");
+  await expect(page.getByTestId("editor-props")).toBeVisible();
+});
+
+test("AC-629: a header link with edits not downloaded asks; Cancel stays, Download anyway downloads then leaves; no edits leaves at once", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 632 });
+  await open(page);
+  const link = page.getByRole("banner").first().getByRole("link", { name: /rotate/i }).first();
+  await addText(page, "Not saved yet");
+  await link.click();
+  const ask = page.getByRole("dialog", { name: "Close without downloading?" });
+  await expect(ask).toBeVisible();
+  await ask.getByRole("button", { name: "Cancel" }).click();
+  await expect(page).toHaveURL(/\/edit-pdf$/);
+  await expect(page.locator('[data-kind="text"]')).toHaveCount(1);
+  await link.click();
+  const [dl] = await Promise.all([page.waitForEvent("download"), ask.getByRole("button", { name: "Download anyway" }).click()]);
+  expect(dl.suggestedFilename()).toBe("report-form-3p.pdf");
+  await expect(page).toHaveURL(/\/rotate-pdf$/);
+
+  await open(page);
+  await page.getByRole("banner").first().getByRole("link", { name: /rotate/i }).first().click();
+  await expect(page).toHaveURL(/\/rotate-pdf$/);
+});
+
+test("AC-650: Download runs the pill, says Downloaded for about 2.4s, and opens the card (no toast); Escape and the next edit close it", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 632 });
+  await open(page);
+  await addText(page, "Ready to go");
+  await page.evaluate(() => {
+    const w = window as unknown as { __dl: { pill?: number; done?: number; back?: number } };
+    w.__dl = {};
+    new MutationObserver(() => {
+      const now = performance.now();
+      const btn = document.querySelector("[data-testid=download]");
+      if (!w.__dl.pill && document.querySelector("[data-testid=processing]")) w.__dl.pill = now;
+      if (!w.__dl.done && btn?.hasAttribute("data-done")) w.__dl.done = now;
+      if (w.__dl.done && !w.__dl.back && btn && !btn.hasAttribute("data-done")) w.__dl.back = now;
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-done"] });
+  });
+  const [dl] = await Promise.all([page.waitForEvent("download"), downloadBtn(page).click()]);
+  const bytes = new Uint8Array(await readFile((await dl.path())!));
+  await expect(page.getByTestId("download")).toHaveText("Downloaded");
+  const card = page.getByTestId("download-card");
+  await expect(card).toBeVisible();
+  await expect(card).toContainText(`report-form-3p.pdf, `);
+  await expect(card).toContainText("Done on this device.");
+  await expect(card.getByRole("button")).toHaveCount(4); // Close + three chips
+  await expect(page.locator(".ed-toast", { hasText: "Downloaded" })).toHaveCount(0);
+  expect(bytes.byteLength).toBeGreaterThan(1000);
+  await expect(page.getByTestId("download")).toHaveText("Download", { timeout: 4000 });
+  const t = await page.evaluate(() => (window as unknown as { __dl: { pill: number; done: number; back: number } }).__dl);
+  expect(t.pill, "the pill ran").toBeGreaterThan(0);
+  expect(t.back - t.done).toBeGreaterThanOrEqual(2200);
+  expect(t.back - t.done).toBeLessThanOrEqual(2600 + 200);
+  await page.keyboard.press("Escape");
+  await expect(card).toHaveCount(0);
+  // The next edit closes it too.
+  await Promise.all([page.waitForEvent("download"), downloadBtn(page).click()]);
+  await expect(card).toBeVisible();
+  await addText(page, "One more", 260);
+  await expect(card).toHaveCount(0);
+});
+
+// AC-650 no-password-note: its testid and text are asserted in editor-e1-qa.spec.ts:164.
+
+test("AC-651: Keep going hands the downloaded file to a ready tool without the leave guard", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 632 });
+  await open(page);
+  await addText(page, "Hand me over");
+  await Promise.all([page.waitForEvent("download"), downloadBtn(page).click()]);
+  const card = page.getByTestId("download-card");
+  await card.getByRole("button", { name: "Merge" }).click();
+  await expect(page.getByRole("dialog", { name: "Close without downloading?" })).toHaveCount(0);
+  await expect(page).toHaveURL(/\/merge-pdf$/);
+  await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
+  await expect(page.getByText("report-form-3p.pdf").first()).toBeVisible();
+});
+
+test("AC-651: Compress (planned) opens its page with nothing handed over", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 632 });
+  await open(page);
+  await addText(page, "Shrink me");
+  await Promise.all([page.waitForEvent("download"), downloadBtn(page).click()]);
+  await page.getByTestId("download-card").getByRole("button", { name: "Compress" }).click();
+  await expect(page.getByRole("dialog", { name: "Close without downloading?" })).toHaveCount(0);
+  await expect(page).toHaveURL(/\/compress-pdf$/);
+});
