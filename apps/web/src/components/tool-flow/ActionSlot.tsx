@@ -93,11 +93,17 @@ export const ProgressPill = forwardRef(function ProgressPill(
         <span className="ip-pill__label">{label}</span>
         {second && <span className="ip-pill__second">{second}</span>}
       </span>
-      {onCancel && phase !== "done" && (
-        <button type="button" className="ip-pill__cancel" onClick={onCancel} data-testid="cancel">
-          {slotCopy.cancel}
-        </button>
-      )}
+      {/* At done Cancel keeps its box, hidden, so "Done" doesn't reflow the pill (no layout shift). */}
+      {onCancel &&
+        (phase !== "done" ? (
+          <button type="button" className="ip-pill__cancel" onClick={onCancel} data-testid="cancel">
+            {slotCopy.cancel}
+          </button>
+        ) : (
+          <span className="ip-pill__cancel invisible" aria-hidden="true">
+            {slotCopy.cancel}
+          </span>
+        ))}
       {phase !== "done" && (
         <span
           role="progressbar"

@@ -204,11 +204,13 @@
     outline: 3px solid var(--ip-focus);
     outline-offset: 3px;
   }
+  /* One width for the spinner (20), the done tick (22) and a short queue number, so the label never
+     moves when the lead changes (no layout shift, AC-632). */
   .ip-pill__lead {
     display: grid;
     flex: none;
     place-items: center;
-    min-width: 20px;
+    min-width: 22px;
   }
   .ip-pill__spin {
     width: 20px;
@@ -256,7 +258,9 @@
     white-space: nowrap;
   }
   .ip-pill__cancel {
+    display: inline-flex;
     flex: none;
+    align-items: center;
     height: 40px;
     padding: 0 14px;
     border-radius: 10px;

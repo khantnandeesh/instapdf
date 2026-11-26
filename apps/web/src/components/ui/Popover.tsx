@@ -36,7 +36,9 @@ export function Popover({
       if (refocus) trigger.current?.focus();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      // A control inside that handles Escape itself (a rename field) prevents the default: leave it open.
+      // (React's own listener is on the document too, so its stopPropagation can't stop this one.)
+      if (e.key !== "Escape" || e.defaultPrevented) return;
       e.preventDefault();
       shut(true);
     };

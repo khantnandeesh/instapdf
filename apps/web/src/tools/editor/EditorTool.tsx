@@ -201,7 +201,8 @@ export function EditorTool() {
   }, []);
 
   const status = (
-      <div role="status" aria-live="polite" className="mx-auto mt-2 flex min-h-6 max-w-[440px] justify-center">
+      // Out of the flow while a document is open, so the page is exactly the screen tall (E1).
+      <div role="status" aria-live="polite" className={open ? "sr-only" : "mx-auto mt-2 flex min-h-6 max-w-[440px] justify-center"}>
         {notice && !open && (
           <p key={notice.key} className="ed-notice rounded-full bg-danger-soft px-3 py-1 text-sm text-danger-strong" data-testid="editor-notice">
             {notice.text}

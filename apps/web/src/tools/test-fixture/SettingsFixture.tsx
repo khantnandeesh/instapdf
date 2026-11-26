@@ -3,13 +3,15 @@
  * Test-only settings tool (F25 AC-623): a client stub with Compress-like options that exercises the
  * settings layout (§4) until a real settings tool ships. Not in the registry or the sitemap; its route
  * answers 404 unless the server runs with IP_TEST_FIXTURES=1 (middleware.ts). `?tall=1` adds steps
- * taller than the stage (AC-621).
+ * taller than the stage (AC-621). `?server=1` makes it a server tool that runs through the job API
+ * client (`runServerJob(httpJobApi())`, F25 §6), which `e2e/ui/progress-pill.spec.ts` mocks with routes.
  */
 import { useEffect, useState } from "react";
 import { Step } from "@/components/page-select/Step";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
 import type { ProcessFn } from "@/components/tool-flow/types";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { httpJobApi, runServerJob } from "@/lib/jobs/server-job";
 import type { FlowTool } from "@/tools/registry";
 
 const MB = 1024 * 1024;
@@ -58,6 +60,18 @@ const process: ProcessFn = async (files, signal, onProgress) => {
   return { name: fixtureTool.flow.outputName([f.name]), type: "application/pdf", blob: f.source, size: f.size, pageCount: f.pageCount, wasEncrypted: false };
 };
 
+/** The server variant: upload, queue, work and done through the (mocked) job API. */
+const serverTool: FlowTool = { ...fixtureTool, runtime: "server" };
+const serverProcess: ProcessFn = async (files, signal, _onProgress, job) => {
+  const f = files[0];
+  const out = await runServerJob(
+    httpJobApi(),
+    { tool: "compress-pdf", files: [{ name: f.name, blob: f.source }], options: {} },
+    { signal, onPhase: job.onPhase, onCancel: job.onCancel, pollMs: 200 },
+  );
+  return { name: out.name, type: "application/pdf", blob: out.blob, size: out.blob.size, pageCount: f.pageCount, wasEncrypted: false };
+};
+
 const LEVELS = [
   { value: "less", label: "Less" },
   { value: "recommended", label: "Recommended" },
@@ -72,11 +86,17 @@ export function SettingsFixture() {
   const [level, setLevel] = useState("recommended");
   const [colour, setColour] = useState("keep");
   const [tall, setTall] = useState(false);
-  useEffect(() => setTall(new URLSearchParams(window.location.search).has("tall")), []);
+  const [server, setServer] = useState(false);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    setTall(q.has("tall"));
+    setServer(q.has("server"));
+  }, []);
   return (
     <ToolFlow
-      tool={fixtureTool}
-      process={process}
+      key={server ? "server" : "client"}
+      tool={server ? serverTool : fixtureTool}
+      process={server ? serverProcess : process}
       renderOptions={() => (
         <div className="flex items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-side:gap-7">
           <div className="flex min-w-0 flex-col gap-3.5 dock-bar:flex-1">

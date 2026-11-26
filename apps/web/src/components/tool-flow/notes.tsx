@@ -4,7 +4,7 @@ import { copy } from "./copy";
 /** Short limits line; the full limits (total size and pages) are its tooltip and reach screen readers. */
 export function LimitsNote({ text, full }: { text: string; full: string }) {
   return (
-    <p className="text-sm text-muted tabular-nums" title={full}>
+    <p className="text-sm text-muted tabular-nums" title={full} data-testid="limits">
       <span aria-hidden="true">{text}</span>
       <span className="sr-only">{full}</span>
     </p>

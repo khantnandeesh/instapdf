@@ -1120,6 +1120,9 @@ export function ToolFlow({
           )}
           <LimitsNote text={copyOverrides?.limits ?? copy.limits(flow)} full={copyOverrides?.limitsFull ?? copy.limitsFull(flow)} />
           <PrivacyNote runtime={tool.runtime} context="intro" />
+          {/* Every file undone (F5 history): the files are only held, so Undo│Redo stays reachable here,
+              under the card, to bring them back. Never on a fresh visit or after Start over. */}
+          {workspaceEmpty && files.length > 0 && dockStart && <div className="mt-4 flex justify-center">{dockStart(ctx)}</div>}
         </DropCard>
       ) : state === "done" && output ? (
         // Its own key: the work area's element (faded out and inert by T12) is never reused for the result.

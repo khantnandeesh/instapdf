@@ -217,8 +217,14 @@ export function EditorShell(props: ShellProps) {
     const html = document.documentElement;
     const prev = html.style.overflow;
     html.style.overflow = "hidden";
+    // overflow: hidden still lets focus() and scrollIntoView move the window; keep it at the top.
+    const lock = () => {
+      if (window.scrollY || window.scrollX) window.scrollTo(0, 0);
+    };
+    window.addEventListener("scroll", lock, { passive: true });
     return () => {
       html.style.overflow = prev;
+      window.removeEventListener("scroll", lock);
     };
   }, []);
 
@@ -472,7 +478,8 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       const f = store.get().fit;
       if (f) store.set({ zoom: fitZoom(f) });
     });
-    ro.observe(scroller);
+    // Border-box: the properties panel changes the canvas's padding, never its zoom (F25 §5).
+    ro.observe(scroller, { box: "border-box" });
     return () => ro.disconnect();
   }, [scroller, fitZoom, store, innerSize]);
   useLayoutEffect(() => {
@@ -1296,7 +1303,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         </div>
       </div>
       {props && (
-        <aside className="ed-props" aria-label="Properties" data-testid="editor-props">
+        <aside className="ed-props" aria-label="Properties" data-ip-scroll="overlay" data-testid="editor-props">
           <ToolOptions />
         </aside>
       )}
