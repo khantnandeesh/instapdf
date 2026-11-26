@@ -379,11 +379,11 @@ export function SegmentGrid({
                 {(!compact || badge) && (
                   <span aria-hidden="true" className="pointer-events-none absolute -top-1.5 -left-1.5 z-[1] flex gap-1">
                     {!compact && (
-                      <span className="grid h-6 min-w-6 place-items-center rounded-pill bg-surface-raised px-1.5 font-display text-help font-semibold text-brand-strong shadow-menu" data-testid="source-badge">
+                      <span className="grid h-6 min-w-6 place-items-center rounded-pill bg-surface-raised px-1.5 font-display text-help font-semibold text-brand-strong" data-testid="source-badge">
                         {card.letter}
                       </span>
                     )}
-                    {badge && <span className="rounded-pill bg-surface-raised px-2 py-1 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">{badge}</span>}
+                    {badge && <span className="rounded-pill bg-surface-raised px-2 py-1 font-display text-help font-semibold text-brand-strong tabular-nums">{badge}</span>}
                   </span>
                 )}
                 {!compact && (

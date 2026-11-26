@@ -5,9 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { CardView } from "@/components/page-edit/SegmentGrid";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
 import type { WorkspaceContext } from "@/components/tool-flow/types";
-import { ChevronDownIcon, CloseIcon, LeafIcon } from "@/components/ui/icons";
+import { ChevronDownIcon } from "@/components/ui/icons";
 import type { MenuEntry } from "@/components/ui/Menu";
-import { IconButton } from "@/components/ui/IconButton";
 import { A4, isBlank, sortPages, type PageRef } from "@/lib/page-list";
 import { canMix, interleave, type MixCard } from "@/lib/mix-plan";
 import { parseCount } from "@/lib/plan-counts";
@@ -23,6 +22,7 @@ import type { Mix } from "./MixSettings";
 const tool = flowTool("alternate-mix-pdf");
 
 const loadMixSettings = () => import("./MixSettings");
+const OneFileHint = dynamic(() => import("./OneFileHint").then((m) => m.OneFileHint), { ssr: false });
 const MixSettings = dynamic(() => loadMixSettings().then((m) => m.MixSettings), { ssr: false, loading: () => <div className="min-h-[120px]" aria-hidden="true" /> });
 const DEFAULT_MIX: Mix = { reverse: false, perTurn: "1", repeat: true };
 const NO_SELECTION: ReadonlySet<string> = new Set();
@@ -84,18 +84,7 @@ export function AlternateTool() {
   };
   const oneFileHint = (w: WorkspaceContext) =>
     single && hintClosed !== single && !w.dimmed ? (
-      // One compact line (two at most on a phone): the question, then "Open in Organize" as an inline link-style
-      // button (visual gate round 2: the boxed button made it about 135px tall at 320).
-      <div className="mp-callout mt-1 mb-3 items-center px-3 py-2 text-sm" role="status" data-testid="one-file-hint">
-        <LeafIcon size={20} className="mt-0! max-[399px]:hidden" />
-        <p className="min-w-0 flex-1">
-          {a.oneFile}{" "}
-          <button type="button" className="font-semibold whitespace-nowrap text-brand-strong underline underline-offset-2 hover:text-brand" onClick={() => openInOrganize(single)}>
-            {a.openOrganize}
-          </button>
-        </p>
-        <IconButton label={`Dismiss: ${a.oneFile}`} size="sm" icon={<CloseIcon size={16} />} tooltip={false} className="-my-1 -me-1.5 shrink-0" onClick={() => setHintClosed(single)} />
-      </div>
+      <OneFileHint onOpen={() => openInOrganize(single)} onClose={() => setHintClosed(single)} />
     ) : null;
 
   // ---- Sort ▾: name order of the cards (AC-529) ----

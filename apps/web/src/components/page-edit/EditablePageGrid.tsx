@@ -575,7 +575,7 @@ export default function EditablePageGrid({
           </span>
           <IconButton label={labels.rotateSelLeft} variant="soft" icon={<RotateLeftIcon size={18} />} onClick={() => onRotateSelection(-90)} />
           <IconButton label={labels.rotateSelRight} variant="soft" icon={<RotateRightIcon size={18} />} tabIndex={-1} onClick={() => onRotateSelection(90)} />
-          <Button variant="soft" aria-label={labels.removeSel} tabIndex={-1} className="max-sm:h-11" onClick={onRemoveSelection}>
+          <Button variant="soft" aria-label={labels.removeSel} tabIndex={-1} className="ip-bare max-sm:size-11 max-sm:px-0" onClick={onRemoveSelection}>
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
             </svg>

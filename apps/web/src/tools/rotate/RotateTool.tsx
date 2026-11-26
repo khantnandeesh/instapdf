@@ -124,7 +124,7 @@ export function RotateTool() {
       }}
       renderOptions={(ctx) => (
         // BerryPDF working mode: numbered steps, ChoiceTiles for the scope, the rotate actions as
-        // blueberry editing tools, Reset as a soft button; the berry primary sits below in the dock.
+        // blueberry editing tools, Reset as a bare soft button (tint on hover); the berry primary sits below in the dock.
         // In the bottom bar (dock-bar) the same controls fold into one row; labels stay from 1024 px.
         <div className="flex items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-side:gap-7">
           <div className="flex min-w-0 flex-col gap-3.5 dock-bar:flex-1 lg:dock-bar:max-w-[420px]">
@@ -144,7 +144,7 @@ export function RotateTool() {
               </div>
               <Button
                 variant="soft"
-                className="max-sm:size-11 max-sm:px-0"
+                className="ip-bare max-sm:size-11 max-sm:px-0"
                 iconStart={<ResetIcon size={16} />}
                 aria-label="Reset rotation"
                 title="Reset rotation"

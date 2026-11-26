@@ -120,6 +120,16 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
     --ip-notice-top: calc(var(--ip-header-h) + var(--ip-intro-h) + 64px + 8px);
   }
 }
+/* Nor the first screen's primary action: below 1024px the drop card's Choose button sits right under the
+   title, where two stacked notices (say two cloud errors) would land on it. So with no files in, the stack
+   sits at the bottom instead, above the bar, and grows upwards over the empty decor (NoticeStack reads
+   --ip-notice-bottom; top goes auto). */
+@media (max-width: 1023px) {
+  .ip-flow[data-state="empty"] {
+    --ip-notice-top: auto;
+    --ip-notice-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + 12px);
+  }
+}
 
 /* A focus move the page made after a mouse or touch pick (eval G-7): no ring until the next key
    press (components/ui/focus.ts removes the mark), the same as :focus-visible for a real click. */
@@ -252,15 +262,19 @@ body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard {
   }
 }
 
-/* More options (page tools): a clean icon (and label from 1440 px), no box at rest; the tint shows on hover
-   and press (owner rule, 2026-11-26). Same layer as .mp-btn--soft, loaded after it. */
+/* More options (page tools), the selection bar's Remove and Rotate's Reset: a clean icon (and label where
+   it fits), no box at rest, like the icon buttons beside them; the tint shows on hover and press (owner
+   rule, 2026-11-26). Same layer as .mp-btn--soft, loaded after it. */
 @layer components {
-  .ip-more-trigger {
+  .ip-more-trigger,
+  .ip-bare {
     background: transparent;
   }
   .ip-more-trigger:hover:not(:disabled),
   .ip-more-trigger:active:not(:disabled),
-  .ip-more-trigger[aria-expanded="true"] {
+  .ip-more-trigger[aria-expanded="true"],
+  .ip-bare:hover:not(:disabled),
+  .ip-bare:active:not(:disabled) {
     background: var(--brand-tint);
   }
 }
@@ -306,13 +320,49 @@ body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard {
     overscroll-behavior: contain;
     padding: 6px;
   }
-  .mp-menu__list[data-more-down] {
+  /* Also Split's parts list in More options (MoreOptionsDialog), which can stop on a whole row. */
+  :is(.mp-menu__list, .ip-edge-fade)[data-more-down] {
     mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
   }
-  .mp-menu__list[data-more-up] {
+  :is(.mp-menu__list, .ip-edge-fade)[data-more-up] {
     mask-image: linear-gradient(to top, #000 calc(100% - 32px), transparent);
   }
-  .mp-menu__list[data-more-up][data-more-down] {
+  :is(.mp-menu__list, .ip-edge-fade)[data-more-up][data-more-down] {
     mask-image: linear-gradient(to bottom, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+  }
+}
+
+/* Tool-only rules kept out of the shared utilities, so the home page's CSS stays within its budget
+   (e2e/f2/home.spec AC-55). */
+/* NoticeStack: under the header (and the tools row, --ip-notice-top), or at the bottom on a phone's empty
+   screen (--ip-notice-bottom, above). */
+.ip-notice-stack {
+  top: var(--ip-notice-top, calc(var(--ip-header-h) + 12px));
+  bottom: var(--ip-notice-bottom, auto);
+}
+/* ControlDock bar from 1024px: the status gives way first (two lines at most), so a long one ("60 pages ·
+   1 file · add more to merge") never pushes the primary off a 1024px screen. */
+@media (min-width: 1024px) {
+  .ip-bar-footer {
+    min-width: 0;
+    flex-shrink: 1;
+  }
+  .ip-bar-status {
+    text-wrap: balance;
+  }
+  .ip-bar-status p {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+  }
+}
+/* Alternate's one-file hint: the leaf goes below 400px to keep the line short. */
+.ip-hint-leaf {
+  margin-top: 0 !important;
+}
+@media (max-width: 399px) {
+  .ip-hint-leaf {
+    display: none;
   }
 }

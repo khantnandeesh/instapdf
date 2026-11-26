@@ -198,12 +198,14 @@ export function ControlDock({
                 // the page stays the only scroller), resting at the panel's bottom once they end. It covers the
                 // panel's padding so options pass under it; a soft fade above it says there is more.
                 "lg:sticky lg:bottom-0 lg:z-20 lg:-mx-6 lg:mt-auto lg:-mb-6 lg:min-w-0 lg:rounded-b-panel lg:bg-surface-raised lg:px-6 lg:pt-2 lg:pb-6 lg:before:pointer-events-none lg:before:absolute lg:before:inset-x-0 lg:before:-top-4 lg:before:h-4 lg:before:bg-linear-to-b lg:before:from-transparent lg:before:to-surface-raised"
-              : "lg:flex-row lg:items-center lg:gap-5 lg:[&>*:last-child]:w-[260px] lg:[&>*:last-child]:shrink-0",
+              : // Bar: the status gives way first (it wraps to two lines), so a long one ("60 pages · 1 file · add
+                // more to merge") never pushes the primary off a 1024 px screen.
+                "ip-bar-footer lg:flex-row lg:items-center lg:gap-5 lg:[&>*:last-child]:w-[260px] lg:[&>*:last-child]:shrink-0",
           ].join(" ")}
           data-testid="dock-footer"
         >
           {/* On the sand bar the status reads in ink (muted on sand is under 4.5:1), beside the primary. */}
-          <div className={["max-lg:sr-only", side ? "" : "min-w-0 text-end [&_p]:text-ink"].join(" ")}>{status}</div>
+          <div className={["max-lg:sr-only", side ? "" : "ip-bar-status min-w-0 text-end [&_p]:text-ink"].join(" ")}>{status}</div>
           {footer}
         </div>
       </div>

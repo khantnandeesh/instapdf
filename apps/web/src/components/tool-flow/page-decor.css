@@ -195,7 +195,8 @@
   }
 }
 
-/* Corner Enlarge (tiles whose click toggles): a 36px white circle in the page box's bottom-right. */
+/* Corner Enlarge (tiles whose click toggles): a 36px white circle in the page box's bottom-right, no shadow,
+   like the ghost trash badge it shares the page with. */
 .ip-corner-enlarge {
   opacity: 0;
   transition: opacity var(--motion-micro) var(--ease-out);

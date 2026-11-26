@@ -431,6 +431,8 @@ test("Page tools below 768 is a bottom sheet: scrim, title, Close, a capped heig
   const sheet = page.locator(".mp-menu[data-sheet]:popover-open");
   await expect(sheet).toBeVisible();
   await expect(sheet.locator(".mp-menu__head")).toContainText("Page tools");
+  // Measure the sheet at rest, after its opening transition.
+  await sheet.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
   const m = await sheet.evaluate((el) => {
     const list = el.querySelector(".mp-menu__list") as HTMLElement;
     const r = el.getBoundingClientRect();

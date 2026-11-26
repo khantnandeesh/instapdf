@@ -170,6 +170,17 @@ export type ToolFlowProps = {
   renderMore?: (ctx: FlowContext) => ReactNode;
 };
 
+/**
+ * True from the first time `on` is true. The closed dialogs below mount only then (they keep their
+ * close animation and focus return after that), so their chunks stay out of the first screen's JS
+ * (spec P-12; seo.spec phone budget). Intent (onIntent → loadLazyParts) still fetches them early.
+ */
+function useMountOnce(on: boolean): boolean {
+  const [seen, setSeen] = useState(on);
+  if (on && !seen) setSeen(true);
+  return seen || on;
+}
+
 export function ToolFlow({
   tool,
   renderOptions,
@@ -911,6 +922,11 @@ export function ToolFlow({
       fallbackFocus={() => heading.current}
     />
   );
+  const pwOpen = (!!currentLocked || !!pwSubmitting) && state !== "done";
+  const pwMounted = useMountOnce(pwOpen);
+  const ownerMounted = useMountOnce(!!ownerFile);
+  const leaveMounted = useMountOnce(guardLeave);
+  const replaceMounted = useMountOnce(!!pendingReplace);
   return (
     <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" className="ip-flow" style={thumbSize === THUMB_DEFAULT ? undefined : { ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
       <DropOverlay active={dragging && acceptsDrop} mode={flow.multiFile || files.length === 0 ? "add" : "replace"} />
@@ -1118,8 +1134,8 @@ export function ToolFlow({
 
       <NoticeStack notices={notices} onDismiss={dismissNotice} />
 
-      <PasswordDialog
-        open={(!!currentLocked || !!pwSubmitting) && state !== "done"}
+      {pwMounted && <PasswordDialog
+        open={pwOpen}
         fileId={pwSubmitting?.id ?? currentLocked?.id ?? ""}
         fileName={pwSubmitting?.name ?? currentLocked?.name ?? ""}
         queuePosition={pwDone + lockedFiles.length > 1 ? { index: pwDone + 1, total: pwDone + lockedFiles.length } : undefined}
@@ -1130,8 +1146,8 @@ export function ToolFlow({
         onSubmit={submitPassword}
         onSkip={skipLocked}
         fallbackFocus={fallbackFocus}
-      />
-      <OwnerPasswordDialog
+      />}
+      {ownerMounted && <OwnerPasswordDialog
         open={!!ownerFile}
         fileName={ownerFile?.name ?? ""}
         denied={ownerFile ? flow.requiredPermissions.filter((p) => ownerFile.denied.includes(p)) : []}
@@ -1142,9 +1158,9 @@ export function ToolFlow({
           setOwnerFor(null);
           setOwnerError(undefined);
         }}
-      />
-      <LeaveGuard active={guardLeave} />
-      <ReplaceFileDialog
+      />}
+      {leaveMounted && <LeaveGuard active={guardLeave} />}
+      {replaceMounted && <ReplaceFileDialog
         open={!!pendingReplace}
         fileName={files[0]?.name ?? ""}
         onCancel={() => setPendingReplace(null)}
@@ -1153,7 +1169,7 @@ export function ToolFlow({
           setPendingReplace(null);
           if (next) void intake(next, null, { replace: true });
         }}
-      />
+      />}
     </div>
   );
 }

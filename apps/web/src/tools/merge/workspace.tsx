@@ -270,7 +270,9 @@ export function usePageWorkspace({ tool, history: full }: { tool: FlowTool; hist
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [historyOn]);
-  useEffect(() => full?.prefetch(), [full]);
+  // Undo│Redo shows only once files are in: fetch it at the first sign of intent, not on mount
+  // (out of the first screen's JS, seo.spec phone budget).
+  useEffect(() => (full ? onIntent(() => full.prefetch()) : undefined), [full]);
 
   // Glow on inserted or restored tiles fades out.
   useEffect(() => {

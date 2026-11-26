@@ -90,6 +90,24 @@ const VIRTUAL_FROM = 50;
  */
 function PartsList({ rows, onRename }: { rows: PartRow[]; onRename: (key: string, name: string) => void }) {
   const list = useRef<HTMLOListElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  // A soft fade at an edge while there is more that way (tool-flow.css .ip-edge-fade), like the Page tools sheet.
+  useLayoutEffect(() => {
+    const s = scroller.current;
+    if (!s) return;
+    const edges = () => {
+      s.toggleAttribute("data-more-up", s.scrollTop > 1);
+      s.toggleAttribute("data-more-down", s.scrollTop + s.clientHeight < s.scrollHeight - 1);
+    };
+    edges();
+    s.addEventListener("scroll", edges, { passive: true });
+    const ro = new ResizeObserver(edges);
+    ro.observe(s);
+    return () => {
+      s.removeEventListener("scroll", edges);
+      ro.disconnect();
+    };
+  }, [rows.length]);
   const [win, setWin] = useState<[number, number]>([0, Math.min(rows.length, VIRTUAL_FROM)]);
   const virtual = rows.length > VIRTUAL_FROM;
   useLayoutEffect(() => {
@@ -121,9 +139,11 @@ function PartsList({ rows, onRename }: { rows: PartRow[]; onRename: (key: string
       {/* About five rows, then the list scrolls inside, so the name pattern, bookmarks and Done stay in view.
           In the phone sheet the cap also follows the screen height (the sheet is --ip-sheet-max-h tall; its title
           row, footer, padding, Files heading, pattern and bookmarks take about 335px), so the sheet body never
-          scrolls around the list: only the list scrolls (visual gate round 2). Two rows at least. */}
+          scrolls around the list: only the list scrolls (visual gate round 2). Two rows at least; an edge fades
+          while there is more that way (round 3). */}
       <div
-        className="max-h-[calc(5.5*var(--ip-tap-min))] overflow-y-auto overscroll-contain max-sm:max-h-[max(calc(2*var(--ip-tap-min)),min(calc(5.5*var(--ip-tap-min)),calc(var(--ip-sheet-max-h)-335px)))]"
+        ref={scroller}
+        className="ip-edge-fade ip-parts-scroller overflow-y-auto overscroll-contain"
         data-ip-scroll="overlay"
         data-testid="parts-scroller"
       >

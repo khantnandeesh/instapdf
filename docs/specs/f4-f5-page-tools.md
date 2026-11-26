@@ -720,7 +720,7 @@ There is no horizontal overflow at any of these sizes (`scrollWidth − clientWi
 
 #### F4 at 1280 (≥ 1024 behaves the same), empty
 
-This is the Rotate empty layout. The F1 drop card is on the left. On the right is the 360px side panel (`ControlDock layout="side"`, height `--ip-work-h`), with numbered steps (`mp-step`) and the sticky primary at its foot. Shots: `split-1-empty-1366x657.png`, `extract-1-empty-…`, `delete-1-empty-…`.
+This is the Rotate empty layout. The F1 drop card is on the left. On the right is the 360px side panel (`ControlDock layout="side"`, height `--ip-work-h`), with numbered steps (`mp-step`) and the sticky primary at its foot. Shots: `split-1-empty-1366x657.png`, `extract-1-empty-…`, `delete-1-empty-…` (mockups); the build shot `build/split-1-empty-1366x657.png` (P-14).
 
 - **Split**
   - **1 Split**: 2×2 `ChoiceTiles` (`SegmentedControl look="tiles"`) for Every page · Every N pages · Spreads · Custom. Each has a 30px duotone page-strip glyph, the same drawing style as Rotate's `ScopeIcon`.
@@ -1289,6 +1289,8 @@ All shots are in `/mnt/project-files/designs/f4-f5-page-tools/mockups/`. The pri
 | **390x664** (27) | the same 27 states |
 | 1280x720, 390x844 (DSF 2) | `split-1-empty` · `split-4-custom-marks` · `split-9-result` · `extract-2-ready` · `delete-2-ready` · `organize-1-empty` · `organize-2-ready` · `organize-5-selection` · `combine-1-ready` · `alternate-2-files` · `alternate-4-preview` |
 | 320x640 (DSF 2) | the same 11, plus `organize-3/4/6` |
+
+Build shots of the shipped code are in `/mnt/project-files/designs/f4-f5-page-tools/build/`: every state at 1280x720, 390x844 and 320x640, plus `split-1-empty-1366x657.png`, the side panel at the hard case (More options right under the steps, fully above the pinned status; e2e `split.spec.ts` "Fit the first screen" checks the same boxes).
 
 The 1280x632, 1536x730, 1920x969, 1024x768, 1023x700, 768x1024, 640x900 and 360x640 checks in P-3 were measured on the same overlays. They are kept out of the folder to keep it small.
 

@@ -453,6 +453,8 @@ test("More options on a 320x640 phone: only the parts list scrolls, the sheet bo
   await page.setViewportSize({ width: 320, height: 640 });
   await openReady(page, "split-pdf", "twelve.pdf");
   await openMore(page);
+  // The sheet rises 32px as it opens (dialog.css mp-sheet-in): measure where it comes to rest.
+  await page.getByRole("dialog").evaluate((d) => Promise.all(d.getAnimations({ subtree: true }).map((a) => a.finished)));
   const metrics = await page.getByTestId("more-options-dialog").evaluate((d) => {
     const body = d.closest("[data-ip-scroll=overlay]") as HTMLElement;
     const list = d.querySelector("[data-testid=parts-scroller]") as HTMLElement;

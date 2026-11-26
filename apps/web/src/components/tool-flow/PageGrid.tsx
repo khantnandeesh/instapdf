@@ -111,7 +111,7 @@ export function PageGrid({
       variant={inCorner ? "raised" : "soft"}
       tabIndex={isActive ? 0 : -1}
       icon={<EnlargeIcon size={16} />}
-      className={inCorner ? "size-9 bg-surface-raised shadow-menu" : undefined}
+      className={inCorner ? "size-9 bg-surface-raised" : undefined}
       onClick={() => onOpen(file, i)}
     />
   );
