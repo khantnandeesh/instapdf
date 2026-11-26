@@ -45,7 +45,7 @@
     }
   }
 
-  /* Bar (and a NumberStepper with float, data-fb-float): a floating bubble above the field (white, 1.5px edge, 10px radius, menu shadow, a 6px
+  /* Bar: a floating bubble above the field (white, 1.5px edge, 10px radius, menu shadow, a 6px
      tail at the bottom-left), shown only with something to say. */
   @media (width < 64rem) {
     .ip-fb {
@@ -71,7 +71,7 @@
       content: "";
       position: absolute;
       top: 100%;
-      left: 1.25rem;
+      left: var(--ip-fb-tail, 1.25rem);
       margin-top: -4.5px;
       width: 9px;
       height: 9px;
@@ -85,17 +85,17 @@
       border-color: var(--color-danger);
     }
   }
-  :where([data-ip-dock="bar"], [data-fb-float]) .ip-fb {
+  :where([data-ip-dock="bar"]) .ip-fb {
     pointer-events: none;
     position: absolute;
     bottom: calc(100% + var(--ip-bubble-gap));
     left: 0;
     z-index: 30;
   }
-  :where([data-ip-dock="bar"], [data-fb-float]) .ip-fb[data-empty] {
+  :where([data-ip-dock="bar"]) .ip-fb[data-empty] {
     display: none;
   }
-  :where([data-ip-dock="bar"], [data-fb-float]) .ip-fb__text {
+  :where([data-ip-dock="bar"]) .ip-fb__text {
     position: relative;
     width: max-content;
     border: 1.5px solid var(--border-card);
@@ -104,11 +104,11 @@
     padding: 0.5rem 0.75rem;
     box-shadow: var(--shadow-menu);
   }
-  :where([data-ip-dock="bar"], [data-fb-float]) .ip-fb__text::after {
+  :where([data-ip-dock="bar"]) .ip-fb__text::after {
     content: "";
     position: absolute;
     top: 100%;
-    left: 1.25rem;
+    left: var(--ip-fb-tail, 1.25rem);
     margin-top: -4.5px;
     width: 9px;
     height: 9px;
@@ -117,8 +117,30 @@
     border-width: 0 1.5px 1.5px 0;
     background: var(--color-surface-raised);
   }
-  :where([data-ip-dock="bar"], [data-fb-float]) .ip-fb__text[data-tone="error"],
-  :where([data-ip-dock="bar"], [data-fb-float]) .ip-fb__text[data-tone="error"]::after {
+  :where([data-ip-dock="bar"]) .ip-fb__text[data-tone="error"],
+  :where([data-ip-dock="bar"]) .ip-fb__text[data-tone="error"]::after {
     border-color: var(--color-danger);
+  }
+
+  /* A NumberStepper outside the dock (data-fb-under, Alternate's cards): the error is a plain line under the
+     stepper, in the flow, so it covers nothing (visual review 2026-11-26). */
+  [data-fb-under] {
+    flex-wrap: wrap;
+  }
+  [data-fb-under] .ip-fb {
+    position: static;
+    flex-basis: 100%;
+    pointer-events: auto;
+  }
+  [data-fb-under] .ip-fb__text {
+    width: auto;
+    border: 0;
+    background: none;
+    padding: 4px 0 0;
+    box-shadow: none;
+    translate: none;
+  }
+  [data-fb-under] .ip-fb__text::after {
+    display: none;
   }
 }

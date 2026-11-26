@@ -11,7 +11,7 @@ test("AC-510: bravo + alpha in one batch open in the Pages view, alpha first, wi
   const panel = await mergeOptions(page);
   await expect(panel.getByRole("switch", { name: "Pad for double-sided printing" })).toBeVisible();
   await closeMergeOptions(page);
-  await expect(primary(page)).toHaveText(/^Merge PDFs/);
+  await expect(primary(page)).toHaveText(/^Combine PDF/);
 });
 
 test("AC-511: B1 dragged between A1 and A2 gives alpha_merged.pdf in that order", async ({ page }, info) => {

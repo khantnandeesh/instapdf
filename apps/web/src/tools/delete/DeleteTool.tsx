@@ -105,7 +105,7 @@ export function DeleteTool() {
             onChange={s.type}
             onBlur={s.blur}
             onClear={s.clear}
-            className="min-w-0 flex-1 dock-bar:lg:max-w-[300px] dock-bar:lg:max-xl:max-w-[190px]"
+            className="min-w-0 flex-1 dock-bar:lg:w-[190px] dock-bar:lg:flex-none dock-bar:xl:w-[300px]"
           />
         </div>
       )}

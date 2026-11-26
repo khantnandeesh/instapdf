@@ -531,12 +531,12 @@ export const seoContent: Record<string, ToolSeoContent> = {
     steps: [
       { name: "Add your files", text: "Drop PDFs and images on the page, or choose them from your device. Nothing is uploaded." },
       { name: "Reorder the pages", text: "Every page of every file shows at once. Drag pages between files, rotate or remove them." },
-      { name: "Combine and save", text: "Pick any options, select Merge PDFs and download one PDF with your pages in order." },
+      { name: "Combine and save", text: "Pick any options, select Combine PDF and download one PDF with your pages in order." },
     ],
     faq: [
       {
         q: "How do I combine pages from different PDFs in any order?",
-        a: "Add the files and drag their pages into the order you want. Pages from different files can sit side by side, then Merge PDFs saves them as one document.",
+        a: "Add the files and drag their pages into the order you want. Pages from different files can sit side by side, then Combine PDF saves them as one document.",
       },
       {
         q: "Can I take only some pages from a file?",

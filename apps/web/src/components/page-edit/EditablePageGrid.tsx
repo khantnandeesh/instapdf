@@ -314,7 +314,7 @@ export default function EditablePageGrid({
         <span
           aria-hidden="true"
           className={cx(
-            "grid size-(--ip-insert-size) place-items-center rounded-full border-[1.5px] border-brand-tint-border bg-surface-raised text-brand-strong shadow-menu transition-[background-color,transform] duration-(--dur-base)",
+            "grid size-(--ip-insert-size) place-items-center rounded-full border-[1.5px] border-brand-tint-border bg-surface-raised text-brand-strong transition-[background-color,transform] duration-(--dur-base)",
             "group-hover/ins:scale-110 group-hover/ins:bg-brand-tint group-focus-visible/ins:bg-brand-tint group-focus-visible/ins:outline-3 group-focus-visible/ins:outline-offset-2 group-focus-visible/ins:outline-focus group-aria-expanded/ins:bg-brand-tint",
           )}
         >
@@ -407,7 +407,7 @@ export default function EditablePageGrid({
               <CheckIcon size={14} />
             </span>
           ) : (
-            <span className="size-[22px] rounded-full border-[1.5px] border-field-line bg-surface-raised shadow-menu" />
+            <span className="size-[22px] rounded-full border-[1.5px] border-field-line bg-surface-raised" />
           );
           return (
             // Page tile (berrypdf.md "Page tiles"): the page fills the tile, its label below in Fredoka; a selected page gets the berry outline and a leaf tick.

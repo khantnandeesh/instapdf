@@ -317,7 +317,7 @@ function EntryDownload({ name, blob, announce }: { name: string; blob: () => Blo
     <IconButton
       label={copy.downloadEntry(name)}
       variant="raised"
-      className="size-9 shrink-0 bg-surface-raised"
+      className="size-9 shrink-0"
       data-testid="entry-download"
       icon={done ? <CheckIcon size={18} className="mp-tick-in" /> : <DownloadSimpleIcon size={18} />}
       onClick={() => {
@@ -355,8 +355,9 @@ function ResultPreview({ output }: { output: ToolOutput }) {
       const box = host.current?.parentElement?.clientWidth || 240;
       const canvas = await renderPage(r.pdf.doc, 0, box);
       if (!alive) return;
-      canvas.className = "ip-fade-in block max-h-full max-w-full shadow-paper";
-      canvas.style.width = `${canvas.width / Math.min(2, window.devicePixelRatio || 1)}px`;
+      // Fit the whole page in the square (width and height auto, both capped): a portrait page is
+      // height-bound, a landscape one width-bound, and nothing is cropped.
+      canvas.className = "ip-fade-in block h-auto max-h-full w-auto max-w-full shadow-paper";
       canvas.setAttribute("role", "img");
       canvas.setAttribute("aria-label", "Preview of page 1 of the result");
       canvas.dataset.testid = "result-preview";

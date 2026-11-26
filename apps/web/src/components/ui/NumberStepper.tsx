@@ -34,7 +34,7 @@ export function NumberStepper({
   error,
   min = 1,
   max = 9999,
-  float,
+  under,
   className,
 }: {
   /** The field's text (the caller validates it with stepperValue). */
@@ -47,8 +47,8 @@ export function NumberStepper({
   error: string;
   min?: number;
   max?: number;
-  /** Outside the dock (Alternate's file cards): the error always floats above the field, as in the bar. */
-  float?: boolean;
+  /** Outside the dock (Alternate's file cards): the error is a line under the stepper, covering nothing. */
+  under?: boolean;
   className?: string;
 }) {
   const id = useId();
@@ -74,7 +74,7 @@ export function NumberStepper({
   }
 
   return (
-    <span className={cx("relative inline-flex items-center gap-1", className)} data-testid="number-stepper" data-fb-float={float ? "" : undefined}>
+    <span className={cx("relative inline-flex items-center gap-1", className)} data-testid="number-stepper" data-fb-under={under ? "" : undefined}>
       <IconButton
         label={decLabel}
         variant="soft"

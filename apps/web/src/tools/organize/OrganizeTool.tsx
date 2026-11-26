@@ -144,6 +144,7 @@ export function OrganizeTool() {
                 disabled={w.dimmed}
                 className={`${toolbarButton} size-11 px-0`}
                 title={o.pageTools}
+                sheet
                 data-testid="page-tools-menu"
               >
                 <MoreIcon size={20} />

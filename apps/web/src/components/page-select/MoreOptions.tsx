@@ -14,8 +14,8 @@ const prefetch = () => void loadDialog().catch(() => {});
 
 /**
  * The More options trigger and its dialog (spec F4/F5 UI P-4, P-5). The trigger reads
- * "More options" with a "{n} changed" chip; in the bar from 1024 to 1279 px and below 1024 px it is
- * a 44px icon button with a tooltip, and on phones a 52px square beside the primary.
+ * "More options" with a "{n} changed" chip; in the bar below 1440 px and below 1024 px it is a 44px
+ * icon button with a tooltip, and on phones a bare 44px icon beside the primary.
  */
 export function MoreOptions({ changed, disabled, content }: { changed: number; disabled?: boolean; content: MoreOptionsContent }) {
   const [open, setOpen] = useState(false);
@@ -34,24 +34,24 @@ export function MoreOptions({ changed, disabled, content }: { changed: number; d
         onPointerEnter={prefetch}
         onFocus={prefetch}
         onClick={() => setOpen(true)}
-        className="group/more relative h-11 dock-bar:max-xl:size-11 dock-bar:max-xl:px-0 max-sm:size-[52px]! max-sm:px-0"
+        className="ip-more-trigger group/more relative h-11 dock-bar:max-[1439px]:size-11 dock-bar:max-[1439px]:px-0 max-sm:size-11! max-sm:px-0"
         iconStart={<SlidersIcon size={18} />}
       >
-        <span aria-hidden="true" className="dock-bar:max-xl:hidden">
+        <span aria-hidden="true" className="dock-bar:max-[1439px]:hidden">
           {selectCopy.more}
         </span>
         {changed > 0 && (
           <>
-            <span aria-hidden="true" className="mp-tag mp-tag--sm dock-bar:max-xl:hidden">
+            <span aria-hidden="true" className="mp-tag mp-tag--sm dock-bar:max-[1439px]:hidden">
               {selectCopy.moreChanged(changed)}
             </span>
             {/* Icon-only: a small berry dot says something is changed. */}
-            <span aria-hidden="true" className="absolute top-1.5 right-1.5 hidden size-2 rounded-full bg-brand ring-2 ring-white dock-bar:max-xl:block" />
+            <span aria-hidden="true" className="absolute top-1.5 right-1.5 hidden size-2 rounded-full bg-brand ring-2 ring-white dock-bar:max-[1439px]:block" />
           </>
         )}
         <span
           aria-hidden="true"
-          className="ip-tooltip pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden -translate-x-1/2 rounded-sm bg-inverse px-2 py-1 font-ui text-help whitespace-nowrap text-on-inverse dock-bar:max-xl:group-hover/more:block dock-bar:max-xl:group-focus-visible/more:block [@media(hover:none)]:!hidden"
+          className="ip-tooltip pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden -translate-x-1/2 rounded-sm bg-inverse px-2 py-1 font-ui text-help whitespace-nowrap text-on-inverse dock-bar:max-[1439px]:group-hover/more:block dock-bar:max-[1439px]:group-focus-visible/more:block [@media(hover:none)]:!hidden"
         >
           {selectCopy.more}
         </span>

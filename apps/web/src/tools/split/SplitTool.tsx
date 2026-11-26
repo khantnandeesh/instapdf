@@ -37,11 +37,11 @@ const modes = [
     value: "everyN" as const,
     label: c.everyN,
     icon: <StripGlyph groups={[2, 2]} />,
-    // The bar from 1024 to 1279 px reads "Every N" (P-5).
+    // The bar reads "Every N" (P-5): the stepper beside it says what N is. The name stays "Every N pages".
     node: (
       <>
-        <span className="dock-bar:max-xl:hidden">{c.everyN}</span>
-        <span className="hidden dock-bar:max-xl:inline">{c.everyNShort}</span>
+        {c.everyNShort}
+        <span className="dock-bar:sr-only">{c.everyNRest}</span>
       </>
     ),
   },
@@ -79,7 +79,15 @@ export function SplitTool() {
 
   const problem = m ? m.splitProblem(split, files) : null;
   const plan = useMemo(() => (m ? m.splitPlan(split, files, { pattern: opts.pattern, renames }) : null), [m, split, files, opts.pattern, renames]);
-  const parts = useMemo(() => Object.fromEntries(files.map((f) => [f.id, m ? m.partsOf(split, f, files) : null])), [m, split, files]);
+  const live = useMemo(() => Object.fromEntries(files.map((f) => [f.id, m ? m.partsOf(split, f, files) : null])), [m, split, files]);
+  // While the typed parts don't parse, the grid keeps the last valid parts drawn (the bubble says what is
+  // wrong), instead of dashing every tile (visual review 2026-11-26).
+  const invalid = !!problem && "field" in problem;
+  const [lastGood, setLastGood] = useState(live);
+  useEffect(() => {
+    if (!invalid) setLastGood(live);
+  }, [invalid, live]);
+  const parts = invalid && lastGood ? lastGood : live;
   const pageParts = useMemo(() => (m ? Object.fromEntries(files.map((f) => [f.id, m.pageParts(parts[f.id] ?? null, f.pageCount)])) : {}), [m, parts, files]);
   const total = files.reduce((n, f) => n + f.pageCount, 0);
   const docCount = plan?.documents.length ?? 0;
@@ -176,11 +184,11 @@ export function SplitTool() {
                 options={modes}
                 onChange={setKind}
                 fullWidth
-                className="max-lg:hidden dock-side:grid-flow-row dock-side:grid-cols-2 dock-bar:w-auto dock-bar:gap-1.5"
+                className="max-lg:hidden dock-side:grid-flow-row dock-side:grid-cols-2 dock-bar:w-auto dock-bar:auto-cols-max dock-bar:gap-1.5"
               />
               {/* Below 1024 px the four pills don't fit beside a field: a native select (one tap on touch). */}
               <div className="w-[150px] max-sm:w-[130px] lg:hidden">
-                <Select id={selectId} label={c.mode} hideLabel value={split.kind} options={modes.map((o) => ({ value: o.value, label: o.label }))} onChange={setKind} />
+                <Select id={selectId} label={c.mode} hideLabel value={split.kind} options={modes.map((o) => ({ value: o.value, label: o.value === "everyN" ? c.everyNShort : o.label }))} onChange={setKind} />
               </div>
             </div>
             {/* Step 2: a fixed slot in the side panel, so switching modes moves nothing (P-10). */}
@@ -188,8 +196,8 @@ export function SplitTool() {
               {split.kind === "everyN" && (
                 <>
                   <Step n={2}>{c.perFile}</Step>
-                  <div className="flex items-center gap-2.5">
-                    <span aria-hidden="true" className="hidden text-sm font-semibold whitespace-nowrap text-ink lg:dock-bar:inline">
+                  <div className="flex shrink-0 items-center gap-2.5">
+                    <span aria-hidden="true" className="hidden text-sm font-semibold whitespace-nowrap text-ink xl:dock-bar:inline">
                       {c.perFile}
                     </span>
                     <NumberStepper
@@ -220,7 +228,7 @@ export function SplitTool() {
                     onChange={(text) => change(typeParts(split, text))}
                     onBlur={() => setSplit((s) => (m ? m.blurParts(s, files) : s))}
                     onClear={() => change(clearParts(split))}
-                    className="min-w-0 flex-1 dock-bar:lg:max-w-[300px] dock-bar:lg:max-xl:max-w-[190px]"
+                    className="min-w-0 flex-1 dock-bar:lg:w-[190px] dock-bar:lg:flex-none dock-bar:xl:w-[300px]"
                   />
                 </>
               )}

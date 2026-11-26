@@ -48,13 +48,14 @@ export async function leftOutPages(page: Page) {
 /** Split's mode: the pills from 1024 px, the native select below (UI P-5). */
 export async function splitMode(page: Page, label: "Every page" | "Every N pages" | "Spreads" | "Custom") {
   const select = page.getByRole("combobox", { name: "Split" });
-  if (await select.isVisible()) await select.selectOption({ label });
+  // The select's option reads "Every N" (visual review 2026-11-26: the long label was cut at 390).
+  if (await select.isVisible()) await select.selectOption({ label: label === "Every N pages" ? "Every N" : label });
   else await page.getByRole("radiogroup", { name: "Split" }).getByRole("radio", { name: label }).click();
 }
 
 export async function currentSplitMode(page: Page) {
   const select = page.getByRole("combobox", { name: "Split" });
-  if (await select.isVisible()) return select.evaluate((el: HTMLSelectElement) => el.selectedOptions[0]?.textContent ?? "");
+  if (await select.isVisible()) return select.evaluate((el: HTMLSelectElement) => (el.selectedOptions[0]?.textContent === "Every N" ? "Every N pages" : (el.selectedOptions[0]?.textContent ?? "")));
   return page.getByRole("radiogroup", { name: "Split" }).getByRole("radio", { checked: true }).innerText();
 }
 

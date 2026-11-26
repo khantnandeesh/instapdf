@@ -101,7 +101,8 @@ export function ExtractTool() {
         />
       )}
       renderOptions={() => (
-        <div className="flex min-w-0 items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-side:gap-3.5 max-sm:flex-1">
+        // Below 400 px the field gets its own row under the pills, so it stays usable (P-5).
+        <div className="flex min-w-0 items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-side:gap-3.5 max-sm:flex-1 max-[399px]:flex-wrap">
           <Step n={1}>{c.step}</Step>
           <SegmentedControl
             look="tiles"
@@ -123,7 +124,7 @@ export function ExtractTool() {
             onChange={s.type}
             onBlur={s.blur}
             onClear={s.clear}
-            className="min-w-0 flex-1 dock-bar:lg:max-w-[300px] dock-bar:lg:max-xl:max-w-[190px]"
+            className="min-w-0 flex-1 dock-bar:lg:w-[190px] dock-bar:lg:flex-none dock-bar:xl:w-[300px] max-[399px]:basis-full"
           />
         </div>
       )}

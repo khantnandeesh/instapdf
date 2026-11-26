@@ -47,9 +47,11 @@ export const MenuButton = forwardRef<
     onOpenChange?: (open: boolean) => void;
     onFocus?: () => void;
     onKeyDown?: (e: KeyboardEvent<HTMLButtonElement>) => void;
+    /** Below 640 px the menu is a bottom sheet (full width, capped height, scrolls inside): for long menus. */
+    sheet?: boolean;
     "data-testid"?: string;
   }
->(function MenuButton({ label, children, items, className, placement = "bottom-start", tabIndex, disabled, title, onOpenChange, onFocus, onKeyDown, ...rest }, ref) {
+>(function MenuButton({ label, children, items, className, placement = "bottom-start", tabIndex, disabled, title, onOpenChange, onFocus, onKeyDown, sheet, ...rest }, ref) {
   const trigger = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
   const menuId = useId();
@@ -62,6 +64,15 @@ export const MenuButton = forwardRef<
     const t = trigger.current?.getBoundingClientRect();
     const p = popup.current;
     if (!t || !p) return;
+    // Never taller than the screen: a long menu scrolls inside (16px clear of the edges).
+    p.style.maxHeight = `${window.innerHeight - 16}px`;
+    const asSheet = !!sheet && window.innerWidth < 640;
+    Object.assign(p.style, asSheet ? { top: "auto", bottom: "0px", left: "0px", width: "100%", maxWidth: "none", maxHeight: "" } : { bottom: "", width: "", maxWidth: "" });
+    if (asSheet) {
+      p.dataset.sheet = "";
+      return;
+    }
+    delete p.dataset.sheet;
     const h = p.offsetHeight;
     const w = p.offsetWidth;
     const below = window.innerHeight - t.bottom;
@@ -70,7 +81,7 @@ export const MenuButton = forwardRef<
     left = Math.max(8, Math.min(window.innerWidth - w - 8, left));
     p.style.top = `${Math.max(8, top)}px`;
     p.style.left = `${left}px`;
-  }, [placement]);
+  }, [placement, sheet]);
 
   const show = useCallback(
     (where: "first" | "last" = "first") => {
@@ -203,7 +214,8 @@ export const MenuButton = forwardRef<
         aria-label={label}
         onKeyDown={onMenuKey}
         // BerryPDF Menu: white, 1.5px sand, radius 14, shadow-menu, scales in (0.15s).
-        className="mp-menu fixed m-0 max-w-[calc(100vw-32px)] min-w-[220px] p-1.5 text-ink"
+        className="mp-menu fixed m-0 max-w-[calc(100vw-32px)] min-w-[220px] overflow-y-auto overscroll-contain p-1.5 text-ink"
+        data-ip-scroll="overlay"
         style={{ inset: "auto" }}
       >
         {items.map((entry, i) =>

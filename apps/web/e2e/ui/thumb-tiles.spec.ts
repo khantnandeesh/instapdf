@@ -109,7 +109,7 @@ for (const [w, h] of [
       }
     });
 
-    test("Alternate & mix: file cards keep controls off the page and the name under it; the result view uses plain tiles", async ({ page }) => {
+    test("Alternate & mix: file cards keep controls and the name off the page; the result view uses plain tiles", async ({ page }) => {
       await page.goto("/alternate-mix-pdf");
       await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
       await page.getByTestId("file-input").setInputFiles([fx("alpha.pdf"), fx("three-pages.pdf")]);
@@ -117,10 +117,15 @@ for (const [w, h] of [
       await expect(page.locator(`[data-testid=file-card] ${box}`)).toHaveCount(2);
       // Rule 6 at every width for the wide cards (their controls never float over the page), and rule 3.
       await expect.poll(() => onPage(page, box, "alternate cards"), { timeout: 5000 }).toEqual([]);
-      const under = await page.getByTestId("file-card").evaluateAll((cards, box) =>
-        cards.map((c) => c.querySelector("[data-testid=file-name]")!.getBoundingClientRect().top >= c.querySelector(box)!.getBoundingClientRect().bottom - 0.5),
+      // The name is off the page: under it from 640 px, beside the 72px page on phones (P-3).
+      const off = await page.getByTestId("file-card").evaluateAll((cards, box) =>
+        cards.map((c) => {
+          const n = c.querySelector("[data-testid=file-name]")!.getBoundingClientRect();
+          const p = c.querySelector(box)!.getBoundingClientRect();
+          return n.top >= p.bottom - 0.5 || n.left >= p.right - 0.5;
+        }),
       box);
-      expect(under).toEqual([true, true]);
+      expect(off).toEqual([true, true]);
       await expect.poll(() => page.getByTestId("file-card").evaluateAll((cards) => cards.map((c) => getComputedStyle(c).backgroundColor)), { timeout: 5000 }).toEqual(["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)"]);
       await page.getByRole("radio", { name: "Pages" }).click();
       await expect(page.locator("[data-uid] [data-tile-box] > span:first-child")).toHaveCount(6);

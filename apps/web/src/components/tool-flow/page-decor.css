@@ -32,14 +32,23 @@
   opacity: var(--ip-dim-left-out);
 }
 
-/* Delete, a marked page: an overlay on the page itself (dimmed and grey, static) under the solid
-   trash badge, and the number struck through. No edge, no fill (PT-1 rule 4). */
+/* Delete, a marked page: grey, under a pale veil (static), with a 1px field-line edge so it still reads as
+   a page on cream, under the solid trash badge; the whole label struck through with a 2px line. No fill
+   on the tile (PT-1 rule 4). */
 :is(.mp-tray, .ip-tile)[data-marked] [data-testid="page-visual"] {
-  opacity: var(--ip-dim-marked);
   filter: grayscale(1);
+  outline: 1px solid var(--ip-field-line);
+}
+:is(.mp-tray, .ip-tile)[data-marked] [data-testid="page-visual"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--cream);
+  opacity: var(--ip-veil-marked);
+  pointer-events: none;
 }
 :is(.mp-tray, .ip-tile)[data-marked] :is(.mp-tray__n, .ip-tile__n) {
-  text-decoration: line-through;
+  text-decoration: line-through 2px;
 }
 
 /* Badges that appear (part disc, pick tick, solid trash): fade + scale 0.9 -> 1, 120ms (P1, P4). */
@@ -212,11 +221,24 @@
 .ip-page-grid {
   isolation: isolate;
 }
-/* Below 1024 px the part disc leads the tile's number line, off the page (PT-1 rule 6). */
-.ip-part-disc--line {
-  display: inline-grid;
+/* Split: the first tile of a part starts its number line with a dot in the part's tone (the label says
+   "Part n"). */
+.ip-part-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
   margin-inline-end: 6px;
-  vertical-align: middle;
+  border-radius: 50%;
+  background: var(--ip-part-tone-1);
+  vertical-align: 1px;
+}
+.ip-tile[data-tone="even"] .ip-part-dot {
+  background: var(--ip-part-tone-2);
+}
+@media (forced-colors: active) {
+  .ip-part-dot {
+    background: CanvasText;
+  }
 }
 /* Two columns below 640 px: the second column's mark sits on its tile's edge, inside the panel, not
    centred in a gap that isn't there (the row wraps there). */

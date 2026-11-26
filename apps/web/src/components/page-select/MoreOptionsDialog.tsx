@@ -118,17 +118,20 @@ function PartsList({ rows, onRename }: { rows: PartRow[]; onRename: (key: string
       <h3 id="ip-parts-title" className="mb-1.5 text-sm font-semibold text-ink">
         {dialogCopy.files} <span className="text-muted tabular-nums">{rows.length.toLocaleString("en")}</span>
       </h3>
-      <ol
-        ref={list}
-        className="relative"
-        data-testid="parts-list"
-        // The full height is kept so the scroll bar is true; only the rows in view are drawn.
-        style={virtual ? { height: rows.length * ROW_H } : undefined}
-      >
-        {rows.slice(from, to).map((r, i) => (
-          <PartRowItem key={r.key} row={r} onRename={onRename} top={virtual ? (from + i) * ROW_H : undefined} />
-        ))}
-      </ol>
+      {/* About five rows, then the list scrolls inside, so the name pattern, bookmarks and Done stay in view. */}
+      <div className="max-h-[calc(5.5*var(--ip-tap-min))] overflow-y-auto overscroll-contain" data-ip-scroll="overlay" data-testid="parts-scroller">
+        <ol
+          ref={list}
+          className="relative"
+          data-testid="parts-list"
+          // The full height is kept so the scroll bar is true; only the rows in view are drawn.
+          style={virtual ? { height: rows.length * ROW_H } : undefined}
+        >
+          {rows.slice(from, to).map((r, i) => (
+            <PartRowItem key={r.key} row={r} onRename={onRename} top={virtual ? (from + i) * ROW_H : undefined} />
+          ))}
+        </ol>
+      </div>
     </section>
   );
 }

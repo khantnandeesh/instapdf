@@ -1,4 +1,5 @@
 import "./field-bubble.css";
+import { useLayoutEffect, useRef } from "react";
 import { cx } from "./cx";
 import { AlertIcon } from "./icons";
 
@@ -17,12 +18,30 @@ import { AlertIcon } from "./icons";
 export function FieldBubble({ id, error, hint, className }: { id: string; error?: string | null; hint?: string | null; className?: string }) {
   const text = error || hint || "";
   const isError = !!error;
+  // A floating bubble stays inside the screen (16px margin): it slides left when the field sits near
+  // the right edge (a phone's bar), and its tail moves the other way so it still points at the field.
+  const bubble = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = bubble.current;
+    if (!el) return;
+    el.style.translate = "";
+    el.style.removeProperty("--ip-fb-tail");
+    if (getComputedStyle(el.parentElement ?? el).position !== "absolute") return;
+    const r = el.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth;
+    let dx = r.right > vw - 16 ? vw - 16 - r.right : 0;
+    if (r.left + dx < 16) dx = 16 - r.left;
+    if (!dx) return;
+    el.style.translate = `${dx}px 0`;
+    el.style.setProperty("--ip-fb-tail", `${Math.max(12, Math.min(r.width - 24, 20 - dx))}px`);
+  }, [text]);
   return (
     // Layout and the bubble look live in field-bubble.css (loaded with this chunk, not on every page).
     <span className={cx("ip-fb", className)} data-empty={text ? undefined : ""}>
       {text && (
         <span
           key={text}
+          ref={bubble}
           id={isError ? id : undefined}
           role={isError ? "alert" : undefined}
           aria-hidden={isError ? undefined : true}

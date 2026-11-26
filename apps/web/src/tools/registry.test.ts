@@ -49,7 +49,7 @@ describe("flow config", () => {
     const { flowTool } = await import("./registry");
     const expected = {
       "organize-pdf": { view: "pages", density: "compact", action: "Save PDF", progress: "Saving", out: "alpha_organized.pdf" },
-      "combine-reorder-pdf": { view: "pages", density: "full", action: "Merge PDFs", progress: "Merging", out: "alpha_merged.pdf" },
+      "combine-reorder-pdf": { view: "pages", density: "full", action: "Combine PDF", progress: "Combining", out: "alpha_merged.pdf" },
       "alternate-mix-pdf": { view: "files", density: "compact", action: "Mix PDFs", progress: "Mixing", out: "alpha_mixed.pdf" },
     } as const;
     for (const [slug, e] of Object.entries(expected)) {

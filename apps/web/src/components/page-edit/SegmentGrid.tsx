@@ -205,9 +205,9 @@ export function SegmentGrid({
 
   /**
    * Alternate's wide card (PT-1, "The page is the tile"): the page itself, page-shaped and filling its
-   * column, with no fill around it; the letter, name and count under it; the move and remove buttons in
-   * a row of their own (never drawn over the page); the card's settings beside it (from 640 px) or under
-   * it. The card is grouped by an outline, never a filled block.
+   * column, with no fill around it. On phones (P-3) a 72px page with the letter, name, count and the move
+   * and remove buttons beside it, the settings full width under; from 640 px the page, name and buttons
+   * in a column and the settings beside. Never drawn over the page; grouped by an outline, not a fill.
    */
   const mixCard = (card: CardView, i: number, tab: number) => {
     const size = card.thumbSize;
@@ -216,7 +216,7 @@ export function SegmentGrid({
         key={card.key}
         role="listitem"
         aria-label={`${card.name}, ${card.letter}, ${card.meta}`}
-        className="group/card grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-[14px] border-[1.5px] border-sand p-3 [grid-template-areas:'thumb_ctrl'_'name_name'_'set_set'] sm:grid-cols-[128px_minmax(0,1fr)] sm:gap-x-4 sm:[grid-template-areas:'thumb_set'_'name_set'_'ctrl_set']"
+        className="group/card grid min-w-0 grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-[14px] border-[1.5px] border-sand p-3 [grid-template-areas:'thumb_name'_'thumb_ctrl'_'set_set'] sm:grid-cols-[128px_minmax(0,1fr)] sm:gap-x-4 sm:[grid-template-areas:'thumb_set'_'name_set'_'ctrl_set']"
         data-card-key={card.key}
         data-testid="file-card"
         data-flip
@@ -266,7 +266,7 @@ export function SegmentGrid({
             {card.meta}
           </span>
         </div>
-        <div className="-mx-1 flex items-center gap-1 self-start [grid-area:ctrl] sm:self-end">
+        <div className="-mx-1 flex items-center gap-1 self-end [grid-area:ctrl]">
           <IconButton
             label={labels.moveEarlier(card.name)}
             size="sm"
@@ -375,12 +375,17 @@ export function SegmentGrid({
                   className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-1"
                   data-testid="card-main"
                 />
-                <span aria-hidden="true" className="pointer-events-none absolute -top-1.5 -left-1.5 z-[1] flex gap-1">
-                  <span className="grid h-6 min-w-6 place-items-center rounded-pill bg-surface-raised px-1.5 font-display text-help font-semibold text-brand-strong shadow-menu" data-testid="source-badge">
-                    {card.letter}
+                {/* Below 1024 px the letter leads the name line instead, off the page (PT-1 rule 6). */}
+                {(!compact || badge) && (
+                  <span aria-hidden="true" className="pointer-events-none absolute -top-1.5 -left-1.5 z-[1] flex gap-1">
+                    {!compact && (
+                      <span className="grid h-6 min-w-6 place-items-center rounded-pill bg-surface-raised px-1.5 font-display text-help font-semibold text-brand-strong shadow-menu" data-testid="source-badge">
+                        {card.letter}
+                      </span>
+                    )}
+                    {badge && <span className="rounded-pill bg-surface-raised px-2 py-1 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">{badge}</span>}
                   </span>
-                  {badge && <span className="rounded-pill bg-surface-raised px-2 py-1 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">{badge}</span>}
-                </span>
+                )}
                 {!compact && (
                 <IconButton
                   label={labels.remove(card.name)}
@@ -406,8 +411,15 @@ export function SegmentGrid({
                   </div>
                 )}
               </div>
-              <span className="mt-1 truncate font-display text-[15px] leading-5 font-semibold text-ink" title={card.name} data-testid="file-name">
-                {card.name}
+              <span className="mt-1 flex min-w-0 items-baseline gap-1.5 font-display text-[15px] leading-5 font-semibold text-ink" title={card.name}>
+                {compact && (
+                  <span aria-hidden="true" className="shrink-0 text-brand-strong" data-testid="source-badge">
+                    {card.letter}
+                  </span>
+                )}
+                <span className="truncate" data-testid="file-name">
+                  {card.name}
+                </span>
               </span>
               <span className="truncate text-help text-muted tabular-nums" data-testid="file-meta">
                 {card.meta}

@@ -203,7 +203,7 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
     status: "beta",
     flow: clientPdfFlow(
       "combine-reorder-pdf",
-      { title: "Combine & reorder PDF pages", actionLabel: "Merge PDFs", progressLabel: "Merging" },
+      { title: "Combine & reorder PDF pages", actionLabel: "Combine PDF", progressLabel: "Combining" },
       { accept: PDF_AND_IMAGES, maxFiles: 50, defaultView: "pages", optionsDensity: "full", outputName: (inputs) => mergedName(inputs[0]) },
     ),
   },

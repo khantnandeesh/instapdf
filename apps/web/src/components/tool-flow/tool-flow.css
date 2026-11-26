@@ -75,6 +75,21 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
   }
 }
 
+/* Below 1024 px the same: once a file is in, the head is one compact line (the pages get the screen). */
+@media (max-width: 1023px) {
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) .mp-intro {
+    padding-top: 12px;
+    padding-bottom: 10px;
+  }
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) .mp-intro h1 {
+    overflow: hidden;
+    font-size: 22px;
+    line-height: 28px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 /* A focus move the page made after a mouse or touch pick (eval G-7): no ring until the next key
    press (components/ui/focus.ts removes the mark), the same as :focus-visible for a real click. */
 [data-quiet-focus]:focus-visible {
@@ -203,5 +218,30 @@ body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard {
       background: none;
       border: 0;
     }
+  }
+}
+
+/* More options (page tools): a clean icon (and label from 1440 px), no box at rest; the tint shows on hover
+   and press (owner rule, 2026-11-26). Same layer as .mp-btn--soft, loaded after it. */
+@layer components {
+  .ip-more-trigger {
+    background: transparent;
+  }
+  .ip-more-trigger:hover:not(:disabled),
+  .ip-more-trigger:active:not(:disabled),
+  .ip-more-trigger[aria-expanded="true"] {
+    background: var(--brand-tint);
+  }
+}
+
+/* A long menu on a phone (Organize's Page tools): a bottom sheet, full width, its height capped under the
+   header; the items scroll inside (Menu sets data-sheet below 640 px). */
+@layer components {
+  .mp-menu[data-sheet] {
+    max-height: calc(100dvh - var(--ip-header-h) - 16px);
+    border-width: 1.5px 0 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+    transform-origin: bottom center;
   }
 }

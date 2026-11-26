@@ -6,6 +6,8 @@ export const splitCopy = {
   every: "Every page",
   everyN: "Every N pages",
   everyNShort: "Every N",
+  /** everyNShort + everyNRest = everyN (the bar hides the rest visually). */
+  everyNRest: " pages",
   spreads: "Spreads",
   spreadsTip: "Page 1 alone, then pairs: 2-3, 4-5…",
   custom: "Custom",

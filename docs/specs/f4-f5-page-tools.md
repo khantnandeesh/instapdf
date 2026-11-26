@@ -648,9 +648,9 @@ No new colours. Add these to `apps/web/src/styles/tokens.css`:
 |---|---|---|
 | `--ip-mark-size` | 28px | Visible circle of a Split mark (scissors). The hit area is 44×44 (`--ip-tap-min`), centred in the gap between two tiles. |
 | `--ip-cut-line` | `var(--ip-slot-bar)` (3px) | The cut line drawn the full tray height when a mark is on. It reuses Merge's insert bar width, so a cut and an insert point look related. |
-| `--ip-part-disc` | 24px | Part-number disc on the first tile of each Split part. Same style as `mp-step__n`. |
+| `--ip-part-disc` | 24px | Part-number disc in More options' Files list. (On the tiles a part starts with an 8px tone dot in the number line, `.ip-part-dot`.) |
 | `--ip-dim-left-out` | 0.38 | Opacity of the page image on a Split tile that is in no part. |
-| `--ip-dim-marked` | 0.32 | Opacity of the page image on a Delete tile marked for removal. The image is also `grayscale(1)`, which is static, never animated. |
+| `--ip-veil-marked` | 0.55 | Opacity of the cream veil over the page image of a Delete tile marked for removal. The image is also `grayscale(1)` with a 1px field-line edge, and the label is struck with a 2px line; all static, never animated (visual review 2026-11-26; was a 0.32 opacity, which almost vanished on cream). |
 | `--ip-stepper-field-w` | 56px | Number field inside `NumberStepper`. Two 44px buttons sit around it, so it is 152px wide with 4px gaps. |
 | `--ip-mix-card-min` | 330px | Minimum column of the wide Alternate card. This gives 3 per row at 1366 and 1 per row below 640. |
 | `--ip-bubble-gap` | 8px | Gap between a bar field and its floating hint or error bubble. |
@@ -929,11 +929,11 @@ The page-strip glyphs (mode tiles, odd/even items) are inline SVGs drawn in the 
 
 | Control | Side panel (empty, ≥ 1024) | Bar row (≥ 1024) | Bar 640–1023 | Phone (< 640) |
 |---|---|---|---|---|
-| Split mode | 2×2 tiles with glyphs | 4 pills, labels only ("Every N" below 1280) | `Select` | `Select` (row 1) |
-| Split N | step 2, "Pages per file" + stepper | "Pages per file" + stepper | stepper | stepper (row 1) |
-| Split / Extract / Delete range | step 1 or 2, field (full width) + under-line error | field 300px (190 below 1280) + bubble | field (flex) + bubble | field (flex) + bubble |
+| Split mode | 2×2 tiles with glyphs | 4 content-width pills, labels only ("Every N") | `Select` ("Every N") | `Select` ("Every N", row 1) |
+| Split N | step 2, "Pages per file" + stepper | stepper, with "Pages per file" from 1280 | stepper | stepper (row 1) |
+| Split / Extract / Delete range | step 1 or 2, field (full width) + under-line error | field 300px (190 below 1280), a fixed width that never shrinks + bubble | field (flex) + bubble | field (flex) + bubble; Extract below 400: its own row under the pills. The bubble stays inside the screen (16px) |
 | Extract quick pick | 3 tiles with glyphs | 3 pills | 3 pills | 3 compact pills (row 1) |
-| More options | soft button, icon + label | soft button, icon + label (icon-only below 1280) | 44px icon | 52px square (row 2) |
+| More options | bare icon + label | bare icon + label from 1440 (icon-only below, with a tooltip) | 44px bare icon | 44px bare icon (row 2) |
 | Status | above the primary | left of the primary | `sr-only` | `sr-only` |
 | Primary | 310px, sticky at the panel foot | 260px | 200px+ | flex (row 2) |
 
@@ -977,7 +977,7 @@ Changes apply immediately. Done only closes the dialog. Escape and the backdrop 
 
 | Tool | Tile at rest | Tile hover / focus (fine pointer) or always (touch) | Tile active state |
 |---|---|---|---|
-| Split | Tray in its part tone; the part disc (24px, `mp-step__n` style) at the top-left of the **first** tile of each part | The mark after the tile shows as a white 28px circle, `field-line` edge, `brand-strong` scissors | Mark on: `brand` fill, white scissors rotated 90°, a 3px `brand` cut line the full tray height in the gap |
+| Split | Tray in its part tone; the **first** tile of each part starts its number line with an 8px dot in the part tone (the label already says "Part n"; visual review 2026-11-26: a numbered disc on the page covered its text) | The mark after the tile shows as a white 28px circle, `field-line` edge, `brand-strong` scissors | Mark on: `brand` fill, white scissors rotated 90°, a 3px `brand` cut line the full tray height in the gap |
 | Split, left-out page (Custom) | Dashed `field-line` tray edge, page at 0.38, no disc; marks on either side hidden (and absent from the DOM) | – | – |
 | Extract | Plain tray | An empty 24px ring (`field-line` edge) at the top-right | Picked: 2px `brand` ring on the tray plus the `leaf` tick disc (the F1 leaf tick) in the ring's place |
 | Delete | Plain tray | A ghost trash badge (white circle, `danger` icon) at the top-right | Marked: page at 0.32 + grayscale, `band` tray with a 1.5px `brand-tint-border` edge, a solid `danger` trash badge with a white icon, page number struck through |
@@ -999,7 +999,7 @@ Changes apply immediately. Done only closes the dialog. Escape and the backdrop 
 |---|---|---|
 | Split, empty | Drop card + side panel (≥ 1024) or bar with `Select` + disabled "Split PDF" (< 1024) | `split-1-empty-<x>` |
 | Split, loading / password | F1 skeleton tiles at their final aspect box; F1 password dialog. The bar is already in its loaded form, disabled | F1 (unchanged) |
-| Split, ready (Every page) | 12 discs, a cut line after every page, "Split into 12 files" | `split-2-ready-every-<x>` |
+| Split, ready (Every page) | 12 part dots, a cut line after every page, "Split into 12 files" | `split-2-ready-every-<x>` |
 | Split, Every N | Stepper = 5, three parts, "Split into 3 files" | `split-3-everyn-<x>` |
 | Split, Custom by marks | Marks after 4 and 10 on; field `1-4, 5-10, 11-12`; hovered mark shown off | `split-4-custom-marks-<x>` |
 | Split, Custom typed with gaps | `1-3, 8-9, 12`: pages 4–7, 10, 11 dashed and dimmed; status "6 of 12 pages in 3 files" | `split-5-custom-typed-<x>` |
@@ -1256,7 +1256,7 @@ The strings live in `tools/<slug>/copy.ts`, and the shared ones in `components/p
 | Primary / progress | Save PDF · Saving |
 | Empty status | Add files to start |
 
-**Combine & reorder**: Merge's copy, plus Undo│Redo as for Organize.
+**Combine & reorder**: Merge's copy, except the primary / progress: **Combine PDF · Combining** (lead override, 2026-11-26: the button names the tool the visitor is on), plus Undo│Redo as for Organize.
 
 **Alternate & mix**
 

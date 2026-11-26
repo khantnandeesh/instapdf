@@ -281,7 +281,8 @@
     height: 34px;
     border: 0;
     border-radius: 50%;
-    background: var(--brand-tint);
+    /* Owner rule (2026-11-26): a clean icon, no disc at rest; the tint shows on hover and press. */
+    background: transparent;
     color: var(--brand-strong);
     cursor: pointer;
     transition:
@@ -289,8 +290,9 @@
       color var(--dur-base),
       transform var(--dur-lift);
   }
-  .mp-iconbtn:hover:not(:disabled) {
-    background: var(--mp-pink-hover);
+  .mp-iconbtn:hover:not(:disabled),
+  .mp-iconbtn:active:not(:disabled) {
+    background: var(--brand-tint);
   }
   .mp-iconbtn:active:not(:disabled) {
     transform: scale(0.92);

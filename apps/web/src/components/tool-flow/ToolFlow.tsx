@@ -1058,9 +1058,9 @@ export function ToolFlow({
                   // Decorative; the dock's progress bar and status carry the state for assistive tech.
                   <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[11]" data-testid="processing-loader">
                     <div className="sticky top-[calc(var(--ip-header-h)+120px)] flex justify-center pt-16">
-                      <div className="mp-loading ip-wait-in rounded-panel border-[1.5px] border-sand bg-surface-raised px-8 pt-5 pb-4 shadow-card">
+                      {/* The loader alone: the dock's bar says "Splitting… 40%" (one progress text, not two). */}
+                      <div className="mp-loading ip-wait-in rounded-panel border-[1.5px] border-sand bg-surface-raised px-8 py-5 shadow-card">
                         <BerryLoader size="md" />
-                        <span className="tabular-nums">{copy.progress(flow.progressLabel, Math.round(progress * 100))}</span>
                       </div>
                     </div>
                   </div>

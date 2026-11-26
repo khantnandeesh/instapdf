@@ -29,7 +29,7 @@ export function MixSettings({ id, name, pageCount, mix: m, onChange, announce }:
         }}
         className="max-w-[220px] self-start"
       />
-      <div className="flex min-h-11 items-center gap-2">
+      <div className="flex min-h-11 items-start gap-2">
         <NumberStepper
           value={m.perTurn}
           onChange={(t) => onChange({ perTurn: t })}
@@ -38,9 +38,9 @@ export function MixSettings({ id, name, pageCount, mix: m, onChange, announce }:
           incLabel={a.more(name)}
           error={a.perTurnError}
           max={MAX_COUNT}
-          float
+          under
         />
-        <span className="text-sm whitespace-nowrap text-muted" aria-hidden="true">
+        <span className="text-sm leading-11 whitespace-nowrap text-muted" aria-hidden="true">
           {a.perTurn}
         </span>
       </div>

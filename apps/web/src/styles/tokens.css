@@ -476,7 +476,7 @@
   --ip-part-tone-2: #c46a12; /* Split part outline, even parts (amber): 3.69:1 on cream, 3.19:1 on sand */
   --ip-part-disc: 24px; /* part number on the first tile of each Split part */
   --ip-dim-left-out: 0.38; /* page image of a Split tile that is in no part */
-  --ip-dim-marked: 0.32; /* page image of a Delete tile marked for removal (also grayscale) */
+  --ip-veil-marked: 0.55; /* Delete: the cream veil over a marked page (the page edge stays) */
   --ip-stepper-field-w: 56px; /* number field inside NumberStepper */
   --ip-mix-card-min: 330px; /* minimum column of the wide Alternate card */
   --ip-bubble-gap: 8px; /* gap between a bar field and its floating hint or error bubble */

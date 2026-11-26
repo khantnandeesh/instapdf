@@ -15,11 +15,11 @@ export function DropCard({ children, fill = "work" }: { children: ReactNode; fil
   return (
     <div
       // "pages": no side panel (ToolFlow emptyLayout="bar"), so the card fills the pages slot above the bar.
-      className={`mp-empty grid min-h-[300px] place-items-center px-[15px] py-10 ${fill === "pages" ? "lg:h-(--ip-pages-h)" : "lg:h-(--ip-work-h)"} lg:min-h-0 lg:py-6`}
+      className={`mp-empty grid min-h-[300px] place-items-center px-[15px] py-10 max-[399px]:px-0 ${fill === "pages" ? "lg:h-(--ip-pages-h)" : "lg:h-(--ip-work-h)"} lg:min-h-0 lg:py-6`}
       data-testid="drop-card"
     >
       <Floaties set="empty" />
-      <div className="mp-empty__in mp-dropcard relative w-full max-w-[440px] rounded-[16px_16px_28px_16px] border-[1.5px] border-sand bg-surface-raised px-6 pt-9 pb-8 shadow-card">
+      <div className="mp-empty__in mp-dropcard relative w-full max-w-[440px] min-w-0 rounded-[16px_16px_28px_16px] border-[1.5px] border-sand bg-surface-raised px-6 pt-9 pb-8 shadow-card max-[399px]:px-4">
         <Sticker kind="blossom" size={34} className="mp-sticker--tilt-r absolute -top-4 -right-3" />
         <div className="flex flex-col items-center gap-3">{children}</div>
       </div>

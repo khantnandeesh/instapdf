@@ -6,7 +6,7 @@ import { mergeCopy as c } from "./copy";
 export function HistoryButtons({ canUndo, canRedo, onUndo, onRedo }: { canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void }) {
   const cls = "mp-btn mp-btn--tool h-11 shrink-0 gap-1.5 max-lg:w-11 max-lg:px-0";
   return (
-    <div role="group" aria-label="History" className="mp-toolbar" data-testid="history">
+    <div role="group" aria-label="History" className="mp-toolbar shadow-none" data-testid="history">
       <button type="button" className={cls} aria-disabled={!canUndo || undefined} aria-keyshortcuts="Control+Z Meta+Z" title={c.undo} onClick={() => canUndo && onUndo()} data-testid="undo">
         <UndoIcon size={18} />
         <span className="max-lg:sr-only">{c.undo}</span>
