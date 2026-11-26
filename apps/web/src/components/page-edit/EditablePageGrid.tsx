@@ -3,7 +3,7 @@ import "./page-edit.css";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { flip } from "@/lib/motion/flow";
-import { pageBoxStyle } from "@/components/tool-flow/PageTile";
+import { pageBoxStyle, pageTransform } from "@/components/tool-flow/page-box";
 import { PageThumb } from "@/components/tool-flow/Thumbnail";
 import { Button } from "@/components/ui/Button";
 import { cx } from "@/components/ui/cx";
@@ -307,7 +307,7 @@ export default function EditablePageGrid({
         aria-describedby="ip-pages-hint"
         data-settled={settled || undefined}
         className={cx(
-          "mp-rise-tiles grid grid-cols-2 gap-3 px-2 sm:grid-cols-[repeat(auto-fill,calc(var(--ip-thumb-size)+32px))] sm:gap-5",
+          "mp-rise-tiles ip-tile-grid px-2",
           dimmed && "opacity-60 transition-opacity duration-(--dur-base)",
         )}
         data-testid="page-grid"
@@ -331,14 +331,14 @@ export default function EditablePageGrid({
             { id: "enlarge", label: labels.enlarge, disabled: t.blank, onSelect: () => onAction(t.uid, "enlarge", null) },
           ];
           return (
-            // BerryPDF PagePreview tray: the page on a pink tray, its label below in Fredoka; a selected page gets the berry ring and a leaf tick.
-            <div key={t.uid} role="listitem" className="group/tile mp-tray relative flex min-w-0 flex-col items-center gap-2 max-sm:p-2" data-selected={t.selected || undefined} data-uid={t.uid} data-flip>
+            // Page tile (berrypdf.md "Page tiles"): the page fills the tile, its label below in Fredoka; a selected page gets the berry outline and a leaf tick.
+            <div key={t.uid} role="listitem" className="group/tile ip-tile relative flex min-w-0 flex-col items-center gap-1.5" data-selected={t.selected || undefined} data-uid={t.uid} data-flip>
               {i === 0 && insertPoint(0, labels.insertStart, tab, "start")}
               <div
                 data-tile-box=""
                 onPointerDown={(e) => onPointerDown(e, t)}
                 className={cx(
-                  "ip-no-callout relative grid aspect-square w-(--ip-thumb-size) touch-pan-y place-items-center rounded-[10px] max-sm:w-full",
+                  "ip-no-callout ip-tile__box relative grid touch-pan-y place-items-center rounded-[10px]",
                   "transition-opacity duration-(--dur-base)",
                   dragging.has(t.uid) && "opacity-40 outline-2 outline-offset-2 outline-brand outline-dashed",
                 )}
@@ -348,7 +348,7 @@ export default function EditablePageGrid({
               >
                 <span
                   className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
-                  style={{ ...pageBoxStyle(t.size), transform: `rotate(${t.rotation}deg)` }}
+                  style={{ ...pageBoxStyle(t.size), transform: pageTransform(t.size, t.rotation) }}
                 >
                   {t.blank ? (
                     <span className="absolute inset-2 flex flex-col items-center justify-center gap-1 rounded-sm border-[1.5px] border-dashed border-brand-tint-border text-help text-on-paper-muted">
@@ -378,7 +378,7 @@ export default function EditablePageGrid({
                     onSelect(t.uid, { toggle: e.ctrlKey || e.metaKey, range: e.shiftKey });
                   }}
                   onKeyDown={(e) => onKeyDown(e, i)}
-                  className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-3"
+                  className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-1"
                   data-testid="tile-main"
                 />
                 {badge && (
@@ -447,7 +447,7 @@ export default function EditablePageGrid({
                   </div>
                 )}
               </div>
-              <span className="mp-tray__n h-5 tabular-nums" aria-hidden="true" data-testid="tile-label">
+              <span className="ip-tile__n h-5 tabular-nums" aria-hidden="true" data-testid="tile-label">
                 {t.label}
               </span>
               {insertPoint(i + 1, labels.insertAfter(t.label), tab, "end")}

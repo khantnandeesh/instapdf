@@ -109,7 +109,7 @@ export function PageGrid({
               role="list"
               aria-label={showHeaders ? `Pages of ${file.name}` : "Pages"}
               className={cx(
-                "grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,calc(var(--ip-thumb-size)+40px))] sm:gap-5",
+                "ip-tile-grid",
                 dimmed && "opacity-60 transition-opacity duration-(--dur-base)",
               )}
             >

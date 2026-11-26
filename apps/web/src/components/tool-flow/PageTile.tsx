@@ -4,14 +4,10 @@ import { describeDelta, formatDelta } from "@/lib/pdf/rotation";
 import type { PageSize } from "@/lib/pdf/pdfjs";
 import { cx } from "../ui/cx";
 import { CheckIcon } from "../ui/icons";
+import { pageBoxStyle, pageTransform } from "./page-box";
 import { PageThumb } from "./Thumbnail";
 
-/** Page box inside a square: contained so its longest side equals the box. */
-export function pageBoxStyle(size: PageSize): { width: string; height: string } {
-  const landscape = size.width >= size.height;
-  const ratio = landscape ? size.height / size.width : size.width / size.height;
-  return landscape ? { width: "100%", height: `${ratio * 100}%` } : { width: `${ratio * 100}%`, height: "100%" };
-}
+export { pageBoxStyle, pageTransform, TILE_ASPECT } from "./page-box";
 
 export function PageTile({
   fileId,
@@ -42,24 +38,24 @@ export function PageTile({
 }) {
   const badge = formatDelta(pendingDelta);
   const label = `Page ${index + 1} of ${pageCount}, ${describeDelta(pendingDelta)}`;
-  // BerryPDF PagePreview: each white page sits in a pink tray (14px radius) with its page number
-  // below in Fredoka; a page in the selected scope gets the 2.5px berry ring (and a leaf tick).
+  // Page tile (berrypdf.md "Page tiles"): the page fills the tile, its number below in Fredoka; a page
+  // in the selected scope gets the 2.5px berry outline (and a leaf tick).
   return (
     <div
       role="listitem"
-      className="group/tile mp-tray flex min-w-0 flex-col items-center gap-2 max-sm:p-3"
+      className="group/tile ip-tile flex min-w-0 flex-col items-center gap-1.5"
       data-selected={inScope ? "" : undefined}
       data-page-index={index}
       data-file-id={fileId}
     >
       <div
-        className="relative grid aspect-square w-(--ip-thumb-size) place-items-center max-sm:w-full"
+        className="ip-tile__box relative grid place-items-center"
         data-testid="page-tile"
         data-rotation={pendingDelta}
       >
         <span
           className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
-          style={{ ...pageBoxStyle(size), transform: `rotate(${pendingDelta}deg)` }}
+          style={{ ...pageBoxStyle(size), transform: pageTransform(size, pendingDelta) }}
           data-testid="page-visual"
         >
           <PageThumb fileId={fileId} index={index} />
@@ -73,7 +69,7 @@ export function PageTile({
           onFocus={onFocus}
           onClick={onOpen}
           onKeyDown={onKeyDown}
-          className="absolute inset-0 rounded-sm focus-visible:outline-offset-3"
+          className="absolute inset-0 rounded-sm focus-visible:outline-offset-1"
         />
         {badge && (
           <span className="pointer-events-none absolute top-1.5 left-1.5 z-[1] rounded-pill bg-surface-raised px-2 py-0.5 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">
@@ -96,8 +92,8 @@ export function PageTile({
           </div>
         )}
       </div>
-      {/* Page number in Fredoka 600, muted (4.85:1 on the tray). */}
-      <span className="mp-tray__n h-5 tabular-nums" aria-hidden="true">
+      {/* Page number in Fredoka 600, muted (5.19:1 on the cream work area). */}
+      <span className="ip-tile__n h-5 tabular-nums" aria-hidden="true">
         {index + 1}
       </span>
     </div>

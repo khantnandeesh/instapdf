@@ -3,7 +3,7 @@ import "./page-edit.css";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { flip } from "@/lib/motion/flow";
-import { pageBoxStyle } from "@/components/tool-flow/PageTile";
+import { pageBoxStyle, pageTransform } from "@/components/tool-flow/page-box";
 import { PageThumb } from "@/components/tool-flow/Thumbnail";
 import { cx } from "@/components/ui/cx";
 import { IconButton } from "@/components/ui/IconButton";
@@ -199,7 +199,7 @@ export function SegmentGrid({
         aria-describedby="ip-files-hint"
         data-settled={settled || undefined}
         className={cx(
-          "mp-rise-tiles grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,calc(var(--ip-thumb-size)+32px))] sm:gap-5",
+          "mp-rise-tiles ip-tile-grid",
           dimmed && "opacity-60 transition-opacity duration-(--dur-base)",
         )}
         data-testid="segment-grid"
@@ -208,14 +208,14 @@ export function SegmentGrid({
           const isActive = i === active;
           const tab = isActive ? 0 : -1;
           const badge = formatDelta(card.rotation);
-          // BerryPDF PagePreview tray: the file's first page on a pink tray, its name in Fredoka below.
+          // Page tile (berrypdf.md "Page tiles"): the file's first page fills the tile, its name in Fredoka below.
           return (
-            <div key={card.key} role="listitem" className="group/card mp-tray flex min-w-0 flex-col gap-1 max-sm:p-2" data-card-key={card.key} data-testid="file-card" data-flip>
+            <div key={card.key} role="listitem" className="group/card ip-tile flex min-w-0 flex-col gap-1" data-card-key={card.key} data-testid="file-card" data-flip>
               <div
                 data-card-box=""
                 onPointerDown={(e) => onPointerDown(e, card)}
                 className={cx(
-                  "ip-no-callout relative grid aspect-square w-(--ip-thumb-size) touch-pan-y place-items-center rounded-[10px] max-sm:w-full",
+                  "ip-no-callout ip-tile__box relative grid touch-pan-y place-items-center rounded-[10px]",
                   "transition-opacity duration-(--dur-base)",
                   dragKey === card.key && "opacity-40 outline-2 outline-offset-2 outline-brand outline-dashed",
                 )}
@@ -223,7 +223,7 @@ export function SegmentGrid({
                 {card.status === "ready" && card.fileId && card.thumbSize ? (
                   <span
                     className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
-                    style={{ ...pageBoxStyle(card.thumbSize), transform: `rotate(${card.rotation}deg)` }}
+                    style={{ ...pageBoxStyle(card.thumbSize), transform: pageTransform(card.thumbSize, card.rotation) }}
                   >
                     <PageThumb fileId={card.fileId} index={card.thumbIndex} />
                   </span>
@@ -242,7 +242,7 @@ export function SegmentGrid({
                   onFocus={() => setActiveKey(card.key)}
                   onClick={() => onPreview(card.key)}
                   onKeyDown={(e) => onKeyDown(e, i)}
-                  className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-3"
+                  className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-1"
                   data-testid="card-main"
                 />
                 <span aria-hidden="true" className="pointer-events-none absolute -top-1.5 -left-1.5 z-[1] flex gap-1">
