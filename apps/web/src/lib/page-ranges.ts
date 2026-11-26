@@ -21,15 +21,19 @@
 /** A range end: a page number, or the file's last page. */
 export type Bound = number | "last";
 
+/**
+ * One parsed item. `text` is its tidy form ("5-3", "10-last"); `typed` is the
+ * user's own text for it, spaces and dash style kept ("5 – 3"), for errors.
+ */
 export type RangeItem =
-  | { kind: "span"; from: number; to: Bound; text: string }
-  | { kind: "last"; text: string }
-  | { kind: "odd" | "even"; text: string };
+  | { kind: "span"; from: number; to: Bound; text: string; typed?: string }
+  | { kind: "last"; text: string; typed?: string }
+  | { kind: "odd" | "even"; text: string; typed?: string };
 
 export type RangeErrorReason = "not-a-number" | "page-zero" | "past-end" | "start-after-end";
 
 export type RangeError = {
-  /** The item as typed (trimmed), e.g. "5-3". */
+  /** The item as the user typed it (trimmed), e.g. "5 – 3". */
   item: string;
   reason: RangeErrorReason;
   /** One sentence for the inline error, naming the item. */
@@ -50,13 +54,41 @@ function fail(item: string, reason: RangeErrorReason, last?: number): { ok: fals
   return { ok: false, error: { item, reason, message: messages[reason] } };
 }
 
-/** Splits the text into items, joining spaces around dashes first ("1 - 3" is one item). */
-function tokens(text: string): string[] {
-  return text
-    .replace(DASHES, "-")
-    .replace(/\s*-\s*/g, "-")
-    .split(/[\s,;]+/)
-    .filter(Boolean);
+type Token = { norm: string; typed: string };
+
+/**
+ * Splits the text into items, joining spaces around dashes first ("1 - 3" is
+ * one item). Each token keeps the slice of the original text it came from.
+ */
+function tokens(text: string): Token[] {
+  // Normalise char by char, remembering where each kept char came from.
+  const dashed = text.replace(DASHES, "-");
+  const chars: string[] = [];
+  const from: number[] = [];
+  for (let i = 0; i < dashed.length; i++) {
+    const c = dashed[i];
+    if (/\s/.test(c)) {
+      // Drop whitespace touching a dash: before one (look ahead) or after one.
+      let j = i;
+      while (j < dashed.length && /\s/.test(dashed[j])) j++;
+      if (dashed[j] !== "-" && chars[chars.length - 1] !== "-") {
+        chars.push(" ");
+        from.push(i);
+      }
+      i = j - 1;
+      continue;
+    }
+    chars.push(c);
+    from.push(i);
+  }
+  const out: Token[] = [];
+  const norm = chars.join("");
+  for (const m of norm.matchAll(/[^\s,;]+/g)) {
+    const start = m.index;
+    const end = start + m[0].length;
+    out.push({ norm: m[0], typed: text.slice(from[start], from[end - 1] + 1) });
+  }
+  return out;
 }
 
 const NUMBER = /^\d+$/;
@@ -70,20 +102,20 @@ function parseNumber(s: string): number | null {
 /** Checks the syntax only (no page counts): `abc`, `0`, `5-3`, `2-x` and `lst` fail here. */
 export function parsePageRanges(text: string): ParseResult {
   const items: RangeItem[] = [];
-  for (const raw of tokens(text)) {
-    const t = raw.toLowerCase();
+  for (const { norm, typed: raw } of tokens(text)) {
+    const t = norm.toLowerCase();
     if (t === "odd" || t === "even") {
-      items.push({ kind: t, text: t });
+      items.push({ kind: t, text: t, typed: raw });
       continue;
     }
     if (t === "last") {
-      items.push({ kind: "last", text: t });
+      items.push({ kind: "last", text: t, typed: raw });
       continue;
     }
     const n = parseNumber(t);
     if (n !== null) {
       if (n === 0) return fail(raw, "page-zero");
-      items.push({ kind: "span", from: n, to: n, text: String(n) });
+      items.push({ kind: "span", from: n, to: n, text: String(n), typed: raw });
       continue;
     }
     const dash = t.indexOf("-");
@@ -104,7 +136,7 @@ export function parsePageRanges(text: string): ParseResult {
     if (typeof to === "number" && from > to) return fail(raw, "start-after-end");
     // Keep what was typed for open ranges ("10-", "10-last"); closed ones are written plainly.
     const shown = to === "last" ? (right ? `${from}-last` : `${from}-`) : `${from}-${to}`;
-    items.push({ kind: "span", from, to, text: shown });
+    items.push({ kind: "span", from, to, text: shown, typed: raw });
   }
   return { ok: true, items };
 }
@@ -121,7 +153,7 @@ export function validatePageRanges(text: string, pageCounts: readonly number[]):
   if (!longest) return parsed;
   for (const item of parsed.items) {
     if (item.kind !== "span") continue;
-    if (item.from > longest || (typeof item.to === "number" && item.to > longest)) return fail(item.text, "past-end", longest);
+    if (item.from > longest || (typeof item.to === "number" && item.to > longest)) return fail(item.typed ?? item.text, "past-end", longest);
   }
   return parsed;
 }
@@ -173,12 +205,15 @@ export function formatPages(indexes: readonly number[]): string {
  * it is the canonical list of the pages selected. With two or more files the
  * closed numbers are canonicalised, and open ranges and keywords stay as
  * typed (each file reads them against its own length, AC-402, AC-543).
- * Text that does not parse is returned unchanged.
+ * Text that does not validate against the page counts is returned unchanged,
+ * so the field keeps what the user typed next to its error (AC-403), and so
+ * does text that selects nothing in a single file (`even` on one page): the
+ * field is never blanked.
  */
 export function canonicalPageSet(text: string, pageCounts: readonly number[]): string {
-  const parsed = parsePageRanges(text);
+  const parsed = validatePageRanges(text, pageCounts);
   if (!parsed.ok) return text;
-  if (pageCounts.length <= 1) return formatPages(selectedPages(parsed.items, pageCounts[0] ?? 0));
+  if (pageCounts.length <= 1) return formatPages(selectedPages(parsed.items, pageCounts[0] ?? 0)) || text;
   const closed: [number, number][] = [];
   const symbolic: string[] = [];
   for (const item of parsed.items) {
@@ -201,10 +236,11 @@ export function canonicalPageSet(text: string, pageCounts: readonly number[]): s
  * The field's text after blur for Split's Custom mode, where each item is one
  * part, in the typed order. Items are written plainly; with one file, open
  * ranges and `last` are closed against its length (`10-` -> `10-12`).
- * `odd` and `even` stay keywords (each is one part).
+ * `odd` and `even` stay keywords (each is one part). Text that does not
+ * validate is returned unchanged.
  */
 export function canonicalPartList(text: string, pageCounts: readonly number[]): string {
-  const parsed = parsePageRanges(text);
+  const parsed = validatePageRanges(text, pageCounts);
   if (!parsed.ok) return text;
   const single = pageCounts.length === 1 ? pageCounts[0] : undefined;
   return parsed.items
