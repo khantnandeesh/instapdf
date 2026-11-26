@@ -41,7 +41,7 @@ test("AC-120: no sources trigger or provider name on /merge-pdf, in any menu", a
 });
 
 test("AC-120: the HTML and the first-load scripts carry no cloud code", async ({ request }) => {
-  for (const path of ["/rotate-pdf", "/merge-pdf"]) {
+  for (const path of ["/rotate-pdf", "/merge-pdf", "/edit-pdf"]) {
     const html = await (await request.get(path)).text();
     expect(html, path).not.toMatch(/cloud-row|cloud-caret|data-cloud-last|berrypdf:cloud/);
     expect(html, path).not.toMatch(PROVIDERS);
@@ -50,4 +50,13 @@ test("AC-120: the HTML and the first-load scripts carry no cloud code", async ({
       expect(js, `${path} ${src}`).not.toMatch(/berrypdf:cloud|\/cloud\/mock|BroadcastChannel\("cloud:/);
     }
   }
+});
+
+test("AC-120, E6: the editor's landing has no sources trigger, row or provider name", async ({ page }) => {
+  await page.goto("/edit-pdf");
+  await expect(page.getByTestId("editor")).toHaveAttribute("data-hydrated", "true");
+  await expect(page.getByRole("button", { name: "Open PDF", exact: true })).toBeVisible();
+  for (const id of ["cloud-caret", "cloud-row"]) await expect(page.getByTestId(id), id).toHaveCount(0);
+  expect(await page.locator("body").innerText()).not.toMatch(PROVIDERS);
+  await expect(page.locator("[aria-haspopup=menu]").filter({ hasText: PROVIDERS })).toHaveCount(0);
 });

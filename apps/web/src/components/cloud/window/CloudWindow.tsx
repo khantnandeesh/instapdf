@@ -32,6 +32,8 @@ type View =
   | { k: "done" }
   | { k: "denied" }
   | { k: "unreachable" }
+  /** The provider couldn't open here (its sign-in failed, or its picker stayed silent): Try again, or Choose from this device. */
+  | { k: "signin" }
   | { k: "lost" }
   | { k: "invalid" }
   | { k: "saving"; name: string; pct: number }
@@ -69,6 +71,8 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
   const [live, setLive] = useState("");
   /** The tool tab stopped answering while this window is busy: a banner, cleared when it answers again. */
   const [toolLost, setToolLost] = useState(false);
+  /** The pick in progress: a pick started again (Try again) makes the older one's answer void. */
+  const pickGen = useRef(0);
   const viewRef = useRef<View>(view);
   viewRef.current = view;
   /** Files the tool tab stopped: never downloaded, or dropped if one is under way (AC-136). */
@@ -215,6 +219,8 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
     const code = e instanceof CloudError ? e.code : "unreachable";
     // A sign-in that was to leave the page failed instead: the heartbeat resumes, so the tool hears this.
     link.current?.back();
+    // A failed sign-in is put right here (Try again, Choose from this device): the tool keeps waiting.
+    if (code === "signin") return setView({ k: "signin" });
     link.current?.send({ t: "error", code });
     setView({ k: code === "denied" ? "denied" : "unreachable" });
   }, []);
@@ -233,12 +239,14 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
       void doSave(a, saveFile.current, prm);
       return;
     }
+    const gen = ++pickGen.current;
     a.pick().then(
       (r) => {
+        if (gen !== pickGen.current) return;
         if (r === "cancel") cancelAndClose();
         else void handlePicked(r, prm);
       },
-      (e) => fail(e),
+      (e) => gen === pickGen.current && fail(e),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cancelAndClose, fail, handlePicked, params]);
@@ -344,12 +352,18 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
           setView({ k: "frame", spec, title });
         }),
       leaving: () => l.away(SIGN_IN_AWAY_MS),
+      // The picker stayed silent after its load (Google's blocked picker): its frame goes, our state shows.
+      trouble: () => {
+        if (viewRef.current.k !== "frame" && viewRef.current.k !== "mock") return;
+        frameEl.current = null;
+        setView({ k: "signin" });
+      },
       mockPick: () =>
-        new Promise<Picked[] | "cancel">((resolve, reject) => {
+        new Promise<Picked[] | "cancel" | "quiet">((resolve, reject) => {
           mockResolve.current = (r) => {
             mockResolve.current = null;
             if (r === "cancel") resolve("cancel");
-            else if (r === "denied" || r === "unreachable") reject(new CloudError(r));
+            else if (r === "denied" || r === "unreachable" || r === "signin") reject(new CloudError(r));
             else resolve(r);
           };
           setView({ k: "mock" });
@@ -389,7 +403,7 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
   // Focus: the berry button on arrival (an Enter press is the gesture the SDK needs), the h1 when done.
   useEffect(() => {
     if (view.k === "before" && ready) primary.current?.focus();
-    else if (view.k === "done" || view.k === "saved" || view.k === "lost" || view.k === "denied" || view.k === "unreachable") heading.current?.focus();
+    else if (view.k === "done" || view.k === "saved" || view.k === "lost" || view.k === "denied" || view.k === "unreachable" || view.k === "signin") heading.current?.focus();
   }, [view.k, ready]);
 
   // A form-POSTed picker (OneDrive v8) is submitted once its iframe exists.
@@ -426,6 +440,15 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
     </h1>
   );
 
+  /** "Choose from this device": the tool offers its own picker; this window closes. */
+  const chooseDevice = () => {
+    for (const a of aborts.current.values()) a.abort();
+    link.current?.device();
+    finished.current = true;
+    window.close();
+    setTimeout(() => setCanClose(true), 300);
+  };
+
   let body: ReactNode;
   switch (view.k) {
     case "invalid":
@@ -447,7 +470,7 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
           {mark}
           {h1(name)}
           {params?.mode === "save" && saveFile.current && <p className="ip-cw__text">{saveFile.current.name}</p>}
-          <Button ref={primary} variant="primary" size="lg" className="ip-cw__btn" busy={!ready} disabled={!params} onClick={start} data-testid="cloud-open">
+          <Button ref={primary} variant="primary" size="lg" className="ip-cw__btn" busy={!ready} disabled={!params} onClick={() => start()} data-testid="cloud-open">
             {provider ? windowCopy.open(provider) : ""}
           </Button>
           {privacy}
@@ -553,6 +576,37 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
           </span>
           {provider && h1(windowCopy.savedTitle(provider))}
           <p className="ip-cw__text">{canClose ? windowCopy.canClose : windowCopy.closesItself}</p>
+        </>
+      );
+      break;
+    case "signin":
+      body = (
+        <>
+          {mark}
+          {provider && h1(windowCopy.blockedTitle(provider))}
+          {canClose ? (
+            <p className="ip-cw__text">{windowCopy.canClose}</p>
+          ) : (
+            <>
+              <p className="ip-cw__text">
+                {provider === "google" ? windowCopy.blockedGoogle : windowCopy.blockedOther}
+                {provider === "google" && (
+                  <>
+                    {" "}
+                    <a href={windowCopy.blockedHelpUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-link underline underline-offset-2">
+                      {windowCopy.blockedHelp}
+                    </a>
+                  </>
+                )}
+              </p>
+              <Button variant="primary" size="lg" className="ip-cw__btn" onClick={() => start()} data-testid="cloud-signin-retry">
+                {transferCopy.tryAgain}
+              </Button>
+              <Button variant="line" onClick={chooseDevice} data-testid="cloud-choose-device">
+                {windowCopy.chooseDevice}
+              </Button>
+            </>
+          )}
         </>
       );
       break;

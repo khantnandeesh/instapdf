@@ -34,6 +34,8 @@ type SessionState = {
   stopped: Set<string>;
   /** At most this many distinct files per request (1 for a single-file tool). */
   cap: number;
+  /** The window closed for "Choose from this device": focus goes to the tool's picker, wherever it was. */
+  device?: boolean;
 };
 
 export type Begin = {
@@ -131,7 +133,7 @@ export function createIntake(host: CloudHub) {
       // Back to where it was: focus the control that opened the window once this tab is in front.
       const back = () => {
         const t = s.trigger;
-        if (t?.isConnected && (document.activeElement === document.body || !document.activeElement)) t.focus();
+        if (t?.isConnected && (s.device || document.activeElement === document.body || !document.activeElement)) t.focus();
       };
       if (document.hasFocus()) back();
       else window.addEventListener("focus", back, { once: true });
@@ -265,6 +267,12 @@ export function createIntake(host: CloudHub) {
           showError(provider, code, again);
         },
         onDone: () => endSession(req, "done"),
+        // "Choose from this device" in a window that couldn't open: focus goes to the tool's own picker (when this tab is in front).
+        onDevice: () => {
+          const s = box.s;
+          const picker = d().devicePicker?.();
+          if (s && picker) Object.assign(s, { trigger: picker, device: true });
+        },
         onClosed: (reason) => endSession(req, reason),
         onGaveUp: () => {
           const s = box.s;

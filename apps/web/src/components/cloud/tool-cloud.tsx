@@ -17,7 +17,7 @@ import "./cloud.css";
 import { useEffect, useState } from "react";
 import { buildNames, buildProviders, providerName, type CloudProvider } from "@/lib/cloud/names";
 import { popupFeatures } from "@/lib/cloud/popup";
-import type { FlowTool } from "@/tools/registry";
+import type { CloudFlow } from "./editor-flow";
 import type { FlowNoticeInput } from "../tool-flow/types";
 import { cx } from "../ui/cx";
 import { ChevronDownIcon } from "../ui/icons";
@@ -40,7 +40,8 @@ export type CloudDownload = {
 
 /** What the intake needs from the tool page: ToolFlow sets it on every render. */
 export type CloudDeps = {
-  tool: FlowTool;
+  /** The tool page's flow config (the editor's landing passes its own subset, editor-flow.ts). */
+  tool: { flow: CloudFlow };
   announce: (m: string) => void;
   intake: (files: File[], trigger: HTMLElement | null, opts: { tag?: unknown; replace?: boolean }) => Promise<void>;
   pushNotice: (n: Omit<FlowNoticeInput, "id">) => string;
@@ -51,6 +52,12 @@ export type CloudDeps = {
   errorType?: (name: string) => string;
   /** The page's files (the result's privacy line names a cloud any came from, AC-131). */
   files: readonly { source: Blob }[];
+  /**
+   * The tool's own "from this device" button: focused when the person chose "Choose from this device"
+   * in a provider window that couldn't open. It can't be opened for them: the click was in the other
+   * window, and a file chooser needs a click in this tab.
+   */
+  devicePicker?: () => HTMLElement | null;
 };
 
 /** What the tool page shows of the cloud intake (set by the engine). */
@@ -229,12 +236,22 @@ export function CloudCaret({ hub, look, className, disabled }: { hub: CloudHub; 
 /**
  * One-tap provider buttons under the upload button (spec U-2 E1, AC-165), in the fixed order and at
  * their final 44 px height; the pre-paint script's html[data-cloud-last] moves the last used provider
- * first and shows its name with "(last used)" (cloud.css), so nothing shifts after hydration. The
- * chip's `title` (a tooltip, no layout) is set after mount.
+ * first and shows its name (cloud.css), so nothing shifts after hydration. The chip's `title` and
+ * its sr-only "(last used)" (a tooltip and a clipped span, no layout) are added after mount, only on
+ * the provider that really was used last.
  */
 export function CloudRow({ hub }: { hub: CloudHub }) {
+  // The provider really used last (html[data-cloud-last], set before paint and after each pick): only
+  // its button carries "(last used)", in the DOM as well as in its name, never the others (fresh profile: none).
   const [last, setLast] = useState<string>();
-  useEffect(() => setLast(document.documentElement.dataset.cloudLast), []);
+  useEffect(() => {
+    const html = document.documentElement;
+    const read = () => setLast(html.dataset.cloudLast);
+    read();
+    const watch = new MutationObserver(read);
+    watch.observe(html, { attributes: true, attributeFilter: ["data-cloud-last"] });
+    return () => watch.disconnect();
+  }, []);
   if (!providers.length) return null;
   const load = () => warm(hub);
   return (
@@ -255,7 +272,7 @@ export function CloudRow({ hub }: { hub: CloudHub }) {
             <span className="sr-only">Choose from </span>
             {providerName[p]}
           </span>
-          <span className="ip-cloud-last">{cloudCopy.lastUsed}</span>
+          {last === p && <span className="ip-cloud-last">{cloudCopy.lastUsed}</span>}
         </button>
       ))}
     </div>

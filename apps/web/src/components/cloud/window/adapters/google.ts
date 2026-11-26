@@ -6,10 +6,20 @@
  * Save: multipart upload into a "BerryPDF" folder the app creates (drive.file sees only that).
  * [U] untested with real credentials; the toUri() callback format is not documented in detail, so
  * the message parser below accepts the documented response shape wherever it appears.
+ *
+ * Failures the window shows itself (never Google's dead end), with Try again and Choose from this device:
+ * - detected: an error from Google's token client (GIS), and a token Drive refuses (one
+ *   files.list call, under the window's existing connect-src, before the picker opens);
+ * - not detectable: what the picker's own iframe shows (docs.google.com is another origin, so its
+ *   "You must sign in to access this content" page can't be read). When Google blocks it (cookies
+ *   for google.com blocked, another Google account active), the picker posts nothing at all from
+ *   https://docs.google.com: pickerWatchdog notices that silence after its load and the window
+ *   shows its "couldn't open Drive" state.
  */
 import type { Adapter, AdapterCtx, Picked } from "./types";
 import { exportName, exportUrl, isNative, nativeMimes } from "./native";
 import { CloudError, loadScript, xhrUpload } from "./types";
+import { PICKER_QUIET_MS, pickerWatchdog } from "./watchdog";
 
 type TokenResponse = { access_token?: string; error?: string };
 type Gis = {
@@ -44,6 +54,43 @@ const MIME: Record<string, string> = {
 };
 
 type PickerDoc = { id: string; name: string; sizeBytes?: number | string; mimeType?: string };
+
+export type SignInOutcome = "ok" | "signin" | "denied" | "unreachable" | "cancel";
+
+/**
+ * What a GIS token response's `error` (OAuth 2.0 and OpenID codes) means for the window: the person
+ * refused access, or the sign-in itself didn't work (try again or with another account).
+ */
+export function classifyTokenError(error: string | undefined): SignInOutcome {
+  if (!error) return "ok";
+  if (error === "access_denied") return "denied";
+  // interaction_required, login_required, consent_required, account_selection_required, invalid_request…
+  return "signin";
+}
+
+/** GIS error_callback types: closing Google's window is a cancel; a window that couldn't open is unreachable. */
+export function classifyPopupError(type: string | undefined): SignInOutcome {
+  if (type === "popup_closed") return "cancel";
+  if (type === "popup_failed_to_open") return "unreachable";
+  return "signin";
+}
+
+/**
+ * Drive's answer to the token check (files.list, one result). 401: the token isn't valid for Drive (a
+ * sign-in problem). 403 with too narrow a scope: the person unticked Drive access (denied). Any other
+ * failure says nothing about the sign-in: the picker goes ahead (null), as it would without the check.
+ */
+export function classifyDriveCheck(status: number, body: unknown): SignInOutcome | null {
+  if (status >= 200 && status < 300) return "ok";
+  if (status === 401) return "signin";
+  if (status === 403) {
+    const text = JSON.stringify(body ?? "");
+    if (/insufficientPermissions|ACCESS_TOKEN_SCOPE_INSUFFICIENT|insufficient authentication scopes/i.test(text)) return "denied";
+  }
+  return null;
+}
+
+
 
 /** Finds the Picker's response ({ action, docs }) in a message from docs.google.com. */
 export function findPickerResponse(data: unknown, depth = 0): { action: string; docs: PickerDoc[] } | null {
@@ -86,6 +133,21 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
       client.requestAccessToken({ prompt: "" }); // synchronously inside the tap
     });
 
+  /** Drive accepts the token (or the check can't tell): see classifyDriveCheck. */
+  const checkToken = async (t: string) => {
+    let res: Response;
+    try {
+      res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id)", { headers: { Authorization: `Bearer ${t}` } });
+    } catch {
+      return; // offline or blocked: the picker and the downloads will say so themselves
+    }
+    const outcome = classifyDriveCheck(res.status, res.ok ? null : await res.json().catch(() => null));
+    if (outcome === "signin" || outcome === "denied") {
+      token = null; // never reused: Try again asks Google again
+      throw new CloudError(outcome);
+    }
+  };
+
   return {
     needsTap: true,
     prepare: async () => {
@@ -99,7 +161,8 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
         callback: (r) => {
           const p = pending;
           pending = null;
-          if (r.error || !r.access_token) p?.reject(new CloudError("denied"));
+          const outcome = classifyTokenError(r.error);
+          if (outcome !== "ok" || !r.access_token) p?.reject(new CloudError(outcome === "denied" ? "denied" : "signin"));
           else {
             token = r.access_token;
             p?.resolve(token);
@@ -109,7 +172,8 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
         error_callback: (e) => {
           const p = pending;
           pending = null;
-          p?.reject(e?.type === "popup_closed" ? "cancel" : new CloudError(e?.type === "popup_failed_to_open" ? "unreachable" : "denied"));
+          const outcome = classifyPopupError(e?.type);
+          p?.reject(outcome === "cancel" ? "cancel" : new CloudError(outcome === "unreachable" ? "unreachable" : "signin"));
         },
       });
     },
@@ -121,6 +185,7 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
         if (e === "cancel") return "cancel";
         throw e;
       }
+      await checkToken(t);
       const gp = g()!.picker;
       // Google Docs, Sheets and Slides too where the tool takes PDFs: Drive exports them (AC-141).
       const mimes = [...ctx.params.accept.map((e) => MIME[e]).filter(Boolean), ...nativeMimes(ctx.params.accept)].join(",");
@@ -139,12 +204,23 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
       const url = b.toUri();
       ctx.setPhase("picking");
       const frame = await ctx.frame({ url }, "Google Drive");
+      // Google's "You must sign in" page inside the picker can't be read: a picker silent after its load is the failure state.
+      let stopWatch = () => {};
+      frame?.addEventListener(
+        "load",
+        () => {
+          stopWatch();
+          stopWatch = pickerWatchdog({ target: window, frame, origin: "https://docs.google.com", ms: PICKER_QUIET_MS, onQuiet: () => ctx.trouble?.() });
+        },
+        { once: true },
+      );
       return new Promise<Picked[] | "cancel">((resolve) => {
         const onMessage = (e: MessageEvent) => {
           if (e.origin !== "https://docs.google.com" || (frame && e.source !== frame.contentWindow)) return;
           const r = findPickerResponse(e.data);
           if (!r) return;
           window.removeEventListener("message", onMessage);
+          stopWatch();
           void ctx.frame(null);
           if (r.action === "cancel") return resolve("cancel");
           resolve(

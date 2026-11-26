@@ -4,6 +4,7 @@
  * the fake token MOCK-TOKEN-F23 in memory only and never sends it anywhere, and records what it was
  * asked for in localStorage["berrypdf:cloud-mock-log"] (no tokens, no file bytes: names and hashes).
  */
+import { PICKER_QUIET_MS, pickerWatchdog } from "./watchdog";
 import type { Adapter, AdapterCtx } from "./types";
 
 export const MOCK_TOKEN = "MOCK-TOKEN-F23";
@@ -86,7 +87,10 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
       token = MOCK_TOKEN;
       ctx.setPhase("picking");
       const r = await ctx.mockPick!();
-      return r;
+      if (r !== "quiet") return r;
+      // A picker that posts nothing, as Google's does when it is blocked: the same check as the Google window.
+      pickerWatchdog({ target: window, frame: null, origin: "https://docs.google.com", ms: PICKER_QUIET_MS, onQuiet: () => ctx.trouble?.() });
+      return new Promise<never>(() => {});
     },
     save: async (file, onProgress) => {
       await signIn();

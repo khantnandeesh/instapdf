@@ -17,6 +17,8 @@ import { LimitsNote, PrivacyNote } from "@/components/tool-flow/notes";
 import { copy } from "@/components/tool-flow/copy";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+// F23 cloud sources on the landing (E6): the same caret, menu and row as every tool (builds without them get a no-op module).
+import { EditorCloudCaret, EditorCloudRow, EditorCloudStatus, useEditorCloud } from "@/components/cloud/editor-cloud";
 import { blankPdf, defaultPaper } from "@/lib/editor/blank";
 import { earlyFetchAllowed } from "@/lib/editor/engine-load";
 import { openPdf, prefetchPdfjs, type OpenedPdf } from "@/lib/pdf/pdfjs";
@@ -24,11 +26,12 @@ import { warmPdfjs } from "@/lib/pdf/pdfjs-warm";
 import { FilePlusBold, FileUpBold } from "./icons";
 import { prefetchEditorChunks } from "./idle-prefetch";
 import type { ShellProps } from "./EditorShell";
+import { EDITOR_MAX_BYTES } from "./limits";
 
 // Only a locked PDF needs it: its own chunk, fetched after hydration, out of the first load.
 const PasswordDialog = dynamic(() => import("@/components/tool-flow/PasswordDialog").then((m) => m.PasswordDialog), { ssr: false });
 
-export const MAX_BYTES = 200 * 1024 * 1024;
+export const MAX_BYTES = EDITOR_MAX_BYTES;
 
 type Opened = { name: string; bytes: Uint8Array; pdf: OpenedPdf; password?: string; key: number };
 
@@ -107,6 +110,10 @@ export function EditorTool() {
     [finish, say],
   );
 
+  // A PDF picked from a cloud goes through the same open path as a local pick.
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- the flag is a build-time constant: the same call on every render
+  const cloud = process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? useEditorCloud((f) => void openFile(f), () => picker.current?.element ?? null) : null;
+
   const openBlank = useCallback(async () => {
     setBusy(true);
     try {
@@ -168,6 +175,16 @@ export function EditorTool() {
     requestAnimationFrame(() => picker.current?.focus());
   }, []);
 
+  const status = (
+      <div role="status" aria-live="polite" className="mx-auto mt-2 flex min-h-6 max-w-[440px] justify-center">
+        {notice && !open && (
+          <p key={notice.key} className="ed-notice rounded-full bg-danger-soft px-3 py-1 text-sm text-danger-strong" data-testid="editor-notice">
+            {notice.text}
+          </p>
+        )}
+      </div>
+  );
+
   return (
     <div data-testid="editor" data-state={open ? "open" : busy ? "opening" : "empty"} data-hydrated={hydrated || undefined}>
       <DropOverlay active={dragging && !open} mode="add" />
@@ -179,7 +196,7 @@ export function EditorTool() {
         <Floaties set="empty" />
         <div className="mp-empty__in mp-dropcard relative w-full max-w-[440px] rounded-[16px_16px_28px_16px] border-[1.5px] border-sand bg-surface-raised px-6 pt-8 pb-7 shadow-card">
           <div className="flex flex-col items-center gap-3 text-center">
-            <span onPointerEnter={() => void prefetchShell()} onFocus={() => void prefetchShell()} className="inline-flex">
+            <span onPointerEnter={() => void prefetchShell()} onFocus={() => void prefetchShell()} className={process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? "inline-flex max-sm:w-full" : "inline-flex"}>
               <FilePicker
                 ref={picker}
                 accept=".pdf,application/pdf"
@@ -189,8 +206,10 @@ export function EditorTool() {
                 icon={<FileUpBold size={20} />}
                 onFiles={(files) => void openFile(files[0])}
                 inputTestId="editor-input"
+                sources={process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? <EditorCloudCaret cloud={cloud!} /> : undefined}
               />
             </span>
+            {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && <EditorCloudRow cloud={cloud!} />}
             <p className="text-sm text-muted">
               or drop it here <span aria-hidden="true">·</span> <kbd className="font-ui">Ctrl+V</kbd>
             </p>
@@ -202,13 +221,15 @@ export function EditorTool() {
           </div>
         </div>
       </div>
-      <div role="status" aria-live="polite" className="mx-auto mt-2 flex min-h-6 max-w-[440px] justify-center">
-        {notice && !open && (
-          <p key={notice.key} className="ed-notice rounded-full bg-danger-soft px-3 py-1 text-sm text-danger-strong" data-testid="editor-notice">
-            {notice.text}
-          </p>
-        )}
-      </div>
+      {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
+        // The cloud download's line sits over the same reserved slot (never moves the page), outside the live region.
+        <div className="relative">
+          {status}
+          {!open && <EditorCloudStatus cloud={cloud!} line={!notice} />}
+        </div>
+      ) : (
+        status
+      )}
       <PasswordDialog
         open={!!locked}
         fileId={locked?.name ?? ""}

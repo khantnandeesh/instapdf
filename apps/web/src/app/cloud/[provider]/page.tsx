@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { CloudWindow } from "@/components/cloud/window/CloudWindow";
 import { cloudRoutes, isProvider, isRoute, providerName } from "@/lib/cloud/providers";
 import { tools } from "@/tools/registry";
+import { EDITOR_TITLE } from "@/tools/editor/limits";
 
 /**
  * F23: the /cloud/<provider> window (spec D-3). Prerendered for the providers this build has
@@ -27,6 +28,7 @@ export default async function CloudPage({ params }: { params: Promise<{ provider
   const { provider } = await params;
   if (!isRoute(provider) || !cloudRoutes().includes(provider)) notFound();
   // The window shows "Added to <tool>" from its URL: only these titles are accepted (never free text).
-  const toolTitles = tools.flatMap((t) => (t.flow ? [t.flow.title] : []));
+  // The editor's landing (F23 E6) is not on the shared flow: its title is added by name.
+  const toolTitles = [...tools.flatMap((t) => (t.flow ? [t.flow.title] : [])), EDITOR_TITLE];
   return <CloudWindow route={provider} toolTitles={toolTitles} />;
 }

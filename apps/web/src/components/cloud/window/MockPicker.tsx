@@ -5,7 +5,7 @@ import { writeLog } from "./adapters/mock";
 import { exportName } from "./adapters/native";
 import type { Picked } from "./adapters/types";
 
-export type MockChoice = Picked[] | "cancel" | "denied" | "unreachable";
+export type MockChoice = Picked[] | "cancel" | "denied" | "unreachable" | "signin" | "quiet";
 
 /** Fixtures the mock can return (tests/fixtures, served by /cloud-mock/<name>). Sizes are reported by the server. */
 const FIXTURES = ["alpha.pdf", "bravo.pdf", "echo.pdf", "charlie.png", "notes.txt", "user-pw.pdf", "corrupt.pdf", "three-pages.pdf"];
@@ -36,7 +36,8 @@ function item(id: string, fixture: string, opts: { as?: string; slow?: boolean; 
 
 /**
  * The mock provider's own "picker" (CI only): pick fixtures, plus the states tests need
- * (spec §7: slow download, mid-download failure, a 403 file, a 101 MB file, denied, unreachable).
+ * (spec §7: slow download, mid-download failure, a 403 file, a 101 MB file, denied, unreachable; a
+ * failed sign-in, and a picker that stays silent like Google's own sign-in page inside it).
  */
 export function MockPicker({ multiple, onChoose }: { multiple: boolean; onChoose: (c: MockChoice) => void }) {
   const [sel, setSel] = useState<string[]>([]);
@@ -116,6 +117,12 @@ export function MockPicker({ multiple, onChoose }: { multiple: boolean; onChoose
         </Button>
         <Button variant="outline" onClick={() => onChoose("unreachable")}>
           Unreachable
+        </Button>
+        <Button variant="outline" onClick={() => onChoose("signin")}>
+          Sign-in error
+        </Button>
+        <Button variant="outline" onClick={() => onChoose("quiet")}>
+          Picker stuck
         </Button>
       </div>
     </div>

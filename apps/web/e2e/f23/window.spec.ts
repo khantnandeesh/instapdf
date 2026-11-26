@@ -68,3 +68,42 @@ test("AC-157: the tool page passes axe with the menu open, while downloading and
   await expect(page.getByRole("alert").filter({ hasText: "Couldn't reach OneDrive." })).toBeVisible();
   await expectNoSeriousAxeViolations(page, "provider error");
 });
+
+test("Google couldn't open Drive (the picker stays silent): our state with the help link, Try again, and Choose from this device", async ({ page }) => {
+  const win = await openWindow(page, () => rowButton(page, "Google Drive").click());
+  await reachPicker(win);
+  // The mock picker goes silent, as Google's does when it is blocked: no message from docs.google.com.
+  await win.getByRole("button", { name: "Picker stuck" }).click();
+  await expect(win.getByTestId("cloud-window")).toHaveAttribute("data-view", "mock");
+  await win.waitForTimeout(4000);
+  await expect(win.getByTestId("cloud-window"), "nothing before about 6 s").toHaveAttribute("data-view", "mock");
+  await expect(win.getByTestId("cloud-window")).toHaveAttribute("data-view", "signin", { timeout: 6000 });
+  await expect(win.getByRole("heading", { level: 1 })).toHaveText("Google couldn't open Drive here");
+  await expect(win.getByRole("heading", { level: 1 })).toBeFocused();
+  await expect(win.getByText("Cookies for google.com may be blocked in this browser, or another Google account is active.")).toBeVisible();
+  await expect(win.getByRole("link", { name: "How to fix it" })).toHaveAttribute("href", "https://support.google.com/drive/answer/13812413");
+  await expect(win.getByTestId("cloud-signin-retry")).toBeInViewport({ ratio: 1 });
+  await expect(win.getByTestId("cloud-choose-device")).toBeInViewport({ ratio: 1 });
+  await expectNoSeriousAxeViolations(win, "cloud window: Google couldn't open Drive");
+  // The tool tab still waits (no error from the window), with its own Cancel.
+  await expect(page.getByText("Waiting for Google Drive…")).toBeVisible();
+  // Try again opens the picker again, and a pick then goes through.
+  await win.getByTestId("cloud-signin-retry").click();
+  await reachPicker(win);
+  await mockPick(win, ["alpha.pdf"]);
+  await closed(win);
+  await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
+});
+
+test("a failed sign-in shows the same state; Choose from this device closes the window and puts focus on the tool's own picker", async ({ page }) => {
+  const win = await openWindow(page, () => rowButton(page, "Google Drive").click());
+  await reachPicker(win);
+  await win.getByRole("button", { name: "Sign-in error" }).click();
+  await expect(win.getByTestId("cloud-window")).toHaveAttribute("data-view", "signin");
+  await win.getByTestId("cloud-choose-device").click();
+  await closed(win);
+  await page.bringToFront();
+  await expect(page.getByText("Waiting for Google Drive…")).toBeHidden();
+  await expect(page.getByRole("button", { name: "Choose PDF files" })).toBeFocused();
+  await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "empty");
+});
