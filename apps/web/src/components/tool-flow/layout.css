@@ -415,6 +415,8 @@
     display: flex;
     flex-direction: column;
     width: 360px;
+    /* Capped to the screen under the row, footer included; only the body scrolls. */
+    max-height: calc(100dvh - var(--ip-header-h) - var(--ip-row-h) - 16px);
     border: 1.5px solid var(--border);
     border-radius: var(--radius-panel);
     background: var(--surface);
@@ -423,7 +425,8 @@
   }
   .ip-popover__body {
     /* ip-scroll: overlay (the popover's own body; never a second scroller in the page) */
-    max-height: calc(100dvh - var(--ip-header-h) - var(--ip-row-h) - 24px);
+    flex: 1 1 auto;
+    min-height: 0;
     padding: 20px;
     overflow-y: auto;
     overscroll-behavior: contain;
