@@ -95,14 +95,33 @@ function noise(seed: number, w = 120, h = 120): Uint8Array {
   return buf;
 }
 
+/** A font dictionary with an incompressible embedded font program of `bytes` bytes (a stand-in for a big form font). */
+export function bigFont(doc: PDFDocument, bytes: number, seed = 7): PDFRef {
+  const ctx = doc.context;
+  const program = ctx.register(ctx.stream(noise(seed, bytes / 3, 1), { Length1: bytes }));
+  return ctx.register(ctx.obj({ Type: "Font", Subtype: "TrueType", BaseFont: "BigForm", FontDescriptor: ctx.obj({ Type: "FontDescriptor", FontName: "BigForm", FontFile2: program }) }));
+}
+
 /**
  * `shared-res.pdf` / `inherited-res.pdf`: 12 A4 pages "Shared n", page n
  * draws its own 120×120 image. One indirect resource dict holds all 12
  * images and the font: on every page (shared), or on the page-tree root with
- * no /Resources on the pages (inherited).
+ * no /Resources on the pages (inherited). With `form`, page 3 also has a
+ * text field "name", and the AcroForm's /DR holds a 100 KB font.
  */
-export async function sharedResPdf(layout: "shared" | "inherited"): Promise<Uint8Array> {
+export async function sharedResPdf(layout: "shared" | "inherited", { form = false } = {}): Promise<Uint8Array> {
   const { doc, pages, ctx } = await base(12, (i) => `Shared ${i}`);
+  if (form) {
+    const field = doc.getForm().createTextField("name");
+    field.setText("Ada");
+    field.addToPage(pages[2], { x: 50, y: 500, width: 200, height: 24 });
+    const acro = doc.catalog.lookup(PDFName.of("AcroForm"), PDFDict);
+    let dr = acro.lookup(PDFName.of("DR"));
+    if (!(dr instanceof PDFDict)) acro.set(PDFName.of("DR"), (dr = ctx.obj({})));
+    let fonts = (dr as PDFDict).lookup(PDFName.of("Font"));
+    if (!(fonts instanceof PDFDict)) (dr as PDFDict).set(PDFName.of("Font"), (fonts = ctx.obj({})));
+    (fonts as PDFDict).set(PDFName.of("BigF"), bigFont(doc, 100_000));
+  }
   const images: Record<string, PDFRef> = {};
   for (let i = 1; i <= 12; i++) {
     images[`Im${i}`] = ctx.register(ctx.stream(noise(i), { Type: "XObject", Subtype: "Image", Width: 120, Height: 120, ColorSpace: "DeviceRGB", BitsPerComponent: 8 }));

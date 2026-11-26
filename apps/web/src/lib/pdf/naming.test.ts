@@ -101,3 +101,73 @@ describe("page tool names (F4/F5 §6)", () => {
     expect(mergedName("a:b.pdf")).toBe("a-b_merged.pdf");
   });
 });
+
+describe("review 11: names fit every file system", () => {
+  const bytes = (s: string) => new TextEncoder().encode(s).length;
+  const t = { input: "doc.pdf", pages: "1-4", first: 1, last: 4, n: 1, date: new Date(2026, 0, 5) };
+  const oddPages = Array.from({ length: 1000 }, (_, i) => String(2 * i + 1)).join("_"); // "1_3_5_…_1999", 4 KB
+
+  it("names stay within 255 UTF-8 bytes, extension included, without breaking a character", () => {
+    const long = `${"a".repeat(300)}.pdf`;
+    for (const name of [patternName("{name}-{pages}", { ...t, input: long }), customName("b".repeat(400)) ?? "", pdfOutputName("c".repeat(300)), mergedName(long), splitZipName([long])]) {
+      expect(bytes(name), name.slice(0, 20)).toBeLessThanOrEqual(255);
+      expect(name).toMatch(/\.(pdf|zip)$/);
+    }
+    const accents = patternName("{name}", { ...t, input: `${"é".repeat(200)}.pdf` });
+    expect(bytes(accents)).toBeLessThanOrEqual(255);
+    expect(accents).toMatch(/^é+\.pdf$/);
+    const emoji = customName("😀".repeat(100)) ?? "";
+    expect(bytes(emoji)).toBeLessThanOrEqual(255);
+    expect(emoji).toMatch(/^(😀)+\.pdf$/u);
+    // Short names are untouched.
+    expect(pdfOutputName("report.pdf")).toBe("report.pdf");
+  });
+
+  it("a long {pages} list is cut at a page with an ellipsis: 1_3_5_…", () => {
+    const name = patternName("{name}-{pages}", { ...t, pages: oddPages });
+    expect(bytes(name)).toBeLessThanOrEqual(255);
+    expect(name.startsWith("doc-1_3_5_")).toBe(true);
+    expect(name).toMatch(/_\d+_…\.pdf$/);
+    // The kept list is whole pages from the start.
+    const kept = name.slice(4, -"_….pdf".length).split("_");
+    expect(kept).toEqual(oddPages.split("_").slice(0, kept.length));
+    expect(kept.length).toBeGreaterThan(50);
+    // Text after {pages} stays.
+    expect(patternName("{pages}-{name}", { ...t, pages: oddPages })).toMatch(/_…-doc\.pdf$/);
+  });
+
+  it("the \" (n)\" suffix for duplicates fits in the cap too", () => {
+    const max = `${"x".repeat(251)}.pdf`;
+    expect(bytes(max)).toBe(255);
+    const out = uniqueNames([max, max, max.toUpperCase()]);
+    expect(out[0]).toBe(max);
+    expect(out[1]).toMatch(/^x+ \(2\)\.pdf$/);
+    expect(out[2]).toMatch(/^X+ \(3\)\.PDF$/);
+    for (const n of out) expect(bytes(n)).toBeLessThanOrEqual(255);
+    expect(new Set(out.map((n) => n.toLowerCase())).size).toBe(3);
+    // Over-long input names are cut first.
+    for (const n of uniqueNames([`${"y".repeat(300)}.pdf`])) expect(bytes(n)).toBeLessThanOrEqual(255);
+  });
+
+  it("Windows reserved names get a leading underscore", () => {
+    expect(customName("CON")).toBe("_CON.pdf");
+    expect(customName("nul.pdf")).toBe("_nul.pdf");
+    expect(customName("Com1")).toBe("_Com1.pdf");
+    expect(customName("lpt9.tar")).toBe("_lpt9.tar.pdf");
+    expect(patternName("{name}", { ...t, input: "aux.pdf" })).toBe("_aux.pdf");
+    expect(pdfOutputName("PRN.pdf")).toBe("_PRN.pdf");
+    expect(uniqueNames(["con.pdf"])).toEqual(["_con.pdf"]);
+    // Only the exact device names.
+    expect(customName("CONSOLE")).toBe("CONSOLE.pdf");
+    expect(customName("com10")).toBe("com10.pdf");
+    expect(customName("aux-notes")).toBe("aux-notes.pdf");
+  });
+
+  it("no trailing dot or space before the extension, even after cutting", () => {
+    expect(customName("report. . ")).toBe("report.pdf");
+    const cut = customName(`${"a".repeat(250)}. tail`);
+    expect(cut).toBe(`${"a".repeat(250)}.pdf`);
+    const cut2 = patternName("{name}-{pages}", { ...t, input: `${"a".repeat(250)}.pdf`, pages: "7" });
+    expect(cut2).not.toMatch(/[ .]\.pdf$/);
+  });
+});

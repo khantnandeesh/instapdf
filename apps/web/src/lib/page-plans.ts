@@ -55,7 +55,17 @@ export function parseCount(text: string, max = MAX_COUNT): number | null {
   return n >= 1 && n <= max ? n : null;
 }
 
-const allPages = (count: number) => Array.from({ length: count }, (_, i) => i);
+/**
+ * Guards for every planner entry (the UI parses its fields, but a plan must
+ * never loop forever or write an empty or misnamed file on bad numbers).
+ * A page count that is not a whole number of 0 or more reads as 0 pages.
+ */
+const pagesIn = (count: number) => (Number.isSafeInteger(count) && count > 0 ? count : 0);
+/** A count setting (Split's N, pages per turn): a whole number of 1 or more, else null. */
+const countOf = (n: number | undefined) => (n !== undefined && Number.isSafeInteger(n) && n >= 1 ? n : null);
+/** A page index usable in a file of `pageCount` pages. */
+const isPageIn = (i: number, pageCount: number) => Number.isInteger(i) && i >= 0 && i < pagesIn(pageCount);
+const allPages = (count: number) => Array.from({ length: pagesIn(count) }, (_, i) => i);
 const page = (sourceId: string, sourceIndex: number): PlannedPage => ({ sourceId, sourceIndex, rotation: 0 });
 
 /** "1-4", "5", or runs joined with "_" for a page set that is not one run ("1_3_5"): the {pages} token. */
@@ -91,12 +101,14 @@ export type SplitMode =
 
 /** The parts (0-based page lists, in output order) a mode gives for a file of `pageCount` pages. */
 export function splitParts(pageCount: number, mode: SplitMode): number[][] {
+  pageCount = pagesIn(pageCount);
   const pages = allPages(pageCount);
   switch (mode.kind) {
     case "every":
       return pages.map((i) => [i]);
     case "everyN": {
-      const n = Math.max(1, Math.floor(mode.n));
+      const n = countOf(mode.n);
+      if (n === null) return [];
       const parts: number[][] = [];
       for (let i = 0; i < pageCount; i += n) parts.push(pages.slice(i, i + n));
       return parts;
@@ -111,12 +123,13 @@ export function splitParts(pageCount: number, mode: SplitMode): number[][] {
       if (!mode.items.length) return pageCount ? [pages] : [];
       return mode.items.map((item) => resolveItem(item, pageCount)).filter((p) => p.length);
     case "parts":
-      return mode.parts.map((p) => p.filter((i) => i >= 0 && i < pageCount)).filter((p) => p.length);
+      return mode.parts.map((p) => p.filter((i) => isPageIn(i, pageCount))).filter((p) => p.length);
   }
 }
 
 /** Parts from cut points: a cut after page index k ends a part there. */
 export function partsFromCuts(pageCount: number, cutsAfter: Iterable<number>): number[][] {
+  pageCount = pagesIn(pageCount);
   const cuts = new Set(cutsAfter);
   const parts: number[][] = [];
   let current: number[] = [];
@@ -225,7 +238,7 @@ export function planSplit(files: readonly PlanFile[], settings: SplitSettings): 
 
 /** The pages a typed list selects in each file (the shared field, spec §3a). */
 export function pagesPerFile(items: readonly RangeItem[], files: readonly PlanFile[]): Record<string, number[]> {
-  return Object.fromEntries(files.map((f) => [f.id, selectedPages(items, f.pageCount)]));
+  return Object.fromEntries(files.map((f) => [f.id, selectedPages(items, pagesIn(f.pageCount))]));
 }
 
 export type ExtractSettings = { pattern?: string; date?: Date };
@@ -240,7 +253,7 @@ export function planExtract(files: readonly PlanFile[], selected: Readonly<Recor
   const names: string[] = [];
   const skipped: FileRef[] = [];
   for (const f of files) {
-    const pages = [...new Set(selected[f.id] ?? [])].filter((i) => i >= 0 && i < f.pageCount).sort((a, b) => a - b);
+    const pages = [...new Set(selected[f.id] ?? [])].filter((i) => isPageIn(i, f.pageCount)).sort((a, b) => a - b);
     if (!pages.length) {
       skipped.push({ sourceId: f.id, name: f.name });
       continue;
@@ -290,6 +303,9 @@ export type MixCard = {
 /** A one-page card with Repeat on (the default) is never used up. */
 export const repeats = (c: MixCard) => c.pageCount === 1 && c.repeat !== false;
 
+/** A card's pages per turn; a bad value (NaN, 0, 2.5) reads as 1 so the order always ends. */
+const perTurnOf = (c: MixCard) => countOf(c.perTurn ?? 1) ?? 1;
+
 /**
  * Alternate's page order (spec §3g "Interleave rule"): cards in order, round
  * after round. On its turn a card gives its next `perTurn` pages (fewer if it
@@ -314,7 +330,7 @@ export function interleave(cards: readonly MixCard[]): PlannedPage[] {
         out.push(page(c.sourceId, 0));
         continue;
       }
-      const take = Math.max(1, Math.floor(c.perTurn ?? 1));
+      const take = perTurnOf(c);
       const pages = queues[i].slice(next[i], next[i] + take);
       next[i] += pages.length;
       for (const p of pages) out.push(page(c.sourceId, p));
@@ -323,9 +339,14 @@ export function interleave(cards: readonly MixCard[]): PlannedPage[] {
   return out;
 }
 
-/** Alternate needs two cards and at least one that is not a repeating one-page card (spec §3g). */
+/**
+ * Alternate needs two cards and at least one that is not a repeating one-page
+ * card (spec §3g), and every card's pages per turn must be a whole number of
+ * 1 or more.
+ */
 export function canMix(cards: readonly MixCard[]): boolean {
-  return cards.length >= 2 && cards.some((c) => !repeats(c) && c.pageCount > 0);
+  if (cards.some((c) => c.perTurn !== undefined && countOf(c.perTurn) === null)) return false;
+  return cards.length >= 2 && cards.some((c) => !repeats(c) && pagesIn(c.pageCount) > 0);
 }
 
 /** Alternate's single output: the interleaved pages, named "<first card>_mixed.pdf" (spec §6e). */

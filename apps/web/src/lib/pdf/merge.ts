@@ -99,6 +99,8 @@ type OpenedPdf = {
   doc: PDFDocument;
   pages: PDFPage[];
   pageIndexOf: Map<PDFRef, number>;
+  /** Widget annotation refs on each page (after flattening). */
+  widgets: PDFRef[][];
   pruner: Pruner;
   links: LinkFilter;
   meta: SourceMeta;
@@ -355,12 +357,15 @@ export async function openSource(s: MergeSourceInput, options: Pick<MergeOptions
   const meta: SourceMeta = {
     name: s.name,
     kind: "pdf",
-    title: doc.getTitle() || undefined,
+    // An encrypted source's strings are not decrypted by the parser, so its
+    // Title and Info read as garbage: neither is used (AC-541 cannot carry
+    // Info from encrypted sources; the output is never encrypted).
+    title: (!wasEncrypted && doc.getTitle()) || undefined,
     outline: options.bookmarks === "keep" || options.bookmarks === "perFileNested" ? readOutline(doc) : [],
     lang: readLang(doc),
     labels: readPageLabels(doc),
     keptFields,
-    docInfo: readDocInfo(doc),
+    docInfo: wasEncrypted ? undefined : readDocInfo(doc),
   };
   return {
     kind: "pdf",
@@ -368,6 +373,7 @@ export async function openSource(s: MergeSourceInput, options: Pick<MergeOptions
     doc,
     pages,
     pageIndexOf: new Map(pages.map((page, i) => [page.ref, i])),
+    widgets: pages.map(widgetRefs),
     pruner: createPruner(doc.context, pages),
     links: createLinkFilter(doc, pages),
     meta,
@@ -375,7 +381,26 @@ export async function openSource(s: MergeSourceInput, options: Pick<MergeOptions
   };
 }
 
-/** Binds an opened source to one output: a fresh object copier with the output refs of its used pages reserved. */
+/** Refs of the widget annotations on a page. */
+function widgetRefs(page: PDFPage): PDFRef[] {
+  const annots = page.node.lookup(PDFName.of("Annots"));
+  if (!(annots instanceof PDFArray)) return [];
+  const out: PDFRef[] = [];
+  for (let i = 0; i < annots.size(); i++) {
+    const raw = annots.get(i);
+    const a = annots.lookup(i);
+    if (raw instanceof PDFRef && a instanceof PDFDict && a.lookup(PDFName.of("Subtype")) === PDFName.of("Widget")) out.push(raw);
+  }
+  return out;
+}
+
+/**
+ * Binds an opened source to one output: a fresh object copier with the output
+ * refs of its used pages reserved. Widgets of pages the output does not hold
+ * are seeded as null, so copying a field (through a kept widget's /Parent)
+ * does not drag in its widgets and appearances on other pages. The form's
+ * /DR and /DA are copied only when a used page has a widget.
+ */
 function bindSource(o: OpenedSource, usedIndexes: Set<number>, options: MergeOptions, out: PDFDocument): { loaded: Loaded; meta: SourceMeta } {
   if (o.kind === "image") return { loaded: { kind: "image", input: o.input, bytes: o.bytes, format: o.format, embedded: new Map(), frames: o.frames, tiff: o.tiff }, meta: o.meta };
   const { doc, pages } = o;
@@ -387,20 +412,30 @@ function bindSource(o: OpenedSource, usedIndexes: Set<number>, options: MergeOpt
       const ref = out.context.nextRef();
       reserved.set(idx, ref);
       traversed.set(page.ref, ref);
-    } else traversed.set(page.ref, PDFNull); // anything else that reaches a dropped page goes nowhere
+    } else {
+      traversed.set(page.ref, PDFNull); // anything else that reaches a dropped page goes nowhere
+      for (const w of o.widgets[idx]) traversed.set(w, PDFNull);
+    }
   });
   let form: PDFDict | undefined;
   const acro = doc.catalog.lookup(PDFName.of("AcroForm"));
-  if (acro instanceof PDFDict && options.forms !== "remove" && (options.forms !== "flatten" || o.meta.keptFields?.length)) {
+  const hasWidgets = [...usedIndexes].some((i) => o.widgets[i]?.length);
+  if (acro instanceof PDFDict && hasWidgets && options.forms !== "remove" && (options.forms !== "flatten" || o.meta.keptFields?.length)) {
     form = out.context.obj({}) as PDFDict;
     const dr = acro.get(PDFName.of("DR"));
     const da = acro.get(PDFName.of("DA"));
     if (dr) form.set(PDFName.of("DR"), copier.copy(dr));
     if (da) form.set(PDFName.of("DA"), da.clone());
   }
-  // A direct copy: nothing is written unless the output keeps it.
+  // A direct copy: nothing is written unless the output keeps it. /PrintPageRange
+  // names source page numbers, which no longer match the output's pages.
   const prefs = doc.catalog.lookup(PDFName.of("ViewerPreferences"));
-  const viewerPreferences = prefs instanceof PDFDict ? copier.copy(prefs) : undefined;
+  let viewerPreferences: PDFObject | undefined;
+  if (prefs instanceof PDFDict) {
+    const shallow = prefs.clone();
+    shallow.delete(PDFName.of("PrintPageRange"));
+    viewerPreferences = copier.copy(shallow);
+  }
   const prune = usedIndexes.size < pages.length;
   return { loaded: { kind: "pdf", input: o.input, opened: o, pages, copier, reserved, used: usedIndexes, prune }, meta: { ...o.meta, form, viewerPreferences } };
 }

@@ -20,6 +20,7 @@ import {
   type MixCard,
   type PlanFile,
   type PlannedPage,
+  type SplitMode,
 } from "./page-plans";
 
 const twelve: PlanFile = { id: "t", name: "twelve.pdf", pageCount: 12 };
@@ -299,5 +300,53 @@ describe("Two-sided scan order (I-9)", () => {
     expect(twoSidedScanOrder(["F1", "F2", "F3", "B2", "B1"])).toEqual(["F1", "B1", "F2", "B2", "F3"]);
     expect(twoSidedScanOrder([])).toEqual([]);
     expect(twoSidedScanOrder(["X"])).toEqual(["X"]);
+  });
+});
+
+describe("review 10: bad counts never give empty, garbage or endless output", () => {
+  const bad = [Number.NaN, 0, -2, 2.5, Number.POSITIVE_INFINITY];
+
+  it("Split every N with a bad N gives no parts and no documents (never `twelve-.pdf`)", () => {
+    for (const n of bad) {
+      expect(splitParts(12, { kind: "everyN", n }), String(n)).toEqual([]);
+      const plan = planSplit([twelve], { mode: { kind: "everyN", n } });
+      expect(plan.documents, String(n)).toEqual([]);
+      expect(plan.skipped.map((f) => f.sourceId)).toEqual(["t"]);
+      expect(plan.download.name).not.toBe("twelve-.pdf");
+    }
+    expect(splitParts(12, { kind: "everyN", n: 5 }).map((p) => p.length)).toEqual([5, 5, 2]);
+  });
+
+  it("a bad page count reads as an empty file in every planner", () => {
+    for (const pageCount of [Number.NaN, -1, 2.5, Number.POSITIVE_INFINITY]) {
+      const f: PlanFile = { id: "x", name: "x.pdf", pageCount };
+      for (const mode of [{ kind: "every" }, { kind: "everyN", n: 2 }, { kind: "spreads" }, { kind: "ranges", items: [] }] satisfies SplitMode[]) {
+        expect(splitParts(pageCount, mode), `${pageCount} ${mode.kind}`).toEqual([]);
+      }
+      expect(partsFromCuts(pageCount, [0])).toEqual([]);
+      expect(planSplit([f], { mode: { kind: "every" } }).documents).toEqual([]);
+      expect(planExtract([f], pagesPerFile(items("1-3"), [f])).documents).toEqual([]);
+      expect(planDelete([f], {}).documents).toEqual([]);
+      expect(interleave([{ sourceId: "x", name: "x.pdf", pageCount }, { sourceId: "p", name: "p.pdf", pageCount: 2 }]).map((p) => p.sourceId)).toEqual(["p", "p"]);
+    }
+  });
+
+  it("page indexes that are not whole numbers are dropped from parts, selections and marks", () => {
+    expect(splitParts(12, { kind: "parts", parts: [[0, 1.5, Number.NaN, 2]] })).toEqual([[0, 2]]);
+    expect(planExtract([twelve], { t: [1.5, Number.NaN, 3] }).documents[0].pages.map((p) => p.sourceIndex)).toEqual([3]);
+    expect(planDelete([three], { p: [0.5, 1] }).documents[0].pages.map((p) => p.sourceIndex)).toEqual([0, 2]);
+  });
+
+  it("Alternate with a bad pages-per-turn terminates and cannot start", () => {
+    for (const perTurn of bad) {
+      const cards: MixCard[] = [
+        { sourceId: "a", name: "a.pdf", pageCount: 3, perTurn },
+        { sourceId: "b", name: "b.pdf", pageCount: 2 },
+      ];
+      expect(canMix(cards), String(perTurn)).toBe(false);
+      const out = interleave(cards);
+      expect(out.length, String(perTurn)).toBe(5);
+    }
+    expect(canMix([{ sourceId: "a", name: "a.pdf", pageCount: Number.NaN }, { sourceId: "b", name: "b.pdf", pageCount: 1 }])).toBe(false);
   });
 });
