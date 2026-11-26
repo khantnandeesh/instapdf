@@ -157,7 +157,7 @@ Every tool page is a working surface, not a document. The user arrives to do one
 7. **The picker card fits the first screen.** In the empty state the picker card is centred, both ways, in `--ip-work-h`; there is no options panel beside it.
 8. **Result screen and dialogs fit too.** Download, the result preview and "keep going" are on the first screen at 1366x657. The bigger page view fills the viewport less a slim row of chrome (see [Modals](#modals)), so its arrows and × are always on screen; any dialog fits the screen the same way.
 9. **Phones (unchanged).** Upload button, limits and privacy line fit the first screen; the dock holds the options row and the primary action; nothing important is covered by it (the e2e check hits the element at its centre).
-10. **New layouts inherit this.** A tool with its own workspace (Merge) keeps the shared head, the top row and the stage. The editor is E1 (F25 §5): it sits in the page under the sticky header, with a 56px editor bar (h1, file menu, the tools centred, Undo│Redo, Download in its action slot), the page strip on the left and a properties panel on the right while a tool with options is active.
+10. **New layouts inherit this.** A tool with its own workspace (Merge) keeps the shared head, the top row and the stage. The editor is E1 (F25 §5): it sits in the page under the sticky header, with a 56px editor bar (h1, file menu, the tools centred, Undo│Redo, Download in its action slot), the page strip on the left and a properties panel floating over the canvas's right side while a tool with options is active (it never moves a page).
 
 ### Viewport checklist (every UI change; screenshots in the spec's `## UI` and the PR)
 
