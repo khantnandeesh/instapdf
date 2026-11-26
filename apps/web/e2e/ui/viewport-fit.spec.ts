@@ -73,7 +73,8 @@ async function openFirstPagePreview(page: Page) {
   if (await enlarge.count()) return enlarge.first().click();
   const card = page.getByTestId("card-main").first();
   if (await card.isVisible()) return card.click();
-  const tile = page.getByTestId("page-tile").first();
+  // The whole tile: below 1024 px its More button sits in the row under the page (PT-1 rule 6).
+  const tile = page.locator("[data-uid]").first();
   await tile.hover();
   // A read-only grid (Alternate's result order) has no More menu: the tile itself shows the page larger.
   if (!(await tile.getByTestId("tile-more").count())) return page.getByTestId("tile-main").first().click();

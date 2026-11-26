@@ -138,7 +138,7 @@ export default function PrivacyPage() {
             )}
             {providers.includes("google") && (
               <li>
-                <strong className="font-bold text-ink">Google Picker and Google Identity Services</strong> (Google LLC) for signing in to Google Drive, choosing
+                <strong className="font-bold text-ink">Google Drive picker and Google Identity Services</strong> (Google LLC) for signing in to Google Drive, choosing
                 files and saving results. We ask only for access to the files you pick or that BerryPDF creates (the <Code>drive.file</Code> permission).
               </li>
             )}

@@ -305,6 +305,7 @@ test.describe("F23 cloud windows", () => {
     const res = await request.get("/cloud/mock?req=x");
     const h = res.headers();
     expect(h["cross-origin-opener-policy"]).toBe("same-origin-allow-popups");
+    expect(h["referrer-policy"]).toBe("no-referrer"); // like /cloud/google: its URL carries the request
     const csp = h["content-security-policy"];
     const d = directives(csp);
     expect(d.get("connect-src")).toEqual(["'self'"]);

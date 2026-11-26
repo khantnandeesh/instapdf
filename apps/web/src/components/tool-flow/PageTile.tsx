@@ -5,15 +5,11 @@ import { describeDelta, formatDelta } from "@/lib/pdf/rotation";
 import type { PageSize } from "@/lib/pdf/pdfjs";
 import { cx } from "../ui/cx";
 import { CheckIcon, TrashIcon } from "../ui/icons";
+import { pageBoxStyle, pageTransform } from "./page-box";
 import { PageThumb } from "./Thumbnail";
 import type { PageDecoration } from "./types";
 
-/** Page box inside a square: contained so its longest side equals the box. */
-export function pageBoxStyle(size: PageSize): { width: string; height: string } {
-  const landscape = size.width >= size.height;
-  const ratio = landscape ? size.height / size.width : size.width / size.height;
-  return landscape ? { width: "100%", height: `${ratio * 100}%` } : { width: `${ratio * 100}%`, height: "100%" };
-}
+export { pageBoxStyle, pageTransform, TILE_ASPECT } from "./page-box";
 
 /** The page-tool fields of a decoration (spec F4/F5 UI P-6); Rotate passes none of them. */
 export type TileDecor = Omit<PageDecoration, "pendingDelta" | "inScope">;
@@ -31,6 +27,7 @@ export function PageTile({
   onOpen,
   onKeyDown,
   dimmed,
+  compact,
   decor,
   corner,
   cornerRow,
@@ -48,11 +45,13 @@ export function PageTile({
   onOpen: (e: MouseEvent<HTMLButtonElement>) => void;
   onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => void;
   dimmed?: boolean;
+  /** Below 1024 px: the actions sit in a row under the page, never on it (PT-1 rule 6). */
+  compact?: boolean;
   /** Page-tool state: part tone and disc, left out, picked, marked; the tile's own name and aria-pressed. */
   decor?: TileDecor;
-  /** Drawn in the page box's bottom-right corner instead of the centred actions pill (Enlarge on toggle tiles). */
+  /** From 1024 px, drawn in the page box's bottom-right corner instead of the centred actions pill (Enlarge on toggle tiles). */
   corner?: ReactNode;
-  /** Below 1024 px the corner control goes here instead, in the row under the page (44px target). */
+  /** Below 1024 px the corner control goes in the row under the page instead (PT-1 rule 6, 44px target). */
   cornerRow?: ReactNode;
   /** Drawn in the grid gap after the tile (Split's mark). */
   gap?: ReactNode;
@@ -63,13 +62,13 @@ export function PageTile({
   const picked = decor?.picked;
   const marked = decor?.marked;
   const decorated = !!decor && (part !== undefined || decor.leftOut !== undefined || picked !== undefined || marked !== undefined);
-  // BerryPDF PagePreview: each white page sits in a pink tray (14px radius) with its page number
-  // below in Fredoka; a page in the selected scope gets the 2.5px berry ring (and a leaf tick).
-  // Page tools add their state as an outline, an overlay or a badge (page-decor.css), never padding.
+  // Page tile (berrypdf.md "Page tiles"): the page fills the tile, its number below in Fredoka; a page
+  // in the selected scope gets the 2.5px berry outline (and a leaf tick). Page tools add their state as
+  // an outline, an overlay or a badge (page-decor.css, PT-1 rule 4a), never a fill or padding.
   return (
     <div
       role="listitem"
-      className="group/tile mp-tray relative flex min-w-0 flex-col items-center gap-2 max-sm:p-3"
+      className="group/tile ip-tile relative flex min-w-0 flex-col items-center gap-1.5"
       data-selected={inScope ? "" : undefined}
       data-page-index={index}
       data-file-id={fileId}
@@ -81,13 +80,13 @@ export function PageTile({
       data-marked={marked ? "" : undefined}
     >
       <div
-        className="relative grid aspect-square w-(--ip-thumb-size) place-items-center max-sm:w-full"
+        className="ip-tile__box relative grid place-items-center"
         data-testid="page-tile"
         data-rotation={pendingDelta}
       >
         <span
           className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
-          style={{ ...pageBoxStyle(size), transform: `rotate(${pendingDelta}deg)` }}
+          style={{ ...pageBoxStyle(size), transform: pageTransform(size, pendingDelta) }}
           data-testid="page-visual"
         >
           <PageThumb fileId={fileId} index={index} />
@@ -102,7 +101,7 @@ export function PageTile({
           onFocus={onFocus}
           onClick={onOpen}
           onKeyDown={onKeyDown}
-          className="absolute inset-0 rounded-sm focus-visible:outline-offset-3"
+          className="absolute inset-0 rounded-sm focus-visible:outline-offset-1"
         />
         {badge && (
           <span className="pointer-events-none absolute top-1.5 left-1.5 z-[1] rounded-pill bg-surface-raised px-2 py-0.5 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">
@@ -126,11 +125,11 @@ export function PageTile({
           </span>
         )}
         {picked === false && (
-          // Extract: the empty pick ring, on hover / focus (always on touch).
+          // Extract: the empty pick ring, on hover / focus (always on touch). A state mark, not a control.
           <span aria-hidden="true" className="ip-hover-hint pointer-events-none absolute top-1.5 right-1.5 z-[1] size-[22px] rounded-full border-[1.5px] border-field-line bg-surface/85" />
         )}
         {marked !== undefined && (
-          // Delete: a ghost trash badge on hover (always on touch); solid once marked.
+          // Delete: a ghost trash badge on hover (always on touch); solid once marked. A state mark, not a control.
           <span
             aria-hidden="true"
             data-testid={marked ? "marked-badge" : undefined}
@@ -142,8 +141,8 @@ export function PageTile({
             <TrashIcon size={15} />
           </span>
         )}
-        {corner && !dimmed && <div className="ip-corner-enlarge absolute right-1 bottom-1 z-10 max-lg:hidden">{corner}</div>}
-        {actions && !dimmed && (
+        {corner && !dimmed && !compact && <div className="ip-corner-enlarge absolute right-1 bottom-1 z-10 max-lg:hidden">{corner}</div>}
+        {actions && !dimmed && !compact && (
           <div
             className={cx(
               "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1.5 rounded-lg border-[1.5px] border-sand bg-surface-raised p-1.5 shadow-menu",
@@ -154,14 +153,21 @@ export function PageTile({
           </div>
         )}
       </div>
-      {/* Page number in Fredoka 600, muted (4.85:1 on the tray); Split adds the part, in the same colour. */}
-      <div className={cx("flex w-full min-w-0 items-center justify-center", !!cornerRow && !dimmed && "max-lg:justify-between max-lg:ps-2")}>
-        <span className="mp-tray__n ip-tile__n h-5 truncate tabular-nums" aria-hidden="true">
-          {index + 1}
-          {part && <span data-testid="part-label"> · Part {part.n}</span>}
-        </span>
-        {cornerRow && !dimmed && <span className="lg:hidden">{cornerRow}</span>}
-      </div>
+      {/* Page number in Fredoka 600, muted (5.19:1 on the cream work area); Split adds the part. */}
+      <span className="ip-tile__n h-5 max-w-full truncate tabular-nums" aria-hidden="true">
+        {index + 1}
+        {part && <span data-testid="part-label"> · Part {part.n}</span>}
+      </span>
+      {compact && (actions || cornerRow) && (
+        <div className="flex h-11 items-center justify-center gap-2.5" data-testid="tile-row">
+          {!dimmed && (
+            <>
+              {actions}
+              {cornerRow}
+            </>
+          )}
+        </div>
+      )}
       {gap}
     </div>
   );

@@ -37,6 +37,8 @@ export const editCopy = {
   filesAfter: "Files after…",
   enlargeItem: "Enlarge",
   rotateLeftItem: "Rotate left",
+  rotateRightItem: "Rotate right",
+  removeItem: "Remove",
   selectionBar: "Selected pages",
   rotateSelLeft: "Rotate selected pages left",
   rotateSelRight: "Rotate selected pages right",

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { cspViolationsInHtml, inlineScriptHashes, routeForHtmlFile, scriptHash } from "../../../scripts/csp-lib.mjs";
 import { recentPrepaintScript } from "../recent-tools";
-import { CLOUD_ALLOW, CLOUD_COOP, cloudPolicy, cloudRouteOf, contentSecurityPolicy, hashesFor, routeKey, securityHeaders } from "./csp";
+import { CLOUD_ALLOW, CLOUD_COOP, CLOUD_REFERRER, cloudPolicy, cloudRouteOf, contentSecurityPolicy, hashesFor, routeKey, securityHeaders } from "./csp";
 
 const directives = (policy: string) => new Map(policy.split("; ").map((d) => [d.split(" ")[0], d.split(" ").slice(1)] as const));
 
@@ -146,9 +146,10 @@ describe("F23: cloudPolicy (research §2.1)", () => {
 
   it("each window allows exactly its provider's hosts and nothing else", () => {
     const d = directives(cloudPolicy("google", { scriptHashes: ["sha256-AAA="] }));
-    expect(d.get("script-src")).toEqual(["'self'", "'sha256-AAA='", "https://apis.google.com/js/api.js", "https://apis.google.com/_/scs/", "https://accounts.google.com/gsi/client"]);
+    // Picking is a top-level navigation to Google's picker: no Picker script, gapi or docs.google.com frame.
+    expect(d.get("script-src")).toEqual(["'self'", "'sha256-AAA='", "https://accounts.google.com/gsi/client"]);
     expect(d.get("connect-src")).toEqual(["'self'", "https://www.googleapis.com/drive/v3/files", "https://www.googleapis.com/drive/v3/files/", "https://www.googleapis.com/upload/drive/v3/files", "https://accounts.google.com/gsi/"]);
-    expect(d.get("frame-src")).toEqual(["https://docs.google.com/picker", "https://accounts.google.com/gsi/"]);
+    expect(d.get("frame-src")).toEqual(["https://accounts.google.com/gsi/"]);
     expect(d.get("form-action")).toEqual(["'self'"]);
     const dbx = directives(cloudPolicy("dropbox"));
     expect(dbx.get("script-src")).toEqual(["'self'", "https://www.dropbox.com/static/api/2/dropins.js"]);
@@ -176,6 +177,10 @@ describe("F23: cloudPolicy (research §2.1)", () => {
         for (const src of d.get(k) ?? []) expect(["*", "https:", "http:", "data:", "blob:"], `${r} ${k} ${src}`).not.toContain(src);
       }
     }
+  });
+
+  it("Referrer-Policy: the Google window (and its mock) sends no referrer", () => {
+    expect(CLOUD_REFERRER).toEqual({ google: "no-referrer", mock: "no-referrer" });
   });
 
   it("COOP: allow-popups for the windows whose SDK opens a nested popup, same-origin for OneDrive", () => {

@@ -6,6 +6,7 @@ import { CloseIcon, EnlargeIcon, LockIcon } from "../ui/icons";
 import { Spinner } from "../ui/Spinner";
 import { copy } from "./copy";
 import { PageTile } from "./PageTile";
+import { rowSlots, useTileRow } from "./useTileRow";
 import type { LoadedFile, PageDecoration } from "./types";
 
 export type PageActionsRenderer = (file: LoadedFile, index: number, tabIndex: number) => ReactNode;
@@ -53,6 +54,10 @@ export function PageGrid({
   for (const f of files) if (f.status === "ready" && f.pages) for (let i = 0; i < f.pageCount; i++) flat.push({ fileId: f.id, index: i });
   const activeIdx = Math.max(0, active ? flat.findIndex((t) => t.fileId === active.fileId && t.index === active.index) : 0);
   const showHeaders = files.length > 1;
+  // Below 1024 px the actions go under the page (PT-1 rule 6); Enlarge drops out when the row is full
+  // (a tap on the page opens the same preview).
+  const { compact, width } = useTileRow(root);
+  const withEnlarge = !compact || rowSlots(width + 10) >= 3;
 
   function columns(): number {
     const list = root.current?.querySelector<HTMLElement>("[role=list]");
@@ -144,10 +149,11 @@ export function PageGrid({
               role="list"
               aria-label={showHeaders ? `Pages of ${file.name}` : "Pages"}
               className={cx(
-                "grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,calc(var(--ip-thumb-size)+40px))] sm:gap-5",
-                // Split's marks sit in the gaps (--ip-grid-gap, the same values): px-2 keeps the last
-                // column's mark inside the grid (spec F4/F5 UI P-6, "Mark geometry").
-                renderGap && "px-2 [--ip-grid-gap:12px] sm:[--ip-grid-gap:20px]",
+                "ip-tile-grid",
+                // Split's marks sit in the gaps (--ip-grid-gap follows the grid's gap: 12px, then
+                // --ip-tile-gap from 640 px); px-2 keeps the last column's mark inside the grid (spec F4/F5
+                // UI P-6, "Mark geometry").
+                renderGap && "px-2 [--ip-grid-gap:12px] sm:[--ip-grid-gap:var(--ip-tile-gap)]",
                 dimmed && "opacity-60 transition-opacity duration-(--dur-base)",
               )}
             >
@@ -166,11 +172,12 @@ export function PageGrid({
                     active={isActive}
                     dimmed={dimmed}
                     decor={d}
+                    compact={compact}
                     actions={
                       corner ? undefined : (
                         <>
                           {renderActions?.(file, i, isActive ? 0 : -1)}
-                          {enlarge(file, i, isActive)}
+                          {withEnlarge && enlarge(file, i, isActive)}
                         </>
                       )
                     }

@@ -158,7 +158,8 @@ for (const [project, sizes] of [
           else if (await enlarge.count()) await enlarge.first().click();
           else if (await card.isVisible()) await card.click();
           else {
-            const tile = page.getByTestId("page-tile").first();
+            // The whole tile: below 1024 px its More button sits in the row under the page (PT-1 rule 6).
+            const tile = page.locator("[data-uid]").first();
             await tile.hover();
             // A read-only grid (Alternate's result order) has no More menu: the tile itself shows the page larger.
             if (!(await tile.getByTestId("tile-more").count())) await page.getByTestId("tile-main").first().click();

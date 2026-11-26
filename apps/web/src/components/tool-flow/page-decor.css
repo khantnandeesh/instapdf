@@ -64,7 +64,7 @@
   position: absolute;
   top: 0;
   bottom: 28px;
-  right: calc(var(--ip-grid-gap, 20px) / -2 - var(--ip-tap-min) / 2);
+  right: calc(var(--ip-grid-gap, var(--ip-tile-gap)) / -2 - var(--ip-tap-min) / 2);
   z-index: 12;
   display: grid;
   width: var(--ip-tap-min);
@@ -134,7 +134,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  right: calc(var(--ip-grid-gap, 20px) / -2 - var(--ip-cut-line) / 2);
+  right: calc(var(--ip-grid-gap, var(--ip-tile-gap)) / -2 - var(--ip-cut-line) / 2);
   z-index: 11;
   width: var(--ip-cut-line);
   border-radius: 2px;

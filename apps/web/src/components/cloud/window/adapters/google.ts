@@ -1,17 +1,22 @@
 /**
- * Google Drive in the /cloud/google window (research §3.1): Google Identity Services token client
- * (scope drive.file only), then the Picker built with PickerBuilder.toUri() and shown in our own
- * iframe (so no inline styles are needed under style-src 'self'). Files download from Drive v3
- * (files.get alt=media) with the token, which lives in this window's memory only.
- * Save: multipart upload into a "BerryPDF" folder the app creates (drive.file sees only that).
- * [U] untested with real credentials; the toUri() callback format is not documented in detail, so
- * the message parser below accepts the documented response shape wherever it appears.
+ * Google Drive in the /cloud/google window (research §3.1).
+ * Pick: Google's top-level picker (onepick.ts). The window navigates itself to Google's OAuth page
+ * with `trigger_onepick=true` (scope drive.file only) and comes back with the picked file IDs and a
+ * token, which lives in this window's memory only. No third-party cookies, script or iframe: the
+ * embedded Picker needed Google's cookies in a third-party frame and showed "Sign in" wherever
+ * they were blocked. Files download from Drive v3 (files.get alt=media, Docs/Sheets/Slides exported
+ * as PDF) in this window; only their bytes go to the tool tab.
+ * Save: a Google Identity Services token (popup, drive.file), then a multipart upload into a
+ * "BerryPDF" folder the app creates (drive.file sees only that).
+ * [V] 26 Nov 2026: onepick round trip and alt=media download on staging with a real account; the
+ * picker's type filter and multi-select; closing the picker returns `error=access_denied`.
  */
 import type { Adapter, AdapterCtx, Picked } from "./types";
 import { exportName, exportUrl, isNative, nativeMimes } from "./native";
+import * as onepick from "./onepick";
 import { CloudError, loadScript, xhrUpload } from "./types";
 
-type TokenResponse = { access_token?: string; error?: string };
+type TokenResponse = { access_token?: string; expires_in?: number | string; error?: string };
 type Gis = {
   accounts: {
     oauth2: {
@@ -20,17 +25,12 @@ type Gis = {
       };
     };
   };
-  picker: Record<string, unknown> & {
-    DocsView: new (viewId?: unknown) => { setMimeTypes(m: string): unknown; setIncludeFolders(b: boolean): unknown; setSelectFolderEnabled(b: boolean): unknown; setMode(m: unknown): unknown };
-    PickerBuilder: new () => Record<string, (...a: unknown[]) => unknown> & { toUri: () => string };
-    ViewId: { DOCS: unknown };
-    DocsViewMode: { LIST: unknown };
-    Feature: { MULTISELECT_ENABLED: unknown };
-  };
 };
-type Gapi = { load: (m: string, o: { callback: () => void; onerror: () => void }) => void };
 
 const SCOPE = "https://www.googleapis.com/auth/drive.file";
+const FILES = "https://www.googleapis.com/drive/v3/files";
+
+/** The tool's accepted extensions as the picker's MIME filter. */
 const MIME: Record<string, string> = {
   ".pdf": "application/pdf",
   ".png": "image/png",
@@ -43,43 +43,105 @@ const MIME: Record<string, string> = {
   ".tiff": "image/tiff",
 };
 
-type PickerDoc = { id: string; name: string; sizeBytes?: number | string; mimeType?: string };
+/**
+ * What the picker is asked for, from the tool's request (Google's desktop picker guide, "OAuth 2.0
+ * parameters"): `mimetypes` shows only the types the tool takes (PDF tools also see Docs, Sheets and
+ * Slides, exported as PDF), and `allow_multiple` only where the tool takes several files, so
+ * single-file tools get a single-select picker. [V] 26 Nov 2026: both carried through to Google's
+ * picker, which then listed only PDFs and was titled "Select items".
+ */
+export function onepickParams({ multiple, accept }: { multiple: boolean; accept: readonly string[] }): Record<string, string> {
+  // Any extension without a known type: no filter at all, so no type the tool takes is ever hidden
+  // (the window still checks names after the pick).
+  const known = accept.every((e) => e in MIME);
+  const mimes = known ? [...new Set([...accept.map((e) => MIME[e]!), ...nativeMimes(accept)])] : [];
+  return { ...(multiple ? { allow_multiple: "true" } : {}), ...(mimes.length ? { mimetypes: mimes.join(",") } : {}) };
+}
 
-/** Finds the Picker's response ({ action, docs }) in a message from docs.google.com. */
-export function findPickerResponse(data: unknown, depth = 0): { action: string; docs: PickerDoc[] } | null {
-  if (depth > 6 || data == null) return null;
-  if (typeof data === "string") {
-    try {
-      return findPickerResponse(JSON.parse(data), depth + 1);
-    } catch {
-      return null;
-    }
-  }
-  if (typeof data !== "object") return null;
-  const o = data as Record<string, unknown>;
-  if (typeof o.action === "string" && (o.action === "picked" || o.action === "cancel")) {
-    const docs = Array.isArray(o.docs) ? (o.docs as PickerDoc[]).filter((d) => d && typeof d.id === "string" && typeof d.name === "string") : [];
-    return { action: o.action, docs };
-  }
-  for (const v of Object.values(o)) {
-    const hit = findPickerResponse(v, depth + 1);
-    if (hit) return hit;
-  }
-  return null;
+/** Google's OAuth page that ends in its own Drive picker (the window adds `state`). */
+export function onepickUrl(clientId: string, origin: string, tool: { multiple: boolean; accept: readonly string[] }): string {
+  const u = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  u.searchParams.set("client_id", clientId);
+  u.searchParams.set("response_type", "token");
+  u.searchParams.set("scope", SCOPE);
+  u.searchParams.set("redirect_uri", `${origin}/cloud/google`);
+  // Google asks which files the app may open: that consent is the picker itself.
+  u.searchParams.set("prompt", "consent");
+  u.searchParams.set("trigger_onepick", "true");
+  for (const [k, v] of Object.entries(onepickParams(tool))) u.searchParams.set(k, v);
+  return u.toString();
+}
+
+type Meta = { id: string; name?: string; mimeType?: string; size?: string };
+
+/**
+ * The picked IDs as rows: name, type and size come from files.get (drive.file covers picked files).
+ * `supportsAllDrives` lets a file picked from a shared drive be found (Drive's shared-drive guide).
+ */
+export async function pickedFiles(token: string, ids: string[], get: typeof fetch = fetch): Promise<Picked[]> {
+  const auth = { Authorization: `Bearer ${token}` };
+  const metas = await Promise.all(
+    ids.map(async (id): Promise<Meta | null> => {
+      try {
+        const r = await get(`${FILES}/${encodeURIComponent(id)}?fields=id,name,mimeType,size&supportsAllDrives=true`, { headers: auth });
+        return r.ok ? ((await r.json()) as Meta) : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return ids.map((id, i): Picked => {
+    const d = metas[i];
+    const fid = `f${i + 1}`;
+    if (!d) return { id: fid, name: "Google Drive file", size: 0, request: async () => Promise.reject(new CloudError("denied")) };
+    const name = d.name || "Google Drive file";
+    if (isNative(d.mimeType))
+      return {
+        id: fid,
+        name: exportName(name),
+        size: 0, // unknown until exported
+        native: true,
+        request: async () => ({ url: exportUrl(id), headers: auth, name: exportName(name), type: "application/pdf" }),
+      };
+    return {
+      id: fid,
+      name,
+      size: Number(d.size) || 0,
+      request: async () => ({ url: `${FILES}/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`, headers: auth, name, type: d.mimeType, total: Number(d.size) || undefined }),
+    };
+  });
+}
+
+/**
+ * Save's GIS token response `error`: refused access is denied; any other OAuth error
+ * (interaction_required, login_required…) is a sign-in that didn't work here.
+ */
+export function classifyTokenError(error: string | undefined): "ok" | "denied" | "signin" {
+  if (!error) return "ok";
+  return error === "access_denied" ? "denied" : "signin";
+}
+
+/** Save's GIS popup errors: closing Google's window is a cancel; one that couldn't open is unreachable. */
+export function classifyPopupError(type: string | undefined): "cancel" | "unreachable" | "signin" {
+  if (type === "popup_closed") return "cancel";
+  return type === "popup_failed_to_open" ? "unreachable" : "signin";
 }
 
 export function createAdapter(ctx: AdapterCtx): Adapter {
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY ?? "";
-  const appId = process.env.NEXT_PUBLIC_GOOGLE_APP_ID ?? "";
   const g = () => (window as Window & { google?: Gis }).google;
-  let token: string | null = null; // memory only (spec AC-129)
+  // Save's token (memory only, spec AC-129) and when it runs out (a minute early).
+  let token: string | null = null;
+  let expires = 0;
   let pending: { resolve: (t: string) => void; reject: (e: unknown) => void } | null = null;
   let client: ReturnType<Gis["accounts"]["oauth2"]["initTokenClient"]> | null = null;
+  // Back from Google's picker: the response is waiting, so the window goes straight on.
+  const back = onepick.hasPending();
 
   const getToken = (): Promise<string> =>
     new Promise((resolve, reject) => {
-      if (token) return resolve(token);
+      if (token && Date.now() < expires) return resolve(token);
+      token = null;
       if (!client) return reject(new CloudError("unreachable"));
       pending = { resolve, reject };
       ctx.setPhase("signing");
@@ -87,21 +149,22 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
     });
 
   return {
-    needsTap: true,
+    needsTap: !back,
     prepare: async () => {
-      await Promise.all([loadScript("https://apis.google.com/js/api.js"), loadScript("https://accounts.google.com/gsi/client")]);
-      const gapi = (window as Window & { gapi?: Gapi }).gapi;
-      if (!gapi || !g()) throw new CloudError("unreachable");
-      await new Promise<void>((resolve, reject) => gapi.load("picker", { callback: resolve, onerror: () => reject(new CloudError("unreachable")) }));
+      if (ctx.params.mode !== "save") return; // picking needs no Google script
+      await loadScript("https://accounts.google.com/gsi/client");
+      if (!g()) throw new CloudError("unreachable");
       client = g()!.accounts.oauth2.initTokenClient({
         client_id: clientId,
         scope: SCOPE,
         callback: (r) => {
           const p = pending;
           pending = null;
-          if (r.error || !r.access_token) p?.reject(new CloudError("denied"));
+          const outcome = classifyTokenError(r.error);
+          if (outcome !== "ok" || !r.access_token) p?.reject(new CloudError(outcome === "signin" ? "signin" : "denied"));
           else {
             token = r.access_token;
+            expires = Date.now() + (Number(r.expires_in) || 3600) * 1000 - 60_000;
             p?.resolve(token);
           }
         },
@@ -109,71 +172,22 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
         error_callback: (e) => {
           const p = pending;
           pending = null;
-          p?.reject(e?.type === "popup_closed" ? "cancel" : new CloudError(e?.type === "popup_failed_to_open" ? "unreachable" : "denied"));
+          const outcome = classifyPopupError(e?.type);
+          p?.reject(outcome === "cancel" ? "cancel" : new CloudError(outcome));
         },
       });
     },
     pick: async () => {
-      let t: string;
-      try {
-        t = await getToken();
-      } catch (e) {
-        if (e === "cancel") return "cancel";
-        throw e;
-      }
-      const gp = g()!.picker;
-      // Google Docs, Sheets and Slides too where the tool takes PDFs: Drive exports them (AC-141).
-      const mimes = [...ctx.params.accept.map((e) => MIME[e]).filter(Boolean), ...nativeMimes(ctx.params.accept)].join(",");
-      const view = new gp.DocsView(gp.ViewId.DOCS);
-      view.setMimeTypes(mimes);
-      view.setIncludeFolders(true);
-      view.setSelectFolderEnabled(false);
-      view.setMode(gp.DocsViewMode.LIST);
-      const b = new gp.PickerBuilder();
-      b.addView(view);
-      b.setOAuthToken(t);
-      b.setDeveloperKey(apiKey);
-      b.setAppId(appId);
-      b.setOrigin(window.location.origin);
-      if (ctx.params.multiple) b.enableFeature(gp.Feature.MULTISELECT_ENABLED);
-      const url = b.toUri();
-      ctx.setPhase("picking");
-      const frame = await ctx.frame({ url }, "Google Drive");
-      return new Promise<Picked[] | "cancel">((resolve) => {
-        const onMessage = (e: MessageEvent) => {
-          if (e.origin !== "https://docs.google.com" || (frame && e.source !== frame.contentWindow)) return;
-          const r = findPickerResponse(e.data);
-          if (!r) return;
-          window.removeEventListener("message", onMessage);
-          void ctx.frame(null);
-          if (r.action === "cancel") return resolve("cancel");
-          resolve(
-            r.docs.map((d, i): Picked =>
-              isNative(d.mimeType)
-                ? {
-                    id: `f${i + 1}`,
-                    name: exportName(d.name),
-                    size: 0, // unknown until exported
-                    native: true,
-                    request: async () => ({ url: exportUrl(d.id), headers: { Authorization: `Bearer ${t}` }, name: exportName(d.name), type: "application/pdf" }),
-                  }
-                : {
-                    id: `f${i + 1}`,
-                    name: d.name,
-                    size: Number(d.sizeBytes) || 0,
-                    request: async () => ({
-                      url: `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(d.id)}?alt=media`,
-                      headers: { Authorization: `Bearer ${t}` },
-                      name: d.name,
-                      type: d.mimeType,
-                      total: Number(d.sizeBytes) || undefined,
-                    }),
-                  },
-            ),
-          );
-        };
-        window.addEventListener("message", onMessage);
-      });
+      const r = onepick.take();
+      if (!r) return onepick.start(onepickUrl(clientId, window.location.origin, ctx.params), "google", () => ctx.leaving());
+      // Closing Google's picker comes back as `error=access_denied`, the same as declining its
+      // consent ([V] 26 Nov 2026), so both are a cancel: the window closes quietly (AC-142).
+      if (r.kind === "empty" || r.kind === "denied") return "cancel";
+      // A state that isn't ours (or a broken response): its token is never used.
+      if (r.kind !== "picked") throw new CloudError("unreachable");
+      ctx.setPhase("connecting");
+      // A single-file tool asked for one file; anything extra is never looked up.
+      return pickedFiles(r.token, ctx.params.multiple ? r.ids : r.ids.slice(0, 1));
     },
     save: async (file, onProgress) => {
       const t = await getToken();

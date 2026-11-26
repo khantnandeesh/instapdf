@@ -101,6 +101,20 @@ test("keyboard: focus on the caret before the chunk stays on it after the real m
   await expect(page.getByRole("menuitem").first()).toBeFocused();
 });
 
+// Known bug, kept visible (PR #67 review): the stand-in caret is swapped for the real menu button when
+// the cloud chunk arrives. An Enter pressed in that moment lands on a button that is gone and is lost,
+// so the menu does not open. Keeping the stand-in while it is focused fixes it but breaks the test
+// above (focus must move to the real button), so the shared caret needs a decision first.
+test.fixme("keyboard: Enter on the caret as the chunk arrives still opens the menu", async ({ page }) => {
+  for (let i = 0; i < 5; i++) {
+    await openRotate(page);
+    await caret(page).focus(); // starts the chunk fetch
+    await page.keyboard.press("Enter"); // at once, while the real button may be taking over
+    await expect(page.getByRole("menuitem").first()).toBeFocused({ timeout: 10_000 });
+    await page.keyboard.press("Escape");
+  }
+});
+
 test("L-1: Merge's idle prefetch leaves the cloud chunk alone; a cloud control still fetches it", async ({ page }) => {
   await page.goto("/merge-pdf");
   await expect(rowButton(page, "Dropbox")).toBeVisible();

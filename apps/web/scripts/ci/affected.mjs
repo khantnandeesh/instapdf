@@ -75,7 +75,7 @@ export const AREAS = {
   f2: ["src/app/page.tsx", "src/app/[slug]/", "src/app/not-found.tsx", "src/app/(info)/", "src/app/rotate-pdf/", "src/app/merge-pdf/"],
   f3: ["src/app/merge-pdf/", "src/app/[slug]/", "src/app/page.tsx"],
   f16: ["src/app/edit-pdf/", "src/app/page.tsx", "src/app/sitemap.ts", "public/engine/"],
-  f23: ["src/app/cloud/", "src/app/cloud-mock/", "src/app/merge-pdf/", "src/app/rotate-pdf/"],
+  f23: ["src/app/cloud/", "src/app/cloud-mock/", "src/app/merge-pdf/", "src/app/rotate-pdf/", "src/app/edit-pdf/"],
   f24: ["src/app/edit-pdf/", "public/engine/"],
   f5: ["src/app/organize-pdf/", "src/app/combine-reorder-pdf/", "src/app/alternate-mix-pdf/", "src/app/merge-pdf/"],
   f4: ["src/app/split-pdf/", "src/app/extract-pdf-pages/", "src/app/delete-pdf-pages/"],

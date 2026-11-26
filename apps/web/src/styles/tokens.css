@@ -233,7 +233,13 @@
   --ip-pages-h: max(320px, calc(100vh - var(--ip-header-h) - var(--ip-intro-h) - var(--ip-dock-actual, 88px) - var(--ip-fold-gap)));
   --ip-dock-h: 176px; /* fixed bottom dock below 640px */
   --ip-dock-h-md: 104px; /* fixed bottom dock 640-1023px */
-  --ip-thumb-size: 160px; /* default page box inside its tray; slider range 80-400 */
+  --ip-thumb-size: 160px; /* default page box width in a page tile; slider range 80-400 */
+  /* Page tiles (docs/design/berrypdf.md "Page tiles", owner 2026-11-26): the page is the tile. No tray,
+     a 4px edge for the selection outline, a page-shaped box, the label under the page. */
+  --ip-tile-pad: 4px; /* tile edge to page box, each side (rule: <= 8px) */
+  --ip-tile-aspect: 1 / 1.4142; /* page box: A4/A-series portrait, so portrait and wider pages fill its width */
+  --ip-tile-gap: 16px; /* between tiles from 640px; 12px below */
+  --ip-tile-fill: 0.9; /* the page fills >= 90% of its tile's width (e2e/ui/thumb-tiles.spec.ts) */
   --ip-tap-min: 44px;
   --ip-z-header: 20;
   --ip-z-header-open: 50;

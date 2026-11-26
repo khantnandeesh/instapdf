@@ -1,5 +1,6 @@
 # Evaluation: F3 Merge PDF
 
+- **Verdict (updated 26 Nov 2026): PASS.** The one blocker, M2, is now a tie: a real Google Drive pick works on staging (see "M2 re-check" at the end). The original FAIL verdict is kept below for the record.
 - **Verdict: FAIL.** One micro-check is a *lose*: **M2 (upload start)**. The reference offers Dropbox, Google Drive and OneDrive as ways in. We offer click, drop and paste only, and no owner waiver is on record. Everything else clears the bar: **80/80 F3 ACs pass** (P0 32/32), all 40 evaluated inherited F1 ACs pass, Lighthouse mobile performance is 97 (median of 3), and axe finds 0 violations of any impact in 18 states.
 - To turn this into PASS, do one of these: (a) the owner waives M2 in writing in this file (cloud pickers are deferred as F1 D-5), or (b) ship the cloud pickers. Nothing else blocks.
 - Evaluated: 2026-11-24, 03:40–04:35 UTC, by parity-evaluator (independent: I read only the spec, `docs/process/*` and earlier evals. I did not read any code, PR text or builder notes).
@@ -182,3 +183,13 @@ None recorded. If the owner waives M2 (G-1) in writing here, this evaluation bec
 - On Sejda, the result screen lives in an iframe (`/result`). My first two task scripts looked for "Download" in the top frame only, so those two outputs were lost even though the tasks ran. The third script searched every frame and captured the file. Future runs should reuse the frame-aware script.
 - In the Sejda observation, the first "time to thumbnail" numbers (about 400 ms) were placeholder canvases. The M3 numbers above use a painted-pixel check on both sites.
 - Fixtures, scripts and raw results are in the session scratchpad and are not committed. Raw AC results are in `results.json` there.
+
+## M2 re-check (26 Nov 2026, staging 670e96b)
+
+Re-check of M2 (upload start) on staging, 26 Nov 2026, under the cloud pass rule: a pass needs a real file picked from the provider and landing in the tool, in the owner's already signed-in Chrome, with no password typed. Neither the sign-in screen nor `/cloud/mock` counts. The raw screenshots stay in `/mnt/project-files/evals-cache/m2-cloud-recheck/real-pick/` (not in git, because they show the owner's Drive), and its README has the steps.
+
+- **Merge:** Google's picker opened at top level, filtered to PDFs, images and Google docs, with multi-select. Two real Drive PDFs were chosen. The window returned with no token left in the URL, closed itself, and both files arrived as cards with thumbnails (screenshots 10–13).
+- **Rotate** (same shared intake): the picker allowed PDFs only. Closing it left the tool empty with no notice. A real pick arrived with its page drawn (screenshots 20–23).
+- **Result: M2 is now a tie.** Google Drive works end to end. Dropbox and OneDrive are built and configured but not yet verified with a real pick, because those accounts aren't signed in. We have no URL source; the reference has no URL source on this tool either. We still upload nothing: the file goes from the provider straight to the browser.
+- G-1 is closed, because it asked for "at least one cloud picker". **The verdict becomes PASS**, with no other changes (80/80 ACs, Lighthouse 97, axe 0).
+- Still to do under F23, not blocking: the real-pick checks for Dropbox and OneDrive.

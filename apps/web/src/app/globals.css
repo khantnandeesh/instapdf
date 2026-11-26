@@ -569,6 +569,12 @@
       background-color var(--dur-base),
       color var(--dur-base);
   }
+  /* 320-359 px phones: narrower tabs so a tool's toolbar row fits (page tiles, owner 2026-11-26). */
+  @media (max-width: 359px) {
+    .mp-tab {
+      padding-inline: 12px;
+    }
+  }
   .mp-tab:hover {
     color: var(--brand-strong);
   }
@@ -906,9 +912,48 @@
   .mp-tray[data-selected] {
     box-shadow: 0 0 0 2.5px var(--brand);
   }
-  .mp-tray__n {
+  .mp-tray__n,
+  .ip-tile__n {
     font: 600 13px/20px var(--font-display);
     color: var(--muted);
+  }
+  /* Page tiles (berrypdf.md "Page tiles"): no tray, the page fills the tile; selection and hover are
+     an outline hugging the page, never a filled block. No text selection or iOS callout on a tile, so
+     a long press never raises selection handles over the page. */
+  .ip-tile-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  @media (min-width: 640px) {
+    .ip-tile-grid {
+      grid-template-columns: repeat(auto-fill, calc(var(--ip-thumb-size) + 2 * var(--ip-tile-pad)));
+      gap: var(--ip-tile-gap);
+    }
+  }
+  .ip-tile {
+    padding: var(--ip-tile-pad);
+    border-radius: var(--radius-md);
+    -webkit-touch-callout: none;
+    user-select: none;
+    transition: outline-color var(--dur-fast);
+  }
+  @media (hover: hover) {
+    .ip-tile:hover {
+      outline: 1.5px solid var(--mp-card-hover-border);
+    }
+  }
+  .ip-tile[data-selected] {
+    outline: 2.5px solid var(--brand);
+  }
+  .ip-tile__box {
+    aspect-ratio: var(--ip-tile-aspect);
+    width: 100%;
+  }
+  @media (min-width: 640px) {
+    .ip-tile__box {
+      width: var(--ip-thumb-size);
+    }
   }
 
   /* ---- Prose: the long-reading column ------------------------------------------------------- */
@@ -1261,7 +1306,8 @@
     .mp-switch-track::before {
       background: ButtonText;
     }
-    .mp-tray[data-selected] {
+    .mp-tray[data-selected],
+    .ip-tile[data-selected] {
       outline: 2px solid Highlight;
     }
     /* Our drawn checkbox paints its tick as a white image on a berry fill, and forced colors

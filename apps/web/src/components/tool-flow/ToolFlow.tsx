@@ -546,7 +546,8 @@ export function ToolFlow({
     [announce, beforeIntake, copyOverrides?.errorType, flow, flushProblems, inTask, loadFile, onFilesAdded, pushNotice, removeFile, sortIntake, updateFiles],
   );
 
-  if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1") cloud!.deps = { tool, announce, intake, pushNotice, dismissNotice, sortIntake, errorType: copyOverrides?.errorType, files };
+  if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1")
+    cloud!.deps = { tool, announce, intake, pushNotice, dismissNotice, sortIntake, errorType: copyOverrides?.errorType, files, devicePicker: () => picker.current?.element ?? null };
 
   // ---- password queue ------------------------------------------------------
   const currentLocked = lockedFiles[0];
@@ -1001,8 +1002,10 @@ export function ToolFlow({
                 </div>
                 <div
                   ref={setScrollArea}
+                  // overflow-x clip: a page turning in a tile is briefly wider than its tile (page tiles have a 4px
+                  // edge); it must never widen the page (phones zoom out) or flash a sideways scroll bar.
                   data-testid="pages-scroll"
-                  className="ip-scroll flex flex-col gap-4 pt-3 pb-6 max-lg:min-h-[calc(var(--ip-thumb-size)+76px)] lg:-mx-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5"
+                  className="ip-scroll flex flex-col gap-4 overflow-x-clip pt-3 pb-6 max-lg:-mx-2 max-lg:min-h-[calc(var(--ip-thumb-size)+76px)] max-lg:px-2 lg:-mx-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5"
                   data-ip-scroll="pages"
                   inert={state === "processing" ? true : undefined}
                 >

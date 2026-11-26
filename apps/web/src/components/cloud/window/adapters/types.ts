@@ -45,8 +45,12 @@ export const isSignInResponse = (hash: string, search: string) =>
     return p.has("state") && (p.has("code") || p.has("error"));
   });
 
+/**
+ * "signin": Google's sign-in popup for Save didn't work (blocked google.com cookies, another active
+ * account). The window shows its "couldn't open" state with Close window and tells the tool it failed.
+ */
 export class CloudError extends Error {
-  constructor(readonly code: "denied" | "unreachable") {
+  constructor(readonly code: "denied" | "unreachable" | "signin") {
     super(code);
   }
 }

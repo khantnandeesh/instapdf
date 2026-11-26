@@ -2,7 +2,7 @@
 import "./page-edit.css";
 /** Merge's dialogs (spec F3 M-4). Loaded on first open (next/dynamic), never on page load. */
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { pageBoxStyle } from "@/components/tool-flow/PageTile";
+import { pageBoxStyle } from "@/components/tool-flow/page-box";
 import { PageThumb } from "@/components/tool-flow/Thumbnail";
 import { Button } from "@/components/ui/Button";
 import { cx } from "@/components/ui/cx";
@@ -167,8 +167,8 @@ export function PagePickerDialog({
             const label = `${letter}${i + 1}`;
             const used = !!inUse?.has(i);
             return (
-              <div key={i} role="listitem" className="mp-tray flex flex-col items-center gap-1.5 p-3" data-selected={on || undefined}>
-                <div className="relative grid aspect-square w-full place-items-center sm:w-[120px]">
+              <div key={i} role="listitem" className="ip-tile flex flex-col items-center gap-1.5" data-selected={on || undefined}>
+                <div className="relative grid aspect-(--ip-tile-aspect) w-full place-items-center">
                   <span className="relative block overflow-hidden bg-paper shadow-paper" style={pageBoxStyle(size)}>
                     <PageThumb fileId={fileId} index={i} />
                   </span>
@@ -186,7 +186,7 @@ export function PagePickerDialog({
                       select(i, { toggle: e.ctrlKey || e.metaKey, range: e.shiftKey });
                     }}
                     onKeyDown={(e) => onKey(e, i)}
-                    className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-3"
+                    className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-1"
                     data-testid="picker-tile"
                   />
                   {used && (
@@ -208,7 +208,7 @@ export function PagePickerDialog({
                     )}
                   </span>
                 </div>
-                <span aria-hidden="true" className="mp-tray__n tabular-nums">
+                <span aria-hidden="true" className="ip-tile__n tabular-nums">
                   {label}
                 </span>
               </div>

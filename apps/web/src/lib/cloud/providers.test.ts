@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cloudRoutes, cloudSourcesOn, configuredProviders, mockActive, providerList, routeFor } from "./providers";
 
-const keys = { dropboxAppKey: "dbx", googleClientId: "gid", googleApiKey: "gkey", googleAppId: "123", onedriveClientId: "ms" };
+const keys = { dropboxAppKey: "dbx", googleClientId: "gid", onedriveClientId: "ms" };
 
 describe("cloud providers (flag and keys)", () => {
   it("flag off: nothing, whatever keys are set (AC-120)", () => {
@@ -12,8 +12,9 @@ describe("cloud providers (flag and keys)", () => {
   it("live: only providers whose public IDs are set, in the fixed order (AC-124)", () => {
     expect(configuredProviders({ flag: "1", production: true, onedriveClientId: "ms" })).toEqual(["onedrive"]);
     expect(configuredProviders({ flag: "1", production: true, ...keys })).toEqual(["google", "dropbox", "onedrive"]);
-    // Google needs all three of its values.
-    expect(configuredProviders({ flag: "1", production: true, googleClientId: "gid", googleApiKey: " " })).toEqual([]);
+    // Google needs only its OAuth client ID (onepick); a blank one doesn't count.
+    expect(configuredProviders({ flag: "1", production: true, googleClientId: " " })).toEqual([]);
+    expect(configuredProviders({ flag: "1", production: true, googleClientId: "gid" })).toEqual(["google"]);
     expect(cloudRoutes({ flag: "1", production: true, dropboxAppKey: "dbx" })).toEqual(["dropbox"]);
   });
   it("mock: every provider through /cloud/mock; never in a production build without NEXT_PUBLIC_CLOUD_MOCK=1", () => {
@@ -29,7 +30,7 @@ describe("cloud providers (flag and keys)", () => {
   });
   it("the build's flag (next.config.ts): on only with a provider to show, so the flag without keys builds as off (M-a)", () => {
     expect(cloudSourcesOn({ flag: "1", production: true })).toBe(false);
-    expect(cloudSourcesOn({ flag: "1", production: true, googleClientId: "gid", googleApiKey: "gkey" })).toBe(false);
+    expect(cloudSourcesOn({ flag: "1", production: true, googleClientId: " " })).toBe(false);
     expect(cloudSourcesOn({ flag: "1", production: true, dropboxAppKey: "dbx" })).toBe(true);
     expect(cloudSourcesOn({ flag: "1", production: true, mock: "1" })).toBe(true);
     expect(cloudSourcesOn({ flag: "1", production: false })).toBe(true); // next dev: the mock

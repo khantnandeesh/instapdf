@@ -348,6 +348,8 @@ test("AC-166: last used provider leads the row after a reload; a local pick clea
   const boxes = await cloudRow(page).getByRole("button").evaluateAll((els) => els.map((e) => [e.textContent, e.getBoundingClientRect().left] as const));
   expect(boxes.sort((a, b) => a[1] - b[1])[0][0]).toContain("Dropbox");
   await expect(rowButton(page, "Dropbox")).toHaveAccessibleName("Choose from Dropbox (last used)");
+  // Its tooltip names the provider too (a bare "Last used" read as the name in some tools).
+  await expect(rowButton(page, "Dropbox")).toHaveAttribute("title", "Dropbox (last used)");
   // Its name is visible (a chip); the others stay icon-only.
   expect((await rowButton(page, "Dropbox").locator(".ip-cloud-name").boundingBox())!.width).toBeGreaterThan(30);
   expect((await rowButton(page, "OneDrive").locator(".ip-cloud-name").boundingBox())!.width).toBeLessThan(2);
