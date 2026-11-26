@@ -186,6 +186,22 @@ test("AC-47: every error message is dismissible and none leaves the primary enab
   await expect(primary(page)).toBeDisabled();
 });
 
+test("AC-54: the preview shows the whole page inside its square and never covers the file name", async ({ page }) => {
+  await pickReady(page, "three-pages.pdf");
+  await run(page);
+  const preview = page.getByTestId("result-preview");
+  await expect(preview).toBeVisible();
+  const shown = (await preview.boundingBox())!;
+  const square = (await preview.locator("xpath=../..").boundingBox())!;
+  expect(shown.height, "portrait: taller than wide").toBeGreaterThan(shown.width);
+  expect(shown.y).toBeGreaterThanOrEqual(square.y);
+  expect(shown.y + shown.height, "the page ends inside its square").toBeLessThanOrEqual(square.y + square.height + 0.5);
+  const name = (await page.getByTestId("result-name").boundingBox())!;
+  const overlapX = shown.x < name.x + name.width && name.x < shown.x + shown.width;
+  const overlapY = shown.y < name.y + name.height && name.y < shown.y + shown.height;
+  expect(overlapX && overlapY, "the preview stays off the file name").toBe(false);
+});
+
 test("AC-54: the result previews the output's first page (landscape after +90°); a ZIP lists entry names", async ({ page }) => {
   await pickReady(page, "three-pages.pdf");
   await rotateRight(page).click();
