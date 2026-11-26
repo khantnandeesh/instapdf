@@ -262,7 +262,7 @@ export function CloudRow({ hub }: { hub: CloudHub }) {
           type="button"
           className="ip-cloud-glyph"
           data-p={p}
-          title={last === p ? cloudCopy.lastUsedTitle : providerName[p]}
+          title={last === p ? `${providerName[p]}${cloudCopy.lastUsed}` : providerName[p]}
           onPointerEnter={load}
           onFocus={load}
           onClick={(e) => pick(hub, p, e.currentTarget)}
