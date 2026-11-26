@@ -5,7 +5,7 @@
  */
 import { readFile } from "node:fs/promises";
 import { unzipSync } from "fflate";
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRef, PDFStream, PDFString, StandardFonts } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, PDFRef, PDFStream, PDFString, StandardFonts } from "@cantoo/pdf-lib";
 import { beforeAll, describe, expect, it } from "vitest";
 import { parsePageRanges } from "../page-ranges";
 import { pagesPerFile, planAlternate, planDelete, planExtract, planSplit, type OutputPlan, type PlanFile } from "../page-plans";
@@ -575,5 +575,27 @@ describe("review nits", () => {
     expect(widgetsOf(e.getPage(0))).toEqual({ refs: [], count: 1 });
     e.getPage(0).node.set(PDFName.of("Annots"), e.context.obj([ref, e.context.obj({ Subtype: "Link", Rect: [0, 0, 1, 1] })]));
     expect(widgetsOf(e.getPage(0))).toEqual({ refs: [ref], count: 1 });
+  });
+
+  it("a page whose only widget is direct does not pull the form's /DR fonts into the part", async () => {
+    const d = await PDFDocument.create();
+    d.addPage();
+    d.addPage();
+    const f = d.getForm().createTextField("direct");
+    f.setText("x");
+    f.addToPage(d.getPage(0), { x: 50, y: 500 });
+    const annots = d.getPage(0).node.lookup(PDFName.of("Annots"), PDFArray);
+    annots.set(0, d.context.lookup(annots.get(0) as PDFRef, PDFDict));
+    const big = d.context.register(PDFRawStream.of(d.context.obj({}) as PDFDict, new Uint8Array(300_000).map((_, i) => (i * 7919) % 251)));
+    const font = d.context.register(d.context.obj({ Type: "Font", Subtype: "TrueType", FontDescriptor: d.context.obj({ FontFile2: big }) }));
+    d.catalog.lookup(PDFName.of("AcroForm"), PDFDict).set(PDFName.of("DR"), d.context.obj({ Font: d.context.obj({ BigF: font }) }));
+    const bytes = await d.save();
+    const r = await buildDocuments(
+      { sources: [{ id: "x", name: "x.pdf", kind: "pdf", source: new Blob([bytes]) }], documents: [{ name: "a.pdf", pages: [{ sourceId: "x", sourceIndex: 0, rotation: 0 }] }] },
+      {},
+      () => {},
+    );
+    expect(bytes.length).toBeGreaterThan(300_000);
+    expect(r.documents[0].bytes.length).toBeLessThan(50_000);
   });
 });

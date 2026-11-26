@@ -435,7 +435,8 @@ function bindSource(o: OpenedSource, usedIndexes: Set<number>, options: MergeOpt
   });
   let form: PDFDict | undefined;
   const acro = doc.catalog.lookup(PDFName.of("AcroForm"));
-  const hasWidgets = [...usedIndexes].some((i) => o.widgets[i]?.count);
+  // Only referenced widgets become fields (buildAcroForm starts from refs), so only they justify copying /DR.
+  const hasWidgets = [...usedIndexes].some((i) => o.widgets[i]?.refs.length);
   if (acro instanceof PDFDict && hasWidgets && options.forms !== "remove" && (options.forms !== "flatten" || o.meta.keptFields?.length)) {
     form = out.context.obj({}) as PDFDict;
     const dr = acro.get(PDFName.of("DR"));
