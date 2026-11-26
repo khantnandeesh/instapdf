@@ -56,7 +56,9 @@ export async function splitMode(page: Page, label: "Every page" | "Every N pages
 export async function currentSplitMode(page: Page) {
   const select = page.getByRole("combobox", { name: "Split" });
   if (await select.isVisible()) return select.evaluate((el: HTMLSelectElement) => (el.selectedOptions[0]?.textContent === "Every N" ? "Every N pages" : (el.selectedOptions[0]?.textContent ?? "")));
-  return page.getByRole("radiogroup", { name: "Split" }).getByRole("radio", { checked: true }).innerText();
+  // In the bar the pill shows "Every N" with " pages" for screen readers only (an sr-only span, which
+  // innerText puts on its own line): read the words as one line.
+  return (await page.getByRole("radiogroup", { name: "Split" }).getByRole("radio", { checked: true }).innerText()).replace(/\s+/g, " ").trim();
 }
 
 /** Types into the range field and leaves it (blur rewrites it in canonical form). */
