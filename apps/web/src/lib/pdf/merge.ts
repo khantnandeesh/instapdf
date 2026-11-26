@@ -357,12 +357,15 @@ export async function openSource(s: MergeSourceInput, options: Pick<MergeOptions
   const meta: SourceMeta = {
     name: s.name,
     kind: "pdf",
-    title: doc.getTitle() || undefined,
+    // An encrypted source's strings are not decrypted by the parser, so its
+    // Title and Info read as garbage: neither is used (AC-541 cannot carry
+    // Info from encrypted sources; the output is never encrypted).
+    title: (!wasEncrypted && doc.getTitle()) || undefined,
     outline: options.bookmarks === "keep" || options.bookmarks === "perFileNested" ? readOutline(doc) : [],
     lang: readLang(doc),
     labels: readPageLabels(doc),
     keptFields,
-    docInfo: readDocInfo(doc),
+    docInfo: wasEncrypted ? undefined : readDocInfo(doc),
   };
   return {
     kind: "pdf",
@@ -424,9 +427,15 @@ function bindSource(o: OpenedSource, usedIndexes: Set<number>, options: MergeOpt
     if (dr) form.set(PDFName.of("DR"), copier.copy(dr));
     if (da) form.set(PDFName.of("DA"), da.clone());
   }
-  // A direct copy: nothing is written unless the output keeps it.
+  // A direct copy: nothing is written unless the output keeps it. /PrintPageRange
+  // names source page numbers, which no longer match the output's pages.
   const prefs = doc.catalog.lookup(PDFName.of("ViewerPreferences"));
-  const viewerPreferences = prefs instanceof PDFDict ? copier.copy(prefs) : undefined;
+  let viewerPreferences: PDFObject | undefined;
+  if (prefs instanceof PDFDict) {
+    const shallow = prefs.clone();
+    shallow.delete(PDFName.of("PrintPageRange"));
+    viewerPreferences = copier.copy(shallow);
+  }
   const prune = usedIndexes.size < pages.length;
   return { loaded: { kind: "pdf", input: o.input, opened: o, pages, copier, reserved, used: usedIndexes, prune }, meta: { ...o.meta, form, viewerPreferences } };
 }

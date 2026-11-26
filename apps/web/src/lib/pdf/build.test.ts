@@ -479,3 +479,40 @@ describe("buildDocuments and the documents job (§0a.4)", () => {
     expect((root.lookup(PDFName.of("Count")) as PDFNumber).asNumber()).toBe(2);
   });
 });
+
+describe("review nits", () => {
+  it("/PrintPageRange is not copied into an output (its page numbers no longer match); other viewer preferences are", async () => {
+    const doc = await PDFDocument.load(fx["links.pdf"]);
+    doc.catalog.set(PDFName.of("ViewerPreferences"), doc.context.obj({ HideToolbar: true, NumCopies: 2, PrintPageRange: [0, 1, 3, 4] }));
+    fx["prefs.pdf"] = await doc.save();
+    const f = await file("prefs.pdf");
+    const out = (await run(planExtract([f], pagesPerFile(items("2"), [f]))))[0];
+    const organized = await merge(["prefs.pdf"], all("prefs.pdf", f.pageCount));
+    for (const bytes of [out.bytes, organized.bytes]) {
+      const prefs = (await plain(bytes)).catalog.lookup(PDFName.of("ViewerPreferences"), PDFDict);
+      expect(prefs.get(PDFName.of("HideToolbar"))?.toString()).toBe("true");
+      expect(prefs.get(PDFName.of("NumCopies"))?.toString()).toBe("2");
+      expect(prefs.has(PDFName.of("PrintPageRange"))).toBe(false);
+    }
+  });
+
+  it("PDF or ZIP is decided by the documents actually written (an empty one does not count)", async () => {
+    const out = await runJob(
+      { kind: "extract", sources: [source("twelve.pdf")], zipName: "berrypdf-extract.zip", documents: [{ name: "empty.pdf", pages: [] }, { name: "two.pdf", pages: [{ sourceId: "twelve.pdf", sourceIndex: 1, rotation: 0 }] }] },
+      () => {},
+    );
+    expect(out.type).toBe("application/pdf");
+    expect(out.name).toBe("two.pdf");
+    expect(await pageTexts(new Uint8Array(await out.blob.arrayBuffer()))).toEqual(["Twelve 2"]);
+  });
+
+  it("AC-541: an encrypted source's Info is not carried (it cannot be read reliably)", async () => {
+    const f = await file("owner-restricted.pdf");
+    const out = (await run(planExtract([f], pagesPerFile(items("1"), [f]))))[0];
+    const doc = await plain(out.bytes);
+    expect(doc.getTitle()).toBeUndefined();
+    expect(doc.getAuthor()).toBeUndefined();
+    expect(doc.getSubject()).toBeUndefined();
+    expect(doc.getKeywords()).toBeUndefined();
+  });
+});

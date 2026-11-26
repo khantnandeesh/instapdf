@@ -98,8 +98,11 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
 }
 
 async function runDocuments(job: DocumentsJob, onProgress: ProgressFn, env: JobEnv): Promise<JobOutput> {
-  const names = uniqueNames(job.documents.map((d) => d.name));
-  const documents = job.documents.map((d, i) => ({ ...d, name: names[i] }));
+  // Only documents with pages are written (buildDocuments skips the others), so
+  // they alone decide between one PDF and a ZIP.
+  const written = job.documents.filter((d) => d.pages.length);
+  const names = uniqueNames(written.map((d) => d.name));
+  const documents = written.map((d, i) => ({ ...d, name: names[i] }));
   const progress = (f: number) => onProgress(f, "pages");
   if (documents.length === 1) {
     const r = await buildDocuments({ sources: job.sources, documents, options: job.options }, env, progress);
