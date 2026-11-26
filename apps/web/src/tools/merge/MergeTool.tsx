@@ -46,7 +46,7 @@ export function MergeTool({ slug = "merge-pdf" }: { slug?: MergeSlug }) {
   };
   const keys = ["name-asc", "name-desc", "date-asc", "date-desc"] as const;
   const sortItems: MenuEntry[] =
-    ws.segments.length < 2
+    ws.fileRuns < 2
       ? [{ note: c.sortNeedsMore }, ...keys.map((k) => ({ id: k, label: c.sortItems[k], disabled: true, onSelect: () => {} })), { separator: true as const }, { id: "reverse", label: c.sortItems.reverse, disabled: true, onSelect: () => {} }]
       : [...keys.map((k) => ({ id: k, label: c.sortItems[k], onSelect: () => sortBy(k) })), { separator: true as const }, { id: "reverse", label: c.sortItems.reverse, onSelect: () => sortBy("reverse") }];
 

@@ -12,6 +12,7 @@ import {
   removePages,
   reverseRange,
   reverseSegments,
+  fileRunsOf,
   rotatePages,
   segmentsOf,
   sortByName,
@@ -176,6 +177,17 @@ describe("sort and reverse", () => {
     expect(labels(reverseSegments(split))).toEqual(["B2", "A2", "A3", "B1", "A1"]);
     const files = [page("a", 0), page("b", 0), page("e", 0)];
     expect(reverseSegments(reverseSegments(files))).toEqual(files);
+  });
+  it("reverses file runs, not AC-501's cards: a backward run stays whole, and twice restores (AC-78)", () => {
+    const back = moveBlock(ab(), set("a3"), 0); // A3 A1 A2 B1 B2: three cards, two file runs
+    expect(segmentsOf(back)).toHaveLength(3);
+    expect(fileRunsOf(back)).toHaveLength(2);
+    expect(labels(reverseSegments(back))).toEqual(["B1", "B2", "A3", "A1", "A2"]);
+    expect(reverseSegments(reverseSegments(back))).toEqual(back);
+    // One file arranged A3 A2 A1 is one run: nothing to reverse or sort between files.
+    const one = [page("a", 2), page("a", 1), page("a", 0)];
+    expect(fileRunsOf(one)).toHaveLength(1);
+    expect(reverseSegments(one)).toEqual(one);
   });
 });
 

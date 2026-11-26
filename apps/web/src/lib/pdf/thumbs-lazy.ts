@@ -15,20 +15,34 @@ export class LazyThumbnails implements Thumbs {
   private pending: ((r: ThumbnailRenderer) => void)[] = [];
   private loading: Promise<void> | null = null;
 
-  /** Fetches the renderer (idempotent); the flow warms it on intent. */
+  /** `loader` is the chunk import (a test passes its own). */
+  constructor(private readonly loader: () => Promise<Pick<typeof import("./thumbnails"), "ThumbnailRenderer">> = loadThumbnails) {}
+
+  /**
+   * Fetches the renderer (idempotent). If the chunk fails to load (offline, a new deploy), the queued
+   * calls are dropped, so they stop holding PDF documents, and the next call tries again.
+   */
   load(): Promise<void> {
-    return (this.loading ??= loadThumbnails().then((m) => {
-      const real = new m.ThumbnailRenderer();
-      this.real = real;
-      for (const op of this.pending.splice(0)) op(real);
-    }));
+    return (this.loading ??= this.loader().then(
+      (m) => {
+        const real = new m.ThumbnailRenderer();
+        this.real = real;
+        for (const op of this.pending.splice(0)) op(real);
+      },
+      (err: unknown) => {
+        this.loading = null;
+        this.pending.length = 0;
+        throw err;
+      },
+    ));
   }
 
   private run(op: (r: ThumbnailRenderer) => void): void {
     if (this.real) op(this.real);
     else {
       this.pending.push(op);
-      void this.load();
+      // A failed load is handled above (queue dropped, retried on the next call); nothing to report here.
+      this.load().catch(() => {});
     }
   }
 

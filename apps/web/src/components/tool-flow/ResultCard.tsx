@@ -247,6 +247,18 @@ const ROWS_PHONE = 3;
 function EntryWell({ output, entries, announce }: { output: ToolOutput; entries: { name: string; pageCount: number }[]; announce: (message: string) => void }) {
   const [all, setAll] = useState(false);
   const [slices, setSlices] = useState<ZipEntrySlice[] | null>(null);
+  const list = useRef<HTMLUListElement>(null);
+  // "Show all" removes itself: focus goes to the first row it revealed (its download button), not to body.
+  const revealAt = useRef(-1);
+  useEffect(() => {
+    const at = revealAt.current;
+    if (!all || at < 0) return;
+    revealAt.current = -1;
+    const row = list.current?.children[at] as HTMLElement | undefined;
+    const target = row?.querySelector<HTMLElement>("[data-testid=entry-download]") ?? row;
+    if (target === row) row?.setAttribute("tabindex", "-1");
+    target?.focus();
+  }, [all]);
   useEffect(() => {
     let alive = true;
     storedZipEntries(output.blob).then(
@@ -261,7 +273,7 @@ function EntryWell({ output, entries, announce }: { output: ToolOutput; entries:
   const more = all ? 0 : entries.length - ROWS;
   return (
     <div className="mp-tray w-full shrink-0 p-3 max-sm:order-last sm:w-[240px]" data-testid="result-well">
-      <ul className="flex flex-col" data-testid="result-entries">
+      <ul ref={list} className="flex flex-col" data-testid="result-entries">
         {shown.map((e, i) => (
           <li key={i} className={cx("flex h-11 items-center gap-2 text-sm", !all && i >= ROWS_PHONE && "max-sm:hidden")}>
             <span className="min-w-0 flex-1">
@@ -277,7 +289,13 @@ function EntryWell({ output, entries, announce }: { output: ToolOutput; entries:
       {(more > 0 || (!all && entries.length > ROWS_PHONE)) && (
         <button
           type="button"
-          onClick={() => setAll(true)}
+          onClick={() => {
+            // The first row not shown yet: the 4th row on phones (it is rendered but hidden), else the 5th.
+            const rows = [...(list.current?.children ?? [])] as HTMLElement[];
+            const hidden = rows.findIndex((r) => r.offsetParent === null);
+            revealAt.current = hidden >= 0 ? hidden : rows.length;
+            setAll(true);
+          }}
           className={cx("mt-1 h-11 rounded-sm px-1 font-display text-[15px] font-medium text-brand-strong underline-offset-4 hover:underline", more <= 0 && "sm:hidden")}
         >
           {copy.showAll(entries.length)}

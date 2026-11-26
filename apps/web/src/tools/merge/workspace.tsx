@@ -13,6 +13,7 @@ import { onIntent } from "@/components/tool-flow/intent";
 import type { FlowApi, FlowContext, LoadedFile, ProcessFn } from "@/components/tool-flow/types";
 import {
   A4,
+  fileRunsOf,
   insertPages,
   isBlank,
   moveSegment,
@@ -76,8 +77,8 @@ export const toolbarButton = "mp-btn mp-btn--tool shrink-0 whitespace-nowrap max
 export type PageWorkspace = ReturnType<typeof usePageWorkspace>;
 
 /**
- * `history`: full undo / redo (Organize, Combine & reorder), or none for F3's single undo behind the
- * notice (Merge, AC-79).
+ * `history`: full undo / redo (Merge, Organize, Combine & reorder; I-10, AC-549), or none (Alternate &
+ * mix), which keeps only the single undo behind the removal notice.
  */
 export function usePageWorkspace({ tool, history: full }: { tool: FlowTool; history?: FullHistory }) {
   const historyOn = !!full;
@@ -223,6 +224,8 @@ export function usePageWorkspace({ tool, history: full }: { tool: FlowTool; hist
       api.current?.pushNotice({ tone: "warning", title: c.overPages(tool.flow.maxTotalPages) });
       return false;
     }
+    // Nothing changed (Sort on a list already in that order): no step, no undo notice, nothing to undo.
+    if (next.length === prev.length && next.every((p, i) => p.uid === prev[i].uid && p.rotation === prev[i].rotation)) return true;
     dismissUndoNotice();
     if (historyOn) setHist(H.record(histRef.current, prev, o.step));
     else setHist(o.undo ? H.record(H.emptyHistory, prev, o.step) : H.emptyHistory);
@@ -251,7 +254,7 @@ export function usePageWorkspace({ tool, history: full }: { tool: FlowTool; hist
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey || isTextField(e.target)) return;
-      if (e.target instanceof Element && e.target.closest("[role=dialog]")) return;
+      if (e.target instanceof Element && e.target.closest("dialog[open], [role=dialog]")) return;
       const key = e.key.toLowerCase();
       const isUndo = key === "z" && !e.shiftKey;
       const isRedo = historyOn && ((key === "z" && e.shiftKey) || (key === "y" && e.ctrlKey && !e.shiftKey));
@@ -423,6 +426,8 @@ export function usePageWorkspace({ tool, history: full }: { tool: FlowTool; hist
 
   // ---- derived views ----
   const segments = useMemo(() => segmentsOf(pages), [pages]);
+  /** File runs (no backward split): what Sort and Reverse act on and how many they need (AC-78). */
+  const fileRuns = useMemo(() => fileRunsOf(pages).length, [pages]);
   const readyPages = pages.filter((p) => !p.pending);
   const sourceCount = new Set(readyPages.flatMap((p) => (p.sourceId ? [p.sourceId] : []))).size;
   const viewModel = { pages, sources, files: filesById };
@@ -583,6 +588,7 @@ export function usePageWorkspace({ tool, history: full }: { tool: FlowTool; hist
     files,
     filesById,
     segments,
+    fileRuns,
     readyPages,
     sourceCount,
     viewModel,

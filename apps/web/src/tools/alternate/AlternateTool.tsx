@@ -101,7 +101,7 @@ export function AlternateTool() {
   const sortItems: MenuEntry[] = (["name-asc", "name-desc"] as const).map((k) => ({
     id: k,
     label: a.sortItems[k],
-    disabled: ws.segments.length < 2,
+    disabled: ws.fileRuns < 2,
     onSelect: () => ws.reorder(sortPages(ws.pagesRef.current, ws.sourcesRef.current, k), "sort", a.sorted[k]),
   }));
 

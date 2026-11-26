@@ -285,7 +285,7 @@ export function SegmentGrid({
             icon={<ChevronRightIcon size={16} />}
             onClick={() => moved(() => onMove(card.key, "later"))}
           />
-          <IconButton label={labels.remove(card.name)} size="sm" tabIndex={tab} data-no-drag="" className="max-lg:size-11" icon={<CloseIcon size={16} />} onClick={() => moved(() => onRemove(card.key))} />
+          <IconButton label={labels.remove(card.name)} size="sm" tabIndex={tab} data-no-drag="" className="max-lg:size-11" disabled={dimmed} icon={<CloseIcon size={16} />} onClick={() => moved(() => onRemove(card.key))} />
         </div>
         <div className="flex min-w-0 flex-col gap-2 [grid-area:set]" data-no-drag="" data-testid="card-settings">
           {card.status === "ready" && renderSettings?.(card)}

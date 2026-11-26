@@ -412,7 +412,7 @@ test("ZIP result: each part downloads on its own from the list, Download comes f
   expect(await textsOf(bytes)).toEqual(range(5, 8).map(twelve));
 });
 
-test("ZIP result: more than 4 entries show 4 (3 on a phone), then Show all grows the list in place", async ({ page }, info) => {
+test("ZIP result: more than 4 entries show 4 (3 on a phone), then Show all grows the list in place and focuses the first new row", async ({ page }, info) => {
   await openReady(page, "split-pdf", "twelve.pdf");
   await runDownload(page);
   const rows = page.getByTestId("result-entries").getByRole("listitem");
@@ -420,4 +420,6 @@ test("ZIP result: more than 4 entries show 4 (3 on a phone), then Show all grows
   await page.getByRole("button", { name: "Show all 12" }).click();
   await expect(rows).toHaveCount(12);
   await expect(page.getByRole("button", { name: "Download twelve-12.pdf" })).toBeVisible();
+  // Show all removes itself; focus lands on the first row it revealed, not on the page body.
+  await expect(page.getByRole("button", { name: isDesktop(info.project.name) ? "Download twelve-5.pdf" : "Download twelve-4.pdf" })).toBeFocused();
 });

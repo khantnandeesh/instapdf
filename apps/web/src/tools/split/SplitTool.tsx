@@ -61,8 +61,6 @@ export function SplitTool() {
   const [opts, setOpts] = useRemembered("split-pdf", defaults, check, (stored) =>
     setSplit((s) => ({ ...s, ...(stored.kind ? { kind: stored.kind } : {}), ...(stored.nText ? { nText: stored.nText } : {}) })),
   );
-  // Marks are off while the flow is busy (processing, result): the options say so through ctx.
-  const busy = useRef(false);
   const user = useRef(false);
 
   const onFilesChange = useCallback((all: LoadedFile[]) => {
@@ -95,7 +93,7 @@ export function SplitTool() {
   }, [plan, docCount, files.length, announce]);
 
   const fieldError = m && problem && "field" in problem ? m.rangeErrorText(problem.field, files.map((f) => f.pageCount)) : null;
-  const changed = (opts.pattern !== DEFAULT_PATTERN ? 1 : 0) + (opts.removeBookmarks ? 1 : 0) + (Object.keys(renames).length ? 1 : 0);
+  const changed = (opts.pattern !== DEFAULT_PATTERN ? 1 : 0) + (opts.removeBookmarks ? 1 : 0) + (plan?.documents.some((d) => d.key in renames) ? 1 : 0);
 
   const process: ProcessFn = async (ready, signal, onProgress) => {
     const run = (m ?? (await loadModel())).splitPlan(split, planFiles(ready), { pattern: opts.pattern, renames });
@@ -125,8 +123,9 @@ export function SplitTool() {
           ? { pendingDelta: 0, inScope: false, part: { n: p.part, first: p.first }, leftOut: false, label: c.tile(index + 1, p.part, count) }
           : { pendingDelta: 0, inScope: false, leftOut: true, label: c.tileLeftOut(index + 1) };
       }}
-      renderGap={(file, index, tabIndex) => {
-        if (!m || busy.current || index >= file.pageCount - 1) return null;
+      renderGap={(file, index, tabIndex, busy) => {
+        // Marks are off while the flow is busy (processing, result).
+        if (!m || busy || index >= file.pageCount - 1) return null;
         const state = m.markAfter(parts[file.id] ?? null, index);
         if (state === "hidden") return null;
         const on = state === "on";
@@ -166,9 +165,7 @@ export function SplitTool() {
           }}
         />
       )}
-      renderOptions={(ctx) => {
-        busy.current = ctx.state === "processing" || ctx.state === "done";
-        return (
+      renderOptions={() => (
           <div className="flex min-w-0 items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-side:gap-7 max-sm:flex-1">
             <div className="flex shrink-0 flex-col gap-3.5">
               <Step n={1}>{c.mode}</Step>
@@ -229,8 +226,7 @@ export function SplitTool() {
               )}
             </div>
           </div>
-        );
-      }}
+      )}
     />
   );
 }

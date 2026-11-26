@@ -1162,7 +1162,7 @@ Tokens and presets come from `docs/design/motion.md`. Everything is transform, o
 | `/delete-pdf-pages` | **143 / 153** | same as Extract |
 | `/organize-pdf` | **150 / 160** | Merge's budget. Organize drops `MergeOptions` from the first load and adds its menus and history (~2) |
 | `/combine-reorder-pdf` | **150 / 160** | the Merge code on another route |
-| `/alternate-mix-pdf` | **148 / 158** | Merge workspace minus `MergeOptions`; `EditablePageGrid readOnly` behind `next/dynamic`, prefetched on hover / focus of "Pages" |
+| `/alternate-mix-pdf` | **148 / 158**; cloud build **151 / 160** (lead, 2026-11-26) | Merge workspace minus `MergeOptions`; `EditablePageGrid readOnly` behind `next/dynamic`, prefetched on hover / focus of "Pages". Cloud entry +3, not +2: it shares every first-load chunk with Organize and differs only in its page chunk (150.6 kB after the F4 and tile-rule merges) |
 | `/merge-pdf` | stays **150 / 160** | history, the Add ▾ change and the selection bar fix must fit |
 
 The phone total stays ≤ 170 KB JS.

@@ -124,7 +124,6 @@ const PAGE_TOOL_ICONS = {
   UndoIcon: "arrow-u-up-left@bold",
   RedoIcon: "arrow-u-up-right@bold",
   SelectAllIcon: "selection-all@bold",
-  SelectInverseIcon: "selection-inverse@bold",
   MoreIcon: "dots-three@bold",
 };
 

@@ -40,4 +40,24 @@ describe("LazyThumbnails", () => {
     t.unregister("a");
     expect(calls.slice(3)).toEqual(["request b:0", "cancel b:0", "unregister a"]);
   });
+
+  it("drops the queued calls when the chunk fails to load, and loads again on the next call", async () => {
+    calls.length = 0;
+    const real = await import("./thumbnails");
+    let fail = true;
+    const loader = vi.fn(() => (fail ? Promise.reject(new Error("chunk")) : Promise.resolve(real)));
+    const t = new LazyThumbnails(loader);
+    const done = vi.fn();
+    t.register("a", {} as never);
+    t.request("a", 0, 100, 1, done);
+    await expect(t.load()).rejects.toThrow("chunk");
+    expect(calls).toEqual([]);
+    fail = false;
+    t.register("b", {} as never);
+    await t.load();
+    // Only the call made after the failure runs; the dropped ones never do.
+    expect(calls).toEqual(["register b"]);
+    expect(done).not.toHaveBeenCalled();
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
 });

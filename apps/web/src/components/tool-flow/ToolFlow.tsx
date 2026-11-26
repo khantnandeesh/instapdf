@@ -162,8 +162,8 @@ export type ToolFlowProps = {
   primaryLabel?: () => string;
   /** A tile click (and Enter / Space) toggles the page instead of opening the preview (Extract, Delete). */
   onTileActivate?: TileActivate;
-  /** Drawn in the grid gap after each tile (Split's marks). */
-  renderGap?: (file: LoadedFile, index: number, tabIndex: number) => ReactNode;
+  /** Drawn in the grid gap after each tile (Split's marks). `busy`: processing or showing the result. */
+  renderGap?: (file: LoadedFile, index: number, tabIndex: number, busy: boolean) => ReactNode;
   /** The grid's keyboard hint after "Use arrow keys to move between pages." */
   gridHint?: string;
   /** The dock's More options trigger: after the options, beside the primary on phones. */
@@ -1032,7 +1032,7 @@ export function ToolFlow({
                         renderActions={renderPageActions}
                         onPageKey={onPageKey}
                         onTileActivate={onTileActivate}
-                        renderGap={renderGap}
+                        renderGap={renderGap && ((f, i, t) => renderGap(f, i, t, state === "processing" || state === "done"))}
                         gridHint={gridHint}
                         onRemove={(f) => removeFile(f.id)}
                         onOpen={(f, i) =>

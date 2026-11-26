@@ -242,6 +242,29 @@ test.describe("undo", () => {
     expect(await words(out.bytes)).toEqual(["Bravo 1", "Bravo 2", "Echo 1"]);
   });
 
+  test("AC-549: Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z inside the page picker leave the list behind it alone", async ({ page }) => {
+    await pickMerge(page, "alpha.pdf", "bravo.pdf");
+    await showPages(page);
+    await tileMain(page, "B1").focus();
+    await page.keyboard.press("Delete");
+    const before = ["A1", "A2", "A3", "B2"];
+    expect(await tileLabels(page)).toEqual(before);
+    await chooseAddPages(page, "Pages from a file…");
+    await page.getByTestId("pages-file-input").setInputFiles(fx("three-pages.pdf"));
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByTestId("picker-tile").first().focus();
+    await page.keyboard.press("ControlOrMeta+z");
+    await page.keyboard.press("ControlOrMeta+Shift+z");
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    expect(await tileLabels(page)).toEqual(before);
+    // The removal is still the last step: one Undo brings B1 back.
+    await page.getByTestId("history").getByRole("button", { name: "Undo" }).click();
+    expect(await tileLabels(page)).toEqual(["A1", "A2", "A3", "B1", "B2"]);
+  });
+
   test("AC-79: pages view: Delete removes a tile, Ctrl+Z restores it in place with focus; Reverse is undoable", async ({ page }) => {
     await pickMerge(page, "alpha.pdf", "bravo.pdf");
     await showPages(page);

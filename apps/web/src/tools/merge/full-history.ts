@@ -4,9 +4,9 @@ import type { PageRef } from "@/lib/page-list";
 import type { History, HistoryStep, Snapshot } from "./history";
 
 /**
- * Full undo / redo (spec F4/F5 I-10, AC-549, AC-550) for the tools that have it (Organize, Combine &
- * reorder), passed to `usePageWorkspace({ history: fullHistory })`. It is its own module so Merge,
- * which keeps F3's single undo (AC-79), does not ship it (first-load budget, P-12).
+ * Full undo / redo (spec F4/F5 I-10, AC-549, AC-550) for Merge, Organize and Combine & reorder,
+ * passed to `usePageWorkspace({ history: fullHistory })`. It is its own module so a tool without
+ * history (Alternate & mix) does not ship it (first-load budget, P-12).
  */
 
 /** Repeats the last undone step; null when there is nothing to redo. */

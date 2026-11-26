@@ -19,6 +19,7 @@ export const organizeCopy = {
   twoSidedDone: "Put in two-sided scan order",
   needsTwoPages: "Add more pages to reorder",
   reverseSelectionNeedsTwo: "Select two or more pages to reverse, or none for all",
+  twoSidedSelectionNeedsTwo: "Select two or more pages to put in scan order, or none for all",
   removeSelected: "Remove selected",
   keepOnly: (name: string) => `Keep only ${name}`,
   removeAll: "Remove all",

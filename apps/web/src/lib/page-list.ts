@@ -234,9 +234,17 @@ export function sortPages(pages: readonly PageRef[], sources: Readonly<Record<st
   return flatten(units.map((u) => u.unit));
 }
 
-/** Reverses the order of the segments, keeping page order inside each (AC-78). */
+/**
+ * The file runs of a list: segments that never split where page numbers go backwards. Sort and Reverse
+ * act on these, so they mean "files" (AC-78); AC-501's backward split is for the cards only.
+ */
+export function fileRunsOf(pages: readonly PageRef[]): Segment[] {
+  return segmentsOf(pages, { splitBackward: false });
+}
+
+/** Reverses the order of the file runs, keeping page order inside each (AC-78): applying it twice restores. */
 export function reverseSegments(pages: readonly PageRef[]): PageRef[] {
-  return flatten(segmentsOf(pages).map((s) => s.pages).reverse());
+  return flatten(fileRunsOf(pages).map((s) => s.pages).reverse());
 }
 
 /** "A1" for a source page, "Blank" for a blank page. */

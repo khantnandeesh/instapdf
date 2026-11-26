@@ -52,14 +52,14 @@ export function OrganizeTool() {
   const permute = (how: "reverse" | "two-sided") => {
     const sel = ws.selectionRef.current;
     if (sel.size === 1) {
-      ws.announce(o.reverseSelectionNeedsTwo);
+      ws.announce(how === "reverse" ? o.reverseSelectionNeedsTwo : o.twoSidedSelectionNeedsTwo);
       return;
     }
     const list = pagesRef.current;
     ws.reorder(how === "reverse" ? reverseRange(list, sel) : twoSidedScanPages(list, sel), how === "reverse" ? "reverse" : "sort", how === "reverse" ? mergeCopy.sorted.reverse : o.twoSidedDone);
   };
   const sortItems = (): MenuEntry[] => {
-    const byName = ws.segments.length >= 2;
+    const byName = ws.fileRuns >= 2;
     const reorderable = ws.readyPages.length >= 2;
     const keys = ["name-asc", "name-desc", "date-asc", "date-desc"] as const;
     return [
