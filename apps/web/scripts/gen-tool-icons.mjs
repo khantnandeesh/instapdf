@@ -106,6 +106,16 @@ const UI_ICONS = {
   ArrowRightIcon: "arrow-right@bold",
   ArrowLeftIcon: "arrow-left@bold",
   LeafIcon: "leaf",
+  // Page tools (spec F4/F5 UI P-4, decision 15): bold, drawn bare on small controls.
+  ScissorsIcon: "scissors@bold",
+  TrashIcon: "trash@bold",
+  UndoIcon: "arrow-u-up-left@bold",
+  RedoIcon: "arrow-u-up-right@bold",
+  SelectAllIcon: "selection-all@bold",
+  SelectInverseIcon: "selection-inverse@bold",
+  SlidersIcon: "sliders-horizontal@bold",
+  MoreIcon: "dots-three@bold",
+  DownloadSimpleIcon: "download-simple@bold",
 };
 
 /** "name" is the duotone weight; "name@bold" picks another weight. */

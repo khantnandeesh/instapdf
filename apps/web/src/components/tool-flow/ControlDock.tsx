@@ -47,6 +47,7 @@ export function ControlDock({
   footer,
   density = "compact",
   sheet,
+  more,
 }: {
   label: string;
   layout?: "side" | "bar";
@@ -61,6 +62,12 @@ export function ControlDock({
    */
   density?: "compact" | "full";
   sheet?: { title: string; badge?: string; footer: (close: () => void) => ReactNode };
+  /**
+   * Page tools (spec F4/F5 UI P-3): the More options trigger. It follows the options (in the side
+   * panel under them; in the bar between them and the status). Below 640 px the options take the
+   * first row and the trigger sits beside the primary in the second.
+   */
+  more?: ReactNode;
 }) {
   const desktop = useDesktop();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -111,6 +118,7 @@ export function ControlDock({
       <div
         className={[
           "flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4",
+          more ? "max-sm:flex-row max-sm:flex-wrap max-sm:items-center max-sm:[&>[data-testid=dock-options]]:basis-full" : "",
           side ? "lg:flex-1 lg:flex-col lg:items-stretch" : "lg:mx-auto lg:max-w-[1216px] lg:gap-8",
         ].join(" ")}
       >
@@ -158,10 +166,16 @@ export function ControlDock({
             </span>
           </Button>
         )}
+        {more && (
+          <div className={["flex shrink-0 items-center", side ? "lg:self-start" : ""].join(" ")} data-testid="dock-more">
+            {more}
+          </div>
+        )}
         {full && !side && <span aria-hidden="true" className="hidden lg:block lg:flex-1" />}
         <div
           className={[
             "flex shrink-0 flex-col gap-2 sm:min-w-[200px]",
+            more ? "max-sm:min-w-0 max-sm:flex-1" : "",
             side
               ? // Side panel: pinned to the bottom of the screen while the options run past the fold (sticky, so
                 // the page stays the only scroller), resting at the panel's bottom once they end. It covers the

@@ -2,7 +2,16 @@
 import { useRef, type KeyboardEvent, type ReactNode } from "react";
 import { cx } from "./cx";
 
-export type SegmentOption<T extends string> = { value: T; label: string; shortLabel?: string; icon?: ReactNode };
+export type SegmentOption<T extends string> = {
+  value: T;
+  label: string;
+  shortLabel?: string;
+  icon?: ReactNode;
+  /** Replaces the drawn label (its text is the accessible name), e.g. a shorter one at some widths. */
+  node?: ReactNode;
+  /** Tooltip (title) on the option. */
+  title?: string;
+};
 
 /**
  * Radio group with roving tabindex; arrow keys move and select. Three BerryPDF looks:
@@ -69,6 +78,7 @@ export function SegmentedControl<T extends string>({
             tabIndex={checked ? 0 : -1}
             disabled={disabled}
             onClick={() => onChange(o.value)}
+            title={o.title}
             className={cx(
               tiles ? "mp-choice min-w-0 px-2 py-4 dock-bar:flex-row dock-bar:gap-1.5 dock-bar:py-2.5" : tabs ? "mp-tab" : "mp-btn mp-btn--tool flex-1",
               checked && "ip-seg-checked",
@@ -77,7 +87,9 @@ export function SegmentedControl<T extends string>({
             data-active={!tiles && !tabs && checked ? "" : undefined}
           >
             {tiles && o.icon}
-            {o.shortLabel ? (
+            {o.node ? (
+              o.node
+            ) : o.shortLabel ? (
               <>
                 <span className="lg:hidden">{o.shortLabel}</span>
                 <span className="hidden lg:inline">{o.label}</span>

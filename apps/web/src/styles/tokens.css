@@ -460,6 +460,22 @@
   --color-on-paper-muted: var(--ip-on-paper-muted);
 }
 
+/*
+ * F4/F5 page tools (docs/specs/f4-f5-page-tools.md, UI P-2). No new colours; no existing value changed.
+ */
+:root {
+  --ip-mark-size: 28px; /* visible circle of a Split mark; hit area is --ip-tap-min */
+  --ip-cut-line: var(--ip-slot-bar); /* the cut drawn the full tray height when a mark is on */
+  --ip-part-tone-1: var(--blueberry); /* Split part outline, odd parts: 4.90:1 on cream, 4.24:1 on sand */
+  --ip-part-tone-2: #c46a12; /* Split part outline, even parts (amber): 3.69:1 on cream, 3.19:1 on sand */
+  --ip-part-disc: 24px; /* part number on the first tile of each Split part */
+  --ip-dim-left-out: 0.38; /* page image of a Split tile that is in no part */
+  --ip-dim-marked: 0.32; /* page image of a Delete tile marked for removal (also grayscale) */
+  --ip-stepper-field-w: 56px; /* number field inside NumberStepper */
+  --ip-mix-card-min: 330px; /* minimum column of the wide Alternate card */
+  --ip-bubble-gap: 8px; /* gap between a bar field and its floating hint or error bubble */
+}
+
 /* Fold fit: dvh where supported (it follows mobile browser bars); 100vh above is the fallback. */
 @supports (height: 1dvh) {
   :root {
