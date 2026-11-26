@@ -136,7 +136,11 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
       b.setAppId(appId);
       b.setOrigin(window.location.origin);
       if (ctx.params.multiple) b.enableFeature(gp.Feature.MULTISELECT_ENABLED);
-      const url = b.toUri();
+      // toUri() drops the app ID (build() sends it as `appId`). Without it Drive does not grant
+      // this app drive.file access to the files picked, so the download would 404.
+      const pickerUrl = new URL(b.toUri());
+      if (appId) pickerUrl.searchParams.set("appId", appId);
+      const url = pickerUrl.toString();
       ctx.setPhase("picking");
       const frame = await ctx.frame({ url }, "Google Drive");
       return new Promise<Picked[] | "cancel">((resolve) => {

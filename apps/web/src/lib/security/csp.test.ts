@@ -148,7 +148,7 @@ describe("F23: cloudPolicy (research §2.1)", () => {
     const d = directives(cloudPolicy("google", { scriptHashes: ["sha256-AAA="] }));
     expect(d.get("script-src")).toEqual(["'self'", "'sha256-AAA='", "https://apis.google.com/js/api.js", "https://apis.google.com/_/scs/", "https://accounts.google.com/gsi/client"]);
     expect(d.get("connect-src")).toEqual(["'self'", "https://www.googleapis.com/drive/v3/files", "https://www.googleapis.com/drive/v3/files/", "https://www.googleapis.com/upload/drive/v3/files", "https://accounts.google.com/gsi/"]);
-    expect(d.get("frame-src")).toEqual(["https://docs.google.com/picker", "https://accounts.google.com/gsi/"]);
+    expect(d.get("frame-src")).toEqual(["https://docs.google.com", "https://drive.google.com", "https://accounts.google.com"]);
     expect(d.get("form-action")).toEqual(["'self'"]);
     const dbx = directives(cloudPolicy("dropbox"));
     expect(dbx.get("script-src")).toEqual(["'self'", "https://www.dropbox.com/static/api/2/dropins.js"]);
