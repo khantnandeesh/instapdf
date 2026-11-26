@@ -22,7 +22,7 @@ type Gis = {
   };
   picker: Record<string, unknown> & {
     DocsView: new (viewId?: unknown) => { setMimeTypes(m: string): unknown; setIncludeFolders(b: boolean): unknown; setSelectFolderEnabled(b: boolean): unknown; setMode(m: unknown): unknown };
-    PickerBuilder: new () => Record<string, (...a: unknown[]) => unknown> & { toUri: () => string };
+    PickerBuilder: new () => Record<string, (...a: unknown[]) => unknown> & { toUri: () => unknown };
     ViewId: { DOCS: unknown };
     DocsViewMode: { LIST: unknown };
     Feature: { MULTISELECT_ENABLED: unknown };
@@ -76,7 +76,8 @@ export function findPickerResponse(data: unknown, depth = 0): { action: string; 
  * (PickerBuilder.setAuthUser does the same, but it is undocumented). Parameters are appended,
  * so the rest of toUri()'s query stays byte for byte.
  */
-export function pickerUrl(base: string, { appId = "", authUser = "" }: { appId?: string; authUser?: string } = {}): string {
+export function pickerUrl(uri: unknown, { appId = "", authUser = "" }: { appId?: string; authUser?: string } = {}): string {
+  const base = String(uri); // toUri() returns a URL object (not a string) in the live library
   const cut = base.indexOf("#");
   let url = cut < 0 ? base : base.slice(0, cut); // parameters go before any #fragment
   const hash = cut < 0 ? "" : base.slice(cut);
