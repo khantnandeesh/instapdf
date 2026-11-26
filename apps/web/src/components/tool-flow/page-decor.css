@@ -71,6 +71,15 @@
   place-items: center;
   pointer-events: none;
 }
+/* Below 1024 px no control sits on a page (PT-1 rule 6): the mark is level with the tile's 44px number
+   line instead (PageTile gives a tile with a mark that line), like Merge's insert points. */
+@media (max-width: 1023px) {
+  .ip-split-slot {
+    top: auto;
+    bottom: var(--ip-tile-pad);
+    height: var(--ip-tap-min);
+  }
+}
 .ip-split-mark {
   position: relative;
   display: grid;

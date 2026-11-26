@@ -154,7 +154,8 @@ export function PageTile({
         )}
       </div>
       {/* Page number in Fredoka 600, muted (5.19:1 on the cream work area); Split adds the part. */}
-      <span className="ip-tile__n h-5 max-w-full truncate tabular-nums" aria-hidden="true">
+      {/* Below 1024 px a tile with a gap mark (Split) gets a 44px number line: the marks sit level with it, off the page (PT-1 rule 6). */}
+      <span className={cx("ip-tile__n max-w-full truncate tabular-nums", compact && gap ? "h-11 leading-11" : "h-5")} aria-hidden="true">
         {index + 1}
         {part && <span data-testid="part-label"> · Part {part.n}</span>}
       </span>

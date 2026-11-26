@@ -2,8 +2,11 @@
  * Page tiles rule (docs/design/berrypdf.md "Page tiles", owner 2026-11-26): the page fills at least
  * 90% of its tile's width (--ip-tile-fill), the tile's edge is at most 8px each side, and the tile has
  * no filled background (no pink tray). Checked at 1280x800, 390x844 and 320x568 on Rotate, Merge's files
- * view and Merge's pages view, with A4 portrait pages (the common and the narrowest case the rule covers).
- * Below 1024 px no control may sit on a page (rule 6), and Merge's toolbar fits a 320 px screen.
+ * view and Merge's pages view, with A4 portrait pages (the common and the narrowest case the rule covers),
+ * and on the page tools: Split, Extract and Delete (with their states: part outlines and marks, picked
+ * and marked pages), Organize, Combine & reorder, and Alternate & mix (its wide file cards follow rule 3
+ * and rule 6; its read-only result view uses plain tiles). Below 1024 px no control may sit on a page
+ * (rule 6), and Merge's toolbar fits a 320 px screen.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { fx } from "../support/flow";
@@ -75,6 +78,53 @@ for (const [w, h] of [
       await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
       await expect(page.getByTestId("page-visual")).toHaveCount(3);
       await check(page, "[role=listitem]:has([data-testid=page-tile])", "[data-testid=page-visual]", "rotate");
+    });
+
+    test(`Split, Extract and Delete: the page fills >= ${FILL * 100}% of its tile, with their states on`, async ({ page }) => {
+      const tiles = "[role=listitem]:has([data-testid=page-tile])";
+      for (const slug of ["split-pdf", "extract-pdf-pages", "delete-pdf-pages"]) {
+        await page.goto(`/${slug}`);
+        await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
+        await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
+        await expect(page.getByTestId("page-visual")).toHaveCount(3);
+        // A state on the first page: Extract picks it, Delete marks it (a tap on the tile toggles both).
+        if (slug !== "split-pdf") {
+          await page.getByTestId("page-tile").first().locator("[data-tile-button]").click();
+          await expect(page.locator(slug === "delete-pdf-pages" ? "[data-marked]" : "[data-picked]")).toHaveCount(1);
+        }
+        await check(page, tiles, "[data-testid=page-visual]", slug);
+      }
+    });
+
+    test(`Organize and Combine & reorder: the page fills >= ${FILL * 100}% of its tile`, async ({ page }) => {
+      for (const slug of ["organize-pdf", "combine-reorder-pdf"]) {
+        await page.goto(`/${slug}`);
+        await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
+        await page.getByTestId("file-input").setInputFiles([fx("alpha.pdf"), fx("three-pages.pdf")]);
+        await expect(page.locator("[data-uid] [data-tile-box] > span:first-child")).toHaveCount(6);
+        await check(page, "[data-uid]", "[data-tile-box] > span:first-child", `${slug} pages`);
+        await page.getByRole("radio", { name: "Files" }).click();
+        await expect(page.locator("[data-testid=file-card] [data-card-box] > span:first-child")).toHaveCount(2);
+        await check(page, "[data-testid=file-card]", "[data-card-box] > span:first-child", `${slug} files`);
+      }
+    });
+
+    test("Alternate & mix: file cards keep controls off the page and the name under it; the result view uses plain tiles", async ({ page }) => {
+      await page.goto("/alternate-mix-pdf");
+      await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
+      await page.getByTestId("file-input").setInputFiles([fx("alpha.pdf"), fx("three-pages.pdf")]);
+      const box = "[data-card-box] > span:first-child";
+      await expect(page.locator(`[data-testid=file-card] ${box}`)).toHaveCount(2);
+      // Rule 6 at every width for the wide cards (their controls never float over the page), and rule 3.
+      await expect.poll(() => onPage(page, box, "alternate cards"), { timeout: 5000 }).toEqual([]);
+      const under = await page.getByTestId("file-card").evaluateAll((cards, box) =>
+        cards.map((c) => c.querySelector("[data-testid=file-name]")!.getBoundingClientRect().top >= c.querySelector(box)!.getBoundingClientRect().bottom - 0.5),
+      box);
+      expect(under).toEqual([true, true]);
+      await expect.poll(() => page.getByTestId("file-card").evaluateAll((cards) => cards.map((c) => getComputedStyle(c).backgroundColor)), { timeout: 5000 }).toEqual(["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)"]);
+      await page.getByRole("radio", { name: "Pages" }).click();
+      await expect(page.locator("[data-uid] [data-tile-box] > span:first-child")).toHaveCount(6);
+      await check(page, "[data-uid]", "[data-tile-box] > span:first-child", "alternate result");
     });
 
     test(`Merge files and pages views: the page fills >= ${FILL * 100}% of its tile`, async ({ page }) => {
