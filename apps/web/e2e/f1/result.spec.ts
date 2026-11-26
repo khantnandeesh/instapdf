@@ -63,7 +63,7 @@ test("AC-43: Continue with Rotate opens ready with the output loaded; rotating a
   await page.getByRole("button", { name: "Rotate", exact: true }).click();
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
   await expect(tiles(page)).toHaveCount(3);
-  await expect(page.getByRole("button", { name: "Choose PDF files" })).toHaveCount(0); // no picker step
+  await expect(page.getByRole("button", { name: "Choose files" })).toHaveCount(0); // no picker step
   // The loaded file is the output: its pages are landscape on screen with nothing pending.
   for (let i = 0; i < 3; i++) {
     await expect(tiles(page).nth(i)).toHaveAttribute("data-rotation", "0");
@@ -82,7 +82,7 @@ test("AC-44: Start over returns to empty with no thumbnails, and a new pick work
   await run(page);
   await startOver(page);
   await expect(tiles(page)).toHaveCount(0);
-  await expect(primary(page)).toBeDisabled();
+  await expect(primary(page)).toHaveCount(0); // F25 AC-600: no primary while empty
   await pickReady(page, "pre-rotated.pdf");
   await expect(tiles(page)).toHaveCount(3);
   await expect(tiles(page).nth(0)).toHaveAttribute("data-rotation", "0"); // old pending rotation is gone
@@ -92,7 +92,7 @@ test("AC-44: Start over returns to empty with no thumbnails, and a new pick work
   expect(await rotationsOf(out.bytes)).toEqual([0, 90, 0]);
 });
 
-test("AC-45: Back to options keeps the file and pending rotations", async ({ page }) => {
+test("AC-45: Back to editing keeps the file and pending rotations", async ({ page }) => {
   await pickReady(page, "three-pages.pdf");
   await page.getByRole("button", { name: "Rotate page 2 right" }).click();
   await run(page);
@@ -133,7 +133,8 @@ test("AC-46: a processing failure shows Retry and Start over; Retry keeps file a
   await expect(flow(page)).toHaveAttribute("data-state", "error");
   const panel = page.getByTestId("process-error");
   await expect(panel).toBeVisible();
-  await expect(panel.getByRole("button", { name: "Start over" })).toBeVisible();
+  // F25 AC-638: the slot keeps the danger line and Try again; Start over lives in the NoticeStack notice.
+  await expect(page.getByTestId("notice").getByRole("button", { name: "Start over" })).toBeVisible();
   const retry = panel.getByRole("button", { name: "Try again" });
   await expect(retry).toBeFocused();
   await expect(tiles(page)).toHaveCount(3);
@@ -153,10 +154,10 @@ test("AC-47: every error message is dismissible and none leaves the primary enab
     await pick(page, name);
     const alert = alerts.filter({ hasText: name });
     await expect(alert).toBeVisible();
-    await expect(primary(page)).toBeDisabled();
+    await expect(primary(page)).toHaveCount(0); // F25 AC-600: no primary while empty
     await alert.getByRole("button", { name: /^Dismiss/ }).click();
     await expect(alert).toHaveCount(0);
-    await expect(primary(page)).toBeDisabled();
+    await expect(primary(page)).toHaveCount(0); // F25 AC-600: no primary while empty
   }
   // A batch of problems becomes one dismissible notice listing each file.
   await pick(page, "notes.txt", "corrupt.pdf", "empty.pdf");
@@ -165,7 +166,7 @@ test("AC-47: every error message is dismissible and none leaves the primary enab
   await expect(batch).toContainText("notes.txt");
   await expect(batch).toContainText("corrupt.pdf");
   await expect(batch).toContainText("empty.pdf");
-  await expect(primary(page)).toBeDisabled();
+  await expect(primary(page)).toHaveCount(0); // F25 AC-600: no primary while empty
   await batch.getByRole("button", { name: /^Dismiss/ }).click();
   await expect(alerts).toHaveCount(0);
   // The file-count warning is dismissible too, and files did load, so the primary is usable.
@@ -183,7 +184,7 @@ test("AC-47: every error message is dismissible and none leaves the primary enab
   await passwordField(page).press("Enter");
   await expect(page.getByTestId("password-error")).toContainText("didn't work");
   await dialog(page).getByRole("button", { name: "Skip this file" }).click();
-  await expect(primary(page)).toBeDisabled();
+  await expect(primary(page)).toHaveCount(0); // F25 AC-600: no primary while empty
 });
 
 test("AC-54: the preview shows the whole page inside its square and never covers the file name", async ({ page }) => {
@@ -216,7 +217,9 @@ test("AC-54: the result previews the output's first page (landscape after +90°)
   await startOver(page);
   await pickReady(page, "three-pages.pdf", "sixty-pages.pdf");
   await run(page);
-  await expect(page.getByTestId("result-preview")).toHaveCount(0);
+  // F25 AC-649: a ZIP previews its first entry with "1 / n files", beside the entry list.
+  await expect(page.getByTestId("result-preview")).toBeVisible();
+  await expect(page.getByTestId("result-counter")).toHaveText("1 / 2 files");
   const entries = page.getByTestId("result-entries");
   await expect(entries.getByRole("listitem")).toHaveCount(2);
   await expect(entries.getByRole("listitem").nth(0)).toContainText("three-pages.pdf");

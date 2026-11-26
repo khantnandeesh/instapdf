@@ -74,10 +74,11 @@ test.describe("desktop", () => {
     await expect(page.getByTestId("mode-hint")).toHaveCount(0);
   });
 
-  test("the selection popover leaves the rotate handle free, and tool options stay in the top bar", async ({ page }) => {
+  test("the selection popover leaves the rotate handle free, and tool options stay in the properties panel", async ({ page }) => {
     await open(page);
     await drawRect(page);
-    await expect(page.locator(".ed-top__slot")).not.toBeEmpty();
+    // F25 E1: tool options moved from the top bar to the properties panel.
+    await expect(page.getByTestId("editor-props")).not.toBeEmpty();
     const rot = (await page.locator('.ed-rotate').boundingBox())!;
     const pop = page.locator("[data-popover].ed-popover");
     await expect(pop).toBeVisible();

@@ -323,6 +323,40 @@ for (const size of SIZES) {
       await expectEscapeCloses(page, "move to position");
     });
 
+    test("More options (F25 §3.3): a popover under its trigger from 1024 px, the sheet below; Escape closes it and focus returns", async ({ page }) => {
+      await openTool(page, "merge-pdf", ["alpha.pdf", "bravo.pdf"]);
+      await ready(page);
+      const trigger = page.getByTestId("options-button");
+      await trigger.click();
+      if (size.project === "desktop") {
+        const pop = page.getByTestId("options-popover");
+        await expect(pop).toBeVisible();
+        await expect(pop).toHaveAttribute("role", "dialog");
+        await expect(pop).toHaveAttribute("aria-modal", "false");
+        // Under its trigger, right-aligned to it, and inside the screen.
+        const t = (await trigger.boundingBox())!;
+        const b = (await pop.boundingBox())!;
+        expect(b.y).toBeGreaterThanOrEqual(t.y + t.height);
+        expect(Math.abs(b.x + b.width - (t.x + t.width))).toBeLessThanOrEqual(1);
+        expect(b.y + b.height).toBeLessThanOrEqual(size.height);
+        // Focus goes into it; the page behind stays usable (non-modal).
+        expect(await pop.evaluate((p) => p.contains(document.activeElement))).toBe(true);
+        await page.keyboard.press("Escape");
+        await expect(pop).toHaveCount(0);
+        await expect(trigger).toBeFocused();
+        // A click outside closes it too.
+        await trigger.click();
+        await expect(pop).toBeVisible();
+        await page.getByRole("heading", { level: 1 }).click();
+        await expect(pop).toHaveCount(0);
+      } else {
+        const dialog = openDialog(page);
+        await expect(dialog.getByTestId("options-sheet")).toBeVisible();
+        await expectNormalButtons(dialog, "options sheet", false);
+        await expectEscapeCloses(page, "options sheet");
+      }
+    });
+
     test("editor sign dialog", async ({ page }) => {
       await page.goto("/edit-pdf");
       await page.getByTestId("editor-input").setInputFiles(fx("three-pages.pdf"));

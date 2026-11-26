@@ -132,11 +132,11 @@ test("AC-452, AC-453, AC-454: Odd and Even pick and fill the field; a click then
   await expect(field(page)).toHaveValue("1, 3, 5, 7, 9, 11");
   let out = await runDownload(page);
   expect(await textsOf(out.bytes)).toEqual([1, 3, 5, 7, 9, 11].map(twelve));
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await pick(page, "Even").click();
   out = await runDownload(page);
   expect(await textsOf(out.bytes)).toEqual([2, 4, 6, 8, 10, 12].map(twelve));
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await pick(page, "Odd").click();
   await tile(page, 2).click();
   expect(await pressedPages(page)).toEqual([1, 2, 3, 5, 7, 9, 11]);
@@ -150,7 +150,7 @@ test("AC-455, AC-456: 9, 2-3 runs in document order and reads 2-3, 9 after blur;
   await expect(field(page)).toHaveValue("2-3, 9");
   let out = await runDownload(page);
   expect(await textsOf(out.bytes)).toEqual([2, 3, 9].map(twelve));
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await tile(page, 1).focus();
   await page.keyboard.press("ControlOrMeta+a");
   await expect.poll(() => pressedPages(page)).toHaveLength(12);
@@ -167,7 +167,7 @@ test("AC-457, AC-458: 5-6, 10 keeps Middle (Detail) and End, not Intro; Remove b
     { title: "Middle", page: 1, children: [{ title: "Detail", page: 2, children: [] }] },
     { title: "End", page: 3, children: [] },
   ]);
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await openMore(page);
   await page.getByRole("switch", { name: "Remove bookmarks" }).check();
   await closeMore(page);
@@ -210,12 +210,12 @@ test("AC-407, AC-408, AC-460: two files share the field; a click changes one fil
   expect(out.name).toBe("berrypdf-extract.zip");
   expect(out.entries!.map(([n]) => n)).toEqual(["twelve.pdf", "three-pages.pdf"]);
   expect(await textsOf(out.entries![1][1])).toEqual(["Page 1", "Page 2"]);
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await typeRange(page, "3-5");
   out = await runDownload(page);
   expect(await textsOf(out.entries![0][1])).toEqual([3, 4, 5].map(twelve));
   expect(await textsOf(out.entries![1][1])).toEqual(["Page 3"]);
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await typeRange(page, "10-12");
   await expect(page.getByText("three-pages.pdf has none of these pages, so it's skipped.")).toBeVisible();
   out = await runDownload(page);

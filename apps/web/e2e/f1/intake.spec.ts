@@ -30,10 +30,10 @@ test("AC-1: empty state has one multi-file PDF picker, no thumbnails and a disab
   await expect(fileInput(page)).toHaveCount(1);
   await expect(fileInput(page)).toHaveAttribute("accept", /\.pdf/);
   await expect(fileInput(page)).toHaveAttribute("multiple", "");
-  await expect(page.getByRole("button", { name: "Choose PDF files" })).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "Choose PDF files" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Choose files" })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Choose files" })).toBeVisible();
   await expect(tiles(page)).toHaveCount(0);
-  await expect(primary(page)).toBeDisabled();
+  await expect(primary(page)).toHaveCount(0); // F25 AC-600: no primary while empty
 });
 
 test("AC-2: picking three-pages.pdf reaches ready with 3 thumbnails labeled 1, 2, 3", async ({ page }) => {
@@ -170,7 +170,7 @@ test("AC-13: corrupt.pdf shows an error naming it, returns to empty, primary sta
   await pick(page, "corrupt.pdf");
   await expect(page.getByRole("alert").filter({ hasText: "corrupt.pdf" })).toBeVisible();
   await expect(flow(page)).toHaveAttribute("data-state", "empty");
-  await expect(primary(page)).toBeDisabled();
+  await expect(primary(page)).toHaveCount(0); // F25 AC-600: no primary while empty
   await expect(tiles(page)).toHaveCount(0);
 });
 
@@ -178,7 +178,7 @@ test("AC-14: empty.pdf (0 bytes) behaves like a corrupt file", async ({ page }) 
   await pick(page, "empty.pdf");
   await expect(page.getByRole("alert").filter({ hasText: "empty.pdf" })).toBeVisible();
   await expect(flow(page)).toHaveAttribute("data-state", "empty");
-  await expect(primary(page)).toBeDisabled();
+  await expect(primary(page)).toHaveCount(0); // F25 AC-600: no primary while empty
 });
 
 test("AC-15: a wrong type next to a PDF shows the error and still loads the PDF", async ({ page }) => {
@@ -239,7 +239,7 @@ test("Edge: an empty selection (chooser closed with no file) changes nothing", a
   await page.waitForTimeout(200);
   await expect(flow(page)).toHaveAttribute("data-state", "empty");
   await expect(page.locator("[data-testid=tool-flow] [role=alert]")).toHaveCount(0);
-  await expect(primary(page)).toBeDisabled();
+  await expect(primary(page)).toHaveCount(0); // F25 AC-600: no primary while empty
 });
 
 test("Edge: cancel mid-way by removing a file while it is still loading", async ({ page }, info) => {

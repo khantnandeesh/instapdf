@@ -320,7 +320,7 @@ test("AC-144, AC-145: unreachable and denied are named inline; local files still
   await expect(page.getByRole("alert").filter({ hasText: "Google Drive access wasn't given." }).getByRole("button", { name: "Try again" })).toBeVisible();
   await win.close();
   // Choose files still opens the file chooser, and a drop still adds a file.
-  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("drop-card").getByRole("button", { name: "Choose PDF files", exact: true }).click()]);
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("drop-card").getByRole("button", { name: "Choose files", exact: true }).click()]);
   await chooser.setFiles("tests/fixtures/alpha.pdf");
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
   await expect(tiles(page)).toHaveCount(3);

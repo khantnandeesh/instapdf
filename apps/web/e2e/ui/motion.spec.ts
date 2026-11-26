@@ -681,7 +681,7 @@ for (const size of SIZES) {
       await expect(enlarge).toBeFocused();
     });
 
-    test("10: focus never drops to <body> while the work area leaves for the result, and on Back to options", async ({ page }) => {
+    test("10: focus never drops to <body> while the work area leaves for the result, and on Back to editing", async ({ page }) => {
       const hits = watchEngine(page);
       await openMerge(page);
       await primeEngine(page, hits);
@@ -704,6 +704,9 @@ for (const size of SIZES) {
         tick();
       });
       await page.getByTestId("primary-action").click();
+      // F25 §6: the pill in the slot is the only progress; there is no berry overlay over the work.
+      await expect(page.getByTestId("action-slot").getByTestId("processing").or(page.getByTestId("result"))).toBeVisible();
+      await expect(page.locator("[data-testid=processing-loader], .mp-loading, .mp-berry-loader")).toHaveCount(0);
       const download = page.getByRole("link", { name: "Download" });
       await expect(download).toBeFocused({ timeout: 30_000 });
       const trail = await page.evaluate(() => (window as unknown as { focusTrail: string[] }).focusTrail);
@@ -711,14 +714,14 @@ for (const size of SIZES) {
       expect(trail, "focus on the way to the result").not.toContain("body");
       expect(trail.at(-1)).toBe("a");
 
-      // Back to options: the card leaves (inert) with focus on the tool heading, and the work area returns.
+      // Back to editing: the card leaves (inert) with focus on the tool heading, and the work area returns.
       await page.evaluate(() => ((window as unknown as { focusTrail: string[] }).focusTrail = []));
-      await page.getByRole("button", { name: "Back to options" }).click();
+      await page.getByRole("button", { name: "Back to editing" }).click();
       await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
       await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
       await expect.poll(() => page.evaluate(() => (window as unknown as { __motionLive: number }).__motionLive)).toBe(0);
-      expect(await page.evaluate(() => (window as unknown as { focusTrail: string[] }).focusTrail), "focus on Back to options").not.toContain("body");
-      expect(await strayTransforms(page), "after Back to options").toEqual([]);
+      expect(await page.evaluate(() => (window as unknown as { focusTrail: string[] }).focusTrail), "focus on Back to editing").not.toContain("body");
+      expect(await strayTransforms(page), "after Back to editing").toEqual([]);
     });
 
     for (const path of [

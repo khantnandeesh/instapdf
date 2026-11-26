@@ -93,18 +93,20 @@ export async function hugePngPayload() {
   return { name: "huge.png", mimeType: "image/png", buffer: out };
 }
 
-/** Opens the Merge options: inline in the dock at >= 1024 px, the bottom sheet below. Returns the panel. */
+/** The options surface: the bottom sheet below 1024 px, the More options popover from 1024 px (F25 §3.3). */
+const optionsSurface = (page: Page) => page.getByTestId("options-sheet").or(page.getByTestId("options-popover"));
+/** Opens the Merge options: inline in the dock, else the sheet or popover. Returns the panel. */
 export async function mergeOptions(page: Page) {
   if (await page.getByTestId("options-button").isVisible()) {
     await page.getByTestId("options-button").click();
-    await expect(page.getByTestId("options-sheet")).toBeVisible();
-    return page.getByTestId("options-sheet");
+    await expect(optionsSurface(page)).toBeVisible();
+    return optionsSurface(page);
   }
   return page.getByTestId("merge-options");
 }
-/** Closes the options sheet if it is open (no-op for the inline panel). */
+/** Closes the options sheet or popover if it is open (no-op for the inline panel). */
 export async function closeMergeOptions(page: Page) {
-  const sheet = page.getByTestId("options-sheet");
+  const sheet = optionsSurface(page);
   if (await sheet.isVisible()) {
     await page.getByRole("dialog").getByRole("button", { name: "Done" }).click();
     await expect(sheet).toBeHidden();

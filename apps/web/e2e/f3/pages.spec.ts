@@ -66,7 +66,7 @@ test("AC-19, AC-36: dragging B1 between A1 and A2; the files view shows 4 segmen
   await expect(page.getByTestId("file-meta").nth(2)).toHaveText("pages 2–3 of 3");
   const fromFiles = await texts(page);
   expect(fromFiles.texts).toEqual(["Alpha 1", "Bravo 1", "Alpha 2", "Alpha 3", "Bravo 2"]);
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await showPages(page);
   expect((await texts(page)).texts).toEqual(fromFiles.texts);
 });
@@ -327,13 +327,13 @@ test("AC-68: combined edits match the pages view exactly", async ({ page }) => {
   expect(out.doc.getPages().map((p) => p.getRotation().angle)).toEqual([0, 0, 0, 0, 0, 90]);
 });
 
-test("AC-45 (F1) adapted: Back to options keeps page edits", async ({ page }) => {
+test("AC-45 (F1) adapted: Back to editing keeps page edits", async ({ page }) => {
   await pickMerge(page, "alpha.pdf", "bravo.pdf");
   await showPages(page);
   await tileMain(page, "B2").focus();
   await page.keyboard.press("Alt+Home");
   await run(page);
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await expect(page.getByTestId("page-grid")).toBeVisible();
   expect((await tileLabels(page))[0]).toBe("B2");
 });

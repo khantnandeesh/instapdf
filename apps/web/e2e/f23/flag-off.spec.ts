@@ -55,7 +55,7 @@ test("AC-120: the HTML and the first-load scripts carry no cloud code", async ({
 test("AC-120, E6: the editor's landing has no sources trigger, row or provider name", async ({ page }) => {
   await page.goto("/edit-pdf");
   await expect(page.getByTestId("editor")).toHaveAttribute("data-hydrated", "true");
-  await expect(page.getByRole("button", { name: "Open PDF", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Choose PDF", exact: true })).toBeVisible();
   for (const id of ["cloud-caret", "cloud-row"]) await expect(page.getByTestId(id), id).toHaveCount(0);
   expect(await page.locator("body").innerText()).not.toMatch(PROVIDERS);
   await expect(page.locator("[aria-haspopup=menu]").filter({ hasText: PROVIDERS })).toHaveCount(0);

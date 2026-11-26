@@ -303,13 +303,14 @@ test("AC-251: with Tab order open, every field shows its number and a sort renum
   await expect(page2).toHaveText(["5", "6", "7"]);
 });
 
-test("AC-253: the Form tool keeps its place: the rail fits 1366x657, and phones find Form in More", async ({ page }) => {
+test("AC-253: the Form tool keeps its place: the editor bar's tools fit 1366x657, and phones find Form in More", async ({ page }) => {
   await open(page, await fillable());
   const vw = page.viewportSize()!.width;
   if (vw >= 1024) {
     await page.setViewportSize({ width: 1366, height: 657 });
-    const rail = page.locator(".ed-rail");
-    expect(await rail.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+    // F25 E1: the rail became the tools row in the editor bar.
+    const rail = page.getByTestId("editor-tools");
+    expect(await rail.evaluate((el) => el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1)).toBe(true);
     await expect(page.getByRole("button", { name: /^Form/ })).toBeInViewport({ ratio: 1 });
     await page.screenshot({ path: test.info().outputPath("rail-1366x657.png") });
   } else {

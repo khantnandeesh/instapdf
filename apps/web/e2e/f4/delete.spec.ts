@@ -154,7 +154,7 @@ test("AC-471, AC-472: deleting page 5 moves Detail up; Remove bookmarks drops th
     { title: "Detail", page: 5, children: [] },
     { title: "End", page: 9, children: [] },
   ]);
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await openMore(page);
   await page.getByRole("switch", { name: "Remove bookmarks" }).check();
   await closeMore(page);
@@ -192,7 +192,7 @@ test("AC-474, AC-543: two files: 1 gives berrypdf-delete.zip; 1-3 names three-pa
   expect(await textsOf(out.entries![0][1])).not.toContain(twelve(12));
   expect(await pageCountOf(out.entries![0][1])).toBe(11);
   expect(await textsOf(out.entries![1][1])).toEqual(["Page 1", "Page 2"]);
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await typeRange(page, "1");
   out = await runDownload(page);
   expect(out.name).toBe("berrypdf-delete.zip");

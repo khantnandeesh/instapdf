@@ -14,7 +14,6 @@ import {
   mark,
   openMore,
   openReady,
-  openTool,
   outlineOf,
   pageCountOf,
   primary,
@@ -224,7 +223,7 @@ test("AC-430: renaming a part in More options names its entry; a slash becomes a
   await closeMore(page);
   let out = await runDownload(page);
   expect(out.entries!.map(([n]) => n)).toEqual(["intro.pdf", "twelve-5-10.pdf", "twelve-11-12.pdf"]);
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await openMore(page);
   await page.getByRole("button", { name: "Rename intro.pdf" }).click();
   await page.getByRole("textbox", { name: "Rename intro.pdf" }).fill("a/b");
@@ -246,7 +245,7 @@ test("AC-431, AC-432: the name pattern defaults to {name}-{pages}; {name}_part{n
   await closeMore(page);
   let out = await runDownload(page);
   expect(out.entries!.map(([n]) => n)).toEqual(["twelve_part1.pdf", "twelve_part2.pdf", "twelve_part3.pdf"]);
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await openMore(page);
   await page.getByRole("textbox", { name: "Name pattern" }).fill("{name}");
   await closeMore(page);
@@ -425,18 +424,24 @@ test("ZIP result: more than 4 entries show 4 (3 on a phone), then Show all grows
   await expect(page.getByRole("button", { name: isDesktop(info.project.name) ? "Download twelve-5.pdf" : "Download twelve-4.pdf" })).toBeFocused();
 });
 
-test("Fit the first screen: at 1366x657 the empty side panel shows More options right under the steps, above the status", async ({ page }, info) => {
-  test.skip(!isDesktop(info.project.name), "side panel layout, desktop");
+test("Fit the first screen: at 1366x657 the top row holds the steps, then More options, then the status, all on screen", async ({ page }, info) => {
+  test.skip(!isDesktop(info.project.name), "top row layout, desktop");
+  // F25 §3 supersedes the F4/F5 P-3 empty side panel: the options live in the loaded top row.
   await page.setViewportSize({ width: 1366, height: 657 });
-  await openTool(page, "split-pdf");
-  const group = page.getByRole("radiogroup", { name: "Split" });
-  const more = (await page.getByTestId("more-options").boundingBox())!;
+  await openReady(page, "split-pdf", "twelve.pdf");
+  const row = page.locator("[data-ip-dock=row]");
+  const group = row.getByRole("radiogroup", { name: "Split" });
+  const more = (await row.getByTestId("more-options").boundingBox())!;
   const tiles = (await group.getByRole("radio", { name: "Custom" }).boundingBox())!;
   const st = (await status(page).boundingBox())!;
-  expect(more.y, "More options follows the step tiles").toBeGreaterThan(tiles.y + tiles.height);
-  expect(more.y - (tiles.y + tiles.height), "no empty slot between the steps and More options").toBeLessThan(48);
-  expect(more.y + more.height, "More options sits fully above the pinned status").toBeLessThanOrEqual(st.y);
-  expect(st.y + st.height, "the footer fits the screen").toBeLessThanOrEqual(657);
+  const rowBox = (await row.boundingBox())!;
+  expect(more.x, "More options follows the step tiles").toBeGreaterThan(tiles.x + tiles.width);
+  expect(st.x, "the status follows More options").toBeGreaterThan(more.x + more.width);
+  for (const [what, b] of [["steps", tiles], ["More options", more], ["status", st]] as const) {
+    expect(b.y, `${what} inside the row`).toBeGreaterThanOrEqual(rowBox.y - 1);
+    expect(b.y + b.height, `${what} inside the row`).toBeLessThanOrEqual(rowBox.y + rowBox.height + 1);
+  }
+  expect(rowBox.x + rowBox.width, "the row fits the screen").toBeLessThanOrEqual(1366);
   const lines = await group.getByRole("radio", { name: /Every N/ }).evaluate((tile) => {
     // The visible label's text node: one line box means no wrap.
     const walker = document.createTreeWalker(tile, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentElement?.closest(".sr-only") || !n.textContent?.trim() ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });

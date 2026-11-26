@@ -37,16 +37,18 @@ async function backTabTo(page: Page, target: ReturnType<Page["locator"]>, max = 
  * Opens the options. With files loaded the dock is the bottom bar (fold fit), so Merge's many
  * options sit behind the Options button there at every width; inline only in the empty side panel.
  */
+/** The options surface: the sheet below 1024 px, the More options popover from 1024 px (F25 §3.3). */
+const optionsSurface = (page: Page) => page.getByTestId("options-sheet").or(page.getByTestId("options-popover"));
 async function options(page: Page) {
   if (await page.getByTestId("options-button").isVisible()) {
     await page.getByTestId("options-button").click();
-    await expect(page.getByTestId("options-sheet")).toBeVisible();
-    return page.getByTestId("options-sheet");
+    await expect(optionsSurface(page)).toBeVisible();
+    return optionsSurface(page);
   }
   return page.getByTestId("merge-options");
 }
 async function closeOptions(page: Page) {
-  if (await page.getByTestId("options-sheet").isVisible()) await page.getByRole("dialog").getByRole("button", { name: "Done" }).click();
+  if (await optionsSurface(page).isVisible()) await page.getByRole("dialog").getByRole("button", { name: "Done" }).click();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -64,13 +66,14 @@ test("AC-40: first-visit defaults", async ({ page }) => {
   await expect(panel.getByLabel("Form fields")).toHaveValue("rename");
 });
 
-test("AC-42: options are remembered after a reload", async ({ page }) => {
+test("AC-42: options are remembered after a reload", async ({ page }, info) => {
   await pickMerge(page, "alpha.pdf");
   let panel = await options(page);
   await panel.getByRole("radio", { name: /^(File names|Names)$/ }).click();
   await panel.getByRole("switch", { name: "Pad for double-sided printing" }).check();
   await closeOptions(page);
-  await expect(page.getByTestId("options-button")).toHaveAccessibleName("Options, 2 changed");
+  // F25 §3.3: from 1024 the trigger is named "More options" (the bottom bar keeps "Options").
+  await expect(page.getByTestId("options-button")).toHaveAccessibleName(`${info.project.name === "desktop" ? "More options" : "Options"}, 2 changed`);
   await page.reload();
   await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
   await pickMerge(page, "alpha.pdf");
@@ -122,7 +125,7 @@ test("AC-62..AC-65 (UI): form field modes", async ({ page }) => {
   expect(t[0]).toContain("Ann");
   expect(t[1]).toContain("Ben");
   expect((await outputDoc(out.bytes)).getForm().getFields()).toHaveLength(0);
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   panel = await options(page);
   await panel.getByLabel("Form fields").selectOption("rename");
   await closeOptions(page);
@@ -192,12 +195,12 @@ test("AC-73: the whole flow works with the keyboard alone", async ({ page }, inf
   // Set an option (loaded: the bottom bar's Options button opens the sheet), run, download.
   await tabTo(page, page.getByTestId("options-button"));
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("options-sheet")).toBeVisible();
+  await expect(optionsSurface(page)).toBeVisible();
   await tabTo(page, page.getByRole("switch", { name: "Pad for double-sided printing" }));
   await page.keyboard.press("Space");
   await tabTo(page, page.getByRole("dialog").getByRole("button", { name: "Done" }));
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("options-sheet")).toBeHidden();
+  await expect(optionsSurface(page)).toBeHidden();
   await expect(page.getByTestId("options-button")).toBeFocused();
   await tabTo(page, page.getByTestId("primary-action"));
   await page.keyboard.press("Enter");
@@ -257,7 +260,7 @@ test("AC-75: at 375 px no horizontal scroll, the primary is visible, actions are
   expect(await noScroll()).toBe(true);
   for (const s of await targets("[data-testid=page-tile] [data-no-drag] button:not([aria-haspopup=menu][class*='rounded-full'])")) expect(s).toBeGreaterThanOrEqual(44);
   await page.getByTestId("options-button").click();
-  await expect(page.getByTestId("options-sheet")).toBeVisible();
+  await expect(optionsSurface(page)).toBeVisible();
   expect(await noScroll()).toBe(true);
   expect(await page.getByRole("dialog").evaluate((d) => d.scrollWidth <= d.clientWidth + 1)).toBe(true);
 });

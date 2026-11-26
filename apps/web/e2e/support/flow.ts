@@ -129,9 +129,9 @@ export async function tabTo(page: Page, target: Locator, max = 60) {
 
 export const isDesktop = (projectName: string) => projectName === "desktop";
 
-/** "Back to options" on the result screen, then waits for the ready state. */
+/** "Back to editing" on the result screen, then waits for the ready state. */
 export async function backToOptions(page: Page) {
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
 }
 

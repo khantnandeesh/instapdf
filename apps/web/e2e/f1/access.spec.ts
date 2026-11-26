@@ -33,7 +33,7 @@ test("AC-48: the whole flow works by keyboard alone, and the password modal trap
   // added; attach one now so it is active before the first keyboard activation below.
   page.on("filechooser", () => {});
   await page.evaluate(() => 0);
-  const chooseButton = page.getByRole("button", { name: "Choose PDF files" });
+  const chooseButton = page.getByRole("button", { name: "Choose files" });
 
   // Modal: focus trap and return.
   await tabTo(page, chooseButton);
@@ -160,7 +160,7 @@ for (const scheme of ["light", "dark"] as const) {
 
 test("AC-51: with files loaded, leaving the page asks for confirmation (and not when empty)", async ({ page }) => {
   // Empty: no prompt.
-  await page.getByRole("button", { name: "Choose PDF files" }).hover();
+  await page.getByRole("button", { name: "Choose files" }).hover();
   let prompted = false;
   page.on("dialog", (d) => {
     prompted = true;

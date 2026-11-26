@@ -12,7 +12,7 @@ import { caret, cloudRow, closed, mockLog, mockPick, needsCloud, openWindow, pas
 needsCloud();
 
 const editor = (page: Page) => page.getByTestId("editor");
-const openPdf = (page: Page) => page.getByRole("button", { name: "Open PDF", exact: true });
+const openPdf = (page: Page) => page.getByRole("button", { name: "Choose PDF", exact: true });
 
 async function openEditor(page: Page) {
   await page.goto("/edit-pdf");
