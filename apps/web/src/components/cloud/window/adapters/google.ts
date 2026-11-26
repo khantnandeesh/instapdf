@@ -141,6 +141,7 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
           if (r.error || !r.access_token) p?.reject(new CloudError("denied"));
           else {
             token = r.access_token;
+            email = ""; // re-read: the user may have chosen another account
             expires = Date.now() + (Number(r.expires_in) || 3600) * 1000 - 60_000;
             p?.resolve(token);
           }
