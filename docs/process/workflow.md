@@ -67,6 +67,7 @@ The builder attaches screenshots to the PR at **1280x720 and 390x844** (device s
 - [ ] **Focus**: on-theme `:focus-visible` ring after Tab; none after a mouse click.
 - [ ] **Contrast and edges**: white pages and cards read against their background (edge or shadow).
 - [ ] **Phone**: controls in reach of the thumb, nothing cut off, no sideways scroll.
+- [ ] **Guidelines**: `web-design-guidelines` (`.claude/skills/`) run on the changed UI files; no open accessibility, focus, animation or touch finding.
 - [ ] **Compared with Sejda** at the same two sizes: ours is at least as clear and uses the space at least as well.
 
 Automated where possible (`e2e/ui/modals.spec.ts`, `viewport-fit.spec.ts`, `scroll-rules.spec.ts`); the screenshot review catches what the guards can't measure.
