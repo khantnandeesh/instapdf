@@ -31,6 +31,8 @@ type View =
   | { k: "frame"; spec: FrameSpec; title: string }
   | { k: "rows" }
   | { k: "done" }
+  /** Cancelled, but the browser kept the window open (window.close() refused): say it can be closed. */
+  | { k: "closed" }
   | { k: "denied" }
   | { k: "unreachable" }
   | { k: "lost" }
@@ -107,7 +109,13 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
     link.current?.cancel();
     finished.current = true;
     window.close();
-    setTimeout(() => setCanClose(true), 300);
+    setTimeout(() => {
+      setCanClose(true);
+      // Still here (the browser refused to close it, e.g. after a round trip to the provider): never
+      // leave a spinner or a dead button behind.
+      const k = viewRef.current.k;
+      if (k !== "done" && k !== "saved") setView({ k: "closed" });
+    }, 300);
   }, []);
 
   // ---- downloads ---------------------------------------------------------------------------------
@@ -396,7 +404,7 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
   // Focus: the berry button on arrival (an Enter press is the gesture the SDK needs), the h1 when done.
   useEffect(() => {
     if (view.k === "before" && ready) primary.current?.focus();
-    else if (view.k === "done" || view.k === "saved" || view.k === "lost" || view.k === "denied" || view.k === "unreachable") heading.current?.focus();
+    else if (view.k === "done" || view.k === "saved" || view.k === "closed" || view.k === "lost" || view.k === "denied" || view.k === "unreachable") heading.current?.focus();
   }, [view.k, ready]);
 
   // A form-POSTed picker (OneDrive v8) is submitted once its iframe exists.
@@ -533,6 +541,15 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
           </span>
           {h1(windowCopy.addedTo(params?.tool ?? "BerryPDF"))}
           <p className="ip-cw__text">{canClose ? windowCopy.canClose : windowCopy.closesItself}</p>
+        </>
+      );
+      break;
+    case "closed":
+      body = (
+        <>
+          {mark}
+          {h1(name)}
+          <p className="ip-cw__text">{windowCopy.canClose}</p>
         </>
       );
       break;

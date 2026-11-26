@@ -55,7 +55,10 @@ test("the picker closed (Google answers access_denied): a quiet cancel, nothing 
   // Google sends the same error for closing its picker as for declining consent, so both are a cancel (AC-142).
   const { win } = await onepick(page, "denied");
   await closed(win);
-  await expect(tiles(page)).toHaveCount(0);
+  await expect(page.getByText("Waiting for Google Drive…")).toBeHidden({ timeout: 8_000 });
+  await expect(flow(page)).toHaveAttribute("data-state", "empty");
+  await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toHaveCount(0); // no notice (Next's route announcer is an empty alert)
+  await expect(rowButton(page, "Google Drive")).toBeFocused();
   expect((await mockLog(page))!.downloads).toEqual([]);
 });
 

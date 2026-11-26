@@ -1,6 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
-import { onepickParams, onepickUrl, pickedFiles } from "./google";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createAdapter, onepickParams, onepickUrl, pickedFiles } from "./google";
+import * as onepick from "./onepick";
+import type { AdapterCtx } from "./types";
 import { CloudError } from "./types";
+
+vi.mock("./onepick", () => ({ take: vi.fn(), hasPending: vi.fn(() => true), start: vi.fn() }));
 
 describe("onepickUrl", () => {
   const PDF_MULTI = { multiple: true, accept: [".pdf"] };
@@ -31,8 +35,9 @@ describe("onepickUrl", () => {
       allow_multiple: "true",
       mimetypes: "image/jpeg,image/png,image/tiff",
     });
-    // An extension with no known type adds nothing (the window still checks names after the pick).
+    // An extension with no known type: no filter at all, so nothing the tool takes is hidden.
     expect(onepickParams({ multiple: false, accept: [".xyz"] })).toEqual({});
+    expect(onepickParams({ multiple: true, accept: [".pdf", ".docx"] })).toEqual({ allow_multiple: "true" });
     expect(new URL(onepickUrl("c", "https://b.test", { multiple: false, accept: [".pdf"] })).searchParams.has("allow_multiple")).toBe(false);
   });
 });
@@ -65,5 +70,41 @@ describe("pickedFiles", () => {
     // A file Drive won't describe: a row that fails as "can't open", never a crash.
     expect(gone!.name).toBe("Google Drive file");
     await expect(gone!.request()).rejects.toEqual(new CloudError("denied"));
+  });
+});
+
+describe("createAdapter: back from Google's picker", () => {
+  const ctx = (multiple: boolean) =>
+    ({ params: { multiple, accept: [".pdf"], mode: "pick" }, setPhase: vi.fn(), frame: vi.fn(), leaving: vi.fn() }) as unknown as AdapterCtx;
+  const fetched: string[] = [];
+  beforeEach(() => {
+    fetched.length = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        fetched.push(url);
+        const id = url.split("/files/")[1]!.split("?")[0]!;
+        return new Response(JSON.stringify({ id, name: `${id}.pdf`, mimeType: "application/pdf", size: "10" }), { status: 200 });
+      }),
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("a single-file tool looks up only the first picked file; a multi-file tool all of them", async () => {
+    vi.mocked(onepick.take).mockReturnValueOnce({ kind: "picked", token: "T", ids: ["a1", "b2"], expiresIn: 3599 });
+    expect((await createAdapter(ctx(false)).pick()) as unknown[]).toHaveLength(1);
+    expect(fetched).toEqual([expect.stringContaining("/files/a1?")]);
+    vi.mocked(onepick.take).mockReturnValueOnce({ kind: "picked", token: "T", ids: ["a1", "b2"], expiresIn: 3599 });
+    expect((await createAdapter(ctx(true)).pick()) as unknown[]).toHaveLength(2);
+  });
+
+  it("the picker closed (access_denied) or nothing picked is a cancel; a bad state never uses its token", async () => {
+    vi.mocked(onepick.take).mockReturnValueOnce({ kind: "denied" });
+    expect(await createAdapter(ctx(true)).pick()).toBe("cancel");
+    vi.mocked(onepick.take).mockReturnValueOnce({ kind: "empty" });
+    expect(await createAdapter(ctx(true)).pick()).toBe("cancel");
+    vi.mocked(onepick.take).mockReturnValueOnce({ kind: "invalid" });
+    await expect(createAdapter(ctx(true)).pick()).rejects.toEqual(new CloudError("unreachable"));
+    expect(fetched).toEqual([]);
   });
 });

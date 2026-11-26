@@ -51,7 +51,10 @@ const MIME: Record<string, string> = {
  * picker, which then listed only PDFs and was titled "Select items".
  */
 export function onepickParams({ multiple, accept }: { multiple: boolean; accept: readonly string[] }): Record<string, string> {
-  const mimes = [...new Set([...accept.map((e) => MIME[e]).filter((m): m is string => !!m), ...nativeMimes(accept)])];
+  // Any extension without a known type: no filter at all, so no type the tool takes is ever hidden
+  // (the window still checks names after the pick).
+  const known = accept.every((e) => e in MIME);
+  const mimes = known ? [...new Set([...accept.map((e) => MIME[e]!), ...nativeMimes(accept)])] : [];
   return { ...(multiple ? { allow_multiple: "true" } : {}), ...(mimes.length ? { mimetypes: mimes.join(",") } : {}) };
 }
 
