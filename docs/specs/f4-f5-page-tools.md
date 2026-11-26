@@ -299,7 +299,7 @@ Fixtures (QA generates them in `tests/fixtures/` with a script, no third-party c
 
 - **AC-400 (P0) (ref)** `/split-pdf`, `/extract-pdf-pages` and `/delete-pdf-pages` each show the tool (not a coming-soon page). Their file input accepts `.pdf` and allows multiple files.
 - **AC-401 (P0) (ours)** On each of the three, picking `twelve.pdf` reaches the ready state with 12 thumbnails labelled 1–12 and the primary action in view, with **no** intermediate "choose a mode" screen. On Split the mode control shows Every page selected and the status says 12 files.
-- **AC-402 (P0) (ours)** On Extract, typing `1-3, 5, 10-` selects tiles 1, 2, 3, 5, 10, 11 and 12 (`aria-selected="true"`, no others). Typing `-2` selects 1 and 2. After blur the field reads `1-3, 5, 10-12` for the first input.
+- **AC-402 (P0) (ours)** On Extract, typing `1-3, 5, 10-` selects tiles 1, 2, 3, 5, 10, 11 and 12 (`aria-selected="true"`, no others). Typing `-2` selects 1 and 2. After blur the field reads `1-3, 5, 10-12` when one file is loaded. With two or more files loaded, open ranges (`10-`) and keywords (`last`, `odd`, `even`) stay as typed, so each file reads them against its own length.
 - **AC-403 (P0) (ours)** On each of the three, each of `abc`, `0`, `13`, `5-3` and `2-x` in the range field shows an inline error naming the bad item, sets `aria-invalid="true"` on the field and disables the primary action. Replacing it with `2` clears the error.
 - **AC-404 (P1) (ours)** On Extract and Delete: clicking tile 2 and then tile 4 selects (or marks) both, and clicking 4 again unselects it. Clicking 6, then Shift+clicking 9 adds 6–9. Space on a focused tile toggles it, and Ctrl/Cmd+click behaves like a click.
 - **AC-405 (P0) (ref)** On Extract: clicking tile 2, Shift+clicking tile 5 and clicking tile 9 puts `2-5, 9` in the range field.
@@ -436,6 +436,10 @@ Fixtures (QA generates them in `tests/fixtures/` with a script, no third-party c
 
 Decisions 1 to 14 are accepted as written, for now. Step 2 (Research) may overturn any of them with evidence, marked adopt or skip in "Improvements". Decisions 6 and 12 (typed Split ranges, Alternate's interleave and leftover rules) stay provisional until the evaluator's first real reference run (§8b) confirms them. If the reference behaves differently, we either match it or record in the eval why ours is better.
 
+**Step 2 (Research, 2026-11-26):** decision 14 is **changed in part**: full undo/redo for the page workspace joins this feature (Improvements I-10, AC-549, AC-550), and the Rotate range field stays out (I-22). Decisions 2, 3, 6 and 13 gained supporting evidence, and decision 7 is kept (Improvements R-4). No other decision is overturned. Separately, §6's claim that unused resources are not copied does not hold for files with shared or inherited resource dicts with today's engine; I-1 (AC-536, AC-537) makes it true.
+
+Update after step 2 (2026-11-26): undo/redo joins this feature (I-10), the Rotate range field stays out. Decision 7 stands (Extract and Delete keep the original file name) because Rotate already does, so every one-file page tool names its output the same way. The multi-file range issue raised in Improvements is resolved in AC-402: open ranges and keywords stay symbolic when two or more files are loaded. Resource pruning (I-1) and link and bookmark fixes (I-2, I-3) go into the shared copy engine, so Merge gains them too; Merge's own tests must stay green.
+
 ### 8b. Needs a real reference task (evaluator's first run; at most 3 per hour, booked with the lead)
 
 In priority order, so the highest-value ones fit in the first booked slots:
@@ -455,5 +459,139 @@ In priority order, so the highest-value ones fit in the first booked slots:
 Phone notes (reference, for step 3): one tile per row; Split's file-name panel covers half the screen above its action; Organize's toolbar wraps to four rows and its hint text overlaps the zoom slider; no horizontal scroll on any of them.
 
 ## Improvements
+
+Research, 2026-11-26 (step 2). How it was done:
+
+- **Live, synthetic files only.** Headless Chromium from the container, at least 1.3 s between actions, on the public tool pages of iLovePDF (Split, Remove pages, Organize), PDF24 (Split, Remove pages, Rearrange), Smallpdf (Split/Extract workspace) and PDFgear (Split). One real task on each, with our synthetic `probe.pdf` (R-1): iLovePDF split "fixed 5" and remove `2-12`; PDF24 split "5 pages per PDF"; Smallpdf extract pages 1 + 3; PDFgear split "every 5". The outputs were checked with qpdf (through pikepdf) and rendered with PDFium. **Nothing ran on the reference site.**
+- **Docs only (†):** Adobe Acrobat online asks for sign-in before it splits or organizes, so we read only its public pages. Stirling-PDF was read from its docs and source (to learn, never copied), and PDFsam (alternate mix) from its docs. Sources are listed at the end.
+- **Our engine:** the repo's `mergePdf` (F5's output engine and the natural F4 copy path), run in Vitest on synthetic fixtures, plus a prototype pruning pass (I-1).
+- **Evidence (never in git):** `/mnt/project-files/evals-cache/f4-f5-page-tools/research/`: screenshots `*.png`, page text `*.txt`, competitor outputs in `outputs/`, our scripts, fixtures, logs and per-file inspections in `fidelity/` (`inspect-*.txt`, `log.txt`, `prune-log.txt`, `probe-log.txt`). No competitor text, assets or code is reused.
+
+### R-1. Output fidelity: measured
+
+**Probe** (`fidelity/probe.pdf`, made by `make-probe.mjs`): 12 A4 pages, 530 KB. Each page draws its own 43 KB image. All 12 images and the font sit in **one `/Resources` dictionary shared by every page**, a common producer pattern. Page 1 has four internal links: an explicit destination to p3, an explicit one to p10, a named destination "chap2" to p5, and a GoTo action to p4. The outline is Intro → p1; Middle → p5 at y 421, red and bold, open, with child Detail → p6 at y 300; and End → p10 `/FitH 300`. Page 3 has a text field. Info has a Title and an Author.
+
+Split into 1–5, 6–10, 11–12 (Smallpdf: extract pages 1 and 3):
+
+| Engine | Part 1–5 size | Link to a page not in the part | Named-destination link, target kept | Bookmark view (y 421, FitH 300) | Bookmark colour / bold | Info Title, Author | Form field | Names |
+|---|---|---|---|---|---|---|---|---|
+| **BerryPDF today** (`mergePdf`) | 524 KB (a one-page part is 522 KB, 98% of the input) | kept as a dead hotspot, `Dest [null /XYZ …]` | **dead** (name tree not copied) | **lost**: every item becomes `/XYZ null null null` | lost | **lost** (Producer only) | kept | – |
+| BerryPDF + pruning prototype | **221 KB** (one-page part 45 KB, 8.5%) | (I-2) | (I-2) | (I-3) | (I-3) | (I-4) | kept | – |
+| PDF24 (server, "split in the cloud") | 220 KB | **removed** | rewritten to an explicit destination, works | kept | lost | kept | kept | `probe-01-05.pdf` in `probe.zip` |
+| iLovePDF (server, `/v1/upload`) | 525 KB | hotspot kept with no target | works (name tree copied) | kept | kept | lost | kept | `probe-1.pdf` in `ilovepdf_split.zip` |
+| Smallpdf (Producer "Pdftools SDK"; no request body over 50 KB seen, so most likely in the browser) | 88 KB for 2 pages | hotspot kept with no target | dead | – (only Intro is left) | – | lost | kept | `probe-pages.pdf` |
+| PDFgear (pdf-lib in the browser) | 524 KB | **every** internal link, even to p3, points at orphan copies of pages that pdf-lib's copier dragged in | dead | outline dropped | – | lost | **dropped** (orphaned widget) | `page1-5.pdf` in `probe.zip` |
+
+Our own 60-page fixtures (`fidelity/log.txt`, `prune-log.txt`):
+
+| Resources layout | One-page part, today | 60 one-page parts, today | One-page part, with pruning |
+|---|---|---|---|
+| per page | 98 KB (3.6%) | 5.9 MB (2.2× input; each part carries the one shared embedded font) | 98 KB |
+| one dict shared by all pages | **2.66 MB (98.8%)** | **159 MB (59× input)** | 98 KB |
+| inherited from the page tree | **2.66 MB (98.8%)** | **159 MB (59× input)** | 98 KB |
+
+The pruning prototype keeps, for each page, only the resources whose names occur as name tokens in that page's content streams. Forms without their own `/Resources` are scanned recursively. The method is conservative: it can keep too much, but never too little. All 180 one-page parts rendered **pixel-identical** to their source pages (PDFium at 72 dpi, 0 differing pixels, `diff.py`). The pass took 10–26 ms for 60 pages, including parsing.
+
+What this means:
+
+1. §6 says "unused resources are not copied". That is **not true of today's engine** when a file shares one resource dict across its pages or inherits it from the page tree: then every part carries every image of the whole file. AC-438, AC-461 and AC-475 pass only because the F1 fixtures give each page its own dict. → I-1.
+2. Today's engine already avoids PDFgear's worst failure: it pre-seeds the copier so links never drag in other pages. It still leaves dead link hotspots, breaks named-destination links, flattens bookmark views and drops the document info. → I-2 to I-4.
+3. **No server engine is justified (rule 4).** The best server output, PDF24's, is matched in the browser by pdf-lib plus I-1 to I-4: same sizes to within 1 KB (`probe-log.txt`), and better on bookmark styles. Smallpdf and PDFgear already run client-side.
+4. Every tool tested drops the tag structure (`StructTreeRoot`), and ours does too (I-20). All of them copy shared font programs whole (I-21).
+
+### R-2. Quick read of the field (UX)
+
+- **Split.** iLovePDF: Range (Custom from/to rows + Add Range, Fixed "page ranges of N", Smart AI), Pages (extract all, or select pages, with "merge into one PDF"), Size. Its range cards preview each part, but its Fixed preview kept saying "12 PDFs" after we typed 5 and only applied the value on submit (`ilovepdf-split-fixed5.png`). PDF24: a mode dropdown (Pages per PDF, Even/Odd, Halve pages, By file size, Custom with scissors and a "Split after pages" field), a zoom slider, a file-name option `filename-01-03.pdf` / `01-03.pdf`, and a button that counts live ("Split 1 PDF", `pdf24-split-custom.png`). PDFgear: scissors plus "Split every N", and the button relabels live to "Split into 3 PDFs" (`pdfgear-split-every5.png`). Smallpdf: one workspace with Split/Extract, Add, rotate, delete, scissors, "Split after every N pages", sort and list/grid. Acrobat online: up to 19 dividers (20 files), sign-in required †. Stirling: split by page numbers, page count, document count, size, chapters, sections and QR-code divider sheets †. **Nobody has a separate "choose a mode" screen.**
+- **Extract / Delete.** iLovePDF Remove: click toggles, Shift for ranges, a range field synced both ways, removed tiles crossed out in place, primary disabled until something is picked (`ilovepdf-remove-typed.png`). Smallpdf Extract: a checkbox per tile, a tri-state "N pages selected" select-all, a "Separate PDFs" toggle (`smallpdf-extract-picked.png`). Stirling page syntax accepts `all` and `an+b` formulas †.
+- **Organize.** iLovePDF: file list with letters, "Reset all", add, sort (`ilovepdf-organize-loaded.png`). PDF24 Rearrange: drag, zoom slider, sort "No sorting / From back to front" (`pdf24-organize-loaded.png`). Stirling page editor: checkboxes, select all or by page numbers, Undo/Redo buttons, zoom, duplicate, insert blank, split markers, "download selected pages" †. Its rearrange modes include Reverse, Duplex Sort ("all fronts then all backs"), Odd-Even Split/Merge and booklet order †. Acrobat online: drag, rotate, delete, and an undo in the top bar per its help page (seen in a search snippet; the page refused our fetch) †.
+- **Alternate & mix.** No browser competitor among the six has it. PDFsam (desktop) does: per-file reverse, a "pace" (pages per turn) and per-file page ranges; its page does not say how leftovers are handled †. Stirling's Odd-Even Merge works on two halves of one file †.
+
+### R-3. What competitors paywall (these tasks)
+
+| Product | Paywalled or gated | BerryPDF |
+|---|---|---|
+| iLovePDF | Split by size and Smart (AI) split are premium (crown, `ilovepdf-split-size.png`, `-smart.txt`). Split takes 1 file per task even on premium; Organize 5 files free, 20 premium; 100 MB per task free † | Split takes 20 files (AC-407); split by size is F7, free |
+| Smallpdf | Free plan has a small daily task limit (support page: 2 per day) † | No limit (browser) |
+| Acrobat online | Sign-in required to split, organize, delete or add pages; 1,500 pages, 100 MB (organize) † | No account |
+| PDF24 / PDFgear | Free (ads); PDF24 uploads and deletes after 1 hour | Free, nothing uploaded |
+| Reference (§2a) | 1 file per task, 200/50-page caps, 3 tasks/hour | Already planned free in §2a. Nothing adopted below needs a server, so all of it stays free. |
+
+### R-4. Evidence on the §8 decisions
+
+- **D2 (no mode screen):** supported. All four tools we ran keep modes beside the pages.
+- **D3 (click toggles on Extract/Delete):** supported (iLovePDF Remove, Smallpdf Extract).
+- **D6 (typed ranges = one file per range):** supported by iLovePDF (one file per Custom range) and PDFgear ("1-3, 4-7 will export 2 PDF documents" †). PDF24 and Stirling read typed numbers as cut points ("split after"). Still provisional until §8b.
+- **D7 (keep the original name):** mixed. iLovePDF names `probe_removed.pdf` and Smallpdf `probe-pages.pdf` (suffix); PDF24 keeps the base name. **Not overturned**; the lead may revisit.
+- **D13 (mark, don't hide):** supported (iLovePDF crosses removed pages out in place).
+- **D14:** changed in part. Full undo/redo is adopted (I-10); the Rotate range field stays out (I-22). Recorded in §8a.
+
+### Improvements list
+
+| # | Idea | Seen at | User benefit | Cost | Adopt/skip | Reason |
+|---|---|---|---|---|---|---|
+| I-1 | **Prune unreferenced resources** of every copied page (shared or inherited dicts) before copying | PDF24 ✓ and Smallpdf ✓ (R-1); qpdf's `--remove-unreferenced-resources` does the same † | One page of a big file is a small file, not the whole file again (59× in our test) | M | **Adopt** → AC-536, AC-537 | A pure pdf-lib pass in the worker, prototyped and pixel-identical (R-1). It lives in the shared copy path, so Organize, Alternate and Combine & reorder (and Merge) gain it too. If a content stream cannot be decoded, that page keeps all its resources. |
+| I-2 | **Clean links**: remove link annotations whose target page is not in the output; rewrite named-destination links and GoTo actions to explicit destinations on the output page | PDF24 ✓ both; iLovePDF and Smallpdf leave dead hotspots; PDFgear breaks every internal link | No dead clickable areas; cross-references inside a part keep working | S | **Adopt** → AC-538, AC-539 | Today the copier seeds dropped pages as `null`, which leaves a clickable area that goes nowhere. Name lookup already exists in `outline.ts`. |
+| I-3 | **Bookmarks keep their view** (XYZ position and zoom, FitH, Fit…), **colour, bold/italic and open/closed state** | iLovePDF ✓ all; PDF24 view only | A bookmark lands where it did in the source and looks the same | S | **Adopt** → AC-540 | `writeOutline` always writes `/XYZ null null null`. Carry the destination's tail and `/C`, `/F` and the `/Count` sign. |
+| I-4 | **Carry document info** (Title, Author, Subject, Keywords, Creator, CreationDate) and the opening layout (`/PageLayout`, `/ViewerPreferences`) when every output page comes from one source PDF | PDF24 ✓; iLovePDF, Smallpdf and PDFgear drop it | Parts keep their title and author in viewers, search and document systems | S | **Adopt** → AC-541 | Outputs built from several sources keep Merge's rule (Producer only). ModDate is the run time, Producer "BerryPDF". |
+| I-5 | **Form fields follow their page** (kept and fillable where the page is in the output, absent elsewhere) | PDF24, iLovePDF, Smallpdf ✓; PDFgear drops the field; Stirling's PDFium path drops the AcroForm † | A filled form stays fillable after split or extract | S (tests) | **Adopt** → AC-542 | The engine already does this; the AC guards the failure seen at PDFgear. |
+| I-6 | Range keywords **`odd`, `even`, `last`** (also `5-last`) in the §0a syntax | PDF24 Even/Odd mode; Stirling `all`, `2n-1` †; qpdf uses `z` for the last page † | Delete the last page of 20 files of different lengths in one go; type odd/even directly | S | **Adopt** → AC-543, AC-544 | A pure parser change. See the multi-file note under "For the UX step". |
+| I-7 | **Primary action states the outcome** ("Split into 7 files"), live | PDFgear, PDF24 | One glance confirms what will happen | S | **Adopt** → AC-545 | `PrimaryAction` gets a label override; the parts list stays. |
+| I-8 | Organize **Select ▾ → Odd pages / Even pages** (by position) | Stirling select by numbers †; PDF24 Even/Odd; Smallpdf select-all | Rotate or remove every other page of a scan in two clicks | S | **Adopt** → AC-546 | Selection helpers already planned in §0b. |
+| I-9 | Organize **Sort ▾ → Two-sided scan order**: one file holding all fronts, then all backs in reverse, becomes F1, B1, F2, B2… | Stirling Duplex Sort † (and its issue #209) | Fixes the most common single-sided-scanner result without splitting it into two files for Alternate | S | **Adopt** → AC-547, AC-548 | A pure page-list helper; on a selection it acts only on the selected positions, like Reverse (§3e). |
+| I-10 | **Full undo/redo** (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y, toolbar buttons) for every page-list edit | Stirling page editor ✓ †; Acrobat online undo †; iLovePDF has only "Reset all" | Any step is reversible, and long organizing sessions are safe | M | **Adopt** → AC-549, AC-550 | Decision 14 left it to step 2. The page list is immutable, so history is a stack of snapshots. It lives in the shared workspace (Organize, Combine & reorder, Merge). F3 AC-79's undo notice stays. |
+| I-11 | Split by file size | iLovePDF (premium), PDF24, Acrobat desktop † | Fit email or upload limits | M | Skip | A separate backlog tool (F7). |
+| I-12 | Split by bookmarks / chapters | Stirling †, Acrobat desktop † | One file per chapter | M | Skip | F7. |
+| I-13 | AI "smart" split by document type | iLovePDF (premium) | Splits batch scans of invoices etc. | L | Skip | Needs a model or server; rule 5. |
+| I-14 | Split into N documents | Stirling † | "Make 3 files" | S | Skip | Every N pages covers it; a fifth mode adds UI. |
+| I-15 | Formula page syntax (`2n+1`, `3n`) | Stirling † | Every third page etc. | S | Skip | Expert-only; I-6 covers the common cases. |
+| I-16 | Typed cut points ("split after 3, 7") | PDF24 Custom, Stirling † | Another way to set cuts | S | Skip | Clashes with typed ranges meaning parts (D6); the marks already set cut points. |
+| I-17 | "Merge ranges into one PDF" / "Separate PDFs" toggles | iLovePDF, Smallpdf | One switch for both outcomes | S | Skip | Extract gives one file; Split Custom gives one per range. |
+| I-18 | Zero-padded numbers in names (`probe-01-05.pdf`) | PDF24 | Sorts right in plain name order | S | Skip | Explorer, Finder and Files sort naturally; it would change the (ref) names in AC-420 onwards. Could come back later as a pattern token. |
+| I-19 | Keep a bookmark whose page is gone as a title with no target | iLovePDF, PDF24 | Keeps the chapter heading | S | Skip | Clicking it does nothing. Merge's promote rule keeps every remaining bookmark working. |
+| I-20 | Keep the tag structure per output | none of the four tested | Accessible output | L | Skip (gap) | Needs pruning and remapping the structure tree. Outputs stay untagged, as Merge's do; `/Lang` and page labels are kept. |
+| I-21 | Re-subset fonts per part | none | Smaller parts for font-heavy files | L | Skip | Font programs shared by all pages are copied whole everywhere. No permissive subsetter in the worker today. |
+| I-22 | Range field on Rotate (D14) | Stirling † | Rotate typed pages | S | Skip | Rotate has shipped and its ACs would reopen; per-tile rotation covers exceptions. Revisit with F8. |
+| I-23 | Per-file page ranges in Alternate | PDFsam † | Mix only part of a file | M | Skip | Extract first; a field per card is a lot of UI. |
+| I-24 | Server engine for any of the six | iLovePDF, PDF24, Acrobat (upload) | – | L | Skip | Not clearly better (R-1, point 3), so rule 4 rules it out. |
+| I-25 | Halve pages | PDF24 | Split scanned spreads | M | Skip | F7 (split down the middle). |
+
+### Improvement acceptance criteria
+
+The evaluator does not compare these with the reference, but they must work. Extra fixtures (QA script, synthetic):
+
+- `shared-res.pdf`: 12 A4 pages, text "Shared 1".."Shared 12" in Helvetica. Page n draws its own 120×120 RGB image (incompressible, about 43 KB). Every page's `/Resources` is **one** indirect dict holding all 12 images and the font.
+- `inherited-res.pdf`: the same, but the dict sits on the page-tree root and the pages have no `/Resources`.
+- `links.pdf`: 12 A4 pages "Link 1".."Link 12". Page 1 links: L1 `[p3 /XYZ 0 400 0]`, L2 `[p10 /XYZ 0 400 0]`, L3 named "chap2" (in `/Names /Dests` → `[p5 /XYZ 0 500 null]`), L4 a GoTo action `[p4 /Fit]`, L5 a URI link to `https://example.org/`. Outline: "Intro" → p1; "Middle" → `[p5 /XYZ 0 421 null]` with `/C [1 0 0]`, `/F 2`, closed (`/Count -1`), and child "Detail" → `[p6 /XYZ 0 300 null]`; "End" → `[p10 /FitH 300]`. Text field "name" = "Ada" on page 3. Info: Title "Links fixture", Author "QA", Subject "Fixture", Keywords "alpha beta". `/PageLayout /TwoColumnRight`.
+- `duplex-scan.pdf`: 6 pages "Front 1", "Front 2", "Front 3", "Back 3", "Back 2", "Back 1". `duplex-scan-odd.pdf`: 5 pages "Front 1", "Front 2", "Front 3", "Back 2", "Back 1".
+
+- **AC-536 (P0) (ours) (improvement)** Split, Every page, on `shared-res.pdf`: each of the 12 entries is under 15% of the input's size, and the 12 together are at most 1.25× the input. Each entry renders the same as its source page (pdf.js or PDFium at 72 dpi, no differing pixels), its text is "Shared n", and `qpdf --check` passes.
+- **AC-537 (P1) (ours) (improvement)** Pruning holds on every tool and layout. Split, Every page, on `inherited-res.pdf` meets AC-536's limits. Each of these gives one file under 15% of the input's size: Extract page 1 of `shared-res.pdf`; Delete pages 2–12 of it; Organize with it after removing pages 2–12.
+- **AC-538 (P0) (ours) (improvement)** Extract `1-5` of `links.pdf`: page 1 has exactly four link annotations. L1 goes to output page 3, L3 to output page 5 (an explicit destination, or a name the output's own `/Dests` resolves), L4 to output page 4, and the URI link is unchanged. Nothing is left of L2. pdf.js resolves every internal link to the page stated.
+- **AC-539 (P1) (ours) (improvement)** Split, Every page, on `links.pdf`: every entry holds exactly one page object (no copies of other pages reached through links, bookmarks or fields), and entry 1 has only the URI link. Delete page 10: page 1 keeps L1, L3, L4 and the URI link, and has no L2.
+- **AC-540 (P1) (ours) (improvement)** Extract `5-10` of `links.pdf`: "Middle" → page 1 at `/XYZ 0 421`, colour `[1 0 0]`, style flag 2 (bold), still closed; its child "Detail" → page 2 at `/XYZ 0 300`; "End" → page 6 with `/FitH 300`. In Organize with only `links.pdf`, after moving page 12 to the front, "End" → page 11 with `/FitH 300`.
+- **AC-541 (P1) (ours) (improvement)** Split (each mode), Extract and Delete on `links.pdf`, and Organize with only `links.pdf`, give outputs whose Title, Author, Subject, Keywords and CreationDate equal the source's, with `/PageLayout /TwoColumnRight`, Producer "BerryPDF" and a ModDate at run time. Organize with `links.pdf` + `three-pages.pdf`, and Alternate, copy no Title or Author.
+- **AC-542 (P1) (ours) (improvement)** Extract page 3 of `links.pdf`: the output's form has a text field "name" with the value "Ada", its widget is on page 1, and a PDF library can set it to "Bo" and read that back. Split Custom `1-2, 3-12`: entry 1 has no form fields, and entry 2 has "name".
+- **AC-543 (P1) (ours) (improvement)** Delete with `twelve.pdf` + `three-pages.pdf`, typing `last`: each file marks only its own last page. The run gives `twelve.pdf` (11 pages, no "Twelve 12") and `three-pages.pdf` (2 pages, no "Page 3"). After blur the field still reads `last`.
+- **AC-544 (P2) (ours) (improvement)** On Extract with `twelve.pdf`: `even` selects 2, 4, …, 12; `odd, 12` selects 1, 3, …, 11 and 12; `10-last` selects 10–12; `EVEN` works like `even`. `lst` shows the inline error naming `lst`, as AC-403 does.
+- **AC-545 (P2) (ours) (improvement)** On Split with `twelve.pdf`, the primary action's visible label and accessible name state the parts count (12 files), and they update together with the parts list: Every N = 5 → 3 files; Custom `2-5` → 1 file. With an invalid N, the label shows no count and the action stays disabled.
+- **AC-546 (P1) (ours) (improvement)** Organize with `twelve.pdf` + `three-pages.pdf`: Select ▾ → Even pages selects positions 2, 4, …, 14 (A2, A4, …, A12, B2), and Odd pages selects positions 1, 3, …, 15. After Even pages, rotating the selection right and running gives `/Rotate 90` on output pages 2, 4, …, 14 and 0 on the rest.
+- **AC-547 (P1) (ours) (improvement)** Organize with `duplex-scan.pdf`: Sort ▾ → Two-sided scan order gives Front 1, Back 1, Front 2, Back 2, Front 3, Back 3 in the grid and in the output. Undo restores the scan order.
+- **AC-548 (P2) (ours) (improvement)** With `duplex-scan-odd.pdf` it gives Front 1, Back 1, Front 2, Back 2, Front 3. With `twelve.pdf` + `duplex-scan.pdf` and only B1–B6 selected, it reorders only those six positions (A1–A12 stay first and unchanged).
+- **AC-549 (P1) (ours) (improvement)** Organize with `twelve.pdf`, six edits: move A12 to the front, rotate A1 right, duplicate A2, insert a blank page after A3, remove A5, Sort ▾ → Reverse. Ctrl/Cmd+Z six times steps back through each state to A1–A12 unrotated (each intermediate grid checked). Ctrl/Cmd+Shift+Z six times (Ctrl+Y on Windows/Linux too) redoes all six, and running then gives the same output as before the undos. A new edit after an undo clears the redo steps. With focus in a text field (rename, move-to-position), Ctrl/Cmd+Z edits the text, not the page list.
+- **AC-550 (P1) (ours) (improvement)** Undo and Redo buttons sit in the workspace toolbar on Organize and Combine & reorder. They are disabled when there is nothing to undo or redo, work by touch at 390×844, and every undo or redo is announced in the polite live region naming the step. History covers every page-list edit, including adding files or pages, and keeps at least 50 steps. It survives switching between the Files and Pages views and Back to options, and Start over clears it. F3 AC-79 still passes.
+
+**Totals with improvements: 109 ACs (AC-400 to AC-550): 52 P0, 54 P1, 3 P2.** The improvements add 15: 2 P0, 10 P1, 3 P2. AC-551 to AC-559 stay reserved. Plus the inherited ACs in §0e.
+
+### For the UX step (step 3)
+
+- **Undo/Redo** (I-10) need a place in Organize's toolbar, which already holds Select, Sort, Remove and Add. On phones the reference's toolbar wraps to four rows; ours must not. Undo and Redo are good candidates for icon buttons with tooltips.
+- **Live count in the primary action** (I-7): the label length varies ("Split into 1 file" up to "Split into 1,000 files") within the ≤ 48 px control rule, with singular/plural copy.
+- **Keywords in the range field** (I-6): a short hint or tooltip (`last`, `odd`, `even`), no extra text on screen.
+- **Multi-file canonical form (spec issue for the lead).** §0a closes open ranges on blur (`10-` → `10-12`, AC-402 "for the first input"). But §3a applies the field to every file (AC-408). With files of different lengths, the rewrite silently changes the meaning for the others: `10-` on a 15-page file becomes 10–12. The same applies to `last`. Recommendation: keep `a-` and keywords symbolic whenever two or more files are loaded.
+- **Two-sided scan order** (I-9) needs a one-line tooltip saying what it expects (all fronts, then all backs in reverse). Alternate's one-file status line can point to it.
+- **Odd/Even in Organize** (I-8) select by position, while tiles show letter labels (A1, B2). Make "by position" clear without adding text.
+- **ZIP results on phones (not adopted):** competitors offer only the ZIP. Consider whether the result card's entry list should let a phone user open one part without unzipping.
+
+Sources (web, 2026-11-26): [iLovePDF: separate PDF pages](https://ilovepdf.com/blog/how-to-separate-pdf-pages) · [iLovePDF pricing](https://www.ilovepdf.com/pricing) · [PDF24 split PDF](https://tools.pdf24.org/en/split-pdf) · [Smallpdf split PDF](https://smallpdf.com/split-pdf) · [Smallpdf support (free limit)](https://smallpdf.com/support) · [PDFgear split PDF](https://www.pdfgear.com/split-pdf/) · [Adobe Acrobat online: split PDF](https://www.adobe.com/acrobat/online/split-pdf.html) · [Adobe Acrobat online: rearrange PDF](https://www.adobe.com/acrobat/online/rearrange-pdf.html) · [Adobe help: organize pages (Acrobat on the web)](https://helpx.adobe.com/ae_en/acrobat/web/edit-pdfs/organize-documents/organize-pages.html) · [Stirling-PDF docs: page operations](https://docs.stirlingpdf.com/Tools/Guides/Page-Operations/) · [Stirling-PDF docs: page editor](https://docs.stirlingpdf.com/Tools/Workspace/Page-Editor/) · [Stirling-PDF issue #209 (duplex sort)](https://github.com/Stirling-Tools/Stirling-PDF/issues/209) · [Stirling-PDF SplitPDFController (source, read only)](https://github.com/Stirling-Tools/Stirling-PDF/blob/main/app/core/src/main/java/stirling/software/SPDF/controller/api/SplitPDFController.java) · [PDFsam: mix PDF](https://pdfsam.org/mix-pdf/) · [qpdf CLI manual (`--remove-unreferenced-resources`, `--split-pages`)](https://qpdf.readthedocs.io/en/latest/cli.html)
 
 ## UI
