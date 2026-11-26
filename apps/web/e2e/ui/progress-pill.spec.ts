@@ -23,6 +23,7 @@ async function watchPill(page: Page) {
       if (document.querySelector("[data-testid=tool-flow][data-state=done]")) return;
       for (const e of l.getEntries()) {
         w.__pill.shift += (e as unknown as { value: number }).value;
+        w.__pill.tags.push("SHIFT@" + (document.querySelector("[data-testid=processing]")?.getAttribute("data-progress") ?? "-") + " v=" + (e as unknown as { value: number }).value.toFixed(5));
         for (const src of (e as unknown as { sources: { node?: Node; previousRect: DOMRect; currentRect: DOMRect }[] }).sources ?? [])
           w.__pill.tags.push("SHIFT " + ((src.node as Element | undefined)?.outerHTML?.slice(0, 120) ?? "#text:" + src.node?.textContent + " in " + (src.node?.parentElement?.outerHTML.slice(0, 160) ?? "-")) + " " + JSON.stringify(src.previousRect) + " -> " + JSON.stringify(src.currentRect));
       }

@@ -62,6 +62,17 @@
     }
   }
 
+  /* A sticky element sticks only inside its parent, and the flow ends where the tool guide begins. From
+     1024px, once a file is in, the stage wrapper and the flow give up their boxes (their custom properties
+     still inherit), so the row's containing block is main and it stays pinned to the end of the page
+     (AC-611). The chain is main > .mp-toolstage > .ip-flow > the row on every tool route. */
+  @media (min-width: 1024px) {
+    .mp-toolstage:has(> .ip-flow:not([data-state="empty"])),
+    .mp-toolstage > .ip-flow:not([data-state="empty"]) {
+      display: contents;
+    }
+  }
+
   /* The dock as the row's right part (data-ip-dock="row", from 1024px). */
   .ip-dock-row {
     display: flex;

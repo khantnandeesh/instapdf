@@ -90,7 +90,10 @@ export const ProgressPill = forwardRef(function ProgressPill(
         )}
       </span>
       <span className="ip-pill__text">
-        <span className="ip-pill__label">{label}</span>
+        {/* A new node per text: Chrome counts an in-place text change in a clipped line as a layout shift. */}
+        <span key={label} className="ip-pill__label">
+          {label}
+        </span>
         {second && <span className="ip-pill__second">{second}</span>}
       </span>
       {/* At done Cancel keeps its box, hidden, so "Done" doesn't reflow the pill (no layout shift). */}
