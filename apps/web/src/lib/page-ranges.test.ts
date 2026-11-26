@@ -51,7 +51,7 @@ describe("parsing (§0a)", () => {
   });
 
   it("names the bad item inside a longer list, as typed", () => {
-    expect(errorOf("1-3, 5 - 3, 8")?.item).toBe("5-3");
+    expect(errorOf("1-3, 5 - 3, 8")?.item).toBe("5 - 3");
     expect(errorOf("1, 2, ABC")?.item).toBe("ABC");
     expect(errorOf("10-14")?.reason).toBe("past-end");
     expect(errorOf("13-")?.reason).toBe("past-end");
@@ -134,5 +134,43 @@ describe("formatting", () => {
     expect(resolveItem({ kind: "span", from: 3, to: 20, text: "3-20" }, 5)).toEqual([2, 3, 4]);
     expect(resolveItem({ kind: "odd", text: "odd" }, 5)).toEqual([0, 2, 4]);
     expect(resolveItem({ kind: "even", text: "even" }, 1)).toEqual([]);
+  });
+});
+
+describe("review 9: never rewrite text that does not validate; errors quote what was typed", () => {
+  it("canonical text leaves out-of-range input as typed (keeps the AC-403 error visible)", () => {
+    expect(canonicalPageSet("13", [12])).toBe("13");
+    expect(canonicalPageSet("2, 13", [12])).toBe("2, 13");
+    expect(canonicalPageSet("10-14", [12])).toBe("10-14");
+    expect(canonicalPageSet("20", [12, 3])).toBe("20");
+    expect(canonicalPartList("13", [12])).toBe("13");
+    expect(canonicalPartList("2, 13-", [12])).toBe("2, 13-");
+    // Valid text is still canonicalised.
+    expect(canonicalPageSet("3, 1-2", [12])).toBe("1-3");
+  });
+
+  it("a keyword that selects nothing in this file keeps the text, never a blank field", () => {
+    expect(canonicalPageSet("even", [1])).toBe("even");
+    expect(canonicalPageSet(" even ", [1])).toBe(" even ");
+    expect(canonicalPartList("even", [1])).toBe("even");
+    expect(canonicalPageSet("odd", [1])).toBe("1");
+  });
+
+  it("error items are the user's own text, spaces and dashes included", () => {
+    const cases: [string, string, string][] = [
+      ["1-3, 5 – 3, 8", "5 – 3", "start-after-end"],
+      ["-14", "-14", "past-end"],
+      ["1 - 14", "1 - 14", "past-end"],
+      ["2, 13-LAST", "13-LAST", "past-end"],
+      ["13 —", "13 —", "past-end"],
+      ["0 - 3", "0 - 3", "page-zero"],
+      ["1,2-X", "2-X", "not-a-number"],
+    ];
+    for (const [text, item, reason] of cases) {
+      const e = errorOf(text);
+      expect(e?.item, text).toBe(item);
+      expect(e?.reason, text).toBe(reason);
+      expect(e?.message, text).toContain(`“${item}”`);
+    }
   });
 });

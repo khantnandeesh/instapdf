@@ -101,15 +101,26 @@ export function unitsOf(pages: readonly PageRef[]): PageRef[][] {
 
 const sourceOfUnit = (unit: PageRef[]) => unit.find((p) => !isBlank(p))?.sourceId ?? null;
 
-/** Maximal runs of consecutive units from the same source (the files view's cards). */
-export function segmentsOf(pages: readonly PageRef[]): Segment[] {
+const indexOfUnit = (unit: PageRef[]) => unit.find((p) => !isBlank(p))?.sourceIndex ?? -1;
+
+/**
+ * The files view's cards: runs of consecutive units from the same source. A run also ends where the
+ * source's page numbers go backwards (A12 then A1 are two cards, spec F5 AC-501); a forward gap
+ * ("pages 1, 3 of 3") or a repeated page stays one card. `splitBackward: false` gives whole source
+ * runs (Merge's engine: double-sided padding and the cover follow the files, not the cards).
+ */
+export function segmentsOf(pages: readonly PageRef[], { splitBackward = true }: { splitBackward?: boolean } = {}): Segment[] {
   const segments: Segment[] = [];
   let start = 0;
+  let lastIndex = -1;
   for (const unit of unitsOf(pages)) {
     const sourceId = sourceOfUnit(unit);
+    const index = indexOfUnit(unit);
     const last = segments[segments.length - 1];
-    if (last && last.sourceId === sourceId) last.pages.push(...unit);
+    const backward = splitBackward && sourceId !== null && index >= 0 && index < lastIndex;
+    if (last && last.sourceId === sourceId && !backward) last.pages.push(...unit);
     else segments.push({ key: unit[0].uid, sourceId, pages: [...unit], start });
+    if (index >= 0) lastIndex = index;
     start += unit.length;
   }
   return segments;

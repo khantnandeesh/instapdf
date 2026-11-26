@@ -1,8 +1,8 @@
 "use client";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
 import type { WorkspaceContext } from "@/components/tool-flow/types";
-import { ChevronDownIcon } from "@/components/ui/icons";
-import { DotsThreeIcon, SelectAllIcon, TrashIcon } from "@/components/ui/page-tool-icons";
+import { ChevronDownIcon, TrashIcon } from "@/components/ui/icons";
+import { MoreIcon, SelectAllIcon } from "@/components/ui/page-tool-icons";
 import type { MenuEntry } from "@/components/ui/Menu";
 import { reverseRange, sortPages, twoSidedScanPages, type PageRef, type SortKey } from "@/lib/page-list";
 import { ORGANIZE_OPTIONS } from "@/lib/pdf/merge-options";
@@ -146,7 +146,7 @@ export function OrganizeTool() {
                 title={o.pageTools}
                 data-testid="page-tools-menu"
               >
-                <DotsThreeIcon size={20} />
+                <MoreIcon size={20} />
               </PlainMenuButton>
             </span>
           </>

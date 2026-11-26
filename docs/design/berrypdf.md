@@ -81,7 +81,7 @@ BerryPDF pairs Security with `cat-compress`; our Optimize group already takes it
 
 ## Icons
 
-**Phosphor, Duotone** (MIT), from `@phosphor-icons/core` **2.1.1** (exact-pinned devDependency; MIT verified in the installed package). `scripts/gen-tool-icons.mjs` copies only the path data into `src/tools/tool-icons.tsx` (45 tool icons, one per tool; the generator fails on a duplicate) and `src/components/ui/icons.tsx` (30 interface icons), each carrying the MIT notice; they render as server-side inline SVG in `currentColor` with the main shape at 20%. In tool cards the icon sits in a 40px disc tinted with the category colour at 16%. Lucide is removed.
+**Phosphor, Duotone** (MIT), from `@phosphor-icons/core` **2.1.1** (exact-pinned devDependency; MIT verified in the installed package). `scripts/gen-tool-icons.mjs` copies only the path data into `src/tools/tool-icons.tsx` (45 tool icons, one per tool; the generator fails on a duplicate) and `src/components/ui/icons.tsx` (39 interface icons), each carrying the MIT notice; they render as server-side inline SVG in `currentColor` with the main shape at 20%. In tool cards the icon sits in a 40px disc tinted with the category colour at 16%. Lucide is removed.
 
 ## Motifs (Berry kit)
 
@@ -145,6 +145,14 @@ Every tool page is a working surface, not a document. The user arrives to do one
 | 360x640, 390x664, 412x839 | small Android, iPhone with Safari bars, Pixel 7 with Chrome bars |
 
 For each: primary action fully visible and not covered, on load, after loading a 60-page file, after scrolling that file, in the bigger page view and on the result screen; once loaded, the options are in the bottom bar and the pages area spans the content width and at least half the height; no horizontal scroll and no inner scroller outside the [allowed regions](#scrolling); tool head on one line from 1024px. `apps/web/e2e/ui/viewport-fit.spec.ts` enforces this for every usable tool in CI (it reads the registry, so new tools are covered automatically).
+
+## Page tiles
+
+*Short note from the F4 build (2026-11-26); the full rule PT-1, "The page is the tile", lands with `claude/thumb-tile-rule` and this note joins it there as rule 4a.* State on a page tile is an outline, an overlay or a badge, never a fill or extra padding. Page-tool decorations (`src/components/tool-flow/page-decor.css`) are layered on the shared `PageTile` and never change its padding or size:
+
+- **4a. Split parts:** a 1.5px part-tone outline in the tile edge, extra to the number disc and cut line; selection's 2.5px outline wins; tones ≥ 3:1 on cream; dropped in forced colours. Tones: `--ip-part-tone-1` (blueberry, 4.90:1 on cream) and `--ip-part-tone-2` (amber `#c46a12`, 3.69:1), alternating by part; the label under the page adds "· Part n" in the label colour.
+- Extract's picked page is the selection outline plus the leaf tick. Delete's marked page is an overlay on the page itself (dimmed, grey) under a solid trash badge, with the page number struck through. A Split page in no part gets a dashed outline and a dimmed page.
+- Below 1024px nothing is drawn over the page: a toggle tile's Enlarge (Extract, Delete) moves to the row under the page with a 44px target; Split's tile opens the preview itself. Split's scissors marks sit in the gaps between tiles, like insert buttons.
 
 ## Modals
 

@@ -185,11 +185,8 @@ test("AC-501: one file shows the view toggle; the files view shows one card with
   await expect(page.getByTestId("file-meta")).toHaveText(["12 pages"]);
 });
 
-// Open decision for the lead: the files view joins every run of one file's pages into one card
-// (lib/page-list segmentsOf, F3 §3 "maximal runs ... from the same source"), so A12 moved in front of
-// A1–A11 stays one card. Splitting where the page order goes backwards changes segmentsOf, which
-// merge.ts also uses for contents entries and double-sided padding. Not changed in this build.
-test.fixme("AC-501: after moving A12 to the front the files view shows 2 cards (page 12; pages 1–11)", async ({ page }) => {
+// Lead decision (integration): a card ends where a file's page numbers go backwards (segmentsOf).
+test("AC-501: after moving A12 to the front the files view shows 2 cards (page 12; pages 1–11)", async ({ page }) => {
   await pickF5(page, "twelve.pdf");
   await tileAction(page, "A12", "Move to position…");
   await page.getByRole("dialog").getByRole("spinbutton").or(page.getByRole("dialog").getByRole("textbox")).first().fill("1");
@@ -197,6 +194,13 @@ test.fixme("AC-501: after moving A12 to the front the files view shows 2 cards (
   await showFiles(page);
   await expect(page.getByTestId("file-card")).toHaveCount(2);
   await expect(page.getByTestId("file-meta")).toHaveText(["Page 12 of 12", "Pages 1–11 of 12"]);
+  // Back at the end, the file is one card again.
+  await page.getByRole("radio", { name: "Pages", exact: true }).click();
+  await tileAction(page, "A12", "Move to position…");
+  await page.getByRole("dialog").getByRole("spinbutton").or(page.getByRole("dialog").getByRole("textbox")).first().fill("12");
+  await page.getByRole("dialog").getByRole("button", { name: "Move", exact: true }).click();
+  await showFiles(page);
+  await expect(page.getByTestId("file-card")).toHaveCount(1);
 });
 
 test("AC-502: an image and a PDF give 13 tiles and 13 pages, the first holding the image", async ({ page }) => {

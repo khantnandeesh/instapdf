@@ -3,7 +3,7 @@
  * `ref` is the matching Sejda slug, used only by the parity evaluator.
  * `runtime`: "client" = processed in the browser, nothing uploaded; "server" = processing worker.
  */
-import { mergedName, mixedName, organizedName, pdfOutputName, zipName } from "../lib/pdf/naming";
+import { DELETE_ZIP, EXTRACT_ZIP, mergedName, mixedName, organizedName, pdfOutputName, splitZipName, zipName } from "../lib/pdf/naming";
 import type { ToolIconName } from "./tool-icon-names";
 
 export type ToolCategory =
@@ -213,6 +213,33 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
       "alternate-mix-pdf",
       { title: "Alternate & mix PDF", actionLabel: "Mix PDFs", progressLabel: "Mixing" },
       { accept: PDF_AND_IMAGES, maxFiles: 50, defaultView: "files", outputName: (inputs) => mixedName(inputs[0]) },
+    ),
+  },
+  // F4 page tools (spec F4/F5 §0d, §6): PDF only, 20 files, pages view. Split's options fold into one
+  // bar row (UI P-3), so it uses the compact dock too; its parts list lives in More options.
+  "split-pdf": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "split-pdf",
+      { title: "Split PDF", actionLabel: "Split PDF", progressLabel: "Splitting" },
+      // A single part downloads as that PDF (named by the plan); several as `<base>-split.zip` or `berrypdf-split.zip`.
+      { outputName: splitZipName },
+    ),
+  },
+  "extract-pdf-pages": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "extract-pdf-pages",
+      { title: "Extract PDF pages", actionLabel: "Extract pages", progressLabel: "Extracting" },
+      { outputName: (inputs) => (inputs.length === 1 ? pdfOutputName(inputs[0]) : EXTRACT_ZIP) },
+    ),
+  },
+  "delete-pdf-pages": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "delete-pdf-pages",
+      { title: "Delete PDF pages", actionLabel: "Delete pages", progressLabel: "Deleting" },
+      { outputName: (inputs) => (inputs.length === 1 ? pdfOutputName(inputs[0]) : DELETE_ZIP) },
     ),
   },
 };

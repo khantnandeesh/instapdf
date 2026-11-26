@@ -124,6 +124,17 @@ export type DocInfo = {
   pageMode?: string;
 };
 
+/** A value is carried only when it reads: text that decodes, and a date that parses. */
+function readable(key: (typeof CARRIED_INFO)[number], v: PDFString | PDFHexString): boolean {
+  try {
+    if (key === "CreationDate") return !Number.isNaN(v.decodeDate().getTime());
+    v.decodeText();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function readDocInfo(doc: PDFDocument): DocInfo {
   const out: DocInfo = { info: [] };
   const infoRef = doc.context.trailerInfo.Info;
@@ -131,7 +142,7 @@ export function readDocInfo(doc: PDFDocument): DocInfo {
   if (info instanceof PDFDict) {
     for (const key of CARRIED_INFO) {
       const v = info.lookup(PDFName.of(key));
-      if (v instanceof PDFString || v instanceof PDFHexString) out.info.push({ key, value: v });
+      if ((v instanceof PDFString || v instanceof PDFHexString) && readable(key, v)) out.info.push({ key, value: v });
     }
   }
   const layout = doc.catalog.lookup(PDFName.of("PageLayout"));

@@ -78,6 +78,7 @@ export const AREAS = {
   f23: ["src/app/cloud/", "src/app/cloud-mock/", "src/app/merge-pdf/", "src/app/rotate-pdf/"],
   f24: ["src/app/edit-pdf/", "public/engine/"],
   f5: ["src/app/organize-pdf/", "src/app/combine-reorder-pdf/", "src/app/alternate-mix-pdf/", "src/app/merge-pdf/"],
+  f4: ["src/app/split-pdf/", "src/app/extract-pdf-pages/", "src/app/delete-pdf-pages/"],
 };
 /** Paths outside apps/web and the spec folders they run. */
 export const OUTSIDE = { "crates/": ["f16", "f24"] };

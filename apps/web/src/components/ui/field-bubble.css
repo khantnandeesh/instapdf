@@ -1,0 +1,124 @@
+/* FieldBubble (spec F4/F5 UI P-10 P6): fade + y 4 -> 0 in 120ms (the hint's 300ms focus wait is a
+   timer in RangeField, not motion). Reduced motion: the fade only. */
+.ip-bubble-in {
+  animation: ip-bubble-in var(--motion-micro) var(--ease-out) both;
+}
+@keyframes ip-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes ip-bubble-in {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+/*
+ * Layout and look, as plain CSS so it ships with the bubble's lazy chunk instead of the site-wide
+ * stylesheet. The two blocks match the dock-side / dock-bar variants in globals.css exactly. In the
+ * components layer, so utilities a caller passes (NumberStepper's dock-side:absolute) still win.
+ */
+@layer components {
+  .ip-fb__text {
+    max-width: min(340px, calc(100vw - 32px));
+    color: var(--ink);
+  }
+  .ip-fb__text[data-tone="error"] {
+    color: var(--mp-alert-danger-ink);
+  }
+
+  /* Side panel: a reserved 20px line under the field. */
+  @media (width >= 64rem) {
+    :where([data-ip-dock="side"]) .ip-fb {
+      position: static;
+      display: block;
+      height: 1.25rem;
+      padding-top: 0.25rem;
+    }
+    :where([data-ip-dock="side"]) .ip-fb__text {
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+  }
+
+  /* Bar (and a NumberStepper with float, data-fb-float): a floating bubble above the field (white, 1.5px edge, 10px radius, menu shadow, a 6px
+     tail at the bottom-left), shown only with something to say. */
+  @media (width < 64rem) {
+    .ip-fb {
+      pointer-events: none;
+      position: absolute;
+      bottom: calc(100% + var(--ip-bubble-gap));
+      left: 0;
+      z-index: 30;
+    }
+    .ip-fb[data-empty] {
+      display: none;
+    }
+    .ip-fb__text {
+      position: relative;
+      width: max-content;
+      border: 1.5px solid var(--border-card);
+      border-radius: 10px;
+      background: var(--color-surface-raised);
+      padding: 0.5rem 0.75rem;
+      box-shadow: var(--shadow-menu);
+    }
+    .ip-fb__text::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 1.25rem;
+      margin-top: -4.5px;
+      width: 9px;
+      height: 9px;
+      rotate: 45deg;
+      border: solid var(--border-card);
+      border-width: 0 1.5px 1.5px 0;
+      background: var(--color-surface-raised);
+    }
+    .ip-fb__text[data-tone="error"],
+    .ip-fb__text[data-tone="error"]::after {
+      border-color: var(--color-danger);
+    }
+  }
+  :where([data-ip-dock="bar"], [data-fb-float]) .ip-fb {
+    pointer-events: none;
+    position: absolute;
+    bottom: calc(100% + var(--ip-bubble-gap));
+    left: 0;
+    z-index: 30;
+  }
+  :where([data-ip-dock="bar"], [data-fb-float]) .ip-fb[data-empty] {
+    display: none;
+  }
+  :where([data-ip-dock="bar"], [data-fb-float]) .ip-fb__text {
+    position: relative;
+    width: max-content;
+    border: 1.5px solid var(--border-card);
+    border-radius: 10px;
+    background: var(--color-surface-raised);
+    padding: 0.5rem 0.75rem;
+    box-shadow: var(--shadow-menu);
+  }
+  :where([data-ip-dock="bar"], [data-fb-float]) .ip-fb__text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 1.25rem;
+    margin-top: -4.5px;
+    width: 9px;
+    height: 9px;
+    rotate: 45deg;
+    border: solid var(--border-card);
+    border-width: 0 1.5px 1.5px 0;
+    background: var(--color-surface-raised);
+  }
+  :where([data-ip-dock="bar"], [data-fb-float]) .ip-fb__text[data-tone="error"],
+  :where([data-ip-dock="bar"], [data-fb-float]) .ip-fb__text[data-tone="error"]::after {
+    border-color: var(--color-danger);
+  }
+}

@@ -3,12 +3,15 @@ import "@/components/berry/berry-loader.css";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Ref } from "react";
 import { swap } from "@/lib/motion/flow";
 import { formatBytes } from "@/lib/pdf/naming";
+import { entryBlob, storedZipEntries, type ZipEntrySlice } from "@/lib/pdf/zip-entries";
 import { openPdf } from "@/lib/pdf/pdfjs";
 import { renderPage } from "@/lib/pdf/thumbnails";
 import type { FlowTool } from "@/tools/registry";
 import { Button, buttonClasses } from "../ui/Button";
 import { BerryLoader } from "../berry/Berry";
-import { CheckIcon, DownloadIcon, FilesIcon, ShareIcon, ShieldIcon } from "../ui/icons";
+import { cx } from "../ui/cx";
+import { IconButton } from "../ui/IconButton";
+import { CheckIcon, DownloadIcon, DownloadSimpleIcon, FilesIcon, ShareIcon, ShieldIcon } from "../ui/icons";
 import { Notice } from "../ui/Notice";
 import { copy } from "./copy";
 import { PrivacyNote } from "./notes";
@@ -111,7 +114,8 @@ export function ResultCard({
   }, [file]);
 
   const pageCount = output.pageCount ?? output.entries?.reduce((s, e) => s + e.pageCount, 0) ?? 0;
-  const summary = `${formatBytes(output.size)} · ${copy.pages(pageCount)}`;
+  // A ZIP says how many files it holds (spec F4/F5 UI P-3 "Result"); a PDF its pages.
+  const summary = isZip && output.entries ? `${formatBytes(output.size)} · ${copy.files(output.entries.length)}` : `${formatBytes(output.size)} · ${copy.pages(pageCount)}`;
   const titleId = "ip-result-title";
 
   return (
@@ -125,7 +129,7 @@ export function ResultCard({
         {copy.resultTitle(isZip)}
       </h2>
       <div className="mt-[30px] flex flex-col items-center gap-[30px] sm:flex-row sm:items-start">
-        <ResultPreview output={output} />
+        {isZip && output.entries ? <EntryWell output={output} entries={output.entries} announce={announce} /> : <ResultPreview output={output} />}
         <div className="flex w-full min-w-0 flex-1 flex-col gap-4">
           <div>
             <p className="text-tile-title break-all text-ink-black" data-testid="result-name">
@@ -135,7 +139,6 @@ export function ResultCard({
               {summary}
             </p>
           </div>
-          {isZip && output.entries && <EntryList entries={output.entries} />}
           <div className="flex flex-wrap gap-2">
             <a
               ref={download}
@@ -232,20 +235,84 @@ export function ResultCard({
   );
 }
 
-function EntryList({ entries }: { entries: { name: string; pageCount: number }[] }) {
-  const shown = entries.slice(0, 6);
+const ROWS = 4;
+const ROWS_PHONE = 3;
+
+/**
+ * The ZIP's entries in the preview well (spec F4/F5 UI P-3 "Result", decision 7): up to 4 rows (3 on
+ * phones), then "Show all {n}", which grows the list in place (the page scrolls, not the list). Each
+ * row downloads its own file, sliced from the ZIP (stored entries, nothing is copied), so a phone
+ * gets one part in one tap without unzipping. Below 640 px the well sits under the Download button.
+ */
+function EntryWell({ output, entries, announce }: { output: ToolOutput; entries: { name: string; pageCount: number }[]; announce: (message: string) => void }) {
+  const [all, setAll] = useState(false);
+  const [slices, setSlices] = useState<ZipEntrySlice[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    storedZipEntries(output.blob).then(
+      (s) => alive && setSlices(s && s.length === entries.length ? s : null),
+      () => alive && setSlices(null),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [output.blob, entries.length]);
+  const shown = all ? entries : entries.slice(0, ROWS);
+  const more = all ? 0 : entries.length - ROWS;
   return (
-    <ul className="space-y-1 text-sm" data-testid="result-entries">
-      {shown.map((e, i) => (
-        <li key={i} className="flex gap-2">
-          <span className="min-w-0 truncate" title={e.name}>
-            {e.name}
-          </span>
-          <span className="shrink-0 text-muted tabular-nums">{copy.pages(e.pageCount)}</span>
-        </li>
-      ))}
-      {entries.length > 6 && <li className="text-muted">+{entries.length - 6} more</li>}
-    </ul>
+    <div className="mp-tray w-full shrink-0 p-3 max-sm:order-last sm:w-[240px]" data-testid="result-well">
+      <ul className="flex flex-col" data-testid="result-entries">
+        {shown.map((e, i) => (
+          <li key={i} className={cx("flex h-11 items-center gap-2 text-sm", !all && i >= ROWS_PHONE && "max-sm:hidden")}>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-ink" title={e.name}>
+                {e.name}
+              </span>
+              <span className="block text-help text-muted tabular-nums">{copy.pages(e.pageCount)}</span>
+            </span>
+            {slices && <EntryDownload name={e.name} blob={() => entryBlob(output.blob, slices[i])} announce={announce} />}
+          </li>
+        ))}
+      </ul>
+      {(more > 0 || (!all && entries.length > ROWS_PHONE)) && (
+        <button
+          type="button"
+          onClick={() => setAll(true)}
+          className={cx("mt-1 h-11 rounded-sm px-1 font-display text-[15px] font-medium text-brand-strong underline-offset-4 hover:underline", more <= 0 && "sm:hidden")}
+        >
+          {copy.showAll(entries.length)}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** One entry's 36px download button; the arrow turns into a tick for a moment (motion.md T13). */
+function EntryDownload({ name, blob, announce }: { name: string; blob: () => Blob; announce: (message: string) => void }) {
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (!done) return;
+    const t = setTimeout(() => setDone(false), 2400);
+    return () => clearTimeout(t);
+  }, [done]);
+  return (
+    <IconButton
+      label={copy.downloadEntry(name)}
+      variant="raised"
+      className="size-9 shrink-0 bg-surface-raised"
+      data-testid="entry-download"
+      icon={done ? <CheckIcon size={18} className="mp-tick-in" /> : <DownloadSimpleIcon size={18} />}
+      onClick={() => {
+        const url = URL.createObjectURL(blob());
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        setDone(true);
+        announce(copy.downloadedEntry(name));
+      }}
+    />
   );
 }
 

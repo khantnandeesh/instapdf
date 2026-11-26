@@ -11,7 +11,9 @@
  * - Everything else (URI and other actions, links whose target cannot be
  *   resolved, other annotation types) is kept as it is.
  *
- * Works in the source document's space, before the page is copied. The
+ * Named destinations are read through one table per source
+ * (`namedDestinations`), so a file full of named links costs one pass over
+ * its name tree. Works in the source document's space, before the page is copied. The
  * rewritten annotation (the same for every output) is registered once in
  * the source's context; which links survive depends on the output.
  */
@@ -86,7 +88,14 @@ export function createLinkFilter(doc: PDFDocument, pages: readonly PDFPage[]): L
 
   return {
     annotsFor(index, kept) {
-      const found = entriesOf(index);
+      let found: ReturnType<typeof entriesOf>;
+      try {
+        found = entriesOf(index);
+      } catch {
+        // A malformed annotation list: copy the page's own, as Merge always did.
+        cache.set(index, null);
+        return undefined;
+      }
       if (!found) return undefined;
       const keep = found.entries.filter((e) => e.target === null || kept(e.target));
       if (keep.length === found.entries.length && !found.rewritten) return undefined;

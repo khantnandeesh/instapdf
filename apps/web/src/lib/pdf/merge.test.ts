@@ -360,6 +360,17 @@ describe("double-sided and same width", () => {
     expect(s[3]).toEqual(s[2]);
     expect(s[7]).toEqual(s[6]);
   });
+  it("F5 AC-501: a file with its pages out of order (two cards in the files view) is still one file: no pad inside it, one bookmark", async () => {
+    // Alpha 3 first, then Alpha 1-2 (the files view shows two cards); then Bravo.
+    const [a1, a2, a3] = allPages("alpha.pdf");
+    const pages = [a3, a1, a2, ...allPages("bravo.pdf")];
+    const r = await merge(["alpha.pdf", "bravo.pdf"], { doubleSided: true, bookmarks: "perFile" }, pages);
+    expect((await texts(r.bytes)).map(first)).toEqual(["Alpha 3", "Alpha 1", "Alpha 2", "blank", "Bravo 1", "Bravo 2"]);
+    expect(await outline(r.bytes)).toEqual([
+      { title: "alpha", page: 1, children: [] },
+      { title: "bravo", page: 5, children: [] },
+    ]);
+  });
   it("AC-59: with contents, every file starts on an odd page and the total is even", async () => {
     const r = await merge(["alpha.pdf", "bravo.pdf", "echo.pdf"], { doubleSided: true, toc: "names" });
     const t = await texts(r.bytes);

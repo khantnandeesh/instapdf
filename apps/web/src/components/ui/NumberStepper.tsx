@@ -1,108 +1,115 @@
 "use client";
-import { useEffect, useId, useState } from "react";
-import { FieldBubble } from "./FieldBubble";
-import { MinusIcon, PlusIcon } from "./icons";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { cx } from "./cx";
+import { LazyFieldBubble } from "./LazyFieldBubble";
+import { IconButton } from "./IconButton";
+import { MinusIcon, PlusIcon } from "./icons";
+import { shakeElement } from "./shake";
+
+/** The stepper's whole number, or null when the text is not one in [min, max]. */
+export function stepperValue(text: string, min = 1, max = 9999): number | null {
+  const t = text.trim();
+  if (!/^\d+$/.test(t)) return null;
+  const v = Number(t);
+  return v >= min && v <= max ? v : null;
+}
+
+/** The text after a step of `delta` (an invalid text steps from `min`). */
+export function stepText(text: string, delta: number, min = 1, max = 9999): string {
+  const v = stepperValue(text, min, max) ?? (delta > 0 ? min - 1 : min + 1);
+  return String(Math.min(max, Math.max(min, v + delta)));
+}
 
 /**
- * [−] [field] [+] for a whole number (spec F4/F5 P-4 `NumberStepper`). Free typing is allowed;
- * the owner validates the text (`error`) and this shows it in a FieldBubble once typing has paused
- * for 300ms, or on blur. ArrowUp / ArrowDown step by 1, PageUp / PageDown by 10. − is aria-disabled
- * at `min` and + at `max`, so focus never drops off a button that runs out.
+ * [−] [56px number field] [+] (spec F4/F5 UI P-4 `NumberStepper`). Free typing is allowed; the
+ * error shows 300ms after the last keystroke and at once on blur, in the same bubble as the range
+ * field. ArrowUp / ArrowDown step by 1, PageUp / PageDown by 10; − is aria-disabled at `min`.
  */
 export function NumberStepper({
   value,
   onChange,
   label,
-  decrementLabel,
-  incrementLabel,
+  decLabel,
+  incLabel,
   error,
   min = 1,
   max = 9999,
-  disabled,
+  float,
   className,
-  "data-testid": testId,
 }: {
-  /** The field's text (it may be invalid while the user types). */
+  /** The field's text (the caller validates it with stepperValue). */
   value: string;
   onChange: (text: string) => void;
-  /** Accessible name of the field. */
   label: string;
-  decrementLabel: string;
-  incrementLabel: string;
-  /** Why the text is not a valid value, or null. */
-  error: string | null;
+  decLabel: string;
+  incLabel: string;
+  /** The error text while the value is invalid. */
+  error: string;
   min?: number;
   max?: number;
-  disabled?: boolean;
+  /** Outside the dock (Alternate's file cards): the error always floats above the field, as in the bar. */
+  float?: boolean;
   className?: string;
-  "data-testid"?: string;
 }) {
   const id = useId();
-  const errorId = `${id}-error`;
-  const [shown, setShown] = useState<string | null>(null);
-  // The bubble follows the error after a 300ms typing pause; clearing it is immediate.
+  const errId = `${id}-err`;
+  const valid = stepperValue(value, min, max) !== null;
+  const [shown, setShown] = useState(false);
+  const field = useRef<HTMLInputElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
-    if (!error) {
-      setShown(null);
-      return;
-    }
-    const t = setTimeout(() => setShown(error), 300);
-    return () => clearTimeout(t);
-  }, [error, value]);
+    clearTimeout(timer.current);
+    if (valid) setShown(false);
+    else timer.current = setTimeout(() => setShown(true), 300);
+    return () => clearTimeout(timer.current);
+  }, [valid, value]);
+  const atMin = (stepperValue(value, min, max) ?? min) <= min;
+  const atMax = (stepperValue(value, min, max) ?? 0) >= max;
 
-  const current = /^\d+$/.test(value.trim()) ? Number(value.trim()) : null;
-  const step = (delta: number) => {
-    const base = current ?? min;
-    const next = Math.max(min, Math.min(max, base + delta));
-    onChange(String(next));
-  };
-  const atMin = current !== null && current <= min;
-  const atMax = current !== null && current >= max;
+  function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    const delta = e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : e.key === "PageUp" ? 10 : e.key === "PageDown" ? -10 : 0;
+    if (!delta) return;
+    e.preventDefault();
+    onChange(stepText(value, delta, min, max));
+  }
 
   return (
-    <span className={cx("relative inline-flex items-center gap-1", className)} data-testid={testId}>
-      <button
-        type="button"
-        className="mp-iconbtn mp-iconbtn--plain size-11 shrink-0 text-brand-strong aria-disabled:opacity-40"
-        aria-label={decrementLabel}
-        aria-disabled={atMin || disabled || undefined}
-        tabIndex={-1}
-        onClick={() => !atMin && !disabled && step(-1)}
-      >
-        <MinusIcon size={16} />
-      </button>
+    <span className={cx("relative inline-flex items-center gap-1", className)} data-testid="number-stepper" data-fb-float={float ? "" : undefined}>
+      <IconButton
+        label={decLabel}
+        variant="soft"
+        className="size-11"
+        aria-disabled={atMin || undefined}
+        icon={<MinusIcon size={18} />}
+        onClick={() => !atMin && onChange(stepText(value, -1, min, max))}
+      />
       <input
         type="text"
         inputMode="numeric"
-        autoComplete="off"
         aria-label={label}
-        aria-invalid={shown ? true : undefined}
-        aria-describedby={shown ? errorId : undefined}
-        disabled={disabled}
+        aria-invalid={shown && !valid ? true : undefined}
+        aria-describedby={shown && !valid ? errId : undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onBlur={() => setShown(error)}
-        onKeyDown={(e) => {
-          const delta = e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : e.key === "PageUp" ? 10 : e.key === "PageDown" ? -10 : 0;
-          if (!delta) return;
-          e.preventDefault();
-          step(delta);
+        onKeyDown={onKeyDown}
+        onBlur={() => {
+          if (!valid) {
+            setShown(true);
+            shakeElement(field.current);
+          }
         }}
-        className="ip-field h-11 w-(--ip-stepper-field-w) shrink-0 px-1 text-center tabular-nums"
-        data-testid="stepper-field"
+        ref={field}
+        className="ip-field h-11 w-(--ip-stepper-field-w) px-2 text-center tabular-nums"
       />
-      <button
-        type="button"
-        className="mp-iconbtn mp-iconbtn--plain size-11 shrink-0 text-brand-strong aria-disabled:opacity-40"
-        aria-label={incrementLabel}
-        aria-disabled={atMax || disabled || undefined}
-        tabIndex={-1}
-        onClick={() => !atMax && !disabled && step(1)}
-      >
-        <PlusIcon size={16} />
-      </button>
-      {shown && <FieldBubble id={errorId} text={shown} />}
+      <IconButton
+        label={incLabel}
+        variant="soft"
+        className="size-11"
+        aria-disabled={atMax || undefined}
+        icon={<PlusIcon size={18} />}
+        onClick={() => !atMax && onChange(stepText(value, 1, min, max))}
+      />
+      <LazyFieldBubble id={errId} error={shown && !valid ? error : null} className="dock-side:absolute dock-side:top-full dock-side:left-0" />
     </span>
   );
 }

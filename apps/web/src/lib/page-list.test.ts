@@ -75,10 +75,28 @@ describe("segments", () => {
     expect(segmentsOf(atStart)[0].pages.map((p) => p.uid)).toEqual(["y", "a1", "a2", "a3"]);
     expect(segmentsOf([blank("z")]).map((s) => s.sourceId)).toEqual([null]);
   });
+  it("starts a new card where a file's page numbers go backwards (AC-501), not at a forward gap or a repeat", () => {
+    const back = moveBlock(ab(), set("a3"), 0); // a3 a1 a2 b1 b2
+    expect(labels(back)).toEqual(["A3", "A1", "A2", "B1", "B2"]);
+    expect(segmentsOf(back).map((s) => s.pages.map((p) => p.uid))).toEqual([["a3"], ["a1", "a2"], ["b1", "b2"]]);
+    // Whole source runs on request (Merge's engine: double-sided padding and the cover follow files).
+    expect(segmentsOf(back, { splitBackward: false }).map((s) => s.pages.map((p) => p.uid))).toEqual([["a3", "a1", "a2"], ["b1", "b2"]]);
+    const gap = ab().filter((p) => p.uid !== "a2"); // A1, A3: "pages 1, 3 of 3"
+    expect(segmentsOf(gap).map((s) => s.sourceId)).toEqual(["a", "b"]);
+    const repeat = duplicatePages(ab(), set("a1"), () => "a1-copy").pages; // A1, A1, A2, A3
+    expect(segmentsOf(repeat).map((s) => s.sourceId)).toEqual(["a", "b"]);
+    // A blank page travels with the page before it, also across a split.
+    const withBlank = insertPages(back, 1, [blank("x")]); // a3 x a1 a2 ...
+    expect(segmentsOf(withBlank).map((s) => s.pages.map((p) => p.uid))[0]).toEqual(["a3", "x"]);
+  });
   it("joins two segments of the same source when they become neighbours", () => {
     const split = moveBlock(ab(), set("b1"), 1); // a1 b1 a2 a3 b2
-    const joined = moveSegment(split, 1, 3); // a1 a2 a3 b1 b2
+    const joined = moveSegment(split, 1, 2); // a1 a2 a3 b1 b2
+    expect(labels(joined)).toEqual(["A1", "A2", "A3", "B1", "B2"]);
     expect(segmentsOf(joined)).toHaveLength(2);
+    // Past B2 instead, A still joins; B1 after B2 runs backwards, so B is two cards (AC-501).
+    const past = moveSegment(split, 1, 3); // a1 a2 a3 b2 b1
+    expect(segmentsOf(past).map((s) => `${s.sourceId}:${s.pages.length}`)).toEqual(["a:3", "b:1", "b:1"]);
   });
 });
 

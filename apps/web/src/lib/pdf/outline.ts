@@ -39,29 +39,52 @@ const VIEW_ARGS: Record<string, number> = { XYZ: 3, Fit: 0, FitH: 1, FitV: 1, Fi
 
 const textOf = (o: PDFObject | undefined) => (o instanceof PDFString || o instanceof PDFHexString ? o.decodeText() : "");
 
-/** Looks a name up in a name tree (/Kids, /Names). */
-export function lookupNameTree(node: PDFDict | undefined, name: string, depth = 0): PDFObject | undefined {
-  if (!node || depth > 32) return undefined;
-  const names = node.lookup(PDFName.of("Names"));
-  if (names instanceof PDFArray) {
-    for (let i = 0; i + 1 < names.size(); i += 2) if (textOf(names.lookup(i)) === name) return names.get(i + 1);
-  }
-  const kids = node.lookup(PDFName.of("Kids"));
-  if (kids instanceof PDFArray) {
-    for (let i = 0; i < kids.size(); i++) {
-      const kid = kids.lookup(i);
-      if (!(kid instanceof PDFDict)) continue;
-      const limits = kid.lookup(PDFName.of("Limits"));
-      if (limits instanceof PDFArray && limits.size() === 2) {
-        const lo = textOf(limits.lookup(0));
-        const hi = textOf(limits.lookup(1));
-        if (name < lo || name > hi) continue;
+/** Name-tree limits: a hostile tree cannot make the worker loop or spin. */
+const MAX_TREE_NODES = 100_000;
+const MAX_TREE_NAMES = 1_000_000;
+
+/**
+ * Every named destination of a document, as a map from name to its value:
+ * the old-style catalog /Dests dictionary first, then the /Names /Dests name
+ * tree (first entry wins). Built once per document (cached), walking each
+ * tree node at most once, within a node and a name budget.
+ */
+const namedDestCache = new WeakMap<PDFDocument, Map<string, PDFObject>>();
+export function namedDestinations(doc: PDFDocument): Map<string, PDFObject> {
+  const cached = namedDestCache.get(doc);
+  if (cached) return cached;
+  const map = new Map<string, PDFObject>();
+  const dests = doc.catalog.lookup(PDFName.of("Dests"));
+  if (dests instanceof PDFDict) for (const [k, v] of dests.entries()) map.set(k.decodeText(), v);
+  const names = doc.catalog.lookup(PDFName.of("Names"));
+  const tree = names instanceof PDFDict ? names.lookup(PDFName.of("Dests")) : undefined;
+  if (tree instanceof PDFDict) {
+    const seen = new Set<PDFDict>();
+    const stack: PDFDict[] = [tree];
+    let budget = MAX_TREE_NAMES;
+    while (stack.length && seen.size < MAX_TREE_NODES && budget > 0) {
+      const node = stack.pop()!;
+      if (seen.has(node)) continue;
+      seen.add(node);
+      const list = node.lookup(PDFName.of("Names"));
+      if (list instanceof PDFArray) {
+        for (let i = 0; i + 1 < list.size() && budget-- > 0; i += 2) {
+          const key = textOf(list.lookup(i));
+          if (key && !map.has(key)) map.set(key, list.get(i + 1));
+        }
       }
-      const found = lookupNameTree(kid, name, depth + 1);
-      if (found) return found;
+      const kids = node.lookup(PDFName.of("Kids"));
+      if (kids instanceof PDFArray) {
+        // Pushed in reverse so the tree is read left to right (first entry wins).
+        for (let i = kids.size() - 1; i >= 0; i--) {
+          const kid = kids.lookup(i);
+          if (kid instanceof PDFDict && !seen.has(kid)) stack.push(kid);
+        }
+      }
     }
   }
-  return undefined;
+  namedDestCache.set(doc, map);
+  return map;
 }
 
 export type ResolvedDest = {
@@ -95,15 +118,7 @@ export function resolveDest(doc: PDFDocument, dest: PDFObject | undefined): Reso
     }
     if (resolved instanceof PDFName || resolved instanceof PDFString || resolved instanceof PDFHexString) {
       named = true;
-      const key = resolved.decodeText();
-      const dests = doc.catalog.lookup(PDFName.of("Dests"));
-      let found: PDFObject | undefined = dests instanceof PDFDict ? dests.get(PDFName.of(key)) : undefined;
-      if (!found) {
-        const names = doc.catalog.lookup(PDFName.of("Names"));
-        const tree = names instanceof PDFDict ? names.lookup(PDFName.of("Dests")) : undefined;
-        found = lookupNameTree(tree instanceof PDFDict ? tree : undefined, key);
-      }
-      dest = found;
+      dest = namedDestinations(doc).get(resolved.decodeText());
       continue;
     }
     return null;

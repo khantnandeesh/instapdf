@@ -20,12 +20,21 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXED_DATE = new Date("2026-01-01T00:00:00Z");
 
-async function makeDoc(pageCount, { rotate = {} } = {}) {
+/**
+ * `info: false` writes no Info strings (Title, Producer, dates). The encrypting
+ * writer used here stores Info strings that do not decrypt to what was set
+ * (pikepdf and pdf-lib both read them back as garbage; files encrypted by qpdf
+ * read fine), so encrypted fixtures that page tools copy Info from leave them
+ * out. tests/fixtures/encryption/titled-aes256.pdf (qpdf) has real Info.
+ */
+async function makeDoc(pageCount, { rotate = {}, info = true } = {}) {
   const doc = await PDFDocument.create({ updateMetadata: false });
-  doc.setCreationDate(FIXED_DATE);
-  doc.setModificationDate(FIXED_DATE);
-  doc.setProducer("InstaPDF fixtures");
-  doc.setTitle("InstaPDF test fixture");
+  if (info) {
+    doc.setCreationDate(FIXED_DATE);
+    doc.setModificationDate(FIXED_DATE);
+    doc.setProducer("InstaPDF fixtures");
+    doc.setTitle("InstaPDF test fixture");
+  }
   const font = await doc.embedFont(StandardFonts.Helvetica);
   for (let i = 1; i <= pageCount; i++) {
     const page = doc.addPage([595, 842]); // A4 portrait
@@ -55,7 +64,7 @@ for (const name of ["user-pw.pdf", "user-pw-2.pdf"]) {
 }
 
 {
-  const doc = await makeDoc(3);
+  const doc = await makeDoc(3, { info: false });
   doc.encrypt({
     userPassword: "",
     ownerPassword: "owner123",
@@ -408,3 +417,28 @@ await writeFile(join(here, "corrupt.pdf"), "This is not a PDF file, only plain t
 await writeFile(join(here, "empty.pdf"), new Uint8Array(0));
 await writeFile(join(here, "notes.txt"), "Plain text notes. Not a PDF.\n");
 console.log("corrupt.pdf, empty.pdf, notes.txt written");
+
+// ---- F4 page tools (spec F4/F5 §7) ----
+{
+  // 12 A4 pages "Twelve 1".."Twelve 12"; outline Intro → p1, Middle → p5 (child Detail → p6), End → p10.
+  const twelve = await textDoc([595, 842], Array.from({ length: 12 }, (_, i) => `Twelve ${i + 1}`), null);
+  addOutline(twelve, [
+    { title: "Intro", page: 0 },
+    { title: "Middle", page: 4, children: [{ title: "Detail", page: 5 }] },
+    { title: "End", page: 9 },
+  ]);
+  await save("twelve.pdf", twelve);
+  // 250 pages "Big 1".."Big 250" (above the reference's 200-page cap).
+  await save("big-250.pdf", await textDoc([595, 842], Array.from({ length: 250 }, (_, i) => `Big ${i + 1}`), null));
+  // The spec's 4-page mixed-sizes file. Named apart from F1's 3-page mixed-sizes.pdf, which other suites read.
+  const mixed = await PDFDocument.create({ updateMetadata: false });
+  mixed.setCreationDate(FIXED_DATE);
+  mixed.setModificationDate(FIXED_DATE);
+  const font = await mixed.embedFont(StandardFonts.Helvetica);
+  [[595, 842], [792, 612], [420, 595], [595, 842]].forEach(([w, h], i) => {
+    const page = mixed.addPage([w, h]);
+    page.drawText(`Mixed ${i + 1}`, { x: 40, y: h - 60, size: 24, font });
+    if (i === 3) page.setRotation(degrees(90));
+  });
+  await save("mixed-sizes-f4.pdf", mixed);
+}

@@ -25,6 +25,10 @@ const BUDGET_KB = {
   "/organize-pdf/page": [150, 160],
   "/combine-reorder-pdf/page": [150, 160],
   "/alternate-mix-pdf/page": [148, 158],
+  // F4 page tools (spec F4/F5 UI P-12): Rotate + the range parser, field and stepper (+ marks on Split).
+  "/split-pdf/page": [145, 155],
+  "/extract-pdf-pages/page": [143, 153],
+  "/delete-pdf-pages/page": [143, 153],
 };
 /** Cloud-on builds carry the F23 source caret and row (~0.9 KB entry, ~2 KB phone), accepted by the lead 24 Nov. */
 const CLOUD_BUDGET_KB = {
@@ -34,6 +38,9 @@ const CLOUD_BUDGET_KB = {
   "/organize-pdf/page": [152, 162],
   "/combine-reorder-pdf/page": [152, 162],
   "/alternate-mix-pdf/page": [150, 160],
+  "/split-pdf/page": [147, 157],
+  "/extract-pdf-pages/page": [145, 155],
+  "/delete-pdf-pages/page": [145, 155],
 };
 
 const dir = process.argv[2] ?? process.cwd();

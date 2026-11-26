@@ -99,6 +99,8 @@ type OpenedPdf = {
   doc: PDFDocument;
   pages: PDFPage[];
   pageIndexOf: Map<PDFRef, number>;
+  /** Widget annotation refs on each page (after flattening). */
+  widgets: { refs: PDFRef[]; count: number }[];
   pruner: Pruner;
   links: LinkFilter;
   meta: SourceMeta;
@@ -355,7 +357,8 @@ export async function openSource(s: MergeSourceInput, options: Pick<MergeOptions
   const meta: SourceMeta = {
     name: s.name,
     kind: "pdf",
-    title: doc.getTitle() || undefined,
+    // Encrypted sources' strings are decrypted on load, so their Title and Info are used too.
+    title: titleOf(doc),
     outline: options.bookmarks === "keep" || options.bookmarks === "perFileNested" ? readOutline(doc) : [],
     lang: readLang(doc),
     labels: readPageLabels(doc),
@@ -368,6 +371,7 @@ export async function openSource(s: MergeSourceInput, options: Pick<MergeOptions
     doc,
     pages,
     pageIndexOf: new Map(pages.map((page, i) => [page.ref, i])),
+    widgets: pages.map(widgetsOf),
     pruner: createPruner(doc.context, pages),
     links: createLinkFilter(doc, pages),
     meta,
@@ -375,32 +379,80 @@ export async function openSource(s: MergeSourceInput, options: Pick<MergeOptions
   };
 }
 
-/** Binds an opened source to one output: a fresh object copier with the output refs of its used pages reserved. */
+/** The Info /Title, or undefined when it is missing, blank or cannot be read. */
+function titleOf(doc: PDFDocument): string | undefined {
+  try {
+    return doc.getTitle() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The widget annotations on a page: `refs` for the indirect ones (seeded or
+ * kept per output), `count` including widgets written directly in /Annots.
+ * Exported for tests.
+ */
+export function widgetsOf(page: PDFPage): { refs: PDFRef[]; count: number } {
+  const annots = page.node.lookup(PDFName.of("Annots"));
+  const out = { refs: [] as PDFRef[], count: 0 };
+  if (!(annots instanceof PDFArray)) return out;
+  for (let i = 0; i < annots.size(); i++) {
+    const raw = annots.get(i);
+    const a = annots.lookup(i);
+    if (!(a instanceof PDFDict) || a.lookup(PDFName.of("Subtype")) !== PDFName.of("Widget")) continue;
+    out.count++;
+    if (raw instanceof PDFRef) out.refs.push(raw);
+  }
+  return out;
+}
+
+/**
+ * Binds an opened source to one output: a fresh object copier with the output
+ * refs of its used pages reserved. Widgets of pages the output does not hold
+ * are seeded as null, so copying a field (through a kept widget's /Parent)
+ * does not drag in its widgets and appearances on other pages. The form's
+ * /DR and /DA are copied only when a used page has a widget.
+ */
 function bindSource(o: OpenedSource, usedIndexes: Set<number>, options: MergeOptions, out: PDFDocument): { loaded: Loaded; meta: SourceMeta } {
   if (o.kind === "image") return { loaded: { kind: "image", input: o.input, bytes: o.bytes, format: o.format, embedded: new Map(), frames: o.frames, tiff: o.tiff }, meta: o.meta };
   const { doc, pages } = o;
   const copier = PDFObjectCopier.for(doc.context, out.context);
   const traversed = (copier as unknown as { traversedObjects: Map<unknown, unknown> }).traversedObjects;
   const reserved = new Map<number, PDFRef>();
+  // A widget listed on a used page is kept, even when a dropped page lists it too.
+  const keptWidgets = new Set<PDFRef>();
+  for (const idx of usedIndexes) for (const w of o.widgets[idx]?.refs ?? []) keptWidgets.add(w);
   pages.forEach((page, idx) => {
     if (usedIndexes.has(idx)) {
       const ref = out.context.nextRef();
       reserved.set(idx, ref);
       traversed.set(page.ref, ref);
-    } else traversed.set(page.ref, PDFNull); // anything else that reaches a dropped page goes nowhere
+    } else {
+      traversed.set(page.ref, PDFNull); // anything else that reaches a dropped page goes nowhere
+      for (const w of o.widgets[idx].refs) if (!keptWidgets.has(w)) traversed.set(w, PDFNull);
+    }
   });
   let form: PDFDict | undefined;
   const acro = doc.catalog.lookup(PDFName.of("AcroForm"));
-  if (acro instanceof PDFDict && options.forms !== "remove" && (options.forms !== "flatten" || o.meta.keptFields?.length)) {
+  // Only referenced widgets become fields (buildAcroForm starts from refs), so only they justify copying /DR.
+  const hasWidgets = [...usedIndexes].some((i) => o.widgets[i]?.refs.length);
+  if (acro instanceof PDFDict && hasWidgets && options.forms !== "remove" && (options.forms !== "flatten" || o.meta.keptFields?.length)) {
     form = out.context.obj({}) as PDFDict;
     const dr = acro.get(PDFName.of("DR"));
     const da = acro.get(PDFName.of("DA"));
     if (dr) form.set(PDFName.of("DR"), copier.copy(dr));
     if (da) form.set(PDFName.of("DA"), da.clone());
   }
-  // A direct copy: nothing is written unless the output keeps it.
+  // A direct copy: nothing is written unless the output keeps it. /PrintPageRange
+  // names source page numbers, which no longer match the output's pages.
   const prefs = doc.catalog.lookup(PDFName.of("ViewerPreferences"));
-  const viewerPreferences = prefs instanceof PDFDict ? copier.copy(prefs) : undefined;
+  let viewerPreferences: PDFObject | undefined;
+  if (prefs instanceof PDFDict) {
+    const shallow = prefs.clone();
+    shallow.delete(PDFName.of("PrintPageRange"));
+    viewerPreferences = copier.copy(shallow);
+  }
   const prune = usedIndexes.size < pages.length;
   return { loaded: { kind: "pdf", input: o.input, opened: o, pages, copier, reserved, used: usedIndexes, prune }, meta: { ...o.meta, form, viewerPreferences } };
 }
@@ -517,7 +569,9 @@ export async function composeDocument(input: MergeInput, env: MergeEnv, pool: So
 
   // ---- plan: segments, contents pages, padding ----
   const asRefs = pagesIn.map((p, i) => ({ uid: String(i), sourceId: p.sourceId, sourceIndex: p.sourceIndex, rotation: 0, size: { width: 0, height: 0 } }));
-  const segments = segmentsOf(asRefs).map((s) => s.pages.map((r) => pagesIn[Number(r.uid)]));
+  // Whole source runs: a file whose pages the user put out of order (two cards in the files view,
+  // AC-501) is still one file for double-sided padding and the cover.
+  const segments = segmentsOf(asRefs, { splitBackward: false }).map((s) => s.pages.map((r) => pagesIn[Number(r.uid)]));
   const tocOn = options.toc !== "none";
   const coverSegments = tocOn && options.cover ? segments.slice(0, 1) : [];
   const restSegments = segments.slice(coverSegments.length);

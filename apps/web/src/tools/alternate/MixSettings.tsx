@@ -2,7 +2,7 @@
 import { NumberStepper } from "@/components/ui/NumberStepper";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Switch } from "@/components/ui/Switch";
-import { parseCount } from "@/lib/page-plans";
+import { MAX_COUNT } from "@/lib/plan-counts";
 import { alternateCopy as a } from "./copy";
 
 /** A card's settings as the user set them (the per-turn text may be invalid while typing). */
@@ -34,10 +34,11 @@ export function MixSettings({ id, name, pageCount, mix: m, onChange, announce }:
           value={m.perTurn}
           onChange={(t) => onChange({ perTurn: t })}
           label={a.perTurnFrom(name)}
-          decrementLabel={a.fewer(name)}
-          incrementLabel={a.more(name)}
-          error={parseCount(m.perTurn) === null ? a.perTurnError : null}
-          data-testid="per-turn"
+          decLabel={a.fewer(name)}
+          incLabel={a.more(name)}
+          error={a.perTurnError}
+          max={MAX_COUNT}
+          float
         />
         <span className="text-sm whitespace-nowrap text-muted" aria-hidden="true">
           {a.perTurn}

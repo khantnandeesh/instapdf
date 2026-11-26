@@ -107,6 +107,12 @@ const UI_ICONS = {
   ArrowRightIcon: "arrow-right@bold",
   ArrowLeftIcon: "arrow-left@bold",
   LeafIcon: "leaf",
+  // Page tools (spec F4/F5 UI P-4, decision 15): bold, drawn bare on small controls. The ones only
+  // the F5 workspace draws live in PAGE_TOOL_ICONS below.
+  ScissorsIcon: "scissors@bold",
+  TrashIcon: "trash@bold",
+  SlidersIcon: "sliders-horizontal@bold",
+  DownloadSimpleIcon: "download-simple@bold",
 };
 
 /**
@@ -115,10 +121,11 @@ const UI_ICONS = {
  * every page's first load (P-12).
  */
 const PAGE_TOOL_ICONS = {
+  UndoIcon: "arrow-u-up-left@bold",
   RedoIcon: "arrow-u-up-right@bold",
   SelectAllIcon: "selection-all@bold",
-  TrashIcon: "trash@bold",
-  DotsThreeIcon: "dots-three@bold",
+  SelectInverseIcon: "selection-inverse@bold",
+  MoreIcon: "dots-three@bold",
 };
 
 /** "name" is the duotone weight; "name@bold" picks another weight. */
