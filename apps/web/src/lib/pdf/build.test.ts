@@ -5,7 +5,7 @@
  */
 import { readFile } from "node:fs/promises";
 import { unzipSync } from "fflate";
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, PDFStream, PDFString, StandardFonts } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFStream, PDFString, StandardFonts } from "@cantoo/pdf-lib";
 import { beforeAll, describe, expect, it } from "vitest";
 import { parsePageRanges } from "../page-ranges";
 import { pagesPerFile, planAlternate, planDelete, planExtract, planSplit, type OutputPlan, type PlanFile } from "../page-plans";
@@ -507,12 +507,22 @@ describe("review nits", () => {
   });
 
   it("AC-541: an encrypted source's Info is not carried (it cannot be read reliably)", async () => {
-    const f = await file("owner-restricted.pdf");
-    const out = (await run(planExtract([f], pagesPerFile(items("1"), [f]))))[0];
-    const doc = await plain(out.bytes);
-    expect(doc.getTitle()).toBeUndefined();
-    expect(doc.getAuthor()).toBeUndefined();
-    expect(doc.getSubject()).toBeUndefined();
-    expect(doc.getKeywords()).toBeUndefined();
+    const src = await PDFDocument.create({ updateMetadata: false });
+    for (let i = 0; i < 2; i++) src.addPage([200, 200]);
+    src.setTitle("Secret title");
+    src.setAuthor("Someone");
+    src.setSubject("Subject");
+    src.setKeywords(["one", "two"]);
+    src.encrypt({ userPassword: "", ownerPassword: "owner", algorithm: "AES-256", permissions: { modifying: false } });
+    fx["encrypted-info.pdf"] = await src.save({ useObjectStreams: false });
+    const f = await file("encrypted-info.pdf");
+    const outputs = [(await run(planExtract([f], pagesPerFile(items("1"), [f]))))[0].bytes, (await merge(["encrypted-info.pdf"], all("encrypted-info.pdf", 2))).bytes];
+    for (const bytes of outputs) {
+      const doc = await plain(bytes);
+      expect(doc.getTitle()).toBeUndefined();
+      expect(doc.getAuthor()).toBeUndefined();
+      expect(doc.getSubject()).toBeUndefined();
+      expect(doc.getKeywords()).toBeUndefined();
+    }
   });
 });

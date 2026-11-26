@@ -20,12 +20,19 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXED_DATE = new Date("2026-01-01T00:00:00Z");
 
-async function makeDoc(pageCount, { rotate = {} } = {}) {
+/**
+ * `info: false` writes no Info strings (Title, Producer, dates): pdf-lib reads
+ * the strings of an encrypted file back as garbage, so encrypted fixtures that
+ * page tools copy from leave them out.
+ */
+async function makeDoc(pageCount, { rotate = {}, info = true } = {}) {
   const doc = await PDFDocument.create({ updateMetadata: false });
-  doc.setCreationDate(FIXED_DATE);
-  doc.setModificationDate(FIXED_DATE);
-  doc.setProducer("InstaPDF fixtures");
-  doc.setTitle("InstaPDF test fixture");
+  if (info) {
+    doc.setCreationDate(FIXED_DATE);
+    doc.setModificationDate(FIXED_DATE);
+    doc.setProducer("InstaPDF fixtures");
+    doc.setTitle("InstaPDF test fixture");
+  }
   const font = await doc.embedFont(StandardFonts.Helvetica);
   for (let i = 1; i <= pageCount; i++) {
     const page = doc.addPage([595, 842]); // A4 portrait
@@ -55,7 +62,7 @@ for (const name of ["user-pw.pdf", "user-pw-2.pdf"]) {
 }
 
 {
-  const doc = await makeDoc(3);
+  const doc = await makeDoc(3, { info: false });
   doc.encrypt({
     userPassword: "",
     ownerPassword: "owner123",
