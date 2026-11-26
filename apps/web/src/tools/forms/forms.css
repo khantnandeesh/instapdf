@@ -142,7 +142,7 @@ textarea.bf-options { height: auto; padding: 6px 8px; line-height: 1.4; resize: 
 }
 
 /* Phone fill peek (G-15): what is typed into a small field, large, under the top bar. */
-.bf-peek { position: fixed; z-index: 40; left: 8px; right: 8px; top: calc(74px + env(safe-area-inset-top)); /* under the 56 px top bar at 10 px */ display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 14px; background: #fff; box-shadow: 0 6px 24px rgb(0 0 0 / 0.14); animation: bf-peek-in 160ms ease-out; }
+.bf-peek { position: fixed; z-index: 40; left: 8px; right: 8px; top: calc(var(--ip-header-h, 0px) + 74px + env(safe-area-inset-top)); /* under the site header and the 56 px editor bar, at 10 px (F25 E1) */ display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 14px; background: #fff; box-shadow: 0 6px 24px rgb(0 0 0 / 0.14); animation: bf-peek-in 160ms ease-out; }
 .bf-peek-name { flex: none; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px/1.2 Fredoka, sans-serif; color: var(--muted); }
 .bf-peek-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; color: var(--ink); }
 .bf-peek .bf-act { min-height: 44px; }

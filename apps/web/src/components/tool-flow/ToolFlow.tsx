@@ -1059,50 +1059,53 @@ export function ToolFlow({
   const replaceMounted = useMountOnce(!!pendingReplace);
   const dim = working ? { "data-dim": "", inert: true } : {};
   const options = renderOptions(ctx);
+  const dock = loaded && C && (
+    <C.ControlDock
+      label={`${tool.name} options`}
+      layout={wide ? (settings ? "side" : "row") : "bar"}
+      start={dockStart?.(ctx)}
+      optionsDisabled={optionsDisabled}
+      options={settings && wide ? null : options}
+      more={renderMore?.(ctx)}
+      density={flow.optionsDensity}
+      dimmed={working}
+      bare={state === "done"}
+      sheet={{
+        title: wide ? "More options" : `${tool.name} options`,
+        badge: optionsBadge,
+        footer: (close) => (
+          <>
+            <Button variant="secondary" className="flex-1 lg:flex-none" onClick={close}>
+              Done
+            </Button>
+            <Button
+              variant="primary"
+              className="flex-1 lg:flex-none"
+              disabled={!canPrimary}
+              onClick={() => {
+                close();
+                void run();
+              }}
+            >
+              {actionText}
+            </Button>
+          </>
+        ),
+      }}
+      slot={slot}
+    />
+  );
   return (
     <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" className="ip-flow" style={thumbSize === THUMB_DEFAULT ? undefined : { ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
       <DropOverlay active={dragging && acceptsDrop} mode={flow.multiFile || files.length === 0 ? "add" : "replace"} />
       <LiveRegion message={message} />
-      {/* The head: the centred h1 while empty; once a file is in, the sticky top row (F25 §3): h1, options,
-          More options, Undo│Redo and the action slot (from 1024 px), or the h1 over the bottom dock. */}
+      {/* The head: the centred h1 while empty; once a file is in, the sticky top row (F25 §3) with the dock
+          as its right part from 1024 px. Below 1024 px the dock is fixed to the bottom and sits outside the
+          row, so the row holds only the h1 (AC-612); it follows the head in the DOM either way. */}
       <ToolIntro ref={heading} title={flow.title} row={loaded}>
-        {loaded && C && (
-          <C.ControlDock
-            label={`${tool.name} options`}
-            layout={wide ? (settings ? "side" : "row") : "bar"}
-            start={dockStart?.(ctx)}
-            optionsDisabled={optionsDisabled}
-            options={settings && wide ? null : options}
-            more={renderMore?.(ctx)}
-            density={flow.optionsDensity}
-            dimmed={working}
-            bare={state === "done"}
-            sheet={{
-              title: wide ? "More options" : `${tool.name} options`,
-              badge: optionsBadge,
-              footer: (close) => (
-                <>
-                  <Button variant="secondary" className="flex-1 lg:flex-none" onClick={close}>
-                    Done
-                  </Button>
-                  <Button
-                    variant="primary"
-                    className="flex-1 lg:flex-none"
-                    disabled={!canPrimary}
-                    onClick={() => {
-                      close();
-                      void run();
-                    }}
-                  >
-                    {actionText}
-                  </Button>
-                </>
-              ),
-            }}
-            slot={slot}
-          />
-        )}
+        {wide && dock}
       </ToolIntro>
+      {!wide && dock}
 
       {state === "empty" ? (
         // The picker card, alone (F25 §2): no options panel, no dock, centred in the first screen.

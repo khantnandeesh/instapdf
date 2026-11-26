@@ -94,6 +94,8 @@ test("AC-248 AC-231 AC-233: fields fill with any tool, Tab follows the order, th
   await page.locator('.bf-field[data-kind="dropdown"] select').selectOption("Japan");
   await page.locator('.bf-field[data-kind="checkbox"] .bf-hit').click();
   await expect(page.getByRole("checkbox", { name: "agree" })).toBeChecked();
+  // F25 E1: the site header stays above the editor, so on a phone this radio starts under the tools dock: centre it first.
+  await page.getByRole("radio", { name: "contact: Phone" }).evaluate((e) => e.scrollIntoView({ block: "center" }));
   await page.getByRole("radio", { name: "contact: Phone" }).check({ force: true });
   // One undo step per field burst: undo takes the radio back, not the typed text.
   await page.getByTestId("canvas").focus();
