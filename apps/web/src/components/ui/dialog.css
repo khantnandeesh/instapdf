@@ -66,3 +66,15 @@
   outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
+
+/* More options: Split's parts list. About five rows, then it scrolls inside; in the phone sheet the cap
+   also follows the sheet height (title row, footer, padding, heading, pattern and bookmarks take about
+   335px), so only the list scrolls. Two rows at least. */
+.ip-parts-scroller {
+  max-height: calc(5.5 * var(--ip-tap-min));
+}
+@media (max-width: 639px) {
+  .ip-parts-scroller {
+    max-height: max(calc(2 * var(--ip-tap-min)), min(calc(5.5 * var(--ip-tap-min)), calc(var(--ip-sheet-max-h) - 335px)));
+  }
+}

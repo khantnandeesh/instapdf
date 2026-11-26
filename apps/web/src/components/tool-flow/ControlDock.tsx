@@ -47,6 +47,8 @@ export function ControlDock({
   footer,
   density = "compact",
   sheet,
+  start,
+  more,
 }: {
   label: string;
   layout?: "side" | "bar";
@@ -61,6 +63,17 @@ export function ControlDock({
    */
   density?: "compact" | "full";
   sheet?: { title: string; badge?: string; footer: (close: () => void) => ReactNode };
+  /**
+   * Bar layout: controls after the options and before the status (F5 Undo│Redo, spec F4/F5 P-3).
+   * Below 640 px they share the options row, or the primary's row when there are no options.
+   */
+  start?: ReactNode;
+  /**
+   * Page tools (spec F4/F5 UI P-3): the More options trigger. It follows the options (in the side
+   * panel under them; in the bar between them and the status). Below 640 px the options take the
+   * first row and the trigger sits beside the primary in the second.
+   */
+  more?: ReactNode;
 }) {
   const desktop = useDesktop();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -69,8 +82,9 @@ export function ControlDock({
   const side = layout === "side";
   // "full" density: inline options only in the side panel from 1024 px (the SSR render keeps them,
   // hidden below lg by CSS); everywhere else an Options button opens the same options in a sheet.
-  const inline = !full || (side && desktop !== false);
+  const inline = options != null && options !== false && (!full || (side && desktop !== false));
   const sheetMode = full && (!side || desktop !== true);
+  const noOptions = !inline && !sheetMode;
   useEffect(() => {
     if (side && desktop) setSheetOpen(false);
   }, [desktop, side]);
@@ -111,6 +125,8 @@ export function ControlDock({
       <div
         className={[
           "flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4",
+          more || start ? "max-sm:flex-row max-sm:flex-wrap max-sm:items-center" : "",
+          more ? "max-sm:[&>[data-testid=dock-options]]:basis-full" : "",
           side ? "lg:flex-1 lg:flex-col lg:items-stretch" : "lg:mx-auto lg:max-w-[1216px] lg:gap-8",
         ].join(" ")}
       >
@@ -125,7 +141,9 @@ export function ControlDock({
           ) : (
             <fieldset
               disabled={optionsDisabled}
-              className="min-w-0 sm:flex-1"
+              // Side panel: the options keep their height, so More options sits right under the steps and the
+              // status + primary rest at the panel's bottom (visual gate round 2).
+              className={[start ? "min-w-0 flex-1" : "min-w-0 sm:flex-1", side ? "lg:flex-none" : ""].join(" ")}
               data-testid="dock-options"
             >
               <legend className="sr-only">{label}</legend>
@@ -138,7 +156,7 @@ export function ControlDock({
           <Button
             ref={optionsButton}
             variant="secondary"
-            className={side ? "sm:flex-1 lg:hidden" : "sm:flex-1 lg:flex-none"}
+            className={side ? "sm:flex-1 lg:hidden" : start ? "min-w-0 flex-1 lg:flex-none" : "sm:flex-1 lg:flex-none"}
             aria-haspopup="dialog"
             aria-expanded={sheetOpen}
             aria-label={sheet?.badge ? `Options, ${sheet.badge}` : "Options"}
@@ -158,21 +176,36 @@ export function ControlDock({
             </span>
           </Button>
         )}
+        {start && (
+          <div className="flex shrink-0 items-center" data-testid="dock-start">
+            {start}
+          </div>
+        )}
+        {more && (
+          <div className={["flex shrink-0 items-center", side ? "lg:self-start" : ""].join(" ")} data-testid="dock-more">
+            {more}
+          </div>
+        )}
         {full && !side && <span aria-hidden="true" className="hidden lg:block lg:flex-1" />}
         <div
           className={[
             "flex shrink-0 flex-col gap-2 sm:min-w-[200px]",
+            // Below 640 px: beside More options or a lone Undo│Redo; under the options row when Undo│Redo shares it.
+            more || (start && noOptions) ? "max-sm:min-w-0 max-sm:flex-1" : start ? "max-sm:basis-full" : "",
+            !side && noOptions ? "sm:ms-auto" : "",
             side
               ? // Side panel: pinned to the bottom of the screen while the options run past the fold (sticky, so
                 // the page stays the only scroller), resting at the panel's bottom once they end. It covers the
                 // panel's padding so options pass under it; a soft fade above it says there is more.
                 "lg:sticky lg:bottom-0 lg:z-20 lg:-mx-6 lg:mt-auto lg:-mb-6 lg:min-w-0 lg:rounded-b-panel lg:bg-surface-raised lg:px-6 lg:pt-2 lg:pb-6 lg:before:pointer-events-none lg:before:absolute lg:before:inset-x-0 lg:before:-top-4 lg:before:h-4 lg:before:bg-linear-to-b lg:before:from-transparent lg:before:to-surface-raised"
-              : "lg:flex-row lg:items-center lg:gap-5 lg:[&>*:last-child]:w-[260px] lg:[&>*:last-child]:shrink-0",
+              : // Bar: the status gives way first (it wraps to two lines), so a long one ("60 pages · 1 file · add
+                // more to merge") never pushes the primary off a 1024 px screen.
+                "ip-bar-footer lg:flex-row lg:items-center lg:gap-5 lg:[&>*:last-child]:w-[260px] lg:[&>*:last-child]:shrink-0",
           ].join(" ")}
           data-testid="dock-footer"
         >
           {/* On the sand bar the status reads in ink (muted on sand is under 4.5:1), beside the primary. */}
-          <div className={["max-lg:sr-only", side ? "" : "min-w-0 text-end [&_p]:text-ink"].join(" ")}>{status}</div>
+          <div className={["max-lg:sr-only", side ? "" : "ip-bar-status min-w-0 text-end [&_p]:text-ink"].join(" ")}>{status}</div>
           {footer}
         </div>
       </div>

@@ -45,12 +45,37 @@ describe("flow config", () => {
     expect(merge.flow.actionLabel).toBe("Merge PDFs");
     expect(merge.flow.outputName(["alpha.pdf", "bravo.pdf"])).toBe("alpha_merged.pdf");
   });
-  it("keeps every other tool planned", () => {
-    expect(tools.filter((t) => t.status !== "planned").map((t) => t.slug)).toEqual(["merge-pdf", "rotate-pdf"]);
+  it("runs the F5 page tools on the shared flow (F4/F5 §0d)", async () => {
+    const { flowTool } = await import("./registry");
+    const expected = {
+      "organize-pdf": { view: "pages", density: "compact", action: "Save PDF", progress: "Saving", out: "alpha_organized.pdf" },
+      "combine-reorder-pdf": { view: "pages", density: "full", action: "Combine PDF", progress: "Combining", out: "alpha_merged.pdf" },
+      "alternate-mix-pdf": { view: "files", density: "compact", action: "Mix PDFs", progress: "Mixing", out: "alpha_mixed.pdf" },
+    } as const;
+    for (const [slug, e] of Object.entries(expected)) {
+      const t = flowTool(slug);
+      expect(t.status, slug).toBe("beta");
+      expect(t.runtime, slug).toBe("client");
+      expect(t.flow.accept.extensions, slug).toEqual([".pdf", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", ".tiff"]);
+      expect(t.flow.multiFile, slug).toBe(true);
+      expect(t.flow.maxFiles, slug).toBe(50);
+      expect(t.flow.maxFileBytes, slug).toBe(100 * 1024 * 1024);
+      expect(t.flow.maxTotalBytes, slug).toBe(500 * 1024 * 1024);
+      expect(t.flow.maxTotalPages, slug).toBe(1000);
+      expect(t.flow.defaultView, slug).toBe(e.view);
+      expect(t.flow.optionsDensity, slug).toBe(e.density);
+      expect(t.flow.requiredPermissions, slug).toEqual([]);
+      expect(t.flow.actionLabel, slug).toBe(e.action);
+      expect(t.flow.progressLabel, slug).toBe(e.progress);
+      expect(t.flow.outputName(["alpha.pdf", "bravo.pdf"]), slug).toBe(e.out);
+    }
   });
-  it("offers Merge and Rotate to continue with a PDF output and nothing for a ZIP (F3 AC-43 adapted)", async () => {
+  it("keeps every other tool planned", () => {
+    expect(tools.filter((t) => t.status !== "planned").map((t) => t.slug)).toEqual(["merge-pdf", "split-pdf", "extract-pdf-pages", "delete-pdf-pages", "rotate-pdf", "organize-pdf", "combine-reorder-pdf", "alternate-mix-pdf"]);
+  });
+  it("offers the usable PDF tools to continue with a PDF output and nothing for a ZIP (F3 AC-43, F4 AC-412, F5)", async () => {
     const { continueTargets } = await import("./registry");
-    expect(continueTargets("application/pdf").map((t) => t.slug)).toEqual(["merge-pdf", "rotate-pdf"]);
+    expect(continueTargets("application/pdf").map((t) => t.slug)).toEqual(["merge-pdf", "split-pdf", "extract-pdf-pages", "delete-pdf-pages", "rotate-pdf", "organize-pdf", "combine-reorder-pdf", "alternate-mix-pdf"]);
     expect(continueTargets("application/zip")).toEqual([]);
   });
 });
@@ -98,15 +123,15 @@ describe("catalogue fields (F2)", () => {
   it("orders the Popular row usable first, then planned, in the fixed order (AC-11)", () => {
     expect(popularTools().map((t) => t.slug)).toEqual([
       "rotate-pdf",
+      "delete-pdf-pages",
       "merge-pdf",
+      "split-pdf",
+      "extract-pdf-pages",
       "pdf-editor",
       "compress-pdf",
-      "delete-pdf-pages",
-      "split-pdf",
       "crop-pdf",
       "sign-pdf",
       "pdf-to-word",
-      "extract-pdf-pages",
     ]);
     const ranks = tools.filter((t) => t.popularRank !== undefined).map((t) => t.popularRank);
     expect(new Set(ranks).size).toBe(ranks.length);
@@ -115,7 +140,7 @@ describe("catalogue fields (F2)", () => {
     const s = shortcutTools();
     expect(s.length).toBeLessThanOrEqual(5);
     for (const t of s) expect(isUsable(t)).toBe(true);
-    expect(s.map((t) => t.slug)).toEqual(["rotate-pdf", "merge-pdf"]);
+    expect(s.map((t) => t.slug)).toEqual(["rotate-pdf", "delete-pdf-pages", "merge-pdf", "split-pdf", "extract-pdf-pages"]);
   });
   it("features the editor (H-11 item 7)", () => {
     expect(featured).toBe("pdf-editor");

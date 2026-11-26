@@ -281,7 +281,8 @@
     height: 34px;
     border: 0;
     border-radius: 50%;
-    background: var(--brand-tint);
+    /* Owner rule (2026-11-26): a clean icon, no disc at rest; the tint shows on hover and press. */
+    background: transparent;
     color: var(--brand-strong);
     cursor: pointer;
     transition:
@@ -289,8 +290,9 @@
       color var(--dur-base),
       transform var(--dur-lift);
   }
-  .mp-iconbtn:hover:not(:disabled) {
-    background: var(--mp-pink-hover);
+  .mp-iconbtn:hover:not(:disabled),
+  .mp-iconbtn:active:not(:disabled) {
+    background: var(--brand-tint);
   }
   .mp-iconbtn:active:not(:disabled) {
     transform: scale(0.92);
@@ -617,32 +619,6 @@
     color: var(--muted);
   }
 
-  /* Checkbox (FormControls): 22px, 7px radius; checked fills berry with a white tick. */
-  .mp-checkbox {
-    appearance: none;
-    width: 22px;
-    height: 22px;
-    margin: 0;
-    flex: none;
-    border: 1.5px solid var(--ip-field-line);
-    border-radius: 7px;
-    background: #fff;
-    cursor: pointer;
-    transition:
-      background-color var(--dur-fast),
-      border-color var(--dur-fast),
-      transform var(--dur-lift);
-  }
-  .mp-checkbox:checked {
-    border-color: var(--brand);
-    background: var(--brand)
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='11'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='M1.5 5.5l3.5 3.5 7.5-7.5'/%3E%3C/svg%3E")
-      no-repeat center;
-  }
-  .mp-checkbox:active {
-    transform: scale(0.9);
-  }
-
   /* ---- Choice tile -------------------------------------------------------------------------- */
   /* Edges are inset shadows (pale pink, berry when selected) on a pale lip, so in forced colors
      the selected tile alone gets a real Highlight border (below). */
@@ -855,40 +831,6 @@
     color: var(--leaf);
   }
 
-  /* ---- Progress: jam (known amounts, or a gliding segment) -------------------------- */
-  .mp-progress--fixed {
-    position: fixed;
-    top: var(--ip-header-h);
-    left: 0;
-    right: 0;
-    z-index: var(--z-progress);
-    pointer-events: none;
-  }
-  .mp-jam {
-    position: relative;
-    height: 18px;
-    width: 100%;
-    border-radius: 10px;
-    background: var(--cream);
-    border: 1.5px solid var(--mp-jam-border);
-    overflow: hidden;
-  }
-  .mp-jam > i {
-    position: absolute;
-    inset: 0 auto 0 0;
-    border-radius: 10px;
-    background: var(--jam)
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='40'%3E%3Cg fill='%23a80d28'%3E%3Cellipse cx='9' cy='7' rx='3.6' ry='4.2'/%3E%3Cellipse cx='27' cy='27' rx='3.6' ry='4.2'/%3E%3C/g%3E%3Cg fill='%23ffe9a6'%3E%3Cellipse cx='9' cy='8.5' rx='1.8' ry='2.6'/%3E%3Cellipse cx='27' cy='28.5' rx='1.8' ry='2.6'/%3E%3C/g%3E%3C/svg%3E");
-    background-size: 24px 27px;
-    box-shadow:
-      inset 0 3px 0 rgba(255, 255, 255, 0.35),
-      inset 0 -3px 0 rgba(0, 0, 0, 0.12);
-    width: 100%;
-    transform: translateX(calc(var(--p, 0) * 1% - 100%));
-    transition: transform var(--motion-quick) var(--ease-out);
-    animation: mp-jam-flow 2.4s linear infinite;
-  }
-
   /* The full-screen menu (phone All tools): the opaque ground is there on frame 0; only its content
      fades up 8px (motion.md S7), so the page behind never shows through. The modal and sheet surfaces
      live in components/ui/dialog.css. */
@@ -896,66 +838,13 @@
     animation: mp-fade-up var(--motion-quick) var(--ease-out) both;
   }
 
-  /* ---- Panel and page tray (working mode) --------------------------------------------------- */
+  /* ---- Panel (page trays and tiles live in components/tool-flow/tool-flow.css) --------------------------------------------------- */
   .mp-panel {
     background: var(--surface);
     border: 1.5px solid var(--panel-border);
     border-radius: var(--radius-panel);
     box-shadow: var(--shadow-card);
   }
-  .mp-tray {
-    background: var(--page-tray);
-    padding: 16px 16px 10px;
-    border-radius: var(--radius-tray);
-  }
-  .mp-tray[aria-selected="true"],
-  .mp-tray[data-selected] {
-    box-shadow: 0 0 0 2.5px var(--brand);
-  }
-  .mp-tray__n,
-  .ip-tile__n {
-    font: 600 13px/20px var(--font-display);
-    color: var(--muted);
-  }
-  /* Page tiles (berrypdf.md "Page tiles"): no tray, the page fills the tile; selection and hover are
-     an outline hugging the page, never a filled block. No text selection or iOS callout on a tile, so
-     a long press never raises selection handles over the page. */
-  .ip-tile-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-  @media (min-width: 640px) {
-    .ip-tile-grid {
-      grid-template-columns: repeat(auto-fill, calc(var(--ip-thumb-size) + 2 * var(--ip-tile-pad)));
-      gap: var(--ip-tile-gap);
-    }
-  }
-  .ip-tile {
-    padding: var(--ip-tile-pad);
-    border-radius: var(--radius-md);
-    -webkit-touch-callout: none;
-    user-select: none;
-    transition: outline-color var(--dur-fast);
-  }
-  @media (hover: hover) {
-    .ip-tile:hover {
-      outline: 1.5px solid var(--mp-card-hover-border);
-    }
-  }
-  .ip-tile[data-selected] {
-    outline: 2.5px solid var(--brand);
-  }
-  .ip-tile__box {
-    aspect-ratio: var(--ip-tile-aspect);
-    width: 100%;
-  }
-  @media (min-width: 640px) {
-    .ip-tile__box {
-      width: var(--ip-thumb-size);
-    }
-  }
-
   /* ---- Prose: the long-reading column ------------------------------------------------------- */
   .mp-prose {
     max-width: 680px;
@@ -1039,95 +928,11 @@
 
   /* ---- Tool-page guide: how-to, FAQ, related (docs/seo/strategy.md). Below the tool, quiet:
      prose colours, FAQ answers folded, sections separated by spacing only. ------------------- */
-  /* The tool fills the first screen, so the guide always starts below the fold. */
+  /* The tool fills the first screen, so the guide always starts below the fold (guide styles:
+     components/seo/tool-guide.css). */
   .mp-toolstage {
     min-height: calc(100svh - var(--ip-header-h));
   }
-  .mp-guide {
-    max-width: 760px;
-    margin: var(--space-8) auto 0;
-    color: var(--mp-prose);
-    font-size: 16px;
-    line-height: 26px;
-  }
-  .mp-guide h2 {
-    font: 600 22px/1.2 var(--font-display);
-    color: var(--ink);
-    margin: var(--space-7) 0 var(--space-3);
-  }
-  .mp-guide__crumbs {
-    font-size: 14px;
-    color: var(--muted);
-  }
-  .mp-guide__crumbs a {
-    color: inherit;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .mp-guide__steps {
-    counter-reset: step;
-    display: grid;
-    gap: var(--space-3);
-  }
-  .mp-guide__steps > li {
-    counter-increment: step;
-    display: grid;
-    grid-template-columns: 28px 1fr;
-    column-gap: var(--space-3);
-  }
-  .mp-guide__steps > li::before {
-    content: counter(step);
-    grid-row: span 2;
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 999px;
-    background: var(--brand-tint);
-    color: var(--brand-strong);
-    font: 600 14px/1 var(--font-display);
-  }
-  .mp-guide__steps strong {
-    color: var(--ink);
-    font-family: var(--font-display);
-    font-weight: 600;
-  }
-  .mp-guide__faq > details {
-    border-bottom: 1.5px solid var(--border);
-  }
-  .mp-guide__faq > details > summary {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 48px;
-    padding: var(--space-2) 0;
-    cursor: pointer;
-    list-style: none;
-    color: var(--ink);
-    font-family: var(--font-display);
-    font-weight: 500;
-  }
-  .mp-guide__faq > details > summary::-webkit-details-marker {
-    display: none;
-  }
-  .mp-guide__faq > details > summary::after {
-    content: "";
-    flex: none;
-    width: 7px;
-    height: 7px;
-    border-right: 1.5px solid var(--muted);
-    border-bottom: 1.5px solid var(--muted);
-    transform: translateY(-2px) rotate(45deg);
-    transition: transform var(--dur-base);
-  }
-  .mp-guide__faq > details[open] > summary::after {
-    transform: translateY(1px) rotate(-135deg);
-  }
-  .mp-guide__faq > details > p {
-    margin: 0 0 var(--space-4);
-  }
-
   /* ---- Hero --------------------------------------------------------------------------------- */
   .mp-hero {
     position: relative;
@@ -1170,16 +975,8 @@
   /* ---- Berry kit: the one background ------------------------------------------------------------
      Grid paper only (24px squares, 7% berry red, on #fffdfb), carried by html/body above. No waves,
      glows, patterns or coloured bands behind sections; white surfaces stay solid white. */
-  /* ---- Berry kit: jam (the drip and scallop dividers were never placed; removed for the home CSS budget) -------------------------------------------------------------------- */
-  /* Indeterminate jam: a short segment glides across the track. */
-  .mp-jam--indeterminate > i {
-    width: 34%;
-    transform: none;
-    animation:
-      mp-jam-flow 2.4s linear infinite,
-      mp-jam-glide 1.4s var(--ease-standard, ease-in-out) infinite;
-  }
-
+  /* ---- Berry kit: jam (the drip and scallop dividers were never placed; removed for the home CSS budget).
+     The jam progress bar lives in components/ui/progress.css (ProgressBar). ---- */
   /* ---- Berry kit: small parts ----------------------------------------------------------------- */
   /* Seed list: yellow seed teardrops with a berry-red outline. */
   .mp-seedlist {
@@ -1306,19 +1103,6 @@
     .mp-switch-track::before {
       background: ButtonText;
     }
-    .mp-tray[data-selected],
-    .ip-tile[data-selected] {
-      outline: 2px solid Highlight;
-    }
-    /* Our drawn checkbox paints its tick as a white image on a berry fill, and forced colors
-       repaints the fill, so the tick vanishes. Hand the box back to the system checkbox, which
-       draws its checked state in system colours. */
-    .mp-checkbox,
-    .mp-checkbox:checked {
-      appearance: auto;
-      background: none;
-      border: 0;
-    }
     .mp-floaties,
     .mp-sticker {
       display: none;
@@ -1331,19 +1115,6 @@
   from {
     transform: translateY(calc(var(--motion-rise) * -1));
     opacity: 0;
-  }
-}
-@keyframes mp-jam-glide {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(300%);
-  }
-}
-@keyframes mp-jam-flow {
-  to {
-    background-position: 24px 0;
   }
 }
 @keyframes mp-levitate {

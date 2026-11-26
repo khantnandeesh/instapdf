@@ -6,6 +6,7 @@ import { breadcrumbLd, faqLd, howToLd, webApplicationLd } from "@/lib/seo/jsonld
 import type { Tool } from "@/tools/registry";
 import { seoContent } from "@/tools/seo";
 import { JsonLd } from "./JsonLd";
+import "./tool-guide.css";
 
 /**
  * The search-facing part of a tool page (docs/seo/strategy.md, "Tool pages"): structured data

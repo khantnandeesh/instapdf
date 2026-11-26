@@ -24,7 +24,7 @@ const outlineWidth = (el: Locator) => el.evaluate((e) => (getComputedStyle(e).ou
 
 // ---------------------------------------------------------------- G-2: one Add menu on phones
 
-test.describe("G-2: below 640 px the toolbar has one Add menu", () => {
+test.describe("G-2: below 1024 px the toolbar has one Add menu", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   test.beforeEach(async ({}, info) => {
     test.skip(!isDesktop(info.project.name), "this block sets its own 390 px touch context; running it once is enough");
@@ -67,14 +67,19 @@ test.describe("G-2: below 640 px the toolbar has one Add menu", () => {
   });
 });
 
-test("G-2: at 640 px and wider the toolbar keeps Add files and Add pages, and no Add menu", async ({ page }) => {
+// F4/F5 P-3 (decision 13) moved the switch from 640 px to 1024 px: between them the two buttons
+// pushed the toolbar sideways in the pages view.
+test("G-2: at 1024 px and wider the toolbar keeps Add files and Add pages, and no Add menu", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await pickMerge(page, "alpha.pdf");
   expect(await visibleAddButtons(page)).toEqual(["Add files", "Add pages"]);
-  await page.setViewportSize({ width: 640, height: 900 });
+  await page.setViewportSize({ width: 1024, height: 900 });
   expect(await visibleAddButtons(page)).toEqual(["Add files", "Add pages"]);
-  await page.setViewportSize({ width: 639, height: 900 });
+  await page.setViewportSize({ width: 1023, height: 900 });
   expect(await visibleAddButtons(page)).toEqual(["Add"]);
+  await page.setViewportSize({ width: 640, height: 900 });
+  expect(await visibleAddButtons(page)).toEqual(["Add"]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 // ---------------------------------------------------------------- G-3: output name

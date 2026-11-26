@@ -9,6 +9,14 @@
     padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);
   }
 }
+/* Below 1024 px the page scrolls under the sticky header + tools row and above the fixed bar: whatever the
+   page scrolls into view (a focused tile, its Enlarge) stops clear of both (visual gate round 2). */
+@media (max-width: 1023px) {
+  html:has(.ip-flow [data-ip-dock]) {
+    scroll-padding-top: calc(var(--ip-header-h) + 64px + 8px);
+    scroll-padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + 8px);
+  }
+}
 body:has([data-ip-dock="bar"]) .ip-site-footer {
   padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);
 }
@@ -75,6 +83,54 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
   }
 }
 
+/* Below 1024 px the same: once a file is in, and on the result, the head is compact (the pages, or Download,
+   get the screen). */
+@media (max-width: 1023px) {
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"], [data-state="done"]) .mp-intro {
+    padding-top: 12px;
+    padding-bottom: 10px;
+  }
+  /* Never cut (visual gate round 2): one step smaller below 360 px, and a long title wraps to a second
+     compact line rather than an ellipsis. */
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"], [data-state="done"]) .mp-intro h1 {
+    font-size: 22px;
+    line-height: 28px;
+    text-wrap: balance;
+  }
+}
+@media (max-width: 359px) {
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"], [data-state="done"]) .mp-intro h1 {
+    font-size: 19px;
+    line-height: 24px;
+  }
+}
+
+/* Floating notices (NoticeStack) never cover the site header or, once files are in, the tools row (view
+   tabs, Sort, Add files): they float under it. The row is 64px (ToolFlow); the head above it is
+   --ip-intro-h from 1024px and one 50px line below (the compact head above). Below 1024px the row sticks
+   under the header after a scroll, so the notice still clears it. */
+.ip-flow {
+  --ip-notice-top: calc(var(--ip-header-h) + 12px);
+}
+.ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) {
+  --ip-notice-top: calc(var(--ip-header-h) + 50px + 64px + 8px);
+}
+@media (min-width: 1024px) {
+  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) {
+    --ip-notice-top: calc(var(--ip-header-h) + var(--ip-intro-h) + 64px + 8px);
+  }
+}
+/* Nor the first screen's primary action: below 1024px the drop card's Choose button sits right under the
+   title, where two stacked notices (say two cloud errors) would land on it. So with no files in, the stack
+   sits at the bottom instead, above the bar, and grows upwards over the empty decor (NoticeStack reads
+   --ip-notice-bottom; top goes auto). */
+@media (max-width: 1023px) {
+  .ip-flow[data-state="empty"] {
+    --ip-notice-top: auto;
+    --ip-notice-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + 12px);
+  }
+}
+
 /* A focus move the page made after a mouse or touch pick (eval G-7): no ring until the next key
    press (components/ui/focus.ts removes the mark), the same as :focus-visible for a real click. */
 [data-quiet-focus]:focus-visible {
@@ -98,4 +154,215 @@ body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard {
    never show it), then fades up 8px in 200ms. The dock's progress bar carries the state from frame 0. */
 .ip-wait-in {
   animation: mp-fade-up var(--motion-quick) var(--ease-out) 300ms backwards;
+}
+
+/*
+ * Page trays and page tiles (berrypdf.md "Page tiles", PT-1). Moved out of globals.css so the tile rule
+ * ships only with tool routes (home CSS budget, e2e/f2/home.spec.ts AC-55). In the components layer, so
+ * utilities still win as they did in globals.css.
+ */
+@layer components {
+  .mp-tray {
+    background: var(--page-tray);
+    padding: 16px 16px 10px;
+    border-radius: var(--radius-tray);
+  }
+  .mp-tray[aria-selected="true"],
+  .mp-tray[data-selected] {
+    box-shadow: 0 0 0 2.5px var(--brand);
+  }
+  .mp-tray__n,
+  .ip-tile__n {
+    font: 600 13px/20px var(--font-display);
+    color: var(--muted);
+  }
+  /* Page tiles (berrypdf.md "Page tiles"): no tray, the page fills the tile; selection and hover are
+     an outline hugging the page, never a filled block. No text selection or iOS callout on a tile, so
+     a long press never raises selection handles over the page. */
+  .ip-tile-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  @media (min-width: 640px) {
+    .ip-tile-grid {
+      grid-template-columns: repeat(auto-fill, calc(var(--ip-thumb-size) + 2 * var(--ip-tile-pad)));
+      gap: var(--ip-tile-gap);
+    }
+  }
+  .ip-tile {
+    padding: var(--ip-tile-pad);
+    border-radius: var(--radius-md);
+    -webkit-touch-callout: none;
+    user-select: none;
+    transition: outline-color var(--dur-fast);
+  }
+  @media (hover: hover) {
+    .ip-tile:hover {
+      outline: 1.5px solid var(--mp-card-hover-border);
+    }
+  }
+  .ip-tile[data-selected] {
+    outline: 2.5px solid var(--brand);
+  }
+  .ip-tile__box {
+    aspect-ratio: var(--ip-tile-aspect);
+    width: 100%;
+  }
+  @media (min-width: 640px) {
+    .ip-tile__box {
+      width: var(--ip-thumb-size);
+    }
+  }
+  @media (forced-colors: active) {
+    .mp-tray[data-selected],
+    .ip-tile[data-selected] {
+      outline: 2px solid Highlight;
+    }
+  }
+}
+
+/* The drawn checkbox (PasswordDialog's "apply to all"); tool routes only, so out of globals.css. */
+@layer components {
+  /* Checkbox (FormControls): 22px, 7px radius; checked fills berry with a white tick. */
+  .mp-checkbox {
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    flex: none;
+    border: 1.5px solid var(--ip-field-line);
+    border-radius: 7px;
+    background: #fff;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-fast),
+      border-color var(--dur-fast),
+      transform var(--dur-lift);
+  }
+  .mp-checkbox:checked {
+    border-color: var(--brand);
+    background: var(--brand)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='11'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='M1.5 5.5l3.5 3.5 7.5-7.5'/%3E%3C/svg%3E")
+      no-repeat center;
+  }
+  .mp-checkbox:active {
+    transform: scale(0.9);
+  }
+  @media (forced-colors: active) {
+    /* Our drawn checkbox paints its tick as a white image on a berry fill, and forced colors
+       repaints the fill, so the tick vanishes. Hand the box back to the system checkbox, which
+       draws its checked state in system colours. */
+    .mp-checkbox,
+    .mp-checkbox:checked {
+      appearance: auto;
+      background: none;
+      border: 0;
+    }
+  }
+}
+
+/* More options (page tools), the selection bar's Remove and Rotate's Reset: a clean icon (and label where
+   it fits), no box at rest, like the icon buttons beside them; the tint shows on hover and press (owner
+   rule, 2026-11-26). Same layer as .mp-btn--soft, loaded after it. */
+@layer components {
+  .ip-more-trigger,
+  .ip-bare {
+    background: transparent;
+  }
+  .ip-more-trigger:hover:not(:disabled),
+  .ip-more-trigger:active:not(:disabled),
+  .ip-more-trigger[aria-expanded="true"],
+  .ip-bare:hover:not(:disabled),
+  .ip-bare:active:not(:disabled) {
+    background: var(--brand-tint);
+  }
+}
+
+/* A long menu on a phone (Organize's Page tools): a bottom sheet like the options sheet (dialog.css .mp-sheet):
+   a scrim, a title row with Close, 24px top corners, its height capped; only the list scrolls, with a soft
+   fade at an edge while there is more that way. Menu sets data-sheet below 640 px; above, the title row hides. */
+@layer components {
+  .mp-menu:not([data-sheet]) .mp-menu__head {
+    display: none;
+  }
+  .mp-menu[data-sheet] {
+    display: flex;
+    flex-direction: column;
+    max-height: min(70dvh, calc(100dvh - var(--ip-header-h) - 16px));
+    /* !important over the popup's own utilities (overflow-y-auto, p-1.5): here only the list scrolls. */
+    overflow: hidden !important;
+    border-width: 0;
+    border-radius: 24px 24px 0 0;
+    padding: 0 0 env(safe-area-inset-bottom) !important;
+    box-shadow: 0 -12px 40px rgba(58, 20, 30, 0.18);
+    transform-origin: bottom center;
+  }
+  .mp-menu[data-sheet]::backdrop {
+    background: var(--mp-backdrop);
+    backdrop-filter: blur(8px);
+  }
+  .mp-menu[data-sheet] .mp-menu__head {
+    order: -1;
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1.5px solid var(--sand);
+    padding: 8px 12px 8px 16px;
+  }
+  .mp-menu[data-sheet] .mp-menu__list {
+    /* ip-scroll: overlay (the sheet's own list; the sheet itself never scrolls) */
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 6px;
+  }
+  /* Also Split's parts list in More options (MoreOptionsDialog), which can stop on a whole row. */
+  :is(.mp-menu__list, .ip-edge-fade)[data-more-down] {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
+  }
+  :is(.mp-menu__list, .ip-edge-fade)[data-more-up] {
+    mask-image: linear-gradient(to top, #000 calc(100% - 32px), transparent);
+  }
+  :is(.mp-menu__list, .ip-edge-fade)[data-more-up][data-more-down] {
+    mask-image: linear-gradient(to bottom, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+  }
+}
+
+/* Tool-only rules kept out of the shared utilities, so the home page's CSS stays within its budget
+   (e2e/f2/home.spec AC-55). */
+/* NoticeStack: under the header (and the tools row, --ip-notice-top), or at the bottom on a phone's empty
+   screen (--ip-notice-bottom, above). */
+.ip-notice-stack {
+  top: var(--ip-notice-top, calc(var(--ip-header-h) + 12px));
+  bottom: var(--ip-notice-bottom, auto);
+}
+/* ControlDock bar from 1024px: the status gives way first (two lines at most), so a long one ("60 pages ·
+   1 file · add more to merge") never pushes the primary off a 1024px screen. */
+@media (min-width: 1024px) {
+  .ip-bar-footer {
+    min-width: 0;
+    flex-shrink: 1;
+  }
+  .ip-bar-status {
+    text-wrap: balance;
+  }
+  .ip-bar-status p {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+  }
+}
+/* Alternate's one-file hint: the leaf goes below 400px to keep the line short. */
+.ip-hint-leaf {
+  margin-top: 0 !important;
+}
+@media (max-width: 399px) {
+  .ip-hint-leaf {
+    display: none;
+  }
 }

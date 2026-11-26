@@ -10,12 +10,13 @@
  * stay parsed next to the growing output.
  */
 export { USER_ERROR } from "./user-error";
+import { buildDocuments } from "./build";
 import { mergePdf, type MergeEnv, type MergeInput } from "./merge";
 import { pdfOutputName, uniqueNames } from "./naming";
 import { rotatePdf } from "./rotate";
 import { createZipWriter } from "./zip";
-
-export type JobFile = { name: string; source: Blob; password?: string };
+import type { DocumentsJob, JobFile } from "./documents-job";
+export { documentsJob, type DocumentsJob, type JobFile } from "./documents-job";
 
 export type RotateJob = {
   kind: "rotate";
@@ -26,7 +27,7 @@ export type RotateJob = {
 
 export type MergeJob = { kind: "merge"; name: string } & MergeInput;
 
-export type Job = RotateJob | MergeJob;
+export type Job = RotateJob | MergeJob | DocumentsJob;
 
 export type JobOutput = {
   name: string;
@@ -54,7 +55,46 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       return runRotate(job, onProgress);
     case "merge":
       return runMerge(job, onProgress, env);
+    case "split":
+    case "extract":
+    case "delete":
+      return runDocuments(job, onProgress, env);
   }
+}
+
+async function runDocuments(job: DocumentsJob, onProgress: ProgressFn, env: JobEnv): Promise<JobOutput> {
+  // Only documents with pages are written (buildDocuments skips the others), so
+  // they alone decide between one PDF and a ZIP.
+  const written = job.documents.filter((d) => d.pages.length);
+  const names = uniqueNames(written.map((d) => d.name));
+  const documents = written.map((d, i) => ({ ...d, name: names[i] }));
+  const progress = (f: number) => onProgress(f, "pages");
+  if (documents.length === 1) {
+    const r = await buildDocuments({ sources: job.sources, documents, options: job.options }, env, progress);
+    const [doc] = r.documents;
+    return {
+      name: doc.name,
+      type: "application/pdf",
+      blob: new Blob([doc.bytes as Uint8Array<ArrayBuffer>], { type: "application/pdf" }),
+      pageCount: doc.pageCount,
+      wasEncrypted: r.wasEncrypted,
+      ...(r.warnings.length ? { warnings: r.warnings } : {}),
+    };
+  }
+  const zip = createZipWriter();
+  const entries: { name: string; pageCount: number }[] = [];
+  const r = await buildDocuments({ sources: job.sources, documents, options: job.options }, env, progress, (doc) => {
+    zip.add(doc.name, doc.bytes); // copied into the ZIP Blob; doc.bytes can be collected now
+    entries.push({ name: doc.name, pageCount: doc.pageCount });
+  });
+  return {
+    name: job.zipName,
+    type: "application/zip",
+    blob: zip.finish(),
+    entries,
+    wasEncrypted: r.wasEncrypted,
+    ...(r.warnings.length ? { warnings: r.warnings } : {}),
+  };
 }
 
 async function runMerge(job: MergeJob, onProgress: ProgressFn, env: JobEnv): Promise<JobOutput> {

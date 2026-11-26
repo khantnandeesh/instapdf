@@ -1,12 +1,25 @@
 "use client";
-import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, forwardRef, useCallback, useEffect, useId, useImperativeHandle, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { popoverLeaving } from "@/lib/motion";
 import { cx } from "./cx";
+import { CloseIcon } from "./icons";
 
 export type MenuEntry =
-  | { id: string; label: string; icon?: ReactNode; disabled?: boolean; onSelect: () => void }
+  | {
+      id: string;
+      label: string;
+      icon?: ReactNode;
+      disabled?: boolean;
+      onSelect: () => void;
+      /** Accessible name when it says more than the visible label (which it must contain, WCAG 2.5.3). */
+      ariaLabel?: string;
+      /** A short explanation: the item's tooltip and its accessible description. */
+      hint?: string;
+    }
   | { separator: true }
-  | { note: string };
+  | { note: string }
+  /** A section title inside one menu (the phone "Page tools" menu). */
+  | { heading: string };
 
 const isItem = (e: MenuEntry): e is Extract<MenuEntry, { id: string }> => "id" in e;
 
@@ -35,21 +48,43 @@ export const MenuButton = forwardRef<
     onOpenChange?: (open: boolean) => void;
     onFocus?: () => void;
     onKeyDown?: (e: KeyboardEvent<HTMLButtonElement>) => void;
+    /** Below 640 px the menu is a bottom sheet (full width, capped height, scrolls inside): for long menus. */
+    sheet?: boolean;
     "data-testid"?: string;
   }
->(function MenuButton({ label, children, items, className, placement = "bottom-start", tabIndex, disabled, title, onOpenChange, onFocus, onKeyDown, ...rest }, ref) {
+>(function MenuButton({ label, children, items, className, placement = "bottom-start", tabIndex, disabled, title, onOpenChange, onFocus, onKeyDown, sheet, ...rest }, ref) {
   const trigger = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const [open, setOpen] = useState(false);
   const focusFirst = useRef<"first" | "last">("first");
 
-  const itemEls = () => Array.from(popup.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]:not(:disabled)") ?? []);
+  // Only items on screen: the sheet's Close is hidden while the menu is a plain popup.
+  const itemEls = () => Array.from(popup.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]:not(:disabled)") ?? []).filter((el) => el.getClientRects().length > 0);
+
+  // The sheet's list fades at an edge while there is more to scroll that way (data-more-up / data-more-down).
+  const list = useRef<HTMLDivElement>(null);
+  const edges = () => {
+    const l = list.current;
+    if (!l) return;
+    l.toggleAttribute("data-more-up", l.scrollTop > 1);
+    l.toggleAttribute("data-more-down", l.scrollTop + l.clientHeight < l.scrollHeight - 1);
+  };
 
   const position = useCallback(() => {
     const t = trigger.current?.getBoundingClientRect();
     const p = popup.current;
     if (!t || !p) return;
+    // Never taller than the screen: a long menu scrolls inside (16px clear of the edges).
+    p.style.maxHeight = `${window.innerHeight - 16}px`;
+    const asSheet = !!sheet && window.innerWidth < 640;
+    Object.assign(p.style, asSheet ? { top: "auto", bottom: "0px", left: "0px", width: "100%", maxWidth: "none", maxHeight: "" } : { bottom: "", width: "", maxWidth: "" });
+    if (asSheet) {
+      p.dataset.sheet = "";
+      edges();
+      return;
+    }
+    delete p.dataset.sheet;
     const h = p.offsetHeight;
     const w = p.offsetWidth;
     const below = window.innerHeight - t.bottom;
@@ -58,7 +93,7 @@ export const MenuButton = forwardRef<
     left = Math.max(8, Math.min(window.innerWidth - w - 8, left));
     p.style.top = `${Math.max(8, top)}px`;
     p.style.left = `${left}px`;
-  }, [placement]);
+  }, [placement, sheet]);
 
   const show = useCallback(
     (where: "first" | "last" = "first") => {
@@ -191,17 +226,45 @@ export const MenuButton = forwardRef<
         aria-label={label}
         onKeyDown={onMenuKey}
         // BerryPDF Menu: white, 1.5px sand, radius 14, shadow-menu, scales in (0.15s).
-        className="mp-menu fixed m-0 max-w-[calc(100vw-32px)] min-w-[220px] p-1.5 text-ink"
+        className="mp-menu fixed m-0 max-w-[calc(100vw-32px)] min-w-[220px] overflow-y-auto overscroll-contain p-1.5 text-ink"
+        data-ip-scroll="overlay"
         style={{ inset: "auto" }}
       >
-        {items.map((entry, i) =>
+        {sheet ? (
+          // Below 640 px (data-sheet): a bottom sheet with a title row, a scrim and a list that scrolls inside.
+          // The Close item comes last in the DOM (arrow keys reach the tools first) but sits in the title row.
+          <>
+            <div ref={list} role="none" className="mp-menu__list" data-ip-scroll="overlay" onScroll={edges}>
+              {renderItems()}
+            </div>
+            <div role="none" className="mp-menu__head">
+              <p role="presentation" className="text-tile-title text-ink-black">
+                {label}
+              </p>
+              <button type="button" role="menuitem" tabIndex={-1} aria-label="Close" className="mp-iconbtn mp-iconbtn--soft size-11" onClick={() => hide(true)}>
+                <CloseIcon size={18} />
+              </button>
+            </div>
+          </>
+        ) : (
+          renderItems()
+        )}
+      </div>
+    </>
+  );
+
+  function renderItems() {
+    return items.map((entry, i) =>
           isItem(entry) ? (
+            <Fragment key={entry.id}>
             <button
-              key={entry.id}
               type="button"
               role="menuitem"
               tabIndex={-1}
               disabled={entry.disabled}
+              aria-label={entry.ariaLabel}
+              aria-describedby={entry.hint ? `${menuId}-${entry.id}-hint` : undefined}
+              title={entry.hint}
               className={cx(
                 "flex h-11 w-full items-center gap-2 rounded-[9px] px-3 text-start text-[15px] whitespace-nowrap outline-none [@media(pointer:fine)]:lg:h-10",
                 "transition-colors duration-(--dur-base) hover:bg-band hover:text-brand-strong focus:bg-band focus:text-brand-strong disabled:text-muted disabled:opacity-60",
@@ -214,15 +277,23 @@ export const MenuButton = forwardRef<
               {entry.icon && <span className="shrink-0 text-muted">{entry.icon}</span>}
               {entry.label}
             </button>
+            {entry.hint && (
+              <span id={`${menuId}-${entry.id}-hint`} hidden>
+                {entry.hint}
+              </span>
+            )}
+            </Fragment>
           ) : "separator" in entry ? (
             <div key={`s${i}`} role="separator" className="mx-2 my-1 h-[1.5px] bg-sand" />
+          ) : "heading" in entry ? (
+            <p key={`h${i}`} role="presentation" className="px-3 pt-2 pb-1 font-display text-help font-semibold text-muted">
+              {entry.heading}
+            </p>
           ) : (
             <p key={`n${i}`} className="px-3 py-2 text-help text-muted">
               {entry.note}
             </p>
           ),
-        )}
-      </div>
-    </>
-  );
+        );
+  }
 });

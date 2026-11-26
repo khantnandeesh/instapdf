@@ -32,6 +32,7 @@ export function Dialog({
   wide,
   variant = "default",
   onCloseButton,
+  closeOnBackdrop,
 }: {
   open: boolean;
   onClose: (reason: DialogCloseReason) => void;
@@ -54,6 +55,8 @@ export function Dialog({
   variant?: "default" | "fullscreen" | "sheet";
   /** Default modal and sheet: a small close button in the title row. */
   onCloseButton?: () => void;
+  /** A click on the backdrop closes it ("escape"): settings dialogs that apply at once (spec F4/F5 UI P-5). */
+  closeOnBackdrop?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -147,6 +150,7 @@ export function Dialog({
     <dialog
       ref={ref}
       onKeyDown={wrapTab}
+      onClick={closeOnBackdrop ? (e) => e.target === e.currentTarget && onCloseRef.current("escape") : undefined}
       aria-labelledby={titleId}
       aria-modal={variant === "fullscreen" ? true : undefined}
       aria-describedby={description ? descId : undefined}

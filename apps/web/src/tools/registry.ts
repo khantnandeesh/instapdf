@@ -3,7 +3,7 @@
  * `ref` is the matching Sejda slug, used only by the parity evaluator.
  * `runtime`: "client" = processed in the browser, nothing uploaded; "server" = processing worker.
  */
-import { mergedName, pdfOutputName, zipName } from "../lib/pdf/naming";
+import { DELETE_ZIP, EXTRACT_ZIP, mergedName, mixedName, organizedName, pdfOutputName, splitZipName, zipName } from "../lib/pdf/naming";
 import type { ToolIconName } from "./tool-icon-names";
 
 export type ToolCategory =
@@ -187,6 +187,59 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
         // Always one PDF, named after the first file in the output (spec F3 §6).
         outputName: (inputs) => mergedName(inputs[0]),
       },
+    ),
+  },
+  // F5 page tools (spec F4/F5 §0d): PDFs and images, 50 files, the F1 size and page caps.
+  "organize-pdf": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "organize-pdf",
+      // "Save PDF": the output is one edited copy (spec P-11 #10).
+      { title: "Organize PDF", actionLabel: "Save PDF", progressLabel: "Saving" },
+      { accept: PDF_AND_IMAGES, maxFiles: 50, defaultView: "pages", outputName: (inputs) => organizedName(inputs[0]) },
+    ),
+  },
+  "combine-reorder-pdf": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "combine-reorder-pdf",
+      { title: "Combine & reorder PDF pages", actionLabel: "Combine PDF", progressLabel: "Combining" },
+      { accept: PDF_AND_IMAGES, maxFiles: 50, defaultView: "pages", optionsDensity: "full", outputName: (inputs) => mergedName(inputs[0]) },
+    ),
+  },
+  "alternate-mix-pdf": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "alternate-mix-pdf",
+      { title: "Alternate & mix PDF", actionLabel: "Mix PDFs", progressLabel: "Mixing" },
+      { accept: PDF_AND_IMAGES, maxFiles: 50, defaultView: "files", outputName: (inputs) => mixedName(inputs[0]) },
+    ),
+  },
+  // F4 page tools (spec F4/F5 §0d, §6): PDF only, 20 files, pages view. Split's options fold into one
+  // bar row (UI P-3), so it uses the compact dock too; its parts list lives in More options.
+  "split-pdf": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "split-pdf",
+      { title: "Split PDF", actionLabel: "Split PDF", progressLabel: "Splitting" },
+      // A single part downloads as that PDF (named by the plan); several as `<base>-split.zip` or `berrypdf-split.zip`.
+      { outputName: splitZipName },
+    ),
+  },
+  "extract-pdf-pages": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "extract-pdf-pages",
+      { title: "Extract PDF pages", actionLabel: "Extract pages", progressLabel: "Extracting" },
+      { outputName: (inputs) => (inputs.length === 1 ? pdfOutputName(inputs[0]) : EXTRACT_ZIP) },
+    ),
+  },
+  "delete-pdf-pages": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "delete-pdf-pages",
+      { title: "Delete PDF pages", actionLabel: "Delete pages", progressLabel: "Deleting" },
+      { outputName: (inputs) => (inputs.length === 1 ? pdfOutputName(inputs[0]) : DELETE_ZIP) },
     ),
   },
 };

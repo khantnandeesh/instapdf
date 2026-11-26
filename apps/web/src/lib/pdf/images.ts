@@ -5,31 +5,15 @@
  * Kept free of heavy imports: the shared flow reads headers on the main thread.
  */
 import type { PageSize } from "../page-list";
+import type { ImageFormat } from "./image-names";
 
-export type ImageFormat = "png" | "jpeg" | "gif" | "bmp" | "webp" | "tiff";
+// The name check is its own tiny module: the flow needs it on every pick, the rest only for pictures.
+export { imageFormatOfName, type ImageFormat } from "./image-names";
 
 /** Decode cap per image (memory): 50 megapixels. */
 export const MAX_IMAGE_PIXELS = 50_000_000;
 /** Margin around an image on its page, in points. */
 export const IMAGE_MARGIN = 36;
-
-const IMAGE_EXTENSIONS: Record<string, ImageFormat> = {
-  ".png": "png",
-  ".jpg": "jpeg",
-  ".jpeg": "jpeg",
-  ".gif": "gif",
-  ".bmp": "bmp",
-  ".webp": "webp",
-  ".tif": "tiff",
-  ".tiff": "tiff",
-};
-
-/** Image format implied by a file name, or null for anything else (PDFs included). */
-export function imageFormatOfName(name: string): ImageFormat | null {
-  const lower = name.toLowerCase();
-  const dot = lower.lastIndexOf(".");
-  return dot >= 0 ? (IMAGE_EXTENSIONS[lower.slice(dot)] ?? null) : null;
-}
 
 export type ImageProbe = { format: ImageFormat; width: number; height: number };
 

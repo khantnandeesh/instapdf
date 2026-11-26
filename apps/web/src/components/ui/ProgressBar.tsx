@@ -1,4 +1,5 @@
 import { cx } from "./cx";
+import "./progress.css";
 
 /**
  * BerryPDF progress.

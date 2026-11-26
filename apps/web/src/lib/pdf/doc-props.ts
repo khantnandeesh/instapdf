@@ -1,8 +1,10 @@
 /**
  * Document-level properties a merge can carry over (spec F3, PR #7 expert
- * review): the document language and page labels. Runs in the worker.
+ * review): the document language and page labels; and, when every output
+ * page comes from one source PDF, its document info and opening layout
+ * (spec F4/F5 I-4, AC-541). Runs in the worker.
  */
-import { PDFArray, PDFDict, PDFHexString, PDFName, PDFNumber, PDFString, type PDFDocument, type PDFObject, type PDFPage } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFHexString, PDFName, PDFNumber, PDFRef, PDFString, type PDFDocument, type PDFObject, type PDFPage } from "@cantoo/pdf-lib";
 
 export type PageLabel = { S?: string; P?: string; St: number };
 
@@ -106,4 +108,62 @@ export function dropStructureLinks(page: PDFPage): void {
     const a = annots.lookup(i);
     if (a instanceof PDFDict) a.delete(PDFName.of("StructParent"));
   }
+}
+
+/** Info entries carried from a single source (Producer and ModDate are always ours). */
+export const CARRIED_INFO = ["Title", "Author", "Subject", "Keywords", "Creator", "CreationDate"] as const;
+/** Opening page layouts and page modes the output may keep (modes for parts we do not copy are left out). */
+const LAYOUTS = new Set(["SinglePage", "OneColumn", "TwoColumnLeft", "TwoColumnRight", "TwoPageLeft", "TwoPageRight"]);
+const MODES = new Set(["UseNone", "UseOutlines", "UseThumbs", "FullScreen"]);
+
+/** What a source says about itself and how it opens: plain values, safe to keep after the source is released. */
+export type DocInfo = {
+  /** Text strings from the Info dictionary, by key (only CARRIED_INFO keys). */
+  info: { key: (typeof CARRIED_INFO)[number]; value: PDFString | PDFHexString }[];
+  pageLayout?: string;
+  pageMode?: string;
+};
+
+/** A value is carried only when it reads: text that decodes, and a date that parses. */
+function readable(key: (typeof CARRIED_INFO)[number], v: PDFString | PDFHexString): boolean {
+  try {
+    if (key === "CreationDate") return !Number.isNaN(v.decodeDate().getTime());
+    v.decodeText();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function readDocInfo(doc: PDFDocument): DocInfo {
+  const out: DocInfo = { info: [] };
+  const infoRef = doc.context.trailerInfo.Info;
+  const info = infoRef ? doc.context.lookup(infoRef) : undefined;
+  if (info instanceof PDFDict) {
+    for (const key of CARRIED_INFO) {
+      const v = info.lookup(PDFName.of(key));
+      if ((v instanceof PDFString || v instanceof PDFHexString) && readable(key, v)) out.info.push({ key, value: v });
+    }
+  }
+  const layout = doc.catalog.lookup(PDFName.of("PageLayout"));
+  if (layout instanceof PDFName && LAYOUTS.has(layout.decodeText())) out.pageLayout = layout.decodeText();
+  const mode = doc.catalog.lookup(PDFName.of("PageMode"));
+  if (mode instanceof PDFName && MODES.has(mode.decodeText())) out.pageMode = mode.decodeText();
+  return out;
+}
+
+/**
+ * Writes a single source's info and layout onto the output, with ModDate set
+ * to `now`. `viewerPreferences` is the source's /ViewerPreferences already
+ * copied into the output. A /PageMode asking for the outline is dropped when
+ * the output has none.
+ */
+export function writeDocInfo(out: PDFDocument, from: DocInfo, now: Date, viewerPreferences?: PDFObject): void {
+  out.setModificationDate(now);
+  const infoRef = out.context.trailerInfo.Info;
+  const info = infoRef ? out.context.lookup(infoRef) : undefined;
+  if (info instanceof PDFDict) for (const { key, value } of from.info) info.set(PDFName.of(key), value);
+  if (from.pageLayout) out.catalog.set(PDFName.of("PageLayout"), PDFName.of(from.pageLayout));
+  if (from.pageMode && (from.pageMode !== "UseOutlines" || out.catalog.get(PDFName.of("Outlines")))) out.catalog.set(PDFName.of("PageMode"), PDFName.of(from.pageMode));
+  if (viewerPreferences instanceof PDFDict || viewerPreferences instanceof PDFRef) out.catalog.set(PDFName.of("ViewerPreferences"), viewerPreferences);
 }

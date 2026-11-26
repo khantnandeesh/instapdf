@@ -14,9 +14,12 @@ export function Switch({
   onChange,
   className,
   describedBy,
+  ariaLabel,
 }: {
   id: string;
   label: string;
+  /** Accessible name when it says more than the visible label (which it must contain). */
+  ariaLabel?: string;
   shortLabel?: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
@@ -33,7 +36,7 @@ export function Switch({
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
         className="peer absolute inset-0 z-10 m-0 size-full cursor-pointer appearance-none opacity-0"
-        aria-label={shortLabel ? label : undefined}
+        aria-label={ariaLabel ?? (shortLabel ? label : undefined)}
       />
       {shortLabel ? (
         <>

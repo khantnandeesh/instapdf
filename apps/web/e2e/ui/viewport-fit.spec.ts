@@ -12,6 +12,14 @@ import { isUsable, tools } from "../../src/tools/registry";
 import { fx } from "../support/flow";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
+/** Tools with no options at all (F4/F5 §3e, §3g): their bar holds the status, history and primary only. */
+const NO_OPTIONS = new Set(["organize-pdf", "alternate-mix-pdf"]);
+/** Tools that need a second file before they can run (Alternate & mix mixes two or more). */
+const SECOND_FILE: Record<string, string> = { "alternate-mix-pdf": "three-pages.pdf" };
+/** Loads the test file (and a second one where the tool needs it). */
+async function loadFiles(page: Page, slug: string) {
+  await page.getByTestId("file-input").setInputFiles(SECOND_FILE[slug] ? [fx("sixty-pages.pdf"), fx(SECOND_FILE[slug])] : fx("sixty-pages.pdf"));
+}
 
 const DESKTOP: [number, number][] = [
   [1280, 632], // 1280x720 screen in a browser window
@@ -52,19 +60,36 @@ async function expectInViewport(page: Page, el: Locator, what: string) {
 }
 
 /**
- * Opens the bigger view of the first page. Tools on the shared page grid have a "Page 1 of N" tile
- * button; Merge opens it from its file card (files view) or a page tile's More menu (pages view).
+ * Opens the bigger view of the first page. Tools on the shared page grid have a "Page 1 …" tile
+ * button that opens it (Rotate "Page 1 of N", Split "Page 1, part 1 of N"); where the tile toggles
+ * the page instead (Extract, Delete: it carries aria-pressed), its "Enlarge page 1" button opens it
+ * (spec F4/F5 UI decision 12). Merge opens it from its file card (files view) or a page tile's More
+ * menu (pages view).
  */
 async function openFirstPagePreview(page: Page) {
-  const pageButton = page.getByRole("button", { name: /^Page 1 of/ });
+  const pageButton = page.getByRole("button", { name: /^Page 1\b/ }).and(page.locator("[data-tile-button]:not([aria-pressed])"));
   if (await pageButton.count()) return pageButton.first().click();
+  const enlarge = page.getByRole("button", { name: "Enlarge page 1", exact: true });
+  if (await enlarge.count()) return enlarge.first().click();
   const card = page.getByTestId("card-main").first();
   if (await card.isVisible()) return card.click();
   // The whole tile: below 1024 px its More button sits in the row under the page (PT-1 rule 6).
   const tile = page.locator("[data-uid]").first();
   await tile.hover();
+  // A read-only grid (Alternate's result order) has no More menu: the tile itself shows the page larger.
+  if (!(await tile.getByTestId("tile-more").count())) return page.getByTestId("tile-main").first().click();
   await tile.getByTestId("tile-more").click();
   await page.getByRole("menuitem", { name: "Enlarge" }).click();
+}
+
+/**
+ * Tools whose primary waits for a choice (Extract: pick a page; Delete: mark one) get one: the first
+ * toggle tile (spec F4/F5 UI decision 12). Other tools run as loaded.
+ */
+async function makeRunnable(page: Page) {
+  if (await page.getByTestId("primary-action").isEnabled()) return;
+  await page.locator("[data-tile-button][aria-pressed]").first().click();
+  await expect(page.getByTestId("primary-action")).toBeEnabled();
 }
 
 async function open(page: Page, slug: string) {
@@ -96,7 +121,9 @@ for (const tool of usable) {
         // primary stay pinned to the bottom of the screen.
         const dock = (await page.locator("[data-ip-dock]").boundingBox())!;
         expect(dock.y, "options panel starts on the first screen").toBeGreaterThanOrEqual(0);
-        expect(dock.y + 120, "options panel: its first option is on the first screen").toBeLessThanOrEqual(height);
+        // A tool with no options opens on the bottom bar instead of a side panel (F4/F5 P-3): it is all on screen.
+        if (NO_OPTIONS.has(tool.slug)) await expectInViewport(page, page.locator("[data-ip-dock]"), "bottom bar (empty state)");
+        else expect(dock.y + 120, "options panel: its first option is on the first screen").toBeLessThanOrEqual(height);
         await expectInViewport(page, page.getByTestId("drop-card"), "drop area");
         // Scroll the page to the end of the panel (every option read): the drop area and the primary stay in view.
         await page.evaluate(() => {
@@ -114,14 +141,15 @@ for (const tool of usable) {
         expect(title!.height, "tool title fits on one line (the head has a fixed height)").toBeLessThanOrEqual(44);
         await noHorizontalScroll(page);
 
-        await page.getByTestId("file-input").setInputFiles(fx("sixty-pages.pdf"));
+        await loadFiles(page, tool.slug);
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded)");
         // Loaded: the options fold into the compact bottom bar and the pages get most of the screen.
         await expect(page.locator("[data-ip-dock]")).toHaveAttribute("data-ip-dock", "bar");
         // A tool with few options shows them in the bar; one with many (density "full", Merge) shows
         // its Options button there, which opens them in a sheet.
-        await expectInViewport(page, page.locator("[data-ip-dock]").getByTestId("dock-options").or(page.getByTestId("options-button")), "options in the bottom bar");
+        if (NO_OPTIONS.has(tool.slug)) await expect(page.locator("[data-ip-dock]").getByTestId("dock-options").or(page.getByTestId("options-button"))).toHaveCount(0);
+        else await expectInViewport(page, page.locator("[data-ip-dock]").getByTestId("dock-options").or(page.getByTestId("options-button")), "options in the bottom bar");
         // Tools with a Files / Pages view (Merge opens on files): the pages checks below run on the pages.
         const pagesView = page.getByRole("radio", { name: "Pages", exact: true });
         if (await pagesView.count()) await pagesView.click();
@@ -167,6 +195,7 @@ for (const tool of usable) {
           )
           .toBe(true);
 
+        await makeRunnable(page);
         await page.getByTestId("primary-action").click();
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "done", { timeout: 30_000 });
         // The result scrolls the page back to the top: wait for the result to settle.
@@ -194,7 +223,7 @@ for (const tool of usable) {
         }
         await noHorizontalScroll(page);
 
-        await page.getByTestId("file-input").setInputFiles(fx("sixty-pages.pdf"));
+        await loadFiles(page, tool.slug);
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded)");
         await openFirstPagePreview(page);
@@ -204,6 +233,7 @@ for (const tool of usable) {
         await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
         await expectInViewport(page, page.getByTestId("primary-action"), "primary action (loaded, scrolled)");
 
+        await makeRunnable(page);
         await page.getByTestId("primary-action").click();
         await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "done", { timeout: 30_000 });
         await expect(async () => expectInViewport(page, page.getByRole("link", { name: "Download" }), "Download (result)")).toPass({ timeout: 5_000 });

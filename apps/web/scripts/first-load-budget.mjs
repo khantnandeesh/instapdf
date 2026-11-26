@@ -21,6 +21,14 @@ const BUDGET_KB = {
   "/page": [120, 126],
   "/merge-pdf/page": [150, 160],
   "/rotate-pdf/page": [141, 151],
+  // F5 page tools (spec F4/F5 UI P-12).
+  "/organize-pdf/page": [150, 160],
+  "/combine-reorder-pdf/page": [150, 160],
+  "/alternate-mix-pdf/page": [148, 158],
+  // F4 page tools (spec F4/F5 UI P-12): Rotate + the range parser, field and stepper (+ marks on Split).
+  "/split-pdf/page": [145, 155],
+  "/extract-pdf-pages/page": [143, 153],
+  "/delete-pdf-pages/page": [143, 153],
   // The editor's landing (F16 AC-86), measured 124 / 140 on 26 Nov plus ~2 kB (the landing tool cap is 150);
   // its shell, pdf.js and engine are the editor JS budget below.
   "/edit-pdf/page": [126, 142],
@@ -30,6 +38,14 @@ const CLOUD_BUDGET_KB = {
   ...BUDGET_KB,
   "/merge-pdf/page": [152, 162],
   "/rotate-pdf/page": [143, 153],
+  "/organize-pdf/page": [152, 162],
+  "/combine-reorder-pdf/page": [152, 162],
+  // Alternate shares every first-load chunk with Organize but its page chunk (150.6 vs 150.8 kB after the
+  // F4 + main tile-rule merge); 1 kB over its F5 budget, still under Organize's and Combine's 152.
+  "/alternate-mix-pdf/page": [151, 160],
+  "/split-pdf/page": [147, 157],
+  "/extract-pdf-pages/page": [145, 155],
+  "/delete-pdf-pages/page": [145, 155],
   // The editor's landing with the F23 caret, row and intake (E6): measured 128 / 144 on 26 Nov plus ~2 kB.
   "/edit-pdf/page": [130, 146],
 };

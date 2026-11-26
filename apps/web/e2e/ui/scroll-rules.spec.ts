@@ -150,16 +150,23 @@ for (const [project, sizes] of [
             await expectClean(page, "loaded, pages view");
           }
           // The bigger page view (a dialog).
-          const pageButton = page.getByRole("button", { name: /^Page 1 of/ });
+          // A tile that toggles (Extract, Delete: aria-pressed) does not open the preview; its corner Enlarge does.
+          const pageButton = page.getByRole("button", { name: /^Page 1( of|,)/ }).and(page.locator(":not([aria-pressed])"));
+          const enlarge = page.getByRole("button", { name: "Enlarge page 1", exact: true });
           const card = page.getByTestId("card-main").first();
           if (await pageButton.count()) await pageButton.first().click();
+          else if (await enlarge.count()) await enlarge.first().click();
           else if (await card.isVisible()) await card.click();
           else {
             // The whole tile: below 1024 px its More button sits in the row under the page (PT-1 rule 6).
             const tile = page.locator("[data-uid]").first();
             await tile.hover();
-            await tile.getByTestId("tile-more").click();
-            await page.getByRole("menuitem", { name: "Enlarge" }).click();
+            // A read-only grid (Alternate's result order) has no More menu: the tile itself shows the page larger.
+            if (!(await tile.getByTestId("tile-more").count())) await page.getByTestId("tile-main").first().click();
+            else {
+              await tile.getByTestId("tile-more").click();
+              await page.getByRole("menuitem", { name: "Enlarge" }).click();
+            }
           }
           await expect(page.getByRole("dialog")).toBeVisible();
           await expectClean(page, "page preview open");

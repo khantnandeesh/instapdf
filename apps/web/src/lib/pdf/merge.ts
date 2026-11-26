@@ -12,6 +12,21 @@
  *
  * Memory: each source is loaded at its first use and released after its
  * last page is copied; only its outline, title and form defaults are kept.
+ *
+ * Fidelity (spec F4/F5 I-1 to I-5), shared with every page tool through
+ * `buildDocuments` (build.ts):
+ * - a copied page takes only the resources its content uses (prune.ts), when
+ *   the output does not hold every page of that source;
+ * - links to pages that are not in the output are removed, and named
+ *   destinations become explicit ones (links.ts);
+ * - bookmarks keep their view, colour, style and open state (outline.ts);
+ * - when every page comes from one PDF, its document info and opening
+ *   layout are carried (doc-props.ts);
+ * - form fields follow their pages (forms.ts).
+ *
+ * A source is opened once (`openSource`: parsed, metadata read, caches
+ * made) and bound to each output it feeds (`bindSource`: object copier,
+ * reserved page refs, form defaults), so N outputs parse a file once.
  */
 import {
   LineCapStyle,
@@ -31,14 +46,17 @@ import {
   popGraphicsState,
   pushGraphicsState,
   scale as scaleOperator,
+  type PDFObject,
 } from "@cantoo/pdf-lib";
 import { segmentsOf, type PageSize } from "../page-list";
 import { imagePlacement, probeImage, sniffFormat, type ImageFormat } from "./images";
-import { dropStructureLinks, readLang, readPageLabels, writeLang, writePageLabels, type PageLabel } from "./doc-props";
+import { dropStructureLinks, readDocInfo, readLang, readPageLabels, writeDocInfo, writeLang, writePageLabels, type DocInfo, type PageLabel } from "./doc-props";
 import { buildAcroForm, detachAnnotations, flattenFields, removeWidgets } from "./forms";
 import type { MergeOptions } from "./merge-options";
 import { baseName } from "./naming";
-import { mapBookmarks, readOutline, writeOutline, type OutBookmark, type SourceBookmark } from "./outline";
+import { createLinkFilter, type LinkFilter } from "./links";
+import { mapBookmarks, readOutline, scaleView, viewOf, writeOutline, type OutBookmark, type SourceBookmark } from "./outline";
+import { createPruner, type Pruner } from "./prune";
 import { loadForEdit } from "./rotate";
 import { normalizeRotation } from "./rotation";
 import { createTextWriter, type FontSource, type TextWriter } from "./text";
@@ -74,17 +92,45 @@ const FOOTER_SIZE = 8;
 const FOOTER_COLOR = grayscale(0.3);
 const TOC_TITLE = "Contents";
 
-type PdfSource = {
+/** A PDF source as opened once: parsed, metadata read, pruning and link caches made. */
+type OpenedPdf = {
   kind: "pdf";
   input: MergeSourceInput;
   doc: PDFDocument;
   pages: PDFPage[];
+  pageIndexOf: Map<PDFRef, number>;
+  /** Widget annotation refs on each page (after flattening). */
+  widgets: { refs: PDFRef[]; count: number }[];
+  pruner: Pruner;
+  links: LinkFilter;
+  meta: SourceMeta;
+  encrypted: boolean;
+};
+type OpenedImage = { kind: "image"; input: MergeSourceInput; bytes: Uint8Array; format: ImageFormat; frames: PageSize[]; tiff?: TiffFile; meta: SourceMeta; encrypted: false };
+export type OpenedSource = OpenedPdf | OpenedImage;
+
+/** A source bound to one output: its object copier and the output refs reserved for its pages. */
+type PdfSource = {
+  kind: "pdf";
+  input: MergeSourceInput;
+  opened: OpenedPdf;
+  pages: PDFPage[];
   copier: PDFObjectCopier;
   /** Output ref reserved for the first copy of each used source page. */
   reserved: Map<number, PDFRef>;
+  /** Source pages this output holds. */
+  used: Set<number>;
+  /** Prune resources (the output does not hold every page of the source). */
+  prune: boolean;
 };
 type ImageSource = { kind: "image"; input: MergeSourceInput; bytes: Uint8Array; format: ImageFormat; embedded: Map<number, ImageDraw>; frames: PageSize[]; tiff?: TiffFile };
 type Loaded = PdfSource | ImageSource;
+
+/**
+ * Where an output gets its sources: `open` parses a source (or returns it
+ * already open); `release` says this output is done with it.
+ */
+export type SourcePool = { open(id: string): Promise<OpenedSource>; release(id: string): void };
 
 type Slot = { kind: "page"; input: MergePageInput } | { kind: "pad" } | { kind: "toc"; index: number };
 
@@ -266,19 +312,24 @@ type SourceMeta = {
   kind: "pdf" | "image";
   title?: string;
   outline: SourceBookmark[];
+  /** This output's /DR and /DA from the source's AcroForm (set when bound). */
   form?: PDFDict;
   lang?: string;
   labels?: (PageLabel | null)[] | null;
   /** Flatten mode: fields that could not be flattened and stay fillable. */
   keptFields?: string[];
+  /** Info and opening layout, carried when the output's pages all come from this source. */
+  docInfo?: DocInfo;
+  /** This output's copy of the source's /ViewerPreferences (set when bound). */
+  viewerPreferences?: PDFObject;
 };
 
 /**
- * Loads one source (lazily, at its first use) and extracts up front what the
- * later phases need, so the parsed document, its bytes and its copier can be
- * released after the source's last page has been copied.
+ * Opens one source: parses it (decrypting when needed), flattens its fields in
+ * Flatten mode, and reads what later phases need, so the parsed document can
+ * be released after the last page that needs it has been copied.
  */
-async function loadSource(s: MergeSourceInput, usedIndexes: Set<number>, options: MergeOptions, out: PDFDocument): Promise<{ loaded: Loaded; meta: SourceMeta; encrypted: boolean }> {
+export async function openSource(s: MergeSourceInput, options: Pick<MergeOptions, "forms" | "bookmarks">): Promise<OpenedSource> {
   const bytes = new Uint8Array(await s.source.arrayBuffer());
   if (s.kind === "image") {
     const format = sniffFormat(bytes);
@@ -297,42 +348,171 @@ async function loadSource(s: MergeSourceInput, usedIndexes: Set<number>, options
       if (probe) frames = [{ width: probe.width, height: probe.height }];
     }
     if (!frames.length) throw new Error("Unreadable image");
-    return { loaded: { kind: "image", input: s, bytes, format, embedded: new Map(), frames, tiff }, meta: { name: s.name, kind: "image", outline: [] }, encrypted: false };
+    return { kind: "image", input: s, bytes, format, frames, tiff, meta: { name: s.name, kind: "image", outline: [] }, encrypted: false };
   }
   const { doc, wasEncrypted } = await loadForEdit(bytes, s.password);
   // Fields that cannot be flattened stay fillable (merged as in "merge, rename duplicates").
   const keptFields = options.forms === "flatten" ? flattenFields(doc) : [];
   const pages = doc.getPages();
+  const meta: SourceMeta = {
+    name: s.name,
+    kind: "pdf",
+    // Encrypted sources' strings are decrypted on load, so their Title and Info are used too.
+    title: titleOf(doc),
+    outline: options.bookmarks === "keep" || options.bookmarks === "perFileNested" ? readOutline(doc) : [],
+    lang: readLang(doc),
+    labels: readPageLabels(doc),
+    keptFields,
+    docInfo: readDocInfo(doc),
+  };
+  return {
+    kind: "pdf",
+    input: s,
+    doc,
+    pages,
+    pageIndexOf: new Map(pages.map((page, i) => [page.ref, i])),
+    widgets: pages.map(widgetsOf),
+    pruner: createPruner(doc.context, pages),
+    links: createLinkFilter(doc, pages),
+    meta,
+    encrypted: wasEncrypted,
+  };
+}
+
+/** The Info /Title, or undefined when it is missing, blank or cannot be read. */
+function titleOf(doc: PDFDocument): string | undefined {
+  try {
+    return doc.getTitle() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The widget annotations on a page: `refs` for the indirect ones (seeded or
+ * kept per output), `count` including widgets written directly in /Annots.
+ * Exported for tests.
+ */
+export function widgetsOf(page: PDFPage): { refs: PDFRef[]; count: number } {
+  const annots = page.node.lookup(PDFName.of("Annots"));
+  const out = { refs: [] as PDFRef[], count: 0 };
+  if (!(annots instanceof PDFArray)) return out;
+  for (let i = 0; i < annots.size(); i++) {
+    const raw = annots.get(i);
+    const a = annots.lookup(i);
+    if (!(a instanceof PDFDict) || a.lookup(PDFName.of("Subtype")) !== PDFName.of("Widget")) continue;
+    out.count++;
+    if (raw instanceof PDFRef) out.refs.push(raw);
+  }
+  return out;
+}
+
+/**
+ * Binds an opened source to one output: a fresh object copier with the output
+ * refs of its used pages reserved. Widgets of pages the output does not hold
+ * are seeded as null, so copying a field (through a kept widget's /Parent)
+ * does not drag in its widgets and appearances on other pages. The form's
+ * /DR and /DA are copied only when a used page has a widget.
+ */
+function bindSource(o: OpenedSource, usedIndexes: Set<number>, options: MergeOptions, out: PDFDocument): { loaded: Loaded; meta: SourceMeta } {
+  if (o.kind === "image") return { loaded: { kind: "image", input: o.input, bytes: o.bytes, format: o.format, embedded: new Map(), frames: o.frames, tiff: o.tiff }, meta: o.meta };
+  const { doc, pages } = o;
   const copier = PDFObjectCopier.for(doc.context, out.context);
   const traversed = (copier as unknown as { traversedObjects: Map<unknown, unknown> }).traversedObjects;
   const reserved = new Map<number, PDFRef>();
+  // A widget listed on a used page is kept, even when a dropped page lists it too.
+  const keptWidgets = new Set<PDFRef>();
+  for (const idx of usedIndexes) for (const w of o.widgets[idx]?.refs ?? []) keptWidgets.add(w);
   pages.forEach((page, idx) => {
     if (usedIndexes.has(idx)) {
       const ref = out.context.nextRef();
       reserved.set(idx, ref);
       traversed.set(page.ref, ref);
-    } else traversed.set(page.ref, PDFNull); // links to dropped pages go nowhere
+    } else {
+      traversed.set(page.ref, PDFNull); // anything else that reaches a dropped page goes nowhere
+      for (const w of o.widgets[idx].refs) if (!keptWidgets.has(w)) traversed.set(w, PDFNull);
+    }
   });
   let form: PDFDict | undefined;
   const acro = doc.catalog.lookup(PDFName.of("AcroForm"));
-  if (acro instanceof PDFDict && options.forms !== "remove" && (options.forms !== "flatten" || keptFields.length)) {
+  // Only referenced widgets become fields (buildAcroForm starts from refs), so only they justify copying /DR.
+  const hasWidgets = [...usedIndexes].some((i) => o.widgets[i]?.refs.length);
+  if (acro instanceof PDFDict && hasWidgets && options.forms !== "remove" && (options.forms !== "flatten" || o.meta.keptFields?.length)) {
     form = out.context.obj({}) as PDFDict;
     const dr = acro.get(PDFName.of("DR"));
     const da = acro.get(PDFName.of("DA"));
     if (dr) form.set(PDFName.of("DR"), copier.copy(dr));
     if (da) form.set(PDFName.of("DA"), da.clone());
   }
-  const meta: SourceMeta = {
-    name: s.name,
-    kind: "pdf",
-    title: doc.getTitle() || undefined,
-    outline: options.bookmarks === "keep" || options.bookmarks === "perFileNested" ? readOutline(doc) : [],
-    form,
-    lang: readLang(doc),
-    labels: readPageLabels(doc),
-    keptFields,
-  };
-  return { loaded: { kind: "pdf", input: s, doc, pages, copier, reserved }, meta, encrypted: wasEncrypted };
+  // A direct copy: nothing is written unless the output keeps it. /PrintPageRange
+  // names source page numbers, which no longer match the output's pages.
+  const prefs = doc.catalog.lookup(PDFName.of("ViewerPreferences"));
+  let viewerPreferences: PDFObject | undefined;
+  if (prefs instanceof PDFDict) {
+    const shallow = prefs.clone();
+    shallow.delete(PDFName.of("PrintPageRange"));
+    viewerPreferences = copier.copy(shallow);
+  }
+  const prune = usedIndexes.size < pages.length;
+  return { loaded: { kind: "pdf", input: o.input, opened: o, pages, copier, reserved, used: usedIndexes, prune }, meta: { ...o.meta, form, viewerPreferences } };
+}
+
+/**
+ * Copies source page `index` into the output (not yet added): with only the
+ * resources it uses (when pruning) and without links to pages the output
+ * does not hold.
+ */
+function copyPageNode(src: PdfSource, index: number): PDFPage["node"] {
+  const o = src.opened;
+  const srcPage = o.pages[index];
+  const resources = src.prune ? o.pruner.forPage(index) : undefined;
+  const annots = o.links.annotsFor(index, (ref) => {
+    const i = o.pageIndexOf.get(ref);
+    return i !== undefined && src.used.has(i);
+  });
+  let node = srcPage.node;
+  if (resources || annots) {
+    node = srcPage.node.clone();
+    if (resources) node.set(PDFName.of("Resources"), resources);
+    if (annots) node.set(PDFName.of("Annots"), annots);
+  }
+  return src.copier.copy(node);
+}
+
+/** Scales the coordinates of explicit link destinations that point at pages scaled by same width. */
+function scaleLinkDests(pages: PDFPage[], scaledBy: Map<PDFRef, number>) {
+  if (!scaledBy.size) return;
+  const done = new Set<PDFArray>();
+  for (const page of pages) {
+    const annots = page.node.lookup(PDFName.of("Annots"));
+    if (!(annots instanceof PDFArray)) continue;
+    for (let i = 0; i < annots.size(); i++) {
+      const a = annots.lookup(i);
+      if (!(a instanceof PDFDict) || a.lookup(PDFName.of("Subtype")) !== PDFName.of("Link")) continue;
+      const action = a.lookup(PDFName.of("A"));
+      const dest = a.lookup(PDFName.of("Dest")) ?? (action instanceof PDFDict && action.lookup(PDFName.of("S")) === PDFName.of("GoTo") ? action.lookup(PDFName.of("D")) : undefined);
+      if (!(dest instanceof PDFArray) || done.has(dest)) continue;
+      const target = dest.get(0);
+      const s = target instanceof PDFRef ? scaledBy.get(target) : undefined;
+      if (!s) continue;
+      done.add(dest);
+      const tail = Array.from({ length: dest.size() - 1 }, (_, k) => dest.lookup(k + 1) ?? PDFNull);
+      const view = viewOf(tail);
+      if (!view) continue;
+      const scaled = scaleView(view, s);
+      scaled.args.forEach((v, k) => dest.set(k + 2, v === null ? PDFNull : PDFNumber.of(v)));
+    }
+  }
+}
+
+/** Scales the views of bookmarks that point at pages scaled by same width. */
+function scaleBookmarkViews(items: OutBookmark[], scaledBy: Map<PDFRef, number>): OutBookmark[] {
+  if (!scaledBy.size) return items;
+  return items.map((item) => {
+    const s = scaledBy.get(item.page);
+    const children = scaleBookmarkViews(item.children, scaledBy);
+    return { ...item, children, ...(s && item.view ? { view: scaleView(item.view, s) } : {}) };
+  });
 }
 
 /** Displayed size of an input page in the output, before same-width scaling. */
@@ -359,27 +539,29 @@ function ownContents(page: PDFPage) {
   if (value instanceof PDFArray) page.node.set(PDFName.of("Contents"), ctx.obj(value.asArray()));
 }
 
-export async function mergePdf(input: MergeInput, env: MergeEnv, onProgress: (fraction: number) => void): Promise<MergeResult> {
+/**
+ * Builds one output document from a page list (pages, then sizes, footers,
+ * contents, forms, labels, bookmarks and document info), not yet saved.
+ * Reports progress from 0 to 0.95. Sources come from `pool`.
+ */
+export async function composeDocument(input: MergeInput, env: MergeEnv, pool: SourcePool, onProgress: (fraction: number) => void): Promise<{ out: PDFDocument; warnings: string[] }> {
   const { options } = input;
   onProgress(0);
   const out = await PDFDocument.create({ updateMetadata: false });
   out.setProducer("BerryPDF");
   const pagesIn = input.pages.filter((p) => p.sourceId === null || input.sources.some((s) => s.id === p.sourceId));
   if (!pagesIn.length) throw new Error("Nothing to merge");
-  const sourceById = new Map(input.sources.map((s) => [s.id, s]));
   const usedIndexes = new Map<string, Set<number>>();
   for (const p of pagesIn) if (p.sourceId) (usedIndexes.get(p.sourceId) ?? usedIndexes.set(p.sourceId, new Set()).get(p.sourceId)!).add(p.sourceIndex);
 
   // Sources are loaded at first use and released after their last page (memory).
   const loaded = new Map<string, Loaded>();
   const meta = new Map<string, SourceMeta>();
-  let wasEncrypted = false;
   const ensure = async (id: string): Promise<Loaded> => {
     const have = loaded.get(id);
     if (have) return have;
     if (meta.has(id)) throw new Error("Source used after release");
-    const r = await loadSource(sourceById.get(id)!, usedIndexes.get(id) ?? new Set(), options, out);
-    wasEncrypted ||= r.encrypted;
+    const r = bindSource(await pool.open(id), usedIndexes.get(id) ?? new Set(), options, out);
     loaded.set(id, r.loaded);
     meta.set(id, r.meta);
     return r.loaded;
@@ -387,7 +569,9 @@ export async function mergePdf(input: MergeInput, env: MergeEnv, onProgress: (fr
 
   // ---- plan: segments, contents pages, padding ----
   const asRefs = pagesIn.map((p, i) => ({ uid: String(i), sourceId: p.sourceId, sourceIndex: p.sourceIndex, rotation: 0, size: { width: 0, height: 0 } }));
-  const segments = segmentsOf(asRefs).map((s) => s.pages.map((r) => pagesIn[Number(r.uid)]));
+  // Whole source runs: a file whose pages the user put out of order (two cards in the files view,
+  // AC-501) is still one file for double-sided padding and the cover.
+  const segments = segmentsOf(asRefs, { splitBackward: false }).map((s) => s.pages.map((r) => pagesIn[Number(r.uid)]));
   const tocOn = options.toc !== "none";
   const coverSegments = tocOn && options.cover ? segments.slice(0, 1) : [];
   const restSegments = segments.slice(coverSegments.length);
@@ -445,7 +629,7 @@ export async function mergePdf(input: MergeInput, env: MergeEnv, onProgress: (fr
         const key = `${src.input.id}:${p.sourceIndex}`;
         const srcPage = src.pages[p.sourceIndex];
         const reserved = src.reserved.get(p.sourceIndex);
-        const node = src.copier.copy(srcPage.node) as unknown as PDFPage["node"];
+        const node = copyPageNode(src, p.sourceIndex);
         const isFirst = !firstOut.has(key) && reserved;
         const ref = isFirst ? reserved : out.context.register(node);
         if (isFirst) out.context.assign(ref, node);
@@ -469,6 +653,7 @@ export async function mergePdf(input: MergeInput, env: MergeEnv, onProgress: (fr
       if (last !== n) continue;
       loaded.delete(id);
       lastSlot.delete(id);
+      pool.release(id);
     }
     onProgress(0.05 + (0.6 * (n + 1)) / total);
   }
@@ -487,6 +672,7 @@ export async function mergePdf(input: MergeInput, env: MergeEnv, onProgress: (fr
   // ---- pass 2: same width, footers, padding sizes ----
   const contentPages: PDFPage[] = [];
   const tocPages: PDFPage[] = [];
+  const scaledBy = new Map<PDFRef, number>();
   made.forEach(({ page, slot, name }, n) => {
     if (slot.kind === "toc") tocPages.push(page);
     else if (slot.kind === "pad") {
@@ -498,13 +684,18 @@ export async function mergePdf(input: MergeInput, env: MergeEnv, onProgress: (fr
       if (options.sameWidth) {
         const shown = displayed({ width: page.getCropBox().width, height: page.getCropBox().height }, page.getRotation().angle);
         const s = targetWidth / shown.width;
-        if (Math.abs(s - 1) > 1e-4) scalePage(page, s);
+        if (Math.abs(s - 1) > 1e-4) {
+          scalePage(page, s);
+          scaledBy.set(page.ref, s);
+        }
       }
       if (name && writer && options.footer) drawFooter(page, writer, name);
       contentPages.push(page);
     }
     onProgress(0.65 + (0.25 * (n + 1)) / total);
   });
+
+  scaleLinkDests(contentPages, scaledBy);
 
   if (tocPages.length && writer) {
     // The contents lists where each file starts after the cover (a cover source never appears here).
@@ -545,11 +736,41 @@ export async function mergePdf(input: MergeInput, env: MergeEnv, onProgress: (fr
       if (options.bookmarks === "keep") items.push(...inner);
       else items.push({ title: baseName(m.name), page: firstOfSource.get(id)!.ref, children: inner });
     }
-    writeOutline(out, items);
+    writeOutline(out, scaleBookmarkViews(items, scaledBy));
   }
 
+  // ---- document info: only when every page comes from one PDF ----
+  const used = [...firstOfSource.keys()];
+  const only = used.length === 1 ? meta.get(used[0]) : undefined;
+  if (only?.kind === "pdf" && only.docInfo) writeDocInfo(out, only.docInfo, new Date(), only.viewerPreferences);
+
   onProgress(0.95);
+  return { out, warnings };
+}
+
+/** A pool that opens each source at its first use and forgets it on release (one output). */
+function singleUsePool(sources: MergeSourceInput[], options: MergeOptions) {
+  const byId = new Map(sources.map((s) => [s.id, s]));
+  const open = new Map<string, OpenedSource>();
+  const state = { wasEncrypted: false };
+  const pool: SourcePool = {
+    async open(id) {
+      const have = open.get(id);
+      if (have) return have;
+      const o = await openSource(byId.get(id)!, options);
+      state.wasEncrypted ||= o.encrypted;
+      open.set(id, o);
+      return o;
+    },
+    release: (id) => void open.delete(id),
+  };
+  return { pool, state };
+}
+
+export async function mergePdf(input: MergeInput, env: MergeEnv, onProgress: (fraction: number) => void): Promise<MergeResult> {
+  const { pool, state } = singleUsePool(input.sources, input.options);
+  const { out, warnings } = await composeDocument(input, env, pool, onProgress);
   const bytes = await out.save();
   onProgress(1);
-  return { bytes, pageCount: out.getPageCount(), wasEncrypted, warnings };
+  return { bytes, pageCount: out.getPageCount(), wasEncrypted: state.wasEncrypted, warnings };
 }

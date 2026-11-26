@@ -223,18 +223,46 @@ test.describe("undo", () => {
     expect(await words(out.bytes)).toEqual(["Alpha 1", "Alpha 2", "Alpha 3", "Echo 1", "Bravo 1", "Bravo 2"]);
   });
 
-  test("AC-79: undo is single level: two removals, Undo brings back only the last one", async ({ page }) => {
+  test("AC-79, AC-549: two removals: the notice undoes the last one, Ctrl+Z then the first (full history, I-10)", async ({ page }) => {
     await pickMerge(page, "alpha.pdf", "bravo.pdf", "echo.pdf");
     await cardAction(page, "alpha.pdf", "Remove");
     await cardAction(page, "echo.pdf", "Remove");
+    // The newer remove replaces the notice (one notice at a time).
     await expect(notice(page, "Removed alpha.pdf.")).toHaveCount(0);
     await notice(page, "Removed echo.pdf.").getByRole("button", { name: "Undo" }).click();
     expect(await cardNames(page)).toEqual(["bravo.pdf", "echo.pdf"]);
-    await expect(page.getByRole("button", { name: "Undo" })).toHaveCount(0);
-    await page.keyboard.press("ControlOrMeta+z"); // nothing left to undo
+    await expect(notice(page, "Removed echo.pdf.")).toHaveCount(0);
+    // The history goes one step further back: alpha.pdf returns at position 1.
+    await page.getByTestId("history").getByRole("button", { name: "Undo" }).click();
+    expect(await cardNames(page)).toEqual(["alpha.pdf", "bravo.pdf", "echo.pdf"]);
+    // Redo replays the first removal.
+    await page.keyboard.press("ControlOrMeta+Shift+z");
     expect(await cardNames(page)).toEqual(["bravo.pdf", "echo.pdf"]);
     const out = await runAndDownload(page);
     expect(await words(out.bytes)).toEqual(["Bravo 1", "Bravo 2", "Echo 1"]);
+  });
+
+  test("AC-549: Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z inside the page picker leave the list behind it alone", async ({ page }) => {
+    await pickMerge(page, "alpha.pdf", "bravo.pdf");
+    await showPages(page);
+    await tileMain(page, "B1").focus();
+    await page.keyboard.press("Delete");
+    const before = ["A1", "A2", "A3", "B2"];
+    expect(await tileLabels(page)).toEqual(before);
+    await chooseAddPages(page, "Pages from a file…");
+    await page.getByTestId("pages-file-input").setInputFiles(fx("three-pages.pdf"));
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByTestId("picker-tile").first().focus();
+    await page.keyboard.press("ControlOrMeta+z");
+    await page.keyboard.press("ControlOrMeta+Shift+z");
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    expect(await tileLabels(page)).toEqual(before);
+    // The removal is still the last step: one Undo brings B1 back.
+    await page.getByTestId("history").getByRole("button", { name: "Undo" }).click();
+    expect(await tileLabels(page)).toEqual(["A1", "A2", "A3", "B1", "B2"]);
   });
 
   test("AC-79: pages view: Delete removes a tile, Ctrl+Z restores it in place with focus; Reverse is undoable", async ({ page }) => {
@@ -444,7 +472,7 @@ test("AC-77: the catalogue card and the menu entry link to /merge-pdf with Beta,
   await expect(page).toHaveURL(/\/merge-pdf$/);
   await expect(page.getByTestId("coming-soon")).toHaveCount(0);
   await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
-  // A planned tool still renders the coming-soon page (F2's planned-tool tests use split-pdf).
-  await page.goto("/split-pdf");
+  // A planned tool still renders the coming-soon page (F2's planned-tool tests use split-pdf-by-bookmarks).
+  await page.goto("/split-pdf-by-bookmarks");
   await expect(page.getByTestId("coming-soon")).toBeVisible();
 });

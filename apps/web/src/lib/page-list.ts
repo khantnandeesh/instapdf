@@ -101,15 +101,26 @@ export function unitsOf(pages: readonly PageRef[]): PageRef[][] {
 
 const sourceOfUnit = (unit: PageRef[]) => unit.find((p) => !isBlank(p))?.sourceId ?? null;
 
-/** Maximal runs of consecutive units from the same source (the files view's cards). */
-export function segmentsOf(pages: readonly PageRef[]): Segment[] {
+const indexOfUnit = (unit: PageRef[]) => unit.find((p) => !isBlank(p))?.sourceIndex ?? -1;
+
+/**
+ * The files view's cards: runs of consecutive units from the same source. A run also ends where the
+ * source's page numbers go backwards (A12 then A1 are two cards, spec F5 AC-501); a forward gap
+ * ("pages 1, 3 of 3") or a repeated page stays one card. `splitBackward: false` gives whole source
+ * runs (Merge's engine: double-sided padding and the cover follow the files, not the cards).
+ */
+export function segmentsOf(pages: readonly PageRef[], { splitBackward = true }: { splitBackward?: boolean } = {}): Segment[] {
   const segments: Segment[] = [];
   let start = 0;
+  let lastIndex = -1;
   for (const unit of unitsOf(pages)) {
     const sourceId = sourceOfUnit(unit);
+    const index = indexOfUnit(unit);
     const last = segments[segments.length - 1];
-    if (last && last.sourceId === sourceId) last.pages.push(...unit);
+    const backward = splitBackward && sourceId !== null && index >= 0 && index < lastIndex;
+    if (last && last.sourceId === sourceId && !backward) last.pages.push(...unit);
     else segments.push({ key: unit[0].uid, sourceId, pages: [...unit], start });
+    if (index >= 0) lastIndex = index;
     start += unit.length;
   }
   return segments;
@@ -223,9 +234,17 @@ export function sortPages(pages: readonly PageRef[], sources: Readonly<Record<st
   return flatten(units.map((u) => u.unit));
 }
 
-/** Reverses the order of the segments, keeping page order inside each (AC-78). */
+/**
+ * The file runs of a list: segments that never split where page numbers go backwards. Sort and Reverse
+ * act on these, so they mean "files" (AC-78); AC-501's backward split is for the cards only.
+ */
+export function fileRunsOf(pages: readonly PageRef[]): Segment[] {
+  return segmentsOf(pages, { splitBackward: false });
+}
+
+/** Reverses the order of the file runs, keeping page order inside each (AC-78): applying it twice restores. */
 export function reverseSegments(pages: readonly PageRef[]): PageRef[] {
-  return flatten(segmentsOf(pages).map((s) => s.pages).reverse());
+  return flatten(fileRunsOf(pages).map((s) => s.pages).reverse());
 }
 
 /** "A1" for a source page, "Blank" for a blank page. */
@@ -255,4 +274,47 @@ export function sourcesInOrder(pages: readonly PageRef[]): string[] {
   const seen = new Set<string>();
   for (const p of pages) if (p.sourceId && !seen.has(p.sourceId)) seen.add(p.sourceId);
   return [...seen];
+}
+
+/**
+ * Reorders only the pages in `uids` among their own positions (all pages when
+ * `uids` is empty); every other page stays where it is.
+ */
+function permuteSelected(pages: readonly PageRef[], uids: ReadonlySet<string>, order: (picked: PageRef[]) => PageRef[]): PageRef[] {
+  if (!uids.size) return order([...pages]);
+  const positions: number[] = [];
+  pages.forEach((p, i) => uids.has(p.uid) && positions.push(i));
+  const moved = order(positions.map((i) => pages[i]));
+  const out = [...pages];
+  positions.forEach((at, k) => (out[at] = moved[k]));
+  return out;
+}
+
+/**
+ * Reverse (spec F4/F5 §3e): nothing selected reverses the whole list; a
+ * selection is reversed among its own positions, so a consecutive block is
+ * mirrored in place and a scattered one swaps its pages end for end.
+ */
+export function reverseRange(pages: readonly PageRef[], uids: ReadonlySet<string>): PageRef[] {
+  return permuteSelected(pages, uids, (picked) => picked.reverse());
+}
+
+/**
+ * Two-sided scan order (spec I-9, AC-547, AC-548): all fronts then all backs
+ * in reverse become front 1, back 1, front 2, back 2 … On a selection it
+ * acts only on the selected positions, like Reverse.
+ */
+export function twoSidedScanPages(pages: readonly PageRef[], uids: ReadonlySet<string>): PageRef[] {
+  return permuteSelected(pages, uids, twoSidedScanOrder);
+}
+
+/**
+ * The two-sided scan reorder on any list: F1, F2, F3, B3, B2, B1 becomes F1,
+ * B1, F2, B2, F3, B3. With an odd count the extra item is a front
+ * (F1 F2 F3 B2 B1 gives F1, B1, F2, B2, F3).
+ */
+export function twoSidedScanOrder<T>(items: readonly T[]): T[] {
+  const fronts = items.slice(0, Math.ceil(items.length / 2));
+  const backs = items.slice(fronts.length).reverse();
+  return fronts.flatMap((f, i) => (i < backs.length ? [f, backs[i]] : [f]));
 }

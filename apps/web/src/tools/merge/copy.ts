@@ -16,7 +16,7 @@ export const mergeCopy = {
   sortNeedsMore: "Add more files to sort",
   sorted: { "name-asc": "Sorted by name, A to Z", "name-desc": "Sorted by name, Z to A", "date-asc": "Sorted by date, oldest first", "date-desc": "Sorted by date, newest first", reverse: "Order reversed" },
   addPages: "Add pages",
-  /** The one Add menu below 640 px (M-3). */
+  /** The one Add menu below 1024 px (M-3; F4/F5 P-3), icon-only below 360 px. */
   add: "Add",
   addFilesItem: "Files…",
   fromFile: "Pages from a file…",
@@ -50,4 +50,5 @@ export const mergeCopy = {
   reset: "Reset options",
   resetDone: "Options reset",
   overPages: (max: number) => `That would take this merge past ${n(max)} pages, so nothing was added.`,
+  // Undo / redo (F4/F5 I-10, P-13).
 };

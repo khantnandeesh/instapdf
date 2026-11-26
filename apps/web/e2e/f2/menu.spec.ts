@@ -16,6 +16,7 @@ import {
   plannedTools,
   tools,
 } from "./support";
+import { shortcutTools } from "../../src/tools/registry";
 
 const pages = ["/", "/rotate-pdf", "/merge-pdf", "/privacy", "/does-not-exist"];
 
@@ -115,13 +116,15 @@ test.describe("desktop menu (1366x900)", () => {
     expect(new Set(seen)).toEqual(new Set(tools.map((t) => `/${t.slug}`)));
   });
 
-  test("AC-31: at most 5 header shortcuts, none to a planned tool (today: Rotate and Merge)", async ({ page }) => {
+  test("AC-31: at most 5 header shortcuts, none to a planned tool (today: Rotate, Delete pages, Merge, Split, Extract pages)", async ({ page }) => {
     const shortcuts = page.getByRole("navigation", { name: "Quick links" }).getByRole("link");
     const hrefs = await shortcuts.evaluateAll((as) => as.map((a) => a.getAttribute("href")));
     expect(hrefs.length).toBeLessThanOrEqual(5);
     const planned = new Set(plannedTools.map((t) => `/${t.slug}`));
     expect(hrefs.filter((h) => planned.has(h!))).toEqual([]);
-    expect(hrefs).toEqual(["/rotate-pdf", "/merge-pdf"]);
+    // The first 5 usable tools in popular order (registry shortcutTools), so a new ready tool shows up here.
+    expect(hrefs).toEqual(shortcutTools(5).map((t) => `/${t.slug}`));
+    expect(hrefs).toEqual(["/rotate-pdf", "/delete-pdf-pages", "/merge-pdf", "/split-pdf", "/extract-pdf-pages"]);
   });
 
   test("AC-32: opening the menu keeps the scroll position", async ({ page }) => {

@@ -10,13 +10,16 @@ import {
   naturalCompare,
   pageLabel,
   removePages,
+  reverseRange,
   reverseSegments,
+  fileRunsOf,
   rotatePages,
   segmentsOf,
   sortByName,
   sortPages,
   sourceLetter,
   stepIndex,
+  twoSidedScanPages,
   type PageRef,
   type SourceInfo,
 } from "./page-list";
@@ -73,10 +76,28 @@ describe("segments", () => {
     expect(segmentsOf(atStart)[0].pages.map((p) => p.uid)).toEqual(["y", "a1", "a2", "a3"]);
     expect(segmentsOf([blank("z")]).map((s) => s.sourceId)).toEqual([null]);
   });
+  it("starts a new card where a file's page numbers go backwards (AC-501), not at a forward gap or a repeat", () => {
+    const back = moveBlock(ab(), set("a3"), 0); // a3 a1 a2 b1 b2
+    expect(labels(back)).toEqual(["A3", "A1", "A2", "B1", "B2"]);
+    expect(segmentsOf(back).map((s) => s.pages.map((p) => p.uid))).toEqual([["a3"], ["a1", "a2"], ["b1", "b2"]]);
+    // Whole source runs on request (Merge's engine: double-sided padding and the cover follow files).
+    expect(segmentsOf(back, { splitBackward: false }).map((s) => s.pages.map((p) => p.uid))).toEqual([["a3", "a1", "a2"], ["b1", "b2"]]);
+    const gap = ab().filter((p) => p.uid !== "a2"); // A1, A3: "pages 1, 3 of 3"
+    expect(segmentsOf(gap).map((s) => s.sourceId)).toEqual(["a", "b"]);
+    const repeat = duplicatePages(ab(), set("a1"), () => "a1-copy").pages; // A1, A1, A2, A3
+    expect(segmentsOf(repeat).map((s) => s.sourceId)).toEqual(["a", "b"]);
+    // A blank page travels with the page before it, also across a split.
+    const withBlank = insertPages(back, 1, [blank("x")]); // a3 x a1 a2 ...
+    expect(segmentsOf(withBlank).map((s) => s.pages.map((p) => p.uid))[0]).toEqual(["a3", "x"]);
+  });
   it("joins two segments of the same source when they become neighbours", () => {
     const split = moveBlock(ab(), set("b1"), 1); // a1 b1 a2 a3 b2
-    const joined = moveSegment(split, 1, 3); // a1 a2 a3 b1 b2
+    const joined = moveSegment(split, 1, 2); // a1 a2 a3 b1 b2
+    expect(labels(joined)).toEqual(["A1", "A2", "A3", "B1", "B2"]);
     expect(segmentsOf(joined)).toHaveLength(2);
+    // Past B2 instead, A still joins; B1 after B2 runs backwards, so B is two cards (AC-501).
+    const past = moveSegment(split, 1, 3); // a1 a2 a3 b2 b1
+    expect(segmentsOf(past).map((s) => `${s.sourceId}:${s.pages.length}`)).toEqual(["a:3", "b:1", "b:1"]);
   });
 });
 
@@ -157,6 +178,17 @@ describe("sort and reverse", () => {
     const files = [page("a", 0), page("b", 0), page("e", 0)];
     expect(reverseSegments(reverseSegments(files))).toEqual(files);
   });
+  it("reverses file runs, not AC-501's cards: a backward run stays whole, and twice restores (AC-78)", () => {
+    const back = moveBlock(ab(), set("a3"), 0); // A3 A1 A2 B1 B2: three cards, two file runs
+    expect(segmentsOf(back)).toHaveLength(3);
+    expect(fileRunsOf(back)).toHaveLength(2);
+    expect(labels(reverseSegments(back))).toEqual(["B1", "B2", "A3", "A1", "A2"]);
+    expect(reverseSegments(reverseSegments(back))).toEqual(back);
+    // One file arranged A3 A2 A1 is one run: nothing to reverse or sort between files.
+    const one = [page("a", 2), page("a", 1), page("a", 0)];
+    expect(fileRunsOf(one)).toHaveLength(1);
+    expect(reverseSegments(one)).toEqual(one);
+  });
 });
 
 describe("describeSourcePages", () => {
@@ -165,5 +197,37 @@ describe("describeSourcePages", () => {
     expect(describeSourcePages([1, 2], 3)).toBe("pages 2–3");
     expect(describeSourcePages([0], 3)).toBe("page 1");
     expect(describeSourcePages([2, 0], 3)).toBe("pages 3, 1");
+  });
+});
+
+describe("reverse and two-sided scan order (F4/F5 §3e, I-9)", () => {
+  // twelve.pdf (A1-A12) + three-pages.pdf (B1-B3), as in AC-490.
+  const tw = () => [...Array.from({ length: 12 }, (_, i) => page("a", i)), ...Array.from({ length: 3 }, (_, i) => page("b", i))];
+  const uid = (p: PageRef) => p.uid.toUpperCase();
+  it("AC-493: nothing selected reverses the whole list", () => {
+    expect(reverseRange(tw(), set()).map(uid)).toEqual(["B3", "B2", "B1", "A12", "A11", "A10", "A9", "A8", "A7", "A6", "A5", "A4", "A3", "A2", "A1"]);
+  });
+  it("AC-494: a consecutive selection is mirrored in place", () => {
+    expect(reverseRange(tw(), set("a2", "a3", "a4")).map(uid).slice(0, 6)).toEqual(["A1", "A4", "A3", "A2", "A5", "A6"]);
+  });
+  it("AC-495: a scattered selection swaps end for end, the rest stays put", () => {
+    expect(reverseRange(tw(), set("a1", "a3", "a5")).map(uid).slice(0, 6)).toEqual(["A5", "A2", "A3", "A4", "A1", "A6"]);
+  });
+  it("AC-547: two-sided scan order on the whole list", () => {
+    const scan = ["F1", "F2", "F3", "B3", "B2", "B1"].map((u, i): PageRef => ({ ...page("a", i), uid: u }));
+    expect(twoSidedScanPages(scan, set()).map((p) => p.uid)).toEqual(["F1", "B1", "F2", "B2", "F3", "B3"]);
+  });
+  it("AC-548: on a selection it reorders only the selected positions", () => {
+    const pages = [...tw().slice(0, 12), ...["F1", "F2", "F3", "B3", "B2", "B1"].map((u, i): PageRef => ({ ...page("b", i), uid: u }))];
+    const out = twoSidedScanPages(pages, set("F1", "F2", "F3", "B3", "B2", "B1")).map((p) => p.uid);
+    expect(out.slice(0, 12)).toEqual(pages.slice(0, 12).map((p) => p.uid));
+    expect(out.slice(12)).toEqual(["F1", "B1", "F2", "B2", "F3", "B3"]);
+  });
+  it("returns new arrays and leaves the input unchanged", () => {
+    const pages = tw();
+    const before = pages.map((p) => p.uid);
+    reverseRange(pages, set());
+    twoSidedScanPages(pages, set("a1", "a2"));
+    expect(pages.map((p) => p.uid)).toEqual(before);
   });
 });

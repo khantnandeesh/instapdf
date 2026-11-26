@@ -7,9 +7,9 @@ test.beforeEach(async ({}, info) => {
 });
 
 test("AC-48: a planned tool's page is a 200 coming-soon page without a file input", async ({ page }) => {
-  const res = await page.goto("/split-pdf"); // F3 AC-77: Merge is usable now
+  const res = await page.goto("/split-pdf-by-bookmarks"); // F3 AC-77, F4: Merge and Split are usable now
   expect(res?.status()).toBe(200);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Split");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Split by bookmarks");
   await expect(page.getByTestId("coming-soon").getByRole("heading", { name: "Coming soon" })).toBeVisible();
   await expect(page.locator("input[type=file]")).toHaveCount(0);
   await expect(page.locator('main a[href="/#tools"]').first()).toBeVisible();
@@ -28,7 +28,7 @@ test("AC-49: coming-soon and placeholder pages are noindex; home, usable tools a
     await page.goto(path);
     return page.locator('meta[name="robots"]').getAttribute("content").catch(() => null);
   };
-  for (const path of ["/split-pdf", "/about", "/help", "/security"]) expect(await robots(path), path).toMatch(/noindex/);
+  for (const path of ["/split-pdf-by-bookmarks", "/about", "/help", "/security"]) expect(await robots(path), path).toMatch(/noindex/);
   // Indexable pages may carry an explicit "index" robots meta (SEO foundations), never noindex.
   for (const path of ["/", "/rotate-pdf", "/merge-pdf", "/privacy", "/terms", "/cookies", "/licenses"]) expect(await robots(path), path).not.toMatch(/noindex/);
 });
@@ -63,7 +63,7 @@ test("AC-50: an unknown path is a 404 with header, footer, a message and a catal
 });
 
 test("AC-51: the coming-soon page lists the tools available now", async ({ page }) => {
-  await page.goto("/split-pdf");
+  await page.goto("/split-pdf-by-bookmarks");
   const now = page.getByTestId("available-now");
   for (const t of usableTools) await expect(now.locator(`a[href="/${t.slug}"]`)).toBeVisible();
 });

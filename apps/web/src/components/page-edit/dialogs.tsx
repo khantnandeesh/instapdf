@@ -37,6 +37,7 @@ export function PagePickerDialog({
   onCancel,
   announce,
   fallbackFocus,
+  inUse,
 }: {
   open: boolean;
   fileId: string;
@@ -50,6 +51,11 @@ export function PagePickerDialog({
   onCancel: () => void;
   announce: (m: string) => void;
   fallbackFocus: () => HTMLElement | null;
+  /**
+   * Pages of this file already in the list (Organize's "From a loaded file", spec F4/F5 §3e): marked
+   * "in use", not disabled, since a second copy is allowed.
+   */
+  inUse?: ReadonlySet<number>;
 }) {
   const labels: PickerLabels = labelsIn ?? {
     title: c.pickerTitle(fileName),
@@ -159,6 +165,7 @@ export function PagePickerDialog({
           {pages.map((size, i) => {
             const on = selected.has(i);
             const label = `${letter}${i + 1}`;
+            const used = !!inUse?.has(i);
             return (
               <div key={i} role="listitem" className="ip-tile flex flex-col items-center gap-1.5" data-selected={on || undefined}>
                 <div className="relative grid aspect-(--ip-tile-aspect) w-full place-items-center">
@@ -171,7 +178,8 @@ export function PagePickerDialog({
                     data-pick=""
                     tabIndex={i === active ? 0 : -1}
                     aria-pressed={on}
-                    aria-label={labels.tileName(label, i + 1)}
+                    aria-label={used ? `${labels.tileName(label, i + 1)}, ${c.inUse.toLowerCase()}` : labels.tileName(label, i + 1)}
+                    data-in-use={used || undefined}
                     onFocus={() => setActive(i)}
                     onClick={(e) => {
                       if (e.detail === 0) return;
@@ -181,6 +189,11 @@ export function PagePickerDialog({
                     className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-1"
                     data-testid="picker-tile"
                   />
+                  {used && (
+                    <span aria-hidden="true" className="pointer-events-none absolute top-1 left-1 rounded-pill bg-surface-raised px-2 py-0.5 font-display text-help font-semibold text-muted shadow-menu" data-testid="in-use">
+                      {c.inUse}
+                    </span>
+                  )}
                   <span
                     aria-hidden="true"
                     onClick={() => select(i, { toggle: true, range: false })}

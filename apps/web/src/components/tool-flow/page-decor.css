@@ -1,0 +1,260 @@
+/*
+ * Page-tool decorations on the shared PageTile (spec F4/F5 UI P-2, P-6, P-10): Split's part tones,
+ * discs, marks and left-out pages; Extract's pick ring; Delete's marked state. Every state is an
+ * outline, an overlay or a badge: the tray's padding and size stay the tile rule's (berrypdf.md),
+ * so nothing here sets padding, margins or the thumb box. Rotate sets none of the attributes.
+ */
+
+/*
+ * Split parts (berrypdf.md "Page tiles", PT-1 rule 4a): a 1.5px part-tone outline in the tile edge,
+ * alternating two tones (each >= 3:1 on cream), extra to the number disc and the cut line, which
+ * carry the meaning. Never a fill. The 2.5px selection outline wins; forced colours drop the tones.
+ */
+:is(.mp-tray, .ip-tile)[data-part]:not([data-selected]) {
+  outline: 1.5px solid var(--ip-part-tone-1);
+}
+:is(.mp-tray, .ip-tile)[data-tone="even"]:not([data-selected]) {
+  outline-color: var(--ip-part-tone-2);
+}
+:is(.mp-tray, .ip-tile)[data-decor] {
+  transition: outline-color var(--motion-micro) var(--ease-out);
+}
+:is(.mp-tray, .ip-tile)[data-decor] [data-testid="page-visual"] {
+  transition-property: transform, opacity;
+}
+
+/* Split, a page in no part: dashed edge, dimmed page. */
+:is(.mp-tray, .ip-tile)[data-left-out] {
+  outline: 1.5px dashed var(--ip-field-line);
+  outline-offset: -1.5px;
+}
+:is(.mp-tray, .ip-tile)[data-left-out] [data-testid="page-visual"] {
+  opacity: var(--ip-dim-left-out);
+}
+
+/* Delete, a marked page: grey, under a pale veil (static), with a 1px field-line edge so it still reads as
+   a page on cream, under the solid trash badge; the whole label struck through with a 2px line. No fill
+   on the tile (PT-1 rule 4). */
+:is(.mp-tray, .ip-tile)[data-marked] [data-testid="page-visual"] {
+  filter: grayscale(1);
+  outline: 1px solid var(--ip-field-line);
+}
+:is(.mp-tray, .ip-tile)[data-marked] [data-testid="page-visual"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--cream);
+  opacity: var(--ip-veil-marked);
+  pointer-events: none;
+}
+/* The strike is a 2px band drawn across the label's padded box, so it runs 4px past each side of even a
+   one-digit number (a text-decoration line ends at the glyph; visual gate round 2). */
+:is(.mp-tray, .ip-tile)[data-marked] :is(.mp-tray__n, .ip-tile__n) {
+  padding-inline: 4px;
+  background: linear-gradient(currentColor, currentColor) center / 100% 2px no-repeat;
+}
+@media (forced-colors: active) {
+  :is(.mp-tray, .ip-tile)[data-marked] :is(.mp-tray__n, .ip-tile__n) {
+    text-decoration: line-through 2px;
+  }
+}
+
+/* Badges that appear (part disc, pick tick, solid trash): fade + scale 0.9 -> 1, 120ms (P1, P4). */
+@media (prefers-reduced-motion: no-preference) {
+  .ip-badge-in {
+    animation: ip-badge-in var(--motion-micro) var(--ease-out) both;
+  }
+}
+@keyframes ip-badge-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+/*
+ * Split marks (P-6). The mark after a tile sits in the grid gap on its right: a 44px hit area
+ * centred in the gap (--ip-grid-gap, set on the list), the 28px circle drawn inside it, vertically
+ * centred on the page box. The tile's number row stays clear.
+ */
+.ip-split-slot {
+  position: absolute;
+  top: 0;
+  bottom: 28px;
+  right: calc(var(--ip-grid-gap, var(--ip-tile-gap)) / -2 - var(--ip-tap-min) / 2);
+  z-index: 12;
+  display: grid;
+  width: var(--ip-tap-min);
+  place-items: center;
+  pointer-events: none;
+}
+/* Below 1024 px no control sits on a page (PT-1 rule 6): the mark is level with the tile's 44px number
+   line instead (PageTile gives a tile with a mark that line), like Merge's insert points. */
+@media (max-width: 1023px) {
+  .ip-split-slot {
+    top: auto;
+    bottom: var(--ip-tile-pad);
+    height: var(--ip-tap-min);
+  }
+}
+.ip-split-mark {
+  position: relative;
+  display: grid;
+  width: var(--ip-tap-min);
+  height: var(--ip-tap-min);
+  place-items: center;
+  border-radius: 50%;
+  color: var(--brand-strong);
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity var(--motion-micro) var(--ease-out);
+}
+.ip-split-mark::before {
+  content: "";
+  position: absolute;
+  inset: calc((var(--ip-tap-min) - var(--ip-mark-size)) / 2);
+  border-radius: 50%;
+  border: 1.5px solid var(--ip-field-line);
+  background: var(--surface);
+  transition:
+    background-color var(--motion-micro) var(--ease-out),
+    border-color var(--motion-micro) var(--ease-out),
+    transform var(--motion-micro) var(--ease-out);
+}
+.ip-split-mark > svg {
+  position: relative;
+  transition: transform var(--motion-micro) var(--ease-out);
+}
+.group\/tile:hover .ip-split-mark,
+.ip-split-mark:focus-visible,
+.ip-split-mark[aria-pressed="true"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .ip-split-mark {
+    opacity: 1;
+  }
+}
+.ip-split-mark[aria-pressed="true"] {
+  color: #fff;
+}
+.ip-split-mark[aria-pressed="true"]::before {
+  border-color: var(--brand);
+  background: var(--brand);
+}
+.ip-split-mark[aria-pressed="true"] > svg {
+  transform: rotate(90deg);
+}
+.ip-split-mark:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -6px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ip-split-mark:active::before {
+    transform: scale(0.94);
+  }
+}
+
+/* The cut: a 3px berry line the full tray height in the gap, drawn from the centre (P1, 200ms). */
+.ip-cut {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: calc(var(--ip-grid-gap, var(--ip-tile-gap)) / -2 - var(--ip-cut-line) / 2);
+  z-index: 11;
+  width: var(--ip-cut-line);
+  border-radius: 2px;
+  background: var(--brand);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ip-cut {
+    animation: ip-cut-in var(--dur-base) var(--ease-out) both;
+  }
+}
+@keyframes ip-cut-in {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+/* Hover-only hints (Extract's empty ring, Delete's ghost badge), from 1024 px on hover or focus. Below 1024 px
+   and on touch nothing control-like sits on an unpicked or unmarked page (PT-1 rule 6, visual gate round 2):
+   only the leaf tick on a picked page and the solid trash on a marked one. */
+.ip-hover-hint {
+  opacity: 0;
+  transition: opacity var(--motion-micro) var(--ease-out);
+}
+.group\/tile:hover .ip-hover-hint,
+.group\/tile:focus-within .ip-hover-hint {
+  opacity: 1;
+}
+@media (max-width: 1023px), (hover: none) {
+  .ip-hover-hint {
+    display: none;
+  }
+}
+
+/* Corner Enlarge (tiles whose click toggles): a 36px white circle in the page box's bottom-right, no shadow,
+   like the ghost trash badge it shares the page with. */
+.ip-corner-enlarge {
+  opacity: 0;
+  transition: opacity var(--motion-micro) var(--ease-out);
+}
+.group\/tile:hover .ip-corner-enlarge,
+.group\/tile:focus-within .ip-corner-enlarge {
+  opacity: 1;
+}
+@media (hover: none) {
+  .ip-corner-enlarge {
+    opacity: 1;
+  }
+}
+
+@media (forced-colors: active) {
+  .ip-split-mark::before {
+    border-color: ButtonText;
+  }
+  .ip-split-mark[aria-pressed="true"]::before,
+  .ip-cut {
+    background: Highlight;
+  }
+  :is(.mp-tray, .ip-tile)[data-part]:not([data-selected]) {
+    outline: none;
+  }
+  :is(.mp-tray, .ip-tile)[data-marked],
+  :is(.mp-tray, .ip-tile)[data-left-out] {
+    outline: 2px dashed ButtonText;
+  }
+}
+
+/* The page grid is its own stacking layer: discs, badges, marks and cuts stay under the sticky tools row. */
+.ip-page-grid {
+  isolation: isolate;
+}
+/* Split: the first tile of a part starts its number line with a dot in the part's tone (the label says
+   "Part n"). */
+.ip-part-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-inline-end: 6px;
+  border-radius: 50%;
+  background: var(--ip-part-tone-1);
+  vertical-align: 1px;
+}
+.ip-tile[data-tone="even"] .ip-part-dot {
+  background: var(--ip-part-tone-2);
+}
+@media (forced-colors: active) {
+  .ip-part-dot {
+    background: CanvasText;
+  }
+}
+/* Two columns below 640 px: the second column's mark sits on its tile's edge, inside the panel, not
+   centred in a gap that isn't there (the row wraps there). */
+@media (max-width: 639px) {
+  .ip-tile:nth-child(2n) > .ip-split-slot {
+    right: calc(var(--ip-tap-min) / -2);
+  }
+}
