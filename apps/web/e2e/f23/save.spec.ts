@@ -1,6 +1,6 @@
 /** F23 Save to cloud on the result screen (mock provider). Spec: docs/specs/f23-cloud-pickers.md AC-160 to AC-164, AC-169 */
 import { expect, test } from "@playwright/test";
-import { settled } from "../support/axe";
+import { expectNoSeriousAxeViolations, settled } from "../support/axe";
 import { closed, downloadLink, isDesktop, downloadResult, flow, needsCloud, openRotate, openWindow, pickFromRow, pickReady, mockLog, recordRequests, rotateRight, run, sha256, uncovered } from "./support";
 
 needsCloud();
@@ -123,6 +123,29 @@ test("AC-163: a save that fails in its window says so inline; Download still wor
   const { bytes } = await downloadResult(page);
   expect(bytes.length).toBeGreaterThan(0);
   if (!win.isClosed()) await win.close();
+});
+
+test("AC-163: Google's sign-in popup failing in Save: the window says why with only Close window; the tool's save fails inline", async ({ page }) => {
+  await pickReady(page, "alpha.pdf");
+  await run(page);
+  await page.evaluate(() => localStorage.setItem("berrypdf:cloud-mock-save", "signin"));
+  await page.getByTestId("save-main").click();
+  const win = await openWindow(page, () => page.getByRole("menuitem", { name: /^Google Drive/ }).click());
+  await expect(win.getByTestId("cloud-open")).toBeEnabled();
+  await win.getByTestId("cloud-open").click();
+  await expect(win.getByTestId("cloud-window")).toHaveAttribute("data-view", "signin");
+  await expect(win.getByRole("heading", { level: 1 })).toHaveText("Google couldn't open Drive here");
+  await expect(win.getByRole("heading", { level: 1 })).toBeFocused();
+  await expect(win.getByText("Cookies for google.com may be blocked in this browser, or another Google account is active.")).toBeVisible();
+  await expect(win.getByRole("link", { name: "How to fix it" })).toHaveAttribute("href", "https://support.google.com/drive/answer/13812413");
+  // Only a way out: no Try again or Choose from this device here (the tool has its own Try again).
+  await expect(win.getByTestId("cloud-close")).toHaveText("Close window");
+  await expect(win.getByRole("button", { name: /Try again|Choose from this device/ })).toHaveCount(0);
+  await expectNoSeriousAxeViolations(win, "cloud window: Google couldn't open Drive (save)");
+  await expect(page.getByRole("alert").filter({ hasText: "Couldn't save to Google Drive." })).toBeVisible({ timeout: 8000 });
+  expect((await mockLog(page))!.saved).toEqual([]);
+  await Promise.all([win.waitForEvent("close"), win.getByTestId("cloud-close").click()]);
+  await page.evaluate(() => localStorage.removeItem("berrypdf:cloud-mock-save"));
 });
 
 test("AC-163: a save cancelled in its window says so inline; Download still works", async ({ page }) => {

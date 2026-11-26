@@ -24,6 +24,8 @@ export type SessionEvents = {
   onDone?: () => void;
   /** The window was cancelled or closed (also: heartbeat lost). */
   onClosed?: (reason: "cancel" | "lost") => void;
+  /** The window closed for the tool's own picker ("Choose from this device"); onClosed("cancel") follows. */
+  onDevice?: () => void;
   /**
    * The window is away on a sign-in page and this tab has been in front for AWAY_FOCUSED_MS: most
    * likely it was closed there. Say so; the session still listens until the sign-in allowance ends.
@@ -156,6 +158,11 @@ export function openCloudWindow(route: CloudRoute, params: WindowParams, events:
         break;
       case "cancel":
         end();
+        events.onClosed?.("cancel");
+        break;
+      case "device":
+        end();
+        events.onDevice?.();
         events.onClosed?.("cancel");
         break;
     }

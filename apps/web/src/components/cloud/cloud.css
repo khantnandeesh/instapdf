@@ -78,6 +78,14 @@
       min-height: 56px;
     }
   }
+  /* Below 400 px the split's 52 px caret leaves the main half too little room at 28 px of padding
+     (Rotate's "Choose PDF files" ran 13 px past its card at 390, Merge's 11 px at 320): it packs tighter,
+     so the split and the card around it fit the screen with no clipping. */
+  @media (max-width: 399px) {
+    .ip-split--lg > .mp-btn:first-child {
+      padding-inline: 12px;
+    }
+  }
 
   /* ---- Cloud row: one tap to each provider, under the upload button ------------------------- */
   .ip-cloud-row {
@@ -539,5 +547,18 @@
     .mp-menu.ip-menu-sheet::backdrop {
       background: transparent;
     }
+  }
+}
+
+/* Unlayered, so it beats the card's own padding utilities (Tailwind's utilities layer): below 360 px a
+   drop card holding the split (any tool's empty state, the editor's landing) trims its side padding
+   from 24 to 16 px, so the split fits inside it (F23, Merge and Rotate at 320×568). */
+@media (max-width: 359px) {
+  .mp-dropcard:has(.ip-split--lg) {
+    padding-inline: 16px;
+  }
+  /* The decoration's gutter around the card goes too: the page's own 16 px gutter stays. */
+  .mp-empty:has(.ip-split--lg) {
+    padding-inline: 0;
   }
 }

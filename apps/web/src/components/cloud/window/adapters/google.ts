@@ -112,6 +112,21 @@ export async function pickedFiles(token: string, ids: string[], get: typeof fetc
   });
 }
 
+/**
+ * Save's GIS token response `error`: refused access is denied; any other OAuth error
+ * (interaction_required, login_required…) is a sign-in that didn't work here.
+ */
+export function classifyTokenError(error: string | undefined): "ok" | "denied" | "signin" {
+  if (!error) return "ok";
+  return error === "access_denied" ? "denied" : "signin";
+}
+
+/** Save's GIS popup errors: closing Google's window is a cancel; one that couldn't open is unreachable. */
+export function classifyPopupError(type: string | undefined): "cancel" | "unreachable" | "signin" {
+  if (type === "popup_closed") return "cancel";
+  return type === "popup_failed_to_open" ? "unreachable" : "signin";
+}
+
 export function createAdapter(ctx: AdapterCtx): Adapter {
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
   const g = () => (window as Window & { google?: Gis }).google;
@@ -145,7 +160,8 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
         callback: (r) => {
           const p = pending;
           pending = null;
-          if (r.error || !r.access_token) p?.reject(new CloudError("denied"));
+          const outcome = classifyTokenError(r.error);
+          if (outcome !== "ok" || !r.access_token) p?.reject(new CloudError(outcome === "signin" ? "signin" : "denied"));
           else {
             token = r.access_token;
             expires = Date.now() + (Number(r.expires_in) || 3600) * 1000 - 60_000;
@@ -156,7 +172,8 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
         error_callback: (e) => {
           const p = pending;
           pending = null;
-          p?.reject(e?.type === "popup_closed" ? "cancel" : new CloudError(e?.type === "popup_failed_to_open" ? "unreachable" : "denied"));
+          const outcome = classifyPopupError(e?.type);
+          p?.reject(outcome === "cancel" ? "cancel" : new CloudError(outcome));
         },
       });
     },

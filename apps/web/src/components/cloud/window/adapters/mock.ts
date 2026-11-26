@@ -25,6 +25,8 @@ export const MOCK_REDIRECT_KEY = "berrypdf:cloud-mock-redirect";
  * "empty", or "badstate" (a state that isn't ours).
  */
 export const MOCK_ONEPICK_KEY = "berrypdf:cloud-mock-onepick";
+/** Set (by a test) to "signin": a save's Google sign-in fails the way a GIS popup can (CloudWindow's "couldn't open" state). */
+export const MOCK_SAVE_KEY = "berrypdf:cloud-mock-save";
 const SIGNED_KEY = "berrypdf:cloud-mock-signed";
 const RETURN_KEY = "berrypdf:cloud-mock-return";
 
@@ -142,6 +144,15 @@ export function createAdapter(ctx: AdapterCtx): Adapter {
     },
     save: async (file, onProgress) => {
       await signIn();
+      let saveMode: string | null = null;
+      try {
+        saveMode = localStorage.getItem(MOCK_SAVE_KEY);
+      } catch {}
+      if (saveMode === "signin") {
+        ctx.setPhase("signing");
+        await new Promise((r) => setTimeout(r, 120));
+        throw new CloudError("signin");
+      }
       token = token ?? MOCK_TOKEN;
       const total = file.size;
       for (let i = 1; i <= 4; i++) {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createAdapter, onepickParams, onepickUrl, pickedFiles } from "./google";
+import { classifyPopupError, classifyTokenError, createAdapter, onepickParams, onepickUrl, pickedFiles } from "./google";
 import * as onepick from "./onepick";
 import type { AdapterCtx } from "./types";
 import { CloudError } from "./types";
@@ -106,5 +106,19 @@ describe("createAdapter: back from Google's picker", () => {
     vi.mocked(onepick.take).mockReturnValueOnce({ kind: "invalid" });
     await expect(createAdapter(ctx(true)).pick()).rejects.toEqual(new CloudError("unreachable"));
     expect(fetched).toEqual([]);
+  });
+});
+
+describe("Save's Google sign-in failures (what the /cloud/google window can detect)", () => {
+  it("token errors: refused access is denied, every other OAuth error is a sign-in that didn't work", () => {
+    expect(classifyTokenError(undefined)).toBe("ok");
+    expect(classifyTokenError("access_denied")).toBe("denied");
+    for (const e of ["interaction_required", "login_required", "consent_required", "account_selection_required", "invalid_request"]) expect(classifyTokenError(e)).toBe("signin");
+  });
+  it("popup errors: closing is a cancel, a window that can't open is unreachable, anything else is a sign-in failure", () => {
+    expect(classifyPopupError("popup_closed")).toBe("cancel");
+    expect(classifyPopupError("popup_failed_to_open")).toBe("unreachable");
+    expect(classifyPopupError("unknown")).toBe("signin");
+    expect(classifyPopupError(undefined)).toBe("signin");
   });
 });

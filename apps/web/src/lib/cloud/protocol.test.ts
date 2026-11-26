@@ -22,6 +22,8 @@ describe("parseFromWindow", () => {
     expect(parseFromWindow(wrap("window", REQ, { t: "skipped", items: [{ name: "big.pdf", reason: "size" }] }), REQ)).toEqual({ t: "skipped", items: [{ name: "big.pdf", reason: "size" }] });
     expect(parseFromWindow(wrap("window", REQ, { t: "error", code: "denied" }), REQ)).toEqual({ t: "error", code: "denied" });
     expect(parseFromWindow(wrap("window", REQ, { t: "away", ms: 120_000 }), REQ)).toEqual({ t: "away", ms: 120_000 });
+    // "Choose from this device" (the window couldn't open its provider): no fields travel with it.
+    expect(parseFromWindow(wrap("window", REQ, { t: "device", extra: "x" }), REQ)).toEqual({ t: "device" });
     expect(parseFromWindow(wrap("window", REQ, { t: "saved", name: "a.pdf", link: "https://drive.google.com/x" }), REQ)).toEqual({ t: "saved", name: "a.pdf", link: "https://drive.google.com/x" });
   });
 

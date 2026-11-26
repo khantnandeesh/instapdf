@@ -36,7 +36,8 @@ export function item(id: string, fixture: string, opts: { as?: string; slow?: bo
 
 /**
  * The mock provider's own "picker" (CI only): pick fixtures, plus the states tests need
- * (spec §7: slow download, mid-download failure, a 403 file, a 101 MB file, denied, unreachable).
+ * (spec §7: slow download, mid-download failure, a 403 file, a 101 MB file, denied, unreachable; a
+ * failed sign-in, and a picker that stays silent like Google's own sign-in page inside it).
  */
 export function MockPicker({ multiple, onChoose }: { multiple: boolean; onChoose: (c: MockChoice) => void }) {
   const [sel, setSel] = useState<string[]>([]);
