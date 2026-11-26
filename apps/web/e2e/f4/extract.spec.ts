@@ -223,6 +223,21 @@ test("AC-407, AC-408, AC-460: two files share the field; a click changes one fil
   expect(await textsOf(out.bytes)).toEqual([10, 11, 12].map(twelve));
 });
 
+test("AC-402: with two files, open ranges and keywords stay as typed after blur and each file reads them against its own length", async ({ page }) => {
+  await openReady(page, "extract-pdf-pages", "twelve.pdf", "three-pages.pdf");
+  await typeRange(page, "2-", { blur: true });
+  await expect(field(page)).toHaveValue("2-");
+  await expect.poll(() => pressedPages(page, "twelve.pdf")).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  await expect.poll(() => pressedPages(page, "three-pages.pdf")).toEqual([2, 3]);
+  await typeRange(page, "1, last", { blur: true });
+  await expect(field(page)).toHaveValue("1, last");
+  await expect.poll(() => pressedPages(page, "twelve.pdf")).toEqual([1, 12]);
+  await expect.poll(() => pressedPages(page, "three-pages.pdf")).toEqual([1, 3]);
+  await typeRange(page, "even", { blur: true });
+  await expect(field(page)).toHaveValue("even");
+  await expect.poll(() => pressedPages(page, "three-pages.pdf")).toEqual([2]);
+});
+
 test("AC-461: page 1 of sixty-pages.pdf is a fraction of the input", async ({ page }, info) => {
   test.skip(!isDesktop(info.project.name), "output check, desktop");
   const input = (await readFile(fx("sixty-pages.pdf"))).length;

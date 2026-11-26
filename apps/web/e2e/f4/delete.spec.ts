@@ -1,4 +1,4 @@
-/** F4 Delete pages (`/delete-pdf-pages`): spec docs/specs/f4-f5-page-tools.md §3d, §6c, AC-465 to AC-475, AC-543. */
+/** F4 Delete pages (`/delete-pdf-pages`): spec docs/specs/f4-f5-page-tools.md §3d, §6c, AC-465 to AC-475, AC-543; AC-404, AC-406 and AC-409 on Delete. */
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import {
@@ -105,6 +105,43 @@ test("AC-470: Shift+click extends the marks; Delete and Backspace toggle; the li
   await expect(page.locator("[aria-live=polite]").filter({ hasText: "Page 11 kept" })).toHaveCount(1);
   await page.keyboard.press("Escape");
   expect(await pressedPages(page)).toEqual([]);
+});
+
+test("AC-404, AC-406 (Delete): clicks on the tile mark and unmark, Shift+click adds a run, Ctrl/Cmd+click and Space toggle; Clear empties all", async ({ page }) => {
+  await openReady(page, "delete-pdf-pages", "twelve.pdf");
+  // The toggle covers the whole tile (§3d: a click anywhere on it marks the page).
+  await remove(page, 2).click();
+  await remove(page, 4).click();
+  expect(await pressedPages(page)).toEqual([2, 4]);
+  await remove(page, 4).click();
+  expect(await pressedPages(page)).toEqual([2]);
+  await remove(page, 6).click();
+  await remove(page, 9).click({ modifiers: ["Shift"] });
+  expect(await pressedPages(page)).toEqual([2, 6, 7, 8, 9]);
+  await remove(page, 11).click({ modifiers: ["ControlOrMeta"] });
+  expect(await pressedPages(page)).toEqual([2, 6, 7, 8, 9, 11]);
+  await remove(page, 11).focus();
+  await page.keyboard.press("Space");
+  expect(await pressedPages(page)).toEqual([2, 6, 7, 8, 9]);
+  await expect(field(page)).toHaveValue("2, 6-9");
+  // AC-406
+  await page.getByRole("button", { name: "Clear selection" }).click();
+  expect(await pressedPages(page)).toEqual([]);
+  await expect(field(page)).toHaveValue("");
+  await expect(primary(page)).toBeDisabled();
+});
+
+test("AC-409 (Delete): Remove bookmarks is under More options, off on a first visit, and remembered", async ({ page }) => {
+  await openReady(page, "delete-pdf-pages", "twelve.pdf");
+  await openMore(page);
+  const toggle = page.getByRole("switch", { name: "Remove bookmarks" });
+  await expect(toggle).not.toBeChecked();
+  await toggle.check();
+  await closeMore(page);
+  await page.evaluate(() => sessionStorage.setItem("f4-keep", "1"));
+  await openReady(page, "delete-pdf-pages", "twelve.pdf");
+  await openMore(page);
+  await expect(page.getByRole("switch", { name: "Remove bookmarks" })).toBeChecked();
 });
 
 test("AC-471, AC-472: deleting page 5 moves Detail up; Remove bookmarks drops the outline", async ({ page }, info) => {
