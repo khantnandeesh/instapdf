@@ -19,6 +19,15 @@ describe("pickerUrl", () => {
     expect(pickerUrl(BASE, { appId: "1" }).startsWith(`${BASE}&`)).toBe(true);
   });
 
+  it("puts the parameters before a #fragment, which the server never sees", () => {
+    const frag = `${BASE}#rpctoken=1`;
+    const out = pickerUrl(frag, { appId: "123", authUser: "a@b.c" });
+    expect(out.endsWith("#rpctoken=1")).toBe(true);
+    const u = new URL(out);
+    expect(u.searchParams.get("appId")).toBe("123");
+    expect(u.searchParams.get("authuser")).toBe("a@b.c");
+  });
+
   it("does not add authuser twice when setAuthUser already set it", () => {
     const withUser = `${BASE}&authuser=a%40example.com`;
     expect(new URL(pickerUrl(withUser, { authUser: "a@example.com" })).searchParams.getAll("authuser")).toEqual(["a@example.com"]);

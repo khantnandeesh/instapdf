@@ -73,7 +73,7 @@ export const CLOUD_ALLOW: Record<"google" | "dropbox" | "onedrive" | "mock", { s
     script: ["https://apis.google.com/js/api.js", "https://apis.google.com/_/scs/", "https://accounts.google.com/gsi/client"],
     connect: ["https://www.googleapis.com/drive/v3/about", "https://www.googleapis.com/drive/v3/files", "https://www.googleapis.com/drive/v3/files/", "https://www.googleapis.com/upload/drive/v3/files", "https://accounts.google.com/gsi/"],
     // Whole hosts, as Google's own Picker sample does: the Picker frame moves between docs, drive
-    // and accounts pages (sign-in, account switch, upload), and a path-limited source blocks those.
+    // and accounts pages (sign-in, account switch, upload), which path-limited sources may not cover.
     frame: ["https://docs.google.com", "https://drive.google.com", "https://accounts.google.com"],
     form: [],
   },
