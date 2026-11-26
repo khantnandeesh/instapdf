@@ -21,9 +21,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const FIXED_DATE = new Date("2026-01-01T00:00:00Z");
 
 /**
- * `info: false` writes no Info strings (Title, Producer, dates): pdf-lib reads
- * the strings of an encrypted file back as garbage, so encrypted fixtures that
- * page tools copy from leave them out.
+ * `info: false` writes no Info strings (Title, Producer, dates). The encrypting
+ * writer used here stores Info strings that do not decrypt to what was set
+ * (pikepdf and pdf-lib both read them back as garbage; files encrypted by qpdf
+ * read fine), so encrypted fixtures that page tools copy Info from leave them
+ * out. tests/fixtures/encryption/titled-aes256.pdf (qpdf) has real Info.
  */
 async function makeDoc(pageCount, { rotate = {}, info = true } = {}) {
   const doc = await PDFDocument.create({ updateMetadata: false });

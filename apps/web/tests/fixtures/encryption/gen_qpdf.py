@@ -42,3 +42,15 @@ pdf.save(f"{out}/r4aes-latin1.pdf", encryption=pikepdf.Encryption(owner="Owné-r
 pdf = pikepdf.new()
 pdf.add_blank_page(page_size=(200, 200))
 pdf.save(f"{out}/r4aes-utf8.pdf", encryption=pikepdf.Encryption(owner="\u00c4\u00a1-Own", user="op3n", allow=pikepdf.Permissions(modify_other=False), R=4, aes=True), static_id=True)
+
+# Info strings in an encrypted file (page tools carry Title, Author, Subject, Keywords and
+# CreationDate from a single source, AC-541): AES-256, empty user password, three pages.
+pdf = pikepdf.new()
+for _ in range(3):
+    pdf.add_blank_page(page_size=(200, 200))
+pdf.docinfo["/Title"] = "Encrypted Title é"
+pdf.docinfo["/Author"] = "Ada Lovelace"
+pdf.docinfo["/Subject"] = "Locked subject"
+pdf.docinfo["/Keywords"] = "alpha, beta"
+pdf.docinfo["/CreationDate"] = "D:20250102030405Z"
+pdf.save(f"{out}/titled-aes256.pdf", encryption=pikepdf.Encryption(owner="Own€r-é", user="", allow=pikepdf.Permissions(modify_other=False), R=6, aes=True), static_id=True)

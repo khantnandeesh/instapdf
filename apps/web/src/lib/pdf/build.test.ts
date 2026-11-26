@@ -5,14 +5,14 @@
  */
 import { readFile } from "node:fs/promises";
 import { unzipSync } from "fflate";
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFStream, PDFString, StandardFonts } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRef, PDFStream, PDFString, StandardFonts } from "@cantoo/pdf-lib";
 import { beforeAll, describe, expect, it } from "vitest";
 import { parsePageRanges } from "../page-ranges";
 import { pagesPerFile, planAlternate, planDelete, planExtract, planSplit, type OutputPlan, type PlanFile } from "../page-plans";
 import { qpdfCheck, renderPage } from "../forms/test-helpers";
 import { buildDocuments, type BuiltDocument } from "./build";
 import { documentsJob, runJob } from "./jobs";
-import { mergePdf, type MergePageInput, type MergeSourceInput } from "./merge";
+import { mergePdf, widgetsOf, type MergePageInput, type MergeSourceInput } from "./merge";
 import { ALTERNATE_OPTIONS, ORGANIZE_OPTIONS } from "./merge-options";
 import { bigFont, linksOf, linksPdf, mixedSizesPdf, outlineOf, pageObjectCount, pageTexts, sharedResPdf, threePagesPdf, twelvePdf } from "./page-tool-fixtures";
 
@@ -506,23 +506,74 @@ describe("review nits", () => {
     expect(await pageTexts(new Uint8Array(await out.blob.arrayBuffer()))).toEqual(["Twelve 2"]);
   });
 
-  it("AC-541: an encrypted source's Info is not carried (it cannot be read reliably)", async () => {
-    const src = await PDFDocument.create({ updateMetadata: false });
-    for (let i = 0; i < 2; i++) src.addPage([200, 200]);
-    src.setTitle("Secret title");
-    src.setAuthor("Someone");
-    src.setSubject("Subject");
-    src.setKeywords(["one", "two"]);
-    src.encrypt({ userPassword: "", ownerPassword: "owner", algorithm: "AES-256", permissions: { modifying: false } });
-    fx["encrypted-info.pdf"] = await src.save({ useObjectStreams: false });
-    const f = await file("encrypted-info.pdf");
-    const outputs = [(await run(planExtract([f], pagesPerFile(items("1"), [f]))))[0].bytes, (await merge(["encrypted-info.pdf"], all("encrypted-info.pdf", 2))).bytes];
-    for (const bytes of outputs) {
+  it("AC-541: an encrypted source's Title and Info are carried (qpdf-made AES-256 file)", async () => {
+    const name = "encryption/titled-aes256.pdf";
+    fx[name] = new Uint8Array(await readFile(new URL(`../../../tests/fixtures/${name}`, import.meta.url)));
+    const f = await file(name);
+    const extracted = await run(planExtract([f], pagesPerFile(items("2"), [f])));
+    const split1 = await split([name], { kind: "every" });
+    const organized = await merge([name], all(name, 3));
+    for (const bytes of [extracted[0].bytes, split1[1].bytes, organized.bytes]) {
       const doc = await plain(bytes);
-      expect(doc.getTitle()).toBeUndefined();
-      expect(doc.getAuthor()).toBeUndefined();
-      expect(doc.getSubject()).toBeUndefined();
-      expect(doc.getKeywords()).toBeUndefined();
+      expect(doc.isEncrypted).toBe(false);
+      expect(doc.getTitle()).toBe("Encrypted Title é");
+      expect(doc.getAuthor()).toBe("Ada Lovelace");
+      expect(doc.getSubject()).toBe("Locked subject");
+      expect(doc.getKeywords()).toBe("alpha, beta");
+      expect(doc.getCreationDate()?.toISOString()).toBe("2025-01-02T03:04:05.000Z");
     }
+  });
+
+  it("Merge's Contents = Titles reads an encrypted source's Title", async () => {
+    const name = "encryption/titled-aes256.pdf";
+    fx[name] ??= new Uint8Array(await readFile(new URL(`../../../tests/fixtures/${name}`, import.meta.url)));
+    const r = await mergePdf({ sources: [source(name), source("three-pages.pdf")], pages: [...all(name, 3), ...all("three-pages.pdf", 3)], options: { ...ORGANIZE_OPTIONS, toc: "titles" } }, {}, () => {});
+    expect((await pageTexts(r.bytes))[0]).toMatch(/^ContentsEncrypted T.*three-pages/);
+  });
+
+  it("an Info date that does not parse is left out; the other entries are kept", async () => {
+    const doc = await PDFDocument.load(fx["links.pdf"], { updateMetadata: false });
+    const info = doc.context.lookup(doc.context.trailerInfo.Info, PDFDict);
+    info.set(PDFName.of("CreationDate"), PDFString.of("yesterday"));
+    fx["bad-date.pdf"] = await doc.save();
+    const f = await file("bad-date.pdf");
+    const out = await plain((await run(planExtract([f], pagesPerFile(items("1"), [f]))))[0].bytes);
+    const outInfo = out.context.lookup(out.context.trailerInfo.Info, PDFDict);
+    expect(outInfo.has(PDFName.of("CreationDate"))).toBe(false);
+    expect(out.getTitle()).toBe(doc.getTitle());
+  });
+
+  it("a widget listed on a kept page stays, even when a dropped page lists it too", async () => {
+    const e = await PDFDocument.create();
+    e.addPage();
+    e.addPage();
+    const g = e.getForm().createTextField("shared");
+    g.setText("w");
+    g.addToPage(e.getPage(0), { x: 50, y: 500 });
+    const w = e.getPage(0).node.lookup(PDFName.of("Annots"), PDFArray).get(0);
+    e.getPage(1).node.set(PDFName.of("Annots"), e.context.obj([w]));
+    fx["shared-widget.pdf"] = await e.save();
+    for (const keep of ["1", "2"]) {
+      const f = await file("shared-widget.pdf");
+      const out = (await run(planExtract([f], pagesPerFile(items(keep), [f]))))[0].bytes;
+      const doc = await plain(out);
+      const annots = doc.getPage(0).node.lookup(PDFName.of("Annots"), PDFArray);
+      expect(annots.asArray().map(String), keep).not.toContain("null");
+      expect(doc.getForm().getTextField("shared").getText(), keep).toBe("w");
+      expect(qpdfCheck(out), keep).toEqual([]);
+    }
+  });
+
+  it("widgets written directly in /Annots count as widgets (so the form's /DR is copied)", async () => {
+    const e = await PDFDocument.create();
+    e.addPage();
+    const g = e.getForm().createTextField("direct");
+    g.addToPage(e.getPage(0), { x: 50, y: 500 });
+    const annots = e.getPage(0).node.lookup(PDFName.of("Annots"), PDFArray);
+    const ref = annots.get(0) as PDFRef;
+    annots.set(0, e.context.lookup(ref, PDFDict)); // the widget dict itself, not a ref
+    expect(widgetsOf(e.getPage(0))).toEqual({ refs: [], count: 1 });
+    e.getPage(0).node.set(PDFName.of("Annots"), e.context.obj([ref, e.context.obj({ Subtype: "Link", Rect: [0, 0, 1, 1] })]));
+    expect(widgetsOf(e.getPage(0))).toEqual({ refs: [ref], count: 1 });
   });
 });
