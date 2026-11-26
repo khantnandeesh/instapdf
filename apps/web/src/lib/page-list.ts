@@ -256,3 +256,46 @@ export function sourcesInOrder(pages: readonly PageRef[]): string[] {
   for (const p of pages) if (p.sourceId && !seen.has(p.sourceId)) seen.add(p.sourceId);
   return [...seen];
 }
+
+/**
+ * Reorders only the pages in `uids` among their own positions (all pages when
+ * `uids` is empty); every other page stays where it is.
+ */
+function permuteSelected(pages: readonly PageRef[], uids: ReadonlySet<string>, order: (picked: PageRef[]) => PageRef[]): PageRef[] {
+  if (!uids.size) return order([...pages]);
+  const positions: number[] = [];
+  pages.forEach((p, i) => uids.has(p.uid) && positions.push(i));
+  const moved = order(positions.map((i) => pages[i]));
+  const out = [...pages];
+  positions.forEach((at, k) => (out[at] = moved[k]));
+  return out;
+}
+
+/**
+ * Reverse (spec F4/F5 §3e): nothing selected reverses the whole list; a
+ * selection is reversed among its own positions, so a consecutive block is
+ * mirrored in place and a scattered one swaps its pages end for end.
+ */
+export function reverseRange(pages: readonly PageRef[], uids: ReadonlySet<string>): PageRef[] {
+  return permuteSelected(pages, uids, (picked) => picked.reverse());
+}
+
+/**
+ * Two-sided scan order (spec I-9, AC-547, AC-548): all fronts then all backs
+ * in reverse become front 1, back 1, front 2, back 2 … On a selection it
+ * acts only on the selected positions, like Reverse.
+ */
+export function twoSidedScanPages(pages: readonly PageRef[], uids: ReadonlySet<string>): PageRef[] {
+  return permuteSelected(pages, uids, twoSidedScanOrder);
+}
+
+/**
+ * The two-sided scan reorder on any list: F1, F2, F3, B3, B2, B1 becomes F1,
+ * B1, F2, B2, F3, B3. With an odd count the extra item is a front
+ * (F1 F2 F3 B2 B1 gives F1, B1, F2, B2, F3).
+ */
+export function twoSidedScanOrder<T>(items: readonly T[]): T[] {
+  const fronts = items.slice(0, Math.ceil(items.length / 2));
+  const backs = items.slice(fronts.length).reverse();
+  return fronts.flatMap((f, i) => (i < backs.length ? [f, backs[i]] : [f]));
+}

@@ -67,7 +67,75 @@ export function formatBytes(bytes: number): string {
  * not allowed in file names on common systems are replaced with "-".
  */
 export function mergedName(firstInputName: string | undefined): string {
-  const base = firstInputName ? baseName(firstInputName) : "";
-  const safe = base.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-").replace(/^[\s.]+|[\s.]+$/g, "");
-  return `${safe || "berrypdf"}_merged.pdf`;
+  return suffixedName(firstInputName, "_merged");
+}
+
+/** Replaces characters not allowed in file names on common systems with "-", and trims dots and spaces at the ends. */
+export function safeFileStem(stem: string): string {
+  return stem.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-").replace(/^[\s.]+|[\s.]+$/g, "");
+}
+
+/** "<base><suffix>.pdf" from the first input's name ("berrypdf" when there is none). */
+function suffixedName(firstInputName: string | undefined, suffix: string): string {
+  const safe = safeFileStem(firstInputName ? baseName(firstInputName) : "");
+  return `${safe || "berrypdf"}${suffix}.pdf`;
+}
+
+/** Organize output (spec F4/F5 §6d): "<first source's base name>_organized.pdf". */
+export const organizedName = (firstInputName: string | undefined) => suffixedName(firstInputName, "_organized");
+
+/** Alternate & mix output (spec §6e): "<first card's base name>_mixed.pdf". */
+export const mixedName = (firstInputName: string | undefined) => suffixedName(firstInputName, "_mixed");
+
+/** Split's ZIP (spec §6a): "<base>-split.zip" for one input, "berrypdf-split.zip" for several. */
+export function splitZipName(inputNames: readonly string[]): string {
+  const safe = inputNames.length === 1 ? safeFileStem(baseName(inputNames[0])) : "";
+  return safe ? `${safe}-split.zip` : "berrypdf-split.zip";
+}
+
+/** Extract's and Delete's ZIPs for several inputs (spec §6b, §6c). */
+export const EXTRACT_ZIP = "berrypdf-extract.zip";
+export const DELETE_ZIP = "berrypdf-delete.zip";
+
+/** Values for a file-name pattern (spec §3a "File names"). */
+export type NameTokens = {
+  /** Input file name; its base name fills {name}. */
+  input: string;
+  /** Page list of the output in source numbers, e.g. "1-4" or "5". */
+  pages: string;
+  first: number;
+  last: number;
+  /** Part number within its input (Split). */
+  n?: number;
+  /** Run date for {date} (YYYYMMDD, local time). */
+  date: Date;
+};
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * Fills a pattern ({name}, {pages}, {first}, {last}, {n}, {date}; other
+ * text and unknown tokens are kept) and makes it a safe ".pdf" file name.
+ * Token names ignore case. An empty result falls back to the input's name.
+ */
+export function patternName(pattern: string, t: NameTokens): string {
+  const values: Record<string, string> = {
+    name: baseName(t.input),
+    pages: t.pages,
+    first: String(t.first),
+    last: String(t.last),
+    n: t.n === undefined ? "" : String(t.n),
+    date: `${t.date.getFullYear()}${pad2(t.date.getMonth() + 1)}${pad2(t.date.getDate())}`,
+  };
+  const filled = pattern.replace(/\{([a-z]+)\}/gi, (whole, key: string) => values[key.toLowerCase()] ?? whole);
+  return customName(filled) ?? pdfOutputName(t.input);
+}
+
+/**
+ * A name the visitor typed (a renamed part): unsafe characters become "-",
+ * and ".pdf" is added unless it is there. null when nothing usable is left.
+ */
+export function customName(typed: string): string | null {
+  const stem = safeFileStem(typed.trim().replace(/\.pdf$/i, ""));
+  return stem ? `${stem}.pdf` : null;
 }

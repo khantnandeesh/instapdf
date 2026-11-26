@@ -10,6 +10,7 @@ import {
   naturalCompare,
   pageLabel,
   removePages,
+  reverseRange,
   reverseSegments,
   rotatePages,
   segmentsOf,
@@ -17,6 +18,7 @@ import {
   sortPages,
   sourceLetter,
   stepIndex,
+  twoSidedScanPages,
   type PageRef,
   type SourceInfo,
 } from "./page-list";
@@ -165,5 +167,37 @@ describe("describeSourcePages", () => {
     expect(describeSourcePages([1, 2], 3)).toBe("pages 2–3");
     expect(describeSourcePages([0], 3)).toBe("page 1");
     expect(describeSourcePages([2, 0], 3)).toBe("pages 3, 1");
+  });
+});
+
+describe("reverse and two-sided scan order (F4/F5 §3e, I-9)", () => {
+  // twelve.pdf (A1-A12) + three-pages.pdf (B1-B3), as in AC-490.
+  const tw = () => [...Array.from({ length: 12 }, (_, i) => page("a", i)), ...Array.from({ length: 3 }, (_, i) => page("b", i))];
+  const uid = (p: PageRef) => p.uid.toUpperCase();
+  it("AC-493: nothing selected reverses the whole list", () => {
+    expect(reverseRange(tw(), set()).map(uid)).toEqual(["B3", "B2", "B1", "A12", "A11", "A10", "A9", "A8", "A7", "A6", "A5", "A4", "A3", "A2", "A1"]);
+  });
+  it("AC-494: a consecutive selection is mirrored in place", () => {
+    expect(reverseRange(tw(), set("a2", "a3", "a4")).map(uid).slice(0, 6)).toEqual(["A1", "A4", "A3", "A2", "A5", "A6"]);
+  });
+  it("AC-495: a scattered selection swaps end for end, the rest stays put", () => {
+    expect(reverseRange(tw(), set("a1", "a3", "a5")).map(uid).slice(0, 6)).toEqual(["A5", "A2", "A3", "A4", "A1", "A6"]);
+  });
+  it("AC-547: two-sided scan order on the whole list", () => {
+    const scan = ["F1", "F2", "F3", "B3", "B2", "B1"].map((u, i): PageRef => ({ ...page("a", i), uid: u }));
+    expect(twoSidedScanPages(scan, set()).map((p) => p.uid)).toEqual(["F1", "B1", "F2", "B2", "F3", "B3"]);
+  });
+  it("AC-548: on a selection it reorders only the selected positions", () => {
+    const pages = [...tw().slice(0, 12), ...["F1", "F2", "F3", "B3", "B2", "B1"].map((u, i): PageRef => ({ ...page("b", i), uid: u }))];
+    const out = twoSidedScanPages(pages, set("F1", "F2", "F3", "B3", "B2", "B1")).map((p) => p.uid);
+    expect(out.slice(0, 12)).toEqual(pages.slice(0, 12).map((p) => p.uid));
+    expect(out.slice(12)).toEqual(["F1", "B1", "F2", "B2", "F3", "B3"]);
+  });
+  it("returns new arrays and leaves the input unchanged", () => {
+    const pages = tw();
+    const before = pages.map((p) => p.uid);
+    reverseRange(pages, set());
+    twoSidedScanPages(pages, set("a1", "a2"));
+    expect(pages.map((p) => p.uid)).toEqual(before);
   });
 });

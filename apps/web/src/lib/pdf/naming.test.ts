@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baseName, mergedName, fileNameOnly, formatBytes, pdfOutputName, uniqueNames, zipName } from "./naming";
+import { baseName, customName, DELETE_ZIP, EXTRACT_ZIP, mergedName, fileNameOnly, formatBytes, mixedName, organizedName, patternName, pdfOutputName, safeFileStem, splitZipName, uniqueNames, zipName } from "./naming";
 
 describe("pdfOutputName", () => {
   it("AC-41: keeps the original name", () => {
@@ -64,5 +64,40 @@ describe("mergedName (F3 §6, AC-66)", () => {
     expect(mergedName("folder/x.pdf")).toBe("x_merged.pdf");
     expect(mergedName(undefined)).toBe("berrypdf_merged.pdf");
     expect(mergedName("....pdf")).toBe("berrypdf_merged.pdf");
+  });
+});
+
+describe("page tool names (F4/F5 §6)", () => {
+  const t = { input: "twelve.pdf", pages: "1-4", first: 1, last: 4, n: 2, date: new Date(2026, 0, 5) };
+  it("§3a: fills {name}, {pages}, {first}, {last}, {n}, {date}, case-insensitively, keeping other text", () => {
+    expect(patternName("{name}-{pages}", t)).toBe("twelve-1-4.pdf");
+    expect(patternName("{NAME}_p{First}-{last}_{n}_{date}", t)).toBe("twelve_p1-4_2_20260105.pdf");
+    expect(patternName("{name} {unknown}", t)).toBe("twelve {unknown}.pdf");
+  });
+  it("§3a: unsafe characters become '-', '.pdf' is not doubled, an empty result falls back to the input name", () => {
+    expect(patternName("{name}/{pages}", t)).toBe("twelve-1-4.pdf");
+    expect(patternName("{name}.pdf", t)).toBe("twelve.pdf");
+    expect(patternName("  ", t)).toBe("twelve.pdf");
+    expect(patternName("{n}", { ...t, n: undefined })).toBe("twelve.pdf");
+  });
+  it("AC-430: typed part names", () => {
+    expect(customName("intro")).toBe("intro.pdf");
+    expect(customName("a/b")).toBe("a-b.pdf");
+    expect(customName("Report.PDF")).toBe("Report.pdf");
+    expect(customName(" .. ")).toBeNull();
+    expect(safeFileStem('a<b>:c"d|e?f*g')).toBe("a-b--c-d-e-f-g");
+  });
+  it("§6a, §6b, §6c: ZIP names", () => {
+    expect(splitZipName(["twelve.pdf"])).toBe("twelve-split.zip");
+    expect(splitZipName(["twelve.pdf", "three-pages.pdf"])).toBe("berrypdf-split.zip");
+    expect(splitZipName(["..."])).toBe("berrypdf-split.zip");
+    expect(EXTRACT_ZIP).toBe("berrypdf-extract.zip");
+    expect(DELETE_ZIP).toBe("berrypdf-delete.zip");
+  });
+  it("§6d, §6e: Organize and Alternate names", () => {
+    expect(organizedName("twelve.pdf")).toBe("twelve_organized.pdf");
+    expect(mixedName("odd.pdf")).toBe("odd_mixed.pdf");
+    expect(mixedName(undefined)).toBe("berrypdf_mixed.pdf");
+    expect(mergedName("a:b.pdf")).toBe("a-b_merged.pdf");
   });
 });
