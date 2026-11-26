@@ -100,7 +100,7 @@ type OpenedPdf = {
   pages: PDFPage[];
   pageIndexOf: Map<PDFRef, number>;
   /** Widget annotation refs on each page (after flattening). */
-  widgets: PDFRef[][];
+  widgets: { refs: PDFRef[]; count: number }[];
   pruner: Pruner;
   links: LinkFilter;
   meta: SourceMeta;
@@ -357,15 +357,13 @@ export async function openSource(s: MergeSourceInput, options: Pick<MergeOptions
   const meta: SourceMeta = {
     name: s.name,
     kind: "pdf",
-    // An encrypted source's strings are not decrypted by the parser, so its
-    // Title and Info read as garbage: neither is used (AC-541 cannot carry
-    // Info from encrypted sources; the output is never encrypted).
-    title: (!wasEncrypted && doc.getTitle()) || undefined,
+    // Encrypted sources' strings are decrypted on load, so their Title and Info are used too.
+    title: titleOf(doc),
     outline: options.bookmarks === "keep" || options.bookmarks === "perFileNested" ? readOutline(doc) : [],
     lang: readLang(doc),
     labels: readPageLabels(doc),
     keptFields,
-    docInfo: wasEncrypted ? undefined : readDocInfo(doc),
+    docInfo: readDocInfo(doc),
   };
   return {
     kind: "pdf",
@@ -373,7 +371,7 @@ export async function openSource(s: MergeSourceInput, options: Pick<MergeOptions
     doc,
     pages,
     pageIndexOf: new Map(pages.map((page, i) => [page.ref, i])),
-    widgets: pages.map(widgetRefs),
+    widgets: pages.map(widgetsOf),
     pruner: createPruner(doc.context, pages),
     links: createLinkFilter(doc, pages),
     meta,
@@ -381,15 +379,30 @@ export async function openSource(s: MergeSourceInput, options: Pick<MergeOptions
   };
 }
 
-/** Refs of the widget annotations on a page. */
-function widgetRefs(page: PDFPage): PDFRef[] {
+/** The Info /Title, or undefined when it is missing, blank or cannot be read. */
+function titleOf(doc: PDFDocument): string | undefined {
+  try {
+    return doc.getTitle() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The widget annotations on a page: `refs` for the indirect ones (seeded or
+ * kept per output), `count` including widgets written directly in /Annots.
+ * Exported for tests.
+ */
+export function widgetsOf(page: PDFPage): { refs: PDFRef[]; count: number } {
   const annots = page.node.lookup(PDFName.of("Annots"));
-  if (!(annots instanceof PDFArray)) return [];
-  const out: PDFRef[] = [];
+  const out = { refs: [] as PDFRef[], count: 0 };
+  if (!(annots instanceof PDFArray)) return out;
   for (let i = 0; i < annots.size(); i++) {
     const raw = annots.get(i);
     const a = annots.lookup(i);
-    if (raw instanceof PDFRef && a instanceof PDFDict && a.lookup(PDFName.of("Subtype")) === PDFName.of("Widget")) out.push(raw);
+    if (!(a instanceof PDFDict) || a.lookup(PDFName.of("Subtype")) !== PDFName.of("Widget")) continue;
+    out.count++;
+    if (raw instanceof PDFRef) out.refs.push(raw);
   }
   return out;
 }
@@ -407,6 +420,9 @@ function bindSource(o: OpenedSource, usedIndexes: Set<number>, options: MergeOpt
   const copier = PDFObjectCopier.for(doc.context, out.context);
   const traversed = (copier as unknown as { traversedObjects: Map<unknown, unknown> }).traversedObjects;
   const reserved = new Map<number, PDFRef>();
+  // A widget listed on a used page is kept, even when a dropped page lists it too.
+  const keptWidgets = new Set<PDFRef>();
+  for (const idx of usedIndexes) for (const w of o.widgets[idx]?.refs ?? []) keptWidgets.add(w);
   pages.forEach((page, idx) => {
     if (usedIndexes.has(idx)) {
       const ref = out.context.nextRef();
@@ -414,12 +430,12 @@ function bindSource(o: OpenedSource, usedIndexes: Set<number>, options: MergeOpt
       traversed.set(page.ref, ref);
     } else {
       traversed.set(page.ref, PDFNull); // anything else that reaches a dropped page goes nowhere
-      for (const w of o.widgets[idx]) traversed.set(w, PDFNull);
+      for (const w of o.widgets[idx].refs) if (!keptWidgets.has(w)) traversed.set(w, PDFNull);
     }
   });
   let form: PDFDict | undefined;
   const acro = doc.catalog.lookup(PDFName.of("AcroForm"));
-  const hasWidgets = [...usedIndexes].some((i) => o.widgets[i]?.length);
+  const hasWidgets = [...usedIndexes].some((i) => o.widgets[i]?.count);
   if (acro instanceof PDFDict && hasWidgets && options.forms !== "remove" && (options.forms !== "flatten" || o.meta.keptFields?.length)) {
     form = out.context.obj({}) as PDFDict;
     const dr = acro.get(PDFName.of("DR"));
