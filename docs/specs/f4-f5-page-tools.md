@@ -440,6 +440,8 @@ Decisions 1 to 14 are accepted as written, for now. Step 2 (Research) may overtu
 
 Update after step 2 (2026-11-26): undo/redo joins this feature (I-10), the Rotate range field stays out. Decision 7 stands (Extract and Delete keep the original file name) because Rotate already does, so every one-file page tool names its output the same way. The multi-file range issue raised in Improvements is resolved in AC-402: open ranges and keywords stay symbolic when two or more files are loaded. Resource pruning (I-1) and link and bookmark fixes (I-2, I-3) go into the shared copy engine, so Merge gains them too; Merge's own tests must stay green.
 
+Update after step 3 (2026-11-26): the UX decisions in UI §P-11 (1 to 15) are all accepted. AC-402 reads `aria-pressed` for Extract tiles; AC-550 places Undo/Redo in the bottom bar; AC-420, AC-429 and AC-430 open More options for the parts list; Extract and Delete primaries carry live counts. Long titles may wrap on phones (decision 14): the H1 keeps the search keyword. The three Merge layout bugs found while designing (selection bar overlap at 1366x657, sideways scroll at 640–710px, squeezed toolbar at 320px) are fixed in this feature.
+
 ### 8b. Needs a real reference task (evaluator's first run; at most 3 per hour, booked with the lead)
 
 In priority order, so the highest-value ones fit in the first booked slots:
@@ -595,3 +597,699 @@ The evaluator does not compare these with the reference, but they must work. Ext
 Sources (web, 2026-11-26): [iLovePDF: separate PDF pages](https://ilovepdf.com/blog/how-to-separate-pdf-pages) · [iLovePDF pricing](https://www.ilovepdf.com/pricing) · [PDF24 split PDF](https://tools.pdf24.org/en/split-pdf) · [Smallpdf split PDF](https://smallpdf.com/split-pdf) · [Smallpdf support (free limit)](https://smallpdf.com/support) · [PDFgear split PDF](https://www.pdfgear.com/split-pdf/) · [Adobe Acrobat online: split PDF](https://www.adobe.com/acrobat/online/split-pdf.html) · [Adobe Acrobat online: rearrange PDF](https://www.adobe.com/acrobat/online/rearrange-pdf.html) · [Adobe help: organize pages (Acrobat on the web)](https://helpx.adobe.com/ae_en/acrobat/web/edit-pdfs/organize-documents/organize-pages.html) · [Stirling-PDF docs: page operations](https://docs.stirlingpdf.com/Tools/Guides/Page-Operations/) · [Stirling-PDF docs: page editor](https://docs.stirlingpdf.com/Tools/Workspace/Page-Editor/) · [Stirling-PDF issue #209 (duplex sort)](https://github.com/Stirling-Tools/Stirling-PDF/issues/209) · [Stirling-PDF SplitPDFController (source, read only)](https://github.com/Stirling-Tools/Stirling-PDF/blob/main/app/core/src/main/java/stirling/software/SPDF/controller/api/SplitPDFController.java) · [PDFsam: mix PDF](https://pdfsam.org/mix-pdf/) · [qpdf CLI manual (`--remove-unreferenced-resources`, `--split-pages`)](https://qpdf.readthedocs.io/en/latest/cli.html)
 
 ## UI
+
+Step 3 (UX), 2026-11-26. This section designs all six tools as **two families that share one look**:
+
+- **F4 (Split, Extract pages, Delete pages)** is the Rotate skeleton (`ToolFlow` + F1 `PageGrid` + `ControlDock`).
+- **F5 (Organize, Combine & reorder, Alternate & mix)** is the Merge workspace (`MergeTool` + `page-edit/*`).
+
+Nothing new is invented where one of these already has a piece.
+
+The mockups are in `/mnt/project-files/designs/f4-f5-page-tools/mockups/` (outside git), named `<state>-<width>x<height>.png`. They were made by overlaying the designed controls on the live dev app (`/rotate-pdf`, `/merge-pdf`) with headless Playwright, using the real tokens, classes and fixtures (`twelve.pdf`, `three-pages.pdf`, `odd.pdf`, `separator.pdf` …). That means:
+
+- every measurement below is from a real layout, not a drawing;
+- every state is shot at **1366x657 and 390x664** (P-13);
+- the key states are also shot at 1280x720, 390x844 and 320x640, at device scale 2.
+
+No reference text, layout or asset was copied. The reference captures were only looked at to check behaviour.
+
+### P-1. Design principles for the page tools
+
+1. **The grid is the preview.** Every option shows its effect on the page tiles before the run:
+   - Split shows parts, cuts and left-out pages.
+   - Extract shows picked pages.
+   - Delete shows marked pages.
+   - Organize shows the order itself.
+   - Alternate shows the result order in its Pages view.
+
+   No separate "preview" panel, and no mode screen.
+2. **The primary says the outcome.** "Split into 3 files", "Extract 5 pages", "Delete 3 pages". When it can't run, it falls back to the plain verb ("Split PDF") and is disabled. The reason is shown once, where the problem is: the field bubble for a bad range, or the status line for a missing file.
+3. **One row of options once a file is in.** After upload, the options fold into the strawberry-cream bottom bar (`ControlDock layout="bar"`):
+   - From 640px every F4 tool's options fit in **one 76px row**.
+   - On phones they fit in **two rows (130px)**.
+   - Anything rarer (names, bookmarks, the per-file list) sits behind "More options".
+4. **Marks, not removal.** Delete dims and marks a page instead of hiding it, and every mark is one click to undo. Split shows left-out pages in place, dashed and dimmed.
+5. **Same control, same place, all six tools:**
+   - mode or quick-pick on the left of the bar, then the field, then More options;
+   - status, then the primary on the right;
+   - the page size slider and Add files in the workspace toolbar;
+   - Undo | Redo in the bar's left slot on the editing tools.
+6. **Text only where it decides something.** Syntax help is the field's placeholder plus a hint bubble on focus. "Two-sided scan order" explains itself in a tooltip. Odd and even positions read "1st, 3rd, 5th…" with a small page-strip glyph. There are no paragraphs and no descriptions under options.
+7. **Normal controls.**
+   - Every control is 44px tall (the primary is 52).
+   - Icon-only controls are 44×44 with a tooltip that matches their accessible name.
+   - Icons are the Phosphor bold set from `gen-tool-icons.mjs`, drawn bare: no boxed or tinted backgrounds behind them.
+
+### P-2. Tokens: additions to F1 U-2, F3 M-2 and `docs/design/berrypdf.md`
+
+No new colours. Add these to `apps/web/src/styles/tokens.css`:
+
+| Token | Value | Use |
+|---|---|---|
+| `--ip-mark-size` | 28px | Visible circle of a Split mark (scissors). The hit area is 44×44 (`--ip-tap-min`), centred in the gap between two tiles. |
+| `--ip-cut-line` | `var(--ip-slot-bar)` (3px) | The cut line drawn the full tray height when a mark is on. It reuses Merge's insert bar width, so a cut and an insert point look related. |
+| `--ip-part-disc` | 24px | Part-number disc on the first tile of each Split part. Same style as `mp-step__n`. |
+| `--ip-dim-left-out` | 0.38 | Opacity of the page image on a Split tile that is in no part. |
+| `--ip-dim-marked` | 0.32 | Opacity of the page image on a Delete tile marked for removal. The image is also `grayscale(1)`, which is static, never animated. |
+| `--ip-stepper-field-w` | 56px | Number field inside `NumberStepper`. Two 44px buttons sit around it, so it is 152px wide with 4px gaps. |
+| `--ip-mix-card-min` | 330px | Minimum column of the wide Alternate card. This gives 3 per row at 1366 and 1 per row below 640. |
+| `--ip-bubble-gap` | 8px | Gap between a bar field and its floating hint or error bubble. |
+
+**Part tones (Split).** Parts alternate between **two** tones:
+
+- odd parts use `page-tray` (#fdeef1, today's tray);
+- even parts use `surface` (#fff) with a 1.5px `border-card` inset.
+
+BerryPDF reserves hue for categories (`berrypdf.md` → Colour), and five rotating hues would read as five kinds of thing. The non-colour cues carry the meaning:
+
+- the part disc;
+- the cut line;
+- the part number in the accessible name.
+
+This is a change from §3b's "5 rotating hues" (P-11, decision 5).
+
+**New contrast pairs (WCAG 2.1, measured; light only, because dark mode is not shipped per `berrypdf.md` → Dark mode)**
+
+| Pair | Ratio | Where |
+|---|---|---|
+| `brand` on `page-tray` / `surface` / `band` (non-text) | 4.25 / 4.78 / 4.35 | Split mark (on) fill, cut line, Extract picked ring |
+| white on `brand` (icon) | 4.78 | scissors on a Split mark that is on |
+| `field-line` #a2848a on `surface` / `page-tray` (non-text) | 3.39 / 3.01 | Split mark (off) edge, the dashed edge of a left-out tile, Extract's empty pick ring |
+| `brand-strong` on `page-tray` / `surface` | 6.03 / 6.78 | part-disc number, scissors on a mark that is off |
+| white on `danger` (icon) | 7.89 | Delete's trash badge |
+| `danger` on `page-tray` / `band` (non-text) | 7.02 / 7.19 | trash badge against the tile |
+| `leaf` on `page-tray` (non-text) / white on `leaf` | 4.74 / 5.33 | Extract pick tick |
+| `muted` on `band` | 4.97 | struck-through page number on a marked Delete tile |
+| `mp-alert-danger-ink` on `surface`; `danger` border | 9.39; 7.89 | field error bubble |
+| `mp-tool-ink` on `sand` / `surface` | 6.35 / 7.71 | Undo / Redo in the bar; Select / Sort / Remove in the toolbar |
+| `ink` on `sand` | 11.15 | bar status line |
+
+**Watch-out:** `muted` on `sand` is **4.49:1**, which fails. The bar status must stay `ink`, as `ControlDock` already does (`[&_p]:text-ink`). Nothing in the bar may use `text-muted`.
+
+Every picked, marked, cut, left-out or invalid state also has a non-colour cue: a tick, a trash badge, a scissors icon with a line, a dashed edge, or an icon plus text in the bubble.
+
+### P-3. Layout
+
+#### Height budget and first-screen check (measured on the mockups)
+
+The budget is `berrypdf.md` rules 1–10:
+
+- header 64 (72 from 768);
+- head 76, which holds only the `h1`;
+- `--ip-work-h` = clamp(320, 100dvh − header − 76 − 20, 640);
+- once loaded, toolbar 64 + pages area + bar (`--ip-dock-actual`).
+
+"Empty" is the side panel (F4, ≥ 1024) or the empty bar (F5, and every tool below 1024). The numbers are the primary's top and bottom edges in CSS px.
+
+| Viewport | F4 empty (side panel) | Loaded, all six (bar) | Pages area (loaded) | Fits |
+|---|---|---|---|---|
+| **1366x657** (hard case) | panel 148–637, primary 560–612 (310 wide) | bar 581–657 (76), primary 593–645 (260 wide) | toolbar 129–193, pages 193–560 | yes, all 27 states |
+| 1280x632 | primary 535–587 | bar 556–632, primary 568–620 | 193–535 | yes |
+| 1536x730 | primary 633–685 | bar 654–730, primary 666–718 | 193–633 | yes |
+| 1920x969 | primary 711–763 (panel capped at 640) | bar 893–969, primary 905–957 | 193–872 | yes |
+| 1280x720 (DSF 2) | in view | bar 644–720 | 193–620 | yes |
+| 1024x768 | in view | bar 692–768 | 478 tall | yes |
+| 768x1024 | bar 946–1024 (78) | same | – | yes |
+| 640x900 | bar 822–900 (78) | same | – | yes, after the two fixes in P-3 "640–1023" |
+| **390x664** | F4 bar 534–664 (130), primary 598–650 | F4 same; Organize and Alternate 586–664 (78); Combine 532–664 (132) | – | yes, all 27 states |
+| 390x844 (DSF 2) | F4 bar 714–844 | F4 same; Organize 766–844 | – | yes |
+| 360x640 | F4 primary 574–626 (270 wide) | Organize primary 236 wide | – | yes |
+| 320x640 (DSF 2) | F4 bar 510–640 | Organize 562–640 | – | yes, after the 320 fix below |
+
+There is no horizontal overflow at any of these sizes (`scrollWidth − clientWidth = 0`, measured). The page is the only scroller: the pages list grows the document, and the fixed bar never scrolls. The only `data-ip-scroll` regions are the existing ones plus `overlay` (the More options dialog body).
+
+#### F4 at 1280 (≥ 1024 behaves the same), empty
+
+This is the Rotate empty layout. The F1 drop card is on the left. On the right is the 360px side panel (`ControlDock layout="side"`, height `--ip-work-h`), with numbered steps (`mp-step`) and the sticky primary at its foot. Shots: `split-1-empty-1366x657.png`, `extract-1-empty-…`, `delete-1-empty-…`.
+
+- **Split**
+  - **1 Split**: 2×2 `ChoiceTiles` (`SegmentedControl look="tiles"`) for Every page · Every N pages · Spreads · Custom. Each has a 30px duotone page-strip glyph, the same drawing style as Rotate's `ScopeIcon`.
+  - A second step slot appears only for modes that need input, at a fixed height so nothing shifts:
+    - Every N: **2 Pages per file** with the `NumberStepper`.
+    - Custom: **2 Parts** with the range field.
+  - "More options" is a soft button.
+  - The footer shows the status "Add a PDF to start" and the disabled "Split PDF".
+- **Extract**: **1 Pages to keep** is three tiles (Odd · Even · Custom, reusing the Rotate scope glyphs) with the range field under them.
+- **Delete**: **1 Pages to delete** is the range field alone.
+
+Each panel's content is ≤ 474px high, so it fits the 489px work height at 1366x657 and the 464px at 1280x632.
+
+#### F4 at 1280, loaded (one bar row)
+
+The title drops to the compact head. The toolbar (64) holds the size slider on the left and "Add files" on the right. The tiles take the screen. The bar is one 76px row, `max-w-[1216px]` centred:
+
+| Tool | Left (options, `dock-bar:` forms) | Right |
+|---|---|---|
+| Split | mode pills (`ChoiceTiles` in `dock-bar:flex-row`, labels only) · Every N: "Pages per file" + `NumberStepper` · Custom: range field (300px) · "More options" (soft, icon + label) | status · primary (260) |
+| Extract | Odd · Even · Custom pills · range field · More options | status · primary |
+| Delete | range field · (spacer) · More options | status · primary |
+
+From 1024 to 1279 the bar tightens:
+
+- Split's pill reads "Every N";
+- the field is 190px;
+- More options is a 44×44 icon button with a tooltip.
+
+Shots: `split-2-ready-every`, `split-3-everyn`, `split-4-custom-marks`, `split-5-custom-typed`, `extract-2-ready`, `delete-2-ready` (each `-1366x657`).
+
+#### F4 at 768 (640–1023), loaded
+
+The bar is used from the first paint, as `ControlDock` already does below 1024. It is one 78px row:
+
+- **Split**: a native `Select` "Split" (150px) for the mode · the field (flex) or the stepper · a 44px More options icon button | primary. Below 1024 the pills don't fit beside a field. This was measured: at 640 the four pills, the field and the primary overlap. The native select is one tap on touch.
+- **Extract**: Odd · Even · Custom pills · field (flex) · More icon | primary.
+- **Delete**: field (flex) · More icon | primary.
+- The status line is `sr-only` below 1024 (existing).
+
+#### F4 at 375 (< 640)
+
+The bar has two rows (130px):
+
+- **Row 1**:
+  - Split: the `Select` (130px, or flex with the stepper) and the field (flex).
+  - Extract: three compact pills and the field.
+  - Delete: the field alone.
+- **Row 2**: a 52×52 soft More options button, then the primary at flex. The primary is 300px at 390 and 270px at 360.
+
+Tiles run two per row. Each tile's Enlarge sits in the tray's **bottom-right corner** as a 36px white circle (not the centred action pill), so it never covers the page. Shots: every `*-390x664.png`.
+
+**320 fix:** "Split into 1,000 files" needs 176px of text. The primary's padding drops from 28 to 16px below 360 (`max-[359px]:px-4`), so the longest label fits the 230px button at 320.
+
+#### F5: Organize, Combine & reorder, Alternate & mix
+
+**Empty state.**
+
+- Organize and Alternate have **no side panel**. They have no options before a file is in:
+  - Organize has none at all;
+  - Alternate's options are per file.
+
+  The drop card fills the pages slot (height `100dvh − header − head − bar − 20`), and the bar shows from the first paint with the status "Add files to start" and the disabled primary. Shots: `organize-1-empty`, `alternate-1-empty`.
+- Combine & reorder keeps Merge's empty side panel (Merge options).
+
+**Organize toolbar** (in the `toolbarStart` / `toolbarEnd` slots):
+
+| Width | Toolbar |
+|---|---|
+| ≥ 1280 | Files│Pages · Select ▾ · Sort ▾ · Remove ▾ · size slider … Add files · Add pages ▾ (`organize-2-ready-1366x657`) |
+| 1024–1279 | the same, with Select, Sort and Remove as 44px icon-only menu buttons (tooltips) |
+| 768–1023 | icon-only Select / Sort / Remove · slider … one **Add ▾** menu (Merge's phone add menu: Add files, Add pages, blank page) |
+| < 768 | Files│Pages · **⋯ "Page tools"** (one menu with Select, Sort and Remove sections) · **+ Add ▾** |
+| < 360 | as < 768, with Add icon-only |
+
+The reference's toolbar wraps to four rows on phones; ours is one row at every width, measured at 320, 360, 390, 640, 768, 1023, 1024, 1280 and 1366.
+
+**Undo | Redo** sit in the bar's left slot: a joined `mp-toolbar` pair of `mp-btn--tool` (the Rotate left│right pattern).
+
+- From 1024 they show labels.
+- Below 1024 they are 44px icon buttons.
+- On phones the pair (86px) shares the single 78px bar row with the primary ("Save PDF", 266px at 390).
+- On Combine & reorder, the phone bar is [Options (flex) · Undo│Redo] over the primary, which is Merge's two-row bar.
+
+They are not in the workspace toolbar because that toolbar is full at every width (P-11, decision 2). Shots: `organize-2-ready-*`, `combine-1-ready-*`.
+
+**Selection bar.** Merge's floating `SelectionBar` is placed `bottom: calc(var(--ip-dock-actual) + 12px)`, centred over the pages at **every** width. Today's `lg:bottom-6 lg:left-[calc(50%-var(--ip-dock-w)/2)]` is left over from the side-panel layout. At 1366x657 it overlaps the bottom bar: the selection bar runs 577–633 and the bar starts at 581. See `organize-5-selection-*`.
+
+**Alternate.**
+
+- **Files view.** The Files view (default) shows **wide cards** (`SegmentCard variant="mix"`), 3 per row at 1366 and 1 per row below 640. Each card has:
+  - a 112px thumbnail tray with the letter badge and remove ×;
+  - the name and page count;
+  - Normal│Reverse (`SegmentedControl look="tabs"`, max 220px);
+  - `NumberStepper` + "per turn";
+  - Repeat (`Switch`, one-page files only, on its own row);
+  - move earlier / later.
+
+  On phones the card uses grid areas: thumbnail (72px) beside name, count and move arrows, with the settings full width underneath.
+- **Pages view.** The Pages view is the **read-only result** (`EditablePageGrid readOnly`): tiles labelled A1, B1, A2…, click opens the preview, and there is no drag, insert, add tile or selection.
+- **Bar.** The bar has the status and "Mix PDFs". There is no Undo│Redo (P-11, open question 3).
+
+Shots: `alternate-2-files`, `alternate-3-separator`, `alternate-4-preview`, `alternate-5-one-file`.
+
+#### 640–1023: two fixes found while measuring
+
+1. **Merge's pages-view toolbar overflows today** between 640 and about 710px. At 640 it measures `scrollWidth` 686, because the size slider + Add files + Add pages don't fit. This breaks "no sideways scroll" on `/merge-pdf` and would break `/combine-reorder-pdf`. The fix is the same one Organize needs: below 1024 the shared toolbar shows **one Add ▾ menu** (the phone menu) instead of Add files + Add pages.
+2. **At 320, Merge's Sort button is squeezed to 20px wide** and the Add button runs 14px past the toolbar's edge. Toolbar icon buttons need `shrink-0`, and the Add button goes icon-only below 360.
+
+#### Result (F1 `ResultCard`, all six)
+
+One PDF: unchanged (Rotate's card).
+
+**ZIP (Split, and several inputs on Extract or Delete):**
+
+- **Left well (240px)**: the entry list, up to 4 rows (3 on phones), then "Show all {n}". Each row shows the name, page count and a 36px Download icon button (`Download twelve-3.pdf`). On a phone, getting one part takes one tap, with no unzipping.
+- **Right**: the name, then "{size} · {n} files", then **Download** straight after (moved up so Start over and Back stay in view at 1366x657), then the privacy line.
+- "Show all" expands the list in place, so the document grows and the page scrolls. It is not a nested scroller.
+- **Continue with** is hidden for a ZIP (F1 AC-43 adapted).
+
+Shot: `split-9-result-*`.
+
+#### Sticky search and filter bars
+
+Not applicable. None of the six has a list the user searches or filters. Organize's Select ▾ acts on the grid; it is not a filter.
+
+### P-4. Component tree (reuse first)
+
+#### New primitives (`components/ui/`)
+
+- **`NumberStepper`**: [− IconButton] [text input, `inputmode="numeric"`, 56px] [+ IconButton]. Props: `value`, `min` (1), `max` (9,999), `label`, `error`.
+  - ArrowUp / ArrowDown step by 1, and PageUp / PageDown by 10.
+  - − is `aria-disabled` at `min`.
+  - Free typing is allowed. The value is validated on input after 300ms and on blur, and an invalid value gets the same bubble as the range field.
+  - Used by Split (Every N) and Alternate (per turn).
+- **`FieldBubble`**: the floating hint or error above a bar field: white, 1.5px `danger` edge with the alert icon for errors, or `border-card` without an icon for hints, with a 6px tail. It is absolutely positioned (`bottom: 100% + --ip-bubble-gap`), so it never moves the layout. In the side panel the same text is a line under the field, in a reserved 20px slot.
+
+#### Shared F4 pieces (`components/page-select/`, new folder)
+
+- **`RangeField`**: an `ip-field` text input (height 44) with a trailing **×** IconButton (Clear selection / Clear parts, shown only when there is something to clear) and the `FieldBubble`.
+  - It uses `lib/page-ranges.ts` (§0a).
+  - The "Differs per file" placeholder applies when several files differ (§3a).
+  - The × replaces §3a's separate Clear selection button, so the bar does not need an extra control.
+- **`usePageSelection`**: the §0a selection layer as a hook (click, Shift+click, Ctrl/Cmd+click, Space, Shift+Space, Escape), feeding `decoratePage`.
+- **`SplitMarks`**: the focusable mark buttons rendered in the grid gaps (P-6).
+- **`PartsList`**: the Split files list inside More options. It is virtualised in the dialog body (an `overlay` scroller) above 50 rows.
+- **`MoreOptionsDialog`**: `Dialog` (default variant ≥ 640, centred, about 440px wide, content-sized; `sheet` variant below 640). It holds:
+  - Split: `PartsList`, "Name pattern", "Remove bookmarks" (`Switch`);
+  - Extract: name pattern and bookmarks;
+  - Delete: bookmarks only.
+
+  The trigger shows a "{n} changed" chip, the F3 Options chip.
+
+#### Changes to existing shared code
+
+| Piece | Change | Why |
+|---|---|---|
+| `tool-flow/types.ts` `PageDecoration` | Add optional `picked`, `marked`, `part` (number + first-of-part flag), `leftOut`. | Extract, Delete and Split draw on the F1 tile. Rotate passes none. |
+| `PageGrid` / `PageTile` | Optional `onTileActivate` (replaces the default "open preview" on the tile button) and `tilePressed` (`aria-pressed`). A `renderGap(file, index)` slot draws Split marks between tiles. Enlarge moves to the tray corner when the tile has no other action. | Extract and Delete toggle on click; Split's tiles keep opening the preview. |
+| `ControlDock` | A `more` slot (More options button + chip). A `start` slot (left of the options, for Undo│Redo). `emptyLayout="bar"` (no side panel when empty). | Organize, Alternate and the F4 bar. |
+| `ToolFlow` | `primaryLabel?: () => string` (live count), `emptyLayout`, pass-through of the slots above. | I-7 / AC-545. |
+| `ResultCard` | ZIP: entry rows with a per-entry Download (the part blobs are kept after zipping; they are already in memory), and Download first. | P-3 Result; phones. |
+| `page-edit/SelectionBar` | Position from `--ip-dock-actual` at every width. | The overlap bug (P-3). |
+| `page-edit/SegmentGrid` / `SegmentCard` | `variant="mix"` with a `settings` slot. | Alternate. |
+| `page-edit/EditablePageGrid` | `readOnly` (no drag, insert points, add tile, selection or More menu; click = preview). | Alternate's result view. |
+| `tools/merge/MergeTool` | Parameterised by slug (§3f), with history (I-10) and an Add ▾ menu below 1024. | F5. |
+
+#### Per tool
+
+```
+SplitTool / ExtractTool / DeleteTool  (tools/<slug>/)
+└─ ToolFlow tool=flowTool(slug) primaryLabel=… decoratePage=… onPageKey=…
+   ├─ renderOptions(ctx)      → <XOptions layout="side|bar">   (Step + ChoiceTiles | Select, RangeField | NumberStepper)
+   ├─ PageGrid (F1)           → PageTile + decorations, SplitMarks (Split), Enlarge in the corner
+   ├─ ControlDock             → options · more=<MoreOptionsButton/> · status · Primary
+   ├─ MoreOptionsDialog       → PartsList (Split) · NamePatternField · Switch "Remove bookmarks"
+   └─ ResultCard              → EntryList with per-entry download (ZIP)
+
+MergeTool slug="organize-pdf" | "combine-reorder-pdf" | "alternate-mix-pdf" | "merge-pdf"
+├─ toolbarStart → ViewToggle · OrganizeMenus (Select ▾ Sort ▾ Remove ▾ | ⋯ Page tools) · Sort ▾ (others)
+├─ toolbarEnd   → Add files · Add pages ▾ (≥1024) | Add ▾ (<1024)
+├─ renderWorkspace
+│   ├─ Files: SegmentGrid (Organize/Combine) | SegmentGrid variant="mix" (Alternate cards)
+│   └─ Pages: EditablePageGrid | EditablePageGrid readOnly (Alternate)
+├─ SelectionBar (fixed position)
+└─ ControlDock start=<HistoryButtons/> (not Alternate) · Options (Combine/Merge only) · status · Primary
+```
+
+New icons (Phosphor, MIT, bold weight, added to `UI_ICONS` in `scripts/gen-tool-icons.mjs`):
+
+| Icon | Use |
+|---|---|
+| `scissors` | marks |
+| `trash` | Delete badge, Remove ▾ |
+| `arrow-u-up-left` | Undo; already the `ResetIcon` glyph |
+| `arrow-u-up-right` | Redo |
+| `selection-all` | Select ▾ |
+| `selection-inverse` | Invert |
+| `sliders-horizontal` | More options |
+| `dots-three` | Page tools |
+| `download-simple` | per-entry download |
+
+The page-strip glyphs (mode tiles, odd/even items) are inline SVGs drawn in the `ScopeIcon` style. Nothing sits in a boxed or tinted background.
+
+### P-5. Options per tool (all §3 controls, every form)
+
+| Control | Side panel (empty, ≥ 1024) | Bar row (≥ 1024) | Bar 640–1023 | Phone (< 640) |
+|---|---|---|---|---|
+| Split mode | 2×2 tiles with glyphs | 4 pills, labels only ("Every N" below 1280) | `Select` | `Select` (row 1) |
+| Split N | step 2, "Pages per file" + stepper | "Pages per file" + stepper | stepper | stepper (row 1) |
+| Split / Extract / Delete range | step 1 or 2, field (full width) + under-line error | field 300px (190 below 1280) + bubble | field (flex) + bubble | field (flex) + bubble |
+| Extract quick pick | 3 tiles with glyphs | 3 pills | 3 pills | 3 compact pills (row 1) |
+| More options | soft button, icon + label | soft button, icon + label (icon-only below 1280) | 44px icon | 52px square (row 2) |
+| Status | above the primary | left of the primary | `sr-only` | `sr-only` |
+| Primary | 310px, sticky at the panel foot | 260px | 200px+ | flex (row 2) |
+
+**Split mode switch.** Switching mode keeps the file and recomputes the parts at once (AC-439):
+
+- the tiles recolour;
+- the discs and cut lines update;
+- the primary count changes.
+
+Choosing Custom from another mode starts from the current parts written into the field (§3b).
+
+**Range field hint.** Placeholders:
+
+- Split: "1-4, 5-10"
+- Extract: "1-3, 5, 8-last"
+- Delete: "2, 5-7, last"
+
+On focus, while the field is empty, the hint bubble says "Also: odd, even, last". It leaves on the first keystroke. An error takes the same slot, and the error wins.
+
+**Errors** name the item (P-12). The primary falls back to its plain label and is disabled. The status keeps the counts. There is no second copy of the message.
+
+"Keep at least one page" (Delete, every page marked) also uses the bubble, because it is the field's value that empties the file, even when the marks came from clicks (`delete-3-all-*`).
+
+**More options dialog** (`split-7-more-1366x657.png`, `-390x664.png`):
+
+- **Files {n}**: one row per part: number disc · name (a button; activating it swaps in an inline input, Enter saves, Escape cancels) · ".pdf" · page range.
+- **Name pattern**: a field. Its tokens are in the field's tooltip, not on screen.
+- **Remove bookmarks**: a `Switch`.
+- **Done**.
+
+Changes apply immediately. Done only closes the dialog. Escape and the backdrop close it too.
+
+#### Several files (F4)
+
+- The toolbar shows the Files│Pages view toggle (F1, from two files).
+- In the Pages view each file's pages run under its own small header (existing `PageGrid` sections).
+- The field applies to all files. A click changes one file. When the files differ, the field empties and shows "Differs per file" (§3a).
+- No new mockup; this is the F1 layout.
+
+### P-6. Grid decorations
+
+| Tool | Tile at rest | Tile hover / focus (fine pointer) or always (touch) | Tile active state |
+|---|---|---|---|
+| Split | Tray in its part tone; the part disc (24px, `mp-step__n` style) at the top-left of the **first** tile of each part | The mark after the tile shows as a white 28px circle, `field-line` edge, `brand-strong` scissors | Mark on: `brand` fill, white scissors rotated 90°, a 3px `brand` cut line the full tray height in the gap |
+| Split, left-out page (Custom) | Dashed `field-line` tray edge, page at 0.38, no disc; marks on either side hidden (and absent from the DOM) | – | – |
+| Extract | Plain tray | An empty 24px ring (`field-line` edge) at the top-right | Picked: 2px `brand` ring on the tray plus the `leaf` tick disc (the F1 leaf tick) in the ring's place |
+| Delete | Plain tray | A ghost trash badge (white circle, `danger` icon) at the top-right | Marked: page at 0.32 + grayscale, `band` tray with a 1.5px `brand-tint-border` edge, a solid `danger` trash badge with a white icon, page number struck through |
+
+**Mark geometry.** The grid gets `px-2` so a mark in the gap after the last tile of a row never overflows the tray. The mark sits on that row's right edge, and the cut continues at the start of the next row (no line is drawn there).
+
+**Touch.** Marks and rings are always visible on touch, because there is no hover. The marks are 28px circles in a 44px hit area, so they do not crowd two tiles per row (`split-2-ready-every-390x664.png`).
+
+**Tile click.**
+
+- Split: opens the preview, the F1 default. This keeps the `viewport-fit.spec.ts` "Page 1 of" path.
+- Extract and Delete: toggles, with Enlarge in the corner (§3c, §3d).
+- Organize and Combine: Merge's tiles, unchanged.
+- Alternate (Pages view): preview.
+
+### P-7. States (each with its shots; `<x>` = 1366x657 and 390x664)
+
+| State | What it looks like | Shots |
+|---|---|---|
+| Split, empty | Drop card + side panel (≥ 1024) or bar with `Select` + disabled "Split PDF" (< 1024) | `split-1-empty-<x>` |
+| Split, loading / password | F1 skeleton tiles at their final aspect box; F1 password dialog. The bar is already in its loaded form, disabled | F1 (unchanged) |
+| Split, ready (Every page) | 12 discs, a cut line after every page, "Split into 12 files" | `split-2-ready-every-<x>` |
+| Split, Every N | Stepper = 5, three parts, "Split into 3 files" | `split-3-everyn-<x>` |
+| Split, Custom by marks | Marks after 4 and 10 on; field `1-4, 5-10, 11-12`; hovered mark shown off | `split-4-custom-marks-<x>` |
+| Split, Custom typed with gaps | `1-3, 8-9, 12`: pages 4–7, 10, 11 dashed and dimmed; status "6 of 12 pages in 3 files" | `split-5-custom-typed-<x>` |
+| Split, invalid | Field `1-4, 13`: bubble `"13": this file has 12 pages`, `aria-invalid`, primary "Split PDF" disabled | `split-6-invalid-<x>` |
+| Split, More options | Dialog / sheet with Files (first row renamed to `intro`), Name pattern, Remove bookmarks | `split-7-more-<x>` |
+| Split, processing | F1 processing card over the grid (berry loader, "Splitting… 42%"); the bar is disabled and its primary becomes the jam progress bar in the same box | `split-8-processing-<x>` |
+| Split, done (ZIP) | P-3 Result | `split-9-result-<x>` |
+| Extract, empty | Side panel with Odd · Even · Custom + field | `extract-1-empty-<x>` |
+| Extract, ready, nothing picked | Rings on hover/touch; "Extract pages" disabled; status "Pick the pages to keep" | (as `extract-2` without picks) |
+| Extract, picked | 2–5 and 9 picked; field `2-5, 9`; "Extract 5 pages"; status "5 of 12 pages" | `extract-2-ready-<x>` |
+| Extract, invalid | `2-x`: bubble `"x": not a page number` | `extract-3-invalid-<x>` |
+| Delete, empty | Side panel with the field | `delete-1-empty-<x>` |
+| Delete, marked | 2, 4, 6 marked; ghost badge on hover; "Delete 3 pages"; status "9 of 12 pages kept" | `delete-2-ready-<x>` |
+| Delete, every page | `1-`: all marked, bubble "Keep at least one page", primary disabled | `delete-3-all-<x>` |
+| Organize, empty | Drop card in the pages slot; bar with the disabled "Save PDF" | `organize-1-empty-<x>` |
+| Organize, ready | A1–A12, B1–B3; Undo on, Redo off | `organize-2-ready-<x>` |
+| Organize, Select ▾ open | All · None · Invert │ "1st, 3rd, 5th…" · "2nd, 4th, 6th…" with page-strip glyphs | `organize-3-select-menu-<x>` |
+| Organize, Sort ▾ open | Name A to Z … Reverse order · Two-sided scan order + tooltip | `organize-4-sort-menu-<x>` |
+| Organize, selection | Two tiles picked (F3 ring + tick); selection bar above the bottom bar | `organize-5-selection-<x>` |
+| Organize, Remove ▾ open | Remove selected · Keep only twelve.pdf · Keep only three-pages.pdf · Remove all | `organize-6-remove-menu-1366x657` (on phones it is the Remove section of Page tools) |
+| Combine, ready | Merge's pages view first, Merge's options, Undo│Redo | `combine-1-ready-<x>` |
+| Alternate, empty | Drop card + bar with the disabled "Mix PDFs" | `alternate-1-empty-<x>` |
+| Alternate, two files | Wide cards, defaults | `alternate-2-files-<x>` |
+| Alternate, separator | `twelve.pdf` 4 per turn + `separator.pdf` with Repeat on | `alternate-3-separator-<x>` |
+| Alternate, Pages view | Read-only result A1, B1, A2, B2… | `alternate-4-preview-<x>` |
+| Alternate, one file | Primary disabled; status "Add one more file to mix"; info notice "One file with all fronts, then all backs? Organize can put it in order." + "Open in Organize" | `alternate-5-one-file-<x>` |
+| Alternate, per-turn invalid | Bubble on that card's stepper: "Use a whole number from 1"; primary disabled | (as `split-6`, on the card) |
+| Error / limit / wrong type | F1 notices (floating `NoticeStack`) and the F1 error panel with Retry; every setting kept | F1 (unchanged) |
+
+### P-8. Keyboard flow, focus order and ARIA
+
+**Tab order once loaded:**
+
+1. header;
+2. toolbar: slider, Add files (F5: the view toggle and menus first);
+3. grid: **one** Tab stop, roving;
+4. inside the active tile: its Enlarge, then (Split) the mark after it;
+5. bar: mode → field → its × → stepper → More options → Undo │ Redo → primary.
+
+DOM order follows this visual order (the bar is last in the DOM). The empty side panel follows the same order, top to bottom.
+
+| Keys | Where | Does |
+|---|---|---|
+| Arrows, Home / End, PageUp / PageDown | grid | Move the tile focus (F1) |
+| Enter | Split tile, Alternate result tile | Open the preview |
+| Space / Enter | Extract / Delete tile | Toggle pick / mark |
+| Shift+Space, Shift+click | Extract / Delete | Extend from the last toggled tile |
+| Ctrl/Cmd+click | Extract / Delete | Toggle (same as click) |
+| Delete / Backspace | Delete tile | Toggle the mark (AC-470) |
+| Escape | Extract / Delete grid | Clear the selection or marks (AC-406) |
+| Ctrl/Cmd+A | Extract grid; Organize grid | Pick all (Extract); select all (Organize, AC-491) |
+| Tab from a Split tile | grid | Its Enlarge, then "Split after page n" (AC-425); Enter / Space toggles it; Shift+Tab goes back |
+| ArrowUp / ArrowDown | stepper | ±1 |
+| Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y | Organize, Combine (and Merge) | Undo / redo (AC-549); ignored while a text field has focus |
+| Alt+Arrow | Alternate cards, Organize tiles | Move (F3) |
+
+**ARIA**
+
+- **Mode and quick pick.** Split's mode is a `radiogroup` "Split" (tiles or pills), or a native `select` with an accessible name "Split". Extract's quick pick is a `radiogroup` "Pick".
+- **Range field.** Accessible name "Parts" / "Pages to keep" / "Pages to delete". `aria-describedby` points to the sr-only hint "For example 1-3, 5, 8-last. You can also type odd, even or last." and, when present, the error. `aria-invalid="true"` while invalid. The error bubble has `role="alert"`, once per new error, not per keystroke.
+- **Clear ×.** "Clear selection" (Extract, Delete) or "Clear parts" (Split).
+- **Tiles.**
+  - Split: "Page 5, part 2 of 3"; a left-out page is "Page 6, not in any part" (AC-424).
+  - Extract: a button with `aria-pressed`, "Page 2 of 12".
+  - Delete: a button with `aria-pressed`, "Remove page 2" (AC-465).
+  - The grid hint (`#ip-grid-hint`) adds "Space picks, Shift+Space picks a range" on Extract and Delete.
+- **Marks.** A `button` "Split after page 4" with `aria-pressed`. A hidden mark is not in the DOM.
+- **Live region** (polite, debounced 500ms):
+  - Split: "3 files";
+  - Extract: "5 of 12 pages picked";
+  - Delete: "Page 2 marked. 11 of 12 pages kept" / "Page 2 kept";
+  - Undo / Redo: "Undone: rotate" / "Redone: move".
+- **Primary.** The visible label is the accessible name, so it updates with the count (AC-545). When disabled, `aria-describedby` points to the status text.
+- **More options.** `aria-haspopup="dialog"`; with changes its name is "More options, 2 changed". The dialog is labelled by its title, and focus goes to its first control on open (`berrypdf.md` → Modals, rule 5) and returns to the trigger on close.
+- **Undo / Redo.** A `group` "History", using `aria-disabled` instead of `disabled`, so focus stays on Undo after the last undo. `aria-keyshortcuts="Control+Z"` / `"Control+Shift+Z"`.
+- **Organize menus** (`Menu`, popover, `role="menu"`).
+  - Odd and even items are named "Odd positions: 1st, 3rd, 5th…" / "Even positions: 2nd, 4th, 6th…". The visible text is inside the name (2.5.3), and the page-strip glyph is `aria-hidden`.
+  - "Two-sided scan order" has `aria-describedby` → its tooltip.
+- **Alternate cards.** Each card is a `listitem` "odd.pdf, A, 5 pages". It contains a `radiogroup` "Order of odd.pdf", a stepper "Pages per turn from odd.pdf", a `switch` "Repeat separator.pdf", and "Move odd.pdf earlier / later". The result view is a `list` "Result order"; each tile is "A1, page 1 of odd.pdf".
+
+**Focus moves.**
+
+- After a mode switch, focus stays on the mode control.
+- After Clear ×, it goes to the field.
+- After "Remove all" (Organize), it goes to the drop card's button (F3).
+- After the result card opens, it goes to Download (F1).
+- After Escape in the More options dialog, it returns to the trigger.
+
+Focus rings are `:focus-visible` only: 2px `brand`, 2px offset. Fields use their own edge.
+
+### P-9. Drag and drop
+
+- **F4 has no drag.** Page order is not an F4 option (§3a). Dropping files anywhere adds them (F1 `DropOverlay`).
+- **Organize and Combine**: F3 M-7 unchanged (tiles, cards, insert bar, ghost, touch long-press).
+- **Alternate**: card drag and Alt+Arrow moves as F3 cards. The wide card uses the same ghost (`--ip-lift-scale`) and the same 3px insert bar between cards. The result view does not drag.
+
+### P-10. Micro-interactions
+
+Tokens and presets come from `docs/design/motion.md`. Everything is transform, opacity, or colour ≤ 200ms; nothing animates layout; everything is interruptible. Under reduced motion it is opacity only, or instant.
+
+| # | Interaction | Motion | Reduced |
+|---|---|---|---|
+| P1 | Mode switch / quick pick / typed range → tiles update | Tray tones, rings and badges are colour transitions, 120ms. Part discs and ticks fade + scale 0.9 → 1 in 120ms `--ease-out` (no overshoot). Cut lines `scaleY(0 → 1)` from the centre, 200ms `--ease-out`. No stagger, so a 1,000-page grid changes in one frame. | Colour and opacity only |
+| P2 | Mark hover (fine pointer) | The off-mark fades in, 120ms, as the pointer enters the tile or the gap | Instant |
+| P3 | Mark toggle | Press scale 0.94 at 120ms; fill 120ms; cut line P1 | No scale |
+| P4 | Extract pick / Delete mark | Pick: ring colour 120ms; the tick fades in and scales 0.8 → 1, 120ms. Delete: page opacity 1 → 0.32 in 200ms (grayscale switches at once); the badge goes from ghost to solid in 120ms; the number strike appears with it | Opacity only |
+| P5 | Primary count | The text changes on the same frame (no rolling number). The button keeps its slot width, so nothing shifts | Same |
+| P6 | Field bubble (hint or error) | Hint: fade + y 4 → 0, 120ms, after a 300ms focus delay. Error: the same, on the first invalid value after the 300ms input pause. The field shakes 4px, 240ms, only on blur or on pressing a disabled primary (motion.md S10) | Fade only, no shake |
+| P7 | More options | ≥ 640: dialog S11. < 640: sheet S13. Rows of the parts list are never staggered | Fade 120ms |
+| P8 | Organize Sort / Reverse / Two-sided / Odd-Even select | Sort and reverse: T9 FLIP of the visible tiles, 200ms `--ease-move`; above 40 moving tiles, a 120ms crossfade. Select: colour only (P4 timings) | Instant |
+| P9 | Undo / Redo | The inverse of the original move: FLIP T9, remove T10 (as built), insert T4 | Instant |
+| P10 | Selection bar | Enter y +8 → 0 + fade 200ms; exit fade 120ms. It sits above the bottom bar, so it never covers the primary | Fade 120ms |
+| P11 | Alternate setting change | The card updates in place (no motion). The Pages view, when shown, crossfades its tiles in 120ms (it is a new order, not a move) | Instant |
+| P12 | Processing / result / per-entry download | T11 / T12 / T13. The per-entry icon does the T13 arrow → tick swap on its own 36px button | Per T11–T13 |
+| P13 | View toggle, files arriving, thumbnails | T4–T7 unchanged | As built |
+
+**No-shift checklist:**
+
+- The bar holds its final height from the first frame (76 / 78 / 130).
+- The side panel's step-2 slot is reserved per mode.
+- Bubbles, menus, tooltips, the selection bar and notices float.
+- Marks live in the existing grid gap.
+- Discs and badges are absolute.
+- The primary's width is fixed per breakpoint.
+- The result list expands in place below the fold only after "Show all".
+
+### P-11. Decisions and open questions for the lead
+
+1. **`aria-pressed`, not `aria-selected`, on Extract tiles.** The tiles are toggle buttons in a list, not options in a listbox, and `aria-selected` is not valid on `button`. AC-402 and §0a should read `aria-pressed="true"`. Delete already uses `aria-pressed` (AC-465).
+2. **Undo│Redo live in the bottom bar's left slot, not the workspace toolbar.** The toolbar is full at every width. The bar slot is empty on Organize and Combine and is in the thumb zone on phones. AC-550's "workspace toolbar" should read "the bottom bar".
+3. **Live counts on Extract ("Extract 5 pages") and Delete ("Delete 3 pages")**, extending I-7 beyond Split. AC-545 covers Split only, so QA needs one more check per tool. The longest measured label, "Split into 1,000 files", is 176px of text and fits the 260px bar slot. On phones the padding change keeps it inside 230px at 320.
+4. **Split's tile click opens the preview** (§3b says "no action"). This gives keyboard and touch users a way to see a page, and it keeps the `viewport-fit.spec.ts` "Page 1 of" path working.
+5. **Two alternating part tones instead of 5 hues** (§3b), per BerryPDF's colour rule. Disc, cut line and accessible name carry the part.
+6. **Split's parts list lives in More options**, not in the dock. In a one-row bar a list can't fit, and the grid plus the primary already preview the parts live. AC-420, AC-429 and AC-430 need "open More options" as a step.
+7. **ZIP result card:** the entry list moves into the preview well with a per-entry download, and Download comes first. This changes F1 `ResultCard`. Rotate and Merge have no ZIP today, so their screens look the same, but their e2e result specs must stay green.
+8. **SelectionBar position fix** in shared `page-edit` code (overlap at 1366x657 on `/merge-pdf` today). Merge's e2e that reads the bar's position, if any, follows it.
+9. **No side panel when empty on Organize and Alternate** (`ControlDock emptyLayout="bar"`). The panel would hold only a disabled button.
+10. **Organize's action reads "Save PDF"** ("Saving"). Its output is a single edited copy, so "Organize PDF" as a verb would read oddly on the button.
+11. **Alternate's one-file notice offers "Open in Organize"**, handing the file over the way Continue with does. Organize's Two-sided scan order then fixes it (I-9).
+12. **`viewport-fit.spec.ts`** opens previews with the `/^Page 1 of/` tile button. On Extract and Delete the tile toggles instead, so the spec must click "Enlarge page 1" on those two routes.
+13. **Merge toolbar fixes** (P-3): one Add ▾ menu below 1024 (today `/merge-pdf` scrolls sideways from 640 to about 710 in the Pages view), and `shrink-0` plus an icon-only Add below 360. These are real bugs on a shipped route; fixing them here, in shared code, is the cheapest route.
+14. **Long `h1`s wrap on phones.** "Combine & reorder PDF pages" wraps at 390, and "Alternate & mix PDF" at 360. Both still fit, because the head grows but the bar is fixed. A shorter `h1` (for example "Combine PDF pages") would keep the head to one line, but it trades against the SEO keyword. This is the lead's call, with SEO.
+15. **New Phosphor UI icons** (P-4), MIT, generated like the existing ones.
+
+**Open questions (no blocker):**
+
+1. **Spreads tooltip.** "Spreads" is a short label. The tile carries a tooltip, "Page 1 alone, then pairs: 2-3, 4-5…". Is that enough, or should the side-panel tile show it as a second line? Recommendation: tooltip only.
+2. **Status for Split.** The status keeps "{pages} pages · {files} files" instead of §4's "{n} files", because the primary already says the count. With pages left out it reads "6 of 12 pages in 3 files".
+3. **Alternate undo.** Alternate has no Undo│Redo. Card moves and settings are few, and removal keeps F3's undo notice. If the evaluator counts consistency with Organize, the same `HistoryButtons` drop in at no layout cost (the bar's left slot is free).
+4. **Extract "Select all".** AC-456 picks all 12 by clicks. Ctrl/Cmd+A covers keyboards. A visible "All" pill would make a fourth pill; not proposed.
+
+### P-12. Performance: first-load JS per route (gzip, kB; entry / entry + preloads)
+
+`apps/web/scripts/first-load-budget.mjs` gets these rows (cloud build +2, as today):
+
+| Route | Budget | Basis |
+|---|---|---|
+| `/split-pdf` | **145 / 155** | Rotate (141 / 151) + `lib/page-ranges` (~1.5) + `RangeField` / `FieldBubble` / `NumberStepper` (~1.5) + `SplitMarks` and decorations (~1) |
+| `/extract-pdf-pages` | **143 / 153** | Rotate + range parser + field + selection hook |
+| `/delete-pdf-pages` | **143 / 153** | same as Extract |
+| `/organize-pdf` | **150 / 160** | Merge's budget. Organize drops `MergeOptions` from the first load and adds its menus and history (~2) |
+| `/combine-reorder-pdf` | **150 / 160** | the Merge code on another route |
+| `/alternate-mix-pdf` | **148 / 158** | Merge workspace minus `MergeOptions`; `EditablePageGrid readOnly` behind `next/dynamic`, prefetched on hover / focus of "Pages" |
+| `/merge-pdf` | stays **150 / 160** | history, the Add ▾ change and the selection bar fix must fit |
+
+The phone total stays ≤ 170 KB JS.
+
+**Kept out of the first load:**
+
+- `MoreOptionsDialog` and `PartsList`: `next/dynamic`, prefetched on hover or focus of More options.
+- The ZIP writer and every copy job: in the processing worker (§0a).
+- pdf.js: on first intake (F1).
+
+No new dependency: the parser, the stepper and the virtualiser are in-house.
+
+### P-13. Copy (our own wording)
+
+The strings live in `tools/<slug>/copy.ts`, and the shared ones in `components/page-select/copy.ts`. `{n}` values use `toLocaleString("en")` ("1,000"), and singular / plural forms are separate strings, never "file(s)".
+
+**Shared F4**
+
+| Key | Text |
+|---|---|
+| Field name, Split / Extract / Delete | Parts · Pages to keep · Pages to delete |
+| Placeholder, Split / Extract / Delete | 1-4, 5-10 · 1-3, 5, 8-last · 2, 5-7, last |
+| Placeholder when files differ | Differs per file |
+| Hint bubble (focus, empty) | Also: odd, even, last |
+| Hint (sr-only description) | For example 1-3, 5, 8-last. You can also type odd, even or last. |
+| Clear button | Clear selection (Extract, Delete) · Clear parts (Split) |
+| Error: not a number | "{item}": not a page number |
+| Error: page 0 | "0": pages start at 1 |
+| Error: past the end (one file) | "{item}": this file has {count} pages |
+| Error: past the end (every file) | "{item}": past the last page of every file |
+| Error: reversed range | "{item}": start is after end |
+| Error: nothing left (Delete) | Keep at least one page · Keep at least one page of {file} |
+| Notice: a file skipped (Extract) | {file} has none of these pages, so it's skipped. |
+| More options button, chip | More options · {n} changed |
+| Dialog | More options · Files · Name pattern · Remove bookmarks · Done |
+| Name pattern tooltip | {name} file name · {pages} page range · {n} file number · {first} · {last} · {date} |
+| Rename button (sr) | Rename {name} |
+| Empty status | Add a PDF to start |
+
+**Split**
+
+| Key | Text |
+|---|---|
+| Step 1 / step 2 heads | Split · Pages per file · Parts |
+| Modes | Every page · Every N pages (bar 1024–1279: Every N) · Spreads · Custom |
+| Spreads tooltip | Page 1 alone, then pairs: 2-3, 4-5… |
+| Stepper (sr) | Pages per file · Fewer pages per file · More pages per file |
+| Stepper error | Use a whole number from 1 |
+| Mark (sr) | Split after page {n} |
+| Tile (sr) | Page {n}, part {p} of {total} · Page {n}, not in any part |
+| Primary | Split into {n} files · Split into 1 file · Split PDF (when it can't run) |
+| Progress | Splitting |
+| Status (with left-out pages) | {used} of {total} pages in {n} files |
+| Live | {n} files · 1 file |
+
+**Extract pages**
+
+| Key | Text |
+|---|---|
+| Step head | Pages to keep |
+| Quick pick | Odd · Even · Custom |
+| Tile (sr) | Page {n} of {total} |
+| Primary | Extract {n} pages · Extract 1 page · Extract pages (disabled) |
+| Progress | Extracting |
+| Status | {k} of {n} pages · Pick the pages to keep |
+| Live | {k} of {n} pages picked |
+
+**Delete pages**
+
+| Key | Text |
+|---|---|
+| Step head | Pages to delete |
+| Tile (sr) | Remove page {n} |
+| Primary | Delete {n} pages · Delete 1 page · Delete pages (disabled) |
+| Progress | Deleting |
+| Status | {kept} of {n} pages kept · Pick pages to delete |
+| Live | Page {n} marked. {kept} of {total} pages kept · Page {n} kept |
+
+**Organize** (Merge's `copy-edit.ts` strings for tiles, picker, move and remove, through the `labels` prop)
+
+| Key | Text |
+|---|---|
+| Toolbar | Select · Sort · Remove · Page tools (phone) · Add (below 1024) |
+| Select ▾ | Select all · Select none · Invert selection · 1st, 3rd, 5th… · 2nd, 4th, 6th… |
+| Select ▾ (sr names) | Odd positions: 1st, 3rd, 5th… · Even positions: 2nd, 4th, 6th… |
+| Sort ▾ | Name A to Z · Name Z to A · Oldest first · Newest first · Reverse order · Two-sided scan order |
+| Two-sided tooltip | For a scan of all fronts, then all backs in reverse |
+| Remove ▾ | Remove selected · Keep only {file} · Remove all |
+| History | Undo · Redo · group "History" |
+| Live | Undone: {step} · Redone: {step} (steps: move, rotate, duplicate, blank page, remove, sort, reverse, add files, add pages) |
+| Primary / progress | Save PDF · Saving |
+| Empty status | Add files to start |
+
+**Combine & reorder**: Merge's copy, plus Undo│Redo as for Organize.
+
+**Alternate & mix**
+
+| Key | Text |
+|---|---|
+| Card | Normal · Reverse · per turn · Repeat |
+| Card (sr) | Order of {file} · Pages per turn from {file} · Repeat {file} · Move {file} earlier · Move {file} later |
+| Stepper error | Use a whole number from 1 |
+| Result view (sr) | Result order · {label}, page {n} of {file} |
+| Primary / progress | Mix PDFs · Mixing |
+| Status | {pages} pages · {files} files · Add one more file to mix |
+| One-file notice | One file with all fronts, then all backs? Organize can put it in order. · Open in Organize |
+| Empty status | Add files to start |
+
+**Result (ZIP)**
+
+| Key | Text |
+|---|---|
+| Meta | {size} · {n} files |
+| Show all | Show all {n} |
+| Per-entry download (sr) | Download {name} |
+
+### P-14. Screenshot index
+
+All shots are in `/mnt/project-files/designs/f4-f5-page-tools/mockups/`. The primary is in view in every shot that has one, and horizontal overflow is 0 in all of them.
+
+| Viewport | States |
+|---|---|
+| **1366x657** (27) | `split-1-empty` · `split-2-ready-every` · `split-3-everyn` · `split-4-custom-marks` · `split-5-custom-typed` · `split-6-invalid` · `split-7-more` · `split-8-processing` · `split-9-result` · `extract-1-empty` · `extract-2-ready` · `extract-3-invalid` · `delete-1-empty` · `delete-2-ready` · `delete-3-all` · `organize-1-empty` · `organize-2-ready` · `organize-3-select-menu` · `organize-4-sort-menu` · `organize-5-selection` · `organize-6-remove-menu` · `combine-1-ready` · `alternate-1-empty` · `alternate-2-files` · `alternate-3-separator` · `alternate-4-preview` · `alternate-5-one-file` |
+| **390x664** (27) | the same 27 states |
+| 1280x720, 390x844 (DSF 2) | `split-1-empty` · `split-4-custom-marks` · `split-9-result` · `extract-2-ready` · `delete-2-ready` · `organize-1-empty` · `organize-2-ready` · `organize-5-selection` · `combine-1-ready` · `alternate-2-files` · `alternate-4-preview` |
+| 320x640 (DSF 2) | the same 11, plus `organize-3/4/6` |
+
+The 1280x632, 1536x730, 1920x969, 1024x768, 1023x700, 768x1024, 640x900 and 360x640 checks in P-3 were measured on the same overlays. They are kept out of the folder to keep it small.
+
+These are mockups: overlays on the live Rotate and Merge pages, using real classes and tokens. Pixel details such as the exact glyph drawings and part-tone insets are for the engineer to match. The measured boxes and the rules above are binding.
