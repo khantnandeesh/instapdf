@@ -1,4 +1,4 @@
-import { PDFDocument, degrees, rgb, StandardFonts } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFString, degrees, rgb, StandardFonts } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
 import { bookletOrder, halfBoxes, HALF_DEFAULTS, resolveDirection, splitHalfPdf } from "./split-half";
 
@@ -96,4 +96,35 @@ describe("splitHalfPdf", () => {
     expect(r.pageCount).toBe(20);
     expect(r.bytes.length).toBeLessThan(input.length * 1.6);
   });
+  it("AC-927: bookmarks stay and still open their page", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const { outlineEntries } = await import("./split-outline");
+    const input = new Uint8Array(await readFile(new URL("../../../tests/fixtures/bookmarks.pdf", import.meta.url)));
+    const r = await splitHalfPdf({ bytes: input, cut: [0, 1, 2], options: HALF_DEFAULTS });
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const doc = await pdfjs.getDocument({ data: r.bytes.slice(), verbosity: 0 }).promise;
+    const entries = await outlineEntries(doc as never);
+    await doc.loadingTask.destroy();
+    // Each chapter opens the first half of its old page: pages 1, 3 and 5 of 6.
+    expect(entries.map((e) => [e.title, e.page])).toEqual([["Chapter 1", 0], ["Chapter 2", 2], ["Chapter 3", 4]]);
+  });
+  it("AC-928: a link goes to the half that shows it", async () => {
+    const doc = await PDFDocument.load(await sheets([["L1", "R1"]]));
+    const page = doc.getPage(0);
+    const link = (x: number) => doc.context.register(doc.context.obj({ Type: "Annot", Subtype: "Link", Rect: [x, 90, x + 60, 130], P: page.ref, A: { S: "URI", URI: PDFString.of("https://example.com/") } }));
+    page.node.set(PDFName.of("Annots"), doc.context.obj([link(40), link(240)]));
+    const r = await splitHalfPdf({ bytes: await doc.save(), cut: [0], options: HALF_DEFAULTS });
+    const out = await PDFDocument.load(r.bytes);
+    const rects = out.getPages().map((p) => (p.node.Annots()?.asArray() ?? []).map((a) => out.context.lookup(a, PDFDict).lookup(PDFName.of("Rect"), PDFArray).lookup(0, PDFNumber).asNumber()));
+    expect(rects).toEqual([[40], [240]]);
+  });
+  it("AC-929: a crop box that reaches past the page is cut where the page is", async () => {
+    const doc = await PDFDocument.load(await sheets([["L1", "R1"]]));
+    doc.getPage(0).setCropBox(-50, -50, 600, 400);
+    const r = await splitHalfPdf({ bytes: await doc.save(), cut: [0], options: HALF_DEFAULTS });
+    const boxes = (await PDFDocument.load(r.bytes)).getPages().map((p) => p.getMediaBox());
+    expect(boxes).toEqual([{ x: 0, y: 0, width: 200, height: 200 }, { x: 200, y: 0, width: 200, height: 200 }]);
+    expect(await visible(r.bytes)).toEqual(["L1", "R1"]);
+  });
 });
+

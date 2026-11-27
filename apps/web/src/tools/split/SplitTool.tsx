@@ -110,11 +110,21 @@ export function SplitTool({ variant }: { variant?: SplitVariant } = {}) {
     () => (outlineReady && o ? Object.fromEntries(files.map((f) => [f.id, o.partsFromOutline(outlines[f.id], shownLevel, f.pageCount, contains)])) : null),
     [outlineReady, o, files, outlines, shownLevel, contains],
   );
+  // Marks moved by hand stay when a file is added or removed: only a new file, or a new level or
+  // filter, writes parts from the bookmarks.
+  const written = useRef({ key: "", ids: new Set<string>() });
   useEffect(() => {
     if (!outlined || !m) return;
-    const perFile = Object.fromEntries(Object.entries(outlined).map(([id, r]) => [id, r.parts]));
-    setSplit((s) => ({ ...s, kind: "custom", perFile, ...m.textForParts(perFile, filesLive.current) }));
-  }, [outlined, m, setSplit, filesLive]);
+    const key = `${shownLevel}\n${contains}`;
+    const before = written.current.key === key ? written.current.ids : new Set<string>();
+    const ids = Object.keys(outlined);
+    written.current = { key, ids: new Set(ids) };
+    if (ids.every((id) => before.has(id))) return;
+    setSplit((s) => {
+      const perFile = Object.fromEntries(ids.map((id) => [id, before.has(id) && s.perFile[id] ? s.perFile[id] : outlined[id].parts]));
+      return { ...s, kind: "custom", perFile, ...m.textForParts(perFile, filesLive.current) };
+    });
+  }, [outlined, m, shownLevel, contains, setSplit, filesLive]);
 
   /** A user's change, worked out from the live settings (never from this render's, which may be behind). */
   const change = (fn: (s: SplitState) => SplitState) => {

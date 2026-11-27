@@ -54,6 +54,8 @@ stay whole, in place.
 - AC-922 Unpicked pages stay whole and in place. AC-923 Booklet scans come out in reading order.
 - AC-924 The halves share content: the output does not double in size. AC-925 Top / bottom cuts across.
 - AC-926 All three pages pass the every-tool guards (first-screen fit, one scroller, budgets).
+- AC-927 Split in half keeps bookmarks (each opens the first half of its old page), form fields and tags. AC-928 A link or note goes to the half that shows it. AC-929 A crop box larger than the page is cut where the page is.
+- AC-930 Split by size checks the written files: a part over the limit is re-split; a part that cannot fit is named in a note.
 
 Tests: `src/lib/pdf/{split-outline,split-size,split-half}.test.ts`, `e2e/f7/split-variants.spec.ts`.
 Screenshots: `designs/f7/`. Not yet built: Split by text (area on the page), a draggable cut line for In half.

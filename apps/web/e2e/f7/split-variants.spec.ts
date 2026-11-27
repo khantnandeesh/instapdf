@@ -44,6 +44,10 @@ test.describe("Split by bookmarks", () => {
     await open(page, "split-pdf-by-bookmarks", "twelve.pdf");
     await page.getByRole("button", { name: "Split after page 2", exact: true }).click();
     await expect(primary(page)).toHaveText("Split into 4 files");
+    // Adding a file keeps the mark that was moved by hand.
+    await pick(page, "alpha.pdf");
+    await expect(primary(page)).toHaveText("Split into 6 files");
+    await expect(page.getByRole("button", { name: "Split after page 2", exact: true }).first()).toHaveAttribute("aria-pressed", "true");
   });
 
   test("AC-905: a file with no bookmarks says so and the button waits", async ({ page }) => {

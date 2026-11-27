@@ -97,15 +97,42 @@ async function runSplitSize(job: SplitSizeJob, onProgress: ProgressFn, env: JobE
   const perFile: Record<string, SplitMode> = {};
   const notes: string[] = [];
   for (const [i, f] of job.files.entries()) {
+    const progress = (x: number) => onProgress((0.6 * (i + x)) / job.files.length);
     const bytes = new Uint8Array(await f.source.arrayBuffer());
+    // A file that is under the limit as it stands is not cut, however close it is.
+    if (bytes.length <= job.limit) {
+      perFile[f.id] = { kind: "parts", parts: [Array.from({ length: f.pageCount }, (_, k) => k)] };
+      notes.push(`${f.name} is already under the limit, so it stays one file.`);
+      progress(1);
+      continue;
+    }
     const { doc } = await loadForEdit(bytes, f.password);
     const pageCount = doc.getPageCount();
+    const measure = measureWith(doc);
     const guess = Math.floor(job.limit / Math.max(1, bytes.length / pageCount));
-    const r = await partsBySize(pageCount, measuredLimit(job.limit), measureWith(doc), guess, (x) => onProgress((0.6 * (i + x)) / job.files.length));
-    perFile[f.id] = { kind: "parts", parts: r.parts };
-    const pages = r.oversize.map((p) => p + 1);
-    if (pages.length) notes.push(`${pages.length === 1 ? `Page ${pages[0]}` : `Pages ${pages.join(", ")}`} of ${f.name} ${pages.length === 1 ? "is" : "are each"} over the limit alone, so ${pages.length === 1 ? "its file is" : "their files are"} too.`);
-    else if (r.parts.length === 1) notes.push(`${f.name} is already under the limit, so it stays one file.`);
+    // The parts are sized on the bare pages, but the written files also carry bookmarks, links and form
+    // resources. So each round writes the parts for real and, where one is over, sizes them again with
+    // the largest overhead seen taken off the limit.
+    let parts: number[][] = [];
+    let sizes: number[] = [];
+    let extra = 0;
+    for (let round = 0; round < 4; round++) {
+      parts = (await partsBySize(pageCount, Math.max(1, measuredLimit(job.limit) - extra), measure, guess, (x) => progress((round + x) / 4))).parts;
+      const built = await buildDocuments(
+        { sources: [{ id: f.id, name: f.name, kind: "pdf", source: f.source, password: f.password }], documents: parts.map((p, j) => ({ name: `${j}.pdf`, pages: p.map((k) => ({ sourceId: f.id, sourceIndex: k, rotation: 0 })) })) },
+        env,
+        () => {},
+      );
+      sizes = built.documents.map((d) => d.bytes.length);
+      if (!sizes.some((size, j) => size > job.limit && parts[j].length > 1)) break;
+      const overhead = await Promise.all(parts.map(async (p, j) => sizes[j] - (await measure(p[0], p[p.length - 1] + 1))));
+      extra = Math.max(extra + 1024, Math.max(...overhead) + 1024);
+    }
+    progress(1);
+    perFile[f.id] = { kind: "parts", parts };
+    const alone = parts.filter((p, j) => sizes[j] > job.limit && p.length === 1).map((p) => p[0] + 1);
+    if (alone.length) notes.push(`${alone.length === 1 ? `Page ${alone[0]}` : `Pages ${alone.join(", ")}`} of ${f.name} ${alone.length === 1 ? "is" : "are each"} over the limit alone, so ${alone.length === 1 ? "its file is" : "their files are"} too.`);
+    if (parts.some((p, j) => sizes[j] > job.limit && p.length > 1)) notes.push(`Some parts of ${f.name} could not be brought under the limit.`);
   }
   const plan = planSplit(job.files, { mode: { kind: "ranges", items: [] }, perFile });
   const out = await runDocuments(documentsJob("split", plan, job.files), (x, phase) => onProgress(0.6 + 0.4 * x, phase), env);

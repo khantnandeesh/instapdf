@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { PDFDocument } from "@cantoo/pdf-lib";
+import { PDFDocument, PDFName } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
 import { measureWith, partsBySize, type Measure } from "./split-size";
 
@@ -69,7 +69,7 @@ describe("split by size job", () => {
   };
   it("AC-914: pages too big on their own are named in the result", async () => {
     const { runJob } = await import("./jobs");
-    const out = await runJob({ kind: "splitSize", limit: 2500, files: [await file("three-pages.pdf")] }, () => {});
+    const out = await runJob({ kind: "splitSize", limit: 300, files: [await file("three-pages.pdf")] }, () => {});
     expect(out.type).toBe("application/zip");
     expect(out.entries).toHaveLength(3);
     expect(out.warnings?.[0]).toBe("Pages 1, 2, 3 of three-pages.pdf are each over the limit alone, so their files are too.");
@@ -80,4 +80,30 @@ describe("split by size job", () => {
     expect(out).toMatchObject({ name: "twelve.pdf", type: "application/pdf", pageCount: 12 });
     expect(out.warnings).toEqual(["twelve.pdf is already under the limit, so it stays one file."]);
   });
+
+  it("AC-910: parts stay under the limit even when the written files carry shared form resources", async () => {
+    const { runJob } = await import("./jobs");
+    const { unzipSync } = await import("fflate");
+    // 40 pages of 20 KB each, a text field on each, and a 150 KB resource every written part must carry.
+    const doc = await PDFDocument.create();
+    const noise = (n: number, seed: number) => Uint8Array.from({ length: n }, (_, i) => (Math.imul(i + seed, 2654435761) >>> 13) & 255);
+    const form = doc.getForm();
+    for (let i = 0; i < 40; i++) {
+      const page = doc.addPage([300, 200]);
+      const image = doc.context.register(doc.context.stream(noise(100 * 67 * 3, i * 7919), { Type: "XObject", Subtype: "Image", Width: 100, Height: 67, ColorSpace: "DeviceRGB", BitsPerComponent: 8 }));
+      page.node.set(PDFName.of("Resources"), doc.context.obj({ XObject: { Im: image } }));
+      page.node.set(PDFName.of("Contents"), doc.context.register(doc.context.stream("q 100 0 0 67 10 10 cm /Im Do Q")));
+      form.createTextField(`f${i}`).addToPage(page, { x: 150, y: 100, width: 100, height: 20 });
+    }
+    const big = doc.context.register(doc.context.stream(noise(150_000, 1), { Type: "Font" }));
+    form.acroForm.dict.set(PDFName.of("DR"), doc.context.obj({ Font: { Big: big } }));
+    const bytes = await doc.save();
+    const limit = 400_000;
+    const out = await runJob({ kind: "splitSize", limit, files: [{ id: "a", name: "form.pdf", source: new Blob([bytes as Uint8Array<ArrayBuffer>]), pageCount: 40 }] }, () => {});
+    const parts = Object.values(unzipSync(new Uint8Array(await out.blob.arrayBuffer())));
+    expect(parts.length).toBeGreaterThan(1);
+    for (const part of parts) expect(part.length).toBeLessThanOrEqual(limit);
+    expect(out.entries?.reduce((n, e) => n + e.pageCount, 0)).toBe(40);
+    expect(out.warnings ?? []).toEqual([]);
+  }, 60_000);
 });
