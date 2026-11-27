@@ -14,6 +14,7 @@
  * them into a ZIP holds one output at a time.
  */
 import { defaultMergeOptions, type MergeOptions } from "./merge-options";
+import { saveCompact } from "./write";
 import { composeDocument, openSource, type MergeEnv, type MergePageInput, type MergeSourceInput, type OpenedSource, type SourcePool } from "./merge";
 
 export type BuildDocumentPlan = {
@@ -81,7 +82,7 @@ export async function buildDocuments(
     const at = (f: number) => onProgress(Math.min(0.999, (done + weights[i] * f) / total));
     const r = await composeDocument({ sources: input.sources, pages: plan.pages, options }, env, pool, (f) => at(f * 0.9));
     for (const w of r.warnings) if (!warnings.includes(w)) warnings.push(w);
-    const bytes = await r.out.save();
+    const bytes = await saveCompact(r.out);
     const built: BuiltDocument = { name: plan.name, bytes, pageCount: r.out.getPageCount() };
     for (const [id, last] of lastUse) if (last === i) open.delete(id);
     if (onDocument) await onDocument(built, i);

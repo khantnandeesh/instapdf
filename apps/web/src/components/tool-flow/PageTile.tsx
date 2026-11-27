@@ -5,7 +5,7 @@ import { describeDelta, formatDelta } from "@/lib/pdf/rotation";
 import type { PageSize } from "@/lib/pdf/pdfjs";
 import { cx } from "../ui/cx";
 import { CheckIcon, TrashIcon } from "../ui/icons";
-import { pageBoxStyle, pageTransform } from "./page-box";
+import { pageBoxStyle, pageTransform, pageTurnScale } from "./page-box";
 import { PageThumb } from "./Thumbnail";
 import type { PageDecoration } from "./types";
 
@@ -98,7 +98,7 @@ export function PageTile({
           style={{ ...pageBoxStyle(size), transform: pageTransform(size, pendingDelta) }}
           data-testid="page-visual"
         >
-          <PageThumb fileId={fileId} index={index} />
+          <PageThumb fileId={fileId} index={index} scale={pageTurnScale(size, pendingDelta)} />
         </span>
         <button
           type="button"

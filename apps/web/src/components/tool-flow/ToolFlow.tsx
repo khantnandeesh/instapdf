@@ -30,7 +30,7 @@ import { NoticeStack, type FlowNotice } from "./NoticeStack";
 import { OwnerPermissionNotice } from "./OwnerPermissionNotice";
 import type { PageActionsRenderer, PageKeyHandler, TileActivate } from "./PageGrid";
 import type { PreviewTarget } from "./PagePreviewDialog";
-import { createVisibilityWatcher, ThumbContext } from "./Thumbnail";
+import { createVisibilityWatcher, ThumbContext } from "./thumb-context";
 import { ToolIntro } from "./ToolIntro";
 import type { FlowApi, FlowContext, FlowState, LoadedFile, PageDecoration, PreviewItem, ProcessFn, ReadyFile, ToolOutput, WorkspaceContext } from "./types";
 import { onIntent } from "./intent";
@@ -248,7 +248,6 @@ export function ToolFlow({
   const announce = useCallback((m: string) => setMessage((prev) => (prev === m ? `${m} ` : m)), []);
   const [viewChoice, setViewChoice] = useState<"pages" | "files" | null>(null);
   const [thumbSize, setThumbSize] = useState(THUMB_DEFAULT);
-  const [renderSize, setRenderSize] = useState(160);
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<{ items: PreviewItem[]; at: number } | null>(null);
   const [pw, setPw] = useState<{ error?: string; busy: boolean; attempt: number }>({ busy: false, attempt: 0 });
@@ -338,7 +337,9 @@ export function ToolFlow({
   const totalPages = readyFiles.reduce((s, f) => s + f.pageCount, 0);
   const ownerBlocked = readyFiles.filter((f) => flow.requiredPermissions.some((p) => f.denied.includes(p)));
   const runCheck = canRun?.() ?? true;
-  const canPrimary = (state === "ready" || state === "error") && readyFiles.length > 0 && ownerBlocked.length === 0 && runCheck === true;
+  // Enter in a dock field (FlowApi.submit) needs only the flow's own conditions; the tool has checked its settings.
+  const flowCanRun = (state === "ready" || state === "error") && readyFiles.length > 0 && ownerBlocked.length === 0;
+  const canPrimary = flowCanRun && runCheck === true;
   const showViewToggle = files.length > 1 || (!!viewToggleFromOneFile && files.length > 0);
   const view = showViewToggle ? (viewChoice ?? flow.defaultView) : "pages";
   const optionsDisabled = !(state === "ready" || state === "error");
@@ -426,8 +427,8 @@ export function ToolFlow({
         announce(copy.fileReady(entry.name, frames.length));
         return "ok";
       }
-      const inspector = inspectPdf ? await inspectPdf().catch(() => null) : null;
-      const scanned = inspector?.scan(entry.source); // in a worker, in parallel with pdf.js
+      // The inspector loads beside pdf.js, never before it (eval G-11); its scan runs in a worker.
+      const inspection = inspectPdf?.().then((i) => [i, i.scan(entry.source)] as const, () => null);
       const result = await openPdf(bytes, password);
       if (!filesRef.current.some((f) => f.id === id)) {
         if (result.ok) void result.pdf.task.destroy();
@@ -470,9 +471,9 @@ export function ToolFlow({
       renderer?.register(id, pdf.doc);
       patchFile(id, { status: "ready", pages });
       announce(copy.fileReady(entry.name, pdf.pageCount));
-      if (inspector)
-        void Promise.resolve(scanned)
-          .then((markers) => inspector.notice(entry.name, pdf.doc, markers))
+      if (inspection)
+        void inspection
+          .then((x) => x && x[1].then((markers) => x[0].notice(entry.name, pdf.doc, markers)))
           .then((note) => note && filesRef.current.some((f) => f.id === id) && pushNotice({ tone: "warning", title: note, sticky: true }))
           .catch(() => {});
       return "ok";
@@ -613,7 +614,9 @@ export function ToolFlow({
   // ---- run -------------------------------------------------------------------
   const run = useCallback(async () => {
     const ready = filesRef.current.filter(isReady);
-    if (!ready.length) return;
+    if (!ready.length || phaseRef.current === "processing") return;
+    // Set here, not only at render: a second Enter or click before React re-renders must see it.
+    phaseRef.current = "processing";
     const controller = new AbortController();
     abort.current = controller;
     setProgress(0);
@@ -648,6 +651,10 @@ export function ToolFlow({
       setPhase("error");
     }
   }, [announce, processFiles, pushNotice, tool.flow.progressLabel, tool.slug]);
+  const submitRef = useRef<() => void>(() => {});
+  submitRef.current = () => {
+    if (flowCanRun) void run(); // run() itself ignores a second call while one is processing
+  };
 
   // Move focus once the processing bar or the error panel has been committed
   // (a requestAnimationFrame can run before React commits under load).
@@ -812,13 +819,12 @@ export function ToolFlow({
       const saved = Number(sessionStorage.getItem("ip-thumb-size"));
       if (saved >= THUMB_MIN && saved <= THUMB_MAX) {
         setThumbSize(saved);
-        setRenderSize(saved);
       }
     } catch {}
   }, []);
   useEffect(() => {
+    // Each thumbnail redraws for its new box itself (PageThumb measures it); only the choice is kept here.
     const t = setTimeout(() => {
-      setRenderSize(thumbSize);
       try {
         sessionStorage.setItem("ip-thumb-size", String(thumbSize));
       } catch {}
@@ -845,6 +851,7 @@ export function ToolFlow({
       setView: (v) => setViewChoice(v),
       openPicker: () => picker.current?.open(),
       fallbackFocus,
+      submit: () => submitRef.current(),
     }),
     [announce, dismissNotice, fallbackFocus, intake, pushNotice, removeFile],
   );
@@ -863,6 +870,8 @@ export function ToolFlow({
     return items.length ? { items, at: Math.min(preview.at, items.length - 1) } : null;
   }, [preview, readyFiles]);
   const accept = acceptAttribute(flow.accept);
+  const watch = watcher?.watch ?? null;
+  const thumbs = useMemo(() => ({ renderer, watch }), [renderer, watch]);
   const ownerFile = ownerFor ? readyFiles.find((f) => f.id === ownerFor) : undefined;
 
   // Page tools state the outcome while the primary can run (I-7, AC-545); the plain verb otherwise.
@@ -1041,7 +1050,7 @@ export function ToolFlow({
                       onEnterPassword={() => setOwnerFor(f.id)}
                     />
                   ))}
-                  <ThumbContext.Provider value={{ renderer, watch: watcher?.watch ?? null, renderSize: renderBucket(renderSize) }}>
+                  <ThumbContext.Provider value={thumbs}>
                     {renderWorkspace ? (
                       renderWorkspace(wctx)
                     ) : view === "pages" ? (
@@ -1174,10 +1183,9 @@ export function ToolFlow({
   );
 }
 
-/** See `inspectPdf`. `scan` reads the file (off the main thread) for whatever `notice` needs. */
+/**
+ * See `inspectPdf`. `scan` reads the file (off the main thread) for whatever `notice` needs. It is
+ * called on each load attempt (a password retry too), so it scans a file once and never rejects:
+ * a file that fails to open never reads its result.
+ */
 export type PdfInspector = { scan: (file: Blob) => Promise<unknown>; notice: (name: string, doc: OpenedPdf["doc"], scanned: unknown) => Promise<string | null> };
-
-/** Re-render thumbnails only in steps, scaling with CSS in between. */
-function renderBucket(size: number): number {
-  return size <= 160 ? 160 : size <= 240 ? 240 : size <= 320 ? 320 : 400;
-}

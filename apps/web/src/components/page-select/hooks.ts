@@ -1,6 +1,9 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FlowApi, LoadedFile } from "../tool-flow/types";
+import { useLiveState } from "../ui/live-state";
+
+export { useLiveState };
 import type { SelFile } from "./selection";
 
 /**
@@ -17,7 +20,7 @@ export function useRemembered<T extends Record<string, unknown>>(
   onLoad?: (stored: Partial<T>) => void,
 ) {
   const key = `berrypdf:${slug}-options`;
-  const [value, setValue] = useState<T>(defaults);
+  const [value, setValue, live] = useLiveState<T>(defaults);
   const checkRef = useRef(check);
   const onLoadRef = useRef(onLoad);
   useEffect(() => {
@@ -32,7 +35,7 @@ export function useRemembered<T extends Record<string, unknown>>(
     } catch {
       // no storage: keep the defaults
     }
-  }, [key]);
+  }, [key, setValue]);
   const update = useCallback(
     (patch: Partial<T>) =>
       setValue((v) => {
@@ -44,10 +47,12 @@ export function useRemembered<T extends Record<string, unknown>>(
         }
         return next;
       }),
-    [key],
+    [key, setValue],
   );
-  return [value, update] as const;
+  /** `live.current`: the options as the last change left them, for the run (see useLiveState). */
+  return [value, update, live] as const;
 }
+
 
 /** Polite announcements debounced by 500ms (spec F4/F5 UI P-8 "Live region"). */
 export function useDebouncedAnnounce(apiRef: { current: FlowApi | null }) {
