@@ -333,11 +333,16 @@ for (const size of SIZES) {
         await expect(pop).toBeVisible();
         await expect(pop).toHaveAttribute("role", "dialog");
         await expect(pop).toHaveAttribute("aria-modal", "false");
-        // Under its trigger, right-aligned to it, and inside the screen.
+        // Under its trigger, right-aligned to it where that fits, else slid in to 8px from the screen's
+        // edge; always wholly inside the screen (a trigger near the row's left must not clip it).
+        await pop.evaluate((p) => Promise.all(p.getAnimations().map((a) => a.finished)));
         const t = (await trigger.boundingBox())!;
         const b = (await pop.boundingBox())!;
         expect(b.y).toBeGreaterThanOrEqual(t.y + t.height);
-        expect(Math.abs(b.x + b.width - (t.x + t.width))).toBeLessThanOrEqual(1);
+        if (t.x + t.width - b.width >= 8) expect(Math.abs(b.x + b.width - (t.x + t.width))).toBeLessThanOrEqual(1);
+        else expect(Math.abs(b.x - 8)).toBeLessThanOrEqual(1);
+        expect(b.x).toBeGreaterThanOrEqual(0);
+        expect(b.x + b.width).toBeLessThanOrEqual(size.width);
         expect(b.y + b.height).toBeLessThanOrEqual(size.height);
         // Focus goes into it; the page behind stays usable (non-modal).
         expect(await pop.evaluate((p) => p.contains(document.activeElement))).toBe(true);
