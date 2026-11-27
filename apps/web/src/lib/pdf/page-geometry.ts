@@ -73,13 +73,28 @@ export function setPageBox(page: PDFPage, b: Box) {
 
 const num = (n: number) => String(Math.round(n * 1e5) / 1e5);
 
-/** Draws everything on the page through `m`: the content is wrapped, not rewritten. */
-export function transformContent(doc: PDFDocument, page: PDFPage, m: Matrix) {
+/**
+ * Draws everything on the page through `m`: the content is wrapped, not rewritten. With `clip`
+ * (in the page's coordinates before `m`), nothing outside that box is drawn any more: what the old
+ * page box hid stays hidden when the new one is larger.
+ */
+export function transformContent(doc: PDFDocument, page: PDFPage, m: Matrix, clip?: Box) {
+  // Two pages may point at one list of content streams: this page gets its own list first, so the wrap stays on it.
+  const contents = page.node.get(PDFName.of("Contents"));
+  const list = contents && doc.context.lookup(contents);
+  if (list instanceof PDFArray) page.node.set(PDFName.of("Contents"), doc.context.obj(list.asArray()));
   // Normalising first closes any graphics state the page left open, so the matrix cannot leak or be undone.
   page.node.normalize();
-  const start = doc.context.register(doc.context.stream(`q ${m.map(num).join(" ")} cm\n`));
+  const cut = clip ? `${[clip.x, clip.y, clip.width, clip.height].map(num).join(" ")} re W n\n` : "";
+  const start = doc.context.register(doc.context.stream(`q ${m.map(num).join(" ")} cm\n${cut}`));
   const end = doc.context.register(doc.context.stream("\nQ"));
   page.node.wrapContentStreams(start, end);
+}
+
+/** True when the page's shown box is smaller than its media box: something is hidden outside it. */
+export function hidesContent(page: PDFPage, box: Box): boolean {
+  const media = page.getMediaBox();
+  return box.x > media.x + 0.01 || box.y > media.y + 0.01 || box.x + box.width < media.x + media.width - 0.01 || box.y + box.height < media.y + media.height - 0.01;
 }
 
 const numbers = (arr: PDFArray) => Array.from({ length: arr.size() }, (_, i) => arr.lookupMaybe(i, PDFNumber)?.asNumber() ?? 0);

@@ -847,6 +847,10 @@ export const seoContent: Record<string, ToolSeoContent> = {
         a: "Yes. Pages are placed as they are, not as pictures, so text stays text and prints crisply at any size.",
       },
       {
+        q: "Do links still work?",
+        a: "Web links keep working on the new sheets. Links that jump to another page, and form fields, are left out, because the pages they belonged to are now parts of a sheet.",
+      },
+      {
         q: "Is there a size limit?",
         a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up and no watermark.",
       },

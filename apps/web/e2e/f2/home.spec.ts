@@ -171,8 +171,8 @@ test.describe("catalogue", () => {
     const popY = (await popular.boundingBox())!.y;
     const firstCat = (await page.locator("[data-testid=category]").first().boundingBox())!.y;
     expect(popY).toBeLessThan(firstCat);
-    // F3 AC-77, F4: Merge and Split are usable now; Crop is the example planned tool in Popular.
-    await expect(popular.locator('a[href="/crop-pdf"]')).toContainText("Coming soon");
+    // F3 AC-77, F4: Merge and Split are usable now; PDF to Word is the example planned tool in Popular.
+    await expect(popular.locator('a[href="/pdf-to-word"]')).toContainText("Coming soon");
     await expect(popular.locator('a[href="/split-pdf"]')).toContainText("Beta");
     await expect(popular.locator('a[href="/merge-pdf"]')).toContainText("Beta");
     await expect(popular.locator('a[href="/merge-pdf"]')).not.toContainText("Coming soon");

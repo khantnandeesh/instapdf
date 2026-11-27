@@ -1,4 +1,4 @@
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFString, StandardFonts, degrees } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, PDFString, StandardFonts, decodePDFRawStream, degrees, type PDFPage } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
 import { cropPdf } from "./crop";
 import { flipPdf } from "./flip";
@@ -236,5 +236,81 @@ describe("options and trim", () => {
     expect(a.h).toBeCloseTo(0.274, 2);
     expect(contentArea(new Uint8ClampedArray(w * h * 4).fill(255), w, h)).toEqual({ x: 0, y: 0, w: 1, h: 1 });
     expect(unionArea([{ x: 0.1, y: 0.2, w: 0.3, h: 0.3 }, { x: 0.3, y: 0.1, w: 0.5, h: 0.2 }])).toEqual({ x: 0.1, y: 0.1, w: 0.7000000000000001, h: 0.4 });
+  });
+});
+
+describe("review cases (F8 AC-1040 to AC-1044)", () => {
+  /** The page's content streams as text, in order. */
+  const contentOf = (doc: PDFDocument, page: PDFPage) => {
+    const c = page.node.Contents();
+    const list = c instanceof PDFArray ? c.asArray().map((r) => doc.context.lookup(r)) : [c];
+    return list.map((x) => Buffer.from(x instanceof PDFRawStream ? decodePDFRawStream(x).decode() : (x as unknown as { getContents(): Uint8Array }).getContents()).toString("latin1")).join("|");
+  };
+  const count = (doc: PDFDocument, key: string, value: string) => doc.context.enumerateIndirectObjects().filter(([, o]) => ((o as { dict?: PDFDict }).dict ?? (o as PDFDict)).get?.(PDFName.of(key)) === PDFName.of(value)).length;
+
+  it("AC-1040: two pages that share one content list are flipped one by one", async () => {
+    const d = await PDFDocument.create();
+    const pages = [d.addPage([200, 300]), d.addPage([200, 300])];
+    const shared = d.context.register(d.context.obj([d.context.register(d.context.stream("0 0 50 50 re f"))]));
+    for (const p of pages) p.node.set(PDFName.of("Contents"), shared);
+    const bytes = await d.save();
+    const flips = async (picked: number[]) => {
+      const out = await PDFDocument.load((await flipPdf({ bytes, pages: picked, direction: "horizontal" })).bytes);
+      return out.getPages().map((p) => contentOf(out, p).split(" cm").length - 1);
+    };
+    expect((await flips([0]))[1]).toBe(0);
+    const both = await flips([0, 1]);
+    expect(both[0]).toBe(both[1]);
+    expect((await flips([0]))[0]).toBe(both[0]);
+  });
+  it("AC-1041: N-up places a file with an empty page, and stores a shared font and picture once", async () => {
+    const d = await PDFDocument.create();
+    const font = await d.embedFont(StandardFonts.Helvetica);
+    const image = d.context.register(d.context.stream(new Uint8Array(50_000).map((_, i) => (i * 7919) % 251), { Type: "XObject", Subtype: "Image", Width: 250, Height: 200, ColorSpace: "DeviceGray", BitsPerComponent: 8 }));
+    for (let i = 0; i < 8; i++) {
+      const p = d.addPage([200, 300]);
+      p.drawText(`P${i}`, { font });
+      (p.node.normalizedEntries().XObject as PDFDict).set(PDFName.of("Im0"), image);
+    }
+    d.addPage([200, 300]);
+    const bytes = await d.save();
+    const r = await nupPdf({ bytes, options: NUP_DEFAULTS });
+    expect(r.pageCount).toBe(5);
+    const out = await PDFDocument.load(r.bytes);
+    expect(count(out, "Type", "Font")).toBe(1);
+    expect(count(out, "Subtype", "Image")).toBe(1);
+    expect(r.bytes.length).toBeLessThan(bytes.length * 1.5);
+  });
+  it("AC-1042: what the page box hid stays hidden after Resize", async () => {
+    const d = await PDFDocument.create();
+    const p = d.addPage([600, 800]);
+    p.drawText("hidden", { x: 5, y: 5 });
+    p.setCropBox(100, 100, 400, 600);
+    const bytes = await d.save();
+    for (const options of [{ mode: "margins", margins: { top: 100, right: 100, bottom: 100, left: 100 } }, { mode: "size", width: 612, height: 1008 }] as const) {
+      const out = await PDFDocument.load((await resizePdf({ bytes, pages: [0], options })).bytes);
+      expect(contentOf(out, out.getPage(0)), options.mode).toContain("100 100 400 600 re W n");
+    }
+    // A page that hides nothing is not wrapped for margins.
+    const plain = await PDFDocument.load((await resizePdf({ bytes: await make([two]), pages: [0], options: { mode: "margins", margins: { top: 10, right: 10, bottom: 10, left: 10 } } })).bytes);
+    expect(contentOf(plain, plain.getPage(0))).not.toContain("re W n");
+  });
+  it("AC-1043: N-up keeps web links, moved with their page", async () => {
+    const d = await PDFDocument.create();
+    for (let i = 0; i < 2; i++) {
+      const p = d.addPage([200, 300]);
+      p.drawText("x");
+      p.node.set(PDFName.of("Annots"), d.context.obj([d.context.obj({ Type: "Annot", Subtype: "Link", Rect: [20, 30, 120, 50], A: { S: "URI", URI: PDFString.of("https://example.com/a") } })]));
+    }
+    const out = await PDFDocument.load((await nupPdf({ bytes: await d.save(), options: NUP_DEFAULTS })).bytes);
+    const annots = out.getPage(0).node.Annots()!;
+    const rects = [0, 1].map((k) => annots.lookup(k, PDFDict).lookup(PDFName.of("Rect"), PDFArray).asArray().map((n) => (n as PDFNumber).asNumber()));
+    expect(rects).toEqual([[20, 30, 120, 50], [220, 30, 320, 50]]);
+    expect((annots.lookup(1, PDFDict).lookup(PDFName.of("A"), PDFDict).lookup(PDFName.of("URI")) as PDFString).decodeText()).toBe("https://example.com/a");
+  });
+  it("AC-1044: a paper size that is not a size leaves the page as it was", async () => {
+    const bytes = await make([two]);
+    const out = await PDFDocument.load((await resizePdf({ bytes, pages: [0], options: { mode: "size", width: Number.NaN, height: 842 } })).bytes);
+    expect(out.getPage(0).getMediaBox()).toMatchObject({ width: 400, height: 200 });
   });
 });

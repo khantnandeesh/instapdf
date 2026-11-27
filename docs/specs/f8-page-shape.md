@@ -71,3 +71,13 @@ Tests: `src/lib/pdf/page-shape.test.ts`, `e2e/f8/page-shape.spec.ts`.
 ## Result screen
 
 The result shows the first eight "Keep going" tools and a "More tools" chip for the rest, so the card and its actions fit the first screen however many tools there are (guard: `e2e/ui/result-scroll.spec.ts`).
+
+## Review cases (27 Nov)
+
+- AC-1040: pages that share one content list are changed one by one (Flip, Resize).
+- AC-1041: N-up places a file that has an empty page, and stores a font or picture the pages share once.
+- AC-1042: what the old page box hid stays hidden after Resize (margins and paper size).
+- AC-1043: N-up keeps web links, moved with their page. Links to other pages and form fields are not carried to the sheets; the tool page says so in its FAQ.
+- AC-1044: a paper size that is not a usable size leaves the page as it was.
+
+Known limits, to do with F9: after Resize to a paper size, bookmarks and in-file links still open the right page but not the exact spot; after Flip, a stamp or a filled field moves to the mirrored place but its own drawing is not mirrored.
