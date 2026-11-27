@@ -247,6 +247,27 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
       { outputName: splitZipName },
     ),
   },
+  // F7 (spec f7-split-variants.md): Split's workspace with the parts worked out from the bookmarks.
+  "split-pdf-by-bookmarks": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "split-pdf-by-bookmarks",
+      { title: "Split PDF by bookmarks", actionLabel: "Split PDF", progressLabel: "Splitting" },
+      { outputName: splitZipName },
+    ),
+  },
+  "split-pdf-by-size": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "split-pdf-by-size",
+      { title: "Split PDF by size", actionLabel: "Split PDF", progressLabel: "Splitting" },
+      { outputName: splitZipName },
+    ),
+  },
+  "split-pdf-in-half": {
+    status: "beta",
+    flow: clientPdfFlow("split-pdf-in-half", { title: "Split PDF pages in half", actionLabel: "Split in half", progressLabel: "Splitting" }),
+  },
   "extract-pdf-pages": {
     status: "beta",
     flow: clientPdfFlow(

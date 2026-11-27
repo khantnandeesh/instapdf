@@ -34,7 +34,8 @@ describe("seo foundations", () => {
     expect(paths).toContain("/rotate-pdf");
     expect(paths).toContain("/merge-pdf");
     expect(paths).toContain("/split-pdf");
-    expect(paths).not.toContain("/split-pdf-by-bookmarks");
+    expect(paths).toContain("/split-pdf-by-bookmarks");
+    expect(paths).not.toContain("/split-pdf-by-text");
   });
   it("escapes JSON-LD so it cannot close its script tag", () => {
     const s = jsonLdString([{ name: "</script><script>alert(1)</script>&" }]);

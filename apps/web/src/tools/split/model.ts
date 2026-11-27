@@ -12,6 +12,7 @@ import { formatParts, isCut, isMarkVisible, parseCount, planSplit, splitParts, t
 
 import type { SplitState } from "./state";
 
+export { formatPages } from "@/lib/page-ranges";
 export { rangeErrorText } from "@/components/page-select/range-errors";
 export { clearParts, DEFAULT_N, initialSplit, setKind, setN, typeParts, type SplitKind, type SplitState } from "./state";
 

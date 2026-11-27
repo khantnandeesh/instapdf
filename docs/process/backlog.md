@@ -21,7 +21,7 @@ Status values: `todo` · `in-progress (step n)` · `done` · `deferred`. The orc
 | Q2 | Real-world PDF corpus (qpdf/PDFBox/PDFium/pdf.js suites, veraPDF/Isartor, encryption matrix; fetched by hash nightly) + oracles; CI: WebKit project, bundle-size check, lockfile license scan | – | todo |
 | Q3 | Budget hard stop (budget Pub/Sub → server tools max instances 0) + per-IP/global daily job limits + **free job queue** (fixed worker pool, live "You're #n in line" position and ETA, cancel; see docs/process/mission.md) ; static assets behind a CDN | – | todo — before F6 |
 | F6 | Compress (server worker + infra) | compress-pdf | todo — client-first compress (image downsampling in a worker) with server fallback; needs Q3 hard stop and the ≤2h cleaner (Cloud Task per job **and** 15-min sweep) before any upload code |
-| F7 | Split by outline / size / text / in half | split-pdf-by-* , split-pdf-down-the-middle | todo |
+| F7 | Split by outline / size / text / in half | split-pdf-by-* , split-pdf-down-the-middle | in progress — by bookmarks, by size and in half built (`docs/specs/f7-split-variants.md`); by text next |
 | F8 | Crop / Resize / Flip / N-up | crop-pdf, resize-pdf, flip-pdf, n-up-pdf | todo |
 | F9 | Watermark / Page numbers / Header-footer / Bates | watermark-pdf, page-numbers-pdf, header-footer-pdf, bates-numbering-pdf | todo — Bates deferred; rendered-diff tests for Devanagari, Arabic, bidi before shipping |
 | F10 | Metadata / Bookmarks / Rename / Remove annotations / Flatten | edit-pdf-metadata, pdf-bookmarks, rename-pdf, delete-pdf-annotations, flatten-pdf | todo |

@@ -22,6 +22,8 @@ export function toolFixtures(slug: string, pdf = "sixty-pages.pdf"): string[] {
   if (slug === "unlock-pdf") return [fx(pdf), fx("owner-restricted.pdf")];
   // Extract images needs a file that has images, or its run ends in "none found".
   if (slug === "extract-images") return [fx(pdf), fx("with-images.pdf")];
+  // Split by bookmarks needs a file with bookmarks, or the button waits with "no bookmarks".
+  if (slug === "split-pdf-by-bookmarks") return [fx(pdf), fx("bookmarks.pdf")];
   return slug === "alternate-mix-pdf" ? [fx(pdf), fx("three-pages.pdf")] : [fx(pdf)];
 }
 
@@ -183,12 +185,14 @@ export async function cardAction(page: Page, file: string, action: "Remove" | "E
 /**
  * Gives a tool whose primary waits for a choice what it needs, for the guards that run every tool:
  * Protect a password; Extract and Delete the first toggle tile (spec F4/F5 UI decision 12). Other
- * tools run as loaded.
+ * tools run as loaded, some a moment after the file is in.
  */
 export async function makeRunnable(page: Page) {
   if (await primary(page).isEnabled()) return;
   const password = page.locator("#protect-open");
+  const tile = page.locator("[data-tile-button][aria-pressed]").first();
   if (await password.count()) await password.fill("correct horse battery");
-  else await page.locator("[data-tile-button][aria-pressed]").first().click();
+  else if (await tile.count()) await tile.click();
+  // Otherwise the tool is still reading the file (Split by bookmarks reads the outline): it enables itself.
   await expect(primary(page)).toBeEnabled();
 }

@@ -14,10 +14,14 @@ import { buildDocuments } from "./build";
 import { mergePdf, type MergeEnv, type MergeInput } from "./merge";
 import { pdfOutputName, uniqueNames } from "./naming";
 import { protectPdf, unlockPdf, type ProtectOptions } from "./protect";
-import { rotatePdf } from "./rotate";
+import { planSplit, type SplitMode } from "../page-plans";
+import { loadForEdit, rotatePdf } from "./rotate";
+import { splitHalfPdf, type HalfOptions } from "./split-half";
+import { measuredLimit, measureWith, partsBySize } from "./split-size";
 import { USER_ERROR } from "./user-error";
 import { createZipWriter } from "./zip";
 import type { DocumentsJob, JobFile } from "./documents-job";
+import { documentsJob } from "./documents-job";
 export { documentsJob, type DocumentsJob, type JobFile } from "./documents-job";
 
 export type RotateJob = {
@@ -34,7 +38,13 @@ export type ProtectJob = { kind: "protect"; files: JobFile[]; zipName: string; o
 /** Unlock (F11): every file saved with no password and no restrictions. */
 export type UnlockJob = { kind: "unlock"; files: JobFile[]; zipName: string };
 
-export type Job = RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob;
+/** Split by size (F7): each file cut into the fewest parts that stay under `limit` bytes. */
+export type SplitSizeJob = { kind: "splitSize"; files: (JobFile & { id: string; pageCount: number })[]; limit: number };
+
+/** Split in half (F7): the picked pages of each file cut into two pages. */
+export type SplitHalfJob = { kind: "splitHalf"; files: (JobFile & { cut: number[] })[]; zipName: string; options: HalfOptions };
+
+export type Job = RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob;
 
 export type JobOutput = {
   name: string;
@@ -71,11 +81,38 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       // Removing the password is the point here, not a side effect to warn about.
       return { ...out, wasEncrypted: false };
     }
+    case "splitSize":
+      return runSplitSize(job, onProgress, env);
+    case "splitHalf":
+      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => splitHalfPdf({ bytes, password: file.password, cut: file.cut, options: job.options }, progress));
     case "split":
     case "extract":
     case "delete":
       return runDocuments(job, onProgress, env);
   }
+}
+
+/** The parts are worked out first (most of the time goes there), then written like any other split. */
+async function runSplitSize(job: SplitSizeJob, onProgress: ProgressFn, env: JobEnv): Promise<JobOutput> {
+  const perFile: Record<string, SplitMode> = {};
+  const notes: string[] = [];
+  for (const [i, f] of job.files.entries()) {
+    const bytes = new Uint8Array(await f.source.arrayBuffer());
+    const { doc } = await loadForEdit(bytes, f.password);
+    const pageCount = doc.getPageCount();
+    const guess = Math.floor(job.limit / Math.max(1, bytes.length / pageCount));
+    const r = await partsBySize(pageCount, measuredLimit(job.limit), measureWith(doc), guess, (x) => onProgress((0.6 * (i + x)) / job.files.length));
+    perFile[f.id] = { kind: "parts", parts: r.parts };
+    const pages = r.oversize.map((p) => p + 1);
+    if (pages.length) notes.push(`${pages.length === 1 ? `Page ${pages[0]}` : `Pages ${pages.join(", ")}`} of ${f.name} ${pages.length === 1 ? "is" : "are each"} over the limit alone, so ${pages.length === 1 ? "its file is" : "their files are"} too.`);
+    else if (r.parts.length === 1) notes.push(`${f.name} is already under the limit, so it stays one file.`);
+  }
+  const plan = planSplit(job.files, { mode: { kind: "ranges", items: [] }, perFile });
+  const out = await runDocuments(documentsJob("split", plan, job.files), (x, phase) => onProgress(0.6 + 0.4 * x, phase), env);
+  const warnings = [...notes, ...(out.warnings ?? [])];
+  // One file that stays whole keeps its own name, not "name-1-12".
+  const whole = job.files.length === 1 && plan.documents.length === 1 ? { name: pdfOutputName(job.files[0].name) } : {};
+  return { ...out, ...whole, ...(warnings.length ? { warnings } : {}) };
 }
 
 async function runDocuments(job: DocumentsJob, onProgress: ProgressFn, env: JobEnv): Promise<JobOutput> {

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useId, useMemo, useRef } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { selectCopy } from "@/components/page-select/copy";
 import { planFiles, useDebouncedAnnounce, useLazyModule, useLiveState, useRemembered } from "@/components/page-select/hooks";
 import { MoreOptions } from "@/components/page-select/MoreOptions";
@@ -12,6 +12,8 @@ import { ScissorsIcon } from "@/components/ui/icons";
 import { NumberStepper } from "@/components/ui/NumberStepper";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Select } from "@/components/ui/Select";
+import { TextInput } from "@/components/ui/TextInput";
+import type { OutlineEntry } from "@/lib/pdf/split-outline";
 import { USER_ERROR } from "@/lib/pdf/user-error";
 import { flowTool } from "@/tools/registry";
 import { splitCopy as c } from "./copy";
@@ -19,8 +21,13 @@ import { clearParts, DEFAULT_N, DEFAULT_PATTERN, initialSplit, setKind as withKi
 
 // The rules and the engine planner arrive after hydration (spec UI P-12); no file is ready before.
 const loadModel = () => import("./model");
+const loadOutline = () => import("@/lib/pdf/split-outline");
+type OutlineModule = Awaited<ReturnType<typeof loadOutline>>;
+const noModule = () => Promise.resolve(null);
 
-const tool = flowTool("split-pdf");
+/** The same workspace, with the parts worked out for the person (spec F7): they can still move any mark. */
+export type SplitVariant = "bookmarks";
+const SLUG = { bookmarks: "split-pdf-by-bookmarks" } as const;
 
 type Remembered = { kind: SplitKind; nText: string; pattern: string; removeBookmarks: boolean };
 const defaults: Remembered = { kind: "every", nText: DEFAULT_N, pattern: DEFAULT_PATTERN, removeBookmarks: false };
@@ -52,25 +59,62 @@ const modes = [
 ];
 
 /** Split (spec F4/F5 §3b, §6a; UI P-5, P-6): one file per part; the grid shows the parts live. */
-export function SplitTool() {
+export function SplitTool({ variant }: { variant?: SplitVariant } = {}) {
+  const tool = flowTool(variant ? SLUG[variant] : "split-pdf");
   const m = useLazyModule(loadModel);
+  const o = useLazyModule<OutlineModule | null>(variant === "bookmarks" ? loadOutline : noModule);
   const apiRef = useRef<FlowApi | null>(null);
   const announce = useDebouncedAnnounce(apiRef);
   const selectId = useId();
   const [files, setFiles, filesLive] = useLiveState<SelFile[]>([]);
   // Live state (eval G-3): the run and Enter read the parts as typed, even before React shows them.
-  const [split, setSplit, splitLive] = useLiveState<SplitState>(initialSplit);
-  const [renames, setRenames, renamesLive] = useLiveState<Record<string, string>>({});
+  const [split, setSplit, splitLive] = useLiveState<SplitState>(() => (variant ? { ...initialSplit(), kind: "custom" } : initialSplit()));
+  const [renames, setRenames] = useLiveState<Record<string, string>>({});
   const partsField = useRef<RangeFieldHandle>(null);
-  const [opts, setOpts, optsLive] = useRemembered("split-pdf", defaults, check, (stored) =>
-    setSplit((s) => ({ ...s, ...(stored.kind ? { kind: stored.kind } : {}), ...(stored.nText ? { nText: stored.nText } : {}) })),
-  );
+  const [opts, setOpts, optsLive] = useRemembered(tool.slug, defaults, check, (stored) => {
+    // A variant always works in Custom: its parts are marks the person can move.
+    if (!variant) setSplit((s) => ({ ...s, ...(stored.kind ? { kind: stored.kind } : {}), ...(stored.nText ? { nText: stored.nText } : {}) }));
+  });
   const user = useRef(false);
 
+  const [loaded, setLoaded] = useState<LoadedFile[]>([]);
   const onFilesChange = useCallback((all: LoadedFile[]) => {
     const next = planFiles(all);
     setFiles((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
-  }, [setFiles]);
+    if (variant) setLoaded(all.filter((f) => f.status === "ready"));
+  }, [setFiles, variant]);
+
+  // Split by bookmarks: each file's bookmarks, read once; the level and the title filter make the parts.
+  const [outlines, setOutlines] = useState<Record<string, OutlineEntry[]>>({});
+  const [level, setLevel] = useState(1);
+  const [contains, setContains] = useState("");
+  const levelId = useId();
+  const containsId = useId();
+  const asked = useRef(new Set<string>());
+  useEffect(() => {
+    if (variant !== "bookmarks" || !o) return;
+    for (const f of loaded) {
+      if (asked.current.has(f.id)) continue;
+      asked.current.add(f.id);
+      void o.readOutline(f.source, f.password).then(
+        (entries) => setOutlines((all) => ({ ...all, [f.id]: entries })),
+        () => setOutlines((all) => ({ ...all, [f.id]: [] })),
+      );
+    }
+  }, [variant, o, loaded]);
+  const outlineReady = variant === "bookmarks" && !!o && files.length > 0 && files.every((f) => outlines[f.id]);
+  const entries = useMemo(() => files.flatMap((f) => outlines[f.id] ?? []), [files, outlines]);
+  const depth = o ? o.outlineDepth(entries) : 0;
+  const shownLevel = Math.min(level, Math.max(1, depth));
+  const outlined = useMemo(
+    () => (outlineReady && o ? Object.fromEntries(files.map((f) => [f.id, o.partsFromOutline(outlines[f.id], shownLevel, f.pageCount, contains)])) : null),
+    [outlineReady, o, files, outlines, shownLevel, contains],
+  );
+  useEffect(() => {
+    if (!outlined || !m) return;
+    const perFile = Object.fromEntries(Object.entries(outlined).map(([id, r]) => [id, r.parts]));
+    setSplit((s) => ({ ...s, kind: "custom", perFile, ...m.textForParts(perFile, filesLive.current) }));
+  }, [outlined, m, setSplit, filesLive]);
 
   /** A user's change, worked out from the live settings (never from this render's, which may be behind). */
   const change = (fn: (s: SplitState) => SplitState) => {
@@ -83,8 +127,24 @@ export function SplitTool() {
   };
 
   const problem = m ? m.splitProblem(split, files) : null;
-  const plan = useMemo(() => (m ? m.splitPlan(split, files, { pattern: opts.pattern, renames }) : null), [m, split, files, opts.pattern, renames]);
   const live = useMemo(() => Object.fromEntries(files.map((f) => [f.id, m ? m.partsOf(split, f, files) : null])), [m, split, files]);
+  // A part that starts where a bookmark does is named after it; a name the person typed wins.
+  const names = useMemo(() => {
+    if (!outlined || !m || !o) return renames;
+    const auto: Record<string, string> = {};
+    for (const f of files) {
+      const r = outlined[f.id];
+      const titleAt = new Map(r.parts.map((p, i) => [p[0], r.titles[i]]));
+      for (const part of live[f.id] ?? []) {
+        const title = o.titleAsName(titleAt.get(part[0]) ?? "");
+        if (title) auto[`${f.id}:${m.formatPages(part)}`] = title;
+      }
+    }
+    return { ...auto, ...renames };
+  }, [outlined, m, o, files, live, renames]);
+  const namesLive = useRef(names);
+  namesLive.current = names;
+  const plan = useMemo(() => (m ? m.splitPlan(split, files, { pattern: opts.pattern, renames: names }) : null), [m, split, files, opts.pattern, names]);
   // While the typed parts don't parse, the grid draws no parts and no marks (the bubble says what is wrong):
   // no tile claims a part that the text does not make, and marks would do nothing (visual gate round 2).
   const invalid = !!problem && "field" in problem;
@@ -108,7 +168,7 @@ export function SplitTool() {
     const model = m ?? (await loadModel());
     const s = splitLive.current;
     const planned = planFiles(ready);
-    const run = model.splitPlan(s, planned, { pattern: optsLive.current.pattern, renames: renamesLive.current });
+    const run = model.splitPlan(s, planned, { pattern: optsLive.current.pattern, renames: namesLive.current });
     if (!run) {
       const bad = model.splitProblem(s, planned);
       throw new Error(USER_ERROR + (bad && "field" in bad ? model.rangeErrorText(bad.field, planned.map((f) => f.pageCount)) : selectCopy.stepperError));
@@ -125,6 +185,23 @@ export function SplitTool() {
     if (m.splitPlan(s, fs)?.documents.length) apiRef.current?.submit();
   };
 
+  /** The title filter: in the row from 640 px, in the More options sheet on a phone (one place at a time). */
+  const titleFilter = (id: string, className: string) => (
+    <TextInput
+      id={id}
+      label={c.contains}
+      hideLabel={id === containsId}
+      placeholder={c.containsPlaceholder}
+      value={contains}
+      onChange={(v) => {
+        user.current = true;
+        setContains(v);
+      }}
+      onEnter={() => apiRef.current?.submit()}
+      className={className}
+    />
+  );
+
   return (
     <ToolFlow
       tool={tool}
@@ -134,8 +211,17 @@ export function SplitTool() {
       onReset={() => {
         setSplit((s) => ({ ...initialSplit(), kind: s.kind, nText: s.nText }));
         setRenames({});
+        setLevel(1);
+        setContains("");
       }}
-      canRun={() => (problem || !plan || !docCount ? c.statusPages(total) : true)}
+      canRun={() => {
+        if (variant === "bookmarks") {
+          if (!outlineReady) return c.reading;
+          if (!entries.length) return c.noBookmarks(files.length);
+          if (docCount <= files.length && !Object.values(outlined ?? {}).some((r) => r.titles.some(Boolean))) return c.noMatch;
+        }
+        return problem || !plan || !docCount ? c.statusPages(total) : true;
+      }}
       readyStatus={() => (used < total ? c.statusLeftOut(used, total, docCount) : c.status(total, docCount))}
       primaryLabel={() => c.primary(docCount)}
       decoratePage={(file, index) => {
@@ -186,10 +272,29 @@ export function SplitTool() {
               : { rows: [], onRename: () => {} },
             pattern: { value: opts.pattern, onChange: (pattern) => setOpts({ pattern }) },
             bookmarks: { value: opts.removeBookmarks, onChange: (removeBookmarks) => setOpts({ removeBookmarks }) },
+            ...(variant === "bookmarks" ? { extra: titleFilter(`${containsId}-more`, "sm:hidden") } : {}),
           }}
         />
       )}
-      renderOptions={() => (
+      renderOptions={() =>
+        variant === "bookmarks" ? (
+          <div className="flex min-w-0 items-center gap-3 max-sm:flex-1">
+            <div className="w-[210px] shrink-0 max-sm:w-auto max-sm:flex-1">
+              <Select
+                id={levelId}
+                label={c.level}
+                hideLabel
+                value={String(shownLevel)}
+                options={Array.from({ length: Math.max(1, depth) }, (_, i) => ({ value: String(i + 1), label: c.levelOption(i + 1, entries.filter((e) => e.level === i + 1).length) }))}
+                onChange={(v) => {
+                  user.current = true;
+                  setLevel(Number(v));
+                }}
+              />
+            </div>
+{titleFilter(containsId, "min-w-0 w-[170px] shrink max-sm:hidden")}
+          </div>
+        ) : (
           <div className="flex min-w-0 items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-side:gap-7 max-sm:flex-1">
             <div className="flex shrink-0 flex-col gap-3.5">
               <Step n={1}>{c.mode}</Step>
@@ -256,7 +361,8 @@ export function SplitTool() {
               )}
             </div>
           </div>
-      )}
+        )
+      }
     />
   );
 }

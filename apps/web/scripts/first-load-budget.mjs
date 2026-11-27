@@ -29,7 +29,10 @@ const BUDGET_KB = {
   "/alternate-mix-pdf/page": [149, 159],
   // F4 page tools (spec F4/F5 UI P-12): Rotate + the range parser, field and stepper (+ marks on Split).
   // +1 kB entry on Split and Delete (F12 Extract images): each live tool adds its flow entry to the registry every route loads.
-  "/split-pdf/page": [147, 156],
+  "/split-pdf/page": [148, 158],
+  "/split-pdf-by-bookmarks/page": [148, 158],
+  "/split-pdf-by-size/page": [142, 152],
+  "/split-pdf-in-half/page": [144, 154],
   // +1 kB entry on Extract (F12, 27 Nov): three more tools in the registry every route loads, and the shared
   // LinkButton / IconButton variants.
   "/extract-pdf-pages/page": [144, 154],
@@ -59,7 +62,10 @@ const CLOUD_BUDGET_KB = {
   // Alternate shares every first-load chunk with Organize but its page chunk (150.6 vs 150.8 kB after the
   // F4 + main tile-rule merge); 1 kB over its F5 budget, still under Organize's and Combine's 152.
   "/alternate-mix-pdf/page": [151, 160],
-  "/split-pdf/page": [148, 158],
+  "/split-pdf/page": [150, 160],
+  "/split-pdf-by-bookmarks/page": [150, 160],
+  "/split-pdf-by-size/page": [144, 154],
+  "/split-pdf-in-half/page": [146, 156],
   "/extract-pdf-pages/page": [146, 156],
   "/delete-pdf-pages/page": [146, 156],
   "/protect-pdf/page": [144, 154],
