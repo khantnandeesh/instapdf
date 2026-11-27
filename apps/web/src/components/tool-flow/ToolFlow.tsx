@@ -614,7 +614,9 @@ export function ToolFlow({
   // ---- run -------------------------------------------------------------------
   const run = useCallback(async () => {
     const ready = filesRef.current.filter(isReady);
-    if (!ready.length) return;
+    if (!ready.length || phaseRef.current === "processing") return;
+    // Set here, not only at render: a second Enter or click before React re-renders must see it.
+    phaseRef.current = "processing";
     const controller = new AbortController();
     abort.current = controller;
     setProgress(0);
@@ -651,7 +653,7 @@ export function ToolFlow({
   }, [announce, processFiles, pushNotice, tool.flow.progressLabel, tool.slug]);
   const submitRef = useRef<() => void>(() => {});
   submitRef.current = () => {
-    if (flowCanRun && phaseRef.current !== "processing") void run();
+    if (flowCanRun) void run(); // run() itself ignores a second call while one is processing
   };
 
   // Move focus once the processing bar or the error panel has been committed
@@ -1181,5 +1183,9 @@ export function ToolFlow({
   );
 }
 
-/** See `inspectPdf`. `scan` reads the file (off the main thread) for whatever `notice` needs. */
+/**
+ * See `inspectPdf`. `scan` reads the file (off the main thread) for whatever `notice` needs. It is
+ * called on each load attempt (a password retry too), so it scans a file once and never rejects:
+ * a file that fails to open never reads its result.
+ */
 export type PdfInspector = { scan: (file: Blob) => Promise<unknown>; notice: (name: string, doc: OpenedPdf["doc"], scanned: unknown) => Promise<string | null> };

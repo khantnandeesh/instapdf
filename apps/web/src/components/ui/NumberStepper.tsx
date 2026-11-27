@@ -73,6 +73,7 @@ export function NumberStepper({
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" && onEnter && !e.nativeEvent.isComposing) {
       e.preventDefault();
+      if (e.repeat) return; // a held Enter runs once
       if (!valid) {
         setShown(true);
         shakeElement(field.current);

@@ -81,3 +81,53 @@ test("Enter on invalid parts does not run and says what is wrong", async ({ page
   await expect(page.getByTestId("field-error")).toContainText("“5-3”");
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
 });
+
+/** Counts the jobs the page sends to the processing worker (requests carry a `job`). */
+async function countJobs(page: Page) {
+  await page.addInitScript(() => {
+    const post = Worker.prototype.postMessage;
+    const w = window as unknown as { __jobs: number };
+    w.__jobs = 0;
+    Worker.prototype.postMessage = function (this: Worker, ...args: unknown[]) {
+      const data = args[0];
+      if (data && typeof data === "object" && "job" in data) w.__jobs++;
+      return (post as (...a: unknown[]) => void).apply(this, args);
+    } as Worker["postMessage"];
+  });
+  return () => page.evaluate(() => (window as unknown as { __jobs: number }).__jobs);
+}
+
+const FIELDS = {
+  "Extract's pages field": { slug: "extract-pdf-pages", text: "2", get: field, mode: undefined },
+  "Split's Every N stepper": { slug: "split-pdf", text: "4", get: stepper, mode: "Every N pages" },
+} as const;
+
+for (const [name, f] of Object.entries(FIELDS)) {
+  test(`${name}: two Enters before React re-renders run once`, async ({ page }) => {
+    const jobs = await countJobs(page);
+    await openReady(page, f.slug, "twelve.pdf");
+    if (f.mode) await splitMode(page, f.mode);
+    await f.get(page).fill(f.text);
+    // Both in one task: the second sees no render in between, only what run() itself recorded.
+    await f.get(page).evaluate((el) => {
+      for (let i = 0; i < 2; i++) el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+    });
+    await expect(flow(page)).toHaveAttribute("data-state", "done", { timeout: 30_000 });
+    expect(await jobs()).toBe(1);
+  });
+
+  test(`${name}: a held Enter runs once`, async ({ page }) => {
+    const jobs = await countJobs(page);
+    await openReady(page, f.slug, "twelve.pdf");
+    if (f.mode) await splitMode(page, f.mode);
+    await f.get(page).fill(f.text);
+    await f.get(page).focus();
+    // A second keydown without a keyup is an auto-repeat (KeyboardEvent.repeat).
+    await page.keyboard.down("Enter");
+    await page.keyboard.down("Enter");
+    await page.keyboard.down("Enter");
+    await page.keyboard.up("Enter");
+    await expect(flow(page)).toHaveAttribute("data-state", "done", { timeout: 30_000 });
+    expect(await jobs()).toBe(1);
+  });
+}

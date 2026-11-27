@@ -90,6 +90,7 @@ export const RangeField = forwardRef<
           onKeyDown={(e) => {
             if (e.key !== "Enter" || e.nativeEvent.isComposing || !onEnter) return;
             e.preventDefault();
+            if (e.repeat) return; // a held Enter runs once
             // The tool decides from the text as typed (its live state): it runs, or calls shake().
             onEnter();
           }}

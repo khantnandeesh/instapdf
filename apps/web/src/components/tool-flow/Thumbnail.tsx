@@ -67,6 +67,13 @@ export function PageThumb({ fileId, index, className, scale = 1 }: { fileId: str
   const { renderer, watch } = useContext(ThumbContext);
   const host = useRef<HTMLSpanElement>(null);
   const [rendered, setRendered] = useState(false);
+  // Read through a ref: a turn changes the scale, and a canvas that is still sharp enough stays (no redraw).
+  const scaleRef = useRef(scale);
+  const rescale = useRef<() => void>(() => {});
+  useEffect(() => {
+    scaleRef.current = scale;
+    rescale.current();
+  }, [scale]);
 
   useEffect(() => {
     const el = host.current;
@@ -79,7 +86,7 @@ export function PageThumb({ fileId, index, className, scale = 1 }: { fileId: str
     let top = 0;
     let settle: ReturnType<typeof setTimeout> | undefined;
     let longest = 0;
-    const need = () => (longest > 0 ? thumbRenderSize(longest * scale, window.devicePixelRatio) : 0);
+    const need = () => (longest > 0 ? thumbRenderSize(longest * scaleRef.current, window.devicePixelRatio) : 0);
     const draw = () => {
       if (!near || !want) return;
       cancel?.();
@@ -118,6 +125,7 @@ export function PageThumb({ fileId, index, className, scale = 1 }: { fileId: str
       update();
     });
     const stopRatio = watchRatio(update);
+    rescale.current = update;
     const stopNear = watch(el, (isNear, far, t) => {
       near = isNear;
       top = t;
@@ -134,13 +142,14 @@ export function PageThumb({ fileId, index, className, scale = 1 }: { fileId: str
       }
     });
     return () => {
+      rescale.current = () => {};
       clearTimeout(settle);
       stopSize();
       stopRatio();
       stopNear();
       cancel?.();
     };
-  }, [renderer, watch, fileId, index, scale]);
+  }, [renderer, watch, fileId, index]);
 
   return (
     <span

@@ -81,7 +81,18 @@ export async function lostPropertiesNotice(name: string, doc: PDFDocumentProxy, 
   return `${name} has ${list}, which the merged file won't keep.`;
 }
 
+/** One scan per file (a password retry asks again), settled with no markers if anything fails. */
+const scans = new WeakMap<Blob, Promise<PdfMarkers>>();
+export function scanOnce(blob: Blob): Promise<PdfMarkers> {
+  let scan = scans.get(blob);
+  if (!scan) {
+    scan = Promise.resolve(blob).then(scanInWorker).catch(() => NONE);
+    scans.set(blob, scan);
+  }
+  return scan;
+}
+
 export const inspector: PdfInspector = {
-  scan: scanInWorker,
+  scan: scanOnce,
   notice: (name, doc, scanned) => lostPropertiesNotice(name, doc, (scanned as PdfMarkers | undefined) ?? { signed: false, outputIntents: false, structTree: false }),
 };
