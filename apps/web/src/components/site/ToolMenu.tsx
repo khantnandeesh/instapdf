@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { flip } from "@/lib/motion/flow";
 import { usePresence } from "@/lib/motion/react";
@@ -275,19 +275,9 @@ function MenuContent({
   const groups = categories
     .map((c) => ({ ...c, items: matches.filter((m) => m.item.category === c.id).map((m) => m.item) }))
     .filter((g) => g.items.length > 0);
-  // Panel: one column per group, never split (owner 2026-11-27); as many columns as fit at TRACK px.
-  const navRef = useRef<HTMLElement>(null);
-  const [tracks, setTracks] = useState(0);
-  const hasGroups = groups.length > 0;
-  useLayoutEffect(() => {
-    const nav = navRef.current;
-    if (mode !== "panel" || !nav) return;
-    const measure = () => setTracks(Math.max(1, Math.floor((nav.clientWidth + TRACK_GAP) / (TRACK + TRACK_GAP))));
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(nav);
-    return () => ro.disconnect();
-  }, [mode, hasGroups]);
+  // Panel: one column per group, never split (owner 2026-11-27); as many columns as fit at TRACK px in the
+  // bar's 1280 px column less its 32 px gutters (the panel only renders on the client, once opened).
+  const tracks = mode === "panel" && typeof window !== "undefined" ? Math.max(1, Math.floor((Math.min(document.documentElement.clientWidth, 1280) - 64 + TRACK_GAP) / (TRACK + TRACK_GAP))) : 0;
   const columns = mode === "panel" && tracks ? packMenu(groups.map((g) => g.items.length), tracks) : [{ groups: groups.map((_, i) => i), span: 1 }];
 
   useEffect(() => {
@@ -373,7 +363,6 @@ function MenuContent({
           </div>
         ) : (
           <nav
-            ref={navRef}
             aria-label={copy.title}
             className="mt-4 grid items-start gap-x-3 gap-y-2.5"
             style={mode === "panel" && tracks ? { gridTemplateColumns: `repeat(${columns.reduce((n, c) => n + c.span, 0)}, minmax(0, 1fr))` } : undefined}
