@@ -297,6 +297,22 @@
   .ip-slot--editor .ip-slot__main {
     flex: 1;
   }
+  /* The editor's bar is 56px: a 48px button (plus its 3px lip) filled it edge to edge. The editor's slot is
+     40px (44px touch target on phones), so the bar keeps 8px of air above and below, like its tools. */
+  .ip-slot--editor,
+  .ip-slot--editor .ip-slot__main,
+  .ip-slot--editor .ip-pill,
+  .ip-slot--editor .ip-slot__error {
+    height: 40px;
+  }
+  @media (max-width: 1023px) {
+    .ip-slot--editor,
+    .ip-slot--editor .ip-slot__main,
+    .ip-slot--editor .ip-pill,
+    .ip-slot--editor .ip-slot__error {
+      height: 44px;
+    }
+  }
   .ip-slot__error {
     display: flex;
     flex: 1;

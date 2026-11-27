@@ -86,7 +86,7 @@ export function NotFoundPage() {
       <div className="mp-empty">
         <Floaties set="empty" />
         <div className={`mp-empty__in mp-enter ${container} pt-(--space-8)`}>
-          <h1 className="text-page-title text-ink-black">{siteCopy.notFoundTitle}</h1>
+          <h1 className="text-page-title text-balance text-ink-black">{siteCopy.notFoundTitle}</h1>
           <p className="mt-2.5 text-subtitle text-muted">{siteCopy.notFoundBody}</p>
           <Link href="/#tools" className={buttonClasses("primary", "md", "mt-6")}>
             {siteCopy.soonCta}

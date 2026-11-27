@@ -1189,6 +1189,11 @@
     .mp-floaties--hero .mp-floaty--back {
       display: none;
     }
+    /* Word-only empty states (404): on a phone the words span the width, so any berry would sit on them.
+       The picker's drop card keeps its berries around the card. */
+    .mp-empty:not(:has(.mp-dropcard)) .mp-floaties--empty .mp-floaty {
+      display: none;
+    }
   }
 
   /* ---- Berry loader (tossed, sliced, halves fall, juice splatters) -------------------------- */
