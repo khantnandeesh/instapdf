@@ -97,6 +97,36 @@ for (const [width, height] of SLOT_VIEWPORTS) {
   });
 }
 
+test("G-13: a tile click in the frame between the pill and the dim never changes the job that started", async ({ page }, info) => {
+  test.skip(!isDesktop(info.project.name), "one run is enough");
+  await openTool(page, "/delete-pdf-pages");
+  await page.getByTestId("file-input").setInputFiles(fx("sixty-pages.pdf"));
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  const marks = page.locator("[data-tile-button][aria-pressed]");
+  await marks.first().click();
+  await expect(marks.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(primary(page)).toBeEnabled();
+  // The click, then a tile click one frame later (the pill has painted, the pages are not inert yet), from the
+  // page's own script so it lands in that gap every time.
+  const gap = await page.evaluate(async () => {
+    document.querySelector<HTMLElement>("[data-testid=primary-action]")!.click();
+    await new Promise((r) => requestAnimationFrame(r));
+    const pages = document.querySelector<HTMLElement>("[data-testid=pages-scroll]")!;
+    const inGap = !pages.inert && !!document.querySelector("[data-testid=processing]");
+    const tile = document.querySelectorAll<HTMLElement>("[data-tile-button][aria-pressed]")[1];
+    tile.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    tile.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    tile.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+    tile.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    tile.click();
+    return inGap;
+  });
+  expect(gap, "the second click landed before the pages went inert").toBe(true);
+  await expect(page.getByTestId("result")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("result")).toContainText("59 pages");
+  await expect(page.getByTestId("result")).toContainText("1 page deleted.");
+});
+
 test("AC-634 AC-640: the label reads '<verb>… n%', the fill tracks n and never goes back; the pill has focus and an accessible progressbar", async ({ page }, info) => {
   test.skip(!isDesktop(info.project.name), "one run is enough");
   test.skip(!fixturesServed, FIXTURES_OFF);

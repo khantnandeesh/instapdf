@@ -54,6 +54,9 @@ test("G-5: a locked file asks for its password over the editor's placeholders; S
   await expect(page.getByTestId("editor-opening")).toContainText("aes-128.pdf");
   await expect(page.getByTestId("opening-placeholders")).toBeVisible();
   await expect(page.getByTestId("editor-input")).toHaveCount(0);
+  // Waiting for the password is not opening: nothing busy, no "Opening…" progressbar behind the dialog.
+  await expect(page.getByTestId("editor-opening")).not.toHaveAttribute("aria-busy", "true");
+  await expect(page.getByTestId("opening-placeholders").getByRole("progressbar", { includeHidden: true })).toHaveCount(0);
   await dialog.getByRole("button", { name: /skip|cancel/i }).first().click();
   await expect(page.getByTestId("editor-opening")).toHaveCount(0);
   await expect(page.getByTestId("editor-input")).toHaveCount(1);
@@ -62,4 +65,43 @@ test("G-5: a locked file asks for its password over the editor's placeholders; S
   await page.getByRole("textbox", { name: "Password" }).fill("test");
   await page.getByRole("button", { name: "Unlock" }).click();
   await expect(page.getByTestId("page-1")).toHaveAttribute("data-drawn", "true", { timeout: 15_000 });
+});
+
+/** Holds pdf.js's renderer worker (the first page can't be drawn) until `release()`. */
+async function holdRenderer(page: Page) {
+  let open!: () => void;
+  const gate = new Promise<void>((r) => (open = r));
+  await page.route(/pdf\.renderer/, async (route) => {
+    await gate;
+    await route.continue().catch(() => {});
+  });
+  return () => open();
+}
+
+test("G-5 (review S5): before the first paint Save as waits with Download, and a Ctrl+S is kept and runs on the paint", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "keyboard, Save as from 1024");
+  const release = await holdRenderer(page);
+  await page.goto("/edit-pdf");
+  await page.getByTestId("editor-input").setInputFiles(fx("three-pages.pdf"));
+  await expect(page.getByTestId("editor")).toHaveAttribute("data-state", "open");
+  await expect(page.getByTestId("download")).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Save as" })).toBeDisabled();
+  await page.getByTestId("canvas").focus();
+  const download = page.waitForEvent("download", { timeout: 20_000 });
+  await page.keyboard.press("Control+s");
+  await expect(page.getByTestId("live")).toContainText("Download starts once the first page is shown");
+  release();
+  await expect(page.getByTestId("download")).toBeEnabled({ timeout: 15_000 });
+  expect((await download).suggestedFilename()).toMatch(/\.pdf$/);
+});
+
+test("G-5 (review S5): a first page that never draws gives Download back after a few seconds", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one run is enough");
+  await holdRenderer(page);
+  await page.goto("/edit-pdf");
+  await page.getByTestId("editor-input").setInputFiles(fx("three-pages.pdf"));
+  await expect(page.getByTestId("editor")).toHaveAttribute("data-state", "open");
+  await expect(page.getByTestId("download")).toBeDisabled();
+  await expect(page.getByTestId("download")).toBeEnabled({ timeout: 12_000 });
+  await expect(page.getByRole("button", { name: "Save as" })).toBeEnabled();
 });

@@ -36,6 +36,7 @@ export const transferCopy = {
   liveStopped: (name: string) => `Download of ${name} stopped`,
   saveTo: (p: CloudProvider) => `Save to ${providerShort[p]}`,
   saveToAny: "Save to…",
+  saveAnother: "Save to another cloud",
   saving: (pct: number) => `Saving… ${pct}%`,
   saved: "Saved",
   savedAlert: (p: CloudProvider, name: string) => `Saved to ${providerName[p]} as ${name}.`,

@@ -38,7 +38,7 @@ import { fontLabel, resetDocFonts } from "./font-service";
 import { resetDocFaces } from "./doc-face";
 import { disposeMatcher } from "@/lib/font-library/match-client";
 import { FontNotice } from "./FontMenu";
-import { useNavAutohide } from "./nav-autohide";
+import { navHiddenAt, restPadding, useNavAutohide, visibleTop } from "./nav-autohide";
 import { OpeningBody } from "./Opening";
 import { placeCard, type PropsPlace } from "./props-place";
 import { AnnotsToggle, DOCK_ORDER, MoreTools, PageChip, PageHeader, PrivacyChip, SaveChip, ToolDock, TopBar, TOOLS, ViewPill } from "./Chrome";
@@ -94,6 +94,9 @@ const writeLocal = (k: string, v: string) => {
 /** A cancelled build (Cancel) or one stopped because the editor closed (disposeBuild). */
 const isAbort = (e: unknown) => e instanceof DOMException && e.name === "AbortError";
 const reducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** How long Download waits for the first page to be drawn before it is given back anyway (G-5). */
+const PAINT_WAIT_MS = 8000;
 
 function initialState(pages: PageEntry[], wide: boolean): EditorState {
   return {
@@ -581,6 +584,32 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     };
   }, [scroller, store, zoomTo]);
 
+  // ---- page actions: shown while the pointer is in a page's top band (editor.css .ed-slot[data-head]) ----
+  useEffect(() => {
+    if (!scroller || !wide) return;
+    const BAND = 48;
+    let at: HTMLElement | null = null;
+    const mark = (slot: HTMLElement | null) => {
+      if (slot === at) return;
+      at?.removeAttribute("data-head");
+      slot?.setAttribute("data-head", "");
+      at = slot;
+    };
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      const slot = (e.target as Element | null)?.closest?.<HTMLElement>(".ed-slot") ?? null;
+      mark(slot && e.clientY - slot.getBoundingClientRect().top < BAND ? slot : null);
+    };
+    const onLeave = () => mark(null);
+    scroller.addEventListener("pointermove", onMove, { passive: true });
+    scroller.addEventListener("pointerleave", onLeave);
+    return () => {
+      scroller.removeEventListener("pointermove", onMove);
+      scroller.removeEventListener("pointerleave", onLeave);
+      mark(null);
+    };
+  }, [scroller, wide]);
+
   // ---- current page and navigation ----
   useEffect(() => {
     if (!scroller) return;
@@ -614,8 +643,10 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       const el = column.current?.children[i] as HTMLElement | undefined;
       if (!el || !scroller) return;
       store.set({ current: i });
-      // Land the page where the first one rests: below the top bar and the chrome band, never under them.
-      const rest = parseFloat(getComputedStyle(scroller).paddingTop) || 0;
+      // Land the page where the first one rests: below the top bar and the chrome band, never under them,
+      // with the navbar as it will be once there (it slides away on the way down, G-1).
+      const near = Math.max(0, el.offsetTop - restPadding(scroller, false));
+      const rest = restPadding(scroller, navHiddenAt(scroller, near));
       scroller.scrollTo({ top: Math.max(0, el.offsetTop - rest), behavior: reducedMotion() ? "auto" : "smooth" });
     },
     [scroller, store],
@@ -628,15 +659,16 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       requestAnimationFrame(() => {
         const obj = objectId ? document.querySelector<HTMLElement>(`[data-obj-id="${objectId}"]`) : null;
         if (obj && scroller) {
+          // Against the part of the canvas really in view: under the bars, wherever the navbar is (G-1).
           const r = obj.getBoundingClientRect();
           const s = scroller.getBoundingClientRect();
-          if (r.top < s.top + 56 || r.bottom > s.bottom - 80) obj.scrollIntoView({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" });
+          if (r.top < visibleTop(scroller) + 8 || r.bottom > s.bottom - 80) obj.scrollIntoView({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" });
           store.set({ current: i });
         } else {
           const el = column.current?.children[i] as HTMLElement | undefined;
           const s = scroller?.getBoundingClientRect();
           const r = el?.getBoundingClientRect();
-          if (el && s && r && (r.bottom < s.top + 40 || r.top > s.bottom - 40)) goto(i);
+          if (el && s && r && (r.bottom < visibleTop(scroller!) + 40 || r.top > s.bottom - 40)) goto(i);
           else store.set({ current: i });
         }
       });
@@ -713,7 +745,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     const g = pageGeom(entry, index);
     const s = scroller?.getBoundingClientRect();
     if (!g || !s) return [w / 2, h / 2];
-    const top = Math.max(g.rect.top, s.top);
+    const top = Math.max(g.rect.top, visibleTop(scroller!));
     const bottom = Math.min(g.rect.bottom, s.bottom);
     const p = toFrameAt(entry, index, g.rect.left + g.rect.width / 2, bottom > top ? (top + bottom) / 2 : g.rect.top + g.rect.height / 2);
     return p ? [Math.min(w, Math.max(0, p[0])), Math.min(h, Math.max(0, p[1]))] : [w / 2, h / 2];
@@ -766,6 +798,24 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       ctl.openSign = null;
     };
   }, [ctl, store, rt, remember]);
+
+  // ---- first paint (G-5) ----
+  // Download and Ctrl+S wait for the first page on screen. A Ctrl+S pressed before is kept and runs on
+  // that paint; and if no page ever settles (a getPage that never answers), Download is given back after
+  // PAINT_WAIT_MS rather than left disabled for good.
+  const saveQueued = useRef(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => !store.get().painted && store.set({ painted: true }), PAINT_WAIT_MS);
+    const stop = store.subscribe(() => {
+      if (!store.get().painted || !saveQueued.current) return;
+      saveQueued.current = false;
+      void downloadRef.current();
+    });
+    return () => {
+      clearTimeout(t);
+      stop();
+    };
+  }, [store]);
 
   // ---- download (AC-44) ----
   // Cancel (F25 §6): stops the build worker; the edits and the document stay as they were.
@@ -856,6 +906,9 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     },
     [ctl, store, rt, original],
   );
+  const downloadRef = useRef(download);
+  downloadRef.current = download;
+
   // Leaving the editor mid-build cancels the download: it never starts after the visitor has left.
   const closed = useRef(false);
   useEffect(() => {
@@ -1073,7 +1126,12 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       const k = e.key;
       if (mod && k.toLowerCase() === "s") {
         e.preventDefault();
+        // Before the first page is drawn, Download waits (G-5): the press is kept and runs then.
         if (store.get().painted) void download();
+        else if (!saveQueued.current) {
+          saveQueued.current = true;
+          ctl.announce("Download starts once the first page is shown");
+        }
         return;
       }
       if (fieldTab(ctl, e)) return e.preventDefault();
@@ -1277,6 +1335,9 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   // transform, so none of this is a layout shift.
   const propsEl = useRef<HTMLElement>(null);
   const [propsAt, setPropsAt] = useState<PropsPlace | null>(null);
+  // The placement now on screen, for measuring: read here, never inside a state updater (which must stay pure).
+  const propsAtNow = useRef<PropsPlace | null>(null);
+  propsAtNow.current = propsAt;
   const placeProps = useCallback(() => {
     const panel = propsEl.current;
     const canvas = scroller;
@@ -1286,14 +1347,15 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     const sel = { l: Math.min(...boxes.map((b) => b.left)), r: Math.max(...boxes.map((b) => b.right)), t: Math.min(...boxes.map((b) => b.top)), b: Math.max(...boxes.map((b) => b.bottom)) };
     const strip = panel.closest(".ed-frame-root")?.querySelector("[data-testid=editor-strip]")?.getBoundingClientRect();
     const bar = panel.closest(".ed-frame-root")?.querySelector(".ed-top")?.getBoundingClientRect();
-    setPropsAt((was) => {
-      // Where it sits with no placement of its own: its rect less the current offset.
-      const r = panel.getBoundingClientRect();
-      const base = { l: r.left - (was?.x ?? 0), t: r.top - (was?.y ?? 0), w: r.width, h: panel.scrollHeight + 3 };
-      const c = canvas.getBoundingClientRect();
-      const next = placeCard(base, sel, { l: Math.max(c.left, strip?.right ?? c.left) + 12, t: (bar?.bottom ?? c.top) + 12, b: c.bottom - 76 });
-      return was && next && was.side === next.side && Math.abs(was.x - next.x) < 1 && Math.abs(was.y - next.y) < 1 && was.maxH === next.maxH ? was : next;
-    });
+    const was = propsAtNow.current;
+    // Where it sits with no placement of its own: its rect less the current offset.
+    const r = panel.getBoundingClientRect();
+    const base = { l: r.left - (was?.x ?? 0), t: r.top - (was?.y ?? 0), w: r.width, h: panel.scrollHeight + 3 };
+    const c = canvas.getBoundingClientRect();
+    const next = placeCard(base, sel, { l: Math.max(c.left, strip?.right ?? c.left) + 12, t: (bar?.bottom ?? c.top) + 12, b: c.bottom - 76 });
+    if (was && next && was.side === next.side && Math.abs(was.x - next.x) < 1 && Math.abs(was.y - next.y) < 1 && was.maxH === next.maxH) return;
+    propsAtNow.current = next;
+    setPropsAt(next);
   }, [selKey, scroller]);
   useLayoutEffect(placeProps, [placeProps, props, selectionObjs, zoom, pages]);
   useEffect(() => {

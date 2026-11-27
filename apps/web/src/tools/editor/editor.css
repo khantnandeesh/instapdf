@@ -63,6 +63,9 @@ html[data-ed-nav="hidden"] body:has(.ed-wide) .ip-site-header {
   top: calc(-1 * var(--ed-under));
   background-color: var(--color-canvas);
   padding-top: calc(var(--ed-rest-top) + var(--ed-under));
+  /* What scrolls into view (focus, scrollIntoView) stops under the bars that are on screen now: the
+     navbar while it shows, and the editor bar. */
+  scroll-padding-top: calc(var(--ed-rest-top) - var(--ed-rest-gap) + var(--ed-under) + var(--ed-lift));
 }
 .ed-wide :is(.ed-top, .ed-props) {
   translate: 0 var(--ed-lift);
@@ -70,13 +73,18 @@ html[data-ed-nav="hidden"] body:has(.ed-wide) .ip-site-header {
 .ed-wide :is(.ed-hint, .ed-recover, .ed-owner) {
   translate: -50% var(--ed-lift);
 }
-/* The page strip starts behind the bar; its contents sit under the bar and grow when it lifts. */
+/* The page strip starts behind the bar; its contents sit under the bar and move up with it. Its box is
+   always the panel's full height (the part pushed past the panel's bottom is clipped), so nothing in it
+   jumps while it slides: only the end of its list gets room to scroll clear of the clipped part. */
 .ed-wide .ed-panel {
   top: calc(var(--ed-top-h) - var(--ed-under));
 }
 .ed-wide .ed-panel > .ed-side {
-  height: calc(100% - var(--ed-under) - var(--ed-lift));
   translate: 0 calc(var(--ed-under) + var(--ed-lift));
+}
+.ed-wide .ed-panel .ed-side__body {
+  padding-bottom: calc(6px + var(--ed-under) + var(--ed-lift));
+  scroll-padding-bottom: calc(var(--ed-under) + var(--ed-lift));
 }
 @media (prefers-reduced-motion: no-preference) {
   body:has(.ed-wide) .ip-site-header {
@@ -808,6 +816,8 @@ html[data-ed-nav="hidden"] body:has(.ed-wide) .ip-site-header {
   /* ip-scroll: pages */
   overflow: auto;
   padding: var(--ed-rest-top) 16px 80px;
+  /* Focus and scrollIntoView stop under the floating bars, never behind them. */
+  scroll-padding-top: calc(var(--ed-rest-top) - var(--ed-rest-gap));
   outline: none;
   touch-action: pan-x pan-y;
 }
@@ -942,18 +952,24 @@ html[data-ed-nav="hidden"] body:has(.ed-wide) .ip-site-header {
   opacity: 0;
   transition: opacity var(--dur-base);
 }
-/* Only the actions take the pointer (the number is a label), and only with Select or Edit text: with a
-   drawing or placing tool armed the page's corner is the page's. */
-.ed-frame-root:is([data-tool="select"], [data-tool="edit"]) .ed-pagehead__acts {
+/* The number is a label and never takes the pointer. The actions show, and take the pointer, only while
+   the pointer is in the page's top band (data-head, set by the canvas, EditorShell) or focus is in them:
+   at rest, and anywhere lower on the page, what is under them is the page's (review nit, G-1). With a
+   drawing or placing tool armed the pointer always goes to the page, but Tab still reaches them. */
+.ed-pagehead__acts {
+  pointer-events: none;
+}
+.ed-frame-root:is([data-tool="select"], [data-tool="edit"]) :is(.ed-slot[data-head], .ed-pagehead:focus-within) .ed-pagehead__acts {
   pointer-events: auto;
 }
-.ed-frame-root:not([data-tool="select"], [data-tool="edit"]) .ed-pagehead__acts {
-  visibility: hidden;
-}
 .ed-pagehead--current .ed-pagehead__n,
-.ed-slot:hover .ed-pagehead > *,
+.ed-slot:hover .ed-pagehead__n,
+.ed-slot[data-head] .ed-pagehead__acts,
 .ed-pagehead:focus-within > * {
   opacity: 1;
+}
+.ed-frame-root:not([data-tool="select"], [data-tool="edit"]) .ed-slot[data-head]:not(:focus-within) .ed-pagehead__acts {
+  opacity: 0;
 }
 .ed-pagehead__n {
   min-width: 28px;
@@ -985,6 +1001,9 @@ html[data-ed-nav="hidden"] body:has(.ed-wide) .ip-site-header {
   }
   .ed-pagehead--current > * {
     opacity: 1;
+  }
+  .ed-frame-root:is([data-tool="select"], [data-tool="edit"]) .ed-pagehead--current .ed-pagehead__acts {
+    pointer-events: auto;
   }
 }
 .ed-panel {

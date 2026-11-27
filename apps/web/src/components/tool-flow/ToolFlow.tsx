@@ -4,7 +4,7 @@ import "./tool-flow.css";
 import "./layout.css";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { cloneElement, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { cloneElement, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type SyntheticEvent } from "react";
 import { setHandoff, takeHandoff } from "@/lib/pdf/handoff";
 import { openPdf, readPageSizes, type OpenedPdf } from "@/lib/pdf/pdfjs";
 import { LazyThumbnails } from "@/lib/pdf/thumbs-lazy";
@@ -73,14 +73,11 @@ const lazyParts = {
 };
 const loadLazyParts = () => void Promise.all(Object.values(lazyParts).map((load) => load())).catch(() => {});
 /**
- * On intent only, pdf.js's two workers go into the HTTP cache too, so a drop right after it has the engine
- * at hand (eval G-8). Not with the files: the pick creates the workers itself, and a warm fetch racing that
- * would download them twice.
+ * On a real sign of intent only (never on the 4 s timer, and not with Data Saver on or on 2g), pdf.js's two
+ * workers go into the HTTP cache too, so a drop right after it has the engine at hand (eval G-8). Not
+ * with the files: the pick creates the workers itself, and a warm fetch racing that would download them twice.
  */
-const onIntentLoad = () => {
-  loadLazyParts();
-  void import("@/lib/pdf/pdfjs-warm").then((m) => m.warmPdfjs("low")).catch(() => {});
-};
+const warmWorkers = () => void import("@/lib/pdf/pdfjs-warm-intent").then((m) => m.warmPdfjs()).catch(() => {});
 const PageGrid = dynamic(() => lazyParts.pageGrid().then((m) => m.PageGrid), { ssr: false });
 const FileGrid = dynamic(() => lazyParts.fileGrid().then((m) => m.FileGrid), { ssr: false });
 // Fallbacks only if the chunk was not in when the result came (it is awaited before the swap).
@@ -312,7 +309,11 @@ export function ToolFlow({
   // The parts needed once a file is in: fetched at the first sign of intent (the file chooser or
   // the drag hides the load), when files arrive without one (a hand-off), or after 4 s (intent.ts).
   const stopIntent = useRef<() => void>(() => {});
-  useEffect(() => (stopIntent.current = onIntent(onIntentLoad)), []);
+  useEffect(() => {
+    const parts = onIntent(loadLazyParts);
+    const warm = onIntent(warmWorkers, 0);
+    return (stopIntent.current = () => (parts(), warm()));
+  }, []);
   const hasFiles = files.length > 0;
   useEffect(() => {
     if (!hasFiles) return;
@@ -345,6 +346,15 @@ export function ToolFlow({
   // The pages area dims and goes inert one frame after the pill shows (eval G-13): with hundreds of tiles,
   // making it inert restyles every tile (~450ms at 990 pages), which must not hold the pill's first paint.
   const [pagesDim, setPagesDim] = useState(false);
+  // Until then (the gap frame) the pages still take input, and a tile click there would change the job the
+  // primary just started (the tools read their marks when the work begins). So from the click the pages
+  // area swallows pointer input in the capture phase: no restyle, nothing reaches a tile. (Keys can't reach
+  // a tile then: the click or Enter that started the run moved focus to the pill.)
+  const blockWhileWorking = (e: SyntheticEvent) => {
+    if (phaseRef.current !== "processing") return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
   const retryButton = useRef<HTMLButtonElement>(null);
   const primaryButton = useRef<HTMLButtonElement>(null);
   const workArea = useRef<HTMLDivElement>(null);
@@ -748,6 +758,7 @@ export function ToolFlow({
       if (controller.signal.aborted) return settle(workArea.current);
       setOutput(out);
       for (const w of out.warnings ?? []) pushNotice({ tone: "warning", title: w });
+      setPagesDim(false);
       setPhase("done");
       setPillDone(false);
       announce(copy.resultTitle(out.type === "application/zip"));
@@ -757,6 +768,7 @@ export function ToolFlow({
       console.error(`[${tool.slug}] processing failed:`, message.startsWith(USER_ERROR) ? "user-facing error" : message);
       const shown = message.startsWith(USER_ERROR) ? message.slice(USER_ERROR.length) : null;
       setProcessMessage(shown);
+      setPagesDim(false);
       setPhase("error");
       // The full reason and what to do go in NoticeStack (assertive, never auto-dismissed), with Start over.
       errorNotice.current = pushNotice({ tone: "danger", title: shown ?? copy.errorProcess(tool.flow.progressLabel), action: { label: copy.startOver, onClick: () => startOverRef.current() } });
@@ -783,6 +795,10 @@ export function ToolFlow({
     setProgress(0);
     announce(copy.cancelled);
     setFocusPrimaryTick((n) => n + 1);
+    // The primary is back on this click; the pages wake a frame later (review S6): taking inert off 990
+    // tiles restyles every one (~0.5s), which must not hold the primary's paint.
+    // (A run started meanwhile dims them again after its own frame, which comes later.)
+    requestAnimationFrame(() => setTimeout(() => setPagesDim(false)));
     if (tool.runtime !== "server" && !server) return void pushNotice({ tone: "info", title: copy.cancelledBrowser, timeoutMs: 6000 });
     // "Deleted" only once DELETE answered 2xx. Cancelled mid-upload there is no job id yet, so the upload
     // may still land and is deleted by the 2-hour rule. A late reply never speaks over a newer run.
@@ -1147,8 +1163,10 @@ export function ToolFlow({
   const ownerMounted = useMountOnce(!!ownerFile);
   const leaveMounted = useMountOnce(guardLeave);
   const replaceMounted = useMountOnce(!!pendingReplace);
-  const dim = working ? { "data-dim": "", inert: true } : {};
-  const dimPages = working && pagesDim ? dim : {};
+  const dimOn = { "data-dim": "", inert: true };
+  const dim = working ? dimOn : {};
+  // Set a frame after the pill shows and cleared a frame after the run ends (see run and cancel).
+  const dimPages = pagesDim ? dimOn : {};
   const options = renderOptions(ctx);
   const rowPicker =
     process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
@@ -1306,6 +1324,8 @@ export function ToolFlow({
                 data-testid="pages-scroll"
                 className="ip-scroll ip-dimmable flex flex-col gap-4 overflow-x-clip pt-3 pb-6 max-lg:-mx-2 max-lg:min-h-[calc(var(--ip-thumb-size)+76px)] max-lg:px-2 lg:-mx-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5"
                 data-ip-scroll="pages"
+                onPointerDownCapture={blockWhileWorking}
+                onClickCapture={blockWhileWorking}
                 {...dimPages}
               >
                 {ownerBlocked.map((f) => (
@@ -1319,7 +1339,7 @@ export function ToolFlow({
                 <ThumbContext.Provider value={thumbs}>
                   {/* While the work runs the pages hold still: not re-rendered on every progress tick (990 tiles
                       took ~1s of main thread at the click, eval G-13). The area dims and goes inert around them. */}
-                  <HoldWhile hold={state === "processing"}>
+                  <HoldWhile hold={state === "processing" || pagesDim}>
                   {renderWorkspace ? (
                     renderWorkspace(wctx)
                   ) : view === "pages" ? (

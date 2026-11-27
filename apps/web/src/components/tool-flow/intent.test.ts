@@ -45,6 +45,16 @@ describe("onIntent", () => {
     expect(win.count()).toBe(0);
   });
 
+  it("with no delay it waits for real intent only", () => {
+    const go = vi.fn();
+    onIntent(go, 0);
+    vi.advanceTimersByTime(60_000);
+    expect(go).not.toHaveBeenCalled();
+    win.dispatch("pointerdown");
+    expect(go).toHaveBeenCalledTimes(1);
+    expect(win.count()).toBe(0);
+  });
+
   it("never runs once cancelled", () => {
     const go = vi.fn();
     const stop = onIntent(go);

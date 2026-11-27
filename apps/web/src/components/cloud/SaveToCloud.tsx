@@ -5,7 +5,7 @@ import { newRequestId } from "@/lib/cloud/protocol";
 import { configuredProviders, providerName, routeFor, SAVE_PROVIDERS, type CloudProvider } from "@/lib/cloud/providers";
 import { buttonClasses } from "../ui/Button";
 import { MenuButton, type MenuButtonHandle } from "./CloudMenu";
-import { CheckIcon, UploadIcon } from "../ui/icons";
+import { CheckIcon, ChevronDownIcon, UploadIcon } from "../ui/icons";
 import { cloudCopy } from "./copy";
 import { transferCopy } from "./transfer-copy";
 import { ProviderMark } from "./ProviderMark";
@@ -142,10 +142,11 @@ export function SaveToCloud({ file, toolName, announce, onSaved }: SaveToCloudPr
     <UploadIcon size={22} />
   );
   const cls = buttonClasses("line", "md", "ip-save__icon");
+  const others = main ? providers.filter((p) => p !== main) : [];
   return (
-    <span className="ip-save inline-flex" data-testid="save-to-cloud">
-      {/* After a pick from a cloud (or with one cloud set up), one press saves there (AC-169). Saving to the
-          other cloud from that result is no longer offered: the 48 px icon has no room for a caret (G-3). */}
+    <span className={main && others.length ? "ip-save ip-split inline-flex" : "ip-save inline-flex"} data-testid="save-to-cloud">
+      {/* After a pick from a cloud (or with one cloud set up), one press saves there (AC-169); a narrow caret
+          beside it offers the other clouds (eval G-3: the icon keeps 48 px). Otherwise the icon opens the menu. */}
       {main ? (
         <button type="button" className={cls} aria-label={label} title={label} aria-busy={busy ? true : undefined} disabled={!!busy} onClick={() => save(main)} data-testid="save-cloud">
           {face}
@@ -165,6 +166,22 @@ export function SaveToCloud({ file, toolName, announce, onSaved }: SaveToCloudPr
           data-testid="save-cloud"
         >
           {face}
+        </MenuButton>
+      )}
+      {main && others.length > 0 && (
+        <MenuButton
+          label={transferCopy.saveAnother}
+          title={transferCopy.saveAnother}
+          placement="bottom-end"
+          presentation="auto"
+          popupClassName="ip-menu-wide"
+          className={buttonClasses("line", "md", "ip-split__caret ip-save__caret")}
+          disabled={!!busy}
+          items={providerItems(others, save, "save")}
+          footnote={cloudFootnote(transferCopy.saveFootnote)}
+          data-testid="save-caret"
+        >
+          <ChevronDownIcon size={16} />
         </MenuButton>
       )}
     </span>

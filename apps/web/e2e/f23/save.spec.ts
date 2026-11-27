@@ -82,6 +82,40 @@ test("AC-160: after a local pick, Save to… lists only Google Drive and OneDriv
   await expect(page.getByRole("link", { name: "Open in OneDrive" })).toBeVisible();
 });
 
+test("AC-160, AC-169: after a Drive pick, one press saves to Drive and a narrow caret still offers the other clouds", async ({ page }, info) => {
+  await pickFromRow(page, "Google Drive", ["alpha.pdf"]);
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await run(page);
+  const save = page.getByTestId("save-cloud");
+  const caret = page.getByTestId("save-caret");
+  await expect(save).toHaveAccessibleName("Save to Drive");
+  await expect(caret).toHaveAccessibleName("Save to another cloud");
+  await settled(page);
+  // The icon keeps its 48 px box; the caret is narrow and sits right beside it; Download keeps its box.
+  const s = (await save.boundingBox())!;
+  const c = (await caret.boundingBox())!;
+  expect(Math.round(s.width)).toBe(48);
+  expect(c.width).toBeLessThanOrEqual(32);
+  expect(Math.abs(c.x - (s.x + s.width))).toBeLessThanOrEqual(1);
+  expect(Math.abs(c.y - s.y)).toBeLessThanOrEqual(1);
+  const dl = (await downloadLink(page).boundingBox())!;
+  expect(c.x + c.width).toBeLessThanOrEqual(dl.x);
+  for (const el of [save, caret, downloadLink(page)]) {
+    await expect(el).toBeInViewport({ ratio: 1 });
+    expect(await uncovered(el)).toBe(true);
+  }
+  if (!isDesktop(info.project.name)) expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  // The caret lists the other clouds (not Drive, never Dropbox), and saving there works.
+  await caret.click();
+  await expect(page.getByRole("menuitem")).toHaveCount(1);
+  await expect(page.getByRole("menuitem").first()).toContainText("OneDrive");
+  const win = await openWindow(page, () => page.getByRole("menuitem", { name: /^OneDrive/ }).click());
+  await closed(win, 15_000);
+  await expect(page.getByTestId("notice").filter({ hasText: /Saved to OneDrive as alpha/ })).toBeVisible();
+  // Drive is still one press away.
+  await expect(save).toHaveAccessibleName("Save to Drive", { timeout: 5000 });
+});
+
 test("AC-169: Download is the only berry fill, keeps the focus, and both controls fit at 1366x657 and 390x664", async ({ page }, info) => {
   await pickFromRow(page, "OneDrive", ["alpha.pdf"]);
   await expect(flow(page)).toHaveAttribute("data-state", "ready");

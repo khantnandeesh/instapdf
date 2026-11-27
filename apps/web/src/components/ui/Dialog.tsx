@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { exit, motionReady, settle } from "@/lib/motion";
 import { cx } from "./cx";
 // Styles: ./dialog.css (modal and sheet) is imported by the screens that open them (ToolFlow, ControlDock, the
@@ -75,6 +75,32 @@ export function Dialog({
   if (open) kept.current = now;
   const { title, description, children, footer } = open ? now : kept.current;
 
+  // Escape. Listened for in a layout effect declared before the one that opens it, so a dialog that opens on
+  // mount (a lazy one, the Sign dialog) already hears Escape on the frame it shows: as a passive effect it
+  // was attached a frame or more later, after a busy commit, and an Escape pressed in between closed the
+  // native dialog with nobody told (it stayed in the DOM, invisible, with the page still inert; f16 AC-237).
+  // And if the browser closes it without a cancel event (Chrome skips cancel when the page has no fresh
+  // user activation), the close is reported the same way, so the dialog never closes behind our back.
+  const openRef = useRef(open);
+  openRef.current = open;
+  useLayoutEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    const onCancel = (e: Event) => {
+      e.preventDefault();
+      onCloseRef.current("escape");
+    };
+    const onNativeClose = () => {
+      if (openRef.current && !dialog.open) onCloseRef.current("escape");
+    };
+    dialog.addEventListener("cancel", onCancel);
+    dialog.addEventListener("close", onNativeClose);
+    return () => {
+      dialog.removeEventListener("cancel", onCancel);
+      dialog.removeEventListener("close", onNativeClose);
+    };
+  }, []);
+
   // A layout effect: the dialog opens and closes in the same commit as its content, never a frame apart.
   useLayoutEffect(() => {
     const dialog = ref.current;
@@ -117,16 +143,6 @@ export function Dialog({
     }
   }, [open, initialFocusRef, returnFocusRef, fallbackFocus, variant]);
 
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    const onCancel = (e: Event) => {
-      e.preventDefault();
-      onCloseRef.current("escape");
-    };
-    dialog.addEventListener("cancel", onCancel);
-    return () => dialog.removeEventListener("cancel", onCancel);
-  }, []);
 
   /** Wrap guard (spec U-7): Tab from the last control goes to the first, Shift+Tab the reverse, instead of leaving for the browser UI. */
   function wrapTab(e: React.KeyboardEvent<HTMLDialogElement>) {

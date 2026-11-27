@@ -21,6 +21,8 @@ import {
   tileLabels,
   tileMain,
   chooseAddPages,
+  chooseContents,
+  contentsRadio,
 } from "./support";
 import { cardAction } from "../support/flow";
 
@@ -58,7 +60,8 @@ test.beforeEach(async ({ page }) => {
 test("AC-40: first-visit defaults", async ({ page }) => {
   await pickMerge(page, "alpha.pdf");
   const panel = await options(page);
-  await expect(panel.getByRole("radio", { name: "None" })).toHaveAttribute("aria-checked", "true");
+  // Contents page: in the row from 1280 (F25 §3.4), else in the panel.
+  await expect(await contentsRadio(page, "None", panel)).toHaveAttribute("aria-checked", "true");
   for (const name of ["First file is a cover", "Add file name to the footer", "Make all pages the same width", "Pad for double-sided printing"]) {
     await expect(panel.getByRole("switch", { name })).not.toBeChecked();
   }
@@ -68,8 +71,8 @@ test("AC-40: first-visit defaults", async ({ page }) => {
 
 test("AC-42: options are remembered after a reload", async ({ page }, info) => {
   await pickMerge(page, "alpha.pdf");
+  await chooseContents(page, "File names");
   let panel = await options(page);
-  await panel.getByRole("radio", { name: /^(File names|Names)$/ }).click();
   await panel.getByRole("switch", { name: "Pad for double-sided printing" }).check();
   await closeOptions(page);
   // F25 §3.3: from 1024 the trigger is named "More options" (the bottom bar keeps "Options").
@@ -78,16 +81,16 @@ test("AC-42: options are remembered after a reload", async ({ page }, info) => {
   await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
   await pickMerge(page, "alpha.pdf");
   panel = await options(page);
-  await expect(panel.getByRole("radio", { name: /^(File names|Names)$/ })).toHaveAttribute("aria-checked", "true");
+  await expect(await contentsRadio(page, "File names", panel)).toHaveAttribute("aria-checked", "true");
   await expect(panel.getByRole("switch", { name: "Pad for double-sided printing" })).toBeChecked();
   await panel.getByRole("button", { name: "Reset options" }).click();
-  await expect(panel.getByRole("radio", { name: "None" })).toHaveAttribute("aria-checked", "true");
+  await expect(await contentsRadio(page, "None", panel)).toHaveAttribute("aria-checked", "true");
 });
 
 test("AC-48, AC-54: contents page and footer through the UI", async ({ page }) => {
   await pickMerge(page, "alpha.pdf", "bravo.pdf");
+  await chooseContents(page, "File names");
   const panel = await options(page);
-  await panel.getByRole("radio", { name: /^(File names|Names)$/ }).click();
   await panel.getByRole("switch", { name: "Add file name to the footer" }).check();
   await panel.getByLabel("Bookmarks").selectOption("perFile");
   await closeOptions(page);
@@ -140,8 +143,8 @@ test("F1 AC-5 adapted: nothing is uploaded, with every option on and an image", 
     if (r.method() !== "GET") posts.push(r.postDataBuffer()?.length ?? 0);
   });
   await pickMerge(page, "alpha.pdf", "charlie.png");
+  await chooseContents(page, "File names");
   const panel = await options(page);
-  await panel.getByRole("radio", { name: /^(File names|Names)$/ }).click();
   for (const name of ["Add file name to the footer", "Pad for double-sided printing", "Make all pages the same width", "First file is a cover"]) await panel.getByRole("switch", { name }).check();
   await panel.getByLabel("Form fields").selectOption("flatten");
   await closeOptions(page);

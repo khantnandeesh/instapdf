@@ -346,7 +346,8 @@ export function DownloadButton({ compact }: { compact?: boolean }) {
               <span className="max-[359px]:sr-only">{done ? "Downloaded" : "Download"}</span>
             </Button>
             {!compact && (
-              <Pop label="Save as" title="Save as" className="ed-download__more" trigger={<CaretDownBold size={14} />} panelClassName="w-[280px] p-4">
+              // Held with Download until the first page is drawn (G-5): Save as downloads too.
+              <Pop label="Save as" title="Save as" className="ed-download__more" trigger={<CaretDownBold size={14} />} panelClassName="w-[280px] p-4" disabled={!painted}>
                 {(close) => (
                   <form
                     className="flex flex-col gap-3"

@@ -142,6 +142,13 @@ for (const tool of usable) {
         await expectInViewport(page, pages, "pages area");
         const box = (await pages.boundingBox())!;
         expect(box.width, "pages use the full content width").toBeGreaterThanOrEqual(Math.min(width, 1280) - 120);
+        // From 1440 the row and the stage widen past the 1280 column, up to 1856px with 32px gutters (G-14).
+        if (width >= 1440) {
+          const wide = Math.min(width - 64, 1856);
+          const toolRow = (await page.getByTestId("tool-intro").boundingBox())!;
+          expect(toolRow.width, "the top row widens on a large screen").toBeGreaterThanOrEqual(wide - 2);
+          expect(box.width, "the pages widen with it").toBeGreaterThanOrEqual(wide - 120);
+        }
         expect(box.height, "pages get at least half of the screen height").toBeGreaterThanOrEqual(height * 0.5 - 40);
         // 60 pages overflow the area (wait for the grid to lay out, e.g. right after a view switch).
         await expect.poll(() => pages.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
@@ -236,3 +243,40 @@ for (const tool of usable) {
     }
   });
 }
+
+// Edit PDF (F25 §5, eval G-1): at rest and with the navbar slid away (pages scrolled down), the editor bar,
+// Download, the page strip and the view controls are on screen and uncovered, and the page never scrolls.
+test.describe("fold fit: edit-pdf", () => {
+  for (const [width, height] of DESKTOP) {
+    test(`desktop ${width}x${height}: the editor fits at rest and with the navbar slid away`, async ({ page }, info) => {
+      test.skip(info.project.name !== "desktop", "desktop sizes run in the desktop project");
+      await page.setViewportSize({ width, height });
+      await page.goto("/edit-pdf");
+      await expect(page.locator("[data-testid=editor][data-hydrated]")).toBeVisible();
+      await expectInViewport(page, page.getByTestId("drop-card").getByRole("button").first(), "file picker");
+      await page.getByTestId("editor-input").setInputFiles(fx("sixty-pages.pdf"));
+      await expect(page.getByTestId("page-1")).toHaveAttribute("data-drawn", "true", { timeout: 15_000 });
+      const check = async (state: string) => {
+        await expectInViewport(page, page.getByTestId("download"), `Download (${state})`);
+        await expectInViewport(page, page.getByRole("button", { name: "Undo" }), `Undo (${state})`);
+        await expectInViewport(page, page.getByTestId("editor-strip"), `page strip (${state})`);
+        await expectInViewport(page, page.locator("[data-region=view]"), `view controls (${state})`);
+        const bar = (await page.locator(".ed-top").boundingBox())!;
+        const canvas = (await page.getByTestId("canvas").boundingBox())!;
+        expect(canvas.y + canvas.height, `canvas ends at the fold (${state})`).toBeLessThanOrEqual(height + 1);
+        expect(bar.y + bar.height, `editor bar above the pages (${state})`).toBeLessThanOrEqual(height / 3);
+        expect(await page.evaluate(() => window.scrollY), `the page itself never scrolls (${state})`).toBe(0);
+        await noHorizontalScroll(page);
+        return bar;
+      };
+      await check("at rest");
+      await page.getByTestId("canvas").evaluate((el) => el.scrollBy(0, 900));
+      if (process.env.NEXT_PUBLIC_EDITOR_NAV_AUTOHIDE !== "0" && height > 600) {
+        await expect.poll(() => page.evaluate(() => document.documentElement.dataset.edNav ?? "shown")).toBe("hidden");
+        await page.waitForTimeout(300); // the slide
+        const bar = await check("navbar away");
+        expect(bar.y, "the editor bar takes the navbar's place").toBeLessThanOrEqual(1);
+      } else await check("scrolled");
+    });
+  }
+});

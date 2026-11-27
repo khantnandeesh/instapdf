@@ -26,11 +26,18 @@ const pagesShare = (page: Page) =>
 const nav = (page: Page) => page.evaluate(() => document.documentElement.dataset.edNav ?? "shown");
 const headerBottom = (page: Page) => page.evaluate(() => document.querySelector(".ip-site-header")!.getBoundingClientRect().bottom);
 const barTop = (page: Page) => page.evaluate(() => document.querySelector(".ed-top")!.getBoundingClientRect().top);
-const scrollDown = (page: Page, px: number) => page.evaluate((px) => document.querySelector<HTMLElement>("[data-testid=canvas]")!.scrollBy(0, px), px);
+// Each scroll waits for the next frame, so the page sees it as a scroll of its own (scroll events come once
+// a frame): two scripted jumps in one busy frame would read as one move, which no person can make.
+const scrollDown = (page: Page, px: number) =>
+  page.evaluate((px) => {
+    document.querySelector<HTMLElement>("[data-testid=canvas]")!.scrollBy(0, px);
+    return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  }, px);
 const scrollTo = (page: Page, f: number) =>
   page.evaluate((f) => {
     const s = document.querySelector<HTMLElement>("[data-testid=canvas]")!;
     s.scrollTop = (s.scrollHeight - s.clientHeight) * f;
+    return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   }, f);
 
 async function open(page: Page, w: number, h: number) {
@@ -85,12 +92,25 @@ for (const [w, h] of [
     await expect.poll(() => nav(page)).toBe("shown");
     await expect.poll(() => barTop(page)).toBe(hh);
 
-    // The pointer at the top edge brings it back.
+    // The pointer resting at the top edge brings it back; one passing through it on the way to the editor
+    // bar's buttons does not (the bar would slide down from under it).
     await scrollDown(page, 300);
     await expect.poll(() => nav(page)).toBe("hidden");
     await page.mouse.move(w / 2, 300);
+    await page.mouse.move(w / 2, 4);
+    await page.waitForTimeout(120);
+    await page.mouse.move(w / 2, 28);
+    await page.waitForTimeout(600);
+    expect(await nav(page)).toBe("hidden");
     await page.mouse.move(w / 2, 2);
     await expect.poll(() => nav(page)).toBe("shown");
+
+    // Focus in the navbar keeps it: a scroll down with a navbar link focused does not hide it.
+    await page.locator(".ip-site-header a").first().focus();
+    await scrollDown(page, 300);
+    await page.waitForTimeout(300);
+    expect(await nav(page)).toBe("shown");
+    await page.getByTestId("canvas").focus();
 
     // Focus going into it (Tab from the page, a skip link) brings it back.
     await page.mouse.move(w / 2, 300);
@@ -104,6 +124,36 @@ for (const [w, h] of [
     const cls = await page.evaluate(() => (window as unknown as { __cls: number }).__cls);
     expect(cls - cls0).toBe(0);
   });
+
+test("G-1: go to page lands the page right under the editor bar with the navbar away (no 72px gap), and back up under both", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop");
+  await open(page, 1280, 632);
+  const settle = async (n: number) => {
+    let last = NaN;
+    await expect
+      .poll(async () => {
+        const y = (await page.getByTestId(`page-${n}`).boundingBox())!.y;
+        const still = Math.abs(y - last) < 0.5;
+        last = y;
+        return still;
+      }, { intervals: [200] })
+      .toBe(true);
+    await page.waitForTimeout(250); // the bars' slide (150ms)
+  };
+  const gap = (n: number) => page.evaluate((n) => document.querySelector(`[data-testid=page-${n}]`)!.getBoundingClientRect().top - document.querySelector(".ed-top")!.getBoundingClientRect().bottom, n);
+  await page.getByTestId("editor-strip").getByRole("button", { name: "Page 12 of 60" }).click();
+  await settle(12);
+  expect(await nav(page)).toBe("hidden");
+  const down = await gap(12);
+  expect(down, `page 12 sits under the bar, not 72px lower (${down})`).toBeGreaterThanOrEqual(0);
+  expect(down).toBeLessThanOrEqual(24);
+  await page.getByTestId("editor-strip").getByRole("button", { name: "Page 3 of 60" }).click();
+  await settle(3);
+  expect(await nav(page)).toBe("shown");
+  const up = await gap(3);
+  expect(up, `page 3 sits under the bar, not behind the navbar (${up})`).toBeGreaterThanOrEqual(0);
+  expect(up).toBeLessThanOrEqual(24);
+});
 
 test("G-1: reduced motion moves the navbar without a transition; the page strip and bar move with it", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop");

@@ -167,10 +167,18 @@ test("AC-41 AC-55 AC-79: page actions rotate, duplicate, insert and delete; over
     // F25 AC-627: a selection opens the properties panel over the canvas's right side; clear it first.
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("editor-props")).toHaveCount(0);
-    await page.getByRole("button", { name: "Rotate right, page 1" }).click();
-    await page.getByRole("button", { name: "Duplicate page, page 2" }).click();
-    await page.getByRole("button", { name: "Insert blank page after, page 1" }).click();
-    await page.getByRole("button", { name: "Delete page, page 5" }).click();
+    // The page actions show (and take the pointer) with the pointer in the page's top band (eval G-1).
+    const act = async (name: string, n: number) => {
+      const btn = page.getByRole("button", { name: `${name}, page ${n}` });
+      await btn.scrollIntoViewIfNeeded();
+      const b = (await btn.boundingBox())!;
+      await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+      await btn.click();
+    };
+    await act("Rotate right", 1);
+    await act("Duplicate page", 2);
+    await act("Insert blank page after", 1);
+    await act("Delete page", 5);
   } else {
     await page.getByTestId("page-chip").click();
     await page.getByRole("button", { name: "Page 1 actions" }).click();

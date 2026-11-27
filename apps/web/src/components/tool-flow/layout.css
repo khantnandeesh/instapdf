@@ -86,6 +86,12 @@
     .mp-toolstage > .ip-flow:not([data-state="empty"]) {
       display: contents;
     }
+    /* With More options open, the row (and its popover) lifts over the floating selection bar (z 25), which
+       would otherwise cover the popover's footer now that it hangs under its button (eval G-7, AC-74);
+       notices (30) stay above it. */
+    .ip-toolrow:has(.ip-popover) {
+      z-index: calc(var(--ip-z-selbar) + 1);
+    }
   }
 
   /* The dock as the row's right part (data-ip-dock="row", from 1024px). */

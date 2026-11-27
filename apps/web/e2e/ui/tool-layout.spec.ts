@@ -240,6 +240,7 @@ test.describe("F25 structure", () => {
   // (load, pick, run, result) is 0.00 on Delete and Merge, phones included (the bar is anchored by a
   // transform and keeps the slot's row, so Download takes the primary's box without moving anything).
   for (const [width, height] of [
+    [1920, 969],
     [1366, 657],
     [1280, 632],
     [390, 664],
@@ -456,6 +457,36 @@ test.describe("F25 structure", () => {
           expect(await shown(dock.getByRole("combobox", { name: "Split" })), "split select").toBe(!xl);
         }
       }
+      // Rotate (F1's form, §3.4): "Apply to" All · Odd · Even, all three whole, then the rotate actions and
+      // Reset, in the row without overflow, overlap or wrap.
+      await open(page, "/rotate-pdf");
+      await load(page, "rotate-pdf");
+      await expect(flow(page)).toHaveAttribute("data-state", "ready", { timeout: 20_000 });
+      const row = page.locator("[data-ip-dock=row]");
+      const scope = row.getByRole("radiogroup", { name: "Apply to" });
+      await expect(scope).toBeVisible();
+      const pills = scope.getByRole("radio");
+      expect(await pills.allInnerTexts(), "rotate: the three pills").toEqual(xl ? ["All pages", "Odd pages", "Even pages"] : ["All", "Odd", "Even"]);
+      const boxes = await pills.evaluateAll((els) =>
+        els.map((e) => {
+          const r = e.getBoundingClientRect();
+          // Whole: the shown label sits on one line, inside its pill (the checked pill's tick badge may overhang).
+          const label = [...e.querySelectorAll("span")].find((x) => x.getClientRects().length > 0)!;
+          const lr = label.getBoundingClientRect();
+          return { l: r.left, r: r.right, t: r.top, b: r.bottom, clipped: label.getClientRects().length !== 1 || lr.left < r.left || lr.right > r.right };
+        }),
+      );
+      for (const [i, b] of boxes.entries()) {
+        expect(b.clipped, `rotate: pill ${i + 1} whole`).toBe(false);
+        if (i) expect(b.l, `rotate: pill ${i + 1} after pill ${i}`).toBeGreaterThanOrEqual(boxes[i - 1].r);
+        expect(Math.abs(b.t - boxes[0].t), "rotate: one line").toBeLessThanOrEqual(1);
+      }
+      expect(await page.getByTestId("dock-options").evaluate((d) => d.scrollWidth - d.clientWidth), "rotate: options overflow").toBeLessThanOrEqual(0);
+      const left = (await row.getByRole("button", { name: "Rotate left" }).boundingBox())!;
+      expect(left.x, "rotate: actions after the pills").toBeGreaterThanOrEqual(boxes[2].r);
+      const reset = (await row.getByRole("button", { name: "Reset rotation" }).boundingBox())!;
+      expect(reset.x + reset.width, "rotate: Reset clear of the slot").toBeLessThanOrEqual((await page.getByTestId("action-slot").boundingBox())!.x);
+      expect(await row.evaluate((d) => d.scrollWidth - d.clientWidth), "rotate: row sideways").toBeLessThanOrEqual(0);
       // Undo│Redo: labels from 1280 on Organize; icons at every width on Merge and Combine.
       for (const [slug, labels] of [
         ["organize-pdf", xl],
@@ -509,6 +540,31 @@ test.describe("F25 structure", () => {
         expect(Math.abs(stage.x - (width - want) / 2), `${slug} ${width}: centred`).toBeLessThanOrEqual(10);
         expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), `${slug}: no sideways scroll`).toBeLessThanOrEqual(0);
       }
+    }
+  });
+
+  // G-8 (review S2): pdf.js's workers are fetched ahead of a pick only on a real sign of intent, never on the
+  // 4 s timer alone, and never with Data Saver on.
+  test("G-8: the page tools fetch pdf.js's workers on intent only, and not with Data Saver", async ({ browser }, info) => {
+    test.skip(info.project.name !== "desktop", "one run is enough");
+    for (const saveData of [false, true]) {
+      const ctx = await browser.newContext();
+      const page = await ctx.newPage();
+      if (saveData) await page.addInitScript(() => Object.defineProperty(navigator, "connection", { value: { saveData: true, effectiveType: "4g" }, configurable: true }));
+      const workers: string[] = [];
+      page.on("request", (r) => /pdf\.(worker|renderer)/.test(r.url()) && workers.push(r.url()));
+      await open(page, "/delete-pdf-pages");
+      // Past the 4 s timer with no input: the other lazy parts may load, the workers do not.
+      await page.waitForTimeout(5000);
+      expect(workers, "no worker fetch on the timer").toEqual([]);
+      await page.mouse.move(400, 400);
+      await page.mouse.down();
+      await page.mouse.up();
+      if (saveData) {
+        await page.waitForTimeout(1500);
+        expect(workers, "Data Saver: no worker fetch before a pick").toEqual([]);
+      } else await expect.poll(() => workers.length, { message: "intent fetches both workers" }).toBe(2);
+      await ctx.close();
     }
   });
 });

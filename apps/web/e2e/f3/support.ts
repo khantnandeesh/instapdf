@@ -1,6 +1,6 @@
 /** Helpers for the F3 Merge e2e suite. Spec: docs/specs/f3-merge.md */
 import { readFile } from "node:fs/promises";
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { PDFDocument } from "pdf-lib";
 import { cloudOn, downloadResult, flow, fx, primary } from "../support/flow";
 
@@ -113,16 +113,39 @@ export async function closeMergeOptions(page: Page) {
   }
 }
 export type ContentsChoice = "None" | "File names" | "Document titles";
+const contentsName = (c: ContentsChoice) => new RegExp(`^(${c}|${{ None: "None", "File names": "Names", "Document titles": "Titles" }[c]})$`);
+/** Merge's Contents page in the top row (from 1280 px, F25 §3.4 / eval G-6); hidden there below 1280. */
+const rowContents = (page: Page) => page.getByTestId("dock-row-options").getByRole("radiogroup", { name: "Contents page" });
+/**
+ * Where Contents page is shown now: Merge's top row from 1280 px, else the options panel (the inline panel,
+ * the sheet or the popover, which this opens when needed). Reading it never closes an open popover.
+ */
+export async function contentsGroup(page: Page, panel?: Locator): Promise<Locator> {
+  if (await rowContents(page).isVisible()) return rowContents(page);
+  return panel ?? mergeOptions(page);
+}
+/** The Contents page radio for `c`, wherever it is shown (see contentsGroup). */
+export async function contentsRadio(page: Page, c: ContentsChoice, panel?: Locator) {
+  return (await contentsGroup(page, panel)).getByRole("radio", { name: contentsName(c) });
+}
+/**
+ * Picks Contents page. In the row this is one click; in the panel it opens the panel, picks and closes it,
+ * so a test can open the panel afterwards for the other options (a click in the row closes the popover).
+ */
+export async function chooseContents(page: Page, c: ContentsChoice) {
+  if (await rowContents(page).isVisible()) return rowContents(page).getByRole("radio", { name: contentsName(c) }).click();
+  const panel = await mergeOptions(page);
+  await panel.getByRole("radio", { name: contentsName(c) }).click();
+  await closeMergeOptions(page);
+}
 /** Sets options through the UI (switches by label, Contents radio, Bookmarks and Form fields selects). */
 export async function setMergeOptions(
   page: Page,
   o: { toc?: ContentsChoice; switches?: string[]; bookmarks?: "keep" | "remove" | "perFile" | "perFileNested"; forms?: "rename" | "merge" | "flatten" | "remove" },
 ) {
+  // Contents page first: from 1280 it sits in the row, and a click there would close an open popover.
+  if (o.toc) await chooseContents(page, o.toc);
   const panel = await mergeOptions(page);
-  if (o.toc) {
-    const short = { None: "None", "File names": "Names", "Document titles": "Titles" }[o.toc];
-    await panel.getByRole("radio", { name: new RegExp(`^(${o.toc}|${short})$`) }).click();
-  }
   for (const name of o.switches ?? []) await panel.getByRole("switch", { name }).check();
   if (o.bookmarks) await panel.getByLabel("Bookmarks").selectOption(o.bookmarks);
   if (o.forms) await panel.getByLabel("Form fields").selectOption(o.forms);

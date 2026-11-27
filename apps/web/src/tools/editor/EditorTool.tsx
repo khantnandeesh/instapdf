@@ -218,14 +218,15 @@ export function EditorTool() {
       {(pending || locked) && !open ? (
         // Opening (F25 §8): the editor's layout with placeholders, from the frame the file is picked. A locked
         // file's password is asked for over it (eval G-5), and Skip goes back to the picker.
-        <div className="ed-shell" data-testid="editor-opening" aria-busy="true">
+        // Busy only while it really opens: a password the dialog waits for is not "Opening…".
+        <div className="ed-shell" data-testid="editor-opening" aria-busy={pending || busy ? true : undefined}>
           <div className="ed-opening">
             <header className="ed-top" role="group" aria-label="Document">
               <h1 className="ed-title">Edit PDF</h1>
               <Badge tone="beta">Beta</Badge>
               <h2 className="ed-file truncate">{pending ?? locked?.name}</h2>
             </header>
-            <OpeningBody />
+            <OpeningBody busy={!!pending || busy} />
           </div>
         </div>
       ) : (

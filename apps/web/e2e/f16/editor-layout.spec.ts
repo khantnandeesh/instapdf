@@ -228,6 +228,37 @@ test("G-10: with Shapes armed, a shape just drawn keeps the kind switch above it
   await expect(kinds.getByRole("radio", { name: "Ellipse" })).toHaveAttribute("aria-checked", "true");
 });
 
+test("G-1 page actions: they take the pointer only in the page's top band; lower on the page what is under them is the page's; Tab reaches them with a drawing tool armed", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "a mouse (a touch screen keeps the current page's actions shown)");
+  await page.setViewportSize({ width: 1280, height: 632 });
+  await open(page);
+  const rotate = page.getByRole("button", { name: "Rotate right, page 1" });
+  const p1 = (await page.getByTestId("page-1").boundingBox())!;
+  const r = (await rotate.boundingBox())!;
+  const hit = () => page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest(".ed-pagehead button")?.getAttribute("aria-label") ?? null, [r.x + r.width / 2, r.y + r.height / 2]);
+  // At rest, and with the pointer lower on the page, the action's spot is the page's.
+  expect(await hit()).toBe(null);
+  await page.mouse.move(p1.x + p1.width / 2, p1.y + 200);
+  await page.waitForTimeout(250);
+  expect(await hit()).toBe(null);
+  expect(Number(await rotate.evaluate((b) => getComputedStyle(b.parentElement!).opacity))).toBe(0);
+  // In the top band they show and take the pointer.
+  await page.mouse.move(p1.x + p1.width / 2, p1.y + 20);
+  await expect.poll(() => hit()).toBe("Rotate right, page 1");
+  await rotate.click();
+  await expect(page.getByTestId("live")).not.toBeEmpty();
+  // A drawing tool armed: the band is the page's for the pointer, but Tab still reaches the actions.
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("p");
+  await expect(page.locator(".ed-frame-root")).toHaveAttribute("data-tool", "draw");
+  await page.mouse.move(p1.x + p1.width / 2, p1.y + 20);
+  await page.waitForTimeout(250);
+  expect(await hit()).toBe(null);
+  await page.getByRole("button", { name: "Rotate left, page 1" }).focus();
+  await expect(page.getByRole("button", { name: "Rotate left, page 1" })).toBeFocused();
+  await expect.poll(() => rotate.evaluate((b) => getComputedStyle(b.parentElement!).opacity)).toBe("1");
+});
+
 test("AC-629: a header link with edits not downloaded asks; Cancel stays, Download anyway downloads then leaves; no edits leaves at once", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 632 });
   await open(page);

@@ -43,5 +43,21 @@ describe("placeCard (eval G-9: the properties card never covers the selection)",
     const sel = { l: 140, r: 1270, t: 60, b: 600 };
     const p = placeCard(card, sel, room);
     expect(p === null || p.side === "right" || p.side === "left").toBe(true);
+    // And of every spot it could take, it takes one that covers the least.
+    const h = Math.min(card.h, room.b - card.t);
+    const at = (x: number, y: number, hh: number) => Math.max(0, Math.min(card.l + x + card.w, sel.r) - Math.max(card.l + x, sel.l)) * Math.max(0, Math.min(card.t + y + hh, sel.b) - Math.max(card.t + y, sel.t));
+    const chosen = at(p?.x ?? 0, p?.y ?? 0, p?.maxH ?? h);
+    expect(chosen).toBeLessThanOrEqual(at(0, 0, h));
+    expect(chosen).toBeLessThanOrEqual(at(room.l - card.l, 0, h));
+  });
+  it("picks the spot that covers less when every spot covers some of it", () => {
+    // Taller than the canvas and wider than both beside spots, but leaving the left spot's lower part clear.
+    const sel = { l: 300, r: 1270, t: 60, b: 600 };
+    const p = placeCard(card, sel, room);
+    const h = Math.min(card.h, room.b - card.t);
+    const at = (x: number) => Math.max(0, Math.min(card.l + x + card.w, sel.r) - Math.max(card.l + x, sel.l)) * Math.max(0, Math.min(card.t + h, sel.b) - Math.max(card.t, sel.t));
+    expect(p?.side).toBe("left");
+    expect(at(p!.x)).toBeLessThan(at(0));
+    expect(at(p!.x)).toBe((300 - 144 > 272 ? 0 : 144 + 272 - 300) * h);
   });
 });
