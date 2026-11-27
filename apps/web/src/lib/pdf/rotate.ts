@@ -1,4 +1,4 @@
-import { PDFDocument, degrees } from "@cantoo/pdf-lib";
+import { PDFDict, PDFDocument, PDFName, PDFRef, PDFStream, degrees } from "@cantoo/pdf-lib";
 import { finalRotation, normalizeRotation } from "./rotation";
 
 export type RotateInput = {
@@ -24,7 +24,28 @@ export async function loadForEdit(bytes: Uint8Array, password?: string) {
   const wasEncrypted = probe.isEncrypted;
   if (!wasEncrypted) return { doc: probe, wasEncrypted };
   const doc = await PDFDocument.load(bytes, { password: password ?? "", updateMetadata: false });
+  dropOldSecurity(doc);
   return { doc, wasEncrypted };
+}
+
+/**
+ * The library decrypts a file on load but keeps two leftovers as ordinary objects: the old encryption
+ * dictionary (with the password check values) and the old cross-reference stream's dictionary, which
+ * still points at it. Saved as they are, they leave the old password open to guessing offline and make
+ * some readers (this library among them) take the new file for an encrypted one. Both go.
+ */
+export function dropOldSecurity(doc: PDFDocument) {
+  const has = (dict: PDFDict, ...keys: string[]) => keys.every((k) => dict.has(PDFName.of(k)));
+  for (const [ref, object] of doc.context.enumerateIndirectObjects()) {
+    const dict = object instanceof PDFDict ? object : object instanceof PDFStream ? object.dict : undefined;
+    if (!dict) continue;
+    const oldTrailer = has(dict, "Root", "Size", "Encrypt");
+    const oldEncrypt = has(dict, "Filter", "O", "U", "P") && dict.get(PDFName.of("Filter")) === PDFName.of("Standard");
+    // The old trailer is also where the document information (title, author) hangs: keep that link.
+    const info = oldTrailer ? dict.get(PDFName.of("Info")) : undefined;
+    if (info instanceof PDFRef && !doc.context.trailerInfo.Info) doc.context.trailerInfo.Info = info;
+    if (oldTrailer || oldEncrypt) doc.context.delete(ref);
+  }
 }
 
 /**

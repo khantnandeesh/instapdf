@@ -7,7 +7,7 @@ import type { ProcessFn } from "@/components/tool-flow/types";
 import { cx } from "@/components/ui/cx";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Switch } from "@/components/ui/Switch";
-import { ALLOW_ALL, canProtect, passwordTooLong, restricts, type ProtectAllow, type ProtectOptions } from "@/lib/pdf/protect-options";
+import { ALLOW_ALL, canProtect, ownerSameAsOpen, passwordTooLong, restricts, type ProtectAllow, type ProtectOptions } from "@/lib/pdf/protect-options";
 import { runInWorker } from "@/lib/pdf/worker-client";
 import { flowTool } from "@/tools/registry";
 import { protectCopy as c } from "./copy";
@@ -20,7 +20,7 @@ export function protectCheck(o: ProtectOptions): true | string {
   if (!canProtect(o)) return c.needs;
   if (passwordTooLong(o.openPassword) || passwordTooLong(o.ownerPassword)) return c.tooLong;
   // The same password for both would open the file with every right, so the restrictions would mean nothing.
-  if (restricts(o.allow) && o.ownerPassword && o.ownerPassword === o.openPassword) return c.sameAsOpen;
+  if (ownerSameAsOpen(o)) return c.sameAsOpen;
   return true;
 }
 

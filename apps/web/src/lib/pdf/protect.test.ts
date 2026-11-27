@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { PDFDocument } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
 import { runJob } from "./jobs";
-import { ALLOW_ALL, canProtect, passwordTooLong, protectPdf, unlockPdf } from "./protect";
+import { ALLOW_ALL, canProtect, passwordTooLong, PDFA_NOTE, protectPdf, unlockPdf } from "./protect";
 
 const fx = async (name: string) => new Uint8Array(await readFile(new URL(`../../../tests/fixtures/${name}`, import.meta.url)));
 const blob = (b: Uint8Array) => new Blob([b as Uint8Array<ArrayBuffer>], { type: "application/pdf" });
@@ -101,5 +101,47 @@ describe("protect job", () => {
     const out = await runJob({ kind: "protect", zipName: "x.zip", files: [{ name: "alpha.pdf", source: blob(await fx("alpha.pdf")) }], options: { openPassword: "pw", ownerPassword: "", allow: ALLOW_ALL } }, () => {});
     expect(out).toMatchObject({ name: "alpha.pdf", type: "application/pdf", pageCount: 3, wasEncrypted: false });
     expect(await needsPassword(new Uint8Array(await out.blob.arrayBuffer()))).toBe(true);
+  });
+  it("AC-814: a PDF/A file is protected as a normal PDF, with a note saying so", async () => {
+    const out = await runJob({ kind: "protect", zipName: "x.zip", files: [{ name: "a.pdf", source: blob(await fx("tagged-features.pdf")) }], options: { openPassword: "pw", ownerPassword: "", allow: ALLOW_ALL } }, () => {});
+    expect(out.warnings).toEqual([PDFA_NOTE]);
+    const bytes = new Uint8Array(await out.blob.arrayBuffer());
+    expect(await needsPassword(bytes)).toBe(true);
+    expect((await open(bytes, "pw")).pages).toBeGreaterThan(0);
+    // The claim is gone: once unlocked, the same file protects again with no note.
+    const plain = await unlockPdf({ bytes, password: "pw" });
+    const again = await protectPdf({ bytes: plain.bytes, options: { openPassword: "pw", ownerPassword: "", allow: ALLOW_ALL } });
+    expect(again.warnings).toBeUndefined();
+  });
+});
+
+describe("review fixes", () => {
+  it("AC-815: a password opens the file however its accents were typed", async () => {
+    const nfd = "cafe\u0301";
+    const { bytes } = await protectPdf({ bytes: await fx("alpha.pdf"), options: { openPassword: nfd, ownerPassword: "", allow: ALLOW_ALL } });
+    expect((await open(bytes, "caf\u00e9")).pages).toBe(3);
+  });
+
+  it("AC-804: the engine itself refuses an owner password equal to the open one", async () => {
+    const options = { openPassword: "same", ownerPassword: "same", allow: { ...ALLOW_ALL, print: false } };
+    await expect(protectPdf({ bytes: await fx("alpha.pdf"), options })).rejects.toThrow(/different password/);
+  });
+
+  it("AC-816: no trace of the old password is left, and our own tools read the copy as an open file", async () => {
+    const options = { openPassword: "first", ownerPassword: "", allow: ALLOW_ALL };
+    const titled = await PDFDocument.load(await fx("alpha.pdf"));
+    titled.setTitle("Kept title");
+    const locked = await protectPdf({ bytes: await titled.save(), options });
+    const count = (bytes: Uint8Array) => Buffer.from(bytes).toString("latin1").split("/Standard").length - 1;
+    const open1 = await unlockPdf({ bytes: locked.bytes, password: "first" });
+    expect(count(open1.bytes)).toBe(0);
+    const reopened = await PDFDocument.load(open1.bytes, { ignoreEncryption: true, updateMetadata: false });
+    expect(reopened.isEncrypted).toBe(false);
+    expect(reopened.getTitle()).toBe("Kept title");
+    // Protecting a protected file again keeps one encryption dictionary: the new one.
+    const again = await protectPdf({ bytes: locked.bytes, password: "first", options: { ...options, openPassword: "second" } });
+    const plain = await PDFDocument.load(again.bytes, { password: "second" });
+    expect(plain.getPageCount()).toBe(3);
+    expect(await needsPassword(again.bytes, "first")).toBe(true);
   });
 });

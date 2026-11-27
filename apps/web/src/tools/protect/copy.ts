@@ -8,7 +8,7 @@ export const protectCopy = {
   owner: "Password to change these",
   ownerPlaceholder: "Password for changes (optional)",
   needs: "Enter a password",
-  tooLong: "Use up to 127 characters",
+  tooLong: "That password is too long",
   sameAsOpen: "Use a different password from the one that opens the file",
   changed: (count: number) => `${count} changed`,
 };

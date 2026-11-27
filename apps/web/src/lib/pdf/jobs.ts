@@ -127,7 +127,7 @@ async function runMerge(job: MergeJob, onProgress: ProgressFn, env: JobEnv): Pro
   };
 }
 
-type FileResult = { bytes: Uint8Array; pageCount: number; wasEncrypted: boolean };
+type FileResult = { bytes: Uint8Array; pageCount: number; wasEncrypted: boolean; warnings?: string[] };
 
 /**
  * One output per input file, each kept under its own name: a single PDF, or a ZIP of them. `weights`
@@ -144,12 +144,16 @@ async function runPerFile<F extends JobFile>(
   let done = 0;
   onProgress(0);
   let wasEncrypted = false;
+  // Each note once, however many files it applies to.
+  const notes = new Set<string>();
+  const warnings = () => (notes.size ? { warnings: [...notes] } : {});
   const one = async (file: F, i: number) => {
     const within = (fraction: number) => onProgress(Math.min(0.99, (done + weights[i] * fraction) / total));
     const bytes = new Uint8Array(await file.source.arrayBuffer());
     within(0.1);
     const r = await work(bytes, file, (f) => within(0.1 + 0.9 * f));
     wasEncrypted ||= r.wasEncrypted;
+    r.warnings?.forEach((w) => notes.add(w));
     return r;
   };
 
@@ -162,6 +166,7 @@ async function runPerFile<F extends JobFile>(
       blob: new Blob([r.bytes as Uint8Array<ArrayBuffer>], { type: "application/pdf" }),
       pageCount: r.pageCount,
       wasEncrypted,
+      ...warnings(),
     };
   }
 
@@ -175,7 +180,7 @@ async function runPerFile<F extends JobFile>(
     done += weights[i];
     onProgress(done / total);
   }
-  return { name: zipName, type: "application/zip", blob: zip.finish(), entries, wasEncrypted };
+  return { name: zipName, type: "application/zip", blob: zip.finish(), entries, wasEncrypted, ...warnings() };
 }
 
 const runRotate = (job: RotateJob, onProgress: ProgressFn): Promise<JobOutput> =>

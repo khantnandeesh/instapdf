@@ -19,4 +19,12 @@ export const canProtect = (o: ProtectOptions) => o.openPassword.length > 0 || re
 
 /** A password is at most 127 bytes of UTF-8 in revision 6; longer ones would be cut silently. */
 export const MAX_PASSWORD_BYTES = 127;
-export const passwordTooLong = (p: string) => new TextEncoder().encode(p).length > MAX_PASSWORD_BYTES;
+/**
+ * The form a password is stored in. Revision 6 asks for a normalised password (SASLprep); NFKC is its
+ * core, so "é" typed as one character or as e + accent, or a full-width letter, opens the same file in a
+ * reader that normalises what is typed.
+ */
+export const normalPassword = (p: string) => p.normalize("NFKC");
+export const passwordTooLong = (p: string) => new TextEncoder().encode(normalPassword(p)).length > MAX_PASSWORD_BYTES;
+/** With restrictions, the password that lifts them must not be the one that opens the file. */
+export const ownerSameAsOpen = (o: ProtectOptions) => restricts(o.allow) && o.ownerPassword.length > 0 && normalPassword(o.ownerPassword) === normalPassword(o.openPassword);

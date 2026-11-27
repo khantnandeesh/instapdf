@@ -51,6 +51,9 @@ for files you own or may change.
 - AC-810 Unlock removes an open password after the dialog (wrong password shows the error, right one continues).
 - AC-811 Unlock removes owner restrictions with no prompt; text and page count are unchanged.
 - AC-812 A PDF with nothing to remove gets "This PDF has no password or restrictions, so there is nothing to remove."
+- AC-814 A PDF/A file is protected as a normal PDF (its PDF/A claim is removed, since PDF/A forbids encryption) and the result says so.
+- AC-815 Passwords are normalised (NFKC), so the same password opens the file however its accents were typed.
+- AC-816 A file that had a password keeps no trace of it after any tool (the old encryption dictionary is removed), keeps its title and author, and our own tools read the copy as an open file.
 - AC-813 Both pages pass the every-tool guards: first-screen fit at every size, one scroller, focus rings, first-load budget.
 
 Tests: `src/lib/pdf/protect.test.ts`, `e2e/f11/security.spec.ts`. Screenshots: `designs/f11/`.
