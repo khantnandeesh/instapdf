@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { LoadedFile } from "../tool-flow/types";
-import { planFiles, useLazyModule } from "./hooks";
+import { planFiles, useLazyModule, useLiveState } from "./hooks";
 import type * as Sel from "./selection";
 
 const loadSelection = () => import("./selection");
@@ -17,18 +17,17 @@ export function usePageSelection(onUserChange?: (state: Sel.SelectionState, file
   const sel = useLazyModule(loadSelection);
   const selRef = useRef(sel);
   selRef.current = sel;
-  const [files, setFiles] = useState<Sel.SelFile[]>([]);
-  const [state, setState] = useState<Sel.SelectionState>(EMPTY);
-  const filesRef = useRef(files);
-  filesRef.current = files;
+  // Live state (eval G-3): the run reads the selection as typed, even before React shows it.
+  const [files, setFiles, filesRef] = useLiveState<Sel.SelFile[]>([]);
+  const [state, setState, live] = useLiveState<Sel.SelectionState>(EMPTY);
 
   const onFilesChange = useCallback((all: LoadedFile[]) => {
     const next = planFiles(all);
     setFiles((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
-  }, []);
+  }, [setFiles]);
   useEffect(() => {
     if (sel) setState((s) => sel.syncFiles(s, files));
-  }, [files, sel]);
+  }, [files, sel, setState]);
   // The live message follows the user's own changes, not files arriving.
   const user = useRef(false);
   const onUserRef = useRef(onUserChange);
@@ -37,7 +36,7 @@ export function usePageSelection(onUserChange?: (state: Sel.SelectionState, file
     if (!user.current) return;
     user.current = false;
     onUserRef.current?.(state, filesRef.current);
-  }, [state]);
+  }, [state, filesRef]);
 
   const actions = useMemo(() => {
     // A user's change: the live message follows it (blur and Start over say nothing).
@@ -59,7 +58,7 @@ export function usePageSelection(onUserChange?: (state: Sel.SelectionState, file
       custom: () => setState((s) => (s.pick === "custom" ? s : { ...s, pick: "custom" })),
       reset: () => setState(EMPTY),
     };
-  }, []);
+  }, [filesRef, setState]);
   const error = sel ? sel.fieldError(state.text, files) : null;
   const errorText = sel && error ? sel.rangeErrorText(error, files.map((f) => f.pageCount)) : null;
   const count = sel ? sel.selectedCount(state, files) : 0;
@@ -67,5 +66,22 @@ export function usePageSelection(onUserChange?: (state: Sel.SelectionState, file
   /** Files with nothing selected (Extract skips them) and with every page selected (Delete can't run). */
   const empty = files.filter((f) => !(state.sets[f.id]?.length ?? 0));
   const full = files.filter((f) => (state.sets[f.id]?.length ?? 0) >= f.pageCount);
-  return { files, state, error, errorText, count, total, empty, full, onFilesChange, ...actions };
+  /**
+   * The run and Enter: the selection and files as the last change left them (`live`), with the
+   * checks the dock shows (`problem`: the field's error, nothing picked, every page of a file marked).
+   */
+  const current = useCallback(() => {
+    const m = selRef.current;
+    const st = live.current;
+    const fs = filesRef.current;
+    const err = m ? m.fieldError(st.text, fs) : null;
+    return {
+      state: st,
+      files: fs,
+      errorText: m && err ? m.rangeErrorText(err, fs.map((f) => f.pageCount)) : null,
+      count: m ? m.selectedCount(st, fs) : 0,
+      full: fs.filter((f) => (st.sets[f.id]?.length ?? 0) >= f.pageCount),
+    };
+  }, [filesRef, live]);
+  return { files, state, error, errorText, count, total, empty, full, onFilesChange, current, ...actions };
 }

@@ -1,4 +1,4 @@
-import "./field-bubble.css";
+// Its stylesheet comes with LazyFieldBubble, in the page's first CSS (see there).
 import { useLayoutEffect, useRef } from "react";
 import { cx } from "./cx";
 import { AlertIcon } from "./icons";

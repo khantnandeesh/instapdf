@@ -2,7 +2,7 @@
 import dynamic from "next/dynamic";
 import { useEffect } from "react";
 import { onIntent } from "@/components/tool-flow/intent";
-import type { PageWorkspace } from "./workspace";
+import { loadPageGrid, type PageWorkspace } from "./workspace";
 
 /**
  * The editing parts of Merge, Combine & reorder and Organize (page-editing.tsx), loaded apart from
@@ -19,7 +19,10 @@ export function EditorDialogs({ ws }: { ws: PageWorkspace }) {
   return ws.dialogsUsed ? <Dialogs ws={ws} /> : null;
 }
 
-/** Prefetches the editing parts at the first pointer, key, focus or drag (or after a few seconds). */
+/**
+ * Prefetches the editing parts and the pages view at the first pointer, key, focus or drag (or after a
+ * few seconds): Organize and Combine open on the pages view, so its first tiles never wait for it (eval G-11).
+ */
 export function usePrefetchEditing() {
-  useEffect(() => onIntent(() => void load().catch(() => {})), []);
+  useEffect(() => onIntent(() => void Promise.all([load(), loadPageGrid()]).catch(() => {})), []);
 }

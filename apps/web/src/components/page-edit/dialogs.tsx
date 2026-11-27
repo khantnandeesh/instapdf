@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { pageBoxStyle } from "@/components/tool-flow/page-box";
 import { PageThumb } from "@/components/tool-flow/Thumbnail";
 import { Button } from "@/components/ui/Button";
+import { useLiveState } from "@/components/ui/live-state";
 import { cx } from "@/components/ui/cx";
 import { Dialog } from "@/components/ui/Dialog";
 import { AlertIcon, CheckIcon } from "@/components/ui/icons";
@@ -244,7 +245,8 @@ export function MoveToPositionDialog({
 }) {
   const labels: MoveLabels = labelsIn ?? { title: c.moveTitle(subject), now: c.moveNow(current, total), field: c.moveField(total), error: c.moveError(total), cancel: c.cancel, move: c.move };
   const input = useRef<HTMLInputElement>(null);
-  const [value, setValue] = useState(String(current));
+  // Live (eval G-3): Move and Enter read the number as typed, even before React shows it.
+  const [value, setValue, valueLive] = useLiveState(String(current));
   const [invalid, setInvalid] = useState(false);
   const [shake, setShake] = useState(0);
   const errorId = useId();
@@ -254,9 +256,10 @@ export function MoveToPositionDialog({
     setValue(String(current));
     setInvalid(false);
     requestAnimationFrame(() => input.current?.select());
-  }, [open, current]);
+  }, [open, current, setValue]);
   const submit = () => {
-    const n = /^\s*\d+\s*$/.test(value) ? Number(value) : NaN;
+    const typed = valueLive.current;
+    const n = /^\s*\d+\s*$/.test(typed) ? Number(typed) : NaN;
     if (!Number.isInteger(n) || n < 1 || n > total) {
       setInvalid(true);
       setShake((k) => k + 1);

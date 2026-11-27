@@ -32,10 +32,12 @@ export const RangeField = forwardRef<
     onChange: (text: string) => void;
     onBlur: () => void;
     onClear: () => void;
+    /** Enter: run with the text as typed. The tool checks it (live) and runs, or calls shake(). */
+    onEnter?: () => void;
     className?: string;
     testId?: string;
   }
->(function RangeField({ label, value, placeholder, differs, error, notice, clearLabel, canClear, onChange, onBlur, onClear, className, testId = "range-field" }, ref) {
+>(function RangeField({ label, value, placeholder, differs, error, notice, clearLabel, canClear, onChange, onBlur, onClear, onEnter, className, testId = "range-field" }, ref) {
   const id = useId();
   const hintId = `${id}-hint`;
   const errId = `${id}-err`;
@@ -85,6 +87,12 @@ export const RangeField = forwardRef<
           value={value}
           data-testid={testId}
           onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || e.nativeEvent.isComposing || !onEnter) return;
+            e.preventDefault();
+            // The tool decides from the text as typed (its live state): it runs, or calls shake().
+            onEnter();
+          }}
           onFocus={() => {
             setNarrow(window.matchMedia("(max-width: 639px)").matches);
             setFocused(true);

@@ -12,7 +12,24 @@ export type Mix = { reverse: boolean; perTurn: string; repeat: boolean };
  * One card's settings (spec F4/F5 §3g, P-5): order, pages per turn and, for a one-page file, Repeat.
  * Cards exist only once a file is in, so this loads apart from the page (budget, P-12).
  */
-export function MixSettings({ id, name, pageCount, mix: m, onChange, announce }: { id: string; name: string; pageCount: number; mix: Mix; onChange: (patch: Partial<Mix>) => void; announce: (msg: string) => void }) {
+export function MixSettings({
+  id,
+  name,
+  pageCount,
+  mix: m,
+  onChange,
+  announce,
+  onEnter,
+}: {
+  id: string;
+  name: string;
+  pageCount: number;
+  mix: Mix;
+  onChange: (patch: Partial<Mix>) => void;
+  announce: (msg: string) => void;
+  /** Enter in pages per turn: mix with the numbers as typed. */
+  onEnter?: () => void;
+}) {
   return (
     <>
       <SegmentedControl
@@ -39,6 +56,7 @@ export function MixSettings({ id, name, pageCount, mix: m, onChange, announce }:
           error={a.perTurnError}
           max={MAX_COUNT}
           under
+          onEnter={onEnter}
         />
         <span className="text-sm leading-11 whitespace-nowrap text-muted" aria-hidden="true">
           {a.perTurn}
