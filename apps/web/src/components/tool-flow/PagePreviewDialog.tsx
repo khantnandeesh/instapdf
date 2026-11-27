@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Thumbs } from "@/lib/pdf/thumbs-lazy";
 import { Dialog } from "../ui/Dialog";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "../ui/icons";
+import { IconButton } from "../ui/IconButton";
 import { fitPage, keyTarget, neighbours, readGesture, renderSize, type Size } from "./preview-fit";
 import type { ReadyFile } from "./types";
 import "./page-preview.css";
@@ -194,9 +195,7 @@ export function PagePreviewDialog({
           onClick={onClick}
         >
           <div className="ip-pv__top">
-            <button type="button" className="ip-pv__btn ip-pv__close" aria-label="Close" onClick={onClose}>
-              <CloseIcon size={20} />
-            </button>
+            <IconButton variant="onDark" tooltip={false} className="ip-pv__close" label="Close" icon={<CloseIcon size={20} />} onClick={onClose} />
           </div>
           <div ref={stage} className="ip-pv__stage" data-testid="page-preview-stage">
             {box && shown && (
@@ -214,9 +213,7 @@ export function PagePreviewDialog({
             )}
           </div>
           <div className="ip-pv__bar">
-            <button type="button" className="ip-pv__btn ip-pv__prev" aria-label="Previous page" disabled={at <= 0} onClick={() => onNavigate(at - 1)}>
-              <ChevronLeftIcon size={20} />
-            </button>
+            <IconButton variant="onDark" tooltip={false} className="ip-pv__prev" label="Previous page" icon={<ChevronLeftIcon size={20} />} disabled={at <= 0} onClick={() => onNavigate(at - 1)} />
             <span className="ip-pv__count" title={file.name} data-testid="page-preview-counter">
               <span aria-hidden="true">
                 {pageNo} / {count}
@@ -225,9 +222,7 @@ export function PagePreviewDialog({
                 Page {pageNo} of {count}
               </span>
             </span>
-            <button type="button" className="ip-pv__btn ip-pv__next" aria-label="Next page" disabled={at >= total - 1} onClick={() => onNavigate(at + 1)}>
-              <ChevronRightIcon size={20} />
-            </button>
+            <IconButton variant="onDark" tooltip={false} className="ip-pv__next" label="Next page" icon={<ChevronRightIcon size={20} />} disabled={at >= total - 1} onClick={() => onNavigate(at + 1)} />
           </div>
         </div>
       )}

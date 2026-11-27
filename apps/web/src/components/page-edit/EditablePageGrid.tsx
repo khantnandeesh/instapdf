@@ -3,12 +3,14 @@ import "./page-edit.css";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { flip } from "@/lib/motion/flow";
-import { pageBoxStyle, pageTransform, pageTurnScale } from "@/components/tool-flow/page-box";
+import { pageTurnScale } from "@/components/tool-flow/page-box";
 import { PageThumb } from "@/components/tool-flow/Thumbnail";
 import { Button } from "@/components/ui/Button";
 import { cx } from "@/components/ui/cx";
 import { IconButton } from "@/components/ui/IconButton";
-import { CheckIcon, FileIcon, LockIcon, PlusIcon, RotateLeftIcon, RotateRightIcon } from "@/components/ui/icons";
+import { FileIcon, LockIcon, PlusIcon, RotateLeftIcon, RotateRightIcon, TrashIcon } from "@/components/ui/icons";
+import { MoreIcon } from "@/components/ui/page-tool-icons";
+import { TileActions, TileBadge, TileCheck, TileCorner, TileHit, TileLabel, TilePage, TileRow } from "@/components/tile/parts";
 import { MenuButton, type MenuButtonHandle, type MenuEntry } from "@/components/ui/Menu";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatDelta } from "@/lib/pdf/rotation";
@@ -380,9 +382,7 @@ export default function EditablePageGrid({
                 ) : a === "rotate-right" ? (
                   <RotateRightIcon size={16} />
                 ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
-                  </svg>
+                  <TrashIcon size={16} />
                 )
               }
               onClick={(e) => onAction(t.uid, a, e.currentTarget)}
@@ -400,20 +400,10 @@ export default function EditablePageGrid({
               className="mp-iconbtn relative before:absolute before:size-11 before:content-[''] max-lg:size-11"
               data-testid="tile-more"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-                <circle cx="5" cy="12" r="1.75" />
-                <circle cx="12" cy="12" r="1.75" />
-                <circle cx="19" cy="12" r="1.75" />
-              </svg>
+              <MoreIcon size={18} />
             </MenuButton>
           );
-          const selectMark = t.selected ? (
-            <span className="mp-tick-in grid size-[22px] place-items-center rounded-full bg-leaf text-white ring-2 ring-white">
-              <CheckIcon size={14} />
-            </span>
-          ) : (
-            <span className="size-[22px] rounded-full border-[1.5px] border-field-line bg-surface-raised" />
-          );
+          const selectMark = <TileCheck on={!!t.selected} />;
           return (
             // Page tile (berrypdf.md "Page tiles"): the page fills the tile, its label below in Fredoka; a selected page gets the berry outline and a leaf tick.
             <div key={t.uid} role="listitem" className="group/tile ip-tile relative flex min-w-0 flex-col items-center gap-1.5" data-selected={t.selected || undefined} data-uid={t.uid} data-flip>
@@ -422,7 +412,7 @@ export default function EditablePageGrid({
                 data-tile-box=""
                 onPointerDown={(e) => onPointerDown(e, t)}
                 className={cx(
-                  "ip-no-callout ip-tile__box relative grid touch-pan-y place-items-center rounded-[10px]",
+                  "ip-no-callout ip-tile__box relative grid touch-pan-y place-items-center rounded-(--ip-page-radius)",
                   "transition-opacity duration-(--dur-base)",
                   dragging.has(t.uid) && "opacity-40 outline-2 outline-offset-2 outline-brand outline-dashed",
                 )}
@@ -430,10 +420,7 @@ export default function EditablePageGrid({
                 data-selected={t.selected || undefined}
                 data-rotation={t.rotation}
               >
-                <span
-                  className="relative block overflow-hidden rounded-(--ip-page-radius) bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
-                  style={{ ...pageBoxStyle(t.size), transform: pageTransform(t.size, t.rotation) }}
-                >
+                <TilePage size={t.size} rotation={t.rotation}>
                   {t.blank ? (
                     <span className="absolute inset-2 flex flex-col items-center justify-center gap-1 rounded-sm border-[1.5px] border-dashed border-brand-tint-border text-help text-on-paper-muted">
                       <FileIcon size={24} />
@@ -446,10 +433,9 @@ export default function EditablePageGrid({
                       {t.status === "locked" ? <LockIcon size={24} className="text-muted" /> : <Spinner size={20} label={t.accessibleName} className="text-brand-strong" />}
                     </span>
                   )}
-                </span>
-                {t.inserted && <span aria-hidden="true" className="ip-glow pointer-events-none absolute inset-0 rounded-[10px] bg-brand-tint" />}
-                <button
-                  type="button"
+                </TilePage>
+                {t.inserted && <span aria-hidden="true" className="ip-glow pointer-events-none absolute inset-0 rounded-(--ip-page-radius) bg-brand-tint" />}
+                <TileHit
                   data-main=""
                   tabIndex={tab}
                   aria-label={t.accessibleName}
@@ -463,38 +449,19 @@ export default function EditablePageGrid({
                     else onSelect(t.uid, { toggle: e.ctrlKey || e.metaKey, range: e.shiftKey });
                   }}
                   onKeyDown={(e) => onKeyDown(e, i)}
-                  className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-1"
                   data-testid="tile-main"
                 />
-                {badge && (
-                  <span aria-hidden="true" className="pointer-events-none absolute top-1.5 left-1.5 z-[1] rounded-pill bg-surface-raised px-2 py-0.5 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">
-                    {badge}
-                  </span>
-                )}
+                {badge && <TileBadge>{badge}</TileBadge>}
                 {t.status === "ready" && !compact && !readOnly && (
-                  <span
-                    aria-hidden="true"
-                    data-no-drag=""
-                    onClick={() => onSelect(t.uid, { toggle: true, range: false })}
-                    className={cx(
-                      "absolute top-0.5 right-0.5 z-[2] grid size-8 cursor-pointer place-items-center",
-                      !t.selected && "opacity-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100",
-                    )}
-                  >
+                  <TileCorner hint={!t.selected} onToggle={() => onSelect(t.uid, { toggle: true, range: false })}>
                     {selectMark}
-                  </span>
+                  </TileCorner>
                 )}
                 {t.status === "ready" && !dimmed && !compact && !readOnly && (
-                  <div
-                    data-no-drag=""
-                    className={cx(
-                      "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1.5 rounded-lg border-[1.5px] border-sand bg-surface-raised p-1.5 shadow-menu max-sm:bottom-0 max-sm:gap-0 max-sm:border-0 max-sm:bg-surface-raised/90 max-sm:p-0",
-                      "opacity-0 transition-opacity duration-(--dur-base) group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 has-[[aria-expanded=true]]:opacity-100 [@media(hover:none)]:opacity-100",
-                    )}
-                  >
+                  <TileActions>
                     {(["rotate-left", "rotate-right", "remove"] as const).filter((a) => rowActions.includes(a)).map(actionButton)}
                     {more}
-                  </div>
+                  </TileActions>
                 )}
               </div>
               {compact && !readOnly ? (
@@ -515,23 +482,23 @@ export default function EditablePageGrid({
                     ) : (
                       <span className="size-11 shrink-0" />
                     )}
-                    <span className="ip-tile__n min-w-0 flex-1 truncate text-center tabular-nums" aria-hidden="true" data-testid="tile-label">
+                    <TileLabel className="min-w-0 flex-1 text-center" data-testid="tile-label">
                       {t.label}
-                    </span>
+                    </TileLabel>
                   </div>
-                  <div data-no-drag="" className="-mx-1 flex h-11 items-center justify-center" data-testid="tile-row">
+                  <TileRow tight data-testid="tile-row">
                     {t.status === "ready" && !dimmed && (
                       <>
                         {rowActions.map(actionButton)}
                         {more}
                       </>
                     )}
-                  </div>
+                  </TileRow>
                 </>
               ) : (
-                <span className="ip-tile__n h-5 tabular-nums" aria-hidden="true" data-testid="tile-label">
+                <TileLabel className="h-5" data-testid="tile-label">
                   {t.label}
-                </span>
+                </TileLabel>
               )}
               {!readOnly && insertPoint(i + 1, labels.insertAfter(t.label), tab, "end")}
             </div>
@@ -565,9 +532,7 @@ export default function EditablePageGrid({
           <IconButton label={labels.rotateSelLeft} variant="soft" icon={<RotateLeftIcon size={18} />} onClick={() => onRotateSelection(-90)} />
           <IconButton label={labels.rotateSelRight} variant="soft" icon={<RotateRightIcon size={18} />} tabIndex={-1} onClick={() => onRotateSelection(90)} />
           <Button variant="soft" aria-label={labels.removeSel} tabIndex={-1} className="ip-bare max-sm:size-11 max-sm:px-0" onClick={onRemoveSelection}>
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
-            </svg>
+            <TrashIcon size={18} />
             <span className="max-sm:hidden">Remove</span>
           </Button>
           <Button variant="plain" aria-label={labels.clearSel} tabIndex={-1} className="max-sm:h-11" onClick={onClearSelection}>

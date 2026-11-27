@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Button } from "./Button";
 import { cx } from "./cx";
+import { IconButton } from "./IconButton";
 import { AlertIcon, CheckCircleIcon, CloseIcon, ErrorIcon, InfoIcon, LeafIcon } from "./icons";
 
 export type NoticeTone = "info" | "success" | "warning" | "danger";
@@ -79,33 +80,17 @@ export function Notice({
             {action.label}
           </Button>
         ))}
-      {/* F23: the action goes before the close. The close is written out twice so that builds without cloud
-          sources keep main's children exactly (the second branch is main's code). */}
-      {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
-        <>
-          {inline}
-          {onDismiss && (
-            <button
-              type="button"
-              aria-label={title ? `Dismiss: ${title}` : "Dismiss"}
-              className={kind === "alert" ? "mp-alert__close" : "mp-iconbtn mp-iconbtn--plain -my-1 -me-1 size-[30px]"}
-              onClick={onDismiss}
-            >
-              <CloseIcon size={18} />
-            </button>
-          )}
-        </>
-      ) : (
-        onDismiss && (
-          <button
-            type="button"
-            aria-label={title ? `Dismiss: ${title}` : "Dismiss"}
-            className={kind === "alert" ? "mp-alert__close" : "mp-iconbtn mp-iconbtn--plain -my-1 -me-1 size-[30px]"}
-            onClick={onDismiss}
-          >
-            <CloseIcon size={18} />
-          </button>
-        )
+      {/* F23: an inline cloud action goes before the close. */}
+      {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && inline}
+      {onDismiss && (
+        <IconButton
+          label={title ? `Dismiss: ${title}` : "Dismiss"}
+          tooltip={false}
+          variant={kind === "alert" ? "inherit" : "ghost"}
+          className={kind === "alert" ? undefined : "-my-1 -me-1 size-[30px]"}
+          icon={<CloseIcon size={18} />}
+          onClick={onDismiss}
+        />
       )}
     </div>
   );

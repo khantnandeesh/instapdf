@@ -3,7 +3,7 @@ import "./page-edit.css";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { flip } from "@/lib/motion/flow";
-import { pageBoxStyle, pageTransform, pageTurnScale } from "@/components/tool-flow/page-box";
+import { pageTurnScale } from "@/components/tool-flow/page-box";
 import { PageThumb } from "@/components/tool-flow/Thumbnail";
 import { cx } from "@/components/ui/cx";
 import { IconButton } from "@/components/ui/IconButton";
@@ -18,6 +18,8 @@ import { editCopy as c } from "@/tools/merge/copy-edit";
 import { gridColumns, loadDragFor, moveStepFor, navTarget, useSettled, useWarmDrag } from "./grid-keys";
 import { buildCards, type ListModel } from "./view-model";
 import { AddTileFace, addTileClass } from "./AddTile";
+import { TileActions, TileBadge, TileBadges, TileHit, TilePage, TileRemove } from "@/components/tile/parts";
+import { MoreIcon } from "@/components/ui/page-tool-icons";
 
 export type CardView = {
   key: string;
@@ -343,30 +345,26 @@ export function SegmentGrid({
           }));
           // Page tile (berrypdf.md "Page tiles"): the file's first page fills the tile, its name in Fredoka below.
           return (
-            <div key={card.key} role="listitem" className="group/card ip-tile flex min-w-0 flex-col gap-1" data-card-key={card.key} data-testid="file-card" data-flip>
+            <div key={card.key} role="listitem" className="group/tile ip-tile flex min-w-0 flex-col gap-1" data-card-key={card.key} data-testid="file-card" data-flip>
               <div
                 data-card-box=""
                 onPointerDown={(e) => onPointerDown(e, card)}
                 className={cx(
-                  "ip-no-callout ip-tile__box relative grid touch-pan-y place-items-center rounded-[10px]",
+                  "ip-no-callout ip-tile__box relative grid touch-pan-y place-items-center rounded-(--ip-page-radius)",
                   "transition-opacity duration-(--dur-base)",
                   dragKey === card.key && "opacity-40 outline-2 outline-offset-2 outline-brand outline-dashed",
                 )}
               >
                 {card.status === "ready" && card.fileId && card.thumbSize ? (
-                  <span
-                    className="relative block overflow-hidden rounded-(--ip-page-radius) bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
-                    style={{ ...pageBoxStyle(card.thumbSize), transform: pageTransform(card.thumbSize, card.rotation) }}
-                  >
+                  <TilePage size={card.thumbSize} rotation={card.rotation}>
                     <PageThumb fileId={card.fileId} index={card.thumbIndex} scale={pageTurnScale(card.thumbSize, card.rotation)} />
-                  </span>
+                  </TilePage>
                 ) : card.status === "loading" ? (
                   <Spinner size={24} label={`Reading ${card.name}`} className="text-brand-strong" />
                 ) : card.status === "locked" ? (
                   <LockIcon size={28} className="text-muted" />
                 ) : null}
-                <button
-                  type="button"
+                <TileHit
                   data-main=""
                   tabIndex={tab}
                   aria-label={card.accessibleName}
@@ -375,44 +373,26 @@ export function SegmentGrid({
                   onFocus={() => setActiveKey(card.key)}
                   onClick={() => onPreview(card.key)}
                   onKeyDown={(e) => onKeyDown(e, i)}
-                  className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-1"
                   data-testid="card-main"
                 />
                 {/* Below 1024 px the letter leads the name line instead, off the page (PT-1 rule 6). */}
                 {(!compact || badge) && (
-                  <span aria-hidden="true" className="pointer-events-none absolute -top-1.5 -left-1.5 z-[1] flex gap-1">
+                  <TileBadges>
                     {!compact && (
-                      <span className="grid h-6 min-w-6 place-items-center rounded-pill bg-surface-raised px-1.5 font-display text-help font-semibold text-brand-strong shadow-menu" data-testid="source-badge">
+                      <TileBadge inline data-testid="source-badge">
                         {card.letter}
-                      </span>
+                      </TileBadge>
                     )}
-                    {badge && <span className="rounded-pill bg-surface-raised px-2 py-1 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">{badge}</span>}
-                  </span>
+                    {badge && <TileBadge inline>{badge}</TileBadge>}
+                  </TileBadges>
                 )}
-                {!compact && (
-                <IconButton
-                  label={labels.remove(card.name)}
-                  variant="soft"
-                  tabIndex={tab}
-                  data-no-drag=""
-                  // On hover or focus only, no shadow (visual gate round 2): at rest the page corner stays clear.
-                  className="absolute -top-2 -right-2 z-[2] bg-surface-raised text-brand-strong opacity-0 transition-[background-color,color,transform,opacity] duration-(--dur-fast) group-focus-within/card:opacity-100 group-hover/card:opacity-100 hover:rotate-90 hover:bg-brand hover:text-white focus-visible:bg-brand focus-visible:text-white focus-visible:opacity-100 motion-reduce:hover:rotate-0 max-lg:size-11 [@media(hover:none)]:opacity-100"
-                  icon={<CloseIcon size={16} />}
-                  onClick={() => moved(() => onRemove(card.key))}
-                />
-                )}
+                {!compact && <TileRemove label={labels.remove(card.name)} tabIndex={tab} onClick={() => moved(() => onRemove(card.key))} />}
                 {card.status === "ready" && !dimmed && !compact && (
-                  <div
-                    data-no-drag=""
-                    className={cx(
-                      "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1.5 rounded-lg border-[1.5px] border-sand bg-surface-raised p-1.5 shadow-menu max-sm:bottom-0 max-sm:gap-0 max-sm:border-0 max-sm:bg-surface-raised/90 max-sm:p-0",
-                      "opacity-0 transition-opacity duration-(--dur-base) group-hover/card:opacity-100 group-focus-within/card:opacity-100 [@media(hover:none)]:opacity-100",
-                    )}
-                  >
+                  <TileActions>
                     {action("rotate-left")}
                     {action("rotate-right")}
                     {action("enlarge")}
-                  </div>
+                  </TileActions>
                 )}
               </div>
               <span className="mt-1 flex min-w-0 items-baseline gap-1.5 font-display text-[15px] leading-5 font-semibold text-ink" title={card.name}>
@@ -450,11 +430,7 @@ export function SegmentGrid({
                         className="mp-iconbtn relative size-11"
                         data-testid="card-more"
                       >
-                        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-                          <circle cx="5" cy="12" r="1.75" />
-                          <circle cx="12" cy="12" r="1.75" />
-                          <circle cx="19" cy="12" r="1.75" />
-                        </svg>
+                        <MoreIcon size={18} />
                       </MenuButton>
                     )}
                   </span>

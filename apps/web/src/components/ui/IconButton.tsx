@@ -8,8 +8,12 @@ export type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "ari
   size?: "sm" | "md";
   pressed?: boolean;
   tooltip?: boolean;
-  /** "soft" (default for raised/secondary): BerryPDF's 34px round pink icon button (shrinks to 0.92 when pressed). "ghost": no fill, a milk-pink round halo on hover. */
-  variant?: "ghost" | "secondary" | "raised" | "soft";
+  /**
+   * "soft" (default for raised/secondary): BerryPDF's 34px round pink icon button (shrinks to 0.92 when pressed).
+   * "ghost": no fill, a milk-pink round halo on hover. "onDark": 40px, on a dark scrim (the page preview).
+   * "inherit": 26px, takes the surrounding text colour (the close on a tinted notice).
+   */
+  variant?: "ghost" | "secondary" | "raised" | "soft" | "onDark" | "inherit";
 };
 
 /**
@@ -31,6 +35,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         "group/ib mp-iconbtn",
         plain && "mp-iconbtn--plain",
         plain && size === "sm" && "size-[34px]",
+        variant === "onDark" && "mp-iconbtn--on-dark",
+        variant === "inherit" && "mp-iconbtn--inherit",
         /\babsolute\b/.test(className ?? "") ? className : cx("relative", className),
       )}
       {...rest}

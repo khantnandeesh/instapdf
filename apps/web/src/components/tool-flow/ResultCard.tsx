@@ -11,6 +11,7 @@ import { Button, buttonClasses } from "../ui/Button";
 import { cx } from "../ui/cx";
 import { IconButton } from "../ui/IconButton";
 import { CheckIcon, DownloadIcon, DownloadSimpleIcon, FilesIcon, ShareIcon, ShieldIcon } from "../ui/icons";
+import { LinkButton } from "../ui/LinkButton";
 import { Notice } from "../ui/Notice";
 import { copy } from "./copy";
 import { slotCopy } from "./slot-copy";
@@ -237,9 +238,9 @@ export function ResultCard({
           </div>
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <button type="button" onClick={onBack} className="h-11 rounded-sm px-1 font-display text-[16px] font-medium text-brand-strong underline-offset-4 hover:underline">
+          <LinkButton onClick={onBack} className="text-[16px]">
             {slotCopy.backToEditing}
-          </button>
+          </LinkButton>
           <Button variant="ghost" onClick={onStartOver}>
             {slotCopy.startOver}
           </Button>
@@ -300,8 +301,7 @@ function EntryList({ output, entries, announce }: { output: ToolOutput; entries:
         ))}
       </ul>
       {(more > 0 || (!all && entries.length > ROWS_PHONE)) && (
-        <button
-          type="button"
+        <LinkButton
           onClick={() => {
             // The first row not shown yet: the 4th row on phones (it is rendered but hidden), else the 5th.
             const rows = [...(list.current?.children ?? [])] as HTMLElement[];
@@ -309,10 +309,10 @@ function EntryList({ output, entries, announce }: { output: ToolOutput; entries:
             revealAt.current = hidden >= 0 ? hidden : rows.length;
             setAll(true);
           }}
-          className={cx("h-11 rounded-sm px-1 font-display text-[15px] font-medium text-brand-strong underline-offset-4 hover:underline", more <= 0 && "sm:hidden")}
+          className={cx("text-[15px]", more <= 0 && "sm:hidden")}
         >
           {copy.showAll(entries.length)}
-        </button>
+        </LinkButton>
       )}
     </div>
   );

@@ -178,7 +178,7 @@
       grid-area: 2 / 2;
       justify-self: start;
     }
-    .ip-notice-inline > .mp-alert__close {
+    .ip-notice-inline > .mp-iconbtn {
       grid-area: 1 / 3;
     }
   }

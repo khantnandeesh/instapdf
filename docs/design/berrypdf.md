@@ -186,6 +186,28 @@ Every one is a shared piece or a global rule, so a fix lands everywhere; `e2e/ui
 8. **All tools menu:** one group per column, never split (`lib/catalogue/menu-pack.ts`; a group too tall for the panel spans two columns under one heading), each on a card tinted with its category hue, headings 18px over 15px rows, names on one line.
 9. **Number steppers:** one joined control, `.ip-stepper` (`NumberStepper` for whole numbers; the editor's and forms' size fields use the same classes): field border and radius, square −/+ buttons the control's height, value centred in tabular figures and sized to its digits, disabled ends at min/max, arrows step.
 
+## Shared components (owner, 2026-11-27)
+
+One component per repeated element. A tool composes these and never styles its own copy.
+
+| Element | Use | Where |
+|---|---|---|
+| Filled, ghost, soft, line, outline, plain buttons | `Button` | `components/ui/Button.tsx` |
+| Icon-only buttons (ghost, soft, `onDark` on a scrim, `inherit` on a tinted notice) | `IconButton` | `components/ui/IconButton.tsx` |
+| Text-link actions ("Back to pages", "Show 3 more", a link in a sentence) | `LinkButton` | `components/ui/LinkButton.tsx` |
+| Choice chips and view switches | `SegmentedControl` | `components/ui/SegmentedControl.tsx` |
+| Menus and popovers | `MenuButton`, `Popover` | `components/ui/Menu.tsx`, `Popover.tsx` |
+| Dialogs | `Dialog` | `components/ui/Dialog.tsx` |
+| Notices | `Notice` in the one `NoticeStack` | `components/ui/Notice.tsx`, `tool-flow/NoticeStack.tsx` |
+| Number stepper | `NumberStepper` (`.ip-stepper`) | `components/ui/NumberStepper.tsx` |
+| Page and file tiles | `TilePage`, `TileHit`, `TileBadge(s)`, `TileCorner`, `TileCheck`, `TileRemove`, `TileActions`, `TileRow`, `TileLabel` | `components/tile/parts.tsx` |
+| Add tile | `AddTile` | `components/page-edit/AddTile.tsx` |
+| Picker card, top row, progress pill, result | `ToolFlow` parts | `components/tool-flow/` |
+
+Tile marks sit inside the tile: badges top left, the tick, trash mark or remove button top right, at the page radius.
+
+**Guard:** `src/lib/ui-rules/one-off-guard.test.ts` (runs with `pnpm test`) counts raw `<button>`, own dialogs and menus, inline `<svg>` and own page tiles per file against `one-off-baseline.json`. Counts may only go down; a clean-up lowers the baseline with `UPDATE_UI_BASELINE=1 pnpm test one-off-guard`.
+
 ## Modals
 
 Owner, 2026-11-24, on Merge's page preview ("Page 13 of 58" at 1900x1300: a small white page in a huge, mostly empty white modal, a wave across the top, a big title and file name, three chunky full-width buttons and a heavy blue ring): "this can be better". Every modal, sheet and viewer follows these rules.

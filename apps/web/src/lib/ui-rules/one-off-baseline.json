@@ -1,0 +1,57 @@
+{
+  "raw-button": {
+    "components/cloud/CloudDownloads.tsx": 1,
+    "components/cloud/CloudMenu.tsx": 2,
+    "components/cloud/SaveToCloud.tsx": 1,
+    "components/cloud/tool-cloud.tsx": 1,
+    "components/page-edit/SegmentGrid.tsx": 2,
+    "components/page-select/MoreOptionsDialog.tsx": 1,
+    "components/site/ToolMenu.tsx": 1,
+    "components/tool-flow/ActionSlot.tsx": 3,
+    "components/tool-flow/NoticeStack.tsx": 1,
+    "tools/editor/Chrome.tsx": 13,
+    "tools/editor/DownloadCard.tsx": 1,
+    "tools/editor/EditorShell.tsx": 7,
+    "tools/editor/EngineProgress.tsx": 1,
+    "tools/editor/FontMenu.tsx": 3,
+    "tools/editor/LineEditBox.tsx": 2,
+    "tools/editor/PageView.tsx": 1,
+    "tools/editor/Pop.tsx": 1,
+    "tools/editor/Properties.tsx": 13,
+    "tools/editor/RecentImages.tsx": 2,
+    "tools/editor/SidePanel.tsx": 4,
+    "tools/editor/SignDialog.tsx": 4,
+    "tools/forms/EditorForms.tsx": 1,
+    "tools/forms/FieldLayer.tsx": 4,
+    "tools/forms/FieldProps.tsx": 13,
+    "tools/forms/FormToolOptions.tsx": 4,
+    "tools/forms/ReviewPill.tsx": 5,
+    "tools/forms/TabOrderPanel.tsx": 3,
+    "tools/merge/HistoryButtons.tsx": 2,
+    "tools/split/SplitTool.tsx": 1
+  },
+  "own-dialog-or-menu": {
+    "components/cloud/CloudMenu.tsx": 2,
+    "tools/editor/Pop.tsx": 1,
+    "tools/forms/FieldProps.tsx": 1
+  },
+  "inline-svg": {
+    "components/page-select/Step.tsx": 1,
+    "components/tool-flow/ActionSlot.tsx": 1,
+    "components/tool-flow/ControlDock.tsx": 1,
+    "tools/editor/EngineProgress.tsx": 1,
+    "tools/editor/LineEditBox.tsx": 1,
+    "tools/editor/ObjectView.tsx": 6,
+    "tools/editor/SignDialog.tsx": 1,
+    "tools/editor/icons-landing.tsx": 1,
+    "tools/forms/FieldLayer.tsx": 2,
+    "tools/forms/ReviewPill.tsx": 3,
+    "tools/merge/MergeOptions.tsx": 1,
+    "tools/merge/workspace.tsx": 1,
+    "tools/organize/OrganizeTool.tsx": 1,
+    "tools/rotate/RotateTool.tsx": 1
+  },
+  "own-page-tile": {
+    "components/page-edit/SegmentGrid.tsx": 1
+  }
+}
