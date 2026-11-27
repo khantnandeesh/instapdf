@@ -100,11 +100,15 @@ export const ProgressPill = forwardRef(function ProgressPill(
       {onCancel &&
         (phase !== "done" ? (
           <button type="button" className="ip-pill__cancel" onClick={onCancel} data-testid="cancel">
-            {slotCopy.cancel}
+            <span className="ip-pill__cancel-text">{slotCopy.cancel}</span>
+            {/* A phone's tight slot (layout.css, .ip-slot--beside): an × with the word kept as its name. */}
+            <svg className="ip-pill__cancel-x" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
           </button>
         ) : (
           <span className="ip-pill__cancel invisible" aria-hidden="true">
-            {slotCopy.cancel}
+            <span className="ip-pill__cancel-text">{slotCopy.cancel}</span>
           </span>
         ))}
       {phase !== "done" && (

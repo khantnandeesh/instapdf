@@ -35,6 +35,7 @@ export function ControlDock({
   sheet,
   start,
   more,
+  add,
   dimmed,
   bare,
 }: {
@@ -54,6 +55,8 @@ export function ControlDock({
   start?: ReactNode;
   /** Page tools (spec F4/F5 UI P-3): their own More options trigger, after the options. */
   more?: ReactNode;
+  /** The bar only: a one-file tool's picker, moved out of its tools row on phones (screen fit, eval G-9). */
+  add?: ReactNode;
   /** Working (spec §6): the options dim to 0.45 and go inert. */
   dimmed?: boolean;
   /** The result (spec §7): the row shows no options, only the slot. */
@@ -68,7 +71,7 @@ export function ControlDock({
   const sheetMode = hasOptions && full;
   const noOptions = !inline && !sheetMode;
   const showStart = !bare && !!start;
-  const showMore = !bare && !!more;
+  const showMore = !bare && (!!more || !!add);
   useEffect(() => setSheetOpen(false), [layout]);
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -93,7 +96,9 @@ export function ControlDock({
     <Button
       ref={optionsButton}
       variant={bar ? "secondary" : "soft"}
-      className={bar ? (start ? "min-w-0 flex-1" : "sm:flex-1") : "ip-more-trigger ip-dimmable h-11 shrink-0"}
+      // Beside Undo│Redo on a phone (390-639 px) the trigger is a 44 px icon, so options, Undo│Redo and the
+      // primary share one row and the pages get the height (screen fit, eval G-9).
+      className={bar ? (start ? "relative min-w-0 flex-1 min-[390px]:max-sm:w-11 min-[390px]:max-sm:flex-none min-[390px]:max-sm:px-0" : "sm:flex-1") : "ip-more-trigger ip-dimmable h-11 shrink-0"}
       aria-haspopup="dialog"
       aria-expanded={sheetOpen}
       aria-label={`${bar ? "Options" : "More options"}${sheet?.badge ? `, ${sheet.badge}` : ""}`}
@@ -109,17 +114,18 @@ export function ControlDock({
       }
     >
       {/* 1024-1279: icon only, its name in the tooltip (spec §3.1). */}
-      <span className={bar ? undefined : "max-xl:sr-only"}>{bar ? "Options" : "More options"}</span>
+      <span className={bar ? (start ? "min-[390px]:max-sm:sr-only" : undefined) : "max-xl:sr-only"}>{bar ? "Options" : "More options"}</span>
       {bar ? (
-        <span className="inline-flex min-w-[84px] justify-start" aria-hidden="true">
+        <span className={`inline-flex min-w-[84px] justify-start${start ? " min-[390px]:max-sm:hidden" : ""}`} aria-hidden="true">
           {sheet?.badge && <span className="mp-tag mp-tag--sm">{sheet.badge}</span>}
         </span>
-      ) : (
-        sheet?.badge && (
-          <span className="mp-tag mp-tag--sm max-xl:hidden" aria-hidden="true">
-            {sheet.badge}
-          </span>
-        )
+      ) : null}
+      {/* Icon only: a dot says some options changed (the count is in the button's name). */}
+      {bar && start && sheet?.badge && <span aria-hidden="true" className="absolute top-1.5 right-1.5 hidden size-2.5 rounded-full bg-brand ring-2 ring-surface min-[390px]:max-sm:block" />}
+      {!bar && sheet?.badge && (
+        <span className="mp-tag mp-tag--sm max-xl:hidden" aria-hidden="true">
+          {sheet.badge}
+        </span>
       )}
     </Button>
   );
@@ -200,15 +206,25 @@ export function ControlDock({
           </div>
         )}
         {showMore && (
-          <div className="ip-dimmable flex shrink-0 items-center" data-testid="dock-more" {...dim}>
+          <div className="ip-dimmable flex shrink-0 items-center gap-2" data-testid="dock-more" {...dim}>
             {more}
+            {add}
           </div>
         )}
         <div
           className={[
             "flex shrink-0 flex-col gap-2 sm:min-w-[200px]",
-            // Below 640 px: beside More options or a lone Undo│Redo; under the options row when Undo│Redo shares it.
-            showMore || (showStart && noOptions) ? "max-sm:min-w-0 max-sm:flex-1" : showStart ? "max-sm:basis-full" : "",
+            // Below 640 px: beside More options or a lone Undo│Redo; under the options row when Undo│Redo shares it,
+            // except from 390 px beside the icon-only options trigger and Undo│Redo. There the slot takes the rest of
+            // the row from a zero basis, so the wider progress pill never wraps it to a new row (AC-632), and the
+            // pill tightens to fit (layout.css, .ip-slot--beside).
+            showMore || (showStart && noOptions)
+              ? "max-sm:min-w-0 max-sm:flex-1"
+              : showStart
+                ? sheetMode
+                  ? "ip-slot--beside max-sm:basis-full min-[390px]:max-sm:min-w-0 min-[390px]:max-sm:basis-0 min-[390px]:max-sm:flex-1"
+                  : "max-sm:basis-full"
+                : "",
             noOptions ? "sm:ms-auto" : "",
           ].join(" ")}
           data-testid="dock-footer"

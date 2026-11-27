@@ -99,7 +99,7 @@ jobs:
   # "serial" rows hold the tests tagged @serial (wall-clock limits and heavy loads) on one worker.
   # The "cloud" rows build the app with F23 cloud sources and the mock provider on
   # (docs/specs/f23-cloud-pickers.md §7) and run the cloud suite plus the specs that branch on the
-  # flag (CSP, intake, Merge, layout, the phone JS budget). No provider keys are needed.
+  # flag (CSP, intake, Merge, the F5 page tools, layout, the phone JS budget). No provider keys are needed.
   e2e:
     name: e2e (${{ matrix.name }})
     needs: plan

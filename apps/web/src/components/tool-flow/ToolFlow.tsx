@@ -358,6 +358,10 @@ export function ToolFlow({
   const flowCanRun = (state === "ready" || state === "error") && readyFiles.length > 0 && ownerBlocked.length === 0;
   const canPrimary = flowCanRun && runCheck === true;
   const showViewToggle = files.length > 1 || (!!viewToggleFromOneFile && files.length > 0);
+  // Screen fit on phones (F25, F4/F5 eval G-9): with one file and no tool controls the tools row holds
+  // only the picker, so below 1024 px the picker sits in the bottom bar (icon only) and the row keeps
+  // just the size slider (640-1023 px); below 640 px the row is gone and the pages start under the title.
+  const solo = !wide && !showViewToggle && !toolbarStart && !toolbarEnd;
   const view = showViewToggle ? (viewChoice ?? flow.defaultView) : "pages";
   const optionsDisabled = !(state === "ready" || state === "error");
   /** Settings tools (F25 §4): the options in a side panel from 1024 px, the row holds only the slot. */
@@ -1069,8 +1073,8 @@ export function ToolFlow({
       size="sm"
       // Without an Add menu, a multi-file tool's picker drops its word below 400 px (a 44 px icon button,
       // its name kept for assistive tech) so the tools row stays one row (F4/F5 P-3, Alternate & mix).
-      className={phoneAddMenu ? "shadow-tool-lift max-lg:hidden" : flow.multiFile ? "shadow-tool-lift max-[399px]:size-11 max-[399px]:px-0" : "shadow-tool-lift"}
-      labelClassName={!phoneAddMenu && flow.multiFile ? "max-[399px]:sr-only" : undefined}
+      className={phoneAddMenu ? "shadow-tool-lift max-lg:hidden" : solo ? "size-11 px-0" : flow.multiFile ? "shadow-tool-lift max-[399px]:size-11 max-[399px]:px-0" : "shadow-tool-lift"}
+      labelClassName={solo ? "sr-only" : !phoneAddMenu && flow.multiFile ? "max-[399px]:sr-only" : undefined}
       icon={<PlusIcon size={16} />}
       disabled={state === "processing"}
       onFiles={(f, t) => void intake(f, t, { replace: !flow.multiFile })}
@@ -1094,6 +1098,12 @@ export function ToolFlow({
   const replaceMounted = useMountOnce(!!pendingReplace);
   const dim = working ? { "data-dim": "", inert: true } : {};
   const options = renderOptions(ctx);
+  const rowPicker =
+    process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
+      ? cloneElement(toolbarPicker(), {
+          sources: <CloudCaret hub={cloud!} look="tool" className={phoneAddMenu ? "max-lg:hidden" : undefined} disabled={state === "processing"} />,
+        })
+      : toolbarPicker();
   const dock = loaded && C && (
     <C.ControlDock
       label={`${tool.name} options`}
@@ -1102,6 +1112,7 @@ export function ToolFlow({
       optionsDisabled={optionsDisabled}
       options={settings && wide ? null : options}
       more={renderMore?.(ctx)}
+      add={solo && rowPicker}
       density={flow.optionsDensity}
       dimmed={working}
       bare={state === "done"}
@@ -1187,13 +1198,13 @@ export function ToolFlow({
                 row is square: at rest the panel rounds it, and once stuck under the header its corners cover the
                 pages scrolling by (visual gate round 2). */}
             <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 max-lg:overflow-clip sm:px-5 lg:flex lg:h-(--ip-stage-h) lg:flex-col">
-              <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] shrink-0 items-center gap-2 bg-cream px-3 sm:-mx-5 sm:gap-3 sm:px-5 lg:static lg:gap-4 lg:rounded-t-panel">
+              <div className={`${solo ? "max-sm:hidden " : ""}sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] shrink-0 items-center gap-2 bg-cream px-3 max-[359px]:gap-1.5 max-[359px]:px-2 sm:-mx-5 sm:gap-3 sm:px-5 lg:static lg:gap-4 lg:rounded-t-panel`}>
                 {showViewToggle && (
                   <SegmentedControl
                     look="tabs"
                     label="View"
-                    // Below 360 px tighter tabs keep the tools row to one row (F4/F5 P-3).
-                    className="shrink-0 max-[359px]:[&_.mp-tab]:px-3.5"
+                    // Below 360 px tighter tabs (and gaps) keep the tools row to one row (F4/F5 P-3), cloud caret included.
+                    className="shrink-0 max-[359px]:[&_.mp-tab]:px-2"
                     value={view}
                     onChange={setViewChoice}
                     options={
@@ -1223,13 +1234,7 @@ export function ToolFlow({
                     valueText={(v) => `Thumbnail size ${v} pixels`}
                   />
                 )}
-                <span className="ms-auto">
-                  {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
-                    ? cloneElement(toolbarPicker(), {
-                        sources: <CloudCaret hub={cloud!} look="tool" className={phoneAddMenu ? "max-lg:hidden" : undefined} disabled={state === "processing"} />,
-                      })
-                    : toolbarPicker()}
-                </span>
+                {!solo && <span className="ms-auto">{rowPicker}</span>}
                 {toolbarEnd?.(wctx)}
               </div>
               <div

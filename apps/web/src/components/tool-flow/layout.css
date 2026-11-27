@@ -22,6 +22,12 @@
     padding: 12px 0 10px;
     text-align: center;
   }
+  /* Phones, a file in: a tighter title row, so the pages get the height (screen fit, eval G-9). */
+  @media (max-width: 1023px) {
+    .ip-flow:not([data-state="empty"]) .ip-toolrow {
+      padding: 8px 0 6px;
+    }
+  }
   .ip-toolrow__h1 {
     font: 600 22px/26px var(--font-display);
     color: var(--ink-black);
@@ -138,6 +144,33 @@
   .ip-slot--editor .ip-pill__cancel {
     padding: 0 8px;
     font-size: 14px;
+  }
+  /* A phone's bar from 390 px, the slot beside the options icon and Undo│Redo (ControlDock): the same tighter
+     pill as the editor's, and Cancel as a 40 px ×, so the verb and the percentage fit whole in about 210 px. */
+  @media (min-width: 390px) and (max-width: 639px) {
+    .ip-slot--beside .ip-pill {
+      gap: 8px;
+      padding-left: 10px;
+    }
+    .ip-slot--beside .ip-pill__label {
+      font-size: 15px;
+    }
+    .ip-slot--beside .ip-pill__cancel {
+      justify-content: center;
+      width: 40px;
+      padding: 0;
+    }
+    .ip-slot--beside .ip-pill__cancel-text {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .ip-slot--beside .ip-pill__cancel-x {
+      display: block;
+    }
   }
   @media (max-width: 1023px) {
     .ip-slot--editor {
@@ -306,6 +339,9 @@
     transition: background-color var(--dur-fast);
   }
   /* A 44px hit area around the 40px button. */
+  .ip-pill__cancel-x {
+    display: none;
+  }
   .ip-pill__cancel::after {
     content: "";
     position: absolute;

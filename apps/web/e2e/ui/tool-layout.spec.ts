@@ -202,6 +202,38 @@ test.describe("F25 structure", () => {
     });
   }
 
+  // G-9 screen fit (F4/F5 eval): with a file in, the pages area holds the screen. The share is the visible part of
+  // the pages scroller, below the sticky header and above the fixed bottom bar, over the viewport height, at rest.
+  const FIT_TOOLS = ["split-pdf", "extract-pdf-pages", "delete-pdf-pages", "organize-pdf", "combine-reorder-pdf", "alternate-mix-pdf"];
+  for (const [width, height, min] of [
+    [1366, 657, 0.6],
+    [390, 664, 0.56],
+  ] as const) {
+    test(`G-9: at ${width}x${height} the pages area gets at least ${Math.round(min * 100)}% of the height on the page tools, with the primary in view and no sideways scroll`, async ({ page }, info) => {
+      test.skip(info.project.name !== (width >= 1024 ? "desktop" : "mobile"), "desktop sizes on desktop, phones on mobile");
+      await page.setViewportSize({ width, height });
+      for (const slug of FIT_TOOLS) {
+        await open(page, `/${slug}`);
+        await load(page, slug);
+        await expect(flow(page)).toHaveAttribute("data-state", "ready");
+        await expect(page.locator("[data-testid=pages-scroll] :is([data-testid=page-tile], li, [role=listitem])").first(), slug).toBeVisible();
+        const share = () =>
+          page.evaluate(() => {
+            const p = document.querySelector("[data-testid=pages-scroll]")!.getBoundingClientRect();
+            const header = document.querySelector(".ip-site-header");
+            const pinned = header && getComputedStyle(header).position !== "static" ? header.getBoundingClientRect().bottom : 0;
+            const bar = document.querySelector("[data-ip-dock=bar]")?.getBoundingClientRect();
+            const top = Math.max(p.top, pinned, 0);
+            const bottom = Math.min(p.bottom, innerHeight, bar && bar.top > p.top ? bar.top : innerHeight);
+            return (bottom - top) / innerHeight;
+          });
+        await expect.poll(share, { message: `${slug}: pages share of the height` }).toBeGreaterThanOrEqual(min);
+        await inView(page, primary(page), `${slug}: primary`);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), `${slug}: no sideways scroll`).toBeLessThanOrEqual(0);
+      }
+    });
+  }
+
   test("AC-605: the picker label never changes after a pick, and the editor shows its layout before the first page is drawn", async ({ page }, info) => {
     test.skip(info.project.name !== "desktop", "desktop");
     await open(page, "/edit-pdf");
