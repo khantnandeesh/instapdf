@@ -253,7 +253,7 @@ export function EditorTool() {
               <Button variant="plain" size="sm" iconStart={<FilePlusBold size={16} />} disabled={busy} onClick={() => void openBlank()} title="A blank A4 page (Letter in the US and Canada)">
                 Start with a blank page
               </Button>
-              <LimitsNote text="PDF. Up to 200 MB." full="One PDF up to 200 MB. No page, save or hourly limits." />
+              <LimitsNote text="One PDF, up to 200 MB" full="One PDF up to 200 MB. No page, save or hourly limits." />
               <PrivacyNote runtime="client" context="intro" />
             </DropCard>
           </>

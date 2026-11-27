@@ -6,7 +6,7 @@ const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 
 export const mergeCopy = {
   pickerButton: "Choose files",
   pickerHint: "or drop them here",
-  limits: "PDFs and images, up to 50 files",
+  limits: "PDFs and images, up to 50 files, 100 MB each",
   limitsFull: "PDF, JPG, PNG, GIF, BMP, WebP or TIFF · up to 50 files, 100 MB each, 500 MB and 1,000 pages in total · you can also paste them with Ctrl+V",
   errorType: (name: string) => `${name} isn't a PDF or an image we can read, so it was skipped. This tool accepts PDFs and JPG, PNG, GIF, BMP, WebP and TIFF images.`,
   statusEmpty: "Add files to start",

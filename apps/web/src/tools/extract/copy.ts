@@ -14,7 +14,7 @@ export const extractCopy = {
   tile: (page: number, total: number) => `Page ${n(page)} of ${n(total)}`,
   primary: (pages: number) => (pages === 1 ? "Extract 1 page" : `Extract ${n(pages)} pages`),
   status: (k: number, total: number) => `${n(k)} of ${n(total)} pages`,
-  statusEmpty: "Pick the pages to keep",
+  statusEmpty: "Pick pages to keep",
   live: (k: number, total: number) => `${n(k)} of ${n(total)} pages picked`,
   gridHint: "Space picks, Shift+Space picks a range.",
   skippedTitle: "A file is skipped",
