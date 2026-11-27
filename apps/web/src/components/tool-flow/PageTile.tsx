@@ -4,8 +4,9 @@ import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { describeDelta, formatDelta } from "@/lib/pdf/rotation";
 import type { PageSize } from "@/lib/pdf/pdfjs";
 import { cx } from "../ui/cx";
-import { CheckIcon, TrashIcon } from "../ui/icons";
-import { pageBoxStyle, pageTransform, pageTurnScale } from "./page-box";
+import { TileActions, TileBadge, TileCheck, TileCorner, TileHit, TileLabel, TilePage, TileRow } from "../tile/parts";
+import { TrashIcon } from "../ui/icons";
+import { pageTurnScale } from "./page-box";
 import { PageThumb } from "./Thumbnail";
 import type { PageDecoration } from "./types";
 
@@ -88,20 +89,11 @@ export function PageTile({
       data-picked={picked ? "" : undefined}
       data-marked={marked ? "" : undefined}
     >
-      <div
-        className="ip-tile__box relative grid place-items-center"
-        data-testid="page-tile"
-        data-rotation={pendingDelta}
-      >
-        <span
-          className="relative block overflow-hidden rounded-(--ip-page-radius) bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
-          style={{ ...pageBoxStyle(size), transform: pageTransform(size, pendingDelta) }}
-          data-testid="page-visual"
-        >
+      <div className="ip-tile__box relative grid place-items-center" data-testid="page-tile" data-rotation={pendingDelta}>
+        <TilePage size={size} rotation={pendingDelta} data-testid="page-visual">
           <PageThumb fileId={fileId} index={index} scale={pageTurnScale(size, pendingDelta)} />
-        </span>
-        <button
-          type="button"
+        </TilePage>
+        <TileHit
           tabIndex={active ? 0 : -1}
           aria-label={label}
           aria-pressed={decor?.pressed}
@@ -110,66 +102,53 @@ export function PageTile({
           onFocus={onFocus}
           onClick={onOpen}
           onKeyDown={onKeyDown}
-          className="absolute inset-0 rounded-(--ip-page-radius) focus-visible:outline-offset-1"
         />
-        {badge && (
-          <span className="pointer-events-none absolute top-1.5 left-1.5 z-[1] rounded-pill bg-surface-raised px-2 py-0.5 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">
-            {badge}
-          </span>
-        )}
-        {inScope && (
-          <span className={cx("pointer-events-none absolute top-1.5 right-1.5 z-[1] grid size-[22px] place-items-center rounded-full bg-leaf text-white ring-2 ring-white", picked && "ip-badge-in")}>
-            <CheckIcon size={14} />
-          </span>
-        )}
-        {picked === false && (
+        {badge && <TileBadge>{badge}</TileBadge>}
+        {inScope ? (
+          <TileCorner>
+            <TileCheck on pop={!!picked} />
+          </TileCorner>
+        ) : picked === false ? (
           // Extract: the empty pick ring, on hover / focus from 1024 px (never on touch). A state mark, not a control.
-          <span aria-hidden="true" className="ip-hover-hint pointer-events-none absolute top-1.5 right-1.5 z-[1] size-[22px] rounded-full border-[1.5px] border-field-line bg-surface/85" />
-        )}
+          <TileCorner className="ip-hover-hint">
+            <TileCheck on={false} />
+          </TileCorner>
+        ) : null}
         {marked !== undefined && (
           // Delete: a ghost trash badge on hover from 1024 px (never on touch); solid once marked. A state mark, not a control.
-          <span
-            aria-hidden="true"
-            data-testid={marked ? "marked-badge" : undefined}
-            className={cx(
-              "pointer-events-none absolute top-1.5 right-1.5 z-[1] grid size-[26px] place-items-center rounded-full ring-2 ring-white transition-colors duration-(--motion-micro)",
-              marked ? "ip-badge-in bg-danger text-white" : "ip-hover-hint bg-surface text-danger",
-            )}
-          >
-            <TrashIcon size={15} />
-          </span>
+          <TileCorner className={marked ? undefined : "ip-hover-hint"} data-testid={marked ? "marked-badge" : undefined}>
+            <span
+              className={cx(
+                "grid size-[26px] place-items-center rounded-full ring-2 ring-white transition-colors duration-(--motion-micro)",
+                marked ? "ip-badge-in bg-danger text-white" : "bg-surface text-danger",
+              )}
+            >
+              <TrashIcon size={15} />
+            </span>
+          </TileCorner>
         )}
         {corner && !dimmed && !compact && <div className="ip-corner-enlarge absolute right-1 bottom-1 z-10 max-lg:hidden">{corner}</div>}
-        {actions && !dimmed && !compact && (
-          <div
-            className={cx(
-              "absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 gap-1.5 rounded-lg border-[1.5px] border-sand bg-surface-raised p-1.5 shadow-menu",
-              "opacity-0 transition-opacity duration-(--dur-base) group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100",
-            )}
-          >
-            {actions}
-          </div>
-        )}
+        {actions && !dimmed && !compact && <TileActions>{actions}</TileActions>}
       </div>
       {/* Page number in Fredoka 600, muted (5.19:1 on the cream work area); Split adds the part. */}
       {/* Below 1024 px a grid with gap marks (Split) gives every tile a 44px number line: the marks sit level with it, off the
           page (PT-1 rule 6). A part's first tile starts the line with its tone dot. */}
-      <span className={cx("ip-tile__n max-w-full truncate tabular-nums", compact && numberLine ? "h-11 leading-11" : "h-5")} aria-hidden="true">
+      <TileLabel className={compact && numberLine ? "h-11 leading-11" : "h-5"}>
         {part?.first && partDot(part.n)}
         {index + 1}
         {part && <span data-testid="part-label"> · Part {part.n}</span>}
         {/* Delete: the word says it, the danger colour backs it up (never colour alone; no strike across the digit). */}
         {marked && <span data-testid="marked-label"> · To delete</span>}
-      </span>
+      </TileLabel>
       {compact && (actions || cornerRow) && (
-        <div className="flex h-11 items-center justify-center gap-2.5" data-testid="tile-row">
+        <TileRow data-testid="tile-row">
           {!dimmed && (
             <>
               {actions}
               {cornerRow}
             </>
           )}
-        </div>
+        </TileRow>
       )}
       {gap}
     </div>

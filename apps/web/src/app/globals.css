@@ -318,6 +318,37 @@
     background: var(--milk);
     color: var(--brand-strong);
   }
+  /* On a dark scrim (the page preview's close and arrows). */
+  .mp-iconbtn--on-dark {
+    width: 40px;
+    height: 40px;
+    background: color-mix(in srgb, var(--surface) 12%, transparent);
+    color: var(--surface);
+  }
+  .mp-iconbtn--on-dark:hover:not(:disabled),
+  .mp-iconbtn--on-dark:active:not(:disabled) {
+    background: color-mix(in srgb, var(--surface) 22%, transparent);
+  }
+  .mp-iconbtn.mp-iconbtn--on-dark:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+  /* Takes its notice's text colour (the close on a tinted alert). */
+  .mp-iconbtn--inherit {
+    width: 26px;
+    height: 26px;
+    margin: -2px -4px -2px 0;
+    color: inherit;
+    opacity: 0.7;
+    transition:
+      opacity var(--dur-base),
+      background-color var(--dur-base);
+  }
+  .mp-iconbtn--inherit:hover:not(:disabled),
+  .mp-iconbtn--inherit:active:not(:disabled) {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.06);
+  }
   .mp-iconbtn[aria-pressed="true"] {
     background: var(--tool-active-bg);
     color: var(--tool-active-ink);
@@ -871,32 +902,6 @@
     text-decoration: underline;
   }
   /* Round close button; at rest 70% (3.51-4.26:1 on the three tints). */
-  .mp-alert__close {
-    position: relative;
-    display: inline-grid;
-    place-items: center;
-    flex: none;
-    width: 26px;
-    height: 26px;
-    margin: -2px -4px -2px 0;
-    border-radius: 50%;
-    color: inherit;
-    opacity: 0.7;
-    cursor: pointer;
-    transition:
-      opacity var(--dur-base),
-      background-color var(--dur-base);
-  }
-  .mp-alert__close:hover {
-    opacity: 1;
-    background: rgba(0, 0, 0, 0.06);
-  }
-  .mp-alert__close::before {
-    content: "";
-    position: absolute;
-    inset: -9px;
-  }
-
   /* ---- Callout: a gentle aside, pink band with a sand outline and a leaf -------------------- */
   .mp-callout {
     display: flex;

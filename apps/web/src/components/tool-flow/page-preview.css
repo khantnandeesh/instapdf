@@ -103,26 +103,6 @@
 }
 
 /* Small, quiet round icon buttons on the scrim. */
-.ip-pv__btn {
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 0;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--surface) 12%, transparent);
-  color: var(--surface);
-  cursor: pointer;
-  transition: background-color var(--dur-base);
-}
-.ip-pv__btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--surface) 22%, transparent);
-}
-.ip-pv__btn:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-
 /* From 640px: the arrows sit beside the page, centred on it; the counter sits top left. */
 @media (min-width: 640px) {
   .ip-pv {

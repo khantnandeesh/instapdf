@@ -2,13 +2,13 @@
 import "./page-edit.css";
 /** Merge's dialogs (spec F3 M-4). Loaded on first open (next/dynamic), never on page load. */
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { pageBoxStyle } from "@/components/tool-flow/page-box";
+import { TileBadge, TileCheck, TileCorner, TileHit, TileLabel, TilePage } from "@/components/tile/parts";
 import { PageThumb } from "@/components/tool-flow/Thumbnail";
 import { Button } from "@/components/ui/Button";
 import { useLiveState } from "@/components/ui/live-state";
 import { cx } from "@/components/ui/cx";
 import { Dialog } from "@/components/ui/Dialog";
-import { AlertIcon, CheckIcon } from "@/components/ui/icons";
+import { AlertIcon } from "@/components/ui/icons";
 import type { PageSize } from "@/lib/page-list";
 import { editCopy as c } from "@/tools/merge/copy-edit";
 import { gridColumns, navTarget } from "./grid-keys";
@@ -170,12 +170,11 @@ export function PagePickerDialog({
             return (
               <div key={i} role="listitem" className="ip-tile flex flex-col items-center gap-1.5" data-selected={on || undefined}>
                 <div className="relative grid aspect-(--ip-tile-aspect) w-full place-items-center">
-                  <span className="relative block overflow-hidden bg-paper shadow-paper" style={pageBoxStyle(size)}>
+                  <TilePage size={size}>
                     <PageThumb fileId={fileId} index={i} />
-                  </span>
-                  <button
+                  </TilePage>
+                  <TileHit
                     ref={i === 0 ? first : undefined}
-                    type="button"
                     data-pick=""
                     tabIndex={i === active ? 0 : -1}
                     aria-pressed={on}
@@ -187,31 +186,18 @@ export function PagePickerDialog({
                       select(i, { toggle: e.ctrlKey || e.metaKey, range: e.shiftKey });
                     }}
                     onKeyDown={(e) => onKey(e, i)}
-                    className="absolute inset-0 rounded-[10px] focus-visible:outline-offset-1"
                     data-testid="picker-tile"
                   />
                   {used && (
-                    <span aria-hidden="true" className="pointer-events-none absolute top-1 left-1 rounded-pill bg-surface-raised px-2 py-0.5 font-display text-help font-semibold text-muted shadow-menu" data-testid="in-use">
+                    <TileBadge muted data-testid="in-use">
                       {c.inUse}
-                    </span>
+                    </TileBadge>
                   )}
-                  <span
-                    aria-hidden="true"
-                    onClick={() => select(i, { toggle: true, range: false })}
-                    className="absolute -top-1.5 -right-1.5 grid size-7 cursor-pointer place-items-center"
-                  >
-                    {on ? (
-                      <span className="mp-tick-in grid size-[22px] place-items-center rounded-full bg-leaf text-white ring-2 ring-white">
-                        <CheckIcon size={14} />
-                      </span>
-                    ) : (
-                      <span className="size-[22px] rounded-full border-[1.5px] border-field-line bg-surface-raised shadow-menu" />
-                    )}
-                  </span>
+                  <TileCorner onToggle={() => select(i, { toggle: true, range: false })}>
+                    <TileCheck on={on} />
+                  </TileCorner>
                 </div>
-                <span aria-hidden="true" className="ip-tile__n tabular-nums">
-                  {label}
-                </span>
+                <TileLabel>{label}</TileLabel>
               </div>
             );
           })}

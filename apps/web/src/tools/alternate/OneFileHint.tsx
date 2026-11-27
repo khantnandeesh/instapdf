@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import type { LoadedFile } from "@/components/tool-flow/types";
 import { CloseIcon, LeafIcon } from "@/components/ui/icons";
 import { IconButton } from "@/components/ui/IconButton";
+import { LinkButton } from "@/components/ui/LinkButton";
 import { setHandoff } from "@/lib/pdf/handoff";
 import { cardCopy as a } from "./copy-card";
 
@@ -24,9 +25,9 @@ export function OneFileHint({ file, onClose }: { file: LoadedFile | undefined; o
       <LeafIcon size={20} className="ip-hint-leaf" />
       <p className="min-w-0 flex-1">
         {a.oneFile}{" "}
-        <button type="button" className="font-semibold whitespace-nowrap text-brand-strong underline underline-offset-2 hover:text-brand" onClick={onOpen}>
+        <LinkButton kind="inline" className="whitespace-nowrap" onClick={onOpen}>
           {a.openOrganize}
-        </button>
+        </LinkButton>
       </p>
       <IconButton label={`Dismiss: ${a.oneFile}`} size="sm" icon={<CloseIcon size={16} />} tooltip={false} className="-my-1 -me-1.5 shrink-0" onClick={onClose} />
     </div>

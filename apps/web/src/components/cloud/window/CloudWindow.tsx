@@ -4,6 +4,7 @@ import "../cloud.css";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { BerryMark } from "@/components/berry/Berry";
 import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
 import { CheckIcon, CloseIcon, ShieldIcon } from "@/components/ui/icons";
 import { LiveRegion } from "@/components/ui/LiveRegion";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -643,9 +644,7 @@ export function CloudWindow({ route, toolTitles }: { route: CloudRoute; /** Ever
         <BerryMark size={26} />
         <span>BerryPDF</span>
         {name && <span className="ip-cw__sub">· {name}</span>}
-        <button type="button" className="mp-iconbtn mp-iconbtn--plain ip-cw__close size-11" aria-label={windowCopy.closeAria} title={windowCopy.closeAria} onClick={cancelAndClose}>
-          <CloseIcon size={20} />
-        </button>
+        <IconButton className="ip-cw__close size-11" label={windowCopy.closeAria} title={windowCopy.closeAria} tooltip={false} icon={<CloseIcon size={20} />} onClick={cancelAndClose} />
       </header>
       {toolLost && view.k !== "lost" && (
         <p role="status" className="ip-cw__banner" data-testid="cloud-lost-banner">

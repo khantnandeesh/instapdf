@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { exit } from "@/lib/motion";
+import { LinkButton } from "../ui/LinkButton";
 import { Notice } from "../ui/Notice";
 import type { FlowNoticeInput } from "./types";
 
@@ -55,9 +56,9 @@ function NoticeItems({ items }: { items: string[] }) {
         ))}
       </ul>
       {items.length > 3 && !open && (
-        <button type="button" className="mt-1 font-bold underline" onClick={() => setOpen(true)}>
+        <LinkButton kind="inline" tone="inherit" className="mt-1" onClick={() => setOpen(true)}>
           Show {items.length - 3} more
-        </button>
+        </LinkButton>
       )}
     </>
   );
