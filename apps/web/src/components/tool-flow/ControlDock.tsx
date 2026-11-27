@@ -39,6 +39,7 @@ export function ControlDock({
   dimmed,
   bare,
   rowOptions,
+  rowOptionsComplete,
 }: {
   label: string;
   layout: "row" | "bar" | "side";
@@ -64,6 +65,8 @@ export function ControlDock({
   bare?: boolean;
   /** The row only, from 1280 px: a compact control before More options (Merge's Contents page, §3.4). */
   rowOptions?: ReactNode;
+  /** The row options are every option: from 1280 px the More options trigger would repeat them, so it goes. */
+  rowOptionsComplete?: boolean;
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const optionsButton = useRef<HTMLButtonElement>(null);
@@ -179,7 +182,7 @@ export function ControlDock({
           </fieldset>
         )}
         {sheetMode && (
-          <span className="relative ip-dock-row__options">
+          <span className={`relative ip-dock-row__options${rowOptionsComplete && rowOptions != null ? " xl:hidden" : ""}`}>
             {optionsTrigger}
             {sheet && (
               <Popover

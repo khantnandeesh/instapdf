@@ -3,10 +3,10 @@
 // They come from the same makers the engine's unit tests use (src/lib/pdf/page-tool-fixtures.ts),
 // so the unit and browser tests read identical documents.
 // Run from apps/web:  node tests/fixtures/generate-page-tools.mjs   (Node 22.18+ runs the .ts import)
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { labelledPdf, linksPdf, sharedResPdf } from "../../src/lib/pdf/page-tool-fixtures.ts";
+import { imagesPdf, labelledPdf, linksPdf, sharedResPdf } from "../../src/lib/pdf/page-tool-fixtures.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const range = (from, to, step = 1) => Array.from({ length: Math.floor((to - from) / step) + 1 }, (_, i) => from + i * step);
@@ -25,6 +25,8 @@ const files = {
   "separator.pdf": () => labelledPdf(["Separator"]),
   "duplex-scan.pdf": () => labelledPdf(["Front 1", "Front 2", "Front 3", "Back 3", "Back 2", "Back 1"]),
   "duplex-scan-odd.pdf": () => labelledPdf(["Front 1", "Front 2", "Front 3", "Back 2", "Back 1"]),
+  // F12 Extract images: a JPEG and a PNG on page 1, the PNG again and a 1x1 dot on page 2, text only on page 3.
+  "with-images.pdf": async () => imagesPdf(await readFile(join(here, "delta.jpg")), await readFile(join(here, "charlie.png"))),
 };
 
 for (const [name, make] of Object.entries(files)) {

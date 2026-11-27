@@ -167,6 +167,8 @@ export type ToolFlowProps = {
    * options (Merge's Contents page, F25 §3.4); below 1280 it lives only behind More options.
    */
   rowOptions?: (ctx: FlowContext) => ReactNode;
+  /** `rowOptions` holds every option, so the row needs no More options trigger from 1280 px. */
+  rowOptionsComplete?: boolean;
   /** Merge's own wording for the empty state and the wrong-type error. */
   copyOverrides?: { pickerButton?: string; pickerHint?: string; limits?: string; limitsFull?: string; statusEmpty?: string; errorType?: (name: string) => string };
   /** Chip on the Options button below 1024 px ("2 changed"), for `optionsDensity: "full"`. */
@@ -237,6 +239,7 @@ export function ToolFlow({
   viewToggleFromOneFile,
   phoneAddMenu,
   dockStart,
+  rowOptionsComplete,
   rowOptions,
   copyOverrides,
   optionsBadge,
@@ -761,7 +764,7 @@ export function ToolFlow({
       setPagesDim(false);
       setPhase("done");
       setPillDone(false);
-      announce(copy.resultTitle(out.type === "application/zip"));
+      announce(copy.resultTitle(out.type));
     } catch (error) {
       if (controller.signal.aborted) return;
       const message = error instanceof Error ? error.message : "unknown error";
@@ -1183,6 +1186,7 @@ export function ToolFlow({
       layout={wide ? (settings ? "side" : "row") : "bar"}
       start={dockStart?.(ctx)}
       rowOptions={wide && !settings ? rowOptions?.(ctx) : undefined}
+      rowOptionsComplete={rowOptionsComplete}
       optionsDisabled={optionsDisabled}
       options={settings && wide ? null : options}
       more={renderMore?.(ctx)}

@@ -49,7 +49,7 @@ import {
   type PDFObject,
 } from "@cantoo/pdf-lib";
 import { segmentsOf, type PageSize } from "../page-list";
-import { imagePlacement, probeImage, sniffFormat, type ImageFormat } from "./images";
+import { imagePlacement, probeImage, sniffFormat, type ImageFormat, type ImageLayout } from "./images";
 import { dropStructureLinks, readDocInfo, readLang, readPageLabels, writeDocInfo, writeLang, writePageLabels, type DocInfo, type PageLabel } from "./doc-props";
 import { buildAcroForm, detachAnnotations, flattenFields, removeWidgets } from "./forms";
 import type { MergeOptions } from "./merge-options";
@@ -517,11 +517,11 @@ function scaleBookmarkViews(items: OutBookmark[], scaledBy: Map<PDFRef, number>)
 }
 
 /** Displayed size of an input page in the output, before same-width scaling. */
-function inputSize(p: MergePageInput, src: Loaded | undefined): PageSize {
+function inputSize(p: MergePageInput, src: Loaded | undefined, layout?: ImageLayout): PageSize {
   if (!p.sourceId || !src) return displayed(p.size ?? { width: 595, height: 842 }, p.rotation);
   if (src.kind === "image") {
     const f = src.frames[p.sourceIndex] ?? src.frames[0];
-    return displayed(imagePlacement(f.width, f.height).page, p.rotation);
+    return displayed(imagePlacement(f.width, f.height, layout).page, p.rotation);
   }
   const page = src.pages[p.sourceIndex];
   const box = page.getCropBox();
@@ -580,7 +580,7 @@ export async function composeDocument(input: MergeInput, env: MergeEnv, pool: So
   const tocSources: string[] = [];
   for (const seg of restSegments) for (const p of seg) if (p.sourceId && p.sourceId !== coverSource && !tocSources.includes(p.sourceId)) tocSources.push(p.sourceId);
   const first = pagesIn[0];
-  const firstSize = inputSize(first, first.sourceId ? await ensure(first.sourceId) : undefined);
+  const firstSize = inputSize(first, first.sourceId ? await ensure(first.sourceId) : undefined, options.imageLayout);
   const targetWidth = firstSize.width;
   const tocSize = firstSize; // same width by definition when same-width is on
   const tocPageCount = tocOn && tocSources.length ? Math.ceil(tocSources.length / tocLayout(tocSize).rows) : 0;
@@ -622,7 +622,7 @@ export async function composeDocument(input: MergeInput, env: MergeEnv, pool: So
         page.setRotation(degrees(normalizeRotation(p.rotation)));
       } else if (src.kind === "image") {
         const frame = src.frames[p.sourceIndex] ?? src.frames[0];
-        const place = imagePlacement(frame.width, frame.height);
+        const place = imagePlacement(frame.width, frame.height, options.imageLayout);
         page = out.addPage([place.page.width, place.page.height]);
         (await embedImageFrame(out, src, Math.max(0, p.sourceIndex), env))(page, place);
         page.setRotation(degrees(normalizeRotation(p.rotation)));

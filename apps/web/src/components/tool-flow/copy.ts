@@ -38,7 +38,9 @@ export const copy = {
   pwQueue: (i: number, n: number) => `Locked file ${i} of ${n}`,
   pwUnlock: "Unlock",
   pwSkip: "Skip this file",
-  resultTitle: (multi: boolean) => (multi ? "Your files are ready" : "Your PDF is ready"),
+  /** By the output's MIME type: a ZIP holds several files; an image or a text file is named as such. */
+  resultTitle: (type: string) =>
+    type === "application/zip" ? "Your files are ready" : type.startsWith("image/") ? "Your image is ready" : type === "text/plain" ? "Your text is ready" : "Your PDF is ready",
   resultUnencrypted: "This copy has no password. Anyone who has the file can open it.",
   resultContinue: "Keep going with this file",
   reading: (name: string) => `Reading ${name}…`,

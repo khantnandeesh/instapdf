@@ -6,11 +6,9 @@
  */
 import { expect, test } from "@playwright/test";
 import { isUsable, tools } from "../../src/tools/registry";
-import { fx } from "../support/flow";
+import { toolFixtures } from "../support/flow";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
-/** Tools that need a second file before they can run (as in viewport-fit.spec.ts). */
-const SECOND_FILE: Record<string, string> = { "alternate-mix-pdf": "three-pages.pdf" };
 
 for (const tool of usable) {
   test(`${tool.slug}: a smooth scroll in flight when the result appears does not carry Download away`, async ({ page }, info) => {
@@ -18,8 +16,7 @@ for (const tool of usable) {
     await page.setViewportSize({ width: 1366, height: 657 });
     await page.goto(`/${tool.slug}`);
     await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
-    const second = SECOND_FILE[tool.slug];
-    await page.getByTestId("file-input").setInputFiles(second ? [fx("sixty-pages.pdf"), fx(second)] : fx("sixty-pages.pdf"));
+    await page.getByTestId("file-input").setInputFiles(toolFixtures(tool.slug));
     await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
     // The moment the flow reports "done", start a smooth scroll down (what a late wheel or an anchor jump does).
     await page.evaluate(() => {

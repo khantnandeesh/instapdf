@@ -30,11 +30,20 @@ export type ReadyFile = LoadedFile & { status: "ready"; pages: PageSize[] };
 
 export type ToolOutput = {
   name: string;
-  type: "application/pdf" | "application/zip";
+  type: "application/pdf" | "application/zip" | "image/jpeg" | "image/png" | "image/tiff" | "text/plain";
   blob: Blob;
   size: number;
   pageCount?: number;
-  entries?: { name: string; pageCount: number }[];
+  /** A ZIP's files. `detail` replaces the "n pages" line for a file that is not a PDF ("1240 × 1754 px"). */
+  entries?: { name: string; pageCount: number; detail?: string }[];
+  /** What the result's meta line counts when it is not PDF pages ("3 images", "1,204 words"). */
+  lead?: string;
+  /** A picture of the result for the result card, when the output is not a PDF (an image, or the first image of a ZIP). */
+  preview?: Blob;
+  /** The start of a text result, shown in the result card instead of a page. */
+  previewText?: string;
+  /** A text result offers "Copy text" beside the download. */
+  copyText?: string;
   wasEncrypted: boolean;
   /** Non-blocking notes about the result, shown as warning notices. */
   warnings?: string[];

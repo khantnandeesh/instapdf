@@ -1,4 +1,5 @@
 /** Merge options (spec F3 §3f): types, defaults and the stored form. Pure, unit tested. */
+import type { ImageLayout } from "./images";
 
 export type BookmarkMode = "keep" | "remove" | "perFile" | "perFileNested";
 export type TocMode = "none" | "names" | "titles";
@@ -12,6 +13,8 @@ export type MergeOptions = {
   sameWidth: boolean;
   doubleSided: boolean;
   forms: FormMode;
+  /** Image to PDF (spec F12 §3): how each image sits on its page. Absent: Merge's fixed A4 layout. Not stored. */
+  imageLayout?: ImageLayout;
 };
 
 export const MERGE_OPTIONS_KEY = "berrypdf:merge-options";
@@ -32,7 +35,7 @@ export const ORGANIZE_OPTIONS: MergeOptions = { ...defaultMergeOptions, bookmark
 /** Alternate & mix's fixed options (spec §3g): no bookmarks (they would be out of order), fields as in Organize. */
 export const ALTERNATE_OPTIONS: MergeOptions = { ...defaultMergeOptions, bookmarks: "remove", forms: "rename" };
 
-const allowed: { [K in keyof MergeOptions]: readonly MergeOptions[K][] } = {
+const allowed: { [K in keyof Omit<MergeOptions, "imageLayout">]: readonly MergeOptions[K][] } = {
   toc: ["none", "names", "titles"],
   cover: [true, false],
   bookmarks: ["keep", "remove", "perFile", "perFileNested"],
@@ -50,7 +53,7 @@ export function parseMergeOptions(raw: string | null | undefined): MergeOptions 
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) stored = parsed as Record<string, unknown>;
   } catch {}
   const out = { ...defaultMergeOptions };
-  for (const key of Object.keys(allowed) as (keyof MergeOptions)[]) {
+  for (const key of Object.keys(allowed) as (keyof typeof allowed)[]) {
     const v = stored[key];
     if ((allowed[key] as readonly unknown[]).includes(v)) (out as Record<string, unknown>)[key] = v;
   }

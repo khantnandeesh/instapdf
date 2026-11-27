@@ -18,17 +18,30 @@ import { gzipSync } from "node:zlib";
 
 /** Route → the most each measure may print, in kB: [entry, entry + preloads] (main's numbers at 006ce21). */
 const BUDGET_KB = {
-  "/page": [120, 126],
+  // +1 kB preloads (F12): four more live tools in the catalogue and the registry.
+  "/page": [121, 128],
   "/merge-pdf/page": [150, 160],
   "/rotate-pdf/page": [141, 151],
   // F5 page tools (spec F4/F5 UI P-12).
   "/organize-pdf/page": [150, 160],
   "/combine-reorder-pdf/page": [150, 160],
-  "/alternate-mix-pdf/page": [148, 158],
+  // +1 kB entry (F12, 27 Nov), as Extract below.
+  "/alternate-mix-pdf/page": [149, 159],
   // F4 page tools (spec F4/F5 UI P-12): Rotate + the range parser, field and stepper (+ marks on Split).
-  "/split-pdf/page": [145, 155],
-  "/extract-pdf-pages/page": [143, 153],
-  "/delete-pdf-pages/page": [143, 153],
+  // +1 kB entry on Split and Delete (F12 Extract images): each live tool adds its flow entry to the registry every route loads.
+  "/split-pdf/page": [147, 156],
+  // +1 kB entry on Extract (F12, 27 Nov): three more tools in the registry every route loads, and the shared
+  // LinkButton / IconButton variants.
+  "/extract-pdf-pages/page": [144, 154],
+  "/delete-pdf-pages/page": [145, 154],
+  // F12 (spec f12-image-text-tools.md): PDF to image is Extract's page with two option groups; PDF to text is the
+  // bare flow; Image to PDF is Organize's workspace. Their engines (page-images, page-text, tiff-write) are lazy.
+  // The four F12 tools grew the registry every route carries: the routes within that of their
+  // budget (home, Split, Delete, PDF to JPG, JPG to PDF) move up 1 kB.
+  "/pdf-to-jpg/page": [145, 155],
+  "/extract-images/page": [142, 152],
+  "/pdf-to-text/page": [139, 149],
+  "/jpg-to-pdf/page": [151, 161],
   // The editor's landing (F16 AC-86), measured 124 / 140 on 26 Nov plus ~2 kB (the landing tool cap is 150);
   // its shell, pdf.js and engine are the editor JS budget below.
   "/edit-pdf/page": [126, 142],
@@ -43,9 +56,13 @@ const CLOUD_BUDGET_KB = {
   // Alternate shares every first-load chunk with Organize but its page chunk (150.6 vs 150.8 kB after the
   // F4 + main tile-rule merge); 1 kB over its F5 budget, still under Organize's and Combine's 152.
   "/alternate-mix-pdf/page": [151, 160],
-  "/split-pdf/page": [147, 157],
-  "/extract-pdf-pages/page": [145, 155],
-  "/delete-pdf-pages/page": [145, 155],
+  "/split-pdf/page": [148, 158],
+  "/extract-pdf-pages/page": [146, 156],
+  "/delete-pdf-pages/page": [146, 156],
+  "/pdf-to-jpg/page": [147, 157],
+  "/extract-images/page": [144, 154],
+  "/pdf-to-text/page": [141, 151],
+  "/jpg-to-pdf/page": [153, 163],
   // The editor's landing with the F23 caret, row and intake (E6): measured 128 / 144 on 26 Nov plus ~2 kB.
   "/edit-pdf/page": [130, 146],
 };

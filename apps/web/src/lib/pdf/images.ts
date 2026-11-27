@@ -97,18 +97,57 @@ export function probeImage(b: Uint8Array): ImageProbe | null {
 
 export const exceedsPixelCap = (width: number, height: number) => width * height > MAX_IMAGE_PIXELS;
 
-/** The A4 page an image becomes: portrait for portrait or square images, landscape for landscape ones. */
-export function imagePageSize(width: number, height: number): PageSize {
+/** Page sizes Image to PDF offers, in points, portrait. "fit" makes the page the size of the image. */
+export const IMAGE_PAGE_SIZES = {
+  a4: { width: 595, height: 842 },
+  a3: { width: 842, height: 1191 },
+  a5: { width: 420, height: 595 },
+  letter: { width: 612, height: 792 },
+  legal: { width: 612, height: 1008 },
+} as const;
+export type ImagePageSizeName = "fit" | keyof typeof IMAGE_PAGE_SIZES;
+/** How Image to PDF lays an image on its page (spec F12 §3). `margin` is in points on every side. */
+export type ImageLayout = { size: ImagePageSizeName; orientation: "auto" | "portrait" | "landscape"; margin: number };
+/** The longest page side a PDF may have (PDF 1.7, Annex C): 200 inches. */
+const MAX_PAGE_SIDE = 14_400;
+
+/**
+ * The layout the page grid previews with on this thread, when a call names none. Image to PDF sets
+ * it while its page is open (tiles then show each image as its own page); every other tool leaves it
+ * unset and gets Merge's layout: A4, auto orientation, a 36pt margin, never enlarged. A job in the
+ * worker never reads it: the tool sends its layout with the job.
+ */
+let previewLayout: ImageLayout | undefined;
+export function setImagePreviewLayout(layout: ImageLayout | undefined) {
+  previewLayout = layout;
+}
+
+function layoutPage(width: number, height: number, layout: ImageLayout): PageSize {
+  if (layout.size === "fit") {
+    const k = Math.min(1, (MAX_PAGE_SIDE - 2 * layout.margin) / Math.max(width, height));
+    return { width: width * k + 2 * layout.margin, height: height * k + 2 * layout.margin };
+  }
+  const p = IMAGE_PAGE_SIZES[layout.size];
+  const landscape = layout.orientation === "landscape" || (layout.orientation === "auto" && width > height);
+  return landscape ? { width: p.height, height: p.width } : { width: p.width, height: p.height };
+}
+
+/** The page an image becomes: by default A4, portrait for portrait or square images, landscape for landscape ones. */
+export function imagePageSize(width: number, height: number, layout: ImageLayout | undefined = previewLayout): PageSize {
+  if (layout) return layoutPage(width, height, layout);
   return width > height ? { width: 842, height: 595 } : { width: 595, height: 842 };
 }
 
 /**
- * Where the image is drawn on its page: centered, inside the margin, aspect
- * ratio kept, and never larger than its size at 72 dpi (1 px = 1 pt).
+ * Where the image is drawn on its page: centered, inside the margin, aspect ratio kept. By default
+ * (Merge) it is never larger than its size at 72 dpi (1 px = 1 pt); with a layout (Image to PDF) it
+ * fills the space inside the margin.
  */
-export function imagePlacement(width: number, height: number): { page: PageSize; x: number; y: number; width: number; height: number } {
-  const page = imagePageSize(width, height);
-  const scale = Math.min(1, (page.width - 2 * IMAGE_MARGIN) / width, (page.height - 2 * IMAGE_MARGIN) / height);
+export function imagePlacement(width: number, height: number, layout: ImageLayout | undefined = previewLayout): { page: PageSize; x: number; y: number; width: number; height: number } {
+  const page = imagePageSize(width, height, layout);
+  const margin = layout ? layout.margin : IMAGE_MARGIN;
+  const fit = Math.min((page.width - 2 * margin) / width, (page.height - 2 * margin) / height);
+  const scale = layout ? fit : Math.min(1, fit);
   const w = width * scale;
   const h = height * scale;
   return { page, width: w, height: h, x: (page.width - w) / 2, y: (page.height - h) / 2 };

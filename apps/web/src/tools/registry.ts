@@ -47,8 +47,11 @@ export type ToolFlowConfig = {
    * 1024px they live in a side panel beside the stage and the top row holds only the action slot.
    */
   layout?: "settings";
-  /** Output file name for these input names (one PDF, or a ZIP for several). */
-  outputName: (inputs: string[]) => string;
+  /**
+   * Output file name for these input names (one PDF, or a ZIP for several). Absent when the name
+   * depends on the run (F12: the image format, one image or a ZIP), and the job names its own output.
+   */
+  outputName?: (inputs: string[]) => string;
 };
 
 export type Tool = {
@@ -158,6 +161,9 @@ const PDF_AND_IMAGES = {
   extensions: [".pdf", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", ".tiff"],
 };
 
+/** Pictures only (Image to PDF, spec F12 §3). */
+const IMAGES_ONLY = { mime: PDF_AND_IMAGES.mime.slice(1), extensions: PDF_AND_IMAGES.extensions.slice(1) };
+
 /** Browser-tool defaults from the F1 spec (no free-tier gate for browser tools). */
 const clientPdfFlow = (
   slug: string,
@@ -255,6 +261,42 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
       "delete-pdf-pages",
       { title: "Delete PDF pages", actionLabel: "Delete pages", progressLabel: "Deleting" },
       { outputName: (inputs) => (inputs.length === 1 ? pdfOutputName(inputs[0]) : DELETE_ZIP) },
+    ),
+  },
+  // F12 (spec f12-image-text-tools.md): the job names its output (lib/pdf/page-images, page-text; Image to PDF
+  // uses the first image's name), so these flows carry no outputName.
+  "pdf-to-jpg": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "pdf-to-jpg",
+      { title: "PDF to JPG", actionLabel: "Convert to JPG", progressLabel: "Converting" },
+      { outputName: undefined },
+    ),
+  },
+  "extract-images": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "extract-images",
+      { title: "Extract images", actionLabel: "Extract images", progressLabel: "Extracting" },
+      { requiredPermissions: ["copy"], outputName: undefined },
+    ),
+  },
+  // Image to PDF: Organize's workspace for pictures only; the PDF is named after the first image.
+  "jpg-to-pdf": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "jpg-to-pdf",
+      { title: "JPG to PDF", actionLabel: "Convert to PDF", progressLabel: "Converting" },
+      { accept: IMAGES_ONLY, maxFiles: 50, defaultView: "pages", optionsDensity: "full", outputName: undefined },
+    ),
+  },
+  // PDF to text: one .txt per PDF, read in the browser; "copy" must be allowed by the file's permissions.
+  "pdf-to-text": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "pdf-to-text",
+      { title: "PDF to text", actionLabel: "Extract text", progressLabel: "Reading" },
+      { requiredPermissions: ["copy"], outputName: undefined },
     ),
   },
 };

@@ -382,6 +382,147 @@ export const seoContent: Record<string, ToolSeoContent> = {
     ],
     related: ["extract-pdf-pages", "delete-pdf-pages", "merge-pdf", "organize-pdf", "rotate-pdf", "compress-pdf"],
   },
+  "pdf-to-jpg": {
+    howTo: "How to convert a PDF to JPG",
+    steps: [
+      { name: "Add your PDF", text: "Drop one or more PDF files on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Choose the image", text: "Pick JPG, PNG or TIFF and a resolution from Small (75 dpi) to Print (300 dpi). Click pages to convert only those." },
+      { name: "Download", text: "Select Convert. One page downloads as an image, several as a ZIP with one image per page." },
+    ],
+    faq: [
+      {
+        q: "How do I convert a PDF to JPG?",
+        a: "Add the PDF, keep JPG selected and choose Convert. Every page becomes a JPG image. To convert a few pages only, click them first.",
+      },
+      {
+        q: "Can I save a PDF as PNG or TIFF instead?",
+        a: "Yes. Pick PNG for sharp text and drawings with no compression marks, or TIFF for print and archive work. TIFF can also hold all pages in one file.",
+      },
+      {
+        q: "Which resolution should I choose?",
+        a: "Medium (150 dpi) is sharp on screen and keeps files small. Use Large (220 dpi) to zoom in, and Print (300 dpi) for printing. Small (75 dpi) is for previews and email.",
+      },
+      {
+        q: "How are the images named?",
+        a: "After the PDF and the page number, such as report-01.jpg, report-02.jpg, so they sort in page order.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The pages are drawn in your browser, so your files stay on your device.",
+      },
+      {
+        q: "Is there a page or size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up and no watermark.",
+      },
+    ],
+    related: ["jpg-to-pdf", "extract-images", "pdf-to-text", "extract-pdf-pages", "split-pdf", "compress-pdf"],
+  },
+  "jpg-to-pdf": {
+    howTo: "How to convert JPG to PDF",
+    steps: [
+      { name: "Add your images", text: "Drop JPG, PNG or other images on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Put them in order", text: "Drag the images into page order, and rotate any that are sideways." },
+      { name: "Choose the page", text: "Pick a page size such as A4 or Letter, or Fit to image, then a margin and an orientation." },
+      { name: "Download", text: "Select Convert to PDF and download one PDF with a page per image." },
+    ],
+    faq: [
+      {
+        q: "How do I convert a JPG to PDF?",
+        a: "Add the image and select Convert to PDF. To combine several images, add them all, drag them into order and convert: each image becomes one page.",
+      },
+      {
+        q: "Which image types can I convert?",
+        a: "JPG, PNG, GIF, BMP, WebP and TIFF. A TIFF with several pages gives one PDF page per page.",
+      },
+      {
+        q: "Will my photos lose quality?",
+        a: "No. JPG and PNG images are placed in the PDF as they are, without being compressed again.",
+      },
+      {
+        q: "Can I choose the page size and margins?",
+        a: "Yes. Use A4, A3, A5, Letter or Legal, or Fit to image so the page is exactly the size of the picture. Margins can be none, small or large.",
+      },
+      {
+        q: "Are my images uploaded?",
+        a: "No. The PDF is made in your browser, so your images stay on your device.",
+      },
+      {
+        q: "Is there a limit?",
+        a: "Up to 50 images at a time, up to 100 MB each. It is free, with no sign-up and no watermark.",
+      },
+    ],
+    related: ["pdf-to-jpg", "merge-pdf", "organize-pdf", "compress-pdf", "extract-images", "rotate-pdf"],
+  },
+  "extract-images": {
+    howTo: "How to extract images from a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop one or more PDF files on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Pick pages, if you like", text: "Click pages to take the images of only those. With none picked, every page is searched." },
+      { name: "Download", text: "Select Extract images. One image downloads as itself, several as a ZIP." },
+    ],
+    faq: [
+      {
+        q: "How do I save the pictures from a PDF?",
+        a: "Add the PDF and select Extract images. Every picture stored in the file is saved once, named after its page.",
+      },
+      {
+        q: "Do the images lose quality?",
+        a: "No. A photo the PDF stores as a JPEG is saved as that same JPEG, untouched. Every other image is saved as a PNG, which loses nothing and keeps transparency.",
+      },
+      {
+        q: "Why were no images found?",
+        a: "Text, lines and charts drawn in a PDF are not images. To save a whole page as a picture, use PDF to image.",
+      },
+      {
+        q: "An image appears on every page. Do I get it many times?",
+        a: "No. An image a file reuses, such as a logo, is saved once.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The images are read in your browser, so your files stay on your device.",
+      },
+      {
+        q: "Is there a page or size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up.",
+      },
+    ],
+    related: ["pdf-to-jpg", "pdf-to-text", "jpg-to-pdf", "extract-pdf-pages", "compress-pdf", "split-pdf"],
+  },
+  "pdf-to-text": {
+    howTo: "How to extract text from a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop one or more PDF files on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Extract", text: "Select Extract text. The text of every page is read in order." },
+      { name: "Copy or download", text: "Copy the text to the clipboard, or download it as a plain .txt file." },
+    ],
+    faq: [
+      {
+        q: "How do I copy all the text out of a PDF?",
+        a: "Add the PDF and select Extract text. You can then copy the whole text in one click or download it as a .txt file.",
+      },
+      {
+        q: "Does it keep line breaks and paragraphs?",
+        a: "Yes. Lines end where they end on the page, paragraphs are separated by a blank line, and pages follow each other in order.",
+      },
+      {
+        q: "Why is there no text in my PDF?",
+        a: "Scanned PDFs are pictures of pages, so there is no text to copy out. They need OCR first, which turns the pictures into text.",
+      },
+      {
+        q: "Does it work with other languages?",
+        a: "Yes. The text file is saved as UTF-8, so accents, Hindi, Arabic, Chinese and other scripts come through as they are stored in the PDF.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The text is read in your browser, so your files stay on your device.",
+      },
+      {
+        q: "Is there a page or size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up.",
+      },
+    ],
+    related: ["pdf-to-jpg", "extract-images", "ocr-pdf", "extract-pdf-pages", "split-pdf", "pdf-to-word"],
+  },
   "extract-pdf-pages": {
     howTo: "How to extract pages from a PDF",
     steps: [

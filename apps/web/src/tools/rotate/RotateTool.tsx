@@ -50,7 +50,7 @@ const process: (deltas: Deltas) => ProcessFn = (deltas) => async (files, signal,
   const out = await runInWorker(
     {
       kind: "rotate",
-      zipName: tool.flow.outputName(files.map((f) => f.name)),
+      zipName: tool.flow.outputName?.(files.map((f) => f.name)) ?? "",
       files: files.map((f) => ({
         name: f.name,
         source: f.source,
