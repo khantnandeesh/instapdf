@@ -631,9 +631,7 @@
     background: var(--surface);
     border: 1.5px solid var(--ip-field-line);
     border-radius: var(--radius-md);
-    transition:
-      border-color var(--dur-fast) ease-in-out,
-      box-shadow var(--dur-fast) ease-in-out;
+    transition: border-color var(--dur-fast) ease-in-out;
   }
   .ip-stepper:hover {
     border-color: var(--ip-field-line-hover);
