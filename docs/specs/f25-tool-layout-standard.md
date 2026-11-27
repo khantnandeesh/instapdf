@@ -340,14 +340,14 @@ This is for future tools: Compress, Protect, Unlock, Convert and OCR. It is spec
 ```
 [◠ spinner 20]  Deleting… 42%                    [Cancel]
                 small second line (server phases)
-▔▔▔▔▔▔▔▔▔▔▔▔▔▔ jam bar 6px along the bottom edge ▔▔▔▔▔▔▔
+░░░░░░░░░░░░░ the fill rises through the pill, 3px berry edge ░░░
 ```
 
 **Contents:**
 - A 20px ring spinner: `brand` arc on a `brand-tint` track, rotating 900ms linear.
 - The label `<progressLabel>… <n>%`: 16px 600 ink, tabular numbers, from the registry `progressLabel` ("Deleting", "Merging", "Mixing"…).
-- Cancel: a `band` ground with muted 15px text, 40px tall, 44px hit area.
-- A 6px jam bar (`ProgressBar`): `brand` fill on `brand-tint`, `transform: scaleX()` from the left.
+- Cancel: a quiet text button (no ground; a 10% berry tint on hover), muted 15px text, 40px tall, 44px hit area.
+- The fill (`ProgressBar`, owner polish 2026-11-27): the pill keeps the primary's corners with a pale berry edge; a pale berry fill (14% `brand`) with a 3px `brand` bottom edge rises through the whole pill behind the text, `transform: scaleX()` from the left, so the button itself fills up.
 
 **Morph.** On click, the slot's rest content (status + primary) fades out over 120ms (`--motion-micro`, `--ease-in`, inert at once) and the pill fades in over 120ms (`--ease-out`). The slot box never changes size.
 - The pill shows on the click, with no 300ms delay: the button itself is what changes. This closes T11's deferred part.
