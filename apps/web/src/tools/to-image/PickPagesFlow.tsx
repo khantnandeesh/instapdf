@@ -4,7 +4,7 @@ import { formatCount as n } from "@/components/page-select/copy";
 import { useDebouncedAnnounce } from "@/components/page-select/hooks";
 import { usePageSelection } from "@/components/page-select/usePageSelection";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
-import type { FlowApi, FlowContext, ReadyFile, ToolOutput } from "@/components/tool-flow/types";
+import type { FlowApi, FlowContext, PageDecoration, ReadyFile, ToolOutput } from "@/components/tool-flow/types";
 import type { FlowTool } from "@/tools/registry";
 
 /** One file's share of the job: the picked pages, or every page when nothing is picked. */
@@ -38,6 +38,8 @@ export function PickPagesFlow({
   run,
   renderOptions,
   renderMore,
+  canRun,
+  decorate,
 }: {
   tool: FlowTool;
   /** "converted", "searched": ends the live message "All 12 pages will be …". */
@@ -47,6 +49,10 @@ export function PickPagesFlow({
   run: (sources: PickedSource[], signal: AbortSignal, onProgress: (fraction: number) => void) => Promise<ToolOutput>;
   renderOptions?: () => ReactNode;
   renderMore?: (ctx: FlowContext) => ReactNode;
+  /** Why the run must wait (the status line says it), or true. */
+  canRun?: () => true | string;
+  /** Extra marks on a page: `applies` is true when the run will change it (picked, or nothing is picked). */
+  decorate?: (applies: boolean) => Partial<PageDecoration>;
 }) {
   const apiRef = useRef<FlowApi | null>(null);
   const announce = useDebouncedAnnounce(apiRef);
@@ -64,6 +70,7 @@ export function PickPagesFlow({
         const now = s.current();
         return run(pickedSources(files, now.state.sets, now.count > 0), signal, onProgress);
       }}
+      canRun={canRun}
       onFilesChange={s.onFilesChange}
       onReset={s.reset}
       readyStatus={() => pickCopy.status(pages, s.total)}
@@ -71,7 +78,7 @@ export function PickPagesFlow({
       gridHint={gridHint}
       decoratePage={(file, index) => {
         const picked = (s.state.sets[file.id] ?? []).includes(index);
-        return { pendingDelta: 0, inScope: picked, picked, pressed: picked, label: pickCopy.tile(index + 1, file.pageCount) };
+        return { pendingDelta: 0, inScope: picked, picked, pressed: picked, label: pickCopy.tile(index + 1, file.pageCount), ...decorate?.(picked || s.count === 0) };
       }}
       onTileActivate={(file, index, mods) => s.activate(file.id, index, mods.shift)}
       onPageKey={(_file, _index, key, e) => {

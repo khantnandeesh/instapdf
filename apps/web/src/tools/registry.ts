@@ -278,6 +278,11 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
     status: "beta",
     flow: clientPdfFlow("split-pdf-in-half", { title: "Split PDF pages in half", actionLabel: "Split in half", progressLabel: "Splitting" }),
   },
+  // F8 (spec f8-page-shape.md): Flip and Resize on the pick-pages flow; Crop and N-up on whole files.
+  "crop-pdf": { status: "beta", flow: clientPdfFlow("crop-pdf", { title: "Crop PDF", actionLabel: "Crop PDF", progressLabel: "Cropping" }) },
+  "resize-pdf": { status: "beta", flow: clientPdfFlow("resize-pdf", { title: "Resize PDF", actionLabel: "Resize PDF", progressLabel: "Resizing" }) },
+  "flip-pdf": { status: "beta", flow: clientPdfFlow("flip-pdf", { title: "Flip PDF", actionLabel: "Flip PDF", progressLabel: "Flipping" }) },
+  "n-up-pdf": { status: "beta", flow: clientPdfFlow("n-up-pdf", { title: "N-up PDF", actionLabel: "Arrange pages", progressLabel: "Arranging" }) },
   "extract-pdf-pages": {
     status: "beta",
     flow: clientPdfFlow(

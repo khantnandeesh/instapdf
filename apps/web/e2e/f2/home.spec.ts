@@ -162,9 +162,9 @@ test.describe("catalogue", () => {
       "/delete-pdf-pages",
       "/merge-pdf",
       "/split-pdf",
+      "/crop-pdf",
       "/extract-pdf-pages",
       "/compress-pdf",
-      "/crop-pdf",
       "/sign-pdf",
       "/pdf-to-word",
     ]);

@@ -252,3 +252,27 @@
     right: calc(var(--ip-tap-min) / -2);
   }
 }
+
+/* Flip: the page picture mirrored, as the result will be. */
+.ip-flip--horizontal {
+  transform: scaleX(-1);
+}
+.ip-flip--vertical {
+  transform: scaleY(-1);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ip-flip {
+    transition: transform var(--dur-move) var(--ease-standard);
+  }
+}
+
+/* Crop: the part that stays is clear inside a berry line; everything else on the page is dimmed. */
+.ip-keep {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  outline: 1.5px solid var(--brand);
+  outline-offset: -1.5px;
+  box-shadow: 0 0 0 999px color-mix(in srgb, var(--ink-black) 34%, transparent);
+  pointer-events: none;
+}

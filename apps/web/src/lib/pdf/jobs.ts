@@ -15,6 +15,11 @@ import { mergePdf, type MergeEnv, type MergeInput } from "./merge";
 import { pdfOutputName, uniqueNames } from "./naming";
 import { protectPdf, unlockPdf, type ProtectOptions } from "./protect";
 import { planSplit, type SplitMode } from "../page-plans";
+import { cropPdf } from "./crop";
+import { flipPdf, type FlipDirection } from "./flip";
+import { nupPdf, type NupOptions } from "./nup";
+import { resizePdf, type ResizeOptions } from "./resize";
+import type { Area } from "./area";
 import { loadForEdit, rotatePdf } from "./rotate";
 import { splitHalfPdf, type HalfOptions } from "./split-half";
 import { measuredLimit, measureWith, partsBySize } from "./split-size";
@@ -44,7 +49,13 @@ export type SplitSizeJob = { kind: "splitSize"; files: (JobFile & { id: string; 
 /** Split in half (F7): the picked pages of each file cut into two pages. */
 export type SplitHalfJob = { kind: "splitHalf"; files: (JobFile & { cut: number[] })[]; zipName: string; options: HalfOptions };
 
-export type Job = RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob;
+/** Page-shape tools (F8). `pages` are the 0-based pages to change; `areas` the part of each page to keep. */
+export type FlipJob = { kind: "flip"; files: (JobFile & { pages: number[] })[]; zipName: string; direction: FlipDirection };
+export type ResizeJob = { kind: "resize"; files: (JobFile & { pages: number[] })[]; zipName: string; options: ResizeOptions };
+export type CropJob = { kind: "crop"; files: (JobFile & { areas: Record<number, Area> })[]; zipName: string };
+export type NupJob = { kind: "nup"; files: JobFile[]; zipName: string; options: NupOptions };
+
+export type Job = RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob;
 
 export type JobOutput = {
   name: string;
@@ -85,6 +96,14 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       return runSplitSize(job, onProgress, env);
     case "splitHalf":
       return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => splitHalfPdf({ bytes, password: file.password, cut: file.cut, options: job.options }, progress));
+    case "flip":
+      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => flipPdf({ bytes, password: file.password, pages: file.pages, direction: job.direction }, progress));
+    case "resize":
+      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => resizePdf({ bytes, password: file.password, pages: file.pages, options: job.options }, progress));
+    case "crop":
+      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => cropPdf({ bytes, password: file.password, areas: file.areas }, progress));
+    case "nup":
+      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => nupPdf({ bytes, password: file.password, options: job.options }, progress));
     case "split":
     case "extract":
     case "delete":

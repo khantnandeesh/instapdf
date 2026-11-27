@@ -1046,7 +1046,7 @@ export function ToolFlow({
       announce,
       openPreview: (items, at) => setPreview({ items, at }),
       setView: (v) => setViewChoice(v),
-      renderPage: (fileId, index, size, onDone) => renderer?.request(fileId, index, size, -2, onDone) ?? (() => {}),
+      renderPage: (fileId, index, size, onDone, background) => renderer?.request(fileId, index, size, background ? Number.MAX_SAFE_INTEGER : -2, onDone) ?? (() => {}),
       openPicker: () => picker.current?.open(),
       fallbackFocus,
       submit: () => submitRef.current(),

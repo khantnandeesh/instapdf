@@ -1,4 +1,4 @@
-# F7: Split by bookmarks, by size, in half (by text to follow)
+# F7: Split by bookmarks, by size, in half and by text
 
 Routes: `/split-pdf-by-bookmarks`, `/split-pdf-by-size`, `/split-pdf-in-half`. All run in the browser;
 nothing is uploaded (rule 4). Reference pages:

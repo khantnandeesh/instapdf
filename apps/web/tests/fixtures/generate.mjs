@@ -15,6 +15,7 @@ import {
   PDFString,
   StandardFonts,
   degrees,
+  rgb,
 } from "@cantoo/pdf-lib";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -139,6 +140,16 @@ function grayPng(width, height, pixel) {
   agree.check();
   agree.addToPage(doc.getPage(0), { x: 72, y: 550, width: 20, height: 20 });
   await save("form.pdf", doc);
+}
+
+{
+  // Crop: a page inked to its edges, so there is no white margin to trim.
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([300, 400]);
+  page.drawRectangle({ x: 0, y: 0, width: 300, height: 400, color: rgb(0.2, 0.3, 0.6) });
+  doc.setCreationDate(FIXED_DATE);
+  doc.setModificationDate(FIXED_DATE);
+  await save("full-bleed.pdf", doc);
 }
 
 {
