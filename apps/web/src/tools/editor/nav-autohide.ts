@@ -5,16 +5,23 @@ import { useEffect } from "react";
  * Edit PDF, the site navbar steps aside while you read (F25 eval G-1, M12): the owner chose "navbar stays
  * + slim editor bar", so at rest both show. Once a document is open and the canvas is scrolled down, the
  * navbar slides up out of view and the editor bar takes its place at the top, giving the pages the
- * navbar's height. It comes back on a scroll up, when the pointer rests at the top edge, or when focus
- * goes into it (Tab, a skip link), and it never hides while focus is in it. CSS does the moving (editor.css, `html[data-ed-nav="hidden"]`), with
- * transforms only, so nothing is a layout shift, and no motion under prefers-reduced-motion.
+ * navbar's height. It comes back only on a deliberate move (eval run 2, R2-1: any small scroll up brought
+ * it back and the pages dropped to 78-80%): a scroll back near the top, a long scroll up (one run up, of at
+ * least the canvas's height or 400px, whichever is more; any move down starts the count again), the pointer
+ * resting at the top edge, or focus going into it (Tab, a skip link). It never hides while keyboard focus is
+ * in it. CSS does the moving (editor.css, `html[data-ed-nav="hidden"]`), with transforms only, so nothing is
+ * a layout shift, and no motion under prefers-reduced-motion.
  *
  * The one switch: NEXT_PUBLIC_EDITOR_NAV_AUTOHIDE=0 builds the editor with the navbar always shown.
  */
 export const NAV_AUTOHIDE = process.env.NEXT_PUBLIC_EDITOR_NAV_AUTOHIDE !== "0";
 
-/** How far (px) a scroll must go in one direction before the navbar hides or comes back. */
+/** How far (px) a scroll down must go before the navbar hides. */
 const HYSTERESIS = 12;
+/** How far (px) one run up must go, with the navbar away, before it comes back: the canvas's height, at least 400. */
+const longUp = (scroller: HTMLElement) => Math.max(scroller.clientHeight, 400);
+/** Where the current run up started (the scroll handler's anchor while the navbar is away), per canvas. */
+const runFrom = new WeakMap<HTMLElement, number>();
 /** Below this canvas scroll the navbar always shows. */
 const TOP_ZONE = 48;
 /**
@@ -38,9 +45,9 @@ export function navHiddenAt(scroller: HTMLElement, to: number): boolean {
   if (!NAV_AUTOHIDE || !px(scroller, "--ed-under")) return false;
   if (to <= TOP_ZONE) return false;
   const from = scroller.scrollTop;
-  if (to - from > HYSTERESIS) return !document.querySelector(".ip-site-header")?.hasAttribute("data-menu-open");
-  if (from - to > HYSTERESIS) return false;
-  return navHidden();
+  if (navHidden()) return to > from || (runFrom.get(scroller) ?? from) - to < longUp(scroller);
+  const header = document.querySelector(".ip-site-header");
+  return to - from > HYSTERESIS && !header?.hasAttribute("data-menu-open") && !header?.querySelector(":focus-visible");
 }
 
 /**
@@ -69,6 +76,7 @@ export function useNavAutohide(scroller: HTMLElement | null, enabled: boolean) {
     const wide = window.matchMedia("(min-width: 1024px) and (min-height: 601px)");
     let hidden = false;
     let anchor = scroller.scrollTop;
+    let last = anchor;
     // The page strip's box (editor.css, data-ed-box): tall from the moment the navbar leaves, short again
     // only once its slide back is over, so the strip's list never shows a gap while it moves.
     let box = 0;
@@ -85,19 +93,26 @@ export function useNavAutohide(scroller: HTMLElement | null, enabled: boolean) {
     const onScroll = () => {
       if (!wide.matches) return set(false);
       const y = scroller.scrollTop;
+      const down = y > last;
+      last = y;
       if (y <= TOP_ZONE) {
         anchor = y;
-        return set(false);
-      }
-      if (y - anchor > HYSTERESIS) {
+        set(false);
+      } else if (hidden) {
+        // Away: the anchor is where this run up started. Any move down starts it again from there; only a
+        // long run up brings the navbar back (a small one, to reread a line, leaves the pages their height).
+        if (down) anchor = y;
+        else if (anchor - y >= longUp(scroller)) {
+          anchor = y;
+          set(false);
+        }
+      } else if (y - anchor > HYSTERESIS) {
         anchor = y;
         // Never while the All tools menu is open from the navbar, nor while keyboard focus is in it (a
         // keyboard user on a navbar link would lose sight of it). Focus a click left there doesn't count.
         if (!header?.hasAttribute("data-menu-open") && !header?.querySelector(":focus-visible")) set(true);
-      } else if (anchor - y > HYSTERESIS) {
-        anchor = y;
-        set(false);
-      } else if ((hidden && y > anchor) || (!hidden && y < anchor)) anchor = y; // keep going the same way
+      } else if (y < anchor) anchor = y; // shown: a move up moves where the next scroll down counts from
+      runFrom.set(scroller, anchor);
     };
     let dwell = 0;
     const stopDwell = () => {
@@ -126,6 +141,7 @@ export function useNavAutohide(scroller: HTMLElement | null, enabled: boolean) {
       header?.removeEventListener("focusin", onFocus);
       wide.removeEventListener("change", onMedia);
       clearTimeout(box);
+      runFrom.delete(scroller);
       delete root.dataset.edNav;
       delete root.dataset.edBox;
     };

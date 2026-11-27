@@ -364,6 +364,53 @@ test("AC-650: from 1024 the pill reads 'Downloading…' whole beside Cancel, and
   }
 });
 
+test("AC-650 (eval run 2, R2-3): on a phone, 390 and 320, the bar fits and the pill reads 'Downloading…' whole with Cancel as an ×; nothing in the bar moves", async ({ page }) => {
+  for (const [width, height] of [
+    [390, 664],
+    [320, 640],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await open(page);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    await page.route(/berry-build\.[^/]*\.js/, async (r) => {
+      await gate;
+      await r.continue().catch(() => {});
+    });
+    // Every item in the bar is on screen, none over another.
+    const items = () =>
+      page.evaluate(() =>
+        [...document.querySelector(".ed-top")!.children]
+          .map((c) => c.getBoundingClientRect())
+          .filter((r) => r.width > 0)
+          .map((r) => [Math.round(r.left), Math.round(r.right)]),
+      );
+    const before = await items();
+    expect(before.at(-1)![1], `Download is inside the window at ${width}`).toBeLessThanOrEqual(width);
+    for (let i = 1; i < before.length; i++) expect(before[i][0], `bar items don't overlap at ${width}`).toBeGreaterThanOrEqual(before[i - 1][1]);
+    await downloadBtn(page).click();
+    const pill = page.getByTestId("processing");
+    await expect(pill).toBeVisible();
+    await expect(pill.locator(".ip-pill__label")).toHaveText("Downloading…");
+    const fit = await pill.evaluate((p) => {
+      const l = p.querySelector<HTMLElement>(".ip-pill__label")!;
+      const c = p.querySelector<HTMLElement>(".ip-pill__cancel")!;
+      const r = p.getBoundingClientRect();
+      const title = document.querySelector(".ed-top .ed-title")!.getBoundingClientRect();
+      return { whole: l.scrollWidth <= l.clientWidth, left: r.left, right: r.right, title: title.right, cancel: c.getBoundingClientRect().width, name: c.textContent };
+    });
+    expect(fit.whole, `the label is not truncated at ${width}`).toBe(true);
+    expect(fit.right, `the pill is inside the window at ${width}`).toBeLessThanOrEqual(width);
+    expect(fit.left, `the pill leaves the title clear at ${width}`).toBeGreaterThanOrEqual(fit.title);
+    expect(fit.cancel, `Cancel is the 40px × at ${width}`).toBe(40);
+    await expect(pill.getByRole("button", { name: "Cancel" })).toBeVisible();
+    expect(await items(), `the bar keeps its place at ${width}`).toEqual(before);
+    release();
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await expect(pill).toHaveCount(0, { timeout: 20_000 });
+  }
+});
+
 // AC-650 no-password-note: its testid and text are asserted in editor-e1-qa.spec.ts:164.
 
 test("AC-651: Keep going hands the downloaded file to a ready tool without the leave guard", async ({ page }) => {

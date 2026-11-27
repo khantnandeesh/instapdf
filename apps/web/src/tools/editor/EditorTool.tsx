@@ -24,7 +24,8 @@ import { blankPdf, defaultPaper } from "@/lib/editor/blank";
 import { earlyFetchAllowed } from "@/lib/editor/engine-load";
 import { openPdf, prefetchPdfjs, type OpenedPdf } from "@/lib/pdf/pdfjs";
 import { warmPdfjs } from "@/lib/pdf/pdfjs-warm";
-import { FilePlusBold, FileUpBold } from "./icons";
+// From icons-landing, not icons: the full set would join the first load (gen-editor-icons.mjs).
+import { FilePlusBold, FileUpBold } from "./icons-landing";
 import { prefetchEditorChunks } from "./idle-prefetch";
 import { OpeningBody } from "./Opening";
 import type { ShellProps } from "./EditorShell";

@@ -3,7 +3,8 @@ import { NumberStepper } from "@/components/ui/NumberStepper";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Switch } from "@/components/ui/Switch";
 import { MAX_COUNT } from "@/lib/plan-counts";
-import { alternateCopy as a } from "./copy";
+import { alternateCopy } from "./copy";
+import { cardCopy as a } from "./copy-card";
 
 /** A card's settings as the user set them (the per-turn text may be invalid while typing). */
 export type Mix = { reverse: boolean; perTurn: string; repeat: boolean };
@@ -53,7 +54,7 @@ export function MixSettings({
           label={a.perTurnFrom(name)}
           decLabel={a.fewer(name)}
           incLabel={a.more(name)}
-          error={a.perTurnError}
+          error={alternateCopy.perTurnError}
           max={MAX_COUNT}
           under
           onEnter={onEnter}

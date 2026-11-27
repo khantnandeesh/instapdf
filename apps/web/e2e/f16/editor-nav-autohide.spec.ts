@@ -1,7 +1,8 @@
 /**
  * F25 eval G-1 (M12 on Edit PDF): from 1024px, scrolling the pages down slides the site navbar away and
- * the editor bar takes its place, so the pages get the navbar's height. The navbar comes back on a
- * scroll up, when the pointer reaches the top edge, and when focus goes into it. Transforms only: no
+ * the editor bar takes its place, so the pages get the navbar's height. The navbar comes back only on a
+ * deliberate move (eval run 2, R2-1): a scroll back near the top, a long run up (the canvas's height, at
+ * least 400px), the pointer resting at the top edge, or focus going into it. Transforms only: no
  * layout shift. Phones keep the navbar. Built behind NEXT_PUBLIC_EDITOR_NAV_AUTOHIDE (0 turns it off).
  */
 import { expect, test, type Page } from "@playwright/test";
@@ -23,6 +24,8 @@ const pagesShare = (page: Page) =>
     }
     return (100 * h) / innerHeight;
   });
+/** The run up that brings the navbar back: the canvas's height, at least 400px (nav-autohide.ts). */
+const longUp = (page: Page) => page.evaluate(() => Math.max(document.querySelector<HTMLElement>("[data-testid=canvas]")!.clientHeight, 400));
 const nav = (page: Page) => page.evaluate(() => document.documentElement.dataset.edNav ?? "shown");
 const headerBottom = (page: Page) => page.evaluate(() => document.querySelector(".ip-site-header")!.getBoundingClientRect().bottom);
 const barTop = (page: Page) => page.evaluate(() => document.querySelector(".ed-top")!.getBoundingClientRect().top);
@@ -74,7 +77,7 @@ for (const [w, h] of [
     await expect.poll(() => barTop(page)).toBe(0);
     expect(await pagesShare(page)).toBeGreaterThanOrEqual(88);
     // Reading on down from 25%, every 5% of the way the pages keep >= 88% (only a 12px gap between two
-    // pages). The jump back to 25% is a scroll up, which shows the navbar; the next step down hides it again.
+    // pages). The jump back to 25% is a long scroll up, which shows the navbar; the next step down hides it again.
     await scrollTo(page, 0.25);
     await expect.poll(() => nav(page)).toBe("shown");
     await scrollTo(page, 0.3);
@@ -87,10 +90,37 @@ for (const [w, h] of [
       expect(await pagesShare(page)).toBeGreaterThanOrEqual(88);
     }
 
-    // A scroll up brings it back, and the editor bar moves back under it.
-    await scrollDown(page, -120);
+    // A small scroll up, to reread a line or two, leaves it away and the pages their height (R2-1).
+    const long = await longUp(page);
+    for (const up of [20, 120, 300]) {
+      await scrollDown(page, -up);
+      await page.waitForTimeout(300);
+      expect(await nav(page), `a ${up}px scroll up keeps the navbar away`).toBe("hidden");
+      expect(await barTop(page)).toBe(0);
+      expect(await pagesShare(page), `the pages keep >= 88% after a ${up}px scroll up`).toBeGreaterThanOrEqual(88);
+      await scrollDown(page, up);
+    }
+    // The count is of one run up: any move down starts it again, so two runs that add up to more do not.
+    await scrollDown(page, -(long - 100));
+    await scrollDown(page, 20);
+    await scrollDown(page, -(long - 100));
+    await page.waitForTimeout(300);
+    expect(await nav(page), "two short runs up with a move down between keep it away").toBe("hidden");
+    expect(await pagesShare(page)).toBeGreaterThanOrEqual(88);
+
+    // A long run up, a step at a time, brings it back, and the editor bar moves back under it.
+    for (let done = 0; done < long + 50; done += 150) await scrollDown(page, -150);
     await expect.poll(() => nav(page)).toBe("shown");
     await expect.poll(() => barTop(page)).toBe(hh);
+    // So does a scroll back to the top, from any distance.
+    await scrollDown(page, 300);
+    await expect.poll(() => nav(page)).toBe("hidden");
+    await scrollTo(page, 0.6);
+    await scrollDown(page, -100);
+    await scrollTo(page, 0);
+    await expect.poll(() => nav(page)).toBe("shown");
+    await expect.poll(() => barTop(page)).toBe(hh);
+    await scrollTo(page, 0.6);
 
     // The pointer resting at the top edge brings it back; one passing through it on the way to the editor
     // bar's buttons does not (the bar would slide down from under it).
@@ -114,7 +144,7 @@ for (const [w, h] of [
     await expect(allTools).toBeFocused();
     await scrollDown(page, 300);
     await expect.poll(() => nav(page)).toBe("hidden");
-    await scrollDown(page, -120);
+    await scrollDown(page, -(long + 50));
     await expect.poll(() => nav(page)).toBe("shown");
 
     // Keyboard focus in the navbar keeps it: Shift+Tab from All tools to the link before it, then a scroll down.
@@ -200,7 +230,7 @@ test("G-1 (review S-2): the page strip's list ends at the window's bottom at res
     };
     requestAnimationFrame(tick);
   });
-  await scrollDown(page, -200);
+  await scrollDown(page, -(await longUp(page)) - 50);
   await expect.poll(() => nav(page)).toBe("shown");
   await page.waitForTimeout(700);
   expect(await page.evaluate(() => (window as unknown as { __gap: number }).__gap), "no gap under the list while it slides").toBeLessThanOrEqual(1);

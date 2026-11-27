@@ -409,8 +409,10 @@ html[data-ed-box] .ed-wide {
 .ed-dlcard__close > svg {
   position: relative;
 }
+/* The opening frame's bar lines up with the editor's (eval run 2, R2-7): 16px from 1024, the narrow
+   bar's sizes below (narrow layout section). */
 .ed-opening .ed-top {
-  padding: 0 20px;
+  padding: 0 16px;
 }
 .ed-home {
   display: grid;
@@ -2151,6 +2153,59 @@ html[data-ed-box] .ed-wide {
 }
 .ed-narrow .ip-slot--editor {
   width: 132px;
+}
+/* While Download runs, the pill takes Undo│Redo's room too (they are off while it runs), with Cancel as an
+   ×, so "Downloading…" shows whole (eval run 2, R2-3). It lies over them: nothing in the bar moves. */
+.ed-narrow .ip-slot--editor .ip-pill {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 216px; /* the slot (132), the gap (4) and Undo│Redo (80) */
+}
+.ed-narrow .ip-slot--editor .ip-pill__cancel {
+  justify-content: center;
+  width: 40px;
+  padding: 0;
+}
+.ed-narrow .ip-slot--editor .ip-pill__cancel-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.ed-narrow .ip-slot--editor .ip-pill__cancel-x {
+  display: block;
+}
+/* Below 360 Download is its icon (Chrome.tsx), so its slot is too and the bar fits 320. The pill then lies
+   over the file menu as well, which steps out of Tab's way while it does. */
+@media (max-width: 359px) {
+  .ed-narrow .ip-slot--editor {
+    width: 48px;
+    min-width: 0;
+  }
+  .ed-narrow .ed-top:has(.ip-pill) > :not(.ed-title, .ed-download) {
+    visibility: hidden;
+  }
+}
+@media (max-width: 1023px) {
+  .ed-opening .ed-top {
+    gap: 4px;
+    padding: 0 8px;
+  }
+  .ed-opening .ed-title {
+    font-size: 18px;
+  }
+  .ed-opening .ed-file {
+    padding: 0 8px;
+  }
+}
+@media (max-width: 639px) {
+  .ed-opening .ed-top > .mp-pill {
+    display: none;
+  }
 }
 .ed-narrow .ed-file {
   flex: 1;

@@ -67,6 +67,36 @@ test("G-5: a locked file asks for its password over the editor's placeholders; S
   await expect(page.getByTestId("page-1")).toHaveAttribute("data-drawn", "true", { timeout: 15_000 });
 });
 
+for (const [width, height] of [
+  [1280, 700],
+  [390, 664],
+] as const)
+  test(`G-5 (eval run 2, R2-7) ${width}: the opening frame's title and file name sit where the editor's do`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    // Where the bar's h1 and the file name's text start (the name is a heading in both frames).
+    const at = () =>
+      page.evaluate(() => {
+        const r = document.createRange();
+        const name = document.querySelector(".ed-top .ed-file h2, .ed-top h2.ed-file")!;
+        r.selectNodeContents(name);
+        const t = document.querySelector(".ed-top .ed-title")!.getBoundingClientRect();
+        return { title: [t.left, t.width], name: name.getBoundingClientRect().width > 1 ? r.getBoundingClientRect().left : null };
+      });
+    await page.goto("/edit-pdf");
+    // A locked file holds the opening frame (behind its password dialog) for as long as the test needs.
+    await page.getByTestId("editor-input").setInputFiles(fx("aes-128.pdf"));
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByTestId("editor-opening")).toBeVisible();
+    const opening = await at();
+    await page.getByRole("textbox", { name: "Password" }).fill("test");
+    await page.getByRole("button", { name: "Unlock" }).click();
+    await expect(page.getByTestId("editor")).toHaveAttribute("data-state", "open");
+    const open = await at();
+    expect(opening.title, "the h1 doesn't move or resize").toEqual(open.title);
+    // A phone's bar shows a file icon in place of a short name, so the name is compared where it shows.
+    if (open.name !== null) expect(Math.abs(opening.name! - open.name), "the file name doesn't move").toBeLessThanOrEqual(0.5);
+  });
+
 /** Holds pdf.js's renderer worker (the first page can't be drawn) until `release()`. */
 async function holdRenderer(page: Page) {
   let open!: () => void;

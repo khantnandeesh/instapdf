@@ -1,22 +1,18 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useLiveState } from "@/components/ui/live-state";
 import type { CardView } from "@/components/page-edit/SegmentGrid";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
 import type { LoadedFile, WorkspaceContext } from "@/components/tool-flow/types";
-import { ChevronDownIcon } from "@/components/ui/icons";
-import type { MenuEntry } from "@/components/ui/Menu";
-import { A4, isBlank, segmentsOf, sortPages, type PageRef, type Segment } from "@/lib/page-list";
+import { A4, isBlank, segmentsOf, type PageRef, type Segment } from "@/lib/page-list";
 import { canMix, interleave, type MixCard } from "@/lib/mix-plan";
 import { parseCount } from "@/lib/plan-counts";
-import { setHandoff } from "@/lib/pdf/handoff";
 import { USER_ERROR } from "@/lib/pdf/user-error";
 import { ALTERNATE_OPTIONS } from "@/lib/pdf/merge-options";
 import { mixedName } from "@/lib/pdf/naming";
 import { mergeCopy } from "@/tools/merge/copy";
-import { EditablePageGrid, PlainMenuButton, SegmentGrid, SortGlyph, toolbarButton, usePageWorkspace } from "@/tools/merge/workspace";
+import { EditablePageGrid, SegmentGrid, usePageWorkspace } from "@/tools/merge/workspace";
 import { flowTool } from "@/tools/registry";
 import { alternateCopy as a } from "./copy";
 import type { Mix } from "./MixSettings";
@@ -24,6 +20,9 @@ import type { Mix } from "./MixSettings";
 const tool = flowTool("alternate-mix-pdf");
 
 const loadMixSettings = () => import("./MixSettings");
+// The tools row's Sort menu: drawn only once a file is in, so apart from the route like the cards' settings.
+const loadSortMenu = () => import("./SortMenu");
+const SortMenu = dynamic(() => loadSortMenu().then((m) => m.SortMenu), { ssr: false, loading: () => <span className="inline-block h-9 w-11 shrink-0" aria-hidden="true" /> });
 const OneFileHint = dynamic(() => import("./OneFileHint").then((m) => m.OneFileHint), { ssr: false });
 const MixSettings = dynamic(() => loadMixSettings().then((m) => m.MixSettings), { ssr: false, loading: () => <div className="min-h-[120px]" aria-hidden="true" /> });
 const DEFAULT_MIX: Mix = { reverse: false, perTurn: "1", repeat: true };
@@ -55,7 +54,6 @@ function orderOf(cards: MixCard[], files: ReadonlyMap<string, LoadedFile>): Page
 export function AlternateTool() {
   // No Undo│Redo: card moves and settings are few, and removal keeps the undo notice (P-11 #3).
   const ws = usePageWorkspace({ tool });
-  const router = useRouter();
   // Live (eval G-3): the run reads pages per turn as typed, even before React shows it.
   const [mix, setMix, mixLive] = useLiveState<Record<string, Mix>>({});
   const mixOf = (id: string) => mix[id] ?? DEFAULT_MIX;
@@ -76,25 +74,10 @@ export function AlternateTool() {
   const [hintClosed, setHintClosed] = useState<string | null>(null);
   useEffect(() => {
     void loadMixSettings();
+    void loadSortMenu();
   }, []);
-  const openInOrganize = (id: string) => {
-    const f = ws.filesById.get(id);
-    if (!f) return;
-    setHandoff("organize-pdf", [f.source instanceof File ? f.source : new File([f.source], f.name, { type: f.source.type })]);
-    router.push("/organize-pdf");
-  };
   const oneFileHint = (w: WorkspaceContext) =>
-    single && hintClosed !== single && !w.dimmed ? (
-      <OneFileHint onOpen={() => openInOrganize(single)} onClose={() => setHintClosed(single)} />
-    ) : null;
-
-  // ---- Sort ▾: name order of the cards (AC-529) ----
-  const sortItems: MenuEntry[] = (["name-asc", "name-desc"] as const).map((k) => ({
-    id: k,
-    label: a.sortItems[k],
-    disabled: ws.fileRuns < 2,
-    onSelect: () => ws.reorder(sortPages(ws.pagesRef.current, ws.sourcesRef.current, k), "sort", a.sorted[k]),
-  }));
+    single && hintClosed !== single && !w.dimmed ? <OneFileHint file={ws.filesById.get(single)} onClose={() => setHintClosed(single)} /> : null;
 
   /** The cards from the live page list and settings, not this render's (eval G-3); null while any number is invalid. */
   const liveCards = () => {
@@ -182,13 +165,7 @@ export function AlternateTool() {
         readyStatus={() => status}
         phoneAddMenu={undefined}
         renderWorkspace={renderWorkspace}
-        toolbarStart={(w) => (
-          <PlainMenuButton label={a.sort} items={ws.segments.length < 2 ? [{ note: a.sortNeedsMore }, ...sortItems] : sortItems} disabled={w.dimmed} className={toolbarButton} title={a.sort} data-testid="sort-menu">
-            <SortGlyph />
-            <span className="max-md:sr-only">{a.sort}</span>
-            <ChevronDownIcon size={16} className="max-md:hidden" />
-          </PlainMenuButton>
-        )}
+        toolbarStart={(w) => <SortMenu ws={ws} disabled={w.dimmed} />}
         // No options before or after a file is in: each card holds its own (spec P-3).
         renderOptions={() => null}
       />
