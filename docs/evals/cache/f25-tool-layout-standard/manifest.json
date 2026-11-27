@@ -1,0 +1,42 @@
+{
+ "feature": "f25-tool-layout-standard",
+ "evaluated": "2026-11-27",
+ "candidate": {"url": "https://web-staging-qzq5fa2g7q-uc.a.run.app", "health_version": "15687e00f3d056fa8286c10b33a9a1babcd659cc"},
+ "raw_evidence": "/mnt/project-files/evals-cache/f25-tool-layout-standard/",
+ "eval_screenshots": "/mnt/project-files/designs/tool-layout-standard/eval/",
+ "side_by_side": "/mnt/project-files/comparisons/f25-tool-layout-standard/",
+ "reference_tasks_run": 0,
+ "reference_requests": 0,
+ "reference_cache_used": [
+  {"feature": "f4-f5-page-tools", "item": "t4 Delete page 5 of twelve.pdf", "captured": "2026-11-26", "file": "eval/t4-delete/sejda-updated_twelve.pdf", "bytes": 3626, "sha256": "a2b2ebf8ef3b0fb42e2bbb87811ca4a1416bf791b933a703e2afaa17cc6f1739", "timings": {"first_thumb_ms": 832, "action_to_download_ms": 3060, "chooser_open_ms_median": 703}, "fit_height_pct": {"1366x657": 59, "1280x632": 57, "1536x730": 63, "1920x969": 65, "390x664": 56}},
+  {"feature": "f3-merge", "item": "sejda-t3 Merge alpha, bravo, echo; TOC file names, footer, double-sided", "captured": "2026-11-24", "file": "sejda-t3-alpha_merged.pdf", "bytes": 7229, "sha256": "e029a7e55e5237001f4d6e8799a81620e6cd1069bb7deb54ab7e6e0a5e6de6dc", "qpdf": "3 warnings (page Resources missing, repaired)", "timings": {"first_thumb_ms": 852, "action_to_download_ms": 3177}, "fit_height_pct": {"1366x657_files": 39, "1366x657_pages": 32, "390x664": 20}},
+  {"feature": "f16-e1-editor", "item": "T2/T3 editor tasks and M12 captures", "captured": "2026-11-24", "files": {"sejda-t2-text-sign-lineedit.pdf": "b5484cdbdec44eab3ef5c566440de98d99cd8e4a1cf7fb5e2118372c0c680b6f", "sejda-t3-whiteout-shapes-annots.pdf": "af5c66cfef04bc61408c41b8ca91e0f3639cc64b47e1aa47121a77b2e1f106cc"}, "timings": {"first_page_ms": 5500, "apply_to_ready_ms": 7700}, "fit_height_pct_after_scroll": {"1280-1536": "90-92", "1920x969": 83, "390x664": "46-69"}}
+ ],
+ "berrypdf_outputs": {
+  "res-delete-pdf-pages-1366-twelve.pdf": {"sha256": "271fca3ff25cc9a662d8a1e6bfcba7e124f6629d2ff1ccea3eaea0332e48ecd5", "bytes": 2742, "pages": 11, "qpdf": "clean", "render_max_diff_vs_source": 0},
+  "m8-merge-alpha_merged.pdf": {"sha256": "b193036fc0729e63a5f9604756a0735c83347ba22371a40e4f4e8aacfbe6092a", "bytes": 3323, "pages": 10, "qpdf": "clean", "links_on_toc": 3, "outline": ["Alpha intro", "Alpha detail", "Alpha end", "Bravo start"]},
+  "res-split-pdf-1366-twelve-split.zip": {"sha256": "e71a62e3ae5ff128c76a1ee47be065c29a1bf5fb2086ae9ef0206bfd6f0bb530", "entries": ["twelve-1-3.pdf", "twelve-4-8.pdf", "twelve-9-12.pdf"]},
+  "out-flow-1.pdf": {"sha256": "409d7c65f288c140d9d0271c4ec8fd0ce4f285908af9d5abf0bf307a11da7084", "bytes": 12299, "qpdf": "clean", "note": "editor 11-object flow, same edits as F16 round 2"},
+  "out-image.pdf": {"sha256": "0911951cecf79b06e92202e943f53d433dc62f36efb18805c69cf28bfa903ac8"},
+  "form-filled.pdf": {"sha256": "e464b8747811f2a6b4da55cb3b5517e4575c7addaf4bdd65240a103061e681bc", "qpdf": "clean"},
+  "edittext.pdf": {"sha256": "d61586921c544aff9b57924b3a787deb1f17c4578c08d8ec817f5b988988a7da", "qpdf": "clean"}
+ },
+ "berrypdf_timings": {
+  "chooser_open_ms_median_1280": {"delete": 1008, "merge": 954, "edit": 952},
+  "first_thumb_ms_median_1280_after_0_5s_idle": {"delete": 1170, "merge": 1236, "edit": 288},
+  "first_thumb_ms_median_1280_after_4s_idle": {"delete": 880, "merge": 656},
+  "action_to_download_ready_ms_median": {"delete": 1872, "merge": 1347, "edit": 933},
+  "cancel_click_to_ready_ms_300_pages": [184, 181, 230],
+  "cancel_click_to_ready_ms_990_pages": 880,
+  "result_swap_layout_shift": {"delete_1366": 0.2818, "merge_1366": 0.2818, "split_1280": 0.2996, "organize_1280": 0.2996, "delete_390": 0.0524, "merge_390": 0.0147},
+  "download_present_after_done_ms": {"1366": 0, "390": 301, "320": 306},
+  "editor_download_enabled_before_first_page_ms": {"para-times": 131, "big-990": 989}
+ },
+ "berrypdf_fit_height_pct": {
+  "page_tools_1366x657": 66.8, "page_tools_1280x632": 65.5, "page_tools_1536x730": 70.1, "page_tools_1920x969": 77.5,
+  "390x664": {"split": 65.2, "extract": 57.4, "delete": 65.2, "organize": 63.4, "combine": 63.4, "alternate": 63.4, "merge": 63.4},
+  "editor_after_scroll": {"1280x632": 71.5, "1366x657": 72.6, "1536x730": 75.3, "1920x969": 81.4, "390x664": 68.4}
+ },
+ "lighthouse_mobile_perf": {"delete-pdf-pages": [97, 95, 98], "merge-pdf": [92, 89, 94], "edit-pdf": [96, 95, 96]},
+ "axe": {"scans": 29, "critical": 0, "serious": 2, "moderate": 1}
+}
