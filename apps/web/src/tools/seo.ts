@@ -130,7 +130,7 @@ export const toolSeo: Record<string, ToolSeo> = {
     description: `Put 2, 4 or more PDF pages on each sheet to save paper when printing. Free, no sign-up. ${privateNote}`,
     also: ["multiple pages per sheet pdf", "2 pages per sheet pdf", "pdf imposition"],
   },
-  "pdf-editor": {
+  "edit-pdf": {
     keyword: "pdf editor",
     title: "Free PDF Editor Online: Edit PDF Text",
     description: `Free online PDF editor: change existing text, add text, images, shapes and links, and sign. No watermark. ${privateNote}`,

@@ -71,7 +71,9 @@ describe("flow config", () => {
     }
   });
   it("keeps every other tool planned", () => {
-    expect(tools.filter((t) => t.status !== "planned").map((t) => t.slug)).toEqual(["merge-pdf", "split-pdf", "extract-pdf-pages", "delete-pdf-pages", "rotate-pdf", "organize-pdf", "combine-reorder-pdf", "alternate-mix-pdf"]);
+    expect(tools.filter((t) => t.status !== "planned" && !t.preview).map((t) => t.slug)).toEqual(["merge-pdf", "split-pdf", "extract-pdf-pages", "delete-pdf-pages", "rotate-pdf", "organize-pdf", "combine-reorder-pdf", "alternate-mix-pdf"]);
+    // Edit PDF is listed as a Beta preview: usable, its own page, noindex.
+    expect(toolBySlug("edit-pdf")).toMatchObject({ status: "beta", preview: true });
   });
   it("offers the usable PDF tools to continue with a PDF output and nothing for a ZIP (F3 AC-43, F4 AC-412, F5)", async () => {
     const { continueTargets } = await import("./registry");
@@ -123,11 +125,11 @@ describe("catalogue fields (F2)", () => {
   it("orders the Popular row usable first, then planned, in the fixed order (AC-11)", () => {
     expect(popularTools().map((t) => t.slug)).toEqual([
       "rotate-pdf",
+      "edit-pdf",
       "delete-pdf-pages",
       "merge-pdf",
       "split-pdf",
       "extract-pdf-pages",
-      "pdf-editor",
       "compress-pdf",
       "crop-pdf",
       "sign-pdf",
@@ -143,7 +145,7 @@ describe("catalogue fields (F2)", () => {
     expect(s.map((t) => t.slug)).toEqual(["rotate-pdf", "delete-pdf-pages", "merge-pdf", "split-pdf", "extract-pdf-pages"]);
   });
   it("features the editor (H-11 item 7)", () => {
-    expect(featured).toBe("pdf-editor");
+    expect(featured).toBe("edit-pdf");
     expect(toolBySlug(featured)).toBeDefined();
   });
 });

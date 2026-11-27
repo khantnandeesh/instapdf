@@ -6,9 +6,9 @@ import { EditorTool } from "@/tools/editor/EditorTool";
 
 /**
  * Edit PDF, beta (F16 E1): add text, signatures, marks, drawings, shapes, images and whiteout, and
- * change existing lines. Noindex and not in the registry or the
- * sitemap until the full editor (registry slug "pdf-editor") ships; the F2 catalogue still lists
- * that tool as planned.
+ * change existing lines. Listed in the catalogue and the All tools menu with its Beta badge
+ * (registry slug "edit-pdf", `preview`), but noindex and out of the sitemap, the hero and the header
+ * shortcuts until the full editor ships.
  */
 export const metadata: Metadata = pageMetadata({
   path: "/edit-pdf",

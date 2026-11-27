@@ -67,6 +67,11 @@ export type Tool = {
   popularRank?: number;
   /** Present once the tool runs on the shared flow. */
   flow?: ToolFlowConfig;
+  /**
+   * Usable and listed (with its Beta badge), but its page is still noindex: kept out of the sitemap,
+   * the hero and the header shortcuts until it ships in full (Edit PDF, owner 27 Nov).
+   */
+  preview?: true;
 };
 
 /** Catalogue groups, in display order. */
@@ -82,12 +87,12 @@ export const categories: { id: ToolCategory; label: string }[] = [
 ];
 
 /** The hero's call to action goes here once this tool is usable (spec F2 §3a). */
-export const featured = "pdf-editor";
+export const featured = "edit-pdf";
 
 /** Popular row, in its fixed order (spec F2 §3b). */
 const popular = [
   "rotate-pdf",
-  "pdf-editor",
+  "edit-pdf",
   "compress-pdf",
   "delete-pdf-pages",
   "merge-pdf",
@@ -114,7 +119,7 @@ const keywordsBySlug: Record<string, string[]> = {
   "resize-pdf": ["page size", "a4", "letter", "scale"],
   "flip-pdf": ["mirror"],
   "n-up-pdf": ["pages per sheet", "imposition"],
-  "pdf-editor": ["text", "annotate", "whiteout", "edit"],
+  "edit-pdf": ["text", "annotate", "whiteout", "edit"],
   "sign-pdf": ["sign", "signature", "form", "esign"],
   "create-fillable-pdf": ["fillable", "form fields"],
   "watermark-pdf": ["stamp", "logo", "confidential"],
@@ -172,6 +177,11 @@ const clientPdfFlow = (
   ...labels,
   ...overrides,
 });
+
+/** Usable tools with a page of their own instead of the shared flow, by slug. */
+const ownPages: Record<string, { status: Tool["status"]; preview?: true }> = {
+  "edit-pdf": { status: "beta", preview: true },
+};
 
 /** Tools that run on the shared flow, by slug. */
 const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = {
@@ -269,7 +279,7 @@ const t = (
     icon,
     keywords: keywordsBySlug[slug] ?? [],
     ...(rank >= 0 ? { popularRank: rank + 1 } : {}),
-    ...(flows[slug] ?? { status: "planned" }),
+    ...(flows[slug] ?? ownPages[slug] ?? { status: "planned" }),
   };
 };
 
@@ -290,7 +300,7 @@ export const tools: Tool[] = [
   t("resize-pdf", "Resize", "Change page size or add margins", "edit", "client", "arrows-out"),
   t("flip-pdf", "Flip", "Mirror pages horizontally or vertically", "edit", "client", "flip-horizontal"),
   t("n-up-pdf", "N-up", "Print several pages per sheet", "edit", "client", "grid-four", "n-up-pdf"),
-  t("pdf-editor", "Edit PDF", "Add and change text, images, shapes and links", "edit", "client", "pencil-simple-line"),
+  t("edit-pdf", "Edit PDF", "Add and change text, images, shapes and links", "edit", "client", "pencil-simple-line"),
   t("sign-pdf", "Fill & sign", "Fill in forms and add your signature", "edit", "client", "signature", "sign-pdf"),
   t("create-fillable-pdf", "Create forms", "Make any PDF fillable", "edit", "client", "textbox", "pdf-forms"),
   t("watermark-pdf", "Watermark", "Stamp text or an image on pages", "edit", "client", "stamp"),
@@ -332,9 +342,9 @@ export function popularTools(list: readonly Tool[] = tools): Tool[] {
   return [...ranked.filter(isUsable), ...ranked.filter((x) => !isUsable(x))];
 }
 
-/** Header shortcuts: up to `max` usable tools, popular order first, then registry order. */
+/** Header shortcuts: up to `max` usable tools (no previews), popular order first, then registry order. */
 export function shortcutTools(max = 5, list: readonly Tool[] = tools): Tool[] {
-  const usable = list.filter(isUsable);
+  const usable = list.filter((x) => isUsable(x) && !x.preview);
   const ranked = usable.filter((x) => x.popularRank !== undefined).sort((a, b) => a.popularRank! - b.popularRank!);
   return [...ranked, ...usable.filter((x) => x.popularRank === undefined)].slice(0, max);
 }

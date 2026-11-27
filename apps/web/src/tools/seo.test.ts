@@ -40,7 +40,7 @@ describe("tool SEO metadata", () => {
 
 describe("tool page content", () => {
   it("exists for every usable tool (no tool ships without its guide)", () => {
-    for (const t of tools.filter(isUsable)) expect(seoContent[t.slug], t.slug).toBeDefined();
+    for (const t of tools.filter((x) => isUsable(x) && !x.preview)) expect(seoContent[t.slug], t.slug).toBeDefined();
   });
   it("has 3–5 steps, 4–8 questions and 3–6 known related tools", () => {
     for (const [slug, c] of Object.entries(seoContent)) {

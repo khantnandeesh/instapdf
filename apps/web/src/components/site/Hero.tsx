@@ -13,12 +13,12 @@ import { siteCopy } from "./copy";
  * Small pale berries and blossoms float behind the text layer, and two die-cut stickers sit in the
  * margins at >= 1024px (never over text). No photo, no large hero berry.
  *
- * The primary CTA opens the featured tool once it is usable; until then it is a jump to the
+ * The primary CTA opens the featured tool once it is usable and out of preview; until then it is a jump to the
  * catalogue that the Catalogue island upgrades to "scroll + focus the search" (data-focus-search, AC-3).
  */
 export function Hero() {
   const feature = toolBySlug(featured);
-  const live = feature && isUsable(feature) ? feature : null;
+  const live = feature && isUsable(feature) && !feature.preview ? feature : null;
   return (
     <div className="relative overflow-x-clip">
       <Floaties set="hero" />

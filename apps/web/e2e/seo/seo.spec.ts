@@ -11,7 +11,8 @@ import { tools } from "../../src/tools/registry";
 import { seoContent } from "../../src/tools/seo";
 
 const ROUTES = indexableRoutes().map((r) => r.path);
-const TOOL_ROUTES = tools.filter((t) => t.status !== "planned").map((t) => `/${t.slug}`);
+// Usable tool pages, not counting noindex previews (Edit PDF beta), which are listed but not indexed.
+const TOOL_ROUTES = tools.filter((t) => t.status !== "planned" && !t.preview).map((t) => `/${t.slug}`);
 const PLANNED = tools.filter((t) => t.status === "planned").map((t) => `/${t.slug}`);
 const STAGING_HOST = "web-staging-qzq5fa2g7q-uc.a.run.app";
 
