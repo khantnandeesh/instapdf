@@ -38,8 +38,12 @@ test("AC-49: every planned tool's coming-soon page carries noindex in the server
   for (const t of tools.filter((x) => x.status === "planned")) {
     expect(robotsMeta(await (await request.get(`/${t.slug}`)).text()), t.slug).toMatch(/content="[^"]*noindex/);
   }
-  for (const path of ["/", ...usableTools.map((t) => `/${t.slug}`)]) {
+  // Edit PDF is a listed preview: usable, but noindex until it ships in full.
+  for (const path of ["/", ...usableTools.filter((t) => !t.preview).map((t) => `/${t.slug}`)]) {
     expect(robotsMeta(await (await request.get(path)).text()) ?? "", path).not.toMatch(/noindex/);
+  }
+  for (const t of usableTools.filter((x) => x.preview)) {
+    expect(robotsMeta(await (await request.get(`/${t.slug}`)).text()), t.slug).toMatch(/noindex/);
   }
 });
 

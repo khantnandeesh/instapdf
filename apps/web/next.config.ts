@@ -82,6 +82,10 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
+  // The editor's registry slug was "pdf-editor" while it was listed as coming soon; it lives at /edit-pdf.
+  async redirects() {
+    return [{ source: "/pdf-editor", destination: "/edit-pdf", permanent: false }];
+  },
   async rewrites() {
     return {
       beforeFiles: engineFiles.flatMap(({ file, source }) => [

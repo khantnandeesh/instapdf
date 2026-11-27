@@ -158,11 +158,11 @@ test.describe("catalogue", () => {
     expect(order).toEqual(expected);
     expect(order).toEqual([
       "/rotate-pdf",
+      "/edit-pdf",
       "/delete-pdf-pages",
       "/merge-pdf",
       "/split-pdf",
       "/extract-pdf-pages",
-      "/pdf-editor",
       "/compress-pdf",
       "/crop-pdf",
       "/sign-pdf",
@@ -177,6 +177,9 @@ test.describe("catalogue", () => {
     await expect(popular.locator('a[href="/merge-pdf"]')).toContainText("Beta");
     await expect(popular.locator('a[href="/merge-pdf"]')).not.toContainText("Coming soon");
     await expect(popular.locator('a[href="/rotate-pdf"]')).toContainText("Beta");
+    // Edit PDF: listed as Beta and opens the editor (owner 27 Nov).
+    await expect(popular.locator('a[href="/edit-pdf"]')).toContainText("Beta");
+    await expect(popular.locator('a[href="/edit-pdf"]')).not.toContainText("Coming soon");
   });
 
   test.describe("without JavaScript", () => {
