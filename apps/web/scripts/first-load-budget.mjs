@@ -24,14 +24,15 @@ const BUDGET_KB = {
   "/rotate-pdf/page": [141, 151],
   // F5 page tools (spec F4/F5 UI P-12).
   "/organize-pdf/page": [150, 160],
-  "/combine-reorder-pdf/page": [150, 160],
+  "/combine-reorder-pdf/page": [151, 161],
   // +1 kB entry (F12, 27 Nov), as Extract below.
   "/alternate-mix-pdf/page": [149, 159],
   // F4 page tools (spec F4/F5 UI P-12): Rotate + the range parser, field and stepper (+ marks on Split).
   // +1 kB entry on Split and Delete (F12 Extract images): each live tool adds its flow entry to the registry every route loads.
-  "/split-pdf/page": [148, 158],
-  "/split-pdf-by-bookmarks/page": [148, 158],
-  "/split-pdf-by-size/page": [142, 152],
+  "/split-pdf/page": [149, 159],
+  "/split-pdf-by-bookmarks/page": [149, 159],
+  "/split-pdf-by-size/page": [143, 153],
+  "/split-pdf-by-text/page": [149, 159],
   "/split-pdf-in-half/page": [144, 154],
   // +1 kB entry on Extract (F12, 27 Nov): three more tools in the registry every route loads, and the shared
   // LinkButton / IconButton variants.
@@ -65,6 +66,7 @@ const CLOUD_BUDGET_KB = {
   "/split-pdf/page": [150, 160],
   "/split-pdf-by-bookmarks/page": [150, 160],
   "/split-pdf-by-size/page": [144, 154],
+  "/split-pdf-by-text/page": [151, 161],
   "/split-pdf-in-half/page": [146, 156],
   "/extract-pdf-pages/page": [146, 156],
   "/delete-pdf-pages/page": [146, 156],

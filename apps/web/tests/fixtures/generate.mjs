@@ -142,6 +142,20 @@ function grayPng(width, height, pixel) {
 }
 
 {
+  // Split by text: an invoice number at the top left that changes from page to page; page 4 has none.
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  ["Invoice 1001", "Invoice 1001", "Invoice 1002", "", "Invoice 1003", "Invoice 1003"].forEach((head, i) => {
+    const page = doc.addPage([420, 595]);
+    if (head) page.drawText(head, { x: 40, y: 540, size: 16, font });
+    page.drawText(`Sheet ${i + 1}`, { x: 40, y: 300, size: 28, font });
+  });
+  doc.setCreationDate(FIXED_DATE);
+  doc.setModificationDate(FIXED_DATE);
+  await save("invoices.pdf", doc);
+}
+
+{
   // Outline (bookmarks) with one entry per page.
   const doc = await makeDoc(3);
   const ctx = doc.context;

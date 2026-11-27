@@ -24,6 +24,8 @@ export function toolFixtures(slug: string, pdf = "sixty-pages.pdf"): string[] {
   if (slug === "extract-images") return [fx(pdf), fx("with-images.pdf")];
   // Split by bookmarks needs a file with bookmarks, or the button waits with "no bookmarks".
   if (slug === "split-pdf-by-bookmarks") return [fx(pdf), fx("bookmarks.pdf")];
+  // Split by text needs a file whose text changes from page to page.
+  if (slug === "split-pdf-by-text") return [fx(pdf), fx("invoices.pdf")];
   return slug === "alternate-mix-pdf" ? [fx(pdf), fx("three-pages.pdf")] : [fx(pdf)];
 }
 
@@ -191,7 +193,13 @@ export async function makeRunnable(page: Page) {
   if (await primary(page).isEnabled()) return;
   const password = page.locator("#protect-open");
   const tile = page.locator("[data-tile-button][aria-pressed]").first();
+  const area = page.getByTestId("choose-area");
   if (await password.count()) await password.fill("correct horse battery");
+  else if (await area.count()) {
+    // Split by text: the box starts over the top left of the page, where the fixture's text is.
+    await area.click();
+    await page.getByRole("dialog").getByRole("button", { name: "Done", exact: true }).click();
+  }
   else if (await tile.count()) await tile.click();
   // Otherwise the tool is still reading the file (Split by bookmarks reads the outline): it enables itself.
   await expect(primary(page)).toBeEnabled();

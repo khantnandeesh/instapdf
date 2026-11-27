@@ -9,25 +9,34 @@ import { Step, StripGlyph } from "@/components/page-select/Step";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
 import type { FlowApi, LoadedFile, ProcessFn } from "@/components/tool-flow/types";
 import { ScissorsIcon } from "@/components/ui/icons";
+import { Button } from "@/components/ui/Button";
 import { NumberStepper } from "@/components/ui/NumberStepper";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Select } from "@/components/ui/Select";
 import { TextInput } from "@/components/ui/TextInput";
-import type { OutlineEntry } from "@/lib/pdf/split-outline";
+import type { Area } from "@/lib/pdf/area";
+import type { OutlineEntry, OutlineParts } from "@/lib/pdf/split-outline";
+import type { TextPoint } from "@/lib/pdf/split-text";
 import { USER_ERROR } from "@/lib/pdf/user-error";
 import { flowTool } from "@/tools/registry";
-import { splitCopy as c } from "./copy";
+import { splitCopy as c, splitTextCopy as t } from "./copy";
 import { clearParts, DEFAULT_N, DEFAULT_PATTERN, initialSplit, setKind as withKind, setN, typeParts, type SplitKind, type SplitState } from "./state";
 
 // The rules and the engine planner arrive after hydration (spec UI P-12); no file is ready before.
 const loadModel = () => import("./model");
 const loadOutline = () => import("@/lib/pdf/split-outline");
 type OutlineModule = Awaited<ReturnType<typeof loadOutline>>;
+const loadText = () => import("@/lib/pdf/split-text");
+type TextModule = Awaited<ReturnType<typeof loadText>>;
+const loadAreaDialog = () => import("./TextAreaDialog");
+type AreaDialogModule = Awaited<ReturnType<typeof loadAreaDialog>>;
+/** Where the box starts when the dialog first opens: the top left, where a document number usually is. */
+const FIRST_AREA: Area = { x: 0.05, y: 0.04, w: 0.5, h: 0.1 };
 const noModule = () => Promise.resolve(null);
 
 /** The same workspace, with the parts worked out for the person (spec F7): they can still move any mark. */
-export type SplitVariant = "bookmarks";
-const SLUG = { bookmarks: "split-pdf-by-bookmarks" } as const;
+export type SplitVariant = "bookmarks" | "text";
+const SLUG = { bookmarks: "split-pdf-by-bookmarks", text: "split-pdf-by-text" } as const;
 
 type Remembered = { kind: SplitKind; nText: string; pattern: string; removeBookmarks: boolean };
 const defaults: Remembered = { kind: "every", nText: DEFAULT_N, pattern: DEFAULT_PATTERN, removeBookmarks: false };
@@ -62,7 +71,9 @@ const modes = [
 export function SplitTool({ variant }: { variant?: SplitVariant } = {}) {
   const tool = flowTool(variant ? SLUG[variant] : "split-pdf");
   const m = useLazyModule(loadModel);
-  const o = useLazyModule<OutlineModule | null>(variant === "bookmarks" ? loadOutline : noModule);
+  // The outline module names the parts for both variants (`titleAsName`).
+  const o = useLazyModule<OutlineModule | null>(variant ? loadOutline : noModule);
+  const tx = useLazyModule<TextModule | null>(variant === "text" ? loadText : noModule);
   const apiRef = useRef<FlowApi | null>(null);
   const announce = useDebouncedAnnounce(apiRef);
   const selectId = useId();
@@ -106,16 +117,40 @@ export function SplitTool({ variant }: { variant?: SplitVariant } = {}) {
   const entries = useMemo(() => files.flatMap((f) => outlines[f.id] ?? []), [files, outlines]);
   const depth = o ? o.outlineDepth(entries) : 0;
   const shownLevel = Math.min(level, Math.max(1, depth));
-  const outlined = useMemo(
-    () => (outlineReady && o ? Object.fromEntries(files.map((f) => [f.id, o.partsFromOutline(outlines[f.id], shownLevel, f.pageCount, contains)])) : null),
-    [outlineReady, o, files, outlines, shownLevel, contains],
+
+  // Split by text: each file's text points, read once; the area makes the parts.
+  const [points, setPoints] = useState<Record<string, TextPoint[][]>>({});
+  const [area, setArea] = useState<Area | null>(null);
+  const [areaOpen, setAreaOpen] = useState(false);
+  const [areaDialog, setAreaDialog] = useState<AreaDialogModule | null>(null);
+  useEffect(() => {
+    if (variant !== "text" || !tx) return;
+    for (const f of loaded) {
+      if (asked.current.has(f.id)) continue;
+      asked.current.add(f.id);
+      void tx.readPagePoints(f.source, f.password).then(
+        (pages) => setPoints((all) => ({ ...all, [f.id]: pages })),
+        () => setPoints((all) => ({ ...all, [f.id]: [] })),
+      );
+    }
+  }, [variant, tx, loaded]);
+  const textReady = variant === "text" && !!tx && files.length > 0 && files.every((f) => points[f.id]);
+  const texts = useMemo(
+    () => (textReady && tx && area ? Object.fromEntries(files.map((f) => [f.id, points[f.id].map((page) => tx.textIn(page, area))])) : null),
+    [textReady, tx, area, files, points],
   );
+
+  const outlined = useMemo<Record<string, OutlineParts> | null>(() => {
+    if (texts && tx) return Object.fromEntries(files.map((f) => [f.id, tx.partsFromTexts(texts[f.id], f.pageCount)]));
+    return outlineReady && o ? Object.fromEntries(files.map((f) => [f.id, o.partsFromOutline(outlines[f.id], shownLevel, f.pageCount, contains)])) : null;
+  }, [outlineReady, o, tx, texts, files, outlines, shownLevel, contains]);
+  const areaKey = area ? `${area.x},${area.y},${area.w},${area.h}` : "";
   // Marks moved by hand stay when a file is added or removed: only a new file, or a new level or
   // filter, writes parts from the bookmarks.
   const written = useRef({ key: "", ids: new Set<string>() });
   useEffect(() => {
     if (!outlined || !m) return;
-    const key = `${shownLevel}\n${contains}`;
+    const key = `${shownLevel}\n${contains}\n${areaKey}`;
     const before = written.current.key === key ? written.current.ids : new Set<string>();
     const ids = Object.keys(outlined);
     written.current = { key, ids: new Set(ids) };
@@ -124,7 +159,7 @@ export function SplitTool({ variant }: { variant?: SplitVariant } = {}) {
       const perFile = Object.fromEntries(ids.map((id) => [id, before.has(id) && s.perFile[id] ? s.perFile[id] : outlined[id].parts]));
       return { ...s, kind: "custom", perFile, ...m.textForParts(perFile, filesLive.current) };
     });
-  }, [outlined, m, shownLevel, contains, setSplit, filesLive]);
+  }, [outlined, m, shownLevel, contains, areaKey, setSplit, filesLive]);
 
   /** A user's change, worked out from the live settings (never from this render's, which may be behind). */
   const change = (fn: (s: SplitState) => SplitState) => {
@@ -213,166 +248,202 @@ export function SplitTool({ variant }: { variant?: SplitVariant } = {}) {
   );
 
   return (
-    <ToolFlow
-      tool={tool}
-      apiRef={apiRef}
-      process={process}
-      onFilesChange={onFilesChange}
-      onReset={() => {
-        setSplit((s) => ({ ...initialSplit(), kind: s.kind, nText: s.nText }));
-        setRenames({});
-        setLevel(1);
-        setContains("");
-      }}
-      canRun={() => {
-        if (variant === "bookmarks") {
-          if (!outlineReady) return c.reading;
-          if (!entries.length) return c.noBookmarks(files.length);
-          if (docCount <= files.length && !Object.values(outlined ?? {}).some((r) => r.titles.some(Boolean))) return c.noMatch;
-        }
-        return problem || !plan || !docCount ? c.statusPages(total) : true;
-      }}
-      readyStatus={() => (used < total ? c.statusLeftOut(used, total, docCount) : c.status(total, docCount))}
-      primaryLabel={() => c.primary(docCount)}
-      decoratePage={(file, index) => {
-        if (invalid) return { pendingDelta: 0, inScope: false };
-        const p = pageParts[file.id]?.[index];
-        const count = parts[file.id]?.length ?? 0;
-        if (p === undefined) return { pendingDelta: 0, inScope: false };
-        return p
-          ? { pendingDelta: 0, inScope: false, part: { n: p.part, first: p.first }, leftOut: false, label: c.tile(index + 1, p.part, count) }
-          : { pendingDelta: 0, inScope: false, leftOut: true, label: c.tileLeftOut(index + 1) };
-      }}
-      renderGap={(file, index, tabIndex, busy) => {
-        // Marks are off while the flow is busy (processing, result).
-        if (!m || busy || invalid || index >= file.pageCount - 1) return null;
-        const state = m.markAfter(parts[file.id] ?? null, index);
-        if (state === "hidden") return null;
-        const on = state === "on";
-        return (
-          <>
-            {on && <span aria-hidden="true" className="ip-cut" data-testid="cut-line" />}
-            <span className="ip-split-slot">
-              <button
-                type="button"
-                className="ip-split-mark"
-                aria-pressed={on}
-                aria-label={c.mark(index + 1)}
-                title={c.mark(index + 1)}
-                tabIndex={tabIndex}
-                data-testid="split-mark"
-                onClick={() => {
-                  change((s) => m.toggleMark(s, filesLive.current, file.id, index));
-                  setOpts({ kind: "custom" });
-                }}
-              >
-                <ScissorsIcon size={16} />
-              </button>
-            </span>
-          </>
-        );
-      }}
-      renderMore={(ctx) => (
-        <MoreOptions
-          changed={changed}
-          disabled={ctx.disabled}
-          content={{
-            parts: plan
-              ? { rows: plan.documents.map((d, i) => ({ key: d.key, n: i + 1, name: d.name, range: d.range })), onRename: (key, name) => setRenames((r) => ({ ...r, [key]: name })) }
-              : { rows: [], onRename: () => {} },
-            pattern: { value: opts.pattern, onChange: (pattern) => setOpts({ pattern }) },
-            bookmarks: { value: opts.removeBookmarks, onChange: (removeBookmarks) => setOpts({ removeBookmarks }) },
-            ...(variant === "bookmarks" ? { extra: titleFilter(`${containsId}-more`, "sm:hidden") } : {}),
-          }}
-        />
-      )}
-      renderOptions={() =>
-        variant === "bookmarks" ? (
-          <div className="flex min-w-0 items-center gap-3 max-sm:flex-1">
-            <div className="w-[210px] shrink-0 max-sm:w-auto max-sm:flex-1">
-              <Select
-                id={levelId}
-                label={c.level}
-                hideLabel
-                value={String(shownLevel)}
-                options={Array.from({ length: Math.max(1, depth) }, (_, i) => ({ value: String(i + 1), label: c.levelOption(i + 1, entries.filter((e) => e.level === i + 1).length) }))}
-                onChange={(v) => {
-                  user.current = true;
-                  setLevel(Number(v));
-                }}
-              />
+    <>
+      <ToolFlow
+        tool={tool}
+        apiRef={apiRef}
+        process={process}
+        onFilesChange={onFilesChange}
+        onReset={() => {
+          setSplit((s) => ({ ...initialSplit(), kind: s.kind, nText: s.nText }));
+          setRenames({});
+          setLevel(1);
+          setContains("");
+          setArea(null);
+        }}
+        canRun={() => {
+          if (variant === "bookmarks") {
+            if (!outlineReady) return c.reading;
+            if (!entries.length) return c.noBookmarks(files.length);
+            if (docCount <= files.length && !Object.values(outlined ?? {}).some((r) => r.titles.some(Boolean))) return c.noMatch;
+          }
+          if (variant === "text") {
+            if (!area) return t.needsArea;
+            if (!textReady) return t.reading;
+            if (!Object.values(texts ?? {}).some((pages) => pages.some(Boolean))) return t.noText;
+            if (docCount <= files.length && Object.values(outlined ?? {}).every((r) => r.parts.length === 1)) return t.same;
+          }
+          return problem || !plan || !docCount ? c.statusPages(total) : true;
+        }}
+        readyStatus={() => (used < total ? c.statusLeftOut(used, total, docCount) : c.status(total, docCount))}
+        primaryLabel={() => c.primary(docCount)}
+        decoratePage={(file, index) => {
+          if (invalid) return { pendingDelta: 0, inScope: false };
+          const p = pageParts[file.id]?.[index];
+          const count = parts[file.id]?.length ?? 0;
+          if (p === undefined) return { pendingDelta: 0, inScope: false };
+          return p
+            ? { pendingDelta: 0, inScope: false, part: { n: p.part, first: p.first }, leftOut: false, label: c.tile(index + 1, p.part, count) }
+            : { pendingDelta: 0, inScope: false, leftOut: true, label: c.tileLeftOut(index + 1) };
+        }}
+        renderGap={(file, index, tabIndex, busy) => {
+          // Marks are off while the flow is busy (processing, result).
+          if (!m || busy || invalid || index >= file.pageCount - 1) return null;
+          const state = m.markAfter(parts[file.id] ?? null, index);
+          if (state === "hidden") return null;
+          const on = state === "on";
+          return (
+            <>
+              {on && <span aria-hidden="true" className="ip-cut" data-testid="cut-line" />}
+              <span className="ip-split-slot">
+                <button
+                  type="button"
+                  className="ip-split-mark"
+                  aria-pressed={on}
+                  aria-label={c.mark(index + 1)}
+                  title={c.mark(index + 1)}
+                  tabIndex={tabIndex}
+                  data-testid="split-mark"
+                  onClick={() => {
+                    change((s) => m.toggleMark(s, filesLive.current, file.id, index));
+                    setOpts({ kind: "custom" });
+                  }}
+                >
+                  <ScissorsIcon size={16} />
+                </button>
+              </span>
+            </>
+          );
+        }}
+        renderMore={(ctx) => (
+          <MoreOptions
+            changed={changed}
+            disabled={ctx.disabled}
+            content={{
+              parts: plan
+                ? { rows: plan.documents.map((d, i) => ({ key: d.key, n: i + 1, name: d.name, range: d.range })), onRename: (key, name) => setRenames((r) => ({ ...r, [key]: name })) }
+                : { rows: [], onRename: () => {} },
+              pattern: { value: opts.pattern, onChange: (pattern) => setOpts({ pattern }) },
+              bookmarks: { value: opts.removeBookmarks, onChange: (removeBookmarks) => setOpts({ removeBookmarks }) },
+              ...(variant === "bookmarks" ? { extra: titleFilter(`${containsId}-more`, "sm:hidden") } : {}),
+            }}
+          />
+        )}
+        renderOptions={() =>
+          variant === "text" ? (
+            <Button
+              variant="line"
+              className="max-sm:flex-1"
+              data-testid="choose-area"
+              onClick={() => {
+                setArea((a) => a ?? FIRST_AREA);
+                setAreaOpen(true);
+                if (!areaDialog) void loadAreaDialog().then(setAreaDialog);
+              }}
+            >
+              {area ? t.change : t.choose}
+            </Button>
+          ) : variant === "bookmarks" ? (
+            <div className="flex min-w-0 items-center gap-3 max-sm:flex-1">
+              <div className="w-[210px] shrink-0 max-sm:w-auto max-sm:flex-1">
+                <Select
+                  id={levelId}
+                  label={c.level}
+                  hideLabel
+                  value={String(shownLevel)}
+                  options={Array.from({ length: Math.max(1, depth) }, (_, i) => ({ value: String(i + 1), label: c.levelOption(i + 1, entries.filter((e) => e.level === i + 1).length) }))}
+                  onChange={(v) => {
+                    user.current = true;
+                    setLevel(Number(v));
+                  }}
+                />
+              </div>
+  {titleFilter(containsId, "min-w-0 w-[170px] shrink max-sm:hidden")}
             </div>
-{titleFilter(containsId, "min-w-0 w-[170px] shrink max-sm:hidden")}
-          </div>
-        ) : (
-          <div className="flex min-w-0 items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-side:gap-7 max-sm:flex-1">
-            <div className="flex shrink-0 flex-col gap-3.5">
-              <Step n={1}>{c.mode}</Step>
-              <SegmentedControl
-                look="tiles"
-                label={c.mode}
-                value={split.kind}
-                options={modes}
-                onChange={setKind}
-                fullWidth
-                className="max-lg:hidden dock-side:grid-flow-row dock-side:grid-cols-2 dock-bar:w-auto dock-bar:auto-cols-max dock-bar:gap-2.5 dock-bar:max-xl:hidden"
-              />
-              {/* Where the four pills don't fit beside a field (below 1024 px, and the row at 1024–1279, F25
-                  §3.4): a native select "Split" (one tap on touch). */}
-              <div className="w-[150px] max-sm:w-[130px] lg:hidden dock-bar:max-xl:block">
-                <Select id={selectId} label={c.mode} hideLabel value={split.kind} options={modes.map((o) => ({ value: o.value, label: o.value === "everyN" ? c.everyNShort : o.label }))} onChange={setKind} />
+          ) : (
+            <div className="flex min-w-0 items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-side:gap-7 max-sm:flex-1">
+              <div className="flex shrink-0 flex-col gap-3.5">
+                <Step n={1}>{c.mode}</Step>
+                <SegmentedControl
+                  look="tiles"
+                  label={c.mode}
+                  value={split.kind}
+                  options={modes}
+                  onChange={setKind}
+                  fullWidth
+                  className="max-lg:hidden dock-side:grid-flow-row dock-side:grid-cols-2 dock-bar:w-auto dock-bar:auto-cols-max dock-bar:gap-2.5 dock-bar:max-xl:hidden"
+                />
+                {/* Where the four pills don't fit beside a field (below 1024 px, and the row at 1024–1279, F25
+                    §3.4): a native select "Split" (one tap on touch). */}
+                <div className="w-[150px] max-sm:w-[130px] lg:hidden dock-bar:max-xl:block">
+                  <Select id={selectId} label={c.mode} hideLabel value={split.kind} options={modes.map((o) => ({ value: o.value, label: o.value === "everyN" ? c.everyNShort : o.label }))} onChange={setKind} />
+                </div>
+              </div>
+              {/* Step 2, when the mode has one. The side panel is the empty state, where the options wait for a file
+                  (disabled), so nothing switches there and no slot is reserved: the panel fits --ip-work-h with More
+                  options right under the steps (visual gate round 2). In the bar the row keeps its place. */}
+              <div className="flex min-w-0 flex-1 flex-col gap-3.5 empty:hidden dock-bar:flex-row dock-bar:items-center">
+                {split.kind === "everyN" && (
+                  <>
+                    <Step n={2}>{c.perFile}</Step>
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <span aria-hidden="true" className="hidden text-sm font-semibold whitespace-nowrap text-ink xl:dock-bar:inline">
+                        {c.perFile}
+                      </span>
+                      <NumberStepper
+                        value={split.nText}
+                        onChange={(nText) => {
+                          change((s) => setN(s, nText));
+                          if (/^\d{1,4}$/.test(nText.trim())) setOpts({ nText: nText.trim() });
+                        }}
+                        label={c.perFile}
+                        decLabel={c.fewer}
+                        incLabel={c.more}
+                        error={selectCopy.stepperError}
+                        onEnter={submit}
+                      />
+                    </div>
+                  </>
+                )}
+                {split.kind === "custom" && (
+                  <>
+                    <Step n={2}>{c.parts}</Step>
+                    <RangeField
+                      ref={partsField}
+                      label={c.parts}
+                      value={split.text}
+                      placeholder={c.placeholder}
+                      differs={split.differs}
+                      error={fieldError}
+                      clearLabel={selectCopy.clearParts}
+                      canClear={!!split.text || Object.keys(split.perFile).length > 0}
+                      onChange={(text) => change((s) => typeParts(s, text))}
+                      onBlur={() => setSplit((s) => (m ? m.blurParts(s, filesLive.current) : s))}
+                      onClear={() => change(clearParts)}
+                      onEnter={submit}
+                      className="min-w-0 flex-1 dock-bar:lg:max-xl:max-w-[190px] dock-bar:xl:flex-none dock-bar:xl:max-[1439px]:w-[180px] dock-bar:min-[1440px]:w-[300px]"
+                    />
+                  </>
+                )}
               </div>
             </div>
-            {/* Step 2, when the mode has one. The side panel is the empty state, where the options wait for a file
-                (disabled), so nothing switches there and no slot is reserved: the panel fits --ip-work-h with More
-                options right under the steps (visual gate round 2). In the bar the row keeps its place. */}
-            <div className="flex min-w-0 flex-1 flex-col gap-3.5 empty:hidden dock-bar:flex-row dock-bar:items-center">
-              {split.kind === "everyN" && (
-                <>
-                  <Step n={2}>{c.perFile}</Step>
-                  <div className="flex shrink-0 items-center gap-2.5">
-                    <span aria-hidden="true" className="hidden text-sm font-semibold whitespace-nowrap text-ink xl:dock-bar:inline">
-                      {c.perFile}
-                    </span>
-                    <NumberStepper
-                      value={split.nText}
-                      onChange={(nText) => {
-                        change((s) => setN(s, nText));
-                        if (/^\d{1,4}$/.test(nText.trim())) setOpts({ nText: nText.trim() });
-                      }}
-                      label={c.perFile}
-                      decLabel={c.fewer}
-                      incLabel={c.more}
-                      error={selectCopy.stepperError}
-                      onEnter={submit}
-                    />
-                  </div>
-                </>
-              )}
-              {split.kind === "custom" && (
-                <>
-                  <Step n={2}>{c.parts}</Step>
-                  <RangeField
-                    ref={partsField}
-                    label={c.parts}
-                    value={split.text}
-                    placeholder={c.placeholder}
-                    differs={split.differs}
-                    error={fieldError}
-                    clearLabel={selectCopy.clearParts}
-                    canClear={!!split.text || Object.keys(split.perFile).length > 0}
-                    onChange={(text) => change((s) => typeParts(s, text))}
-                    onBlur={() => setSplit((s) => (m ? m.blurParts(s, filesLive.current) : s))}
-                    onClear={() => change(clearParts)}
-                    onEnter={submit}
-                    className="min-w-0 flex-1 dock-bar:lg:max-xl:max-w-[190px] dock-bar:xl:flex-none dock-bar:xl:max-[1439px]:w-[180px] dock-bar:min-[1440px]:w-[300px]"
-                  />
-                </>
-              )}
-            </div>
-          </div>
-        )
-      }
-    />
+          )
+        }
+      />
+      {areaDialog && area && (
+        <areaDialog.TextAreaDialog
+          open={areaOpen}
+          onClose={() => setAreaOpen(false)}
+          file={loaded[0]}
+          api={apiRef.current}
+          area={area}
+          onChange={(next) => {
+            user.current = true;
+            setArea(next);
+          }}
+          textAt={(index) => (tx && loaded[0] ? tx.textIn(points[loaded[0].id]?.[index] ?? [], area) : "")}
+        />
+      )}
+    </>
   );
 }

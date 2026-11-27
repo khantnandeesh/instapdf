@@ -107,6 +107,8 @@ export type FlowApi = {
   announce: (message: string) => void;
   openPreview: (items: PreviewItem[], at: number) => void;
   setView: (view: "pages" | "files") => void;
+  /** Draws a page with the shared renderer, `size` CSS px on its longer side; returns a cancel. */
+  renderPage: (fileId: string, index: number, size: number, onDone: (canvas: HTMLCanvasElement) => void) => () => void;
   /** Opens the toolbar's file picker (Add files). */
   openPicker: () => void;
   /** Focus target when nothing better exists (the toolbar picker, else the heading). */

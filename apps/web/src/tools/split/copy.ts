@@ -56,3 +56,21 @@ export const splitHalfCopy = {
   gridHint: "Click pages to cut only those. With none picked, every page is cut.",
   primary: (pages: number) => `Split ${n(pages)} ${pages === 1 ? "page" : "pages"} in half`,
 };
+
+/** Split by text copy (spec F7 §5). */
+export const splitTextCopy = {
+  choose: "Choose text area",
+  change: "Change text area",
+  needsArea: "Choose the text area",
+  reading: "Reading text…",
+  noText: "No text in that area",
+  same: "The text there never changes",
+  dialogTitle: "Where does the text change?",
+  dialogHelp: "Drag a box around the text that is different in each document, such as an invoice number.",
+  areaLabel: "Text area. Arrow keys move it, Shift with arrow keys resizes it.",
+  found: "Text here:",
+  nothing: "No text in the box on this page",
+  prev: "Previous page",
+  next: "Next page",
+  done: "Done",
+};

@@ -117,6 +117,7 @@ const keywordsBySlug: Record<string, string[]> = {
   "alternate-mix-pdf": ["interleave", "collate"],
   "split-pdf-by-bookmarks": ["outline", "chapters"],
   "split-pdf-by-size": ["file size", "email"],
+  "split-pdf-by-text": ["invoices", "statements", "content"],
   "split-pdf-in-half": ["booklet", "two up"],
   "crop-pdf": ["margins", "trim"],
   "resize-pdf": ["page size", "a4", "letter", "scale"],
@@ -261,6 +262,15 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
     flow: clientPdfFlow(
       "split-pdf-by-size",
       { title: "Split PDF by size", actionLabel: "Split PDF", progressLabel: "Splitting" },
+      { outputName: splitZipName },
+    ),
+  },
+  // Split's workspace again, with the parts worked out from the text inside one area of the page.
+  "split-pdf-by-text": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "split-pdf-by-text",
+      { title: "Split PDF by text", actionLabel: "Split PDF", progressLabel: "Splitting" },
       { outputName: splitZipName },
     ),
   },

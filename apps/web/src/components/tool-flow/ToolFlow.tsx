@@ -1046,11 +1046,12 @@ export function ToolFlow({
       announce,
       openPreview: (items, at) => setPreview({ items, at }),
       setView: (v) => setViewChoice(v),
+      renderPage: (fileId, index, size, onDone) => renderer?.request(fileId, index, size, -2, onDone) ?? (() => {}),
       openPicker: () => picker.current?.open(),
       fallbackFocus,
       submit: () => submitRef.current(),
     }),
-    [announce, dismissNotice, fallbackFocus, intake, pushNotice, removeFile],
+    [announce, dismissNotice, fallbackFocus, intake, pushNotice, removeFile, renderer],
   );
   if (apiRef) apiRef.current = api;
 

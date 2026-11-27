@@ -1,6 +1,7 @@
 /** F7 Split variants: spec docs/specs/f7-split-variants.md, AC-900 onwards. */
 import { expect, test, type Page } from "@playwright/test";
 import { PDFDocument, StandardFonts } from "pdf-lib";
+import { expectNoSeriousAxeViolations } from "../support/axe";
 import { downloadResult, flow, pick, primary, run, textsOf, unzip } from "../support/flow";
 
 async function open(page: Page, slug: string, ...names: string[]) {
@@ -138,3 +139,60 @@ test.describe("Split in half", () => {
     expect(await sizes((await downloadResult(page)).bytes)).toEqual([[842, 298], [842, 298]]);
   });
 });
+
+test.describe("Split by text", () => {
+  /** Drags a box over the page in the dialog, in fractions of the page. */
+  async function drawBox(page: Page, from: [number, number], to: [number, number]) {
+    // The hover waits until the dialog has stopped moving in, so the box is measured where it stays.
+    await page.getByTestId("area-select").hover();
+    const box = (await page.getByTestId("area-select").boundingBox())!;
+    await page.mouse.move(box.x + box.width * from[0], box.y + box.height * from[1]);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * to[0], box.y + box.height * to[1], { steps: 4 });
+    await page.mouse.up();
+  }
+  const done = (page: Page) => page.getByRole("dialog").getByRole("button", { name: "Done", exact: true }).click();
+
+  test("AC-940, AC-941, AC-942: a new file where the text in the box changes, named after it", async ({ page }) => {
+    await open(page, "split-pdf-by-text", "invoices.pdf");
+    await expect(page.getByTestId("dock-status")).toHaveText("Choose the text area");
+    await expect(primary(page)).toBeDisabled();
+    await page.getByTestId("choose-area").click();
+    await expect(page.getByTestId("area-text")).toHaveText("Text here: Invoice 1001");
+    await expectNoSeriousAxeViolations(page, "Split by text, area dialog");
+    await done(page);
+    await expect(primary(page)).toHaveText("Split into 3 files");
+    await expect(page.getByTestId("cut-line")).toHaveCount(2);
+    await run(page);
+    const files = unzip((await downloadResult(page)).bytes);
+    expect(Object.keys(files)).toEqual(["Invoice 1001.pdf", "Invoice 1002.pdf", "Invoice 1003.pdf"]);
+    // Sheet 4 has no number: it stays with the invoice before it.
+    expect(await textsOf(files["Invoice 1002.pdf"])).toEqual(["Invoice 1002Sheet 3", "Sheet 4"]);
+  });
+
+  test("AC-943: the box can be drawn anywhere, and moved with the keyboard", async ({ page }) => {
+    await open(page, "split-pdf-by-text", "invoices.pdf");
+    await page.getByTestId("choose-area").click();
+    await drawBox(page, [0.02, 0.42], [0.6, 0.56]);
+    await expect(page.getByTestId("area-text")).toHaveText("Text here: Sheet 1");
+    // The next page shows what the same box catches there.
+    await page.getByRole("button", { name: "Next page", exact: true }).click();
+    await expect(page.getByTestId("area-text")).toHaveText("Text here: Sheet 2");
+    await page.getByTestId("area-box").focus();
+    for (let i = 0; i < 12; i++) await page.keyboard.press("ArrowDown");
+    await expect(page.getByTestId("area-text")).toHaveText("No text in the box on this page");
+    for (let i = 0; i < 12; i++) await page.keyboard.press("ArrowUp");
+    await done(page);
+    await expect(primary(page)).toHaveText("Split into 6 files");
+  });
+
+  test("AC-944: a box with no text keeps the button waiting", async ({ page }) => {
+    await open(page, "split-pdf-by-text", "invoices.pdf");
+    await page.getByTestId("choose-area").click();
+    await drawBox(page, [0.1, 0.75], [0.8, 0.95]);
+    await done(page);
+    await expect(page.getByTestId("dock-status")).toHaveText("No text in that area");
+    await expect(primary(page)).toBeDisabled();
+  });
+});
+

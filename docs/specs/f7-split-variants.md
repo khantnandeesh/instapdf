@@ -56,6 +56,12 @@ stay whole, in place.
 - AC-926 All three pages pass the every-tool guards (first-screen fit, one scroller, budgets).
 - AC-927 Split in half keeps bookmarks (each opens the first half of its old page), form fields and tags. AC-928 A link or note goes to the half that shows it. AC-929 A crop box larger than the page is cut where the page is.
 - AC-930 Split by size checks the written files: a part over the limit is re-split; a part that cannot fit is named in a note.
+- AC-940 By text: the person drags a box on a page (the shared `AreaSelect`); the line under the page says what text the box catches, on any page. The box follows the page as shown (rotation included).
+- AC-941 A new file starts on each page whose text in the box differs from the last text seen; files are named after it.
+- AC-942 A page with no text in the box stays with the file before it. AC-943 The box can be drawn, moved and resized by pointer and by keyboard (arrows move, Shift with arrows resizes); marks can still be moved by hand.
+- AC-944 No box yet, no text in the box, or text that never changes: the button waits and says why.
 
-Tests: `src/lib/pdf/{split-outline,split-size,split-half}.test.ts`, `e2e/f7/split-variants.spec.ts`.
+By text reuses Split's workspace (`SplitTool variant="text"`): pdf.js reads where each piece of text sits (`lib/pdf/split-text.ts`), the dialog draws the page with the flow's own renderer (`FlowApi.renderPage`). Against the reference: same idea (pick an area, split when its text changes); ours shows the caught text and the cut lines live before the run, names files after the text, and uploads nothing. Not yet: a "text starts with" filter.
+
+Tests: `src/lib/pdf/{split-outline,split-size,split-half,split-text}.test.ts`, `e2e/f7/split-variants.spec.ts`.
 Screenshots: `designs/f7/`. Not yet built: Split by text (area on the page), a draggable cut line for In half.

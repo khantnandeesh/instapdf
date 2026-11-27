@@ -698,6 +698,37 @@ export const seoContent: Record<string, ToolSeoContent> = {
     ],
     related: ["compress-pdf", "split-pdf", "split-pdf-by-bookmarks", "extract-pdf-pages", "merge-pdf", "delete-pdf-pages"],
   },
+  "split-pdf-by-text": {
+    howTo: "How to split a PDF by text",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, such as a batch of invoices or statements, or choose it from your device. Nothing is uploaded." },
+      { name: "Mark the text that changes", text: "Select Choose text area and drag a box around the text that is different in each document, such as an invoice number or a customer name." },
+      { name: "Download", text: "The pages show where each file starts. Select Split and download the files, each named after its text." },
+    ],
+    faq: [
+      {
+        q: "How do I split a PDF of invoices into one file per invoice?",
+        a: "Add the PDF, select Choose text area and drag a box around the invoice number. A new file starts on every page where that number changes, so each invoice becomes its own PDF.",
+      },
+      {
+        q: "What happens to pages where the box has no text?",
+        a: "They stay with the document before them. A second or third page with no number in that spot is kept with its first page.",
+      },
+      {
+        q: "Does it work on scanned PDFs?",
+        a: "The pages need real text. A scan is a picture of text, so run OCR on it first; after that the text can be read and the PDF split.",
+      },
+      {
+        q: "Can I change where the files start?",
+        a: "Yes. The lines between pages show each split, and you can click between two pages to add or remove one before you download.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The text is read and the PDF is split in your browser, on your device. The file never leaves it.",
+      },
+    ],
+    related: ["split-pdf", "split-pdf-by-bookmarks", "split-pdf-by-size", "extract-pdf-pages", "organize-pdf", "merge-pdf"],
+  },
   "split-pdf-in-half": {
     howTo: "How to split PDF pages in half",
     steps: [
