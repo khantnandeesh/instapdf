@@ -797,26 +797,6 @@
       no-repeat center;
     box-shadow: 0 0 0 2px #fff;
   }
-  /* Compact choice pills (the one-row options, dock-bar): a smaller tick tucked 5px over the corner, so it
-     never reaches the next pill across the 10px gap (polish rule: badges stay on their own element). */
-  @media (width < 64rem) {
-    .mp-choice[aria-checked="true"]::after,
-    .mp-choice[aria-pressed="true"]::after {
-      top: -5px;
-      right: -5px;
-      width: 16px;
-      height: 16px;
-      background-size: 9px 8px;
-    }
-  }
-  :where([data-ip-dock="bar"], [data-ip-dock="row"]) .mp-choice[aria-checked="true"]::after,
-  :where([data-ip-dock="bar"], [data-ip-dock="row"]) .mp-choice[aria-pressed="true"]::after {
-    top: -5px;
-    right: -5px;
-    width: 16px;
-    height: 16px;
-    background-size: 9px 8px;
-  }
   .mp-choice:disabled {
     cursor: not-allowed;
     opacity: 0.5;

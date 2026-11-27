@@ -662,3 +662,25 @@
     transform: translateY(var(--motion-rise, 8px)) scale(0.98);
   }
 }
+
+/* Compact choice pills (the one-row options, dock-bar): a smaller tick tucked 5px over the corner, so it never
+   reaches the next pill across the 10px gap (polish rule: badges stay on their own element). Tool pages only,
+   so it stays out of the site-wide stylesheet budget (AC-55). */
+@layer components {
+  @media (width < 64rem) {
+    .ip-flow .mp-choice:is([aria-checked="true"], [aria-pressed="true"])::after {
+      top: -5px;
+      right: -5px;
+      width: 16px;
+      height: 16px;
+      background-size: 9px 8px;
+    }
+  }
+  .ip-flow :where([data-ip-dock="bar"], [data-ip-dock="row"]) .mp-choice:is([aria-checked="true"], [aria-pressed="true"])::after {
+    top: -5px;
+    right: -5px;
+    width: 16px;
+    height: 16px;
+    background-size: 9px 8px;
+  }
+}
