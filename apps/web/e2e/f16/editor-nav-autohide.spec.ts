@@ -105,8 +105,21 @@ for (const [w, h] of [
     await page.mouse.move(w / 2, 2);
     await expect.poll(() => nav(page)).toBe("shown");
 
-    // Focus in the navbar keeps it: a scroll down with a navbar link focused does not hide it.
-    await page.locator(".ip-site-header a").first().focus();
+    // Focus a click left in the navbar doesn't keep it (only keyboard focus does): open All tools and close it
+    // with the mouse, then scroll down.
+    const allTools = page.locator(".ip-site-header").getByRole("button", { name: /All tools/ });
+    await allTools.click();
+    await allTools.click();
+    await expect(page.locator(".ip-site-header")).not.toHaveAttribute("data-menu-open", "");
+    await expect(allTools).toBeFocused();
+    await scrollDown(page, 300);
+    await expect.poll(() => nav(page)).toBe("hidden");
+    await scrollDown(page, -120);
+    await expect.poll(() => nav(page)).toBe("shown");
+
+    // Keyboard focus in the navbar keeps it: Shift+Tab from All tools to the link before it, then a scroll down.
+    await page.keyboard.press("Shift+Tab");
+    expect(await page.evaluate(() => !!document.querySelector(".ip-site-header :focus-visible")), "a navbar link has keyboard focus").toBe(true);
     await scrollDown(page, 300);
     await page.waitForTimeout(300);
     expect(await nav(page)).toBe("shown");
@@ -153,6 +166,46 @@ test("G-1: go to page lands the page right under the editor bar with the navbar 
   const up = await gap(3);
   expect(up, `page 3 sits under the bar, not behind the navbar (${up})`).toBeGreaterThanOrEqual(0);
   expect(up).toBeLessThanOrEqual(24);
+});
+
+test("G-1 (review S-2): the page strip's list ends at the window's bottom at rest and with the navbar away, so its end and scroll bar are on screen", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop");
+  await open(page, 1280, 632);
+  const list = page.locator(".ed-panel .ed-side__body");
+  const bottom = () => list.evaluate((el) => el.getBoundingClientRect().bottom);
+  // Scrolled to its end: the last thumbnail is in view.
+  await list.evaluate((el) => (el.scrollTop = el.scrollHeight));
+  const last = page.getByTestId("editor-strip").getByRole("button", { name: "Page 60 of 60" });
+  const check = async (state: string) => {
+    expect(await bottom(), `the list's bottom is at the window's bottom (${state})`).toBeLessThanOrEqual(632 + 0.5);
+    expect(await bottom(), `the list reaches the window's bottom (${state})`).toBeGreaterThanOrEqual(632 - 2);
+    const b = (await last.boundingBox())!;
+    expect(b.y + b.height, `the last thumbnail is on screen (${state})`).toBeLessThanOrEqual(632);
+  };
+  await check("at rest");
+  await scrollTo(page, 0.5);
+  await expect.poll(() => nav(page)).toBe("hidden");
+  await page.waitForTimeout(350);
+  await list.evaluate((el) => (el.scrollTop = el.scrollHeight));
+  await check("navbar away");
+  // While the navbar comes back, the list never leaves a gap above the window's bottom.
+  await page.evaluate(() => {
+    const w = window as unknown as { __gap: number };
+    w.__gap = 0;
+    const el = document.querySelector(".ed-panel .ed-side__body")!;
+    const t0 = performance.now();
+    const tick = () => {
+      w.__gap = Math.max(w.__gap, innerHeight - el.getBoundingClientRect().bottom);
+      if (performance.now() - t0 < 600) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  await scrollDown(page, -200);
+  await expect.poll(() => nav(page)).toBe("shown");
+  await page.waitForTimeout(700);
+  expect(await page.evaluate(() => (window as unknown as { __gap: number }).__gap), "no gap under the list while it slides").toBeLessThanOrEqual(1);
+  await list.evaluate((el) => (el.scrollTop = el.scrollHeight));
+  await check("back at rest");
 });
 
 test("G-1: reduced motion moves the navbar without a transition; the page strip and bar move with it", async ({ page }, info) => {

@@ -89,7 +89,7 @@ test("G-5 (review S5): before the first paint Save as waits with Download, and a
   await page.getByTestId("canvas").focus();
   const download = page.waitForEvent("download", { timeout: 20_000 });
   await page.keyboard.press("Control+s");
-  await expect(page.getByTestId("live")).toContainText("Download starts once the first page is shown");
+  await expect(page.getByTestId("live")).toContainText("Download starts in a moment");
   release();
   await expect(page.getByTestId("download")).toBeEnabled({ timeout: 15_000 });
   expect((await download).suggestedFilename()).toMatch(/\.pdf$/);

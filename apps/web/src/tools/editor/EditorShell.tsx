@@ -595,16 +595,37 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       slot?.setAttribute("data-head", "");
       at = slot;
     };
+    const place = (target: Element | null, y: number) => {
+      const slot = target?.closest?.<HTMLElement>(".ed-slot") ?? null;
+      mark(slot && y - slot.getBoundingClientRect().top < BAND ? slot : null);
+    };
+    // Where the pointer last was: a wheel scroll moves the pages under a still pointer, so the band is found
+    // again from there (once a frame), not left on the page that scrolled away.
+    let last: { x: number; y: number } | null = null;
+    let frame = 0;
     const onMove = (e: PointerEvent) => {
       if (e.pointerType === "touch") return;
-      const slot = (e.target as Element | null)?.closest?.<HTMLElement>(".ed-slot") ?? null;
-      mark(slot && e.clientY - slot.getBoundingClientRect().top < BAND ? slot : null);
+      last = { x: e.clientX, y: e.clientY };
+      place(e.target as Element | null, e.clientY);
     };
-    const onLeave = () => mark(null);
+    const onScroll = () => {
+      if (!last || frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        if (last) place(document.elementFromPoint(last.x, last.y), last.y);
+      });
+    };
+    const onLeave = () => {
+      last = null;
+      mark(null);
+    };
     scroller.addEventListener("pointermove", onMove, { passive: true });
+    scroller.addEventListener("scroll", onScroll, { passive: true });
     scroller.addEventListener("pointerleave", onLeave);
     return () => {
+      cancelAnimationFrame(frame);
       scroller.removeEventListener("pointermove", onMove);
+      scroller.removeEventListener("scroll", onScroll);
       scroller.removeEventListener("pointerleave", onLeave);
       mark(null);
     };
@@ -1130,7 +1151,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         if (store.get().painted) void download();
         else if (!saveQueued.current) {
           saveQueued.current = true;
-          ctl.announce("Download starts once the first page is shown");
+          ctl.announce("Download starts in a moment");
         }
         return;
       }

@@ -73,18 +73,19 @@ html[data-ed-nav="hidden"] body:has(.ed-wide) .ip-site-header {
 .ed-wide :is(.ed-hint, .ed-recover, .ed-owner) {
   translate: -50% var(--ed-lift);
 }
-/* The page strip starts behind the bar; its contents sit under the bar and move up with it. Its box is
-   always the panel's full height (the part pushed past the panel's bottom is clipped), so nothing in it
-   jumps while it slides: only the end of its list gets room to scroll clear of the clipped part. */
+/* The page strip starts behind the bar; its contents sit under the bar and move up with it. Its box ends at
+   the panel's bottom at rest and with the navbar away. It grows the moment the navbar starts to leave and
+   shrinks only once it is back (data-ed-box, nav-autohide.ts), so during the slide the box only ever runs
+   past the panel's bottom, which clips it: never a gap, and never a jump of what shows. */
 .ed-wide .ed-panel {
   top: calc(var(--ed-top-h) - var(--ed-under));
 }
 .ed-wide .ed-panel > .ed-side {
+  height: calc(100% - var(--ed-under) - var(--ed-box-lift, 0px));
   translate: 0 calc(var(--ed-under) + var(--ed-lift));
 }
-.ed-wide .ed-panel .ed-side__body {
-  padding-bottom: calc(6px + var(--ed-under) + var(--ed-lift));
-  scroll-padding-bottom: calc(var(--ed-under) + var(--ed-lift));
+html[data-ed-box] .ed-wide {
+  --ed-box-lift: calc(-1 * var(--ed-under));
 }
 @media (prefers-reduced-motion: no-preference) {
   body:has(.ed-wide) .ip-site-header {

@@ -24,6 +24,8 @@ const TOP_ZONE = 48;
  */
 const EDGE = 8;
 const DWELL = 350;
+/** The bars' slide (editor.css, --motion-quick) with a frame to spare. */
+const SLIDE_MS = 260;
 
 const px = (el: Element, name: string) => parseFloat(getComputedStyle(el).getPropertyValue(name)) || 0;
 const navHidden = () => document.documentElement.dataset.edNav === "hidden";
@@ -67,11 +69,18 @@ export function useNavAutohide(scroller: HTMLElement | null, enabled: boolean) {
     const wide = window.matchMedia("(min-width: 1024px) and (min-height: 601px)");
     let hidden = false;
     let anchor = scroller.scrollTop;
+    // The page strip's box (editor.css, data-ed-box): tall from the moment the navbar leaves, short again
+    // only once its slide back is over, so the strip's list never shows a gap while it moves.
+    let box = 0;
     const set = (hide: boolean) => {
       if (hide === hidden) return;
       hidden = hide;
-      if (hide) root.dataset.edNav = "hidden";
-      else delete root.dataset.edNav;
+      clearTimeout(box);
+      if (hide) root.dataset.edNav = root.dataset.edBox = "hidden";
+      else {
+        delete root.dataset.edNav;
+        box = window.setTimeout(() => delete root.dataset.edBox, SLIDE_MS);
+      }
     };
     const onScroll = () => {
       if (!wide.matches) return set(false);
@@ -82,9 +91,9 @@ export function useNavAutohide(scroller: HTMLElement | null, enabled: boolean) {
       }
       if (y - anchor > HYSTERESIS) {
         anchor = y;
-        // Never while the All tools menu is open from the navbar, nor while focus is in it (a keyboard
-        // user on a navbar link would lose sight of it).
-        if (!header?.hasAttribute("data-menu-open") && !header?.contains(document.activeElement)) set(true);
+        // Never while the All tools menu is open from the navbar, nor while keyboard focus is in it (a
+        // keyboard user on a navbar link would lose sight of it). Focus a click left there doesn't count.
+        if (!header?.hasAttribute("data-menu-open") && !header?.querySelector(":focus-visible")) set(true);
       } else if (anchor - y > HYSTERESIS) {
         anchor = y;
         set(false);
@@ -116,7 +125,9 @@ export function useNavAutohide(scroller: HTMLElement | null, enabled: boolean) {
       stopDwell();
       header?.removeEventListener("focusin", onFocus);
       wide.removeEventListener("change", onMedia);
+      clearTimeout(box);
       delete root.dataset.edNav;
+      delete root.dataset.edBox;
     };
   }, [scroller, enabled]);
 }

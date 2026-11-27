@@ -245,6 +245,14 @@ test("G-1 page actions: they take the pointer only in the page's top band; lower
   // In the top band they show and take the pointer.
   await page.mouse.move(p1.x + p1.width / 2, p1.y + 20);
   await expect.poll(() => hit()).toBe("Rotate right, page 1");
+  // The pages scrolling under a still pointer take the band with them: page 1's actions go once its top
+  // has scrolled away, and come back when it scrolls back under the pointer.
+  const head0 = () => page.locator('.ed-slot[data-index="0"]').evaluate((el) => el.hasAttribute("data-head"));
+  await page.mouse.wheel(0, 200);
+  await expect.poll(head0).toBe(false);
+  await page.mouse.wheel(0, -200);
+  await expect.poll(head0).toBe(true);
+  await expect.poll(() => hit()).toBe("Rotate right, page 1");
   await rotate.click();
   await expect(page.getByTestId("live")).not.toBeEmpty();
   // A drawing tool armed: the band is the page's for the pointer, but Tab still reaches the actions.
