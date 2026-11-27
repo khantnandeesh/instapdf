@@ -338,10 +338,10 @@
     cursor: pointer;
     transition: background-color var(--dur-fast);
   }
-  /* A 44px hit area around the 40px button. */
   .ip-pill__cancel-x {
     display: none;
   }
+  /* A 44px hit area around the 40px button. */
   .ip-pill__cancel::after {
     content: "";
     position: absolute;
