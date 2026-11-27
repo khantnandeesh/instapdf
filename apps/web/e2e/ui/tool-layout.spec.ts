@@ -487,9 +487,9 @@ test.describe("F25 structure", () => {
       const reset = (await row.getByRole("button", { name: "Reset rotation" }).boundingBox())!;
       expect(reset.x + reset.width, "rotate: Reset clear of the slot").toBeLessThanOrEqual((await page.getByTestId("action-slot").boundingBox())!.x);
       expect(await row.evaluate((d) => d.scrollWidth - d.clientWidth), "rotate: row sideways").toBeLessThanOrEqual(0);
-      // Undo│Redo: labels from 1280 on Organize; icons at every width on Merge and Combine.
+      // Undo│Redo: one standard control, icons at every width on Organize, Merge and Combine (UI polish).
       for (const [slug, labels] of [
-        ["organize-pdf", xl],
+        ["organize-pdf", false],
         ["merge-pdf", false],
         ["combine-reorder-pdf", false],
       ] as const) {

@@ -185,7 +185,7 @@ The picker keeps its label: "Opening…" is removed.
 | 390 | `h1` (22px) | same |
 | 768 | `h1` | same (tablet portrait) |
 | 1024–1279 | `h1` · options (tight forms, §3.4) · More options (44px icon button, tooltip "More options") · Undo│Redo (icons) · 300px slot | none |
-| ≥ 1280 | `h1` · options (full forms) · More options (icon + label) · Undo│Redo (labels on Organize) · 340px slot | none |
+| ≥ 1280 | `h1` · options (full forms) · More options (icon + label) · Undo│Redo (icons) · 340px slot | none |
 
 ### 3.2 Height budget (first screen)
 
@@ -223,7 +223,7 @@ All widths are estimates from the mockup, to verify in the build.
 | Delete (210) | "Pages" range field (240) · Clear (shown when marked; its width reserved) | Remove bookmarks | field 190; More options icon-only |
 | Extract (220) | Odd · Even · Custom pills · range field (220) | Remove bookmarks · File names | field 140; More options icon-only |
 | Split (120) | mode pills Every page · Every N · Spreads · Custom · second slot: Every N stepper (130) **or** Custom range field (180) | Parts list (rename) · Remove bookmarks · File names | mode becomes a native Select "Split" (150); field 190 |
-| Organize (160) | (no options) · Undo│Redo with labels | none | Undo│Redo icons |
+| Organize (160) | (no options) · Undo│Redo icons (labels dropped in the 27 Nov UI polish: one standard control on every tool) | none | Undo│Redo icons |
 | Merge (125) | Contents page None · Names · Titles · Undo│Redo icons | Bookmarks · Page layout (footer, same width, padding) · Form fields · First file is a cover | Contents page folds; More options icon-only |
 | Combine & reorder (350) | Undo│Redo icons | all Merge options (Contents page, Bookmarks, Page layout, Form fields, cover) | More options icon-only |
 | Alternate & mix (245) | (none: settings live on each file card) | none | none |
