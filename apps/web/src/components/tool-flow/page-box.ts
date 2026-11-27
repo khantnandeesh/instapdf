@@ -21,15 +21,23 @@ export function pageBoxStyle(size: PageSize, boxAspect = TILE_ASPECT): { width: 
 }
 
 /**
+ * The scale that fits a page turned by `rotation` (a multiple of 90) in the same box: 1 unless the turn
+ * is a quarter. Thumbnails draw for it too (PageThumb `scale`), so a turned page that grows stays sharp.
+ */
+export function pageTurnScale(size: PageSize, rotation: number, boxAspect = TILE_ASPECT): number {
+  const odd = Math.abs(Math.round(rotation / 90)) % 2 === 1;
+  if (!odd) return 1;
+  const [w, h] = fit(size, boxAspect); // in box widths (w) and box heights (h)
+  // Turned, the element is h*H wide and w*W tall; scale so it fits W x H (H = W / boxAspect).
+  return Math.min(boxAspect / h, 1 / (w * boxAspect));
+}
+
+/**
  * The CSS transform for a page shown turned by `rotation` (a multiple of 90): the rotation plus the
  * scale that fits the turned page in the same box. Transform only, so the turn animates on the
  * compositor (motion.md section 4) and the box never changes size.
  */
 export function pageTransform(size: PageSize, rotation: number, boxAspect = TILE_ASPECT): string {
-  const odd = Math.abs(Math.round(rotation / 90)) % 2 === 1;
-  if (!odd) return `rotate(${rotation}deg)`;
-  const [w, h] = fit(size, boxAspect); // in box widths (w) and box heights (h)
-  // Turned, the element is h*H wide and w*W tall; scale so it fits W x H (H = W / boxAspect).
-  const k = Math.min(boxAspect / h, 1 / (w * boxAspect));
-  return `rotate(${rotation}deg) scale(${+k.toFixed(4)})`;
+  const k = pageTurnScale(size, rotation, boxAspect);
+  return k === 1 && Math.abs(Math.round(rotation / 90)) % 2 === 0 ? `rotate(${rotation}deg)` : `rotate(${rotation}deg) scale(${+k.toFixed(4)})`;
 }

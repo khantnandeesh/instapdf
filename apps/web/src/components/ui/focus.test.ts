@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isShown, moveFocus, QUIET_FOCUS_ATTR, trackInputModality, type InputModality } from "./focus";
+import { isShown, markQuietFocus, moveFocus, QUIET_FOCUS_ATTR, trackInputModality, type InputModality } from "./focus";
 
 class FakeEl extends EventTarget {
   attrs = new Map<string, string>();
@@ -14,6 +14,9 @@ class FakeEl extends EventTarget {
   }
   removeAttribute(k: string) {
     this.attrs.delete(k);
+  }
+  hasAttribute(k: string) {
+    return this.attrs.has(k);
   }
   getClientRects() {
     return { length: this.rects } as DOMRectList;
@@ -60,6 +63,27 @@ describe("moveFocus (eval G-7)", () => {
     const el = new FakeEl();
     moveFocus(el as unknown as HTMLElement, "pointer");
     el.dispatchEvent(new Event("blur"));
+    expect(el.attrs.has(QUIET_FOCUS_ATTR)).toBe(false);
+  });
+  it("keeps the quiet mark while the whole window is away (file dialog, another tab)", () => {
+    const el = new FakeEl();
+    let pageFocused = true;
+    const doc = { hasFocus: () => pageFocused };
+    moveFocus(el as unknown as HTMLElement, "pointer", doc);
+    pageFocused = false;
+    el.dispatchEvent(new Event("blur"));
+    expect(el.attrs.has(QUIET_FOCUS_ATTR)).toBe(true);
+    pageFocused = true;
+    el.dispatchEvent(new Event("blur")); // focus moved to another element in the page
+    expect(el.attrs.has(QUIET_FOCUS_ATTR)).toBe(false);
+  });
+  it("marks a pointer-clicked control quiet once, cleared by a key press", () => {
+    const el = new FakeEl();
+    const doc = { hasFocus: () => true };
+    markQuietFocus(el as unknown as HTMLElement, doc);
+    markQuietFocus(el as unknown as HTMLElement, doc);
+    expect(el.attrs.has(QUIET_FOCUS_ATTR)).toBe(true);
+    el.dispatchEvent(key("Enter"));
     expect(el.attrs.has(QUIET_FOCUS_ATTR)).toBe(false);
   });
   it("after keyboard input focuses normally (ring shown)", () => {

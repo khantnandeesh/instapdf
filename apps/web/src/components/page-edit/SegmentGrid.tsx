@@ -3,7 +3,7 @@ import "./page-edit.css";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { flip } from "@/lib/motion/flow";
-import { pageBoxStyle, pageTransform } from "@/components/tool-flow/page-box";
+import { pageBoxStyle, pageTransform, pageTurnScale } from "@/components/tool-flow/page-box";
 import { PageThumb } from "@/components/tool-flow/Thumbnail";
 import { cx } from "@/components/ui/cx";
 import { IconButton } from "@/components/ui/IconButton";
@@ -243,7 +243,9 @@ export function SegmentGrid({
             type="button"
             data-main=""
             tabIndex={tab}
-            aria-label={labels.enlarge(card.name)}
+            // The card's own stop, named for the card as on Merge (eval G-7): Enter enlarges it, the
+            // arrow keys move between cards and Alt with an arrow moves it.
+            aria-label={card.accessibleName}
             aria-describedby="ip-files-hint"
             disabled={card.status !== "ready"}
             onFocus={() => setActiveKey(card.key)}
@@ -355,7 +357,7 @@ export function SegmentGrid({
                     className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
                     style={{ ...pageBoxStyle(card.thumbSize), transform: pageTransform(card.thumbSize, card.rotation) }}
                   >
-                    <PageThumb fileId={card.fileId} index={card.thumbIndex} />
+                    <PageThumb fileId={card.fileId} index={card.thumbIndex} scale={pageTurnScale(card.thumbSize, card.rotation)} />
                   </span>
                 ) : card.status === "loading" ? (
                   <Spinner size={24} label={`Reading ${card.name}`} className="text-brand-strong" />

@@ -2,15 +2,17 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useLiveState } from "@/components/ui/live-state";
 import type { CardView } from "@/components/page-edit/SegmentGrid";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
-import type { WorkspaceContext } from "@/components/tool-flow/types";
+import type { LoadedFile, WorkspaceContext } from "@/components/tool-flow/types";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import type { MenuEntry } from "@/components/ui/Menu";
-import { A4, isBlank, sortPages, type PageRef } from "@/lib/page-list";
+import { A4, isBlank, segmentsOf, sortPages, type PageRef, type Segment } from "@/lib/page-list";
 import { canMix, interleave, type MixCard } from "@/lib/mix-plan";
 import { parseCount } from "@/lib/plan-counts";
 import { setHandoff } from "@/lib/pdf/handoff";
+import { USER_ERROR } from "@/lib/pdf/user-error";
 import { ALTERNATE_OPTIONS } from "@/lib/pdf/merge-options";
 import { mixedName } from "@/lib/pdf/naming";
 import { mergeCopy } from "@/tools/merge/copy";
@@ -28,6 +30,23 @@ const DEFAULT_MIX: Mix = { reverse: false, perTurn: "1", repeat: true };
 const NO_SELECTION: ReadonlySet<string> = new Set();
 const noop = () => {};
 
+/** Cards in order (each a whole, read file), as the interleave sees them. */
+function cardsOf(segments: readonly Segment[], sources: Record<string, { name: string } | undefined>, mix: Record<string, Mix>): MixCard[] {
+  return segments.flatMap((seg) => {
+    if (!seg.sourceId || seg.pages.some((p) => p.pending)) return [];
+    const m = mix[seg.sourceId] ?? DEFAULT_MIX;
+    return [{ sourceId: seg.sourceId, name: sources[seg.sourceId]?.name ?? "", pageCount: seg.pages.length, reverse: m.reverse, perTurn: parseCount(m.perTurn) ?? 1, repeat: m.repeat }];
+  });
+}
+
+/** Whether any card's pages per turn, as typed, is not a valid count. */
+const anyInvalid = (cards: MixCard[], mix: Record<string, Mix>) => cards.some((c) => parseCount((mix[c.sourceId] ?? DEFAULT_MIX).perTurn) === null);
+
+/** The output order as page refs: the read-only pages view and the run use the same list. */
+function orderOf(cards: MixCard[], files: ReadonlyMap<string, LoadedFile>): PageRef[] {
+  return interleave(cards).map((p, i) => ({ uid: `r${i}`, sourceId: p.sourceId, sourceIndex: p.sourceIndex, rotation: 0, size: files.get(p.sourceId)?.pages?.[p.sourceIndex] ?? A4 }));
+}
+
 /**
  * Alternate & mix (spec F4/F5 §3g): one wide card per file with its order, pages per turn and (one-page
  * files) Repeat; the pages view shows the resulting order, read-only. The page list holds each file
@@ -37,34 +56,16 @@ export function AlternateTool() {
   // No Undo│Redo: card moves and settings are few, and removal keeps the undo notice (P-11 #3).
   const ws = usePageWorkspace({ tool });
   const router = useRouter();
-  const [mix, setMix] = useState<Record<string, Mix>>({});
+  // Live (eval G-3): the run reads pages per turn as typed, even before React shows it.
+  const [mix, setMix, mixLive] = useLiveState<Record<string, Mix>>({});
   const mixOf = (id: string) => mix[id] ?? DEFAULT_MIX;
   const patchMix = (id: string, patch: Partial<Mix>) => setMix((m) => ({ ...m, [id]: { ...(m[id] ?? DEFAULT_MIX), ...patch } }));
 
   const pending = ws.pages.some((p) => p.pending);
   /** Cards in order (each a whole, read file), as the interleave sees them. */
-  const cards: MixCard[] = useMemo(
-    () =>
-      ws.segments.flatMap((seg) => {
-        if (!seg.sourceId || seg.pages.some((p) => p.pending)) return [];
-        const m = mix[seg.sourceId] ?? DEFAULT_MIX;
-        return [{ sourceId: seg.sourceId, name: ws.sources[seg.sourceId]?.name ?? "", pageCount: seg.pages.length, reverse: m.reverse, perTurn: parseCount(m.perTurn) ?? 1, repeat: m.repeat }];
-      }),
-    [ws.segments, ws.sources, mix],
-  );
-  const invalid = cards.some((c) => parseCount(mixOf(c.sourceId).perTurn) === null);
-  /** The output order, as page refs (the read-only pages view and the run use the same list). */
-  const result: PageRef[] = useMemo(
-    () =>
-      interleave(cards).map((p, i) => ({
-        uid: `r${i}`,
-        sourceId: p.sourceId,
-        sourceIndex: p.sourceIndex,
-        rotation: 0,
-        size: ws.filesById.get(p.sourceId)?.pages?.[p.sourceIndex] ?? A4,
-      })),
-    [cards, ws.filesById],
-  );
+  const cards: MixCard[] = useMemo(() => cardsOf(ws.segments, ws.sources, mix), [ws.segments, ws.sources, mix]);
+  const invalid = anyInvalid(cards, mix);
+  const result: PageRef[] = useMemo(() => orderOf(cards, ws.filesById), [cards, ws.filesById]);
   const status = a.status(result.length, cards.length);
   const mixable = canMix(cards);
 
@@ -95,11 +96,21 @@ export function AlternateTool() {
     onSelect: () => ws.reorder(sortPages(ws.pagesRef.current, ws.sourcesRef.current, k), "sort", a.sorted[k]),
   }));
 
+  /** The cards from the live page list and settings, not this render's (eval G-3); null while any number is invalid. */
+  const liveCards = () => {
+    const now = cardsOf(segmentsOf(ws.pagesRef.current), ws.sourcesRef.current, mixLive.current);
+    return anyInvalid(now, mixLive.current) ? null : now;
+  };
+  /** Enter in a card's pages per turn: mix when every card's number, as typed, is valid. */
+  const submit = () => {
+    const now = liveCards();
+    if (now && canMix(now) && !ws.pagesRef.current.some((p) => p.pending)) ws.api.current?.submit();
+  };
   const settings = (card: CardView) => {
     const id = card.fileId;
     if (!id) return null;
     const count = ws.sources[id]?.pageCount || ws.filesById.get(id)?.pageCount || 0;
-    return <MixSettings id={id} name={card.name} pageCount={count} mix={mixOf(id)} onChange={(patch) => patchMix(id, patch)} announce={ws.announce} />;
+    return <MixSettings id={id} name={card.name} pageCount={count} mix={mixOf(id)} onChange={(patch) => patchMix(id, patch)} announce={ws.announce} onEnter={submit} />;
   };
 
   const renderWorkspace = (w: WorkspaceContext) => (
@@ -158,7 +169,11 @@ export function AlternateTool() {
         tool={tool}
         {...ws.flowProps}
         process={ws.runList(
-          () => result,
+          () => {
+            const now = liveCards();
+            if (!now) throw new Error(USER_ERROR + a.perTurnError);
+            return orderOf(now, ws.filesById);
+          },
           () => ALTERNATE_OPTIONS,
           mixedName,
         )}

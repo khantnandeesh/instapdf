@@ -1,0 +1,1238 @@
+{
+ "feature": "f4-f5-page-tools",
+ "capture_date": "2026-11-26",
+ "evaluated_build": "4a79c2dca87f9030c468c19ff2bcf25fd82603d0",
+ "staging": "https://web-staging-qzq5fa2g7q-uc.a.run.app",
+ "raw_evidence": "/mnt/project-files/evals-cache/f4-f5-page-tools/",
+ "comparisons": "/mnt/project-files/comparisons/f4-f5-page-tools/",
+ "note": "Reference evidence is kept outside git. These are the evaluator's own notes, timings and hashes. A re-evaluation re-runs BerryPDF only and compares against this cache; refresh the reference side only if the cache is older than 30 days (after 2026-12-26), the owner flags a reference change, or a check needs behaviour not held here.",
+ "reference_tasks": [
+  {
+   "id": "t1-split-custom",
+   "spec_8b": 1,
+   "submit_utc": "2026-11-26T20:00:54Z",
+   "input": "twelve.pdf; Split; select-pages mode; typed 1-3,8-9,12",
+   "observation": "Typed numbers act as cut points: 4 parts covering all 12 pages (1-3, 4-7, 8-9, 10-12). One ZIP with a random name; entries named base-firstpage.pdf, stored in order 1, 8, 10, 4. Each part keeps the bookmarks that point into it, renumbered. Task done about 1.1 s after the action.",
+   "output": "eval/t1-split-custom/sejda-EXRKVJ.zip",
+   "output_bytes": 7181
+  },
+  {
+   "id": "t2-alternate",
+   "spec_8b": 2,
+   "submit_utc": "2026-11-26T20:15:19Z",
+   "input": "twelve.pdf + short.pdf + separator.pdf (1 page); Alternate; defaults",
+   "observation": "One page per file per round; leftovers follow in order. The one-page file repeats every round and once more after the last page (26 pages). Output named first-file_mixed.pdf, no outline, info dictionary dropped.",
+   "timings_ms": {
+    "action_to_done": 2535,
+    "action_to_download_shown": 3059
+   },
+   "output": "eval/t2-alternate/sejda-twelve_mixed.pdf",
+   "output_bytes": 4400
+  },
+  {
+   "id": "t3-extract",
+   "spec_8b": 3,
+   "submit_utc": "2026-11-26T20:30:15Z",
+   "input": "twelve.pdf; Extract; typed 9,2-3",
+   "observation": "Pages in typed order 9, 2, 3. Output keeps the source name. No outline (no bookmark target was among the extracted pages, so bookmark handling is not shown by this run). Creation date and creator kept.",
+   "timings_ms": {
+    "first_thumbnail": 817,
+    "action_to_done": 2543,
+    "action_to_download_shown": 3067
+   },
+   "output": "eval/t3-extract/sejda-twelve.pdf",
+   "output_bytes": 1592
+  },
+  {
+   "id": "t4-delete",
+   "spec_8b": 4,
+   "submit_utc": "2026-11-26T21:01:18Z",
+   "input": "twelve.pdf; Delete; typed 5",
+   "observation": "Output name gets an updated_ prefix. 11 pages. Outline: Intro -> 1; Middle kept as an item with no destination, child Detail -> 5; End -> 9. Thumbnail canvas 300x424 shown at 165x226 CSS px. Loaded-state fit (page auto-scrolled past its header): pages area 59/57/63/65/56 % of height and 99/98/99/99/95 % of width at 1366x657/1280x632/1536x730/1920x969/390x664; primary in view at all five.",
+   "timings_ms": {
+    "first_thumbnail": 832,
+    "action_to_done": 2530,
+    "action_to_download_shown": 3062
+   },
+   "output": "eval/t4-delete/sejda-updated_twelve.pdf",
+   "output_bytes": 3626
+  },
+  {
+   "id": "t5-organize",
+   "spec_8b": 5,
+   "submit_utc": "2026-11-26T21:16:22Z",
+   "input": "twelve.pdf + three-pages.pdf; Organize; rotate A2 right; one blank page added with nothing selected",
+   "observation": "Output named after the second file with a _merged suffix (three-pages_merged.pdf) although the form showed the first file's name before the run. 16 pages: blank A4 page at the front, A2 with /Rotate 90, outline kept and shifted (Intro -> 2, Middle -> 6 / Detail -> 7, End -> 11). qpdf repairs one warning: blank page without /Resources. Loaded-state fit from captures (page auto-scrolled past its header, toolbar still visible): pages start at y 170 on desktop, about 62/60/66/72 % of height at 1366/1280/1536/1920 and about 43 % at 390x664 where the toolbar wraps to four rows. One tile per row on phones.",
+   "timings_ms": {
+    "action_to_done": 2554,
+    "action_to_download_shown": 3082
+   },
+   "output": "eval/t5-organize/sejda-three-pages_merged.pdf",
+   "output_bytes": 4478,
+   "note": "eval/t5-organize/dryrun/ holds a no-submit selector check made at 21:04 UTC (no task)."
+  },
+  {
+   "id": "t6-split-big",
+   "spec_8b": 6,
+   "submit_utc": null,
+   "status": "not started",
+   "observation": "21:29:28-21:30:13 UTC: big-250.pdf picked (uploaded on pick), every-page mode ready, action enabled, no page-cap warning before the run. The runner refused to press the action because the rolling 60-minute window since t3 (20:30:15) had 3 s left; the retry after 21:30:16 was blocked by the session's permission system, so reference work stopped. Run-time cap behaviour unknown.",
+   "captures": "eval/t6-split-big/"
+  }
+ ],
+ "reference_observations": {
+  "M1": "Reference Lighthouse mobile performance 89-91 (one run per page), FCP 2.6-2.8 s, LCP/TTI 2.8-3.0 s. Desktop unthrottled, median of 3: upload button visible at 513-615 ms (Combine 954), file chooser opens 703 (Delete), 711 (Organize), 779 (Split), 839 (Extract), 1145 (Combine) ms. Words above the action 24-35 desktop, 13-24 phone.",
+  "M2": "Reference offers click, drop, three cloud sources and a link source; files upload on pick.",
+  "M3": "Reference first painted thumbnail 817 ms (Extract) and 832 ms (Delete) at 1280x720.",
+  "M4": "Reference thumbnail canvas 300x424 drawn at 165x226 CSS px (1.82 backing px per CSS px). Page order and rotation shown correctly; rotated tile drawn landscape.",
+  "M5": "Reference: click and modifier-click selection, typed ranges, drag on Organize; no undo; tiles not keyboard reachable.",
+  "M6": "Reference free tier: 200 pages per document (Organize/Combine 50), 3 tasks per hour, 30 files per hour.",
+  "M7": "Reference: upload on pick, then 2.53-2.55 s from the action to task done and 3.06-3.08 s to the download control (t2-t5).",
+  "M8": "Reference outputs render pixel-identical to the source pages (72 dpi) on Extract and Delete. Sizes: Extract 1592 B, Delete 3626 B, Alternate 4400 B (26 pages), Organize 4478 B (16 pages), Split parts 1678/1360/1685/1950 B. All use one object stream holding the page and font dictionaries.",
+  "M9": "Reference: generic failure on corrupt files, paywall banner over 50 pages on Organize (from spec research captures).",
+  "M10": "Reference uploads every file to its API on pick (POST /api/files/upload seen in every run's network log).",
+  "M11": "Reference: plain dense layout with repeated hint text.",
+  "M12": "Reference keeps its primary in a fixed bottom bar, in view at all five viewports once a file is in, and auto-scrolls past its header after a load. Split with the options panel open leaves 2-37 % of the height to pages."
+ },
+ "micro_reference_numbers": {
+  "lighthouse_reference_perf": {
+   "split-pdf": 90,
+   "extract-pdf-pages": 89,
+   "delete-pdf-pages": 91,
+   "organize-pdf": 90,
+   "visually-combine-reorder-pdf": 90,
+   "alternate-mix-pdf": 90
+  },
+  "chooser_open_median_ms_reference_vs_berrypdf": {
+   "split": [
+    779,
+    977
+   ],
+   "extract": [
+    839,
+    1004
+   ],
+   "delete": [
+    703,
+    983
+   ],
+   "organize": [
+    711,
+    965
+   ],
+   "combine": [
+    1145,
+    1002
+   ],
+   "alternate": [
+    734,
+    978
+   ]
+  },
+  "first_thumbnail_ms_reference": {
+   "extract": 817,
+   "delete": 832
+  },
+  "fit_loaded_delete_reference_h_w_pct": {
+   "1366x657": [
+    59,
+    99
+   ],
+   "1280x632": [
+    57,
+    98
+   ],
+   "1536x730": [
+    63,
+    99
+   ],
+   "1920x969": [
+    65,
+    99
+   ],
+   "390x664": [
+    56,
+    95
+   ]
+  },
+  "fit_loaded_split_options_open_reference_h_pct": {
+   "1366x657": 7,
+   "1280x632": 3,
+   "1536x730": 16,
+   "1920x969": 37,
+   "390x664": 2
+  },
+  "chooser_open_median_ms_second_set_2129utc": {
+   "split": [
+    625,
+    953
+   ],
+   "extract": [
+    657,
+    959
+   ],
+   "delete": [
+    579,
+    905
+   ],
+   "organize": [
+    426,
+    948
+   ],
+   "combine": [
+    974,
+    973
+   ],
+   "alternate": [
+    827,
+    974
+   ]
+  }
+ },
+ "berrypdf_same_task_baseline": {
+  "build": "4a79c2dca87f9030c468c19ff2bcf25fd82603d0",
+  "split_1-3,8-9,12": "twelve-split.zip, 3 entries (twelve-1-3 1938 B, twelve-8-9 1445 B, twelve-12 1056 B)",
+  "alternate_twelve+short+separator": "twelve_mixed.pdf, 25 pages, 8627 B",
+  "extract_9,2-3": "twelve.pdf, pages 2,3,9, 1835 B",
+  "delete_5": "twelve.pdf, 11 pages, 5151 B, outline Intro->1, Detail->5, End->9",
+  "organize_twelve+three-pages_rotate_A2": "twelve_organized.pdf, 15 pages, /Rotate 90 on page 2, 6651 B",
+  "split_every_page_big-250": "big-250-split.zip, 250 entries, runs 1626/1085/651 ms (median 1085)",
+  "run_time_median_ms": {
+   "split": 888,
+   "extract": 877,
+   "delete": 864,
+   "organize": 876,
+   "combine": 875,
+   "alternate": 875
+  },
+  "thumbnail_backing_px_per_css_px": {
+   "1x": 0.71,
+   "2x": 1.41
+  },
+  "lighthouse_perf_runs": {
+   "split-pdf": [
+    99,
+    99,
+    96
+   ],
+   "extract-pdf-pages": [
+    100,
+    99,
+    98
+   ],
+   "delete-pdf-pages": [
+    99,
+    97,
+    100
+   ],
+   "organize-pdf": [
+    98,
+    99,
+    99
+   ],
+   "combine-reorder-pdf": [
+    97,
+    95,
+    97
+   ],
+   "alternate-mix-pdf": [
+    99,
+    97,
+    97
+   ]
+  },
+  "axe": "0 violations of any impact in 58 scans",
+  "split_paste_race": "Custom 1-2, 3-12 on links.pdf filled in one go then Tab/Enter/click at once -> links-1-12.pdf (stale single part), 3 of 3; typed key by key -> 2 files"
+ },
+ "tasks_used": {
+  "count": 5,
+  "submit_utc": [
+   "2026-11-26T20:00:54Z",
+   "2026-11-26T20:15:19Z",
+   "2026-11-26T20:30:15Z",
+   "2026-11-26T21:01:18Z",
+   "2026-11-26T21:16:22Z"
+  ],
+  "per_clock_hour": {
+   "20": 3,
+   "21": 2
+  }
+ },
+ "other_reference_traffic": [
+  "Landing timing loads (3 per page) and one Lighthouse run per page earlier in the session",
+  "21:04 UTC: no-submit dry run of the Organize task (two files uploaded on pick, no task)",
+  "21:27:30-21:29:09 UTC: a second landing timing set started by mistake (3 loads per page, 3 s apart, no files); its numbers replaced micro/tti-d.json (copy in micro/tti-d-run2.json). The first set: chooser-open medians Split 779, Extract 839, Delete 703, Organize 711, Combine 1145, Alternate 734 ms (BerryPDF 977, 1004, 983, 965, 1002, 978)",
+  "21:29:28-21:30:13 UTC: refused t6 attempt (250-page file uploaded on pick, no task)"
+ ],
+ "open_items": [
+  "8b.6 run-time page cap (one slot)",
+  "8b.4 second half: Delete all pages error (one slot)",
+  "8b.7 every even page card grouping (one slot)",
+  "Reference loaded-state fit for Alternate and Extract (captured only from spec research)"
+ ],
+ "verdict": {
+  "result": "FAIL",
+  "micro": {
+   "M1": "tie",
+   "M2": "tie",
+   "M3": "tie",
+   "M4": "lose",
+   "M5": "win",
+   "M6": "win",
+   "M7": "win",
+   "M8": "lose",
+   "M9": "win",
+   "M10": "win",
+   "M11": "tie",
+   "M12": "tie"
+  },
+  "acs": "109/109 (P0 52/52)"
+ },
+ "files": [
+  {
+   "path": "eval/t1-split-custom/01-loaded.png",
+   "bytes": 101607,
+   "sha256": "89daa317b748ace03a97783e9aa92a33ca36173292d49fccaa2b9f34c10b079d"
+  },
+  {
+   "path": "eval/t1-split-custom/01a-more.png",
+   "bytes": 92971,
+   "sha256": "839a2a582dd7e217a06f3e555c62e2f27b6dd44abc244f3b18c30d3fb5187092"
+  },
+  {
+   "path": "eval/t1-split-custom/01b-typed.png",
+   "bytes": 96897,
+   "sha256": "3923605b80043958fc924ea6dcdddda4d792033c4e13116eccaadd17bb7698e1"
+  },
+  {
+   "path": "eval/t1-split-custom/02-before-submit.png",
+   "bytes": 96897,
+   "sha256": "67582dfef45b31432dd48f3aaf40bdb30824991b2390fd4e6d900cd099c4081e"
+  },
+  {
+   "path": "eval/t1-split-custom/03-result.png",
+   "bytes": 57008,
+   "sha256": "528f2069cd94adadc8b0e7a20efc37da41ddd2af645c8f3542897fe004be5e31"
+  },
+  {
+   "path": "eval/t1-split-custom/99-error.png",
+   "bytes": 77519,
+   "sha256": "f3a2af7a1f31022159940aaf69cba1b9b69c99bf2a3c124425d13717c828fc30"
+  },
+  {
+   "path": "eval/t1-split-custom/fit-loaded-1280x632.png",
+   "bytes": 91936,
+   "sha256": "2bcacc6216cb355503f11f674337ea7c0b625786955e5675ca9099cec3727d39"
+  },
+  {
+   "path": "eval/t1-split-custom/fit-loaded-1366x657.png",
+   "bytes": 96185,
+   "sha256": "503555aab74fc53ebdd88318c5dff7ab06f6a73e96daa9505b59962d5877ad39"
+  },
+  {
+   "path": "eval/t1-split-custom/fit-loaded-1536x730.png",
+   "bytes": 103279,
+   "sha256": "fd50a81db9f245e9825d51def0bf8173154fbba76cd9eaaac53ecf1f53ded160"
+  },
+  {
+   "path": "eval/t1-split-custom/fit-loaded-1920x969.png",
+   "bytes": 121386,
+   "sha256": "140ea46117a52f7144586e99d1a63c7fcf96d7475a84fe71963443ac837bf68b"
+  },
+  {
+   "path": "eval/t1-split-custom/fit-loaded-390x664.png",
+   "bytes": 66839,
+   "sha256": "0eb126ac1746960a3c8fc3e76abbfc2b2a27a73b5467ca3adfe43582df3214d8"
+  },
+  {
+   "path": "eval/t1-split-custom/run.json",
+   "bytes": 9631,
+   "sha256": "04ff13182416bdcf6daa9b5b8ec7b6c831a748a3108be022daa5da68d3fff472"
+  },
+  {
+   "path": "eval/t1-split-custom/sejda-EXRKVJ.zip",
+   "bytes": 7181,
+   "sha256": "1af7985d76e8382f45c1eafdf593957c0636fc2a1920c94666740808be31a864"
+  },
+  {
+   "path": "eval/t2-alternate/01-loaded.png",
+   "bytes": 102436,
+   "sha256": "a58b2d467a39c06ec656dd25caf90d9361b3d3efb8eee626f774ff91b40d231b"
+  },
+  {
+   "path": "eval/t2-alternate/02-before-submit.png",
+   "bytes": 102436,
+   "sha256": "8c03ce388261ba0f1d79886f4d6a04e51b2531a959849a105015c03fce9e8264"
+  },
+  {
+   "path": "eval/t2-alternate/03-result.png",
+   "bytes": 73166,
+   "sha256": "f8e77a789cf9d804966bee904dd3bfdb9384fc700d7c52780d52744c8f58fe74"
+  },
+  {
+   "path": "eval/t2-alternate/04-after-download.png",
+   "bytes": 73147,
+   "sha256": "2773122804d207e9816f6c068cbff728c025f53139637c9423442ab85b509ca0"
+  },
+  {
+   "path": "eval/t2-alternate/fit-result-1280x632.png",
+   "bytes": 69465,
+   "sha256": "c165bca087281715df4500c4fd9490b329bd2ae8a17acf20b07aea616616cc9c"
+  },
+  {
+   "path": "eval/t2-alternate/fit-result-1366x657.png",
+   "bytes": 73166,
+   "sha256": "da0b1611b6ca5251ef43ef1860ea6e9fdc1220da34dca353e488d6153a813be2"
+  },
+  {
+   "path": "eval/t2-alternate/fit-result-1536x730.png",
+   "bytes": 77480,
+   "sha256": "65847fa99de5f39067772afd1b1b6a6f8549d88c0dd5e22a3dd9d33bb1ddea0e"
+  },
+  {
+   "path": "eval/t2-alternate/fit-result-1920x969.png",
+   "bytes": 98411,
+   "sha256": "fc75cd96df7aa56f4572347f89a1b3b6c7b470cb9a694d57c01ea0a40197ad25"
+  },
+  {
+   "path": "eval/t2-alternate/fit-result-390x664.png",
+   "bytes": 46444,
+   "sha256": "7af54599641aa8fd7e32033e4a57204fc114fe10da9e9869256f57ae4d44cede"
+  },
+  {
+   "path": "eval/t2-alternate/run.json",
+   "bytes": 6067,
+   "sha256": "38b49c282331c9fdbd0f9327cd45fbcf6f622306f479d44bdea982afa62c647d"
+  },
+  {
+   "path": "eval/t2-alternate/sejda-twelve_mixed.pdf",
+   "bytes": 4400,
+   "sha256": "6433a48d019135b62654c31f0f815e23ce14a60429a8022e7e73dfc3d0c50c53"
+  },
+  {
+   "path": "eval/t3-extract/01-loaded.png",
+   "bytes": 65835,
+   "sha256": "f7f23f36ab18d453f2bc48a8d56319d8166914c023772b893324a6f8a728ca56"
+  },
+  {
+   "path": "eval/t3-extract/02-before-submit.png",
+   "bytes": 63667,
+   "sha256": "3287d74d3f178d2951a486dce021cfe12d332961c4c9f91cd63f541f1579f08a"
+  },
+  {
+   "path": "eval/t3-extract/03-result.png",
+   "bytes": 68742,
+   "sha256": "4063d62b07e59a3289e9e5b33efe9ca45546f91ef25e4aee757b914e9dcb3548"
+  },
+  {
+   "path": "eval/t3-extract/04-after-download.png",
+   "bytes": 69065,
+   "sha256": "d54ac740cbe2fb02aa57fba32ad899bd546f2a1bb3433809c76117926d7364f8"
+  },
+  {
+   "path": "eval/t3-extract/fit-result-1280x632.png",
+   "bytes": 66831,
+   "sha256": "c6752b514e4d0db01d2f51ca72dfedbe8fa14925a9a6133d4fc9184f3b5dc19d"
+  },
+  {
+   "path": "eval/t3-extract/fit-result-1366x657.png",
+   "bytes": 68742,
+   "sha256": "c1d18d21ccde799933ba2296dd29ac07f103037814d8cc2929af9d0665c932c2"
+  },
+  {
+   "path": "eval/t3-extract/fit-result-1536x730.png",
+   "bytes": 73121,
+   "sha256": "a9e20cb99412319d2096a0f5236ca4925566b5b0ff9fe66bed076f815c1f720f"
+  },
+  {
+   "path": "eval/t3-extract/fit-result-1920x969.png",
+   "bytes": 93684,
+   "sha256": "933c83713ec41882e14e3cd74c160911554e4c25c06bd8171b4d3cdb039459e9"
+  },
+  {
+   "path": "eval/t3-extract/fit-result-390x664.png",
+   "bytes": 44593,
+   "sha256": "11b4d7669eae9f4bccb069ba7d91df581767991db493427b40c44f761910b0f5"
+  },
+  {
+   "path": "eval/t3-extract/run.json",
+   "bytes": 5607,
+   "sha256": "5cd93bc4b9dadfb3a26ad9e8b59823a7fe178a950e7c8e7ff61433f4c37c2fb5"
+  },
+  {
+   "path": "eval/t3-extract/sejda-twelve.pdf",
+   "bytes": 1592,
+   "sha256": "150f8ba2446b8565da0f23e331f846c07e5ab82b1dce866ef4b665bc00d85ec5"
+  },
+  {
+   "path": "eval/t4-delete/01-loaded.png",
+   "bytes": 58559,
+   "sha256": "94b19633bc388f2e5db52aa0b770545ef6857af0dc7a7f68f501d2c7523e7249"
+  },
+  {
+   "path": "eval/t4-delete/02-before-submit.png",
+   "bytes": 55239,
+   "sha256": "8b374bba56fdc5ced9721d1c53129f1df154abcadd77e98427c56bc81b679cb2"
+  },
+  {
+   "path": "eval/t4-delete/03-result.png",
+   "bytes": 72899,
+   "sha256": "c14ff2899405d0c1d1a632c90c48f4696c9ea476d758994cd12ffcf8acf913a3"
+  },
+  {
+   "path": "eval/t4-delete/04-after-download.png",
+   "bytes": 72855,
+   "sha256": "afef1d922d0bb8b866be10f71cde5fc11f0133477f8149dd0f05465b2970f5dc"
+  },
+  {
+   "path": "eval/t4-delete/fit-loaded-1280x632.png",
+   "bytes": 52463,
+   "sha256": "12ae68d6e970b3b35e060209100be29f8bcdc354f4166b2b82c5bc90e127d681"
+  },
+  {
+   "path": "eval/t4-delete/fit-loaded-1366x657.png",
+   "bytes": 54833,
+   "sha256": "4fbf1c2f47e053c94d29c268ec9b8fcef546afda40a356876a6efda1226000d6"
+  },
+  {
+   "path": "eval/t4-delete/fit-loaded-1536x730.png",
+   "bytes": 59088,
+   "sha256": "bbcacf13795b4fbaf214d77fe76a7ac6345efe7af43553ce000a02360959c2ff"
+  },
+  {
+   "path": "eval/t4-delete/fit-loaded-1920x969.png",
+   "bytes": 82478,
+   "sha256": "708db0cbe715e710230095e140e3613b89a29e5f19a7fac91464eeb20afe987a"
+  },
+  {
+   "path": "eval/t4-delete/fit-loaded-390x664.png",
+   "bytes": 31708,
+   "sha256": "99870f0d8eed853d50e6a8d6b8ed5a003cd7021aa21534634df944271f54867d"
+  },
+  {
+   "path": "eval/t4-delete/fit-result-1280x632.png",
+   "bytes": 69207,
+   "sha256": "134ac230280800bdf58741461f7013e2382dcdaf3ad80c10baa088fc8fa43072"
+  },
+  {
+   "path": "eval/t4-delete/fit-result-1366x657.png",
+   "bytes": 72971,
+   "sha256": "a8f4fdacd9cb8920a20b0e69c88781a46b29cc00edd7cda566bdb81c2c368b47"
+  },
+  {
+   "path": "eval/t4-delete/fit-result-1536x730.png",
+   "bytes": 77243,
+   "sha256": "f82599a1440c14da7f5ef9833f5b5c35f320c2775a18edf6ebb89f6230d7d941"
+  },
+  {
+   "path": "eval/t4-delete/fit-result-1920x969.png",
+   "bytes": 98160,
+   "sha256": "0b195cb4e2795f9facf10649b57d9360eb3c6815b035feea70f6ca928d40b0af"
+  },
+  {
+   "path": "eval/t4-delete/fit-result-390x664.png",
+   "bytes": 46210,
+   "sha256": "a6e1863d97e84e6db96629f57adc3ad7667feec2ba7211b8ea4ff7bc0d32c09c"
+  },
+  {
+   "path": "eval/t4-delete/run.json",
+   "bytes": 6877,
+   "sha256": "5aca48ba4ebfba8c40658529b8c5f954c4e6683bb18576ecc7eac37cc0867444"
+  },
+  {
+   "path": "eval/t4-delete/sejda-updated_twelve.pdf",
+   "bytes": 3626,
+   "sha256": "a2b2ebf8ef3b0fb42e2bbb87811ca4a1416bf791b933a703e2afaa17cc6f1739"
+  },
+  {
+   "path": "eval/t4-delete/thumb-crop.png",
+   "bytes": 8950,
+   "sha256": "ae884d432bdbcbec45fbbe3646235738267fc211765c8b727f3a8c806f49575f"
+  },
+  {
+   "path": "eval/t5-organize/01-loaded.png",
+   "bytes": 59308,
+   "sha256": "e0615b81ba3cbd5baaa8ba47a6bd6070384fb458c0a4fe370248fcbd44308e8d"
+  },
+  {
+   "path": "eval/t5-organize/01c-rotated.png",
+   "bytes": 62924,
+   "sha256": "644bfd1660e8afacc15169d5c46308221505668987c7e336956138bae82787c3"
+  },
+  {
+   "path": "eval/t5-organize/01d-blank.png",
+   "bytes": 61025,
+   "sha256": "ee7b97bcda21c428dfe954e3670845199c88dfbd43423c26dea900edc436b30b"
+  },
+  {
+   "path": "eval/t5-organize/02-before-submit.png",
+   "bytes": 61025,
+   "sha256": "a0d726b4620882afd43d8552ace532975ceaa002b684ae0254b82bef166fea1a"
+  },
+  {
+   "path": "eval/t5-organize/03-result.png",
+   "bytes": 73465,
+   "sha256": "95066d821ee107d7f8f397af879e9946485371ef76f71423c077eafa9bebd27d"
+  },
+  {
+   "path": "eval/t5-organize/04-after-download.png",
+   "bytes": 73691,
+   "sha256": "b3c7c0ee0896b1f30a318bd181a9a0294965c7b12889ad44269119a310ed3448"
+  },
+  {
+   "path": "eval/t5-organize/fit-loaded-1280x632.png",
+   "bytes": 55819,
+   "sha256": "07e10db22c3e4d4818cda48fc96e83d30403d57e1a66eedd2d1929cb9acf7050"
+  },
+  {
+   "path": "eval/t5-organize/fit-loaded-1366x657.png",
+   "bytes": 58604,
+   "sha256": "6fa00c791739a3aa2ff0a5097509d511557c71294dce65214dc8c76877f9db52"
+  },
+  {
+   "path": "eval/t5-organize/fit-loaded-1536x730.png",
+   "bytes": 67116,
+   "sha256": "5e391f8b326ed08f872fdd43609111c6b420acecd629a6ebb94fc828127be3d8"
+  },
+  {
+   "path": "eval/t5-organize/fit-loaded-1920x969.png",
+   "bytes": 83529,
+   "sha256": "896e0e6e71baee097fade2099229228a8729897b3684e9c2e16059774b63b852"
+  },
+  {
+   "path": "eval/t5-organize/fit-loaded-390x664.png",
+   "bytes": 34907,
+   "sha256": "5121b6ff469a51f2622f61b7c86768296e0ca54d431d9baa8f2ef383889e53ef"
+  },
+  {
+   "path": "eval/t5-organize/fit-result-1280x632.png",
+   "bytes": 69743,
+   "sha256": "d19bff564dc7c5f659cb5373b8311362704d2a70900694d06147679ee66d63f5"
+  },
+  {
+   "path": "eval/t5-organize/fit-result-1366x657.png",
+   "bytes": 72864,
+   "sha256": "87a57c7520ec96b933762a60747fb4e6c208b6005b4293b27b0179ce2b6e1f9f"
+  },
+  {
+   "path": "eval/t5-organize/fit-result-1536x730.png",
+   "bytes": 77288,
+   "sha256": "0c55bf96995abb77eda28083781ed71f0c86cdf47a41bba04fff716089acc946"
+  },
+  {
+   "path": "eval/t5-organize/fit-result-1920x969.png",
+   "bytes": 98127,
+   "sha256": "8ee1982d011e839ad40ec89c6f2e6e702ee5d0088c2c5c67b79385a2fff6b183"
+  },
+  {
+   "path": "eval/t5-organize/fit-result-390x664.png",
+   "bytes": 46228,
+   "sha256": "acbfb8f58055cb22a44b5f839801874a7fb12ea56573097b63b2540dc48504a3"
+  },
+  {
+   "path": "eval/t5-organize/run.json",
+   "bytes": 7992,
+   "sha256": "45ff5252e1345702110ccc1369c13eb8ba99f7d4ff3c4a99a3af449f05c4d26b"
+  },
+  {
+   "path": "eval/t5-organize/sejda-three-pages_merged.pdf",
+   "bytes": 4478,
+   "sha256": "3114d5b839d71c7beeca762df42050ed28f545274c84ba19efb44b4327d355b5"
+  },
+  {
+   "path": "eval/t5-organize/dryrun/01-loaded.png",
+   "bytes": 59308,
+   "sha256": "bb54fde2916d1df316bb56b64cd658f3918ce0472f049e646b0949e8b11d66ad"
+  },
+  {
+   "path": "eval/t5-organize/dryrun/99-error.png",
+   "bytes": 59308,
+   "sha256": "7bd203b7e6fff22da4ebde777fbfc15b7363bb9936f42c9e4c0ea3722e7b9c6c"
+  },
+  {
+   "path": "eval/t5-organize/dryrun/run.json",
+   "bytes": 2080,
+   "sha256": "80b631a008d868b8c6cef147ab0a067336b6ade247a3e18a40de3a2b77b6618c"
+  },
+  {
+   "path": "eval/t6-split-big/01-loaded.png",
+   "bytes": 102178,
+   "sha256": "cdf6b94f729f9bff0e0c90e5d010fab9b96de4c8ce02e2bce427f806d0a6c749"
+  },
+  {
+   "path": "eval/t6-split-big/02-before-submit.png",
+   "bytes": 79616,
+   "sha256": "dab695d28089e2f4026c75dbadc66dff262b3ce8c743ba15507c5fb1cf5d4ed3"
+  },
+  {
+   "path": "eval/t6-split-big/fit-loaded-1280x632.png",
+   "bytes": 74329,
+   "sha256": "f804638fae248fb091a846ffb0625dbc0626ba998e20e28bf82faf94acb75a07"
+  },
+  {
+   "path": "eval/t6-split-big/fit-loaded-1366x657.png",
+   "bytes": 77760,
+   "sha256": "02798e4e9faef40a313c82038dfd3aae5c34d5ffba8ef20cb0058c95ed34be5a"
+  },
+  {
+   "path": "eval/t6-split-big/fit-loaded-1536x730.png",
+   "bytes": 84426,
+   "sha256": "81c0d7a32b363c9d500382c902dca54bc5aab7c969e0b74bd1141ad45b34483a"
+  },
+  {
+   "path": "eval/t6-split-big/fit-loaded-1920x969.png",
+   "bytes": 106494,
+   "sha256": "94596c7ed91f0a5b79c459470c81f20184dfece8c62ec8659717850afdac0fc3"
+  },
+  {
+   "path": "eval/t6-split-big/fit-loaded-390x664.png",
+   "bytes": 51546,
+   "sha256": "5f5dbee72e610776d86e512d012a9924f09b5f188b69f3f92e176450451224d1"
+  },
+  {
+   "path": "eval/t6-split-big/run.json",
+   "bytes": 3260,
+   "sha256": "33129489cd7443afb1de1750f51a058f537ef2d4feb5d5877cb2d075f9ff0285"
+  },
+  {
+   "path": "micro/sejda/alternate-d-01-landing.png",
+   "bytes": 105025,
+   "sha256": "1d4f75693d0b798fa04cd6c18a78f06d9979e518070fa7c006a350238e97de93"
+  },
+  {
+   "path": "micro/sejda/alternate-fit-empty-1280x632.png",
+   "bytes": 91147,
+   "sha256": "5934d1fdabafdc11824d4c0adb991d68d664594aaeb61421d3a3385b9cf8fe48"
+  },
+  {
+   "path": "micro/sejda/alternate-fit-empty-1366x657.png",
+   "bytes": 93832,
+   "sha256": "19426e07d3e9e75aa7ac673ef64ba9be309385c55bc7249fd42632b44f296f35"
+  },
+  {
+   "path": "micro/sejda/alternate-fit-empty-1536x730.png",
+   "bytes": 111800,
+   "sha256": "f9c94a484817aa5ff0fc2024180039067b7d6723433160ba92b2c25e3c9ba686"
+  },
+  {
+   "path": "micro/sejda/alternate-fit-empty-1920x969.png",
+   "bytes": 148705,
+   "sha256": "64eee944b1bfdf18af5fb35f1f791ae4c4f463d7efe381e14e241d4e16d4e7d8"
+  },
+  {
+   "path": "micro/sejda/alternate-fit-empty-390x664.png",
+   "bytes": 61435,
+   "sha256": "b57e710bb7c086c72a0904b2f576ce9f419362542871b14350cee74ab62fb98d"
+  },
+  {
+   "path": "micro/sejda/alternate-m-01-landing.png",
+   "bytes": 136537,
+   "sha256": "1aa178ecec2dea9792d247921047fc1914217da2894263a38f52438d7992229a"
+  },
+  {
+   "path": "micro/sejda/combine-d-01-landing.png",
+   "bytes": 95715,
+   "sha256": "d0edda3e0550d8ac34586240ae20ffad8b5f635e978865d10e5d14beb38ccb4c"
+  },
+  {
+   "path": "micro/sejda/combine-fit-empty-1280x632.png",
+   "bytes": 86602,
+   "sha256": "9da2c2e64923fdfd34a060da57af27ca83f4284552ec7d3cc2736dac819c4905"
+  },
+  {
+   "path": "micro/sejda/combine-fit-empty-1366x657.png",
+   "bytes": 96117,
+   "sha256": "b8f82cc0a86410ff2a2900744b9360b8df2f8503e10d7c37207fc315cc8d3819"
+  },
+  {
+   "path": "micro/sejda/combine-fit-empty-1536x730.png",
+   "bytes": 102284,
+   "sha256": "a6bfaa4d64474b44ccff78670797ce8c3a667d560b5f66a2606461b0460166f1"
+  },
+  {
+   "path": "micro/sejda/combine-fit-empty-1920x969.png",
+   "bytes": 141007,
+   "sha256": "51ab558b7948235e8892bdcfdd7914297177554648d7594c6ebd5c45bc020a09"
+  },
+  {
+   "path": "micro/sejda/combine-fit-empty-390x664.png",
+   "bytes": 62004,
+   "sha256": "be1749ecf847181121d5c0deb0ef81d0a8bf1f1142ece486af2f99a55bfccc48"
+  },
+  {
+   "path": "micro/sejda/combine-m-01-landing.png",
+   "bytes": 139758,
+   "sha256": "f6cb8aded24b115e935457c162dd9562d62ce0f15c31fa064880fb889cff6884"
+  },
+  {
+   "path": "micro/sejda/delete-d-01-landing.png",
+   "bytes": 101604,
+   "sha256": "974ca375c97269eeb1b6036b46c13d9fe26b6b23a2fb0635a7b01574f5948956"
+  },
+  {
+   "path": "micro/sejda/delete-fit-empty-1280x632.png",
+   "bytes": 81925,
+   "sha256": "d1aa3fd2891e789d29047960f77dbb0bac2b53ce91e217ffa681900c70478af6"
+  },
+  {
+   "path": "micro/sejda/delete-fit-empty-1366x657.png",
+   "bytes": 88627,
+   "sha256": "9418acc63cfce8e1a8c62c34a53b889eae626ecadb4091f42be25389e60a2db1"
+  },
+  {
+   "path": "micro/sejda/delete-fit-empty-1536x730.png",
+   "bytes": 108205,
+   "sha256": "bc68e74ee4f29f39811c124c962630a8060d7899461e749ff16c60a58fc1ac8c"
+  },
+  {
+   "path": "micro/sejda/delete-fit-empty-1920x969.png",
+   "bytes": 142935,
+   "sha256": "39f040c99f24b4071d242fffc12fc1078a460a3d86634966cc608c120c98d3cc"
+  },
+  {
+   "path": "micro/sejda/delete-fit-empty-390x664.png",
+   "bytes": 56808,
+   "sha256": "2fd6a417ece55202a081030767d5d9784e18f3c3b4ab873e156a58b4dc1b55ce"
+  },
+  {
+   "path": "micro/sejda/delete-m-01-landing.png",
+   "bytes": 126959,
+   "sha256": "935bc561350dea0976b8824d3b689739b223c97b07f48bf42999e347b62e7c05"
+  },
+  {
+   "path": "micro/sejda/extract-d-01-landing.png",
+   "bytes": 92301,
+   "sha256": "45d29ad49bdbdcaede77ebbe009c5b786725084615cd1e9a99a5633c0a25b0f5"
+  },
+  {
+   "path": "micro/sejda/extract-fit-empty-1280x632.png",
+   "bytes": 87300,
+   "sha256": "6cf26deb48e2470806e8276e041943cdd5dfe328a1d39a0874d2ae71c816d00a"
+  },
+  {
+   "path": "micro/sejda/extract-fit-empty-1366x657.png",
+   "bytes": 90170,
+   "sha256": "71879af03495ee80c0b8fcb3d2347cc89bd2e980f66befa61a8b96a72123ab66"
+  },
+  {
+   "path": "micro/sejda/extract-fit-empty-1536x730.png",
+   "bytes": 98252,
+   "sha256": "4405041c76285075046e1bd46c8cf4bf38982fb35a5948ddee02455325a2c03e"
+  },
+  {
+   "path": "micro/sejda/extract-fit-empty-1920x969.png",
+   "bytes": 145096,
+   "sha256": "e70847e8dd9c5740bbd46eed6cae01420f449eee372a67615ccdbdc59e7f8e87"
+  },
+  {
+   "path": "micro/sejda/extract-fit-empty-390x664.png",
+   "bytes": 57145,
+   "sha256": "535fd41d14a3c413ca663d84eb1cdd4f9c439e078e7570cda945892b2e57a040"
+  },
+  {
+   "path": "micro/sejda/extract-m-01-landing.png",
+   "bytes": 128594,
+   "sha256": "89db05c285d93a498432bcd741c011764d6867c01a455ce8d13e3d712a3b0c77"
+  },
+  {
+   "path": "micro/sejda/landing-sejda.json",
+   "bytes": 12860,
+   "sha256": "cfef6955097b3c13f050202319952eceb69d2365f901c3f1663a29a4f162efea"
+  },
+  {
+   "path": "micro/sejda/organize-d-01-landing.png",
+   "bytes": 87667,
+   "sha256": "9ff07dd0849958c4bd2ca004553dc54dbbe52b8e1ecb7434709f9b4fab386944"
+  },
+  {
+   "path": "micro/sejda/organize-fit-empty-1280x632.png",
+   "bytes": 82717,
+   "sha256": "d8ae2cb7afffdc4348f41bff0aaa8b9e3a6c8c7a9f3cfc33dbb1e27c54f1bd67"
+  },
+  {
+   "path": "micro/sejda/organize-fit-empty-1366x657.png",
+   "bytes": 85398,
+   "sha256": "b3b12798f93efa01f6098f5de8449aad956f80fdea62c456130f2c4368daff06"
+  },
+  {
+   "path": "micro/sejda/organize-fit-empty-1536x730.png",
+   "bytes": 93721,
+   "sha256": "f19bbacc31ea85920420f9c0db4db820875e93904b31960b64116e7568d02ba3"
+  },
+  {
+   "path": "micro/sejda/organize-fit-empty-1920x969.png",
+   "bytes": 140702,
+   "sha256": "2e01d2cfd4cdf7fa3f38b172c6db57641ae10a900d6bc1ed699977e3542e15ee"
+  },
+  {
+   "path": "micro/sejda/organize-fit-empty-390x664.png",
+   "bytes": 57904,
+   "sha256": "94794e960698f9aa54cc17a321c8567d9efe1d94adad1cec105949428a0df2e6"
+  },
+  {
+   "path": "micro/sejda/organize-m-01-landing.png",
+   "bytes": 130743,
+   "sha256": "e490157e780b7c57e71a29a54bf25da55a5e0b5623cb74a2f5e2c645a7e6acfa"
+  },
+  {
+   "path": "micro/sejda/split-d-01-landing.png",
+   "bytes": 106505,
+   "sha256": "7dbcffd4b7e91587f32491b0a39592b308621d6fa3b41034afa187b617d329a8"
+  },
+  {
+   "path": "micro/sejda/split-d-probe.png",
+   "bytes": 106505,
+   "sha256": "494b5de52a089d323c0233f6f54c255f57b1e74f7018bbd41e42cc3494524cef"
+  },
+  {
+   "path": "micro/sejda/split-fit-empty-1280x632.png",
+   "bytes": 90180,
+   "sha256": "69734428f6474d8eb8526ba6bc77f645367903bb0f6049709b6e662498f1d942"
+  },
+  {
+   "path": "micro/sejda/split-fit-empty-1366x657.png",
+   "bytes": 93046,
+   "sha256": "4f76f4349f6aa11d5d9ba559bd187c05fdd9470c9ac4d0a0faae5eab04e5210e"
+  },
+  {
+   "path": "micro/sejda/split-fit-empty-1536x730.png",
+   "bytes": 113242,
+   "sha256": "98af7c7e6e32c0b269c5d25cffd8493f0e13dc6a7825952120851134881d568e"
+  },
+  {
+   "path": "micro/sejda/split-fit-empty-1920x969.png",
+   "bytes": 151415,
+   "sha256": "82b5c6ab18a3bcb2574e2f04e6268bbe8507c1dfa7e438d36f7824f89e28dca6"
+  },
+  {
+   "path": "micro/sejda/split-fit-empty-390x664.png",
+   "bytes": 60585,
+   "sha256": "3b803470b29c2a98373844ccb840da00e13aad6e7310b3751a742485cd5274c2"
+  },
+  {
+   "path": "micro/sejda/split-m-01-landing.png",
+   "bytes": 135621,
+   "sha256": "097ce15c5b231e4fa3455dc0bdba01064d11483a9ba49bf68903e1257b89e02c"
+  },
+  {
+   "path": "eval/lighthouse/lh-alternate-mix-pdf-1.json",
+   "bytes": 559824,
+   "sha256": "28d143d26081275559ef0db54e511021176e87bfb3cef836120616b1a01db6a6"
+  },
+  {
+   "path": "eval/lighthouse/lh-alternate-mix-pdf-2.json",
+   "bytes": 558794,
+   "sha256": "ab932e4500cb9b41b268ff0e429ed97e1af7f19d5a1266fe65271adf577a72b7"
+  },
+  {
+   "path": "eval/lighthouse/lh-alternate-mix-pdf-3.json",
+   "bytes": 559175,
+   "sha256": "3ef90f83aa6c7b506c69cf10c84c71273d759fa82d7e97c15a82981076055f73"
+  },
+  {
+   "path": "eval/lighthouse/lh-alternate-mix-pdf-4.json",
+   "bytes": 560292,
+   "sha256": "c86f3daa6b0d3ecf668dd73dc5c079bafc11ff6fdf633de858712eaba829ada6"
+  },
+  {
+   "path": "eval/lighthouse/lh-combine-reorder-pdf-1.json",
+   "bytes": 592424,
+   "sha256": "47426d918d383ee9f4119cf100809a5d5619d4ce4d6173767193dd22e5d5959c"
+  },
+  {
+   "path": "eval/lighthouse/lh-combine-reorder-pdf-2.json",
+   "bytes": 575312,
+   "sha256": "d3c30b5a3125833c4b392cdd5f0444c036e8ff2ceb943eb9fb37d1fe3901f1ba"
+  },
+  {
+   "path": "eval/lighthouse/lh-combine-reorder-pdf-3.json",
+   "bytes": 576389,
+   "sha256": "8dfecd446e0fcb0946f8d9beb79ec651874b6f312cb769410dda5d4f77369d6f"
+  },
+  {
+   "path": "eval/lighthouse/lh-combine-reorder-pdf-4.json",
+   "bytes": 578534,
+   "sha256": "f2472bf9aa1abcbfcd9c50665667b0d495de51ea246178fb121c33b649356e51"
+  },
+  {
+   "path": "eval/lighthouse/lh-delete-pdf-pages-1.json",
+   "bytes": 570696,
+   "sha256": "70f591399e06cc43e593bfe05253e01eec9b1ce93de1a417cd473c0ba2b8b9f3"
+  },
+  {
+   "path": "eval/lighthouse/lh-delete-pdf-pages-2.json",
+   "bytes": 569673,
+   "sha256": "6f6ba8943e53ba791b560473bd44f931418b9f1ef5776a0b423accf0b8e8cb48"
+  },
+  {
+   "path": "eval/lighthouse/lh-delete-pdf-pages-3.json",
+   "bytes": 569462,
+   "sha256": "618e3002b0fe9ee5abbddcf17bde7148e065c715a1f3960ec401ab0450eec474"
+  },
+  {
+   "path": "eval/lighthouse/lh-extract-pdf-pages-1.json",
+   "bytes": 577913,
+   "sha256": "3a04cfbe8b9c7645271c0f00bedc1ed16abeed9cba908ba1ec018ff0d73c6d46"
+  },
+  {
+   "path": "eval/lighthouse/lh-extract-pdf-pages-2.json",
+   "bytes": 578694,
+   "sha256": "899c5e58f5b5a668b2b57bdc56e7b087911202c88b05955494a1feae24840492"
+  },
+  {
+   "path": "eval/lighthouse/lh-extract-pdf-pages-3.json",
+   "bytes": 579137,
+   "sha256": "bc9136edd51ec09b6579a4b70114b5663700ff3c21a6bcc7ebcd779647d3e745"
+  },
+  {
+   "path": "eval/lighthouse/lh-organize-pdf-1.json",
+   "bytes": 552266,
+   "sha256": "4db5f04c176c51bd9ff8a28105668f80d6232439e5034f95edbb924bae5b2aa9"
+  },
+  {
+   "path": "eval/lighthouse/lh-organize-pdf-2.json",
+   "bytes": 552617,
+   "sha256": "d78d7a4b074b08e323f90f3f5d1095343af781c343e78eb570bbd681e4195bde"
+  },
+  {
+   "path": "eval/lighthouse/lh-organize-pdf-3.json",
+   "bytes": 552618,
+   "sha256": "64baa7f20bfc307c258409a369c5837863abb04474502aff34521a2bcb0b97e9"
+  },
+  {
+   "path": "eval/lighthouse/lh-sejda-alternate-mix-pdf.json",
+   "bytes": 539538,
+   "sha256": "241b856b52db41372f10ca5d17df83db8261d95a35e785051669c241430e5065"
+  },
+  {
+   "path": "eval/lighthouse/lh-sejda-delete-pdf-pages.json",
+   "bytes": 518208,
+   "sha256": "6b12ee681e6a7fa3d1359daf10184c6c55f55713646c4450383e5d99c7c20446"
+  },
+  {
+   "path": "eval/lighthouse/lh-sejda-extract-pdf-pages.json",
+   "bytes": 431614,
+   "sha256": "b31eeb6920ad79fdc329f84f1c117d85203879f62daf9549c8cc11a858ddfd1c"
+  },
+  {
+   "path": "eval/lighthouse/lh-sejda-organize-pdf.json",
+   "bytes": 417174,
+   "sha256": "525881f7a2c665ef10a12f29261565da757afda2cb65ed45c5b8b3fd0754dd6e"
+  },
+  {
+   "path": "eval/lighthouse/lh-sejda-split-pdf.json",
+   "bytes": 607115,
+   "sha256": "9c571686cfcd13bf81873e067497bff08a50b8fbc6fd0d6ef7ebf9a30b07595a"
+  },
+  {
+   "path": "eval/lighthouse/lh-sejda-visually-combine-reorder-pdf.json",
+   "bytes": 648939,
+   "sha256": "d54a657e90d8f862879c76f481cbd82f6ba70e141d0cfd3a3551164c27efe5b6"
+  },
+  {
+   "path": "eval/lighthouse/lh-split-pdf-1.json",
+   "bytes": 553066,
+   "sha256": "7752ab2c5aef398e47f014d7f550ec0e243162ff0488942db62221f40ef58e48"
+  },
+  {
+   "path": "eval/lighthouse/lh-split-pdf-2.json",
+   "bytes": 552001,
+   "sha256": "302adcbc176718b60799b34157b98b5a3908587cbeca46ab0dd5ea5256909ed8"
+  },
+  {
+   "path": "eval/lighthouse/lh-split-pdf-3.json",
+   "bytes": 554009,
+   "sha256": "07fc52bc6519cb88765ece9931172295103b52cd69727238d46d4454b0cec452"
+  },
+  {
+   "path": "eval/lighthouse/lh-split-pdf-4.json",
+   "bytes": 568256,
+   "sha256": "971990df71114615a4ff3adfc7fa672e64af9abdacfa05e2c5cba30df14ad696"
+  },
+  {
+   "path": "eval/axe.json",
+   "bytes": 1538,
+   "sha256": "3b09e8c2397a2a486c4c070df4a0d71073cd2f5db525daaba0132f7ffecc58c0"
+  },
+  {
+   "path": "eval/axe-split_organize.json",
+   "bytes": 282,
+   "sha256": "b00922dc384b306e3557537b36850428a1d14b98a0ff0a5954c2358a680c1209"
+  },
+  {
+   "path": "eval/sejda-task-log.json",
+   "bytes": 666,
+   "sha256": "dd32a99426030a273a8e96486514814b2ba95e12fab5cfa6bcc5d76c3ce383f9"
+  },
+  {
+   "path": "micro/tti-d.json",
+   "bytes": 2414,
+   "sha256": "245bd08f489f7cc16e9f729e8f531d72f5ca978320adf52de66eb9d6c73fe700"
+  },
+  {
+   "path": "micro/tti-d-run2.json",
+   "bytes": 2414,
+   "sha256": "245bd08f489f7cc16e9f729e8f531d72f5ca978320adf52de66eb9d6c73fe700"
+  },
+  {
+   "path": "micro/berrypdf/micro-berrypdf.json",
+   "bytes": 35613,
+   "sha256": "faa2167dc7e5141439fbe2afdcbdee6b14d0787ae0481779c5cc0adae9ed9e5b"
+  },
+  {
+   "path": "micro/berrypdf/micro-berrypdf-split.json",
+   "bytes": 516,
+   "sha256": "55da7498dc23a0e79a12455152c7ad5a6d5bed0524bb812694cf2d14ec6ca235"
+  },
+  {
+   "path": "micro/berrypdf/same-task/alternate-d__twelve_mixed.pdf",
+   "bytes": 8627,
+   "sha256": "e4b44ab015b0c7681860b19ab94bdeb696e6d5cb358a69c74a77aaad2be97220"
+  },
+  {
+   "path": "micro/berrypdf/same-task/combine-d__alpha_merged.pdf",
+   "bytes": 2499,
+   "sha256": "3542ac677af1f5bcba4358f38cbaebcc8321a34b015c94e8044c58555ff57e75"
+  },
+  {
+   "path": "micro/berrypdf/same-task/delete-d__twelve.pdf",
+   "bytes": 5151,
+   "sha256": "11553691cc4d07ec765ce7c7d1dedbadc83330ac2363c71c7c8dcc68f52823af"
+  },
+  {
+   "path": "micro/berrypdf/same-task/extract-d__twelve.pdf",
+   "bytes": 1835,
+   "sha256": "a24372307cffd83694e71de2b6e5fbd8d7176a863d8bc3010e887c975075696c"
+  },
+  {
+   "path": "micro/berrypdf/same-task/organize-d__twelve_organized.pdf",
+   "bytes": 6651,
+   "sha256": "aad58d543e14b2b918ed670657cde781657ebb54b0941b1e576f135d904029ab"
+  },
+  {
+   "path": "micro/berrypdf/same-task/ours-t5__twelve_organized.pdf",
+   "bytes": 6651,
+   "sha256": "aad58d543e14b2b918ed670657cde781657ebb54b0941b1e576f135d904029ab"
+  },
+  {
+   "path": "micro/berrypdf/same-task/race-click__links-1-12.pdf",
+   "bytes": 6419,
+   "sha256": "c5a5ba8c437ea634a06bef35c1e566059732b9ae1e24c66e424d851db8bcf12d"
+  },
+  {
+   "path": "micro/berrypdf/same-task/split-d__twelve-split.zip",
+   "bytes": 4819,
+   "sha256": "ad5036aab312c2f9c9a74e0b45406e3d461381592b55d77211ccb50c1ca3746c"
+  },
+  {
+   "path": "eval/fixtures/alpha.pdf",
+   "bytes": 2094,
+   "sha256": "fd6dd00201a71b73f5fece128c3097671970da049b4203df3ded2db015daf4f2"
+  },
+  {
+   "path": "eval/fixtures/big-250.pdf",
+   "bytes": 104523,
+   "sha256": "cdb66e3adbdb12c4fafbfb3ee3387246480cbce267052aed06899dd3c849ba23"
+  },
+  {
+   "path": "eval/fixtures/bravo.pdf",
+   "bytes": 1682,
+   "sha256": "000aa10e9b304a45d621046865d0121f4d243dfd102d12da718fb9be6cd9b99a"
+  },
+  {
+   "path": "eval/fixtures/charlie.png",
+   "bytes": 6836,
+   "sha256": "f237c3360ad5345a4bdafe5daf569d1e587f6d69d146de924c1f925748ba73dd"
+  },
+  {
+   "path": "eval/fixtures/corrupt.pdf",
+   "bytes": 800,
+   "sha256": "680620cfaf1a9ff5242fa9eccb6e1f692e5221e91f573f54bb6f42c1bfcda7be"
+  },
+  {
+   "path": "eval/fixtures/duplex-scan-odd.pdf",
+   "bytes": 2914,
+   "sha256": "a8df148d1599e32198ecfb9bc60fb74c4c6430e3e7640a78e8863ef91c8a8b96"
+  },
+  {
+   "path": "eval/fixtures/duplex-scan.pdf",
+   "bytes": 3324,
+   "sha256": "a24e51eb9d0a96651c2b4582b57ed67e925b9edecf5e0e50e9f576d66c1bb037"
+  },
+  {
+   "path": "eval/fixtures/even-reversed.pdf",
+   "bytes": 2910,
+   "sha256": "742143d257cc5646d06c53eec50e9c1ddf0b5a073fa2576a26d37ca3a798d8b2"
+  },
+  {
+   "path": "eval/fixtures/even.pdf",
+   "bytes": 2911,
+   "sha256": "2eba436aa60836be02977d38d7c01ec5716000a3f901ff61870f34988a81ba5a"
+  },
+  {
+   "path": "eval/fixtures/inherited-res.pdf",
+   "bytes": 524994,
+   "sha256": "6bc658b92d06ebe38dc7ff93fe0a1a54d6ad2506efb2f4f87ff77663cbedf375"
+  },
+  {
+   "path": "eval/fixtures/links.pdf",
+   "bytes": 8879,
+   "sha256": "aeffbbadbdfabba339578d4a85fb41afaf81229f500f4ffb41118002d9465806"
+  },
+  {
+   "path": "eval/fixtures/mixed-sizes.pdf",
+   "bytes": 2518,
+   "sha256": "7e4a3616d1a179d68e5716abd03aa0ffdc1ef8278544fca23b273576ae8b6a0c"
+  },
+  {
+   "path": "eval/fixtures/notes.txt",
+   "bytes": 22,
+   "sha256": "8898bf6e006d19149cf06a2983fe0538332879a4bf36d7e9a06bee3f80f90664"
+  },
+  {
+   "path": "eval/fixtures/odd.pdf",
+   "bytes": 2910,
+   "sha256": "5ea24987212b090bd8ceca9398bd208caad0f0857d459733691c29c82de652da"
+  },
+  {
+   "path": "eval/fixtures/owner-restricted.pdf",
+   "bytes": 3109,
+   "sha256": "86c58123f80ef6099929b0c0bda39e071b9242f59e96426ef940e40f41f00f63"
+  },
+  {
+   "path": "eval/fixtures/separator.pdf",
+   "bytes": 1277,
+   "sha256": "7924ecddfbd290cda170883ebf259583937d258ab07aee39b850ec39c9eae1e8"
+  },
+  {
+   "path": "eval/fixtures/shared-res.pdf",
+   "bytes": 525192,
+   "sha256": "0383311f9b66e9b133f3981c54706cc284936e6b9277ab297a5997b8e7bd7cad"
+  },
+  {
+   "path": "eval/fixtures/short.pdf",
+   "bytes": 1680,
+   "sha256": "94559afcfd85a4b4a5198e92ae2de06ea3fc242e058496d5073fbdaa501fd7d8"
+  },
+  {
+   "path": "eval/fixtures/sixty-pages.pdf",
+   "bytes": 1196778,
+   "sha256": "47a4092458c52ec819fd104d926713a5756f3778c357d80863b71bd4eba7bf42"
+  },
+  {
+   "path": "eval/fixtures/three-pages.pdf",
+   "bytes": 2089,
+   "sha256": "f7cd9a364b44878509aaa7e60c5ad7d535cafb6fc5ba6e550812191f6317b291"
+  },
+  {
+   "path": "eval/fixtures/twelve.pdf",
+   "bytes": 6558,
+   "sha256": "ccbd96221a41c182db8236151c52c6f7844e8f145cf38954dd2bd96c971cde0b"
+  },
+  {
+   "path": "eval/fixtures/user-pw.pdf",
+   "bytes": 3109,
+   "sha256": "b43673228ec2d1373e17644e35bd9eaf14e50753cf103c2566fb82778385c035"
+  }
+ ]
+}

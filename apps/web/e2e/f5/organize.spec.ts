@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { PDFDocument } from "pdf-lib";
 import { outlineOf } from "../../src/lib/pdf/page-tool-fixtures";
 import {
+  backToOptions,
   dragTo,
   downloadResult,
   flow,
@@ -161,6 +162,17 @@ test("AC-499: no edits gives twelve_organized.pdf, 15 pages, Rotate 0, not encry
   expect(doc.isEncrypted).toBe(false);
   expect(doc.getPages().map((p) => p.getRotation().angle)).toEqual(Array(15).fill(0));
   expect(await words(out.bytes)).toEqual([...Array.from({ length: 12 }, (_, i) => `Twelve ${i + 1}`), "Page 1", "Page 2", "Page 3"]);
+});
+
+test("AC-499 (eval G-6): the name follows the first file loaded, after Reverse too; without its pages, the next file's", async ({ page }) => {
+  await pickF5(page, "twelve.pdf", "three-pages.pdf");
+  await organizeMenu(page, "Sort", "Reverse order");
+  expect((await tileLabels(page))[0]).toBe("B3");
+  expect((await runAndDownload(page)).name).toBe("twelve_organized.pdf");
+  await backToOptions(page);
+  await organizeMenu(page, "Remove", "Keep only three-pages.pdf");
+  expect(await tileLabels(page)).toEqual(["B3", "B2", "B1"]);
+  expect((await runAndDownload(page)).name).toBe("three-pages_organized.pdf");
 });
 
 test("AC-500: bookmarks follow a move of A12 to the front", async ({ page }) => {

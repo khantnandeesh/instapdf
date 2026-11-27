@@ -57,6 +57,7 @@ import { baseName } from "./naming";
 import { createLinkFilter, type LinkFilter } from "./links";
 import { mapBookmarks, readOutline, scaleView, viewOf, writeOutline, type OutBookmark, type SourceBookmark } from "./outline";
 import { createPruner, type Pruner } from "./prune";
+import { saveCompact } from "./write";
 import { loadForEdit } from "./rotate";
 import { normalizeRotation } from "./rotation";
 import { createTextWriter, type FontSource, type TextWriter } from "./text";
@@ -770,7 +771,7 @@ function singleUsePool(sources: MergeSourceInput[], options: MergeOptions) {
 export async function mergePdf(input: MergeInput, env: MergeEnv, onProgress: (fraction: number) => void): Promise<MergeResult> {
   const { pool, state } = singleUsePool(input.sources, input.options);
   const { out, warnings } = await composeDocument(input, env, pool, onProgress);
-  const bytes = await out.save();
+  const bytes = await saveCompact(out);
   onProgress(1);
   return { bytes, pageCount: out.getPageCount(), wasEncrypted: state.wasEncrypted, warnings };
 }

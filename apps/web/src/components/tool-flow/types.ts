@@ -100,6 +100,12 @@ export type FlowApi = {
   openPicker: () => void;
   /** Focus target when nothing better exists (the toolbar picker, else the heading). */
   fallbackFocus: () => HTMLElement | null;
+  /**
+   * Runs the primary action as a press would, when the flow can run (files ready, nothing
+   * processing): Enter in a dock field. The tool checks its own settings first, from their live
+   * values (the field's text as typed), since its `canRun` may not have rendered them yet.
+   */
+  submit: () => void;
 };
 
 export type FlowNoticeInput = {
