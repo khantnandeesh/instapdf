@@ -42,10 +42,13 @@ export function ResultDownload({
   tool,
   announce,
   onSaved,
+  sizeAs,
 }: {
   output: ToolOutput;
   tool: FlowTool;
   announce: (message: string) => void;
+  /** The primary's label: Download is sized to fit it too, so it takes the primary's exact box (eval G-3). */
+  sizeAs?: string;
   /** F23: a copy went to a cloud; the result's privacy line names it. */
   onSaved: (line: string) => void;
 }) {
@@ -90,6 +93,13 @@ export function ResultDownload({
   const file = useMemo(() => (SaveToCloud ? new File([output.blob], output.name, { type: output.type }) : null), [SaveToCloud, output]);
   return (
     <>
+      {/* F23: Save to Drive, a 48 px icon button before Download; from 1024 it sits in the status's place, and
+          below 1024 in the dock row's room left of the slot (layout.css .ip-slot__drive). */}
+      {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && SaveToCloud && file && (
+        <span className="ip-slot__drive">
+          <SaveToCloud file={file} toolName={tool.flow.title} announce={announce} onSaved={onSaved} />
+        </span>
+      )}
       <a
         ref={download}
         href={url}
@@ -99,26 +109,24 @@ export function ResultDownload({
           setDownloaded(true);
           announce("Downloaded");
         }}
-        className={buttonClasses("primary", "lg", "ip-slot__main min-w-0 flex-1")}
+        className={buttonClasses("primary", "lg", "ip-slot__main ip-slot__download")}
+        data-testid="save-main"
       >
-        <span className="inline-flex items-center gap-2">
-          {/* Both icons share one cell; CSS shows one, lib/motion crossfades them. */}
-          <span className="grid *:col-start-1 *:row-start-1">
-            <span ref={arrow} className={downloaded ? "opacity-0" : undefined}>
-              <DownloadIcon />
+        <span className="ip-slot__size" data-size={sizeAs}>
+          <span className="inline-flex items-center gap-2">
+            {/* Both icons share one cell; CSS shows one, lib/motion crossfades them. */}
+            <span className="grid *:col-start-1 *:row-start-1">
+              <span ref={arrow} className={downloaded ? "opacity-0" : undefined}>
+                <DownloadIcon />
+              </span>
+              <span ref={tick} className={downloaded ? undefined : "opacity-0"}>
+                <CheckIcon />
+              </span>
             </span>
-            <span ref={tick} className={downloaded ? undefined : "opacity-0"}>
-              <CheckIcon />
-            </span>
+            {copy.download}
           </span>
-          Download
         </span>
       </a>
-      {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && SaveToCloud && file && (
-        <span className="flex shrink-0 [&_.mp-btn]:h-12">
-          <SaveToCloud file={file} toolName={tool.flow.title} announce={announce} onSaved={onSaved} />
-        </span>
-      )}
     </>
   );
 }
@@ -169,7 +177,8 @@ export function ResultCard({
   }, [file]);
   const pageCount = output.pageCount ?? output.entries?.reduce((s, e) => s + e.pageCount, 0) ?? 0;
   // "5 pages, 21 KB." A ZIP says how many files it holds (spec F4/F5 UI P-3 "Result").
-  const summary = isZip && output.entries ? `${copy.files(output.entries.length)}, ${formatBytes(output.size)}.` : `${copy.pages(pageCount)}, ${formatBytes(output.size)}.`;
+  const base = isZip && output.entries ? `${copy.files(output.entries.length)}, ${formatBytes(output.size)}.` : `${copy.pages(pageCount)}, ${formatBytes(output.size)}.`;
+  const summary = output.note ? `${base} ${output.note}` : base;
   const titleId = "ip-result-title";
 
   return (

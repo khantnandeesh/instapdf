@@ -74,7 +74,9 @@ for (const [width, height] of SLOT_VIEWPORTS) {
       await primary(page).click();
       const pill = page.getByTestId("action-slot").getByTestId("processing");
       await expect(pill).toBeVisible();
-      // While working: the options and the pages dim to 0.45 and go inert; the navbar does not.
+      // While working: the options and the pages dim to 0.45 and go inert; the navbar does not. The pages
+      // follow the pill's first paint by a frame (eval G-13: restyling every tile must not hold the pill).
+      await expect(page.getByTestId("pages-scroll")).toHaveAttribute("data-dim", "", { timeout: 1000 });
       const dims = await page.evaluate(() =>
         [...document.querySelectorAll("[data-dim]")].map((e) => ({ inert: (e as HTMLElement).inert, opacity: getComputedStyle(e).opacity, id: e.getAttribute("data-testid") })),
       );

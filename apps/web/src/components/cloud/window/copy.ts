@@ -1,7 +1,8 @@
 /** Copy for the /cloud/<provider> window only (F23 spec U-6), kept out of the tool pages' bundle. */
 import { providerName, providerShort, type CloudProvider } from "@/lib/cloud/providers";
+import { formatCount } from "@/lib/format-count";
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+const plural = (n: number, one: string, many = `${one}s`) => `${formatCount(n)} ${n === 1 ? one : many}`;
 
 export const windowCopy = {
   windowTitle: (p: CloudProvider) => `${providerName[p]} · BerryPDF`,

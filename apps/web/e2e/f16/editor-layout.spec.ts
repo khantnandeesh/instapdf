@@ -162,6 +162,72 @@ test("AC-627: a selection under the panel's spot moves the panel to the canvas's
   expect(p.x).toBeGreaterThanOrEqual(strip.x + strip.width);
 });
 
+test("G-9: a selection under both of the panel's spots: the panel moves below or above it, and stays clear while the pages scroll", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 632 });
+  await open(page);
+  const props = page.getByTestId("editor-props");
+  const clear = async () => {
+    const r = await page.evaluate(() => {
+      const boxes = Array.from(document.querySelectorAll('[data-testid=canvas] [data-selected="true"], [data-testid=canvas] [data-handle]'), (e) => e.getBoundingClientRect());
+      const p = document.querySelector("[data-testid=editor-props]")?.getBoundingClientRect();
+      if (!p || !boxes.length) return null;
+      const s = { l: Math.min(...boxes.map((b) => b.left)), r: Math.max(...boxes.map((b) => b.right)), t: Math.min(...boxes.map((b) => b.top)), b: Math.max(...boxes.map((b) => b.bottom)) };
+      const visible = (y: number) => Math.max(0, Math.min(y, innerHeight));
+      // Only the part of the selection on screen counts.
+      const covers = Math.min(p.right, s.r) > Math.max(p.left, s.l) && Math.min(p.bottom, visible(s.b)) > Math.max(p.top, visible(s.t));
+      return { covers, side: document.querySelector("[data-testid=editor-props]")!.getAttribute("data-side") };
+    });
+    return r;
+  };
+  // A wide rectangle across the whole page, under the panel's spot on the right and on the left.
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("r");
+  const b = (await page.getByTestId("page-1").boundingBox())!;
+  const tp = (await props.boundingBox())!;
+  await page.mouse.move(b.x + b.width * 0.03, tp.y + 30);
+  await page.mouse.down();
+  // It ends below the panel, so the pointer never goes over it.
+  await page.mouse.move(b.x + b.width * 0.5, tp.y + tp.height + 12, { steps: 4 });
+  await page.mouse.move(b.x + b.width * 0.97, tp.y + tp.height + 12, { steps: 4 });
+  await page.mouse.up();
+  // The shape just drawn is selected (Shapes stays armed, so its kind switch shows above: a taller panel).
+  await expect(page.locator('[data-kind="shape"][data-selected="true"]')).toHaveCount(1);
+  await expect(props).toBeVisible();
+  await expect.poll(async () => (await clear())?.covers).toBe(false);
+  expect(["below", "above"]).toContain((await clear())?.side);
+  // The pages scroll under it: it follows, never covering what is still on screen.
+  for (const dy of [40, 80, 120, -200]) {
+    await page.getByTestId("canvas").evaluate((el, dy) => el.scrollBy(0, dy), dy);
+    await expect.poll(async () => (await clear())?.covers ?? false).toBe(false);
+  }
+});
+
+test("G-10: with Shapes armed, a shape just drawn keeps the kind switch above its own controls until Esc", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 632 });
+  await open(page);
+  const props = page.getByTestId("editor-props");
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("r");
+  const kinds = props.getByRole("radiogroup", { name: "Shape" });
+  await expect(kinds).toBeVisible();
+  const b = (await page.getByTestId("page-1").boundingBox())!;
+  await page.mouse.move(b.x + b.width * 0.2, b.y + 220);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width * 0.35, b.y + 300, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.locator('[data-kind="shape"]')).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Shapes", pressed: true })).toBeVisible();
+  // Still armed: the kind switch stays, above the drawn shape's controls.
+  await expect(kinds).toBeVisible();
+  await expect(props.getByRole("toolbar", { name: /properties/ })).toBeVisible();
+  const k = (await kinds.boundingBox())!;
+  const t = (await props.getByRole("toolbar", { name: /properties/ }).boundingBox())!;
+  expect(k.y + k.height).toBeLessThanOrEqual(t.y);
+  // A second kind applies to the next shape.
+  await kinds.getByRole("radio", { name: "Ellipse" }).click();
+  await expect(kinds.getByRole("radio", { name: "Ellipse" })).toHaveAttribute("aria-checked", "true");
+});
+
 test("AC-629: a header link with edits not downloaded asks; Cancel stays, Download anyway downloads then leaves; no edits leaves at once", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 632 });
   await open(page);

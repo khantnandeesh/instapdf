@@ -8,7 +8,7 @@ import { changedCount, defaultMergeOptions, MERGE_OPTIONS_KEY, parseMergeOptions
 import { mergedName } from "@/lib/pdf/naming";
 import { flowTool } from "@/tools/registry";
 import { mergeCopy as c } from "./copy";
-import { MergeOptions } from "./MergeOptions";
+import { MergeOptions, MergeTocRow } from "./MergeOptions";
 import { fullHistory } from "./full-history";
 import { MenuButton, SortGlyph, toolbarButton, usePageWorkspace } from "./workspace";
 import { AddMenus, EditorDialogs, EditWorkspace, usePrefetchEditing } from "./editing";
@@ -26,6 +26,8 @@ export function MergeTool({ slug = "merge-pdf" }: { slug?: MergeSlug }) {
   const ws = usePageWorkspace({ tool, history: fullHistory });
   usePrefetchEditing();
   const [options, setOptions] = useState<Options>(defaultMergeOptions);
+  // Merge's row carries Contents page from 1280 px (F25 §3.4); Combine keeps it behind More options.
+  const tocInRow = slug === "merge-pdf";
 
   // ---- options, remembered on this device (AC-42, AC-512) ----
   useEffect(() => {
@@ -75,7 +77,8 @@ export function MergeTool({ slug = "merge-pdf" }: { slug?: MergeSlug }) {
         )}
         toolbarEnd={(w) => <AddMenus ws={ws} w={w} />}
         dockStart={ws.renderHistory}
-        renderOptions={(ctx) => <MergeOptions value={options} onChange={changeOptions} announce={ctx.announce} />}
+        renderOptions={(ctx) => <MergeOptions value={options} onChange={changeOptions} announce={ctx.announce} tocInRow={tocInRow} />}
+        rowOptions={tocInRow ? () => <MergeTocRow value={options} onChange={changeOptions} /> : undefined}
       />
       <EditorDialogs ws={ws} />
     </>

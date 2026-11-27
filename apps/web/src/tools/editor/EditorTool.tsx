@@ -26,6 +26,7 @@ import { openPdf, prefetchPdfjs, type OpenedPdf } from "@/lib/pdf/pdfjs";
 import { warmPdfjs } from "@/lib/pdf/pdfjs-warm";
 import { FilePlusBold, FileUpBold } from "./icons";
 import { prefetchEditorChunks } from "./idle-prefetch";
+import { OpeningBody } from "./Opening";
 import type { ShellProps } from "./EditorShell";
 import { EDITOR_MAX_BYTES } from "./limits";
 
@@ -214,18 +215,17 @@ export function EditorTool() {
   return (
     <div data-testid="editor" data-state={open ? "open" : busy ? "opening" : "empty"} data-hydrated={hydrated || undefined}>
       <DropOverlay active={dragging && !open} mode="add" />
-      {pending && !open ? (
-        // Opening (F25 §8): the editor's layout with placeholders, from the frame the file is picked.
+      {(pending || locked) && !open ? (
+        // Opening (F25 §8): the editor's layout with placeholders, from the frame the file is picked. A locked
+        // file's password is asked for over it (eval G-5), and Skip goes back to the picker.
         <div className="ed-shell" data-testid="editor-opening" aria-busy="true">
           <div className="ed-opening">
             <header className="ed-top" role="group" aria-label="Document">
               <h1 className="ed-title">Edit PDF</h1>
               <Badge tone="beta">Beta</Badge>
-              <h2 className="ed-file truncate">{pending}</h2>
+              <h2 className="ed-file truncate">{pending ?? locked?.name}</h2>
             </header>
-            <div className="grid flex-1 place-items-center">
-              <span className="ed-loader" aria-label="Opening" role="progressbar" />
-            </div>
+            <OpeningBody />
           </div>
         </div>
       ) : (
@@ -281,7 +281,10 @@ export function EditorTool() {
           setBusy(true);
           void finish(locked.name, locked.bytes, pw).finally(() => setBusy(false));
         }}
-        onSkip={() => setLocked(null)}
+        onSkip={() => {
+          setLocked(null);
+          requestAnimationFrame(() => picker.current?.focus());
+        }}
         fallbackFocus={() => picker.current?.element ?? null}
       />
     </div>

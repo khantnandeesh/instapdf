@@ -38,6 +38,8 @@ export type ToolOutput = {
   wasEncrypted: boolean;
   /** Non-blocking notes about the result, shown as warning notices. */
   warnings?: string[];
+  /** A sentence the result's meta line ends with ("3 pages deleted.", spec §7 item 2). */
+  note?: string;
 };
 
 export type FlowState = "empty" | "loading" | "password" | "ready" | "processing" | "done" | "error";

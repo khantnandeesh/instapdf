@@ -45,7 +45,7 @@ test("Save to OneDrive across a redirect sign-in: the result reaches the window 
   await run(page);
   const { bytes } = await downloadResult(page);
   await page.evaluate((k) => localStorage.setItem(k, "1"), REDIRECT);
-  await page.getByTestId("save-main").click();
+  await page.getByTestId("save-cloud").click();
   const urls = visited(page);
   const win = await openWindow(page, () => page.getByRole("menuitem", { name: /^OneDrive/ }).click());
   await closed(win, 20_000);

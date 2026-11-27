@@ -1,7 +1,8 @@
 /** Shared-flow copy (our own wording; spec U-5). Tool-specific labels come from the registry. */
 import type { Permission, ToolFlowConfig } from "@/tools/registry";
+import { formatCount } from "@/lib/format-count";
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+const plural = (n: number, one: string, many = `${one}s`) => `${formatCount(n)} ${n === 1 ? one : many}`;
 
 export const copy = {
   /** F25 §2: the picker names what it takes; its label never changes while a file opens. */
@@ -15,7 +16,7 @@ export const copy = {
   privacyResultServer: "Deleted from our server in 2 hours.",
   limits: (f: ToolFlowConfig) => `PDF. ${f.multiFile ? `Up to ${plural(f.maxFiles, "file")}` : "1 file"}, ${Math.round(f.maxFileBytes / 1024 / 1024)} MB each.`,
   limitsFull: (f: ToolFlowConfig) =>
-    `PDF only · up to ${f.multiFile ? plural(f.maxFiles, "file") : "1 file"}, ${Math.round(f.maxFileBytes / 1024 / 1024)} MB each, ${Math.round(f.maxTotalBytes / 1024 / 1024)} MB and ${f.maxTotalPages.toLocaleString("en-US")} pages in total`,
+    `PDF only · up to ${f.multiFile ? plural(f.maxFiles, "file") : "1 file"}, ${Math.round(f.maxFileBytes / 1024 / 1024)} MB each, ${Math.round(f.maxTotalBytes / 1024 / 1024)} MB and ${formatCount(f.maxTotalPages)} pages in total`,
   statusEmpty: "Add a PDF to start",
   statusLoading: "Reading files…",
   statusPassword: "Waiting for a password",
@@ -26,7 +27,7 @@ export const copy = {
   errorCorrupt: (name: string) => `${name} couldn't be opened. It may be damaged or not really a PDF.`,
   errorSize: (name: string, mb: number) => `${name} is larger than ${mb} MB, the limit for this tool.`,
   errorTotal: (name: string, mb: number) => `${name} would take this task past ${mb} MB in total, so it was skipped.`,
-  errorPages: (name: string, max: number) => `${name} would take this task past ${max.toLocaleString("en-US")} pages, so it was skipped.`,
+  errorPages: (name: string, max: number) => `${name} would take this task past ${formatCount(max)} pages, so it was skipped.`,
   errorCount: (max: number) => `This tool takes up to ${max} files at a time. We loaded the first ${max}.`,
   errorProcess: (label: string) => `Something went wrong while ${label.toLowerCase()}. Your files and settings are still here.`,
   problemsTitle: (n: number) => (n === 1 ? "A file was skipped" : `${n} files were skipped`),
@@ -46,7 +47,8 @@ export const copy = {
   pages: (n: number) => plural(n, "page"),
   files: (n: number) => plural(n, "file"),
   /** ZIP result (spec F4/F5 UI P-13). */
-  showAll: (n: number) => `Show all ${n.toLocaleString("en")}`,
+  showAll: (n: number) => `Show all ${formatCount(n)}`,
+  download: "Download",
   downloadEntry: (name: string) => `Download ${name}`,
   downloadedEntry: (name: string) => `Downloaded ${name}`,
   errorImage: (name: string) => `${name} couldn't be read as an image.`,

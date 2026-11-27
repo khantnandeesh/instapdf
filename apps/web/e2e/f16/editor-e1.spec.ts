@@ -345,7 +345,10 @@ test("AC-48 AC-54 AC-83 AC-98: bars fit the screen, stay put while pages scroll,
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const top = (await page.locator("header.ed-top").boundingBox())!;
   await page.getByTestId("canvas").evaluate((el) => el.scrollBy(0, 900));
-  expect((await page.locator("header.ed-top").boundingBox())!.y).toBe(top.y);
+  // F25 eval G-1: from 1024 (and over 600px tall) the navbar slides away while the pages scroll down and
+  // the bar takes its place at the very top; below that the bar does not move at all.
+  const lifts = vw >= 1024 && page.viewportSize()!.height > 600 && process.env.NEXT_PUBLIC_EDITOR_NAV_AUTOHIDE !== "0";
+  await expect.poll(async () => (await page.locator("header.ed-top").boundingBox())!.y).toBe(lifts ? 0 : top.y);
   await expect(page.getByRole("button", { name: "Download PDF" })).toBeInViewport();
   if (vw < 1024) {
     // Shapes lives in More on phones: the More button shows it.

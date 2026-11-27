@@ -80,6 +80,8 @@ export type EditorState = {
   save: "saved" | "saving" | "off" | "idle";
   /** History index last downloaded (unsaved-changes check). */
   downloadedAt: number;
+  /** A page has been painted (or has failed to): Download waits for it (F25 AC-605, eval G-5). */
+  painted: boolean;
   flash: { ids: string[]; key: number } | null;
   /** Engine reading of each source page (lines and words), when loaded for the shown version. */
   texts: Record<number, PageText>;

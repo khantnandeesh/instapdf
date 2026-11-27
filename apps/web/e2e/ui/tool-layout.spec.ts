@@ -195,7 +195,9 @@ test.describe("F25 structure", () => {
         expect(focusables, `${slug}: nothing focusable in the row`).toBe(0);
         const dock = page.locator("[data-ip-dock]");
         await expect(dock).toHaveAttribute("data-ip-dock", "bar");
-        expect(await dock.evaluate((d) => getComputedStyle(d).position)).toBe("fixed");
+        // Pinned to the bottom: fixed itself, or held by its fixed bottom anchor (eval G-2), and still there after a scroll.
+        expect(await dock.evaluate((d) => getComputedStyle(d).position === "fixed" || getComputedStyle(d.parentElement!).position === "fixed")).toBe(true);
+        await page.evaluate(() => window.scrollBy(0, 400));
         const b = (await dock.boundingBox())!;
         expect(Math.abs(b.y + b.height - height)).toBeLessThanOrEqual(1);
       }
@@ -230,6 +232,64 @@ test.describe("F25 structure", () => {
         await expect.poll(share, { message: `${slug}: pages share of the height` }).toBeGreaterThanOrEqual(min);
         await inView(page, primary(page), `${slug}: primary`);
         expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), `${slug}: no sideways scroll`).toBeLessThanOrEqual(0);
+      }
+    });
+  }
+
+  // G-2 (eval run 1): no blank frame and no layout shift at the result swap. The CLS of the whole visit
+  // (load, pick, run, result) is 0.00 on Delete and Merge, phones included (the bar is anchored by a
+  // transform and keeps the slot's row, so Download takes the primary's box without moving anything).
+  for (const [width, height] of [
+    [1366, 657],
+    [1280, 632],
+    [390, 664],
+    [320, 568],
+  ] as const) {
+    test(`G-2 G-4: at ${width}x${height} the CLS from load through the result is 0.00 on Delete and Merge, with no empty frame at the swap`, async ({ page }, info) => {
+      test.skip(info.project.name !== (width >= 1024 ? "desktop" : "mobile"), "desktop sizes on desktop, phones on mobile");
+      await page.setViewportSize({ width, height });
+      await page.addInitScript(() => {
+        const w = window as unknown as { __cls: { v: number; input: boolean; what: string }[]; __blank: number; __noDl: number };
+        w.__cls = [];
+        w.__blank = 0;
+        w.__noDl = 0;
+        new PerformanceObserver((l) => {
+          for (const e of l.getEntries() as unknown as { value: number; hadRecentInput: boolean; sources?: { node?: Node }[] }[])
+            w.__cls.push({ v: e.value, input: e.hadRecentInput, what: (e.sources ?? []).map((s) => (s.node as Element | undefined)?.getAttribute?.("data-testid") ?? s.node?.nodeName).join(",") });
+        }).observe({ type: "layout-shift", buffered: true });
+        // Every frame while running: the stage (work area or result) must be there.
+        const tick = () => {
+          const st = document.querySelector("[data-testid=tool-flow]")?.getAttribute("data-state");
+          if (st === "processing" || st === "done") {
+            const stage = document.querySelector("[data-testid=pages-scroll], [data-testid=result] [data-testid=result-preview-box]");
+            if (!stage || stage.getBoundingClientRect().height < 40) w.__blank++;
+          }
+          // G-4: from the frame the state is done, Download is there (below 1024 too).
+          if (st === "done" && !(document.querySelector("[data-testid=save-main]")?.getBoundingClientRect().height ?? 0)) w.__noDl++;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+      for (const [slug, files] of [
+        ["delete-pdf-pages", ["sixty-pages.pdf"]],
+        ["merge-pdf", ["alpha.pdf", "bravo.pdf"]],
+      ] as const) {
+        await open(page, `/${slug}`);
+        await page.getByTestId("file-input").setInputFiles(files.map(fx));
+        await expect(flow(page)).toHaveAttribute("data-state", "ready");
+        await runnable(page);
+        await primary(page).click();
+        await expect(page.getByTestId("result")).toBeVisible({ timeout: 20_000 });
+        await page.getByTestId("result").evaluate((r) => Promise.all(r.getAnimations({ subtree: true }).map((a) => a.finished)));
+        await page.waitForTimeout(500);
+        const { cls, blank, noDl } = await page.evaluate(() => {
+          const w = window as unknown as { __cls: { v: number; input: boolean; what: string }[]; __blank: number; __noDl: number };
+          return { cls: w.__cls.filter((e) => !e.input), blank: w.__blank, noDl: w.__noDl };
+        });
+        const total = cls.reduce((n, e) => n + e.v, 0);
+        expect(total, `${slug}: CLS ${total.toFixed(4)} (${cls.map((e) => `${e.what} ${e.v.toFixed(4)}`).join(" | ")})`).toBeLessThan(0.005);
+        expect(blank, `${slug}: frames with no stage during the run and the swap`).toBe(0);
+        expect(noDl, `${slug}: frames after done without Download (G-4)`).toBe(0);
       }
     });
   }
@@ -282,18 +342,23 @@ test.describe("F25 structure", () => {
     ] as const)
       await inView(page, el, what);
     await expect(page.getByRole("link", { name: "Download" })).toHaveCount(1);
-    const dl = (await page.getByRole("link", { name: "Download" }).boundingBox())!;
-    expect(dl.y + dl.height, "Download in the row's slot").toBeLessThanOrEqual(slotBox.y + slotBox.height + 1);
-    // The slot keeps the primary's right edge. With cloud sources on, Save to cloud shares the slot to
-    // Download's right (F23 AC-169), so the slot's edge is measured, with Download inside it.
-    const slot = await page.getByRole("link", { name: "Download" }).evaluate((a) => {
+    // Download (save-main) takes the primary's exact box, on every build (eval G-3); with cloud sources on,
+    // Save to Drive is a 48px named icon button to its left, inside the slot.
+    await expect(page.getByTestId("save-main")).toHaveCount(1);
+    const dl = (await page.getByTestId("save-main").boundingBox())!;
+    for (const k of ["x", "y", "width", "height"] as const) expect(Math.abs(dl[k] - slotBox[k]), `Download ${k} = the primary's`).toBeLessThanOrEqual(1);
+    const slot = await page.getByTestId("save-main").evaluate((a) => {
       const r = a.closest(".ip-slot")!.getBoundingClientRect();
       return { x: r.x, right: r.right };
     });
-    expect(Math.abs(slot.right - (slotBox.x + slotBox.width)), "the slot keeps the primary's right edge").toBeLessThanOrEqual(1);
-    expect(dl.x, "Download inside the slot").toBeGreaterThanOrEqual(slot.x - 1);
-    if ((await page.getByTestId("save-main").count()) === 0)
-      expect(Math.abs(dl.x + dl.width - (slotBox.x + slotBox.width)), "same right edge as the primary").toBeLessThanOrEqual(1);
+    if (await page.getByTestId("save-cloud").count()) {
+      const drive = (await page.getByTestId("save-cloud").boundingBox())!;
+      expect(drive.width).toBe(48);
+      expect(drive.height).toBe(48);
+      expect(drive.x + drive.width, "Drive left of Download").toBeLessThanOrEqual(dl.x);
+      expect(drive.x, "Drive inside the slot").toBeGreaterThanOrEqual(slot.x - 1);
+      await expect(page.getByTestId("save-cloud")).toHaveAccessibleName(/^Save to/);
+    }
     await expect(page.getByRole("link", { name: "Download" })).toBeFocused();
     await expect(page.locator("[data-ip-dock] [data-testid=dock-options]")).toHaveCount(0);
   });
@@ -336,9 +401,13 @@ test.describe("F25 structure", () => {
       await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
       await expect(flow(page)).toHaveAttribute("data-state", "ready");
       await runnable(page);
+      const before = (await primary(page).boundingBox())!;
       await primary(page).click();
       await expect(page.getByTestId("result")).toBeVisible({ timeout: 20_000 });
       const link = page.locator("[data-ip-dock=bar]").getByRole("link", { name: "Download" });
+      // In the primary's former box (eval G-3), on every build.
+      const dl = (await page.getByTestId("save-main").boundingBox())!;
+      for (const k of ["x", "y", "width", "height"] as const) expect(Math.abs(dl[k] - before[k]), `Download ${k} = the primary's`).toBeLessThanOrEqual(1);
       await inView(page, link, "Download");
       await expect(link).toBeFocused();
       await expect(page.getByRole("link", { name: "Download" })).toHaveCount(1);
@@ -348,6 +417,100 @@ test.describe("F25 structure", () => {
       expect(box.height).toBeLessThanOrEqual(height * 0.55 + 1);
     });
   }
+
+  // AC-614 (eval G-6): the row holds §3.4's controls at 1280 and the "1024–1279" column at 1024.
+  for (const [width, height] of [
+    [1024, 768],
+    [1280, 632],
+    [1366, 657],
+  ] as const) {
+    test(`AC-614 G-6: at ${width}x${height} the row holds §3.4's controls`, async ({ page }, info) => {
+      test.skip(info.project.name !== "desktop", "the row is the 1024px+ layout");
+      test.setTimeout(120_000);
+      await page.setViewportSize({ width, height });
+      const xl = width >= 1280;
+      // Role queries leave out what is display:none, so a control that is not drawn has no match at all.
+      const shown = async (l: Locator) =>
+        (await l.count()) > 0 && l.first().evaluate((e) => {
+          // Drawn and readable: sr-only text (also through a responsive variant) is a 1px clipped box.
+          const r = e.getBoundingClientRect();
+          return r.width > 1 && r.height > 1 && getComputedStyle(e).visibility !== "hidden";
+        });
+      // More options carries its label from 1280 (Delete, Extract, Split), icon-only below.
+      for (const slug of ["delete-pdf-pages", "extract-pdf-pages", "split-pdf"]) {
+        await open(page, `/${slug}`);
+        await load(page, slug);
+        await expect(flow(page)).toHaveAttribute("data-state", "ready", { timeout: 20_000 });
+        const more = page.getByTestId("more-options");
+        await expect(more, slug).toBeVisible();
+        // The label itself, not the tooltip that carries the same words below 1280.
+        expect(await shown(more.getByText("More options", { exact: true }).and(more.locator(":not(.ip-tooltip)"))), `${slug}: More options label`).toBe(xl);
+        // With the label, the options still fit their box: the range field never runs under More options.
+        expect(await page.getByTestId("dock-options").evaluate((d) => d.scrollWidth - d.clientWidth), `${slug}: options overflow`).toBeLessThanOrEqual(0);
+        const field = page.locator("[data-ip-dock=row]").getByRole("textbox").first();
+        if (await field.count()) expect((await field.boundingBox())!.x + (await field.boundingBox())!.width, `${slug}: field clear of More options`).toBeLessThanOrEqual((await more.boundingBox())!.x);
+        if (slug === "split-pdf") {
+          // Split: the mode pills from 1280; a native Select "Split" at 1024–1279.
+          const dock = page.locator("[data-ip-dock=row]");
+          expect(await shown(dock.getByRole("radiogroup", { name: "Split" })), "split pills").toBe(xl);
+          expect(await shown(dock.getByRole("combobox", { name: "Split" })), "split select").toBe(!xl);
+        }
+      }
+      // Undo│Redo: labels from 1280 on Organize; icons at every width on Merge and Combine.
+      for (const [slug, labels] of [
+        ["organize-pdf", xl],
+        ["merge-pdf", false],
+        ["combine-reorder-pdf", false],
+      ] as const) {
+        await open(page, `/${slug}`);
+        await load(page, slug);
+        await expect(flow(page)).toHaveAttribute("data-state", "ready", { timeout: 20_000 });
+        const undo = page.getByTestId("undo");
+        await expect(undo, slug).toBeVisible();
+        expect(await shown(undo.getByText("Undo", { exact: true })), `${slug}: Undo label`).toBe(labels);
+        expect((await undo.boundingBox())!.width, `${slug}: Undo width`).toBeLessThanOrEqual(labels ? 200 : 44.5);
+      }
+      // Merge: Contents page in the row from 1280; behind More options (only) at 1024–1279.
+      await open(page, "/merge-pdf");
+      await load(page, "merge-pdf");
+      await expect(flow(page)).toHaveAttribute("data-state", "ready", { timeout: 20_000 });
+      const toc = page.getByTestId("dock-row-options").getByRole("radiogroup", { name: "Contents page" });
+      expect((await toc.count()) > 0 && (await shown(toc)), "Contents page in the row").toBe(xl);
+      await page.getByTestId("options-button").click();
+      const pop = page.getByTestId("options-popover");
+      await expect(pop).toBeVisible();
+      expect(await shown(pop.getByRole("radiogroup", { name: "Contents page" })), "Contents page in the popover").toBe(!xl);
+      await closeMore(page);
+      if (xl) {
+        await toc.getByRole("radio", { name: "Names" }).click();
+        await expect(toc.getByRole("radio", { name: "Names" })).toHaveAttribute("aria-checked", "true");
+      }
+      // The row still never wraps or scrolls sideways.
+      expect(await page.locator("[data-ip-dock=row]").evaluate((d) => d.scrollWidth - d.clientWidth)).toBeLessThanOrEqual(0);
+    });
+  }
+
+  // G-14: on large screens the row and the stage widen past the 1280 column (up to 1856px, 32px gutters).
+  test("G-14: at 1920x969 the row and the stage span the window less 32px gutters; at 1366 they keep the column", async ({ page }, info) => {
+    test.skip(info.project.name !== "desktop", "desktop sizes");
+    for (const [width, height, want] of [
+      [1920, 969, 1856],
+      [1366, 657, 1216],
+    ] as const) {
+      await page.setViewportSize({ width, height });
+      for (const slug of ["delete-pdf-pages", "merge-pdf"]) {
+        await open(page, `/${slug}`);
+        await load(page, slug);
+        await expect(flow(page)).toHaveAttribute("data-state", "ready", { timeout: 20_000 });
+        const row = (await page.getByTestId("tool-intro").boundingBox())!;
+        const stage = (await page.locator(".ip-wide").boundingBox())!;
+        expect(Math.abs(stage.width - want), `${slug} ${width}: stage width ${stage.width}`).toBeLessThanOrEqual(2);
+        expect(Math.abs(row.width - want), `${slug} ${width}: row width ${row.width}`).toBeLessThanOrEqual(2);
+        expect(Math.abs(stage.x - (width - want) / 2), `${slug} ${width}: centred`).toBeLessThanOrEqual(10);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), `${slug}: no sideways scroll`).toBeLessThanOrEqual(0);
+      }
+    }
+  });
 });
 
 // ---- §10 screenshots (AC-656) ----------------------------------------------------------------------

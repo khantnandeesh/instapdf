@@ -4,7 +4,7 @@ import "./tool-flow.css";
 import "./layout.css";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { cloneElement, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { cloneElement, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { setHandoff, takeHandoff } from "@/lib/pdf/handoff";
 import { openPdf, readPageSizes, type OpenedPdf } from "@/lib/pdf/pdfjs";
 import { LazyThumbnails } from "@/lib/pdf/thumbs-lazy";
@@ -45,9 +45,16 @@ import { CloudCaret, CloudRow, useCloud } from "../cloud/tool-cloud";
 let chrome: typeof import("./loaded-chrome") | null = null;
 const loadChrome = () => import("./loaded-chrome").then((m) => (chrome = m));
 
+// The result (F25 §7, eval G-2/G-4): awaited before the swap and read synchronously, so the result and its
+// Download mount in the same commit as "done", with no empty frame between the work area and the result.
+// `require.ensure` fetches and registers a chunk without running its modules (tools/editor/idle-prefetch.ts).
+declare const require: { ensure(deps: string[], ready: () => void, failed: (e: unknown) => void): void };
+let resultParts: typeof import("./ResultCard") | null = null;
+const loadResult = () => import("./ResultCard").then((m) => (resultParts = m));
+
 const lazyParts = {
   chrome: loadChrome,
-  result: () => import("./ResultCard"),
+  result: loadResult,
   popover: () => import("../ui/Popover"),
   password: () => import("./PasswordDialog"),
   owner: () => import("./OwnerPassword"),
@@ -61,12 +68,24 @@ const lazyParts = {
   // The thumbnail renderer (LazyThumbnails fetches the same chunk) and the picture header helpers.
   thumbs: () => import("@/lib/pdf/thumbnails"),
   images: () => import("@/lib/pdf/images"),
+  // pdf.js (eval G-8): its chunk fetched, not run (running it is a long task; the pick does that).
+  pdfjs: () => new Promise<void>((done) => require.ensure(["pdfjs-dist"], () => done(), () => done())),
 };
 const loadLazyParts = () => void Promise.all(Object.values(lazyParts).map((load) => load())).catch(() => {});
+/**
+ * On intent only, pdf.js's two workers go into the HTTP cache too, so a drop right after it has the engine
+ * at hand (eval G-8). Not with the files: the pick creates the workers itself, and a warm fetch racing that
+ * would download them twice.
+ */
+const onIntentLoad = () => {
+  loadLazyParts();
+  void import("@/lib/pdf/pdfjs-warm").then((m) => m.warmPdfjs("low")).catch(() => {});
+};
 const PageGrid = dynamic(() => lazyParts.pageGrid().then((m) => m.PageGrid), { ssr: false });
 const FileGrid = dynamic(() => lazyParts.fileGrid().then((m) => m.FileGrid), { ssr: false });
-const ResultCard = dynamic(() => lazyParts.result().then((m) => m.ResultCard), { ssr: false });
-const ResultDownload = dynamic(() => lazyParts.result().then((m) => m.ResultDownload), { ssr: false });
+// Fallbacks only if the chunk was not in when the result came (it is awaited before the swap).
+const LazyResultCard = dynamic(() => lazyParts.result().then((m) => m.ResultCard), { ssr: false });
+const LazyResultDownload = dynamic(() => lazyParts.result().then((m) => m.ResultDownload), { ssr: false });
 const PasswordDialog = dynamic(() => lazyParts.password().then((m) => m.PasswordDialog), { ssr: false });
 const OwnerPasswordDialog = dynamic(() => lazyParts.owner().then((m) => m.OwnerPasswordDialog), { ssr: false });
 const ReplaceFileDialog = dynamic(() => lazyParts.replace().then((m) => m.ReplaceFileDialog), { ssr: false });
@@ -146,6 +165,11 @@ export type ToolFlowProps = {
   phoneAddMenu?: () => HTMLElement | null;
   /** Controls in the top row (or the bottom dock) after the options (F5 Undo│Redo). */
   dockStart?: (ctx: FlowContext) => ReactNode;
+  /**
+   * For `optionsDensity: "full"`: a compact control shown in the top row itself from 1280 px, before More
+   * options (Merge's Contents page, F25 §3.4); below 1280 it lives only behind More options.
+   */
+  rowOptions?: (ctx: FlowContext) => ReactNode;
   /** Merge's own wording for the empty state and the wrong-type error. */
   copyOverrides?: { pickerButton?: string; pickerHint?: string; limits?: string; limitsFull?: string; statusEmpty?: string; errorType?: (name: string) => string };
   /** Chip on the Options button below 1024 px ("2 changed"), for `optionsDensity: "full"`. */
@@ -174,6 +198,14 @@ export type ToolFlowProps = {
   /** The dock's More options trigger: after the options, beside the primary on phones. */
   renderMore?: (ctx: FlowContext) => ReactNode;
 };
+
+/** Renders its children, then keeps that output while `hold` is true (React skips the subtree). */
+const HoldWhile = memo(
+  function HoldWhile({ children }: { children: ReactNode; hold: boolean }) {
+    return <>{children}</>;
+  },
+  (_, next) => next.hold,
+);
 
 /**
  * True from the first time `on` is true. The closed dialogs below mount only then (they keep their
@@ -208,6 +240,7 @@ export function ToolFlow({
   viewToggleFromOneFile,
   phoneAddMenu,
   dockStart,
+  rowOptions,
   copyOverrides,
   optionsBadge,
   apiRef,
@@ -279,7 +312,7 @@ export function ToolFlow({
   // The parts needed once a file is in: fetched at the first sign of intent (the file chooser or
   // the drag hides the load), when files arrive without one (a hand-off), or after 4 s (intent.ts).
   const stopIntent = useRef<() => void>(() => {});
-  useEffect(() => (stopIntent.current = onIntent(loadLazyParts)), []);
+  useEffect(() => (stopIntent.current = onIntent(onIntentLoad)), []);
   const hasFiles = files.length > 0;
   useEffect(() => {
     if (!hasFiles) return;
@@ -309,6 +342,9 @@ export function ToolFlow({
   const picker = useRef<FilePickerHandle>(null);
   const intakeTrigger = useRef<HTMLElement | null>(null);
   const progressBox = useRef<HTMLDivElement>(null);
+  // The pages area dims and goes inert one frame after the pill shows (eval G-13): with hundreds of tiles,
+  // making it inert restyles every tile (~450ms at 990 pages), which must not hold the pill's first paint.
+  const [pagesDim, setPagesDim] = useState(false);
   const retryButton = useRef<HTMLButtonElement>(null);
   const primaryButton = useRef<HTMLButtonElement>(null);
   const workArea = useRef<HTMLDivElement>(null);
@@ -666,12 +702,18 @@ export function ToolFlow({
     errorNotice.current = null;
     setProgress(0);
     setProgressPhase(undefined);
-    setJobPhase(null);
+    // A server tool's run starts with the upload: show that phase from the first frame (the job reports it again).
+    setJobPhase(tool.runtime === "server" ? { phase: "upload", fraction: 0 } : null);
     setPillDone(false);
+    setPagesDim(false);
     setPhase("processing");
     announce(tool.flow.progressLabel);
     const started = performance.now();
     try {
+      // The pill shows on the click (F25 §6, eval G-13): let it paint before the work starts.
+      await new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+      if (controller.signal.aborted) return;
+      setPagesDim(true);
       const out = await processFiles(
         ready,
         controller.signal,
@@ -697,7 +739,7 @@ export function ToolFlow({
       // The done tick (leaf, "Done") holds, then the stage becomes the result (T12).
       setPillDone(true);
       announce(copy.done);
-      await sleep(DONE_HOLD_MS);
+      await Promise.all([sleep(DONE_HOLD_MS), loadResult().catch(() => {})]);
       if (controller.signal.aborted) return;
       // The work area fades out (120ms, inert at once) and the result rises in its place (T12). The pill
       // that holds focus is about to go: park focus on the tool heading until the result focuses Download.
@@ -719,7 +761,7 @@ export function ToolFlow({
       // The full reason and what to do go in NoticeStack (assertive, never auto-dismissed), with Start over.
       errorNotice.current = pushNotice({ tone: "danger", title: shown ?? copy.errorProcess(tool.flow.progressLabel), action: { label: copy.startOver, onClick: () => startOverRef.current() } });
     }
-  }, [announce, dismissNotice, processFiles, pushNotice, sayProgress, tool.flow.progressLabel, tool.slug]);
+  }, [announce, dismissNotice, processFiles, pushNotice, sayProgress, tool.flow.progressLabel, tool.runtime, tool.slug]);
   const submitRef = useRef<() => void>(() => {});
   submitRef.current = () => {
     if (flowCanRun) void run(); // run() itself ignores a second call while one is processing
@@ -1012,9 +1054,14 @@ export function ToolFlow({
 
   // Page tools state the outcome while the primary can run (I-7, AC-545); the plain verb otherwise.
   const actionText = canPrimary && primaryLabel ? primaryLabel() : flow.actionLabel;
+  // The label the run was started with (the marks and choices are kept on the result): Download takes its box.
+  const ranText = primaryLabel ? primaryLabel() : flow.actionLabel;
   const primary = (
     <Button ref={primaryButton} variant="primary" size="lg" className="ip-slot__main max-[359px]:px-4" disabled={!canPrimary} aria-describedby={statusId} onClick={run} data-testid="primary-action">
-      {actionText}
+      {/* Sized to fit "Download" too (layout.css .ip-slot__size): Download takes this exact box (eval G-3). */}
+      <span className="ip-slot__size ip-slot__size--dl" data-size={copy.download}>
+        <span>{actionText}</span>
+      </span>
     </Button>
   );
   const working = state === "processing";
@@ -1042,7 +1089,11 @@ export function ToolFlow({
       fix={fix ? { label: fix.name, onClick: () => continueWithFiles(fix) } : undefined}
     />
   ) : state === "done" && output ? (
-    <ResultDownload output={output} tool={tool} announce={announce} onSaved={setCloudLine} />
+    resultParts ? (
+      <resultParts.ResultDownload output={output} tool={tool} announce={announce} onSaved={setCloudLine} sizeAs={ranText} />
+    ) : (
+      <LazyResultDownload output={output} tool={tool} announce={announce} onSaved={setCloudLine} sizeAs={ranText} />
+    )
   ) : (
     <>
       <C.SlotStatus id={statusId} text={statusText} extra={state === "ready" && runCheck === true ? readyNote : undefined} />
@@ -1097,6 +1148,7 @@ export function ToolFlow({
   const leaveMounted = useMountOnce(guardLeave);
   const replaceMounted = useMountOnce(!!pendingReplace);
   const dim = working ? { "data-dim": "", inert: true } : {};
+  const dimPages = working && pagesDim ? dim : {};
   const options = renderOptions(ctx);
   const rowPicker =
     process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
@@ -1109,6 +1161,7 @@ export function ToolFlow({
       label={`${tool.name} options`}
       layout={wide ? (settings ? "side" : "row") : "bar"}
       start={dockStart?.(ctx)}
+      rowOptions={wide && !settings ? rowOptions?.(ctx) : undefined}
       optionsDisabled={optionsDisabled}
       options={settings && wide ? null : options}
       more={renderMore?.(ctx)}
@@ -1124,17 +1177,21 @@ export function ToolFlow({
             <Button variant="secondary" className="flex-1 lg:flex-none" onClick={close}>
               Done
             </Button>
-            <Button
-              variant="primary"
-              className="flex-1 lg:flex-none"
-              disabled={!canPrimary}
-              onClick={() => {
-                close();
-                void run();
-              }}
-            >
-              {actionText}
-            </Button>
+            {/* The phone sheet covers the dock, so it repeats the primary; the popover (>= 1024) does not:
+                the primary lives only in the slot there (eval G-7). */}
+            {!wide && (
+              <Button
+                variant="primary"
+                className="flex-1"
+                disabled={!canPrimary}
+                onClick={() => {
+                  close();
+                  void run();
+                }}
+              >
+                {actionText}
+              </Button>
+            )}
           </>
         ),
       }}
@@ -1175,24 +1232,29 @@ export function ToolFlow({
         </DropCard>
       ) : state === "done" && output ? (
         // Its own key: the work area's element (faded out and inert by T12) is never reused for the result.
-        <div key="result" className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 sm:px-5 lg:mt-2">
-          <ResultCard
-            ref={resultCard}
-            output={output}
-            tool={tool}
-            continueTargets={continueTargets(output.type)}
-            onContinue={continueWith}
-            onStartOver={startOver}
-            onBack={backToOptions}
-            announce={announce}
-            cloudLine={cloudLine}
-          />
+        <div key="result" className="ip-wide relative rounded-panel border-[1.5px] border-sand bg-cream px-3 sm:px-5 lg:mt-2">
+          {(() => {
+            const Card = resultParts ? resultParts.ResultCard : LazyResultCard;
+            return (
+              <Card
+                ref={resultCard}
+                output={output}
+                tool={tool}
+                continueTargets={continueTargets(output.type)}
+                onContinue={continueWith}
+                onStartOver={startOver}
+                onBack={backToOptions}
+                announce={announce}
+                cloudLine={cloudLine}
+              />
+            );
+          })()}
         </div>
       ) : (
         // The stage (F25 §3): the cream panel under the row, --ip-stage-h tall from 1024 px, holding the tools
         // row and the pages (they scroll inside it with a slim BerryPDF bar). Below 1024 px the page scrolls
         // and the tools row sticks under the header. A settings tool adds its options panel on the right.
-        <div key="work" ref={workArea} className={settings ? "lg:mt-2 lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-6" : "lg:mt-2"}>
+        <div key="work" ref={workArea} className={settings ? "ip-wide lg:mt-2 lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-6" : "ip-wide lg:mt-2"}>
           <section aria-label="Your files" className="min-w-0">
             {/* Below 1024 px the panel clips to its rounded corners (overflow: clip keeps the row sticky) and the
                 row is square: at rest the panel rounds it, and once stuck under the header its corners cover the
@@ -1244,7 +1306,7 @@ export function ToolFlow({
                 data-testid="pages-scroll"
                 className="ip-scroll ip-dimmable flex flex-col gap-4 overflow-x-clip pt-3 pb-6 max-lg:-mx-2 max-lg:min-h-[calc(var(--ip-thumb-size)+76px)] max-lg:px-2 lg:-mx-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5"
                 data-ip-scroll="pages"
-                {...dim}
+                {...dimPages}
               >
                 {ownerBlocked.map((f) => (
                   <OwnerPermissionNotice
@@ -1255,6 +1317,9 @@ export function ToolFlow({
                   />
                 ))}
                 <ThumbContext.Provider value={thumbs}>
+                  {/* While the work runs the pages hold still: not re-rendered on every progress tick (990 tiles
+                      took ~1s of main thread at the click, eval G-13). The area dims and goes inert around them. */}
+                  <HoldWhile hold={state === "processing"}>
                   {renderWorkspace ? (
                     renderWorkspace(wctx)
                   ) : view === "pages" ? (
@@ -1275,6 +1340,7 @@ export function ToolFlow({
                   ) : (
                     <FileGrid files={files} onRemove={(f) => removeFile(f.id)} />
                   )}
+                  </HoldWhile>
                   {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
                     <>
                       {CloudCards && <CloudCards downloads={cloud!.s.downloads} />}

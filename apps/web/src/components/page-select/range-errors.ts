@@ -1,7 +1,8 @@
 /** The range field's error text (spec F4/F5 UI P-13). Loaded with the selection model, not in the first load. */
 import type { RangeError } from "@/lib/page-ranges";
+import { formatCount } from "@/lib/format-count";
 
-const n = (v: number) => v.toLocaleString("en");
+const n = formatCount;
 
 /**
  * The inline error for a bad range (P-13): it names the item and the reason. "Past the end"

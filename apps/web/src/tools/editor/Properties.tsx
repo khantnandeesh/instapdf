@@ -578,11 +578,17 @@ export function SelectionBar({ objs, panel }: { objs: EditorObject[]; panel?: bo
 }
 
 /** The active tool's defaults (top-bar centre slot ≥ 1024, context strip below). */
-export function ToolOptions({ compact }: { compact?: boolean }) {
+/**
+ * The armed tool's options. `kindOnly`: just its kind switch (Shape, Mark, Pen or marker), shown above a
+ * selection's own controls while the tool stays armed (eval G-10); the rest of its defaults would repeat
+ * the selection's (Fill, colour), so they wait until nothing is selected.
+ */
+export function ToolOptions({ compact, kindOnly }: { compact?: boolean; kindOnly?: boolean }) {
   const ctl = useCtl();
   const tool = useStore(ctl.store, (s) => s.tool);
   const d = useStore(ctl.store, (s) => s.defaults);
   const set = (patch: Partial<ToolDefaults>) => ctl.store.set((s) => ({ defaults: { ...s.defaults, ...patch } }));
+  if (kindOnly && tool === "form") return null;
   if (tool === "form")
     return (
       <div key="form" className="ed-options">
@@ -667,6 +673,8 @@ export function ToolOptions({ compact }: { compact?: boolean }) {
       controls = [{ key: "role", node: <SignRole /> }];
       break;
   }
+  if (kindOnly) controls = controls.filter((c) => c.key === "k");
+  if (kindOnly && !controls.length) return null;
   if (!controls.length) return compact ? null : <div className="ed-bar ed-bar--empty" aria-hidden="true" />;
   return (
     <div key={tool} className="ed-options">

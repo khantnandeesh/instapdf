@@ -42,6 +42,53 @@ body:has(.ed-shell) div:has(> main) {
     --ip-header-h: 0px;
   }
 }
+/*
+ * G-1 (nav-autohide.ts): from 1024 px the canvas runs up behind the site navbar (--ed-under), which
+ * covers it at rest. Scrolling the pages down sets html[data-ed-nav="hidden"]: the navbar slides up out
+ * of view and everything that hangs from the top of the editor (the bar, the page strip, the
+ * properties card, the hints) slides up by the same amount (--ed-lift), so the pages get the navbar's
+ * height. Only translates move, so nothing counts as a layout shift; no motion under reduced motion.
+ */
+.ed-wide {
+  --ed-under: var(--ip-header-h);
+  --ed-lift: 0px;
+}
+html[data-ed-nav="hidden"] .ed-wide {
+  --ed-lift: calc(-1 * var(--ed-under));
+}
+html[data-ed-nav="hidden"] body:has(.ed-wide) .ip-site-header {
+  transform: translateY(calc(-100% - 2px));
+}
+.ed-wide .ed-canvas {
+  top: calc(-1 * var(--ed-under));
+  background-color: var(--color-canvas);
+  padding-top: calc(var(--ed-rest-top) + var(--ed-under));
+}
+.ed-wide :is(.ed-top, .ed-props) {
+  translate: 0 var(--ed-lift);
+}
+.ed-wide :is(.ed-hint, .ed-recover, .ed-owner) {
+  translate: -50% var(--ed-lift);
+}
+/* The page strip starts behind the bar; its contents sit under the bar and grow when it lifts. */
+.ed-wide .ed-panel {
+  top: calc(var(--ed-top-h) - var(--ed-under));
+}
+.ed-wide .ed-panel > .ed-side {
+  height: calc(100% - var(--ed-under) - var(--ed-lift));
+  translate: 0 calc(var(--ed-under) + var(--ed-lift));
+}
+@media (prefers-reduced-motion: no-preference) {
+  body:has(.ed-wide) .ip-site-header {
+    transition: transform var(--motion-quick) var(--ease-out);
+  }
+  /* Only the lift tweens: the properties card's own move off the selection (transform) is instant, so
+     it never passes over what is selected (eval G-9). */
+  .ed-wide :is(.ed-top, .ed-props, .ed-hint, .ed-recover, .ed-owner, .ed-panel > .ed-side) {
+    transition: translate var(--motion-quick) var(--ease-out);
+  }
+}
+
 .ed-frame-root,
 .ed-opening {
   /*
@@ -784,6 +831,12 @@ body:has(.ed-shell) div:has(> main) {
   background: var(--surface);
   box-shadow: var(--shadow-menu);
 }
+/* The armed tool's options over the selection's controls (eval G-10), with a hairline between. */
+.ed-props > .ed-options:not(:last-child) {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-sand, var(--sand));
+}
 /* The selection's name over its controls (F25 §5). */
 .ed-props__title {
   margin: 0 0 8px;
@@ -804,6 +857,12 @@ body:has(.ed-shell) div:has(> main) {
 }
 .ed-canvas--drop {
   box-shadow: inset 0 0 0 3px var(--color-brand);
+}
+/* From 1024 the canvas starts behind the navbar: its top ring edge is drawn under the navbar's bottom. */
+.ed-wide .ed-canvas--drop {
+  box-shadow:
+    inset 0 0 0 3px var(--color-brand),
+    inset 0 calc(var(--ed-under) + var(--ed-lift) + 3px) 0 0 var(--color-brand);
 }
 .ed-pages {
   display: flex;
@@ -858,31 +917,75 @@ body:has(.ed-shell) div:has(> main) {
 .ed-pagewrap--place {
   touch-action: none;
 }
+/* The page header (F16 AC-55, wide only): the page number and the page actions float over the page's
+   top edge instead of taking a 32px row above it (F25 eval G-1, M12): between two pages the canvas
+   shows only the 12px gap. Shown on hover or focus within; the current page keeps its number. */
+.ed-slot {
+  position: relative;
+}
+.ed-wide .ed-pages {
+  gap: 12px;
+}
 .ed-pagehead {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  left: 8px;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 32px;
-  padding: 0 2px;
+  pointer-events: none;
+}
+.ed-pagehead > * {
   opacity: 0;
   transition: opacity var(--dur-base);
 }
-.ed-pagehead--current {
-  opacity: 0.6;
+/* Only the actions take the pointer (the number is a label), and only with Select or Edit text: with a
+   drawing or placing tool armed the page's corner is the page's. */
+.ed-frame-root:is([data-tool="select"], [data-tool="edit"]) .ed-pagehead__acts {
+  pointer-events: auto;
 }
-.ed-slot:hover .ed-pagehead,
-.ed-pagehead:focus-within {
+.ed-frame-root:not([data-tool="select"], [data-tool="edit"]) .ed-pagehead__acts {
+  visibility: hidden;
+}
+.ed-pagehead--current .ed-pagehead__n,
+.ed-slot:hover .ed-pagehead > *,
+.ed-pagehead:focus-within > * {
   opacity: 1;
 }
 .ed-pagehead__n {
+  min-width: 28px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: 0 0 0 1px var(--color-sand, var(--sand));
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  line-height: 18px;
+  text-align: center;
   color: var(--color-muted);
 }
 .ed-pagehead__acts {
   display: flex;
   gap: 2px;
+  padding: 2px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--color-sand, var(--sand)),
+    0 6px 16px -10px rgb(140 30 60 / 0.35);
+}
+/* Without hover (a touch screen from 1024px) nothing hides there: only the current page has the row. */
+@media (hover: none) {
+  .ed-pagehead:not(.ed-pagehead--current) {
+    visibility: hidden;
+  }
+  .ed-pagehead--current > * {
+    opacity: 1;
+  }
 }
 .ed-panel {
   position: absolute;
@@ -1939,14 +2042,63 @@ body:has(.ed-shell) div:has(> main) {
   background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 0 0 / 16px 16px;
 }
 
-/* ---- loading ---------------------------------------------------------------------------- */
-.ed-loader {
-  display: block;
-  width: 28px;
-  height: 28px;
-  border: 3px solid var(--color-brand-tint);
-  border-top-color: var(--color-brand);
-  border-radius: 99px;
+/* ---- opening (motion.md E1): the layout with paper-tinted placeholders, no spinner ---------- */
+.ed-opening__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.ed-opening__strip {
+  display: none;
+}
+.ed-opening__canvas {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  /* Where the first page rests: under the page chip's band on phones, under the bar from 1024. */
+  padding: 54px 8px 0;
+}
+.ed-opening__page,
+.ed-opening__thumb {
+  flex: none;
+  aspect-ratio: var(--ed-paper, 210 / 297);
+  border-radius: 3px;
+  background: #f7f0ed; /* as an undrawn page; pages stay light in dark mode */
+  box-shadow:
+    0 1px 2px rgb(58 20 30 / 0.1),
+    0 8px 24px -12px rgb(58 20 30 / 0.28);
+}
+.ed-opening__page {
+  width: 100%;
+}
+@media (min-width: 1024px) {
+  .ed-opening__strip {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    width: 132px;
+    padding-top: 52px;
+    border-right: 1px solid var(--color-sand, var(--sand));
+    background: var(--surface);
+  }
+  .ed-opening__thumb {
+    width: 92px;
+  }
+  .ed-opening__canvas {
+    padding: var(--ed-rest-gap) 16px 0 148px;
+  }
+  .ed-opening__page {
+    width: calc(100% - 32px);
+  }
 }
 .ed-opening .ed-top {
   position: relative;
@@ -2067,9 +2219,6 @@ body:has(.ed-shell) div:has(> main) {
   .ed-tool:active {
     transform: scale(0.94);
   }
-  .ed-loader {
-    animation: ed-spin 0.9s linear infinite;
-  }
   .ed-guide {
     animation: ed-fade 80ms ease-out both;
   }
@@ -2107,12 +2256,6 @@ body:has(.ed-shell) div:has(> main) {
     opacity: 0;
   }
 }
-@keyframes ed-spin {
-  to {
-    rotate: 360deg;
-  }
-}
-
 /* ---- forced colours --------------------------------------------------------------------- */
 @media (forced-colors: active) {
   .ed-glass,

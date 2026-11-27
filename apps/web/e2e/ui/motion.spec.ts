@@ -712,7 +712,8 @@ for (const size of SIZES) {
       const trail = await page.evaluate(() => (window as unknown as { focusTrail: string[] }).focusTrail);
       expect(trail[0], "the progress bar had focus").toBe("processing");
       expect(trail, "focus on the way to the result").not.toContain("body");
-      expect(trail.at(-1)).toBe("a");
+      // Download carries data-testid="save-main" since eval G-3 (it took the primary's box); before, the trail named its tag "a".
+      expect(trail.at(-1)).toBe("save-main");
 
       // Back to editing: the card leaves (inert) with focus on the tool heading, and the work area returns.
       await page.evaluate(() => ((window as unknown as { focusTrail: string[] }).focusTrail = []));

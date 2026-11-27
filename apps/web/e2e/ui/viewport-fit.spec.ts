@@ -186,8 +186,8 @@ for (const tool of usable) {
         await expect(async () => expectInViewport(page, page.getByRole("link", { name: "Download" }), "Download (result)")).toPass({ timeout: 5_000 });
         // F23 (AC-169): with cloud sources on, the result's second action (Save to…) fits beside Download.
         if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1") {
-          await expect(page.getByTestId("save-main")).toBeVisible();
-          await expectInViewport(page, page.getByTestId("save-main"), "Save to cloud (result)");
+          await expect(page.getByTestId("save-cloud")).toBeVisible();
+          await expectInViewport(page, page.getByTestId("save-cloud"), "Save to cloud (result)");
         }
       });
     }
@@ -229,8 +229,8 @@ for (const tool of usable) {
         await expect(page.locator("[data-ip-dock=bar]").getByRole("link", { name: "Download" })).toBeVisible();
         // F23 (AC-169): with cloud sources on, the result's second action (Save to…) fits beside Download.
         if (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1") {
-          await expect(page.getByTestId("save-main")).toBeVisible();
-          await expectInViewport(page, page.getByTestId("save-main"), "Save to cloud (result)");
+          await expect(page.getByTestId("save-cloud")).toBeVisible();
+          await expectInViewport(page, page.getByTestId("save-cloud"), "Save to cloud (result)");
         }
       });
     }

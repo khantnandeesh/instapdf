@@ -2,6 +2,26 @@
  * Tool-page styles (shared flow). Imported by ToolFlow and ControlDock, so they ship only with tool routes and stay out
  * of the site-wide stylesheet budget (e2e/f2/home.spec.ts AC-55).
  */
+/* The bottom dock (ControlDock, layout "bar"): a zero-height anchor fixed to the bottom edge, and the bar in
+   it lifted by its own height with a transform. The anchor never moves and the bar's own layout box never
+   moves inside it, so when the bar grows or shrinks (the options row leaving at the result) nothing shifts
+   (eval G-2: CLS 0 through the swap; a transform on the fixed element itself would still count its
+   children's moves). */
+.ip-dock-anchor {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  height: 0;
+}
+.ip-dock-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  transform: translateY(-100%);
+}
 /* Below 1024 px, once a file is in, the dock is fixed at the bottom: keep the footer's end clear of it. */
 body:has([data-ip-dock="bar"]) .ip-site-footer {
   padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);

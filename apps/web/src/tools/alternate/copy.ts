@@ -1,5 +1,6 @@
 /** Alternate & mix copy (spec F4/F5 P-13). Our own wording. */
-const n = (v: number) => v.toLocaleString("en-US");
+import { formatCount } from "@/lib/format-count";
+const n = formatCount;
 const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
 
 export const alternateCopy = {

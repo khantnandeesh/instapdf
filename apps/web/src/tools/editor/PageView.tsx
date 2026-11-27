@@ -128,6 +128,7 @@ export const PageView = memo(function PageView({ entry, index, total, scale, roo
     }
     if (src == null) {
       setDrawn("ok");
+      if (!ctl.store.get().painted) ctl.store.set({ painted: true });
       return;
     }
     const key = `${pdfRev}:${rasterRev}:${scale.toFixed(4)}:${rotation}:${retry}:${formsOn}`;
@@ -139,6 +140,8 @@ export const PageView = memo(function PageView({ entry, index, total, scale, roo
         if (canvas && canvas !== "failed") release(canvas);
         return;
       }
+      // Download waits for the first page on screen (or its failure: the file still downloads).
+      if (canvas && !ctl.store.get().painted) ctl.store.set({ painted: true });
       if (canvas === "failed") return setDrawn("failed");
       if (!canvas) return;
       drawnFor.current = key;

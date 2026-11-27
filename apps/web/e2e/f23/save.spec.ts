@@ -27,7 +27,7 @@ test("AC-160, AC-161, AC-162, AC-164, AC-169, AC-131: Save to Drive after a Driv
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
   await rotateRight(page).click();
   await run(page);
-  const save = page.getByTestId("save-main");
+  const save = page.getByTestId("save-cloud");
   await expect(save).toHaveAccessibleName("Save to Drive");
   await expect(downloadLink(page)).toBeFocused();
   await expect(save).toBeInViewport({ ratio: 1 });
@@ -68,7 +68,7 @@ test("AC-160, AC-161, AC-162, AC-164, AC-169, AC-131: Save to Drive after a Driv
 test("AC-160: after a local pick, Save to… lists only Google Drive and OneDrive", async ({ page }) => {
   await pickReady(page, "alpha.pdf");
   await run(page);
-  const save = page.getByTestId("save-main");
+  const save = page.getByTestId("save-cloud");
   await expect(save).toHaveAccessibleName("Save to…");
   await save.click();
   await expect(page.getByRole("menuitem")).toHaveCount(2);
@@ -86,7 +86,7 @@ test("AC-169: Download is the only berry fill, keeps the focus, and both control
   await pickFromRow(page, "OneDrive", ["alpha.pdf"]);
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
   await run(page);
-  const save = page.getByTestId("save-main");
+  const save = page.getByTestId("save-cloud");
   await expect(save).toHaveAccessibleName("Save to OneDrive");
   await expect(downloadLink(page)).toBeFocused();
   // One filled action: no other control in the tool (row, slot and result) has Download's background.
@@ -110,7 +110,7 @@ test("AC-169: Download is the only berry fill, keeps the focus, and both control
 test("AC-163: a save that fails in its window says so inline; Download still works", async ({ page }) => {
   await pickReady(page, "alpha.pdf");
   await run(page);
-  await page.getByTestId("save-main").click();
+  await page.getByTestId("save-cloud").click();
   const win = await openWindow(page, () => page.getByRole("menuitem", { name: /^Google Drive/ }).click());
   await expect(win.getByTestId("cloud-open")).toBeEnabled();
   // Make the upload itself fail inside the window (the mock hashes the file before it "uploads").
@@ -130,7 +130,7 @@ test("AC-163: Google's sign-in popup failing in Save: the window says why with o
   await pickReady(page, "alpha.pdf");
   await run(page);
   await page.evaluate(() => localStorage.setItem("berrypdf:cloud-mock-save", "signin"));
-  await page.getByTestId("save-main").click();
+  await page.getByTestId("save-cloud").click();
   const win = await openWindow(page, () => page.getByRole("menuitem", { name: /^Google Drive/ }).click());
   await expect(win.getByTestId("cloud-open")).toBeEnabled();
   await win.getByTestId("cloud-open").click();
@@ -152,7 +152,7 @@ test("AC-163: Google's sign-in popup failing in Save: the window says why with o
 test("AC-163: a save cancelled in its window says so inline; Download still works", async ({ page }) => {
   await pickReady(page, "alpha.pdf");
   await run(page);
-  await page.getByTestId("save-main").click();
+  await page.getByTestId("save-cloud").click();
   const win = await openWindow(page, () => page.getByRole("menuitem", { name: /^Google Drive/ }).click());
   await expect(win.getByTestId("cloud-open")).toBeEnabled();
   await Promise.all([win.waitForEvent("close"), win.keyboard.press("Escape").catch(() => {})]);

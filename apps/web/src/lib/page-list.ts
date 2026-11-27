@@ -47,8 +47,10 @@ export type Segment = {
 export const A4: PageSize = { width: 595, height: 842 };
 
 /** Natural, case-insensitive order: "file2" before "File10". */
-const collator = typeof Intl !== "undefined" ? new Intl.Collator("en", { numeric: true, sensitivity: "base" }) : null;
+// Made on first use: building it at module load cost ~8ms (~33ms at 4x CPU) on every Merge load (eval G-12).
+let collator: Intl.Collator | null | undefined;
 export function naturalCompare(a: string, b: string): number {
+  collator ??= typeof Intl !== "undefined" ? new Intl.Collator("en", { numeric: true, sensitivity: "base" }) : null;
   if (collator) return collator.compare(a, b);
   return a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0;
 }

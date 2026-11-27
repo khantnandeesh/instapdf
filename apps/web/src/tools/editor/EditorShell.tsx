@@ -9,6 +9,7 @@ import { fieldKey, fieldTab, loadForms, nudgeAfterDownload } from "@/tools/forms
 import { FormsChrome } from "@/tools/forms/lazy";
 import { useRouter } from "next/navigation";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import type { MenuEntry } from "@/components/ui/Menu";
@@ -37,6 +38,9 @@ import { fontLabel, resetDocFonts } from "./font-service";
 import { resetDocFaces } from "./doc-face";
 import { disposeMatcher } from "@/lib/font-library/match-client";
 import { FontNotice } from "./FontMenu";
+import { useNavAutohide } from "./nav-autohide";
+import { OpeningBody } from "./Opening";
+import { placeCard, type PropsPlace } from "./props-place";
 import { AnnotsToggle, DOCK_ORDER, MoreTools, PageChip, PageHeader, PrivacyChip, SaveChip, ToolDock, TopBar, TOOLS, ViewPill } from "./Chrome";
 import { createController, TOOL_NAMES, type Controller, type Runtime, type Toast } from "./controller";
 import { BASE_SCALE, EditorContext, MAX_ZOOM, MIN_ZOOM, ZOOM_STEPS, useCtl } from "./context";
@@ -116,6 +120,7 @@ function initialState(pages: PageEntry[], wide: boolean): EditorState {
     placement: null,
     save: "idle",
     downloadedAt: 0,
+    painted: false,
     flash: null,
     texts: {},
     fresh: {},
@@ -300,20 +305,21 @@ export function EditorShell(props: ShellProps) {
         <div className="ed-opening">
           <header className="ed-top" role="group" aria-label="Document">
             <h1 className="ed-title">Edit PDF</h1>
+            <Badge tone="beta">Beta</Badge>
             <h2 className="ed-file truncate">{props.name}</h2>
           </header>
-          <div className="grid flex-1 place-items-center">
-            {failed ? (
+          {failed ? (
+            <div className="grid flex-1 place-items-center">
               <div className="flex flex-col items-center gap-3 text-center">
                 <p className="text-sm text-muted">This file couldn’t be opened.</p>
                 <Button variant="soft" onClick={props.onClose}>
                   Close
                 </Button>
               </div>
-            ) : (
-              <span className="ed-loader" aria-label="Opening" role="progressbar" />
-            )}
-          </div>
+            </div>
+          ) : (
+            <OpeningBody />
+          )}
         </div>
       )}
       <div aria-live="polite" aria-atomic="true" className="sr-only" data-testid="live">
@@ -352,6 +358,8 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   }, shallowArray);
   const dirty = useStore(store, (s) => s.history.index !== s.downloadedAt && !isPristine(H.current(s.history), s.forms.original ?? undefined));
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
+  // G-1: from 1024 px the site navbar slides away while the pages scroll down (nav-autohide.ts).
+  useNavAutohide(scroller, wide);
   const column = useRef<HTMLDivElement>(null);
   const [sign, setSign] = useState<{ role: "signature" | "initials" } | null>(null);
   const [sheet, setSheet] = useState<"more" | "pages" | null>(null);
@@ -1065,7 +1073,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
       const k = e.key;
       if (mod && k.toLowerCase() === "s") {
         e.preventDefault();
-        void download();
+        if (store.get().painted) void download();
         return;
       }
       if (fieldTab(ctl, e)) return e.preventDefault();
@@ -1262,27 +1270,51 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   const selected = selectionObjs.length > 0;
   const props = wide && (selected || PROPS_TOOLS.has(tool));
   const selKey = selectionObjs.map((o) => o.id).join(" ");
-  // It floats over the canvas, so opening it never moves the page. When it would cover the selected
-  // object it sits on the canvas's left instead (decided before paint, so it never jumps).
+  // It floats over the canvas, so opening it never moves the page, and it never covers what is selected
+  // (eval G-9): when the selection is under its spot it moves to the canvas's left (beside the strip);
+  // when both sides would cover it, it sits below the selection or ends above it, whichever has room.
+  // Decided before paint and again as the selection moves, the pages scroll or zoom. It moves by a
+  // transform, so none of this is a layout shift.
   const propsEl = useRef<HTMLElement>(null);
-  const [propsLeft, setPropsLeft] = useState<number | null>(null);
-  useLayoutEffect(() => {
+  const [propsAt, setPropsAt] = useState<PropsPlace | null>(null);
+  const placeProps = useCallback(() => {
     const panel = propsEl.current;
     const canvas = scroller;
-    if (!panel || !canvas || !selKey) return setPropsLeft(null);
+    if (!panel || !canvas || !selKey) return setPropsAt(null);
     const boxes = Array.from(canvas.querySelectorAll('[data-selected="true"], [data-handle]'), (el) => el.getBoundingClientRect());
-    if (!boxes.length) return setPropsLeft(null);
+    if (!boxes.length) return setPropsAt(null);
     const sel = { l: Math.min(...boxes.map((b) => b.left)), r: Math.max(...boxes.map((b) => b.right)), t: Math.min(...boxes.map((b) => b.top)), b: Math.max(...boxes.map((b) => b.bottom)) };
-    panel.style.left = "";
-    const p = panel.getBoundingClientRect();
-    const c = canvas.getBoundingClientRect();
-    const covered = (l: number) => Math.max(0, Math.min(sel.r, l + p.width) - Math.max(sel.l, l)) * Math.max(0, Math.min(sel.b, p.bottom) - Math.max(sel.t, p.top));
-    // Beside the page strip, never over it.
     const strip = panel.closest(".ed-frame-root")?.querySelector("[data-testid=editor-strip]")?.getBoundingClientRect();
-    const leftAt = Math.max(c.left, strip?.right ?? c.left) + 12;
-    const parent = panel.offsetParent?.getBoundingClientRect().left ?? 0;
-    setPropsLeft(covered(p.left) > 0 && covered(leftAt) < covered(p.left) ? leftAt - parent : null);
-  }, [selKey, props, scroller]);
+    const bar = panel.closest(".ed-frame-root")?.querySelector(".ed-top")?.getBoundingClientRect();
+    setPropsAt((was) => {
+      // Where it sits with no placement of its own: its rect less the current offset.
+      const r = panel.getBoundingClientRect();
+      const base = { l: r.left - (was?.x ?? 0), t: r.top - (was?.y ?? 0), w: r.width, h: panel.scrollHeight + 3 };
+      const c = canvas.getBoundingClientRect();
+      const next = placeCard(base, sel, { l: Math.max(c.left, strip?.right ?? c.left) + 12, t: (bar?.bottom ?? c.top) + 12, b: c.bottom - 76 });
+      return was && next && was.side === next.side && Math.abs(was.x - next.x) < 1 && Math.abs(was.y - next.y) < 1 && was.maxH === next.maxH ? was : next;
+    });
+  }, [selKey, scroller]);
+  useLayoutEffect(placeProps, [placeProps, props, selectionObjs, zoom, pages]);
+  useEffect(() => {
+    if (!props || !selKey || !scroller) return;
+    let frame = 0;
+    const later = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => placeProps());
+    };
+    scroller.addEventListener("scroll", later, { passive: true });
+    window.addEventListener("resize", later);
+    // The navbar sliding away moves the card with the bar (nav-autohide.ts): place it again once it lands.
+    const panel = propsEl.current;
+    panel?.addEventListener("transitionend", later);
+    return () => {
+      cancelAnimationFrame(frame);
+      scroller.removeEventListener("scroll", later);
+      window.removeEventListener("resize", later);
+      panel?.removeEventListener("transitionend", later);
+    };
+  }, [props, selKey, scroller, placeProps]);
   // The strip hides itself when a tool has no options: what sits above it then sits on the dock.
   useLayoutEffect(() => {
     const mark = () => document.querySelector(".ed-frame-root")?.classList.toggle("ed-strip-empty", strip && !document.querySelector(".ed-strip :is(button, input)"));
@@ -1350,9 +1382,12 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
           aria-label="Properties"
           data-ip-scroll="overlay"
           data-testid="editor-props"
-          data-side={propsLeft !== null ? "left" : "right"}
-          style={propsLeft !== null ? { left: propsLeft, right: "auto" } : undefined}
+          data-side={propsAt?.side ?? "right"}
+          style={propsAt && propsAt.side !== "right" ? { transform: `translate(${propsAt.x}px, ${propsAt.y}px)`, maxHeight: propsAt.maxH } : undefined}
         >
+          {/* An armed tool keeps its kind switch above the selection's controls (a shape just drawn with Shapes
+              still shows Rectangle · Ellipse · Line · Arrow, eval G-10). */}
+          {selected && PROPS_TOOLS.has(tool) && <ToolOptions kindOnly />}
           {selected ? <SelectionBar objs={selectionObjs} panel /> : <ToolOptions />}
         </aside>
       )}

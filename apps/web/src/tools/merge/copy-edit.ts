@@ -1,7 +1,8 @@
 /** Merge copy used only by the lazily loaded grids and dialogs (spec F3 M-12). Our own wording. */
 import { mergeCopy } from "./copy";
+import { formatCount } from "@/lib/format-count";
 
-const n = (v: number) => v.toLocaleString("en-US");
+const n = formatCount;
 const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
 
 export const editCopy = {

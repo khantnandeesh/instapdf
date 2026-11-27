@@ -688,3 +688,23 @@ The PM agreed the spec on 26 Nov (Q1 to Q4 as resolved below, Q5 changed). Resol
 3. **Editor properties panel:** decision 4 says "only when something is selected". This spec also opens it for an active tool with options (text, draw, shapes before placing), because those options lived in today's top slot. The alternative is a popover under the tool button.
 4. **Editor progress verb:** the mockup reads "Saving… 60%". This spec uses "Downloading… 60%", so the button keeps its name ("Download" → "Downloading" → "Downloaded") and it isn't confused with the device autosave chip's "Saving…".
 5. **"Start over" on error:** the slot has no room for it. **Resolved (PM):** the NoticeStack error notice carries a "Start over" action (the pages tools row keeps Remove all / ✕ too).
+
+## 13. Eval run 1 follow-ups (27 Nov, build notes)
+
+Changes made in the build for `docs/evals/f25-tool-layout-standard.md` run 1 (G-1 to G-16). Where they refine a section above, this list is the current behaviour.
+
+- **G-1, editor navbar (behind a switch).** At rest both bars show (navbar 72, editor bar 56). From 1024px wide and 601px tall, scrolling the pages down slides the navbar up out of view, and the editor bar, page strip, properties card and hints move up with it. The navbar comes back on a scroll up, when the pointer reaches the top 8px, or when focus enters it, and never while its All tools menu is open. Only transforms move, so nothing is a layout shift. With reduced motion it moves without a transition. Phones keep the navbar. `NEXT_PUBLIC_EDITOR_NAV_AUTOHIDE=0` builds it off (`src/tools/editor/nav-autohide.ts`). The canvas runs up behind the navbar, which covers it at rest.
+- **G-8.** The parts a loaded tool needs, pdf.js's chunk among them, are fetched on intent (pointer, key, focus or drag), with the files, or after 4s. pdf.js's two workers are warmed on intent only: with the files the pick creates them itself, and a warm fetch racing that would download them twice.
+- **G-1, page header row.** The page number and page actions (F16 AC-55) float over the page's top edge instead of a reserved 32px row, and pages are 12px apart from 1024. The actions show on hover or focus, and take the pointer only with Select or Edit text. The current page keeps its number chip.
+- **G-5, opening.** The opening frame shows the editor's layout with paper-tinted placeholders (strip thumbnails and the first page at fit width, in A4 or Letter by locale) and no spinner. A locked file's password dialog opens over that frame. Download stays disabled until the first page is painted, and Ctrl+S waits for it too.
+- **G-9, properties card.** It stays a floating card, and it never covers the selection. It first moves to the canvas's left. When both sides would cover the selection, it sits below the selection or ends above it, with a shorter max height. It is placed again as the selection moves and as the pages scroll or zoom. Moves are transforms, and they are instant, so the card never passes over the selection on its way.
+- **G-10.** With a drawing tool still armed and its new object selected, the tool's kind switch (Shape, Mark, Pen or marker) stays above the selection's controls.
+- **G-3.** Download sits in the primary's exact box on every build. Save to Drive is a 48px `line` icon button beside it, named "Save to …". `save-main` is Download, and `save-cloud` is Drive.
+- **G-6, §3.4 rows.** The rows now follow §3.4:
+  - Merge's row carries Contents page (None · Names · Titles) from 1280; at 1024–1279 it lives in More options.
+  - Split's mode is a native Select "Split" at 1024–1279.
+  - More options shows its label from 1280. To make room, the range fields take §3.4's widths at 1280–1439 (Delete 240, Extract 220, Split 180) and 300 from 1440, where the row is wider (G-14).
+  - Undo│Redo are icons at 1024–1279 on Organize, and at every width on Merge and Combine.
+  - The Rotate line in §3.4 ("All · Selected pills") still describes a form that F1 doesn't ship. It is left for the PM to amend.
+- **G-14.** From 1440px, once a file is in, the top row and the stage widen past the 1280 column, up to 1856px with 32px gutters. The tool guide keeps the column. AC-613's "spans the main column's width" applies below 1440.
+- **G-13.** While the work runs, the pages hold still: they are not re-rendered on each progress tick, and the dimmed area hides the tile buttons through CSS. The pill paints before the work starts. The pages area dims and goes inert one frame after the pill's first paint (the options at once): making hundreds of tiles inert restyles each of them, which must not hold the pill.

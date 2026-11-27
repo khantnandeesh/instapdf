@@ -200,10 +200,11 @@ export function SplitTool() {
                 options={modes}
                 onChange={setKind}
                 fullWidth
-                className="max-lg:hidden dock-side:grid-flow-row dock-side:grid-cols-2 dock-bar:w-auto dock-bar:auto-cols-max dock-bar:gap-1.5"
+                className="max-lg:hidden dock-side:grid-flow-row dock-side:grid-cols-2 dock-bar:w-auto dock-bar:auto-cols-max dock-bar:gap-1.5 dock-bar:max-xl:hidden"
               />
-              {/* Below 1024 px the four pills don't fit beside a field: a native select (one tap on touch). */}
-              <div className="w-[150px] max-sm:w-[130px] lg:hidden">
+              {/* Where the four pills don't fit beside a field (below 1024 px, and the row at 1024–1279, F25
+                  §3.4): a native select "Split" (one tap on touch). */}
+              <div className="w-[150px] max-sm:w-[130px] lg:hidden dock-bar:max-xl:block">
                 <Select id={selectId} label={c.mode} hideLabel value={split.kind} options={modes.map((o) => ({ value: o.value, label: o.value === "everyN" ? c.everyNShort : o.label }))} onChange={setKind} />
               </div>
             </div>
@@ -249,7 +250,7 @@ export function SplitTool() {
                     onBlur={() => setSplit((s) => (m ? m.blurParts(s, filesLive.current) : s))}
                     onClear={() => change(clearParts)}
                     onEnter={submit}
-                    className="min-w-0 flex-1 dock-bar:lg:w-[190px] dock-bar:lg:flex-none dock-bar:xl:w-[300px]"
+                    className="min-w-0 flex-1 dock-bar:lg:max-xl:max-w-[190px] dock-bar:xl:flex-none dock-bar:xl:max-[1439px]:w-[180px] dock-bar:min-[1440px]:w-[300px]"
                   />
                 </>
               )}

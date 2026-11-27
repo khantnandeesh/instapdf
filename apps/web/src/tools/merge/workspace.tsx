@@ -563,12 +563,12 @@ export function usePageWorkspace({ tool, history: full }: { tool: FlowTool; hist
     setDialogsUsed((d) => ({ ...d, picker: true }));
   };
 
-  /** Undo│Redo in the bottom bar (spec F4/F5 P-3, P-8): labels from 1024 px, 44 px icons below. */
+  /** Undo│Redo (spec F4/F5 P-3, P-8; F25 §3.4): labels from 1280 px on Organize, icons on Merge and Combine. */
   const renderHistory = (ctx: FlowContext): ReactNode => {
     if (!full) return null;
     const busy = ctx.state === "processing";
     if (ctx.state === "empty" && !hist.past.length && !hist.future.length) return null;
-    return <full.Buttons canUndo={!busy && hist.past.length > 0} canRedo={!busy && hist.future.length > 0} onUndo={() => doUndoRef.current()} onRedo={() => doRedoRef.current()} />;
+    return <full.Buttons canUndo={!busy && hist.past.length > 0} canRedo={!busy && hist.future.length > 0} onUndo={() => doUndoRef.current()} onRedo={() => doRedoRef.current()} labels={tool.slug === "organize-pdf" ? "xl" : undefined} />;
   };
 
   /** ToolFlow props every page tool shares. */
