@@ -1,6 +1,6 @@
 "use client";
 import "./layout.css";
-import { forwardRef, type ReactNode, type Ref } from "react";
+import { Fragment, forwardRef, useLayoutEffect, useRef, type ReactNode, type Ref } from "react";
 import { cx } from "../ui/cx";
 import { CheckIcon, ErrorIcon } from "../ui/icons";
 import type { PillProgress } from "./announce";
@@ -20,12 +20,39 @@ export function ActionSlot({ kind = "tool", children, className }: { kind?: "too
   );
 }
 
-/** At rest: the status line (one line, its full text as a tooltip) before the primary. */
+/**
+ * At rest: the status line before the primary ("250 pages · 250 files", its full text as a tooltip). Each
+ * short part stays whole; when the parts don't fit on one line they stack, one per line, and the "·" goes
+ * (a wrapped line never starts or ends with a separator; owner polish rule).
+ */
 export function SlotStatus({ id, text, extra }: { id: string; text: string; extra?: string }) {
   const full = extra ? `${text} · ${extra}` : text;
+  const parts = full.split(" · ");
+  const ref = useRef<HTMLParagraphElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || parts.length < 2) return;
+    const fit = () => {
+      el.removeAttribute("data-stacked");
+      const spans = el.querySelectorAll<HTMLElement>("[data-part]");
+      const stacked = spans[spans.length - 1].offsetTop > spans[0].offsetTop + 2;
+      if (stacked) el.setAttribute("data-stacked", "");
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el.parentElement ?? el);
+    return () => ro.disconnect();
+  }, [full, parts.length]);
   return (
-    <p id={id} className="ip-slot__status" title={full} data-testid="dock-status">
-      {full}
+    <p ref={ref} id={id} className="ip-slot__status" title={full} data-testid="dock-status">
+      {parts.map((part, i) => (
+        <Fragment key={i}>
+          {i > 0 && <span className="ip-slot__sep"> · </span>}
+          <span data-part="" className={part.length <= 24 ? "whitespace-nowrap" : undefined}>
+            {part}
+          </span>
+        </Fragment>
+      ))}
     </p>
   );
 }

@@ -222,6 +222,12 @@
   }
   /* On the sand dock (below 1024px) the status is for screen readers only, as before (muted on sand is
      under 4.5:1); the primary takes the row. */
+  .ip-slot__status[data-stacked] .ip-slot__sep {
+    display: none;
+  }
+  .ip-slot__status[data-stacked] [data-part] {
+    display: block;
+  }
   [data-ip-dock="bar"] .ip-slot__status {
     position: absolute;
     width: 1px;

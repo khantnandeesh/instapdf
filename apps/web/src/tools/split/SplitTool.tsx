@@ -200,7 +200,7 @@ export function SplitTool() {
                 options={modes}
                 onChange={setKind}
                 fullWidth
-                className="max-lg:hidden dock-side:grid-flow-row dock-side:grid-cols-2 dock-bar:w-auto dock-bar:auto-cols-max dock-bar:gap-1.5 dock-bar:max-xl:hidden"
+                className="max-lg:hidden dock-side:grid-flow-row dock-side:grid-cols-2 dock-bar:w-auto dock-bar:auto-cols-max dock-bar:gap-2.5 dock-bar:max-xl:hidden"
               />
               {/* Where the four pills don't fit beside a field (below 1024 px, and the row at 1024–1279, F25
                   §3.4): a native select "Split" (one tap on touch). */}

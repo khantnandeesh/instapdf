@@ -57,9 +57,11 @@
     transform: rotate(180deg);
   }
   /* Tool (blueberry) variant in the working toolbar: the halves share one outline. */
+  /* The same soft lift as every tool button, never the 4px glow halo: at rest it read as a focus ring
+     (owner polish rule: a ring means keyboard focus, nothing else). */
   .ip-split--tool {
     border-radius: var(--radius-md);
-    box-shadow: var(--shadow-glow);
+    box-shadow: var(--shadow-tool-lift);
   }
   .ip-split--tool > .mp-btn--tool:first-child {
     border-inline-end-width: 0;

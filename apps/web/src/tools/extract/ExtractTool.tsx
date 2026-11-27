@@ -122,7 +122,7 @@ export function ExtractTool() {
             options={picks}
             onChange={(v) => (v === "custom" ? s.custom() : s.quickPick(v))}
             fullWidth
-            className="shrink-0 dock-bar:w-auto dock-bar:gap-1.5 max-sm:dock-bar:[&>button]:px-2"
+            className="shrink-0 dock-bar:w-auto dock-bar:gap-2.5 max-sm:dock-bar:[&>button]:px-2"
           />
           <RangeField
             ref={field}
