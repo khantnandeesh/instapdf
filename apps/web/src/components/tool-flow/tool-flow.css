@@ -151,11 +151,17 @@ body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard {
     .ip-tile-grid {
       grid-template-columns: repeat(auto-fill, calc(var(--ip-thumb-size) + 2 * var(--ip-tile-pad)));
       gap: var(--ip-tile-gap);
+      /* The columns are fixed-width, so a row rarely fills the stage exactly: centre the tracks so the
+         leftover space splits evenly left and right at every zoom (the last row still starts at the left). */
+      justify-content: center;
     }
   }
+  /* Concentric corners: the page has a 4px radius and the tile (its hover and selection outline) the
+     page's radius plus the tile padding, so the outline's curve runs parallel to the page's on all four
+     corners, badge or not. */
   .ip-tile {
     padding: var(--ip-tile-pad);
-    border-radius: var(--radius-md);
+    border-radius: calc(var(--ip-page-radius) + var(--ip-tile-pad));
     -webkit-touch-callout: none;
     user-select: none;
     transition: outline-color var(--dur-fast);

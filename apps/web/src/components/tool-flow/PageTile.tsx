@@ -94,7 +94,7 @@ export function PageTile({
         data-rotation={pendingDelta}
       >
         <span
-          className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
+          className="relative block overflow-hidden rounded-(--ip-page-radius) bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
           style={{ ...pageBoxStyle(size), transform: pageTransform(size, pendingDelta) }}
           data-testid="page-visual"
         >
@@ -110,7 +110,7 @@ export function PageTile({
           onFocus={onFocus}
           onClick={onOpen}
           onKeyDown={onKeyDown}
-          className="absolute inset-0 rounded-sm focus-visible:outline-offset-1"
+          className="absolute inset-0 rounded-(--ip-page-radius) focus-visible:outline-offset-1"
         />
         {badge && (
           <span className="pointer-events-none absolute top-1.5 left-1.5 z-[1] rounded-pill bg-surface-raised px-2 py-0.5 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">

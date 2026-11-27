@@ -12,9 +12,15 @@ export function needsCloud() {
   test.skip(!cloudOn, "needs a build with NEXT_PUBLIC_CLOUD_SOURCES=1 NEXT_PUBLIC_CLOUD_MOCK=1");
 }
 
-export const cloudRow = (page: Page) => page.getByTestId("cloud-row");
-export const rowButton = (page: Page, name: Name) => cloudRow(page).getByRole("button", { name: new RegExp(`^Choose from ${name}`) });
 export const caret = (page: Page) => page.getByTestId("cloud-caret");
+/** A provider in the upload caret's menu: the one place cloud sources are offered (owner 2026-11-27, the icon row is gone). */
+export const sourceItem = (page: Page, name: Name) => page.getByRole("menuitem", { name: new RegExp(`^${name}`) });
+/** Opens the empty state's caret menu (unless it is open) and chooses a provider. */
+export async function pickSource(page: Page, name: Name) {
+  const item = sourceItem(page, name);
+  if (!(await item.isVisible())) await caret(page).click();
+  await item.click();
+}
 export const cards = (page: Page) => page.getByTestId("cloud-download");
 export const sha256 = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
 
@@ -53,9 +59,9 @@ export async function mockPick(win: Page, files: string[], opts: { slow?: string
   await win.getByRole("button", { name: "Pick", exact: true }).click();
 }
 
-/** Opens a provider from the empty state's cloud row and picks fixtures; resolves when the window has closed itself. */
+/** Opens a provider from the empty state's caret menu and picks fixtures; resolves when the window has closed itself. */
 export async function pickFromRow(page: Page, name: Name, files: string[], opts: { slow?: string; failOnce?: string } = {}) {
-  const win = await openWindow(page, () => rowButton(page, name).click());
+  const win = await openWindow(page, () => pickSource(page, name));
   await mockPick(win, files, opts);
   return win;
 }

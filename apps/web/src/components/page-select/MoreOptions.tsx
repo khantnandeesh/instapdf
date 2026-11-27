@@ -17,7 +17,8 @@ const prefetch = () => void loadDialog().catch(() => {});
 
 /**
  * The More options trigger and its dialog (spec F4/F5 UI P-4, P-5). The trigger reads
- * "More options" with a "{n} changed" chip; in the row below 1280 px (F25 §3.4) and in the bar it is a
+ * "More options"; a count bubble on its corner says how many options changed (the words are in its
+ * accessible name); in the row below 1280 px (F25 §3.4) and in the bar it is a
  * 44px icon button with a tooltip, and on phones a bare 44px icon beside the primary.
  */
 export function MoreOptions({
@@ -54,20 +55,16 @@ export function MoreOptions({
         <span aria-hidden="true" className="dock-bar:max-xl:hidden">
           {selectCopy.more}
         </span>
+        {/* One count bubble on the corner at every width: it never changes the button's width, so the row
+            and the popover under it stay still when an option is toggled (no layout shift). */}
         {changed > 0 && (
-          <>
-            <span
-              aria-hidden="true"
-              className="mp-tag mp-tag--sm dock-bar:max-xl:hidden"
-            >
-              {selectCopy.moreChanged(changed)}
-            </span>
-            {/* Icon-only: a small berry dot says something is changed. */}
-            <span
-              aria-hidden="true"
-              className="absolute top-1.5 right-1.5 hidden size-2 rounded-full bg-brand ring-2 ring-white dock-bar:max-xl:block"
-            />
-          </>
+          <span
+            aria-hidden="true"
+            data-testid="more-options-count"
+            className="mp-tick-in pointer-events-none absolute -top-1.5 -right-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1 font-ui text-[11px] leading-none font-semibold text-white tabular-nums ring-2 ring-white"
+          >
+            {changed}
+          </span>
         )}
         <span
           aria-hidden="true"

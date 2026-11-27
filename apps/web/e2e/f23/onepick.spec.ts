@@ -6,7 +6,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { isPhoneToolbar, openMerge, pickMerge, showPages } from "../f3/support";
-import { closed, flow, mockLog, needsCloud, openRotate, openWindow, rowButton, tiles } from "./support";
+import { caret, closed, flow, mockLog, needsCloud, openRotate, openWindow, pickSource, tiles } from "./support";
 
 needsCloud();
 
@@ -23,7 +23,7 @@ async function onepick(page: Page, outcome: string) {
   await page.evaluate(([k, v, ko, vo]) => (localStorage.setItem(k, v), localStorage.setItem(ko, vo)), [REDIRECT, "onepick", OUTCOME, outcome]);
   const urls: string[] = [];
   page.context().once("page", (w) => w.on("framenavigated", (f) => f === w.mainFrame() && urls.push(f.url())));
-  const win = await openWindow(page, () => rowButton(page, "Google Drive").click());
+  const win = await openWindow(page, () => pickSource(page, "Google Drive"));
   await win.getByTestId("cloud-open").click();
   return { win, urls };
 }
@@ -58,7 +58,7 @@ test("the picker closed (Google answers access_denied): a quiet cancel, nothing 
   await expect(page.getByText("Waiting for Google Drive…")).toBeHidden({ timeout: 8_000 });
   await expect(flow(page)).toHaveAttribute("data-state", "empty");
   await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toHaveCount(0); // no notice (Next's route announcer is an empty alert)
-  await expect(rowButton(page, "Google Drive")).toBeFocused();
+  await expect(caret(page)).toBeFocused();
   expect((await mockLog(page))!.downloads).toEqual([]);
 });
 

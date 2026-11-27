@@ -115,7 +115,7 @@ for (const tool of usable) {
         await expect(page.locator("[data-ip-dock]")).toHaveCount(0);
         if (await page.getByTestId("cloud-caret").count()) {
           await expectInViewport(page, page.getByTestId("cloud-caret"), "sources caret (empty state)");
-          await expectInViewport(page, page.getByTestId("cloud-row"), "cloud row (empty state)");
+          await expectInViewport(page, page.getByTestId("cloud-caret"), "cloud caret (empty state)");
         }
         await expectInViewport(page, page.getByTestId("privacy-intro"), "privacy line (empty state)");
         expect(await page.evaluate(() => window.scrollY), "the empty state needs no scroll").toBe(0);
@@ -212,7 +212,7 @@ for (const tool of usable) {
         // F23 (AC-156, from 390x664): with cloud sources on, the sources caret and the cloud row are on the first screen too.
         if (height >= 664 && (await page.getByTestId("cloud-caret").count())) {
           await expectInViewport(page, page.getByTestId("cloud-caret"), "sources caret (empty state)");
-          await expectInViewport(page, page.getByTestId("cloud-row"), "cloud row (empty state)");
+          await expectInViewport(page, page.getByTestId("cloud-caret"), "cloud caret (empty state)");
         }
         await noHorizontalScroll(page);
 

@@ -1,8 +1,7 @@
 "use client";
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { cx } from "./cx";
 import { LazyFieldBubble } from "./LazyFieldBubble";
-import { IconButton } from "./IconButton";
 import { MinusIcon, PlusIcon } from "./icons";
 import { shakeElement } from "./shake";
 
@@ -21,7 +20,7 @@ export function stepText(text: string, delta: number, min = 1, max = 9999): stri
 }
 
 /**
- * [−] [56px number field] [+] (spec F4/F5 UI P-4 `NumberStepper`). Free typing is allowed; the
+ * [− | number | +] as one joined control (spec F4/F5 UI P-4 `NumberStepper`; globals.css .ip-stepper). Free typing is allowed; the
  * error shows 300ms after the last keystroke and at once on blur, in the same bubble as the range
  * field. ArrowUp / ArrowDown step by 1, PageUp / PageDown by 10; − is aria-disabled at `min`.
  */
@@ -88,42 +87,36 @@ export function NumberStepper({
     onChange(stepText(value, delta, min, max));
   }
 
+  const step = (delta: number) => onChange(stepText(value, delta, min, max));
   return (
-    <span className={cx("relative items-center gap-1", under ? "inline-grid grid-cols-[auto_auto_auto] grid-rows-[auto_1.25rem]" : "inline-flex", className)} data-testid="number-stepper" data-fb-under={under ? "" : undefined}>
-      <IconButton
-        label={decLabel}
-        variant="soft"
-        className="size-11"
-        aria-disabled={atMin || undefined}
-        icon={<MinusIcon size={18} />}
-        onClick={() => !atMin && onChange(stepText(value, -1, min, max))}
-      />
-      <input
-        type="text"
-        inputMode="numeric"
-        aria-label={label}
-        aria-invalid={shown && !valid ? true : undefined}
-        aria-describedby={shown && !valid ? errId : undefined}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={onKeyDown}
-        onBlur={() => {
-          if (!valid) {
-            setShown(true);
-            shakeElement(field.current);
-          }
-        }}
-        ref={field}
-        className="ip-field h-11 w-(--ip-stepper-field-w) px-2 text-center tabular-nums"
-      />
-      <IconButton
-        label={incLabel}
-        variant="soft"
-        className="size-11"
-        aria-disabled={atMax || undefined}
-        icon={<PlusIcon size={18} />}
-        onClick={() => !atMax && onChange(stepText(value, 1, min, max))}
-      />
+    <span className={cx("relative", under ? "inline-grid grid-rows-[auto_1.25rem]" : "inline-flex", className)} data-testid="number-stepper" data-fb-under={under ? "" : undefined}>
+      {/* One joined control (globals.css .ip-stepper), the same everywhere a number steps. */}
+      <span className="ip-stepper" style={{ "--ip-stepper-ch": Math.max(2, String(max).length) } as CSSProperties}>
+        <button type="button" className="ip-stepper__btn" aria-label={decLabel} aria-disabled={atMin || undefined} onClick={() => !atMin && step(-1)}>
+          <MinusIcon size={18} />
+        </button>
+        <input
+          type="text"
+          inputMode="numeric"
+          aria-label={label}
+          aria-invalid={shown && !valid ? true : undefined}
+          aria-describedby={shown && !valid ? errId : undefined}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          onBlur={() => {
+            if (!valid) {
+              setShown(true);
+              shakeElement(field.current);
+            }
+          }}
+          ref={field}
+          className="ip-stepper__value"
+        />
+        <button type="button" className="ip-stepper__btn" aria-label={incLabel} aria-disabled={atMax || undefined} onClick={() => !atMax && step(1)}>
+          <PlusIcon size={18} />
+        </button>
+      </span>
       <LazyFieldBubble id={errId} error={shown && !valid ? error : null} className="dock-side:absolute dock-side:top-full dock-side:left-0" />
     </span>
   );

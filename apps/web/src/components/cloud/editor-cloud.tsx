@@ -12,7 +12,7 @@ import { useCallback, useState } from "react";
 import { NoticeStack, type FlowNotice } from "../tool-flow/NoticeStack";
 import { LiveRegion } from "../ui/LiveRegion";
 import { ProgressBar } from "../ui/ProgressBar";
-import { CloudCaret, CloudRow, useCloud, type CloudDeps, type CloudHub } from "./tool-cloud";
+import { CloudCaret, useCloud, type CloudDeps, type CloudHub } from "./tool-cloud";
 import { EDITOR_CLOUD_FLOW } from "./editor-flow";
 
 const editorTool = { flow: EDITOR_CLOUD_FLOW } as const;
@@ -77,10 +77,6 @@ export function EditorCloudCaret({ cloud }: { cloud: EditorCloud }) {
   return <CloudCaret hub={cloud.hub} look="primary" />;
 }
 
-/** The one-tap provider row under "Open PDF". */
-export function EditorCloudRow({ cloud }: { cloud: EditorCloud }) {
-  return <CloudRow hub={cloud.hub} />;
-}
 
 /**
  * What a download from the cloud shows on the landing, in the status line under the card (its height is

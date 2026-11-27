@@ -6,6 +6,7 @@ import { buildToolIndex } from "@/components/catalogue/toolIndex";
 import { siteCopy } from "@/components/site/copy";
 import { CloudPrepaintScript } from "@/components/site/CloudPrepaintScript";
 import { EnginePrefetch } from "@/components/site/EnginePrefetch";
+import { InputModalityScript } from "@/components/site/InputModalityScript";
 import { MotionPrime } from "@/components/site/MotionPrime";
 import { RecentPrepaintScript } from "@/components/site/RecentPrepaintScript";
 import { SiteFooter } from "@/components/site/SiteFooter";
@@ -46,6 +47,7 @@ export default function RootLayout({
       <head>
         <RecentPrepaintScript />
         <CloudPrepaintScript />
+        <InputModalityScript />
       </head>
       <body className="flex min-h-dvh flex-col antialiased">
         <BerrySprite />

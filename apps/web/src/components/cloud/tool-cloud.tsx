@@ -15,15 +15,13 @@
  */
 import "./cloud.css";
 import { useEffect, useState } from "react";
-import { buildNames, buildProviders, providerName, type CloudProvider } from "@/lib/cloud/names";
-import { popupFeatures } from "@/lib/cloud/popup";
+import { buildNames, buildProviders, type CloudProvider } from "@/lib/cloud/names";
 import type { CloudFlow } from "./editor-flow";
 import type { FlowNoticeInput } from "../tool-flow/types";
 import { cx } from "../ui/cx";
 import { ChevronDownIcon } from "../ui/icons";
 import { cloudCopy } from "./copy";
 import type { Intake } from "./intake-engine";
-import { ProviderMark } from "./ProviderMark";
 
 export type CloudOpenOptions = { tag?: unknown; multiple?: boolean; replace?: boolean };
 
@@ -86,11 +84,6 @@ export type CloudHub = {
 /** A blank window opened in the click before the cloud chunk was here: the intake sends it on. Null: blocked. */
 export type PreOpened = { win: Window | null };
 
-/** The tap the cloud chunk is on its way for: the latest choice, and the one window opened for it. */
-let early: { p: CloudProvider; trigger: HTMLElement; pre?: PreOpened } | undefined;
-/** A blank window at the cloud window's usual size, in the click. Offline: none (the intake says why). */
-const blank = (): PreOpened | undefined => (navigator.onLine === false ? undefined : { win: window.open("", "", popupFeatures(window)) });
-
 const providers = buildProviders();
 
 /** The tool page's hub (one ToolFlow per page), for the parts that live outside it (Save to cloud, Merge's menus). */
@@ -150,36 +143,6 @@ export function pickedFromDevice() {
 }
 
 /**
- * Opens a provider's window for the page: call it synchronously in the click (the browser allows a
- * window only then). Without the cloud chunk yet, a blank window opens here and the chunk sends it on
- * to the provider's page. Taps before the chunk is here share that one window and the last one wins:
- * one cloud window at a time, and no window is left behind waiting for a pick that was replaced.
- */
-function pick(hub: CloudHub, p: CloudProvider, trigger: HTMLElement) {
-  if (hub.ui) return hub.ui.openCloud(p, trigger);
-  if (early) {
-    Object.assign(early, { p, trigger });
-    // Its window again, or a new one if it was closed (or blocked) meanwhile.
-    const win = early.pre?.win;
-    if (win && !win.closed) win.focus();
-    else early.pre = blank();
-    return;
-  }
-  const tap = (early = { p, trigger, pre: blank() });
-  hub.load().then(
-    (m) => {
-      early = undefined;
-      m.openCloud(tap.p, tap.trigger, {}, tap.pre);
-    },
-    () => {
-      early = undefined;
-      tap.pre?.win?.close();
-      offline(hub, providerName[tap.p]);
-    },
-  );
-}
-
-/**
  * The caret half of the upload split button (spec U-2 E1/E2), at its final size before the cloud
  * chunk is here. A pointer over it (touch included: pointerenter comes first), focus or a press fetch
  * the chunk, which then draws the real menu button in its place (SourceCaret), focused if this one
@@ -233,48 +196,3 @@ export function CloudCaret({ hub, look, className, disabled }: { hub: CloudHub; 
   );
 }
 
-/**
- * One-tap provider buttons under the upload button (spec U-2 E1, AC-165), in the fixed order and at
- * their final 44 px height; the pre-paint script's html[data-cloud-last] moves the last used provider
- * first and shows its name (cloud.css), so nothing shifts after hydration. The chip's `title` and
- * its sr-only "(last used)" (a tooltip and a clipped span, no layout) are added after mount, only on
- * the provider that really was used last.
- */
-export function CloudRow({ hub }: { hub: CloudHub }) {
-  // The provider really used last (html[data-cloud-last], set before paint and after each pick): only
-  // its button carries "(last used)", in the DOM as well as in its name, never the others (fresh profile: none).
-  const [last, setLast] = useState<string>();
-  useEffect(() => {
-    const html = document.documentElement;
-    const read = () => setLast(html.dataset.cloudLast);
-    read();
-    const watch = new MutationObserver(read);
-    watch.observe(html, { attributes: true, attributeFilter: ["data-cloud-last"] });
-    return () => watch.disconnect();
-  }, []);
-  if (!providers.length) return null;
-  const load = () => warm(hub);
-  return (
-    <div role="group" aria-label={cloudCopy.rowLabel} className="ip-cloud-row" data-testid="cloud-row">
-      {providers.map((p) => (
-        <button
-          key={p}
-          type="button"
-          className="ip-cloud-glyph"
-          data-p={p}
-          title={last === p ? `${providerName[p]}${cloudCopy.lastUsed}` : providerName[p]}
-          onPointerEnter={load}
-          onFocus={load}
-          onClick={(e) => pick(hub, p, e.currentTarget)}
-        >
-          <ProviderMark provider={p} size={22} />
-          <span className="ip-cloud-name">
-            <span className="sr-only">Choose from </span>
-            {providerName[p]}
-          </span>
-          {last === p && <span className="ip-cloud-last">{cloudCopy.lastUsed}</span>}
-        </button>
-      ))}
-    </div>
-  );
-}

@@ -4,7 +4,7 @@
  * Spec: docs/specs/f23-cloud-pickers.md (AC-136, AC-141, AC-160, AC-168).
  */
 import { expect, test, type Page } from "@playwright/test";
-import { cards, closed, downloadResult, flow, mockLog, mockPick, needsCloud, openRotate, openWindow, pickReady, reachPicker, rowButton, run, sha256, tiles } from "./support";
+import { caret, cards, closed, downloadResult, flow, mockLog, mockPick, needsCloud, openRotate, openWindow, pickReady, pickSource, reachPicker, run, sha256, tiles } from "./support";
 
 needsCloud();
 
@@ -29,7 +29,7 @@ function visited(page: Page) {
 test("OneDrive-style redirect sign-in: the window leaves for the sign-in page, comes back, and the pick arrives", async ({ page }) => {
   await page.evaluate((k) => localStorage.setItem(k, "1"), REDIRECT);
   const urls = visited(page);
-  const win = await openWindow(page, () => rowButton(page, "OneDrive").click());
+  const win = await openWindow(page, () => pickSource(page, "OneDrive"));
   await reachPicker(win);
   // Out to the sign-in response URL and straight back to the window's own URL, with its request.
   expect(urls.some((u) => /\/cloud\/mock#code=MOCK&state=/.test(u)), urls.join("\n")).toBe(true);
@@ -56,7 +56,7 @@ test("Save to OneDrive across a redirect sign-in: the result reaches the window 
 });
 
 test("AC-136: a file stopped while still waiting its turn is never downloaded or added", async ({ page }) => {
-  const win = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  const win = await openWindow(page, () => pickSource(page, "Dropbox"));
   // Two download at a time: echo.pdf waits for a free slot.
   await mockPick(win, ["alpha.pdf", "bravo.pdf", "echo.pdf"], { slow: "*" });
   await expect(cards(page)).toHaveCount(3);
@@ -73,7 +73,7 @@ test("AC-136: a file stopped while still waiting its turn is never downloaded or
 });
 
 test("AC-141: Google's own documents arrive as PDFs; one too large to export is named", async ({ page }) => {
-  const win = await openWindow(page, () => rowButton(page, "Google Drive").click());
+  const win = await openWindow(page, () => pickSource(page, "Google Drive"));
   await reachPicker(win);
   await win.getByRole("button", { name: "Google documents" }).click();
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
@@ -85,7 +85,7 @@ test("AC-141: Google's own documents arrive as PDFs; one too large to export is 
 });
 
 test("AC-168: the tool tab goes away mid-download: a banner over the downloads, and the window never says Added", async ({ page }) => {
-  const win = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  const win = await openWindow(page, () => pickSource(page, "Dropbox"));
   // Three slow files, two at a time: still downloading when the window notices (TOOL_LOST_MS).
   await mockPick(win, ["alpha.pdf", "bravo.pdf", "echo.pdf"], { slow: "*" });
   const bar = win.getByRole("progressbar");
@@ -112,7 +112,7 @@ test("closing the window on a sign-in page: 'Stopped waiting' once this tab has 
   await page.evaluate((k) => localStorage.setItem(k, "hold"), REDIRECT);
   const urls = visited(page);
   // OneDrive starts by itself: the window may leave before it ever shows its own page.
-  const [win] = await Promise.all([page.context().waitForEvent("page"), rowButton(page, "OneDrive").click()]);
+  const [win] = await Promise.all([page.context().waitForEvent("page"), pickSource(page, "OneDrive")]);
   // The window leaves for the "sign-in page", which never answers.
   await expect.poll(() => urls.some((u) => new URL(u).pathname === "/"), { timeout: 15_000 }).toBe(true);
   const waiting = page.getByTestId("notice").filter({ hasText: /^Waiting for OneDrive/ });
@@ -129,7 +129,7 @@ test("closing the window on a sign-in page: 'Stopped waiting' once this tab has 
   expect(Date.now() - t0).toBeGreaterThan(13_000);
   await expect(waiting).toHaveCount(0);
   await expect(stopped.getByRole("button", { name: "Try again" })).toBeVisible();
-  await expect(rowButton(page, "OneDrive")).toBeEnabled();
+  await expect(caret(page)).toBeEnabled();
   // The sign-in comes back after all (a slow MFA prompt): the window is back on its own URL, and the
   // tool, still listening, carries on.
   const own = urls.find((u) => new URL(u).pathname === "/cloud/mock")!;
@@ -144,7 +144,7 @@ test("closing the window on a sign-in page: 'Stopped waiting' once this tab has 
 });
 
 test("AC-168: the tool tab closes just before the hand-off: no 'Added', the rows stay under the banner", async ({ page }) => {
-  const win = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  const win = await openWindow(page, () => pickSource(page, "Dropbox"));
   await reachPicker(win);
   await win.getByTestId("mock-picker").getByRole("group").getByLabel("alpha.pdf", { exact: true }).check();
   await page.close({ runBeforeUnload: false });

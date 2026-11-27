@@ -77,8 +77,6 @@ textarea.bf-options { height: auto; padding: 6px 8px; line-height: 1.4; resize: 
 .bf-toggle { cursor: pointer; user-select: none; }
 .bf-toggle input { width: 16px; height: 16px; margin: 0; accent-color: var(--brand); cursor: inherit; }
 .bf-toggle[data-disabled] { opacity: 0.5; cursor: default; }
-.bf-step { width: 28px; height: 28px; border: 1.5px solid var(--border); border-radius: 9px; background: #fff; font: 600 15px/1 Fredoka, sans-serif; color: var(--ink); cursor: pointer; }
-.bf-step-value { min-width: 2.8em; text-align: center; font-variant-numeric: tabular-nums; }
 .bf-seg { height: 28px; padding: 0 8px; border: 1.5px solid var(--border); border-radius: 9px; background: #fff; font: 500 12px/1 Fredoka, sans-serif; color: var(--ink); cursor: pointer; }
 .bf-seg[aria-checked="true"] { background: var(--tool-active-bg); color: var(--tool-active-ink); border-color: var(--tool-glow); }
 .bf-act { height: 30px; padding: 0 10px; border: 0; border-radius: 10px; background: var(--surface-soft); font: 600 13px/1 Fredoka, sans-serif; color: var(--ink); cursor: pointer; white-space: nowrap; }
@@ -88,8 +86,8 @@ textarea.bf-options { height: auto; padding: 6px 8px; line-height: 1.4; resize: 
 .bf-link { border: 0; padding: 0 2px; background: none; font: 600 13px/1 Fredoka, sans-serif; color: var(--link); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .bf-note { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--ink); }
 .bf-hint { align-self: flex-start; height: 26px; padding: 0 10px; border: 1px dashed var(--border); border-radius: 13px; background: #fff; font: 500 12px/1 Fredoka, sans-serif; color: var(--muted); cursor: pointer; }
-.bf-props :is(button, .bf-step, .bf-seg):focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-@media (pointer: coarse) { .bf-act, .bf-text, .bf-step, .bf-seg, .bf-color { min-height: 40px; } }
+.bf-props :is(button, .bf-seg):focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+@media (pointer: coarse) { .bf-act, .bf-text, .bf-seg, .bf-color { min-height: 40px; } }
 @media (prefers-reduced-motion: reduce) { .bf-props { animation: none; } }
 .bf-prop--tight { gap: 4px; }
 .bf-propgroup { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }

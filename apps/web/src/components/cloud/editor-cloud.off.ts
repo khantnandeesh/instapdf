@@ -4,5 +4,4 @@ import type * as On from "./editor-cloud";
 const none = null as never;
 export const useEditorCloud: typeof On.useEditorCloud = none;
 export const EditorCloudCaret: typeof On.EditorCloudCaret = none;
-export const EditorCloudRow: typeof On.EditorCloudRow = none;
 export const EditorCloudStatus: typeof On.EditorCloudStatus = none;

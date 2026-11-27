@@ -588,10 +588,6 @@ html[data-ed-box] .ed-wide {
   align-items: center;
   gap: 2px;
 }
-.ed-stepper {
-  display: inline-flex;
-  align-items: center;
-}
 .ed-field {
   height: 36px;
   padding: 0 10px;
@@ -608,23 +604,6 @@ html[data-ed-box] .ed-wide {
 .ed-field:focus-visible {
   border-color: var(--color-brand);
   outline: 2px solid color-mix(in srgb, var(--color-brand) 25%, transparent);
-}
-.ed-field--size {
-  width: 46px;
-  height: 32px;
-  padding: 0 4px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-/* − and + sit beside it: no browser spinner arrows as well. */
-.ed-field--size {
-  appearance: textfield;
-  -moz-appearance: textfield;
-}
-.ed-field--size::-webkit-inner-spin-button,
-.ed-field--size::-webkit-outer-spin-button {
-  margin: 0;
-  -webkit-appearance: none;
 }
 .ed-field--page {
   width: 40px;

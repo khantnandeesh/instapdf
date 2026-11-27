@@ -23,6 +23,7 @@ export const mergeCopy = {
   fromFile: "Pages from a file…",
   blankPage: "Blank page",
   blankName: "Blank page",
+  pageOf: (n: number, file: string) => `page ${n} of ${file}`,
   selected: (count: number) => `${n(count)} selected`,
   selectionCleared: "Selection cleared",
   moved: (what: string, pos: number, total: number) => `${what} moved to position ${n(pos)} of ${n(total)}.`,

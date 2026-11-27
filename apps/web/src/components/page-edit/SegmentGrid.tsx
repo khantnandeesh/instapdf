@@ -231,7 +231,7 @@ export function SegmentGrid({
             dragKey === card.key && "opacity-40 outline-2 outline-offset-2 outline-brand outline-dashed",
           )}
         >
-          <span className="relative grid w-full place-items-center overflow-hidden rounded-[4px] bg-paper shadow-paper" style={{ aspectRatio: size ? `${size.width} / ${size.height}` : "1 / 1.4142" }}>
+          <span className="relative grid w-full place-items-center overflow-hidden rounded-(--ip-page-radius) bg-paper shadow-paper" style={{ aspectRatio: size ? `${size.width} / ${size.height}` : "1 / 1.4142" }}>
             {card.status === "ready" && card.fileId && size ? (
               <PageThumb fileId={card.fileId} index={card.thumbIndex} />
             ) : card.status === "loading" ? (
@@ -355,7 +355,7 @@ export function SegmentGrid({
               >
                 {card.status === "ready" && card.fileId && card.thumbSize ? (
                   <span
-                    className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
+                    className="relative block overflow-hidden rounded-(--ip-page-radius) bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
                     style={{ ...pageBoxStyle(card.thumbSize), transform: pageTransform(card.thumbSize, card.rotation) }}
                   >
                     <PageThumb fileId={card.fileId} index={card.thumbIndex} scale={pageTurnScale(card.thumbSize, card.rotation)} />

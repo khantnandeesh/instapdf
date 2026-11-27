@@ -19,7 +19,7 @@ import { copy } from "@/components/tool-flow/copy";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 // F23 cloud sources on the landing (E6): the same caret, menu and row as every tool (builds without them get a no-op module).
-import { EditorCloudCaret, EditorCloudRow, EditorCloudStatus, useEditorCloud } from "@/components/cloud/editor-cloud";
+import { EditorCloudCaret, EditorCloudStatus, useEditorCloud } from "@/components/cloud/editor-cloud";
 import { blankPdf, defaultPaper } from "@/lib/editor/blank";
 import { earlyFetchAllowed } from "@/lib/editor/engine-load";
 import { openPdf, prefetchPdfjs, type OpenedPdf } from "@/lib/pdf/pdfjs";
@@ -248,7 +248,6 @@ export function EditorTool() {
                   sources={process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? <EditorCloudCaret cloud={cloud!} /> : undefined}
                 />
               </span>
-              {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && <EditorCloudRow cloud={cloud!} />}
               <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copy.pickerHintOne}</p>
               <Button variant="plain" size="sm" iconStart={<FilePlusBold size={16} />} disabled={busy} onClick={() => void openBlank()} title="A blank A4 page (Letter in the US and Canada)">
                 Start with a blank page

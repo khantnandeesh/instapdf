@@ -146,6 +146,8 @@ export function usePageWorkspace({ tool, history: full }: { tool: FlowTool; hist
   // ---- names ----
   const describeRef = (p: PageRef) => (isBlank(p) ? c.blankName : (sourcesRef.current[p.sourceId!]?.name ?? ""));
   const labelOf = (p: PageRef) => pageLabel(p, sourcesRef.current);
+  /** A page as a person names it, for notices ("page 3 of report.pdf"); `labelOf`'s "B3" is for tiles. */
+  const pageName = (p: PageRef) => (isBlank(p) ? c.blankName.toLowerCase() : c.pageOf(p.sourceIndex + 1, sourcesRef.current[p.sourceId!]?.name ?? ""));
 
   // ---- history and the undo notice ----
   const dismissUndoNotice = useCallback(() => {
@@ -643,6 +645,7 @@ export function usePageWorkspace({ tool, history: full }: { tool: FlowTool; hist
       focusOn,
       announceSelection,
       labelOf,
+      pageName,
       describeRef,
       filesHereInput,
       pagesInput,

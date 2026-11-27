@@ -71,13 +71,14 @@ export function Notice({
       <div className="min-w-0 flex-1 break-words text-pretty">
         {title && <p className="font-semibold">{title}</p>}
         {children && <div className={cx(kind === "alert" && title && "font-normal")}>{children}</div>}
-        {action &&
-          (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && inline !== null ? null : (
-            <Button size="sm" variant="outline" className="mt-2" onClick={action.onClick}>
-              {action.label}
-            </Button>
-          ))}
       </div>
+      {/* The action sits on the notice's row, before the close, on every notice (one layout: text, action, close). */}
+      {action &&
+        (process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && inline !== null ? null : (
+          <Button size="sm" variant="outline" className="-my-1 shrink-0 self-center" onClick={action.onClick}>
+            {action.label}
+          </Button>
+        ))}
       {/* F23: the action goes before the close. The close is written out twice so that builds without cloud
           sources keep main's children exactly (the second branch is main's code). */}
       {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (

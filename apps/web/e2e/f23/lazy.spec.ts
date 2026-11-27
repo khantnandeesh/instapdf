@@ -5,7 +5,7 @@
  * Spec: docs/specs/f23-cloud-pickers.md (U-4 "Notice", U-5, AC-131).
  */
 import { expect, test, type Page } from "@playwright/test";
-import { caret, closed, flow, mockPick, needsCloud, openRotate, openWindow, pickReady, rowButton, run, tiles } from "./support";
+import { caret, closed, flow, mockPick, needsCloud, openRotate, openWindow, pickReady, pickSource, run } from "./support";
 
 needsCloud();
 
@@ -34,34 +34,17 @@ test("the cloud chunk is not fetched with the page, only once a cloud control is
   const before = await scripts(page);
   await page.waitForTimeout(1000);
   expect(await scripts(page)).toEqual(before);
-  await rowButton(page, "Dropbox").hover();
+  await caret(page).hover();
   await expect.poll(async () => (await scripts(page)).length).toBeGreaterThan(before.length);
 });
 
-test("a tap on the row before the cloud chunk is here still opens the window inside the click", { tag: "@serial" }, async ({ page, context }) => {
+test("M-1: two picks on different clouds in a row leave one window, the second one's", { tag: "@serial" }, async ({ page, context }) => {
   await page.waitForLoadState("networkidle");
-  await slowScripts(page, 2000);
-  const t0 = Date.now();
-  const [win] = await Promise.all([context.waitForEvent("page"), rowButton(page, "Dropbox").click()]);
-  // Opened by the click itself (a blank window first), well before the chunk could arrive.
-  expect(Date.now() - t0).toBeLessThan(1500);
-  // The chunk then sends it on to the provider's page.
-  await expect(win.getByTestId("cloud-window")).toBeVisible({ timeout: 15_000 });
-  await expect(win.getByRole("heading", { level: 1 })).toHaveText("Dropbox");
-  await mockPick(win, ["alpha.pdf"]);
-  await expect(flow(page)).toHaveAttribute("data-state", "ready");
-  await expect(tiles(page)).toHaveCount(3);
-  await closed(win);
-});
-
-test("M-1: two taps on different clouds before the chunk is here leave one window, the second one's", { tag: "@serial" }, async ({ page, context }) => {
-  await page.waitForLoadState("networkidle");
-  await slowScripts(page, 3000);
   const windows = () => context.pages().filter((p) => p !== page && !p.isClosed());
-  await Promise.all([context.waitForEvent("page"), rowButton(page, "Dropbox").click()]);
-  // Back to the tool tab, then the other cloud, while the chunk is still on its way.
+  await Promise.all([context.waitForEvent("page"), pickSource(page, "Dropbox")]);
+  // Back to the tool tab, then the other cloud, while the first window is still open.
   await page.bringToFront();
-  await rowButton(page, "Google Drive").click();
+  await pickSource(page, "Google Drive");
   await expect(page.getByTestId("notice").filter({ hasText: "Waiting for Google Drive" })).toBeVisible({ timeout: 15_000 });
   expect(windows()).toHaveLength(1);
   const [win] = windows();
@@ -117,13 +100,13 @@ test.fixme("keyboard: Enter on the caret as the chunk arrives still opens the me
 
 test("L-1: Merge's idle prefetch leaves the cloud chunk alone; a cloud control still fetches it", async ({ page }) => {
   await page.goto("/merge-pdf");
-  await expect(rowButton(page, "Dropbox")).toBeVisible();
+  await expect(caret(page)).toBeVisible();
   // Merge prefetches its workspace after 4 s of idle: none of it is the cloud chunk.
   await page.waitForTimeout(6000);
   await page.waitForLoadState("networkidle");
   const before = await scripts(page);
   // So the first intent still has it to fetch.
-  await rowButton(page, "Dropbox").hover();
+  await caret(page).hover();
   await expect.poll(async () => (await scripts(page)).length).toBeGreaterThan(before.length);
 });
 
@@ -139,7 +122,7 @@ test("Save to cloud speaks for itself on a page that never touched a cloud contr
 });
 
 test("M-b: a cloud notice's action sits on the notice's row, after the words and before the close (under them on a phone)", async ({ page }, info) => {
-  const win = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  const win = await openWindow(page, () => pickSource(page, "Dropbox"));
   const notice = page.getByTestId("notice").filter({ hasText: "Waiting for Dropbox" });
   const words = await notice.getByText("Waiting for Dropbox…").boundingBox();
   const action = await notice.getByRole("button", { name: "Cancel" }).boundingBox();

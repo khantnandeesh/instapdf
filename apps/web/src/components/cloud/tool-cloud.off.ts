@@ -4,7 +4,6 @@ import type * as On from "./tool-cloud";
 const none = null as never;
 export const useCloud: typeof On.useCloud = none;
 export const CloudCaret: typeof On.CloudCaret = none;
-export const CloudRow: typeof On.CloudRow = none;
 export const pageHub: typeof On.pageHub = none;
 export const loadCloud: typeof On.loadCloud = none;
 export const cloudUi: typeof On.cloudUi = none;
