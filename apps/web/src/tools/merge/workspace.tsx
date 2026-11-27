@@ -568,7 +568,7 @@ export function usePageWorkspace({ tool, history: full }: { tool: FlowTool; hist
     if (!full) return null;
     const busy = ctx.state === "processing";
     if (ctx.state === "empty" && !hist.past.length && !hist.future.length) return null;
-    return <full.Buttons canUndo={!busy && hist.past.length > 0} canRedo={!busy && hist.future.length > 0} onUndo={() => doUndoRef.current()} onRedo={() => doRedoRef.current()} labels={tool.slug === "organize-pdf" ? "xl" : undefined} />;
+    return <full.Buttons canUndo={!busy && hist.past.length > 0} canRedo={!busy && hist.future.length > 0} onUndo={() => doUndoRef.current()} onRedo={() => doRedoRef.current()} />;
   };
 
   /** ToolFlow props every page tool shares. */
