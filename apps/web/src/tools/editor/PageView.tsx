@@ -9,6 +9,7 @@
  * draft in the store while the pointer moves and record one history step on release.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { Button } from "@/components/ui/Button";
 import { cx } from "@/components/ui/cx";
 import { constrain45, dragBox, handlesOf, canRotate, aspectLocked, hasBox, moveObject, newId, objectBounds, pageSize, rotationFor, totalRotation, clampDelta, clampedResize, clampPoint, keepOnPage, rotatedCorners, LINE_HEIGHT, type Box, type EditorObject, type Handle, type PageEntry, type Pt, type TextObj } from "@/lib/editor/model";
 import { displaySize, rectToScreen, screenToFrame, toScreen, userRectToFrame } from "@/lib/editor/geometry";
@@ -606,9 +607,9 @@ export const PageView = memo(function PageView({ entry, index, total, scale, roo
         <div ref={raster} className={cx("ed-page absolute inset-0 overflow-hidden", drawn === "ok" && "ed-page--drawn")} aria-hidden="true" />
         {drawn === "failed" && (
           <div className="absolute inset-0 grid place-items-center">
-            <button type="button" className="mp-btn mp-btn--soft" onClick={() => setRetry((n) => n + 1)}>
+            <Button variant="soft" onClick={() => setRetry((n) => n + 1)}>
               Retry
-            </button>
+            </Button>
           </div>
         )}
         {lineFlash &&

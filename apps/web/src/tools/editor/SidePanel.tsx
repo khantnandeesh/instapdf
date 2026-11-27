@@ -8,6 +8,7 @@
  */
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { MenuButton } from "@/components/ui/Menu";
+import { Button } from "@/components/ui/Button";
 import { cx } from "@/components/ui/cx";
 import * as H from "@/lib/editor/history";
 import { objectLabel, totalRotation, type PageEntry } from "@/lib/editor/model";
@@ -305,9 +306,9 @@ function HistoryList() {
           </li>
         ))}
       </ul>
-      <button
-        type="button"
-        className="mp-btn mp-btn--soft mx-2"
+      <Button
+        variant="soft"
+        className="mx-2"
         disabled={!picked.length}
         onClick={() => {
           void ctl.revert(picked);
@@ -315,7 +316,7 @@ function HistoryList() {
         }}
       >
         Revert {picked.length || ""} selected
-      </button>
+      </Button>
     </div>
   );
 }
