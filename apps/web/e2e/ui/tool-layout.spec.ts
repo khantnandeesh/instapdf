@@ -6,7 +6,7 @@
 import { mkdir } from "node:fs/promises";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { isUsable, tools } from "../../src/tools/registry";
-import { flow, fx, primary, toolFixtures } from "../support/flow";
+import { flow, fx, makeRunnable, primary, toolFixtures } from "../support/flow";
 import { FIXTURES_OFF, fixturesServed } from "../support/fixtures";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
@@ -30,13 +30,6 @@ async function inView(page: Page, el: Locator, what: string) {
     return !!h && (n === h || n.contains(h));
   });
   expect(hit, `${what}: not covered`).toBe(true);
-}
-
-/** Makes the primary runnable where it waits for a choice (Extract, Delete: mark a page). */
-async function runnable(page: Page) {
-  if (await primary(page).isEnabled()) return;
-  await page.locator("[data-tile-button][aria-pressed]").first().click();
-  await expect(primary(page)).toBeEnabled();
 }
 
 const VIEWPORTS: [number, number][] = [
@@ -277,7 +270,7 @@ test.describe("F25 structure", () => {
         await open(page, `/${slug}`);
         await page.getByTestId("file-input").setInputFiles(files.map(fx));
         await expect(flow(page)).toHaveAttribute("data-state", "ready");
-        await runnable(page);
+        await makeRunnable(page);
         await primary(page).click();
         await expect(page.getByTestId("result")).toBeVisible({ timeout: 20_000 });
         await page.getByTestId("result").evaluate((r) => Promise.all(r.getAnimations({ subtree: true }).map((a) => a.finished)));
@@ -323,7 +316,7 @@ test.describe("F25 structure", () => {
     await open(page, "/delete-pdf-pages");
     await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
     await expect(flow(page)).toHaveAttribute("data-state", "ready");
-    await runnable(page);
+    await makeRunnable(page);
     const slotBox = (await primary(page).boundingBox())!;
     await primary(page).click();
     await expect(page.getByTestId("result")).toBeVisible({ timeout: 20_000 });
@@ -375,7 +368,7 @@ test.describe("F25 structure", () => {
         await open(page, `/${t.slug}`);
         await page.getByTestId("file-input").setInputFiles(toolFixtures(t.slug, "three-pages.pdf"));
         await expect(flow(page)).toHaveAttribute("data-state", "ready");
-        await runnable(page);
+        await makeRunnable(page);
         await primary(page).click();
         await expect(page.getByTestId("result"), t.slug).toBeVisible({ timeout: 20_000 });
         await page.getByTestId("result").evaluate((r) => Promise.all(r.getAnimations({ subtree: true }).map((a) => a.finished)));
@@ -400,7 +393,7 @@ test.describe("F25 structure", () => {
       await open(page, "/delete-pdf-pages");
       await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
       await expect(flow(page)).toHaveAttribute("data-state", "ready");
-      await runnable(page);
+      await makeRunnable(page);
       const before = (await primary(page).boundingBox())!;
       await primary(page).click();
       await expect(page.getByTestId("result")).toBeVisible({ timeout: 20_000 });
@@ -635,7 +628,7 @@ test.describe("shots", () => {
         scan.release();
         await expect(flow(page)).toHaveAttribute("data-state", "ready", { timeout: 20_000 });
         await scan.stop();
-        await runnable(page);
+        await makeRunnable(page);
         await page.waitForTimeout(400);
         await shot(page, `${t.name}-ready`, vp);
         if (await moreOptions(page)) {

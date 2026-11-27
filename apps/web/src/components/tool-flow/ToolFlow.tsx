@@ -1189,7 +1189,8 @@ export function ToolFlow({
       rowOptionsComplete={rowOptionsComplete}
       optionsDisabled={optionsDisabled}
       options={settings && wide ? null : options}
-      more={renderMore?.(ctx)}
+      // A settings tool's side panel holds every option, so its More options is for the bar only.
+      more={settings && wide ? undefined : renderMore?.(ctx)}
       add={solo && rowPicker}
       density={flow.optionsDensity}
       dimmed={working}

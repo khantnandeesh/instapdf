@@ -222,14 +222,14 @@ export const toolSeo: Record<string, ToolSeo> = {
   },
   "protect-pdf": {
     keyword: "password protect pdf",
-    title: "Password Protect PDF: Encrypt with AES",
-    description: `Password protect a PDF with strong AES encryption and choose who can print, copy or edit it. Free, no sign-up. ${serverNote}`,
+    title: "Password Protect PDF: Encrypt with AES-256",
+    description: `Password protect a PDF with AES-256 encryption and choose who can print, copy or edit it. Free, no sign-up. ${privateNote}`,
     also: ["encrypt pdf", "lock pdf", "add password to pdf", "protect pdf"],
   },
   "unlock-pdf": {
     keyword: "unlock pdf",
     title: "Unlock PDF: Remove PDF Password Online",
-    description: `Unlock a PDF: remove the password and restrictions from a file you have the right to open. Free, no sign-up. ${serverNote}`,
+    description: `Unlock a PDF: remove the password and restrictions from a file you have the right to open. Free, no sign-up. ${privateNote}`,
     also: ["remove password from pdf", "pdf password remover", "decrypt pdf"],
   },
   "pdf-to-word": {
@@ -452,6 +452,76 @@ export const seoContent: Record<string, ToolSeoContent> = {
       },
     ],
     related: ["pdf-to-jpg", "merge-pdf", "organize-pdf", "compress-pdf", "extract-images", "rotate-pdf"],
+  },
+  "protect-pdf": {
+    howTo: "How to password protect a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop one or more PDF files on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Choose a password", text: "Type the password people will need to open the file. Optionally switch off printing, copying or editing." },
+      { name: "Download", text: "Select Protect PDF and download the encrypted copy. Your original stays as it is." },
+    ],
+    faq: [
+      {
+        q: "How do I add a password to a PDF?",
+        a: "Add the PDF, type a password and select Protect PDF. The copy you download asks for that password every time it is opened.",
+      },
+      {
+        q: "How strong is the encryption?",
+        a: "The file is encrypted with AES-256, the strongest encryption the PDF standard has. Its strength still depends on your password, so prefer a long one.",
+      },
+      {
+        q: "Is my password sent anywhere?",
+        a: "No. The file is encrypted in your browser. Neither the PDF nor the password leaves your device, and the password is not saved.",
+      },
+      {
+        q: "Can I stop people printing or copying without a password to open?",
+        a: "Yes. Leave the password empty and switch off what people may do. The file opens freely and PDF readers apply the limits. Some programs ignore them, so use a password to open for anything confidential.",
+      },
+      {
+        q: "What if I forget the password?",
+        a: "It cannot be recovered, by us or anyone. Keep the original file or store the password somewhere safe.",
+      },
+      {
+        q: "Will the protected PDF open everywhere?",
+        a: "Yes, in every current PDF reader, on computers, in browsers and on phones. Very old readers (from before 2008) cannot open AES-256 files.",
+      },
+    ],
+    related: ["unlock-pdf", "merge-pdf", "compress-pdf", "edit-pdf", "split-pdf", "organize-pdf"],
+  },
+  "unlock-pdf": {
+    howTo: "How to remove a password from a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop one or more PDF files on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Enter the password", text: "If the file needs a password to open, type it once. Files that only limit printing, copying or editing need none." },
+      { name: "Download", text: "Select Unlock PDF and download a copy with no password and no restrictions." },
+    ],
+    faq: [
+      {
+        q: "How do I remove the password from a PDF?",
+        a: "Add the PDF, enter its password when asked and select Unlock PDF. The copy you download opens without a password.",
+      },
+      {
+        q: "Can it open a PDF if I forgot the password?",
+        a: "No. You need the password that opens the file. We do not crack or guess passwords.",
+      },
+      {
+        q: "Does it remove printing, copying and editing restrictions?",
+        a: "Yes. The unlocked copy has no restrictions. Only unlock files you have the right to change.",
+      },
+      {
+        q: "Is my file or password uploaded?",
+        a: "No. The file is unlocked in your browser. Neither the PDF nor the password leaves your device.",
+      },
+      {
+        q: "Does unlocking change the content?",
+        a: "No. Pages, text, images, bookmarks and form fields stay as they are. Only the encryption is removed.",
+      },
+      {
+        q: "Is there a page or size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up.",
+      },
+    ],
+    related: ["protect-pdf", "merge-pdf", "edit-pdf", "pdf-to-text", "extract-images", "split-pdf"],
   },
   "extract-images": {
     howTo: "How to extract images from a PDF",

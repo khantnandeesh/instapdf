@@ -273,6 +273,15 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
       { outputName: undefined },
     ),
   },
+  // F11. Protect is the first settings tool (F25 §4): its options live in the side panel.
+  "protect-pdf": {
+    status: "beta",
+    flow: clientPdfFlow("protect-pdf", { title: "Protect PDF", actionLabel: "Protect PDF", progressLabel: "Protecting" }, { layout: "settings" }),
+  },
+  "unlock-pdf": {
+    status: "beta",
+    flow: clientPdfFlow("unlock-pdf", { title: "Unlock PDF", actionLabel: "Unlock PDF", progressLabel: "Unlocking" }),
+  },
   "extract-images": {
     status: "beta",
     flow: clientPdfFlow(
@@ -357,8 +366,8 @@ export const tools: Tool[] = [
   t("compress-pdf", "Compress", "Make your PDF smaller", "optimize", "server", "arrows-in"),
   t("grayscale-pdf", "Grayscale", "Convert colors to shades of gray", "optimize", "server", "circle-half"),
   t("repair-pdf", "Repair", "Recover content from a damaged file", "optimize", "server", "wrench"),
-  t("protect-pdf", "Protect", "Add a password and permissions", "security", "server", "lock", "encrypt-pdf"),
-  t("unlock-pdf", "Unlock", "Remove passwords and restrictions", "security", "server", "lock-open"),
+  t("protect-pdf", "Protect", "Add a password and permissions", "security", "client", "lock", "encrypt-pdf"),
+  t("unlock-pdf", "Unlock", "Remove passwords and restrictions", "security", "client", "lock-open", "unlock-pdf"),
   t("pdf-to-word", "PDF to Word", "Editable .docx from your PDF", "convert-from", "server", "file-doc"),
   t("pdf-to-excel", "PDF to Excel", "Pull tables into .xlsx or CSV", "convert-from", "server", "file-xls"),
   t("pdf-to-ppt", "PDF to PowerPoint", "Slides from your PDF pages", "convert-from", "server", "file-ppt"),
