@@ -14,9 +14,6 @@ export const toImageCopy = {
   },
   grey: "Black and white",
   singleTiff: "One TIFF file with all pages",
-  tile: (page: number, total: number) => `Page ${n(page)} of ${n(total)}`,
   primary: (pages: number) => (pages === 1 ? "Convert 1 page" : `Convert ${n(pages)} pages`),
-  status: (k: number, total: number) => (k === total ? `All ${n(total)} pages` : `${n(k)} of ${n(total)} pages`),
-  live: (k: number, total: number) => (k === 0 ? `All ${n(total)} pages will be converted` : `${n(k)} of ${n(total)} pages picked`),
   gridHint: "Click pages to convert only those. With none picked, every page is converted.",
 };

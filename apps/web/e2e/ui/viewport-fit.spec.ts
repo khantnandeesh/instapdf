@@ -13,7 +13,7 @@ import { fx, toolFixtures } from "../support/flow";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
 /** Tools with no options at all (F4/F5 §3e, §3g): their bar holds the status, history and primary only. */
-const NO_OPTIONS = new Set(["organize-pdf", "alternate-mix-pdf", "pdf-to-text"]);
+const NO_OPTIONS = new Set(["organize-pdf", "alternate-mix-pdf", "pdf-to-text", "extract-images"]);
 /** Loads the test file (and a second one where the tool needs it). */
 async function loadFiles(page: Page, slug: string) {
   await page.getByTestId("file-input").setInputFiles(toolFixtures(slug));

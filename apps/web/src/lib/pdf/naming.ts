@@ -226,6 +226,13 @@ export function pageImageName(inputName: string, page: number, pageCount: number
   return `${fitStem(safe || "page", suffix)}${suffix}`;
 }
 
+/** Extract images (spec F12 §5): "<base>-p<page>-<n>.<ext>", the n-th image first seen on that page. */
+export function embeddedImageName(inputName: string, page: number, n: number, ext: string): string {
+  const suffix = `-p${page}-${n}.${ext}`;
+  const safe = safeFileStem(baseName(inputName));
+  return `${fitStem(safe || "image", suffix)}${suffix}`;
+}
+
 /** "<base><suffix>" for an output that is not a PDF ("report-images.zip", "report.tiff", "report.txt"); the base is cut to fit. */
 export function derivedName(inputName: string | undefined, suffix: string): string {
   const safe = safeFileStem(inputName ? baseName(inputName) : "");

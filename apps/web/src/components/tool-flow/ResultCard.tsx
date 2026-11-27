@@ -3,7 +3,7 @@ import "./layout.css";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Ref } from "react";
 import { swap } from "@/lib/motion/flow";
 import { formatBytes } from "@/lib/pdf/naming";
-import { entryBlob, storedZipEntries, type ZipEntrySlice } from "@/lib/pdf/zip-entries";
+import { entryBlob, mimeOfName, storedZipEntries, type ZipEntrySlice } from "@/lib/pdf/zip-entries";
 import { openPdf } from "@/lib/pdf/pdfjs";
 import { renderPage } from "@/lib/pdf/thumbnails";
 import type { FlowTool } from "@/tools/registry";
@@ -299,7 +299,7 @@ function EntryList({ output, entries, announce }: { output: ToolOutput; entries:
               </span>
               <span className="block text-help text-muted tabular-nums">{e.detail ?? copy.pages(e.pageCount)}</span>
             </span>
-            {slices && <EntryDownload name={e.name} blob={() => entryBlob(output.blob, slices[i])} announce={announce} />}
+            {slices && <EntryDownload name={e.name} blob={() => entryBlob(output.blob, slices[i], mimeOfName(e.name))} announce={announce} />}
           </li>
         ))}
       </ul>
@@ -368,7 +368,8 @@ function CopyText({ text, announce }: { text: string; announce: (message: string
       iconStart={done ? <CheckIcon size={16} className="mp-tick-in" /> : <FilesIcon size={16} />}
       data-testid="copy-text"
       onClick={() => {
-        navigator.clipboard.writeText(text).then(
+        // No clipboard in an insecure context or some in-app browsers: say so instead of throwing.
+        (navigator.clipboard?.writeText(text) ?? Promise.reject(new Error("no clipboard"))).then(
           () => {
             setDone(true);
             announce(copyCopy.copied);

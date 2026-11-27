@@ -14,6 +14,10 @@ export type TiffPage = {
   /** Pixels per inch, written as the resolution tags. */
   dpi: number;
 };
+/** A page whose pixels are already Deflate-compressed: a many-page file never holds its pages raw. */
+export type TiffStrip = Omit<TiffPage, "data"> & { strip: Uint8Array };
+
+export const compressTiffPage = ({ data, ...rest }: TiffPage): TiffStrip => ({ ...rest, strip: zlibSync(data, { level: 6 }) });
 
 const SHORT = 3;
 const LONG = 4;
@@ -34,10 +38,10 @@ export function packPixels(rgba: Uint8ClampedArray | Uint8Array, grey: boolean):
   return out;
 }
 
-export function encodeTiff(pages: readonly TiffPage[]): Uint8Array<ArrayBuffer> {
+export function encodeTiff(pages: readonly (TiffPage | TiffStrip)[]): Uint8Array<ArrayBuffer> {
   if (!pages.length) throw new Error("A TIFF needs at least one page");
   const even = (n: number) => n + (n & 1);
-  const strips = pages.map((p) => zlibSync(p.data, { level: 6 }));
+  const strips = pages.map((p) => ("strip" in p ? p.strip : zlibSync(p.data, { level: 6 })));
   // Layout per page: strip, [bits per sample ×3], x resolution, y resolution, IFD.
   const ENTRIES = 12;
   const ifdSize = 2 + ENTRIES * 12 + 4;

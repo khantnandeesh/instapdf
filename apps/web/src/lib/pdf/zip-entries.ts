@@ -60,3 +60,7 @@ export async function storedZipEntries(blob: Blob): Promise<ZipEntrySlice[] | nu
 
 /** One entry as its own file (a view of the ZIP's bytes). */
 export const entryBlob = (zip: Blob, e: ZipEntrySlice, type = "application/pdf") => zip.slice(e.start, e.start + e.size, type);
+
+const MIME_BY_EXT: Record<string, string> = { pdf: "application/pdf", jpg: "image/jpeg", png: "image/png", tiff: "image/tiff", txt: "text/plain" };
+/** The type of a ZIP entry, from its extension (a browser that goes by type must not take a .jpg for a PDF). */
+export const mimeOfName = (name: string) => MIME_BY_EXT[name.slice(name.lastIndexOf(".") + 1).toLowerCase()] ?? "application/octet-stream";

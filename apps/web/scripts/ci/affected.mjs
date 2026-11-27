@@ -79,7 +79,7 @@ export const AREAS = {
   f24: ["src/app/edit-pdf/", "public/engine/"],
   f5: ["src/app/organize-pdf/", "src/app/combine-reorder-pdf/", "src/app/alternate-mix-pdf/", "src/app/merge-pdf/"],
   f4: ["src/app/split-pdf/", "src/app/extract-pdf-pages/", "src/app/delete-pdf-pages/"],
-  f12: ["src/app/pdf-to-jpg/", "src/app/jpg-to-pdf/", "src/app/pdf-to-text/"],
+  f12: ["src/app/pdf-to-jpg/", "src/app/jpg-to-pdf/", "src/app/pdf-to-text/", "src/app/extract-images/"],
 };
 /** Paths outside apps/web and the spec folders they run. */
 export const OUTSIDE = { "crates/": ["f16", "f24"] };

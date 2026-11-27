@@ -392,7 +392,7 @@ export const seoContent: Record<string, ToolSeoContent> = {
     faq: [
       {
         q: "How do I convert a PDF to JPG?",
-        a: "Add the PDF, keep JPG selected and choose Convert. Every page becomes a JPG image. To convert a few pages only, click them first or type them, for example 1-3, 7.",
+        a: "Add the PDF, keep JPG selected and choose Convert. Every page becomes a JPG image. To convert a few pages only, click them first.",
       },
       {
         q: "Can I save a PDF as PNG or TIFF instead?",
@@ -452,6 +452,41 @@ export const seoContent: Record<string, ToolSeoContent> = {
       },
     ],
     related: ["pdf-to-jpg", "merge-pdf", "organize-pdf", "compress-pdf", "extract-images", "rotate-pdf"],
+  },
+  "extract-images": {
+    howTo: "How to extract images from a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop one or more PDF files on the page, or choose them from your device. Nothing is uploaded." },
+      { name: "Pick pages, if you like", text: "Click pages to take the images of only those. With none picked, every page is searched." },
+      { name: "Download", text: "Select Extract images. One image downloads as itself, several as a ZIP." },
+    ],
+    faq: [
+      {
+        q: "How do I save the pictures from a PDF?",
+        a: "Add the PDF and select Extract images. Every picture stored in the file is saved once, named after its page.",
+      },
+      {
+        q: "Do the images lose quality?",
+        a: "No. A photo the PDF stores as a JPEG is saved as that same JPEG, untouched. Every other image is saved as a PNG, which loses nothing and keeps transparency.",
+      },
+      {
+        q: "Why were no images found?",
+        a: "Text, lines and charts drawn in a PDF are not images. To save a whole page as a picture, use PDF to image.",
+      },
+      {
+        q: "An image appears on every page. Do I get it many times?",
+        a: "No. An image a file reuses, such as a logo, is saved once.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The images are read in your browser, so your files stay on your device.",
+      },
+      {
+        q: "Is there a page or size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up.",
+      },
+    ],
+    related: ["pdf-to-jpg", "pdf-to-text", "jpg-to-pdf", "extract-pdf-pages", "compress-pdf", "split-pdf"],
   },
   "pdf-to-text": {
     howTo: "How to extract text from a PDF",

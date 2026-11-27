@@ -265,3 +265,24 @@ export async function pageObjectCount(bytes: Uint8Array): Promise<number> {
   const doc = await PDFDocument.load(bytes, { updateMetadata: false });
   return doc.context.enumerateIndirectObjects().filter(([, o]) => o instanceof PDFDict && o.get(PDFName.of("Type")) === PDFName.of("Page")).length;
 }
+
+/**
+ * F12 Extract images: page 1 draws a JPEG (stored as DCTDecode) and a PNG (stored Flate); page 2
+ * draws the same PNG again and a 1x1 dot; page 3 has text only.
+ */
+export async function imagesPdf(jpg: Uint8Array, png: Uint8Array): Promise<Uint8Array> {
+  const { doc, pages, ctx } = await base(3, (i) => `Images ${i}`);
+  const photo = await doc.embedJpg(jpg);
+  const drawing = await doc.embedPng(png);
+  pages[0].drawImage(photo, { x: 60, y: 300, width: 150, height: 200 });
+  pages[0].drawImage(drawing, { x: 260, y: 300, width: 200, height: 150 });
+  pages[1].drawImage(drawing, { x: 60, y: 300, width: 200, height: 150 });
+  const dot = ctx.register(ctx.stream(new Uint8Array([255, 0, 0]), { Type: "XObject", Subtype: "Image", Width: 1, Height: 1, ColorSpace: "DeviceRGB", BitsPerComponent: 8 }));
+  const xobjects = pages[1].node.Resources()!.lookup(PDFName.of("XObject"), PDFDict);
+  xobjects.set(PDFName.of("Dot"), dot);
+  const draw = ctx.register(ctx.stream("q 5 0 0 5 20 20 cm /Dot Do Q"));
+  const contents = pages[1].node.lookup(PDFName.of("Contents"));
+  if (contents instanceof PDFArray) contents.push(draw);
+  else pages[1].node.set(PDFName.of("Contents"), ctx.obj([pages[1].node.get(PDFName.of("Contents"))!, draw]));
+  return doc.save({ useObjectStreams: false });
+}

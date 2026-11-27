@@ -71,13 +71,13 @@ describe("flow config", () => {
     }
   });
   it("keeps every other tool planned", () => {
-    expect(tools.filter((t) => t.status !== "planned" && !t.preview).map((t) => t.slug)).toEqual(["merge-pdf", "split-pdf", "extract-pdf-pages", "delete-pdf-pages", "rotate-pdf", "organize-pdf", "combine-reorder-pdf", "alternate-mix-pdf", "pdf-to-jpg", "pdf-to-text", "jpg-to-pdf"]);
+    expect(tools.filter((t) => t.status !== "planned" && !t.preview).map((t) => t.slug)).toEqual(["merge-pdf", "split-pdf", "extract-pdf-pages", "delete-pdf-pages", "rotate-pdf", "organize-pdf", "combine-reorder-pdf", "alternate-mix-pdf", "pdf-to-jpg", "pdf-to-text", "extract-images", "jpg-to-pdf"]);
     // Edit PDF is listed as a Beta preview: usable, its own page, noindex.
     expect(toolBySlug("edit-pdf")).toMatchObject({ status: "beta", preview: true });
   });
   it("offers the usable PDF tools to continue with a PDF output and nothing for a ZIP (F3 AC-43, F4 AC-412, F5)", async () => {
     const { continueTargets } = await import("./registry");
-    expect(continueTargets("application/pdf").map((t) => t.slug)).toEqual(["merge-pdf", "split-pdf", "extract-pdf-pages", "delete-pdf-pages", "rotate-pdf", "organize-pdf", "combine-reorder-pdf", "alternate-mix-pdf", "pdf-to-jpg", "pdf-to-text"]);
+    expect(continueTargets("application/pdf").map((t) => t.slug)).toEqual(["merge-pdf", "split-pdf", "extract-pdf-pages", "delete-pdf-pages", "rotate-pdf", "organize-pdf", "combine-reorder-pdf", "alternate-mix-pdf", "pdf-to-jpg", "pdf-to-text", "extract-images"]);
     expect(continueTargets("application/zip")).toEqual([]);
     // F12: an image result can go on to the tools that take images.
     expect(continueTargets("image/jpeg").map((t) => t.slug)).toEqual(["merge-pdf", "organize-pdf", "combine-reorder-pdf", "alternate-mix-pdf", "jpg-to-pdf"]);

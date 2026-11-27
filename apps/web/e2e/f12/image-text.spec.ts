@@ -1,7 +1,8 @@
-/** F12 PDF to image, Image to PDF and PDF to text: spec docs/specs/f12-image-text-tools.md, AC-700 to AC-722. */
+/** F12 PDF to image, Image to PDF, PDF to text and Extract images: spec docs/specs/f12-image-text-tools.md, AC-700 to AC-734. */
+import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { PDFDocument } from "pdf-lib";
-import { downloadResult, flow, pageCountOf, pick, primary, run, unzip } from "../support/flow";
+import { downloadResult, flow, fx, pageCountOf, pick, primary, run, unzip } from "../support/flow";
 
 const isJpeg = (b: Uint8Array) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
 const isPng = (b: Uint8Array) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
@@ -141,6 +142,41 @@ test.describe("PDF to text", () => {
     await openReady(page, "pdf-to-text", "scanned.pdf");
     await primary(page).click();
     await expect(page.getByText("This PDF has no text to copy out")).toBeVisible();
+  });
+});
+
+test.describe("Extract images", () => {
+  test("AC-730, AC-731, AC-732: each stored image is saved once; the JPEG is the original file, the rest are PNG", async ({ page }) => {
+    await openReady(page, "extract-images", "with-images.pdf");
+    await expect(primary(page)).toHaveText("Extract images");
+    await run(page);
+    await expect(page.getByTestId("result")).toContainText("2 images");
+    const out = await downloadResult(page);
+    expect(out.name).toBe("with-images-images.zip");
+    const entries = Object.entries(unzip(out.bytes));
+    expect(entries.map(([name]) => name).sort()).toEqual(["with-images-p1-1.jpg", "with-images-p1-2.png"]);
+    const jpg = entries.find(([name]) => name.endsWith(".jpg"))![1];
+    expect(Buffer.from(jpg).equals(await readFile(fx("delta.jpg")))).toBe(true);
+    const png = entries.find(([name]) => name.endsWith(".png"))![1];
+    expect(isPng(png)).toBe(true);
+    const view = new DataView(png.buffer, png.byteOffset);
+    expect([view.getUint32(16), view.getUint32(20)]).toEqual([400, 300]);
+  });
+
+  test("AC-733: only the picked pages are searched; one image downloads as itself", async ({ page }) => {
+    await openReady(page, "extract-images", "with-images.pdf");
+    await tile(page, 2, 3).click();
+    await run(page);
+    const out = await downloadResult(page);
+    expect(out.name).toBe("with-images-p2-1.png");
+    expect(isPng(out.bytes)).toBe(true);
+  });
+
+  test("AC-734: pages with no image say so", async ({ page }) => {
+    await openReady(page, "extract-images", "with-images.pdf");
+    await tile(page, 3, 3).click();
+    await primary(page).click();
+    await expect(page.getByText("No images were found on these pages.")).toBeVisible();
   });
 });
 

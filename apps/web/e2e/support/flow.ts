@@ -18,6 +18,8 @@ export const fx = (name: string) => `tests/fixtures/${name}`;
 export function toolFixtures(slug: string, pdf = "sixty-pages.pdf"): string[] {
   // Enough pictures to overflow the pages area, like the 60-page PDF does.
   if (slug === "jpg-to-pdf") return Array.from({ length: 30 }, (_, i) => fx(["delta.jpg", "charlie.png", "fox.tiff"][i % 3]));
+  // Extract images needs a file that has images, or its run ends in "none found".
+  if (slug === "extract-images") return [fx(pdf), fx("with-images.pdf")];
   return slug === "alternate-mix-pdf" ? [fx(pdf), fx("three-pages.pdf")] : [fx(pdf)];
 }
 

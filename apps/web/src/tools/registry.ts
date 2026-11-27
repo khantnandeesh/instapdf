@@ -273,6 +273,14 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
       { outputName: undefined },
     ),
   },
+  "extract-images": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "extract-images",
+      { title: "Extract images", actionLabel: "Extract images", progressLabel: "Extracting" },
+      { requiredPermissions: ["copy"], outputName: undefined },
+    ),
+  },
   // Image to PDF: Organize's workspace for pictures only; the PDF is named after the first image.
   "jpg-to-pdf": {
     status: "beta",
