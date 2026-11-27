@@ -4,10 +4,11 @@
  * kind in one row, the rest under "More". Every change goes out as a new form state with a short
  * label for the undo history; the popover itself holds only what is being typed.
  */
-import { memo, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { memo, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { checkFieldName, propsFor, renameField, setCheckboxOn, setDefaultValue, setOptions, suggestsMultiline, type PropKey } from "@/lib/forms/edit";
 import { addRadioButton, deleteField, duplicateField, repeatOnAllPages, setMaxLen, setRadioValue, updateField } from "@/lib/forms/model";
 import type { FieldStyle, FormField, FormPage, FormState } from "@/lib/forms/types";
+import { MinusIcon, PlusIcon } from "@/components/ui/icons";
 import "./forms.css";
 
 export type FieldPropsProps = {
@@ -61,9 +62,11 @@ export const FieldProps = memo(function FieldProps({ form, fieldId, widgetId, pa
         return (
           <div key={k} className="bf-prop bf-prop--tight" role="group" aria-label="Text size">
             <span className="bf-prop-label">Size</span>
-            <button type="button" className="bf-step" aria-label="Smaller text" onClick={() => style({ fontSize: Math.max(4, (f.style.fontSize || 12) - 1) }, "Change text size")}>−</button>
-            <span className="bf-step-value" aria-live="polite">{f.style.fontSize ? `${f.style.fontSize} pt` : "Auto"}</span>
-            <button type="button" className="bf-step" aria-label="Larger text" onClick={() => style({ fontSize: Math.min(72, (f.style.fontSize || 12) + 1) }, "Change text size")}>+</button>
+            <span className="ip-stepper ip-stepper--sm" style={{ "--ip-stepper-ch": 5 } as CSSProperties}>
+              <button type="button" className="ip-stepper__btn" aria-label="Smaller text" disabled={f.style.fontSize > 0 && f.style.fontSize <= 4} onClick={() => style({ fontSize: Math.max(4, (f.style.fontSize || 12) - 1) }, "Change text size")}><MinusIcon size={14} /></button>
+              <span className="ip-stepper__value grid place-items-center" aria-live="polite">{f.style.fontSize ? `${f.style.fontSize} pt` : "Auto"}</span>
+              <button type="button" className="ip-stepper__btn" aria-label="Larger text" disabled={f.style.fontSize >= 72} onClick={() => style({ fontSize: Math.min(72, (f.style.fontSize || 12) + 1) }, "Change text size")}><PlusIcon size={14} /></button>
+            </span>
             {f.style.fontSize > 0 && (
               <button type="button" className="bf-link" onClick={() => style({ fontSize: 0 }, "Fit text to field")}>Auto</button>
             )}

@@ -37,7 +37,7 @@ import { exit, settle } from "@/lib/motion";
 import { enter } from "@/lib/motion/flow";
 // F23 cloud sources: the caret, the row and the hub on tool pages (everything else is the cloud chunk,
 // ui.ts, fetched on intent), compiled out entirely without them (every use sits behind the flag).
-import { CloudCaret, CloudRow, useCloud } from "../cloud/tool-cloud";
+import { CloudCaret, useCloud } from "../cloud/tool-cloud";
 
 // Never needed before a file is picked: separate chunks, prefetched on intent (see below).
 // The dock and the action slot (loaded-chrome.ts): fetched on intent and awaited before the first file is
@@ -1237,19 +1237,13 @@ export function ToolFlow({
           {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
             ? cloneElement(introPicker(), { sources: <CloudCaret hub={cloud!} look="primary" /> })
             : introPicker()}
-          {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
-            <>
-              <CloudRow hub={cloud!} />
-              {pickerHint()}
-            </>
-          ) : (
-            pickerHint()
-          )}
+          {/* Cloud sources live in the button's caret menu only (one place, as on the toolbar's Add files). */}
+          {pickerHint()}
           <LimitsNote text={copyOverrides?.limits ?? copy.limits(flow)} full={copyOverrides?.limitsFull ?? copy.limitsFull(flow)} />
           <PrivacyNote runtime={tool.runtime} context="intro" />
-          {/* Every file undone (F5 history): the files are only held, so Undo│Redo stays reachable here,
-              under the card, to bring them back. Never on a fresh visit or after Start over. */}
-          {workspaceEmpty && files.length > 0 && dockStart && <div className="mt-4 flex justify-center">{dockStart(ctx)}</div>}
+          {/* Every file removed or undone (F5 history): no Undo│Redo bar on the picker card. The removal's
+              notice carries Undo, and Ctrl/Cmd+Z and Shift+Z still step through the history (UI polish:
+              a control on an empty screen with nothing to act on is noise). */}
         </DropCard>
       ) : state === "done" && output ? (
         // Its own key: the work area's element (faded out and inert by T12) is never reused for the result.

@@ -185,7 +185,11 @@ export default function EditablePageGrid({
   const active = Math.max(0, tiles.findIndex((t) => t.uid === activeUid));
   // Below 1024 px the controls sit in a row under the page (PT-1 rule 6): as many as fit, the rest in More.
   const { compact, width } = useTileRow(list);
-  const rowActions = (["rotate-right", "remove", "rotate-left"] as const).slice(0, compact ? Math.max(0, rowSlots(width + 8) - 1) : 3);
+  // How many actions show beside ⋯: under the page as many 44 px targets as fit; on the page, as many as
+  // fit in its bar inside the tile (44 px each, 6 px gaps, 6 px padding and a 1.5 px border a side), so the
+  // bar never spills over the neighbouring pages at a small zoom. The rest fold into ⋯.
+  const overlaySlots = width > 0 ? Math.floor((width - 2 * 7.5 + 6) / 50) : 4;
+  const rowActions = (["rotate-right", "remove", "rotate-left"] as const).slice(0, Math.max(0, (compact ? rowSlots(width + 8) : overlaySlots) - 1));
 
   const focusTile = (i: number) => {
     const t = tiles[Math.max(0, Math.min(tiles.length - 1, i))];
@@ -427,7 +431,7 @@ export default function EditablePageGrid({
                 data-rotation={t.rotation}
               >
                 <span
-                  className="relative block overflow-hidden bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
+                  className="relative block overflow-hidden rounded-(--ip-page-radius) bg-paper shadow-paper transition-transform duration-(--dur-move) ease-standard"
                   style={{ ...pageBoxStyle(t.size), transform: pageTransform(t.size, t.rotation) }}
                 >
                   {t.blank ? (
@@ -473,7 +477,7 @@ export default function EditablePageGrid({
                     data-no-drag=""
                     onClick={() => onSelect(t.uid, { toggle: true, range: false })}
                     className={cx(
-                      "absolute -top-2 -right-2 z-[2] grid size-8 cursor-pointer place-items-center",
+                      "absolute top-0.5 right-0.5 z-[2] grid size-8 cursor-pointer place-items-center",
                       !t.selected && "opacity-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100",
                     )}
                   >
@@ -488,9 +492,7 @@ export default function EditablePageGrid({
                       "opacity-0 transition-opacity duration-(--dur-base) group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 has-[[aria-expanded=true]]:opacity-100 [@media(hover:none)]:opacity-100",
                     )}
                   >
-                    {actionButton("rotate-left")}
-                    {actionButton("rotate-right")}
-                    {actionButton("remove")}
+                    {(["rotate-left", "rotate-right", "remove"] as const).filter((a) => rowActions.includes(a)).map(actionButton)}
                     {more}
                   </div>
                 )}

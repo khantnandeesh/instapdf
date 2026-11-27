@@ -235,6 +235,7 @@
   /* Page tiles (docs/design/berrypdf.md "Page tiles", owner 2026-11-26): the page is the tile. No tray,
      a 4px edge for the selection outline, a page-shaped box, the label under the page. */
   --ip-tile-pad: 4px; /* tile edge to page box, each side (rule: <= 8px) */
+  --ip-page-radius: 4px; /* a page thumbnail's corners; tiles add their padding to it (concentric) */
   --ip-tile-aspect: 1 / 1.4142; /* page box: A4/A-series portrait, so portrait and wider pages fill its width */
   --ip-tile-gap: 16px; /* between tiles from 640px; 12px below */
   --ip-tile-fill: 0.9; /* the page fills >= 90% of its tile's width (e2e/ui/thumb-tiles.spec.ts) */
@@ -478,7 +479,6 @@
   --ip-part-disc: 24px; /* part number on the first tile of each Split part */
   --ip-dim-left-out: 0.38; /* page image of a Split tile that is in no part */
   --ip-veil-marked: 0.55; /* Delete: the cream veil over a marked page (the page edge stays) */
-  --ip-stepper-field-w: 56px; /* number field inside NumberStepper */
   --ip-mix-card-min: 330px; /* minimum column of the wide Alternate card */
   --ip-bubble-gap: 8px; /* gap between a bar field and its floating hint or error bubble */
 }

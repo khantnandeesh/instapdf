@@ -172,6 +172,20 @@ Every tool page is a working surface, not a document. The user arrives to do one
 
 For each: primary action fully visible and not covered, on load, after loading a 60-page file, after scrolling that file, in the bigger page view and on the result screen; once loaded, the options are in the top row (≥ 1024) or the dock (< 1024) and the stage spans the content width and at least half the height; no horizontal scroll and no inner scroller outside the [allowed regions](#scrolling); tool head on one line from 1024px. `apps/web/e2e/ui/viewport-fit.spec.ts` enforces this for every usable tool in CI (it reads the registry, so new tools are covered automatically).
 
+## Polish rules (owner, 2026-11-27)
+
+Every one is a shared piece or a global rule, so a fix lands everywhere; `e2e/ui/polish-guards.spec.ts` and `e2e/f2/menu.spec.ts` guard them.
+
+1. **Focus rings are for the keyboard only.** `InputModalityScript` sets `html[data-input="pointer"|"keyboard"]`; under `pointer` no ring shows on buttons, switches or split buttons (text fields keep their focus border). One ring per control: never an inner ring inside an outer one.
+2. **State changes move nothing else.** A count or "changed" mark is an overlay (the More options count bubble), never a chip that widens its button. Reserve space for any text that can appear (errors go in a reserved row or a bubble).
+3. **Concentric corners.** Page visual `--ip-page-radius` (4px); its tile is that radius plus the tile padding. Badges sit inside the tile.
+4. **One place per action.** Cloud sources live only in the upload caret's menu (no second icon row). Undo/Redo shows only once there is something to undo.
+5. **Notices:** text, then the action, then the close, on one row; removals name the page in words ("page 3 of report.pdf"), never an internal label.
+6. **Grids centre their rows:** equal space left and right at every zoom and width.
+7. **Rows share one centre line:** search, chips, text actions and the close in a toolbar row align on one axis. Quiet actions (Clear) are text buttons (`variant="plain"`), not filled pills.
+8. **All tools menu:** one group per column, never split (`lib/catalogue/menu-pack.ts`; a group too tall for the panel spans two columns under one heading), each on a card tinted with its category hue, headings 18px over 15px rows, names on one line.
+9. **Number steppers:** one joined control, `.ip-stepper` (`NumberStepper` for whole numbers; the editor's and forms' size fields use the same classes): field border and radius, square −/+ buttons the control's height, value centred in tabular figures and sized to its digits, disabled ends at min/max, arrows step.
+
 ## Modals
 
 Owner, 2026-11-24, on Merge's page preview ("Page 13 of 58" at 1900x1300: a small white page in a huge, mostly empty white modal, a wave across the top, a big title and file name, three chunky full-width buttons and a heavy blue ring): "this can be better". Every modal, sheet and viewer follows these rules.

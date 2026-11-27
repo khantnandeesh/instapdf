@@ -194,8 +194,8 @@ export function SizeStepper({ value, onChange }: { value: number; onChange: (n: 
     else setText(String(value));
   };
   return (
-    <span className="ed-stepper">
-      <button type="button" className="ed-ctl ed-ctl--sm" aria-label="Smaller" title="Smaller" onClick={(e) => commit(value - (e.shiftKey ? 4 : 1))}>
+    <span className="ed-stepper ip-stepper ip-stepper--sm">
+      <button type="button" className="ip-stepper__btn" aria-label="Smaller" title="Smaller" aria-disabled={value <= 4 || undefined} onClick={(e) => commit(value - (e.shiftKey ? 4 : 1))}>
         <MinusBold size={14} />
       </button>
       {/* A number field: a spinbutton by its own role (a role on a text input is not allowed, axe). */}
@@ -207,7 +207,7 @@ export function SizeStepper({ value, onChange }: { value: number; onChange: (n: 
         step={0.5}
         inputMode="decimal"
         list="ed-sizes"
-        className="ed-field ed-field--size"
+        className="ip-stepper__value"
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={() => commit(parseFloat(text))}
@@ -229,7 +229,7 @@ export function SizeStepper({ value, onChange }: { value: number; onChange: (n: 
           <option key={s} value={s} />
         ))}
       </datalist>
-      <button type="button" className="ed-ctl ed-ctl--sm" aria-label="Larger" title="Larger" onClick={(e) => commit(value + (e.shiftKey ? 4 : 1))}>
+      <button type="button" className="ip-stepper__btn" aria-label="Larger" title="Larger" aria-disabled={value >= 400 || undefined} onClick={(e) => commit(value + (e.shiftKey ? 4 : 1))}>
         <PlusBold size={14} />
       </button>
     </span>

@@ -42,7 +42,7 @@ export function RecentStrip({
             </li>
           ))}
         </ul>
-        <Button variant="ghost" size="sm" aria-label={copy.recentClearLabel} onClick={onClear} className="shrink-0">
+        <Button variant="plain" aria-label={copy.recentClearLabel} onClick={onClear} className="shrink-0">
           {copy.recentClear}
         </Button>
       </section>
@@ -62,7 +62,7 @@ export function RecentStrip({
           </li>
         ))}
       </ul>
-      <Button variant="outline" size="sm" aria-label={copy.recentClearLabel} onClick={onClear} className="col-start-2 row-start-1">
+      <Button variant="plain" aria-label={copy.recentClearLabel} onClick={onClear} className="col-start-2 row-start-1">
         {copy.recentClear}
       </Button>
     </section>

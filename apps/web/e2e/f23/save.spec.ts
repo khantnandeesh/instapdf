@@ -1,7 +1,7 @@
 /** F23 Save to cloud on the result screen (mock provider). Spec: docs/specs/f23-cloud-pickers.md AC-160 to AC-164, AC-169 */
 import { expect, test } from "@playwright/test";
 import { expectNoSeriousAxeViolations, settled } from "../support/axe";
-import { closed, downloadLink, isDesktop, downloadResult, flow, needsCloud, openRotate, openWindow, pickFromRow, pickReady, mockLog, recordRequests, rotateRight, run, sha256, uncovered } from "./support";
+import { closed, downloadLink, downloadResult, flow, isDesktop, mockLog, needsCloud, openRotate, openWindow, pickFromRow, pickReady, recordRequests, rotateRight, run, sha256, uncovered } from "./support";
 
 needsCloud();
 

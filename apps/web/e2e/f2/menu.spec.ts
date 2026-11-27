@@ -230,10 +230,12 @@ test.describe("AC-33 at 1280x720", () => {
   });
 });
 
+// One column per group (owner 2026-11-27) needs ~640 px of panel: from 1280x720 up it all fits one screen;
+// shorter windows scroll the panel itself (its one registered scroller).
 for (const [width, height] of [
   [1280, 720],
-  [1280, 632],
-  [1366, 657],
+  [1366, 768],
+  [1470, 830],
 ] as const) {
   test.describe(`full-width panel (owner 2026-11-24) at ${width}x${height}`, () => {
     test.use({ viewport: { width, height } });
@@ -246,18 +248,80 @@ for (const [width, height] of [
       await menu(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
       const panel = await menu(page).boundingBox();
       expect(panel).toMatchObject({ x: 0, width, y: 72 });
-      // Groups fill the width evenly: the leftmost and rightmost group start in the outer fifths.
+      // Groups fill the content width evenly (the bar's 1280 px column): the leftmost and rightmost group start in its outer fifths.
+      const nav = (await menu(page).locator("nav").boundingBox())!;
       const lefts = await menu(page).locator("nav section h2, nav section li").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().left));
-      expect(Math.min(...lefts)).toBeLessThan(width / 5);
-      expect(Math.max(...lefts)).toBeGreaterThan((width * 4) / 5 - 40);
+      expect(Math.min(...lefts)).toBeLessThan(nav.x + nav.width / 5);
+      expect(Math.max(...lefts)).toBeGreaterThan(nav.x + (nav.width * 4) / 5 - 40);
       // Every entry visible without scrolling the panel.
       await expect(menu(page).locator("nav a").last()).toBeInViewport();
       expect(await menu(page).evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
       const backdrop = await page.getByTestId("tool-menu-scrim").evaluate((el) => getComputedStyle(el).backdropFilter);
       expect(backdrop).toMatch(/blur\(/);
     });
+
+    test("each group sits whole in its own column, on its own tinted card, its heading a step above its rows; no name wraps", async ({ page }, info) => {
+      test.skip(!isDesktop(info.project.name), "desktop menu");
+      await openHydrated(page);
+      await openMenu(page);
+      await menu(page).evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+      const groups = await menu(page).getByTestId("tool-menu-group").evaluateAll((els) =>
+        els.map((g) => {
+          const box = g.getBoundingClientRect();
+          const rows = [...g.querySelectorAll("li")].map((li) => li.getBoundingClientRect());
+          const name = g.querySelector(".ip-menu-name")!;
+          return {
+            box: { l: box.left, r: box.right, t: box.top, b: box.bottom },
+            inside: rows.every((r) => r.left >= box.left - 0.5 && r.right <= box.right + 0.5 && r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5),
+            bg: getComputedStyle(g).backgroundColor,
+            head: parseFloat(getComputedStyle(g.querySelector("h2")!).fontSize),
+            row: parseFloat(getComputedStyle(name).fontSize),
+            line: parseFloat(getComputedStyle(name).lineHeight),
+            tallest: Math.max(...[...g.querySelectorAll(".ip-menu-name")].map((n) => n.getBoundingClientRect().height)),
+          };
+        }),
+      );
+      expect(groups.length).toBeGreaterThan(1);
+      for (const [i, g] of groups.entries()) {
+        expect(g.inside, `group ${i}: every row inside its card (never continued in another column)`).toBe(true);
+        expect(g.bg, `group ${i}: tinted card`).not.toBe("rgba(0, 0, 0, 0)");
+        expect(g.head, `group ${i}: heading bigger than rows`).toBeGreaterThan(g.row);
+        expect(g.tallest, `group ${i}: names on one line`).toBeLessThan(g.line * 1.5);
+        // Cards never overlap.
+        for (const o of groups.slice(i + 1)) expect(g.box.r <= o.box.l + 0.5 || o.box.r <= g.box.l + 0.5 || g.box.b <= o.box.t + 0.5 || o.box.b <= g.box.t + 0.5).toBe(true);
+      }
+      // Adjacent cards differ in colour (columns read apart by their category hue).
+      expect(new Set(groups.map((g) => g.bg)).size).toBe(groups.length);
+    });
   });
 }
+
+test.describe("the panel's top row shares one centre line (owner 2026-11-27)", () => {
+  test.use({ viewport: { width: 1280, height: 720 } });
+  test("search, Recently used, its chips, Clear and the close sit on one axis", async ({ page }, info) => {
+    test.skip(!isDesktop(info.project.name), "desktop menu");
+    await page.goto("/");
+    await page.evaluate(() => localStorage.setItem("berrypdf:recent-tools", JSON.stringify(["organize-pdf", "delete-pdf-pages"])));
+    await openHydrated(page);
+    await openMenu(page);
+    await menu(page).evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+    const mids = await menu(page).evaluate((m) => {
+      const mid = (el: Element | null) => {
+        const r = el!.getBoundingClientRect();
+        return Math.round((r.top + r.height / 2) * 2) / 2;
+      };
+      const recent = m.querySelector("[data-testid=menu-recent]")!;
+      return {
+        search: mid(m.querySelector("input[type=search]")),
+        title: mid(recent.querySelector("h2")),
+        chips: [...recent.querySelectorAll("li a")].map(mid),
+        clear: mid(recent.querySelector("button")),
+        close: mid(m.querySelector("[data-testid=tool-menu-close]")),
+      };
+    });
+    for (const v of [mids.title, ...mids.chips, mids.clear, mids.close]) expect(Math.abs(v - mids.search)).toBeLessThanOrEqual(1);
+  });
+});
 
 test.describe("full-width panel in forced colours", () => {
   test.use({ viewport: { width: 1280, height: 720 }, colorScheme: "light" });

@@ -7,7 +7,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { expectNoSeriousAxeViolations, settled } from "../support/axe";
-import { caret, cloudRow, closed, mockLog, mockPick, needsCloud, openWindow, passwordField, reachPicker, recordRequests, rowButton } from "./support";
+import { caret, closed, mockLog, mockPick, needsCloud, openWindow, passwordField, pickSource, reachPicker, recordRequests, sourceItem } from "./support";
 
 needsCloud();
 
@@ -29,20 +29,13 @@ test.beforeEach(async ({ page }) => {
 });
 test.afterEach(() => expect(dialogs).toEqual([]));
 
-test("E6, AC-165: the landing's cloud row and caret are in the server HTML, in the fixed order, and the CSP is the strict one", async ({ request }) => {
+test("E6, AC-165: the landing's caret is in the server HTML (the one place for cloud sources), and the CSP is the strict one", async ({ request }) => {
   const res = await request.get("/edit-pdf");
   const html = await res.text();
-  const at = html.indexOf('data-testid="cloud-row"');
-  expect(at, "the row is server-rendered").toBeGreaterThan(0);
   expect(html).toContain('data-testid="cloud-caret"');
-  const row = html.slice(at, at + 4000);
-  const order = ["Google Drive", "Dropbox", "OneDrive"].map((n) => row.indexOf(`title="${n}"`));
-  expect(order.every((i) => i > 0)).toBe(true);
-  expect([...order].sort((a, b) => a - b)).toEqual(order);
-  // The marks the row and the menu draw (inline SVG sprite, no request), one per provider.
+  expect(html).not.toContain('data-testid="cloud-row"');
+  // The marks the menu draws (inline SVG sprite, no request), one per provider.
   for (const p of ["google", "dropbox", "onedrive"]) expect(html, `${p} mark`).toContain(`id="ip-mark-${p}"`);
-  // Nothing says "last used" before anything was used (it is added after mount, only to the real one).
-  expect(row).not.toContain("last used");
   // AC-127: provider traffic stays in the /cloud window; the editor page still connects to itself only.
   const csp = res.headers()["content-security-policy"] ?? "";
   const directive = (name: string) => csp.split(";").map((d) => d.trim()).find((d) => d.startsWith(`${name} `));
@@ -97,31 +90,25 @@ test("E6, AC-121, AC-153: the caret opens the same provider menu by keyboard; Es
 
 test.describe("touch", () => {
   test.use({ hasTouch: true });
-  test("E6: a tap on the caret opens the menu and a tap on a row mark opens that provider", async ({ page }) => {
+  test("E6: a tap on the caret opens the menu and a tap on a provider opens its window", async ({ page }) => {
     await openEditor(page);
     await settled(page);
     await caret(page).tap();
     await expect(page.getByRole("menu")).toBeVisible();
     await expect(page.getByRole("menuitem")).toHaveCount(3);
     for (const item of await page.getByRole("menuitem").all()) expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(40);
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("menu")).toBeHidden();
-    const [win] = await Promise.all([page.context().waitForEvent("page"), rowButton(page, "Dropbox").tap()]);
+    const [win] = await Promise.all([page.context().waitForEvent("page"), sourceItem(page, "Dropbox").tap()]);
     await expect(win.getByTestId("cloud-window")).toBeVisible();
     await expect(win.getByRole("heading", { level: 1 })).toHaveText("Dropbox");
     await win.close();
   });
 });
 
-test("E6, AC-126, AC-166: a mock pick opens in the editor like a local file, the page sends only GETs, and the row then names the last used provider", async ({ page, context }) => {
+test("E6, AC-126, AC-166: a mock pick opens in the editor like a local file, the page sends only GETs, and the last used provider is remembered", async ({ page, context }) => {
   const seen = recordRequests(context);
   await openEditor(page);
   const origin = new URL(page.url()).origin;
-  // Fresh profile: no button says "last used", in its name or in the DOM.
-  for (const n of ["Google Drive", "Dropbox", "OneDrive"] as const) await expect(rowButton(page, n)).toHaveAccessibleName(`Choose from ${n}`);
-  expect(await cloudRow(page).evaluate((e) => e.textContent)).not.toContain("last used");
-
-  const win = await openWindow(page, () => rowButton(page, "Google Drive").click());
+  const win = await openWindow(page, () => pickSource(page, "Google Drive"));
   await mockPick(win, ["alpha.pdf"]);
   await closed(win);
   await expect(editor(page)).toHaveAttribute("data-state", "open", { timeout: 20_000 });
@@ -139,8 +126,6 @@ test("E6, AC-126, AC-166: a mock pick opens in the editor like a local file, the
   // After a reload, Google Drive (and only it) is the last used one.
   await openEditor(page);
   await expect(page.locator("html")).toHaveAttribute("data-cloud-last", "google");
-  await expect(rowButton(page, "Google Drive")).toHaveAccessibleName("Choose from Google Drive (last used)");
-  await expect(rowButton(page, "Dropbox")).toHaveAccessibleName("Choose from Dropbox");
   // A local pick makes "This device" the last used source.
   await page.getByTestId("editor-input").setInputFiles("tests/fixtures/bravo.pdf");
   await expect(editor(page)).toHaveAttribute("data-state", "open", { timeout: 20_000 });
@@ -149,7 +134,7 @@ test("E6, AC-126, AC-166: a mock pick opens in the editor like a local file, the
 
 test("E6, AC-136: a slow download shows its progress under the card, then the file opens", async ({ page }) => {
   await openEditor(page);
-  const win = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  const win = await openWindow(page, () => pickSource(page, "Dropbox"));
   await mockPick(win, ["alpha.pdf"], { slow: "alpha.pdf" });
   const status = page.getByTestId("editor-cloud-status");
   await expect(status).toContainText("from Dropbox");
@@ -163,7 +148,7 @@ test("E6, AC-136: a slow download shows its progress under the card, then the fi
 test("E6: a local file opened while a cloud pick is in progress wins; the cloud pick ends and never replaces it", async ({ page }) => {
   await openEditor(page);
   // 1. The window is open, nothing picked yet: a local pick closes it.
-  const win = await openWindow(page, () => rowButton(page, "Google Drive").click());
+  const win = await openWindow(page, () => pickSource(page, "Google Drive"));
   await reachPicker(win);
   await page.getByTestId("editor-input").setInputFiles("tests/fixtures/bravo.pdf");
   await expect(editor(page)).toHaveAttribute("data-state", "open", { timeout: 20_000 });
@@ -173,7 +158,7 @@ test("E6: a local file opened while a cloud pick is in progress wins; the cloud 
 
   // 2. A file already downloading from the cloud when a local file opens: the download stops, the local file stays.
   await openEditor(page);
-  const win2 = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  const win2 = await openWindow(page, () => pickSource(page, "Dropbox"));
   await mockPick(win2, ["alpha.pdf"], { slow: "alpha.pdf" });
   await expect(page.getByTestId("editor-cloud-status")).toBeVisible();
   await page.getByTestId("editor-input").setInputFiles("tests/fixtures/bravo.pdf");
@@ -186,7 +171,7 @@ test("E6: a local file opened while a cloud pick is in progress wins; the cloud 
 
 test("E6: a wrong local file (not a PDF) leaves a cloud pick in progress alone; that pick then opens", async ({ page }) => {
   await openEditor(page);
-  const win = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  const win = await openWindow(page, () => pickSource(page, "Dropbox"));
   await reachPicker(win);
   await page.getByTestId("editor-input").setInputFiles("tests/fixtures/notes.txt");
   await expect(page.getByRole("status").filter({ hasText: "notes.txt isn't a PDF" })).toBeVisible();
@@ -200,7 +185,7 @@ test("E6: a wrong local file (not a PDF) leaves a cloud pick in progress alone; 
 
 test("E6, AC-149: a password-protected PDF from the cloud opens the editor's password dialog", async ({ page }) => {
   await openEditor(page);
-  const win = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  const win = await openWindow(page, () => pickSource(page, "Dropbox"));
   await mockPick(win, ["user-pw.pdf"]);
   await closed(win);
   const dialog = page.getByRole("dialog");
@@ -214,7 +199,7 @@ test("E6, AC-149: a password-protected PDF from the cloud opens the editor's pas
 
 test("E6: a wrong file from the cloud gets the editor's message and the landing stays", async ({ page }) => {
   await openEditor(page);
-  const win = await openWindow(page, () => rowButton(page, "OneDrive").click());
+  const win = await openWindow(page, () => pickSource(page, "OneDrive"));
   await mockPick(win, ["notes.txt"]);
   await expect(page.getByText(/notes\.txt/).first()).toBeVisible();
   await expect(editor(page)).toHaveAttribute("data-state", "empty");
@@ -232,7 +217,6 @@ for (const [w, h] of [
     await settled(page);
     await expect(openPdf(page)).toBeInViewport({ ratio: 1 });
     await expect(caret(page)).toBeInViewport({ ratio: 1 });
-    await expect(cloudRow(page)).toBeInViewport({ ratio: 1 });
     const card = (await page.locator("[data-testid=drop-card] .mp-dropcard").boundingBox())!;
     expect(card.x).toBeGreaterThanOrEqual(0);
     expect(card.x + card.width).toBeLessThanOrEqual(w);

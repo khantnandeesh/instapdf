@@ -324,7 +324,9 @@ test.describe("F23 cloud windows", () => {
     test.skip(!cloudOn, "needs the cloud mock build");
     const toolViolations = await watchCsp(page);
     await openRotate(page);
-    const [win] = await Promise.all([page.context().waitForEvent("page"), page.getByTestId("cloud-row").getByRole("button", { name: /^Choose from Dropbox/ }).click()]);
+    // Cloud sources live in the upload caret's menu (the one place, owner 2026-11-27).
+    await page.getByTestId("cloud-caret").click();
+    const [win] = await Promise.all([page.context().waitForEvent("page"), page.getByRole("menuitem", { name: /^Dropbox/ }).click()]);
     const winViolations: string[] = [];
     win.on("console", (m) => /Content Security Policy/i.test(m.text()) && winViolations.push(m.text()));
     await win.getByTestId("cloud-open").click();

@@ -1,7 +1,7 @@
 /** F23 privacy checks with the mock provider: what reaches our origin, what is stored. Spec: AC-125, AC-126, AC-128, AC-129 */
 import { expect, test } from "@playwright/test";
 import { openMerge, runAndDownload } from "../f3/support";
-import { caret, fixtureBytes, needsCloud, openWindow, mockPick, recordRequests } from "./support";
+import { caret, fixtureBytes, mockPick, needsCloud, openWindow, recordRequests } from "./support";
 
 needsCloud();
 

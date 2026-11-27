@@ -1,12 +1,11 @@
 /** F23 cloud sources: picking files from the mock provider into the shared intake. Spec: docs/specs/f23-cloud-pickers.md §7 */
 import { expect, test } from "@playwright/test";
-import { settled } from "../support/axe";
 import {
   cards,
   caret,
   closed,
-  cloudRow,
   downloadResult,
+  dropFixtures,
   fileInput,
   flow,
   isDesktop,
@@ -15,20 +14,19 @@ import {
   needsCloud,
   openRotate,
   openWindow,
+  pageCountOf,
   passwordField,
   pick,
   pickFromRow,
-  dropFixtures,
   pickReady,
+  pickSource,
+  primary,
   reachPicker,
   rotateRight,
   rotationsOf,
-  pageCountOf,
   run,
   textsOf,
   tiles,
-  rowButton,
-  primary,
   uncovered,
 } from "./support";
 
@@ -112,31 +110,17 @@ test("AC-121: /merge-pdf's empty state has the same caret and providers", async 
   await page.keyboard.press("Escape");
 });
 
-test("AC-165: the cloud row is in the server HTML, before any script runs", async ({ request }) => {
+test("AC-165: the upload caret is in the server HTML, before any script runs; there is no second row of cloud icons", async ({ request }) => {
   for (const path of ["/rotate-pdf", "/merge-pdf"]) {
     const html = await (await request.get(path)).text();
-    const at = html.indexOf('data-testid="cloud-row"');
-    expect(at, `${path}: the row is server-rendered`).toBeGreaterThan(0);
-    const row = html.slice(at, at + 4000);
-    for (const n of ["Google Drive", "Dropbox", "OneDrive"]) expect(row, `${path}: ${n}`).toMatch(new RegExp(`title="${n}"`));
-  }
-});
-
-test("AC-165: the cloud row has one 44 px button per provider, named like its title", async ({ page }) => {
-  await settled(page); // the drop card scales in
-  const buttons = cloudRow(page).getByRole("button");
-  await expect(buttons).toHaveCount(3);
-  for (const [i, n] of ["Google Drive", "Dropbox", "OneDrive"].entries()) {
-    await expect(buttons.nth(i)).toHaveAccessibleName(`Choose from ${n}`);
-    await expect(buttons.nth(i)).toHaveAttribute("title", n);
-    const box = (await buttons.nth(i).boundingBox())!;
-    expect(box.height).toBeGreaterThanOrEqual(44);
-    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(html, `${path}: the caret is server-rendered`).toContain('data-testid="cloud-caret"');
+    // One place for cloud sources (owner 2026-11-27): the caret's menu; the icon row under the button is gone.
+    expect(html, path).not.toContain('data-testid="cloud-row"');
   }
 });
 
 test("AC-132, AC-134, AC-135, AC-158, AC-168: a pick from Google Drive lands in the same intake; the window closes itself", async ({ page }) => {
-  const win = await openWindow(page, () => rowButton(page, "Google Drive").click());
+  const win = await openWindow(page, () => pickSource(page, "Google Drive"));
   await expect(win.getByRole("heading", { level: 1 })).toHaveText("Google Drive");
   await expect(win.getByTestId("cloud-privacy")).toContainText("straight to this browser. We never see them or your sign");
   await expect(win.getByTestId("cloud-open")).toBeEnabled();
@@ -154,11 +138,11 @@ test("AC-132, AC-134, AC-135, AC-158, AC-168: a pick from Google Drive lands in 
   expect(log.requests.at(-1)).toMatchObject({ provider: "google", multiple: true, accept: [".pdf"], mode: "pick" });
   await expect(page.getByTestId("tool-flow").getByText("straight from Google Drive")).toHaveCount(0); // said on the result screen (AC-131)
   // AC-158: focus lands where a local pick puts it (the tool's first target in the ready state), not on the row.
-  await expect(rowButton(page, "Google Drive")).toHaveCount(0);
+  await expect(caret(page)).toHaveCount(0);
   await expect.poll(() => focused(page)).not.toBe("body");
   const cloudFocus = await focused(page);
   await openRotate(page);
-  await rowButton(page, "Google Drive").focus(); // the same starting point
+  await caret(page).focus(); // the same starting point
   await fileInput(page).setInputFiles("tests/fixtures/alpha.pdf");
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
   await expect.poll(() => focused(page)).toBe(cloudFocus);
@@ -225,7 +209,7 @@ test("AC-146, AC-152: wrong type and corrupt files get the local messages; the g
 });
 
 test("AC-147: a 101 MB file is refused by name before any download", async ({ page }) => {
-  const win = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  const win = await openWindow(page, () => pickSource(page, "Dropbox"));
   await reachPicker(win);
   await win.getByRole("button", { name: "101 MB file" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "huge-scan.pdf" })).toContainText("100 MB");
@@ -236,7 +220,7 @@ test("AC-147: a 101 MB file is refused by name before any download", async ({ pa
 });
 
 test("AC-151: a file the provider refuses (403) is named; the other file stays", async ({ page }) => {
-  const win = await openWindow(page, () => rowButton(page, "OneDrive").click());
+  const win = await openWindow(page, () => pickSource(page, "OneDrive"));
   await reachPicker(win);
   await win.getByRole("button", { name: "403 file" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "budget.pdf" })).toContainText("can't be opened from OneDrive");
@@ -270,8 +254,8 @@ test("AC-150: a mid-download failure marks that file, and Retry fetches it witho
 test("AC-142: closing the window without picking goes back quietly, focus on the trigger", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
-  const trigger = rowButton(page, "Dropbox");
-  const win = await openWindow(page, () => trigger.click());
+  const trigger = caret(page);
+  const win = await openWindow(page, () => pickSource(page, "Dropbox"));
   await expect(page.getByText("Waiting for Dropbox…")).toBeVisible();
   await expect(win.getByTestId("cloud-open")).toBeEnabled();
   await win.close();
@@ -284,7 +268,7 @@ test("AC-142: closing the window without picking goes back quietly, focus on the
 });
 
 test("AC-142: Cancel in the window closes it and the tool tab stays as it was", async ({ page }) => {
-  const win = await openWindow(page, () => rowButton(page, "Google Drive").click());
+  const win = await openWindow(page, () => pickSource(page, "Google Drive"));
   await reachPicker(win);
   // The click can outlive the window it closes; the close event is the check.
   await Promise.all([win.waitForEvent("close"), win.getByTestId("mock-picker").getByRole("button", { name: "Cancel" }).click().catch(() => {})]);
@@ -298,7 +282,7 @@ test("AC-143: a blocked window shows a named inline message with Try again, whic
     let n = 0;
     window.open = (...a: Parameters<typeof window.open>) => (n++ === 0 ? null : real(...a));
   });
-  await rowButton(page, "Dropbox").click();
+  await pickSource(page, "Dropbox");
   const alert = page.getByRole("alert").filter({ hasText: "Your browser blocked the Dropbox window." });
   await expect(alert).toBeVisible();
   const again = alert.getByRole("button", { name: "Try again" });
@@ -309,12 +293,12 @@ test("AC-143: a blocked window shows a named inline message with Try again, whic
 });
 
 test("AC-144, AC-145: unreachable and denied are named inline; local files still work", async ({ page }) => {
-  let win = await openWindow(page, () => rowButton(page, "OneDrive").click());
+  let win = await openWindow(page, () => pickSource(page, "OneDrive"));
   await reachPicker(win);
   await win.getByRole("button", { name: "Unreachable" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Couldn't reach OneDrive." })).toBeVisible();
   await win.close();
-  win = await openWindow(page, () => rowButton(page, "Google Drive").click());
+  win = await openWindow(page, () => pickSource(page, "Google Drive"));
   await reachPicker(win);
   await win.getByRole("button", { name: "Deny access" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Google Drive access wasn't given." }).getByRole("button", { name: "Try again" })).toBeVisible();
@@ -328,39 +312,28 @@ test("AC-144, AC-145: unreachable and denied are named inline; local files still
   await expect(tiles(page)).toHaveCount(5);
 });
 
-test("offline: choosing a provider while offline says so inline and opens nothing", async ({ page, context }) => {
+test("offline: opening the cloud sources while offline says so inline and opens nothing", async ({ page, context }) => {
   await context.setOffline(true);
-  await rowButton(page, "Dropbox").click();
+  // The caret's menu needs the cloud chunk: offline, the caret itself says so (naming the clouds).
+  await caret(page).click();
   await expect(page.getByText("You're offline.")).toBeVisible();
-  await expect(page.getByText("Dropbox needs a connection. Files on this device still work.")).toBeVisible();
+  await expect(page.getByText(/needs a connection\. Files on this device still work\./)).toBeVisible();
   expect(context.pages()).toHaveLength(1);
   await context.setOffline(false);
 });
 
-test("AC-166: last used provider leads the row after a reload; a local pick clears it", async ({ page }) => {
+test("AC-166: the last used source is remembered across a reload; a local pick sets it to this device", async ({ page }) => {
   await pickFromRow(page, "Dropbox", ["alpha.pdf"]);
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
   expect(await page.evaluate(() => localStorage.getItem("berrypdf:cloud-last"))).toBe("dropbox");
   await openRotate(page);
-  await expect(page.locator("html")).toHaveAttribute("data-cloud-last", "dropbox");
-  const first = cloudRow(page).getByRole("button").first();
-  // CSS order puts it first visually; the row keeps the fixed DOM order for screen readers.
-  const boxes = await cloudRow(page).getByRole("button").evaluateAll((els) => els.map((e) => [e.textContent, e.getBoundingClientRect().left] as const));
-  expect(boxes.sort((a, b) => a[1] - b[1])[0][0]).toContain("Dropbox");
-  await expect(rowButton(page, "Dropbox")).toHaveAccessibleName("Choose from Dropbox (last used)");
-  // Its tooltip names the provider too (a bare "Last used" read as the name in some tools).
-  await expect(rowButton(page, "Dropbox")).toHaveAttribute("title", "Dropbox (last used)");
-  // Its name is visible (a chip); the others stay icon-only.
-  expect((await rowButton(page, "Dropbox").locator(".ip-cloud-name").boundingBox())!.width).toBeGreaterThan(30);
-  expect((await rowButton(page, "OneDrive").locator(".ip-cloud-name").boundingBox())!.width).toBeLessThan(2);
-  await expect(first).toHaveAttribute("title", "Google Drive"); // DOM order is unchanged
   // One click on the leading button opens the Dropbox window.
-  const lead = await openWindow(page, () => rowButton(page, "Dropbox").click());
+  const lead = await openWindow(page, () => pickSource(page, "Dropbox"));
   await expect(lead.getByRole("heading", { level: 1 })).toHaveText("Dropbox");
   await lead.close();
   await expect(page.getByText("Waiting for Dropbox…")).toBeHidden({ timeout: 8_000 });
   // A cancelled pick does not change it; a local pick sets "device".
-  const win = await openWindow(page, () => rowButton(page, "Google Drive").click());
+  const win = await openWindow(page, () => pickSource(page, "Google Drive"));
   await expect(win.getByTestId("cloud-open")).toBeEnabled();
   await win.close();
   await expect(page.getByText("Waiting for Google Drive…")).toBeHidden({ timeout: 8_000 });
@@ -374,7 +347,7 @@ test("AC-166: last used provider leads the row after a reload; a local pick clea
   await expect(page.locator("html")).not.toHaveAttribute("data-cloud-last", /.*/);
 });
 
-test("AC-165: the row causes no layout shift, with and without a stored last-used source", async ({ page }) => {
+test("AC-165: the empty state causes no layout shift, with and without a stored last-used source", async ({ page }) => {
   for (const stored of [null, "onedrive"]) {
     await page.evaluate((v) => (v ? localStorage.setItem("berrypdf:cloud-last", v) : localStorage.removeItem("berrypdf:cloud-last")), stored);
     await page.addInitScript(() => {

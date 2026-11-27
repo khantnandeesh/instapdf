@@ -372,8 +372,10 @@ test("AC-550: Undo│Redo in the bar: disabled states, announced steps, survive 
   // Only the new "add files" step is there.
   await undoButton(page).click();
   await expect(flow(page)).toHaveAttribute("data-state", "empty");
-  await expect(page.getByTestId("history")).toBeVisible();
-  await expect(undoButton(page)).toHaveAttribute("aria-disabled", "true");
+  // The picker card has no Undo│Redo bar (nothing on screen to act on); the keyboard still redoes.
+  await expect(page.getByTestId("history")).toHaveCount(0);
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
 });
 
 test("AC-550: history keeps at least 50 steps", async ({ page }) => {

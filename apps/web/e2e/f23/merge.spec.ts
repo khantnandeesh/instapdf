@@ -2,7 +2,7 @@
 import { expect, test } from "@playwright/test";
 import { cardNames, chooseMenu, isPhoneToolbar, openMerge, outputDoc, pickMerge, runAndDownload, showPages, tileLabels, textsOf } from "../f3/support";
 import { flowTool } from "../../src/tools/registry";
-import { cards, mockLog, mockPick, needsCloud, openWindow, pickFromRow, reachPicker } from "./support";
+import { cards, mockLog, mockPick, needsCloud, openWindow, pickFromRow, pickSource, reachPicker } from "./support";
 
 needsCloud();
 
@@ -96,7 +96,7 @@ test("AC-123, AC-167: Add pages from a cloud file opens the page picker; on phon
 
 test("AC-148: 51 files from the cloud load 50 and show the local over-the-cap message", { tag: "@serial" }, async ({ page }) => {
   test.setTimeout(120_000);
-  const win = await openWindow(page, () => page.getByTestId("cloud-row").getByRole("button", { name: /^Choose from Google Drive/ }).click());
+  const win = await openWindow(page, () => pickSource(page, "Google Drive"));
   await reachPicker(win);
   await win.getByRole("button", { name: "51 files" }).click();
   await expect.poll(async () => (await cardNames(page)).length, { timeout: 60_000 }).toBe(50);
@@ -147,7 +147,7 @@ for (const [path, w, h] of [
     // The card sits inside the screen with the page's own gutter, and everything it holds sits inside it.
     expect(card.x, "card's left edge").toBeGreaterThanOrEqual(0);
     expect(card.x + card.width, "card's right edge").toBeLessThanOrEqual(w);
-    for (const sel of [".ip-split", "[data-testid=cloud-caret]", "[data-testid=cloud-row]"]) {
+    for (const sel of [".ip-split", "[data-testid=cloud-caret]"]) {
       const b = await box(sel);
       expect(b.x, `${sel} left`).toBeGreaterThanOrEqual(card.x);
       expect(b.x + b.width, `${sel} right`).toBeLessThanOrEqual(card.x + card.width);

@@ -6,6 +6,7 @@ import { flushSync } from "react-dom";
 import { flip } from "@/lib/motion/flow";
 import { usePresence } from "@/lib/motion/react";
 import { clearRecent } from "@/lib/recent-tools";
+import { packMenu } from "@/lib/catalogue/menu-pack";
 import { matchTools } from "@/lib/catalogue/search";
 import { catalogueCopy as copy } from "../catalogue/copy";
 import { RecentStrip } from "../catalogue/RecentStrip";
@@ -32,6 +33,9 @@ const DESKTOP = "(min-width: 768px)";
 const loadDialog = () => import("../ui/Dialog");
 const Dialog = lazy(() => loadDialog().then((m) => ({ default: m.Dialog })));
 const MENU_ID = "tool-menu";
+/** Narrowest panel column (px), and the gap between columns: names and their badge keep one line. */
+const TRACK = 232;
+const TRACK_GAP = 12;
 const RESULTS_ID = "tool-menu-results";
 
 type Mode = "panel" | "dialog";
@@ -271,6 +275,10 @@ function MenuContent({
   const groups = categories
     .map((c) => ({ ...c, items: matches.filter((m) => m.item.category === c.id).map((m) => m.item) }))
     .filter((g) => g.items.length > 0);
+  // Panel: one column per group, never split (owner 2026-11-27); as many columns as fit at TRACK px in the
+  // bar's 1280 px column less its 32 px gutters (the panel only renders on the client, once opened).
+  const tracks = mode === "panel" && typeof window !== "undefined" ? Math.max(1, Math.floor((Math.min(document.documentElement.clientWidth, 1280) - 64 + TRACK_GAP) / (TRACK + TRACK_GAP))) : 0;
+  const columns = mode === "panel" && tracks ? packMenu(groups.map((g) => g.items.length), tracks) : [{ groups: groups.map((_, i) => i), span: 1 }];
 
   useEffect(() => {
     if (!searching) return setLive("");
@@ -354,34 +362,41 @@ function MenuContent({
             </Button>
           </div>
         ) : (
-          <nav aria-label={copy.title} className={cx("mt-4 md:columns-3 md:gap-6 lg:columns-4 xl:columns-5", mode === "panel" ? "-mx-5" : "-mx-4")}>
-            {/* Panel: balanced columns across the full width; a long group may continue in the next
-                column (rows never split, a heading never ends a column) so no column runs long. */}
-            {groups.map((g) => (
-              <section
-                key={g.id}
-                aria-labelledby={`menu-cat-${g.id}`}
-                className={cx("mb-4", mode === "dialog" && "break-inside-avoid", `ip-cat-${g.id}`)}
-                data-testid="tool-menu-group"
-              >
-                {/* Category eyebrow: UPPERCASE in the category's text shade. */}
-                <h2 id={`menu-cat-${g.id}`} className="mp-eyebrow flex break-after-avoid items-baseline gap-2 px-[15px] pt-1.5 pb-1" data-flip>
-                  {g.label}
-                  <span className="text-sm text-muted normal-case tabular-nums">{g.items.length}</span>
-                </h2>
-                <ul>
-                  {g.items.map((item) => (
-                    <li key={item.slug} className="break-inside-avoid" data-flip>
-                      <MenuEntry item={item} />
-                    </li>
-                  ))}
-                </ul>
-              </section>
+          <nav
+            aria-label={copy.title}
+            className="mt-4 grid items-start gap-x-3 gap-y-2.5"
+            style={mode === "panel" && tracks ? { gridTemplateColumns: `repeat(${columns.reduce((n, c) => n + c.span, 0)}, minmax(0, 1fr))` } : undefined}
+          >
+            {/* One column per group, never split across columns; small groups stack in catalogue order, and a
+                group taller than the panel spans two columns under one heading (lib/catalogue/menu-pack.ts). */}
+            {columns.map((col) => (
+              <div key={groups[col.groups[0]!]!.id} className="flex min-w-0 flex-col gap-2.5" style={col.span > 1 ? { gridColumn: `span ${col.span}` } : undefined}>
+                {col.groups.map((i) => {
+                  const g = groups[i]!;
+                  return (
+                    <section key={g.id} aria-labelledby={`menu-cat-${g.id}`} className={cx("ip-menu-group", `ip-cat-${g.id}`)} data-testid="tool-menu-group">
+                      {/* Category heading: a step above the rows, in the category's text shade, on its tinted card. */}
+                      <h2 id={`menu-cat-${g.id}`} className="ip-menu-group__title" data-flip>
+                        {g.label}
+                        <span className="text-sm font-normal text-muted tabular-nums">{g.items.length}</span>
+                      </h2>
+                      <ul style={col.span > 1 ? { columns: col.span, columnGap: "12px" } : undefined}>
+                        {g.items.map((item) => (
+                          <li key={item.slug} className="break-inside-avoid" data-flip>
+                            <MenuEntry item={item} />
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  );
+                })}
+              </div>
             ))}
           </nav>
         )}
       </div>
-      {mode === "panel" && <div className="absolute top-5 end-4 lg:end-6">{closeButton}</div>}
+      {/* Last in the tab order (H-7), drawn on the search row's centre line: top 24 px + a 44 px box, as the search. */}
+      {mode === "panel" && <div className="absolute top-6 end-4 flex h-11 items-center lg:end-6">{closeButton}</div>}
     </div>
   );
 }
@@ -392,7 +407,7 @@ function MenuEntry({ item }: { item: ToolIndexItem }) {
   // name and a short "Soon"/"Beta" mark; the full status and runtime words are visually hidden.
   return (
     // BerryPDF Menu row: icon + label, 8x12 padding, 9px radius; hover gives a pink band and berry text.
-    <Link href={`/${item.slug}`} prefetch={false} title={item.summary} className="mp-menu-row mx-2 gap-0.5 max-md:min-h-11">
+    <Link href={`/${item.slug}`} prefetch={false} title={item.summary} className="mp-menu-row gap-0.5 max-md:min-h-11">
       <span className="flex items-center gap-2">
         <span className={cx("shrink-0 [&_svg]:size-5", usable(item) ? "text-(--c)" : "text-muted")}>{item.icon}</span>
         <span className="ip-menu-name min-w-0 flex-1 [overflow-wrap:anywhere] text-ink">{item.name}</span>
@@ -405,7 +420,9 @@ function MenuEntry({ item }: { item: ToolIndexItem }) {
                 <span className="sr-only">{badge}</span>
               </Badge>
             ) : (
-              <Badge tone="beta">{badge}</Badge>
+              <Badge tone="beta" className="mp-tag--sm">
+                {badge}
+              </Badge>
             )}
           </>
         )}

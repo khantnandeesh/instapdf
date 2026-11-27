@@ -9,8 +9,8 @@ import { PlusIcon } from "@/components/ui/icons";
  */
 export const addTileClass = (fill = false) =>
   cx(
-    fill ? "h-full min-h-[120px] w-full sm:min-h-[200px]" : "ip-tile__box",
-    "group/add grid place-items-center rounded-tray border-2 border-dashed border-brand-tint-border bg-surface-raised/60 text-brand-strong",
+    fill ? "h-full min-h-[120px] w-full rounded-tray sm:min-h-[200px]" : "ip-tile__box rounded-(--ip-page-radius)",
+    "group/add grid place-items-center border-2 border-dashed border-brand-tint-border bg-surface-raised/60 text-brand-strong",
     "transition-[background-color,border-color,transform] duration-(--dur-base) hover:-translate-y-0.5 hover:border-brand hover:bg-brand-tint active:translate-y-0 disabled:opacity-50",
   );
 

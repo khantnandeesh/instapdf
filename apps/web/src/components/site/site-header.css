@@ -84,11 +84,30 @@
 
 /* Denser rows in the panel so every group fits one screen from 1280x632 up. */
 .mp-menu-panel .mp-menu-row {
-  padding: 6px 10px;
+  padding: 5px 8px;
   font-size: 15px;
 }
 /* "Soon" reads as a quiet word here, not a pill, so names keep their line. */
 .mp-menu-panel .mp-menu-row .mp-tag {
   background: none;
   padding-inline: 0;
+}
+
+/* All tools groups (owner 2026-11-27): each group is one card, tinted with its category hue, so the
+   columns read apart by colour; the heading sits a step above the rows (18px vs 15-16px). */
+.ip-menu-group {
+  border-radius: 14px;
+  padding: 4px 4px 6px;
+  background: color-mix(in srgb, var(--c) 7%, var(--surface));
+}
+.ip-menu-group__title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px 3px;
+  font: 600 18px/1.3 var(--font-display);
+  color: var(--c-text, var(--ink));
+}
+.ip-menu-group .mp-menu-row:hover {
+  background: color-mix(in srgb, var(--c) 14%, var(--surface));
 }

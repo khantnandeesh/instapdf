@@ -31,7 +31,7 @@ type Labels = { pages?: Partial<PageGridLabels>; segments?: Partial<SegmentGridL
 /** The editing actions and views over `ws` (no hooks: each part below calls it on render). */
 function editor(ws: PageWorkspace) {
   const { api, pages, pagesRef, sourcesRef, filesById, selection, gridList, focus, viewModel, sourceCount, announce, commit, removeUids, removeCard, moveCard, stepTarget, enlarge, selectAll, clearSelection } = ws;
-  const { tool, newUid, letterSeq, setSources, filesRef, setSelection, anchor, picker, pickerRef, setPicker, moveDialog, setMoveDialog, confirm, setConfirm, dialogsUsed, setDialogsUsed, inserted, setInserted, focusOn, announceSelection, labelOf } = ws.internals;
+  const { tool, newUid, letterSeq, setSources, filesRef, setSelection, anchor, picker, pickerRef, setPicker, moveDialog, setMoveDialog, confirm, setConfirm, dialogsUsed, setDialogsUsed, inserted, setInserted, focusOn, announceSelection, labelOf, pageName } = ws.internals;
   const { filesHereInput, pagesInput, pendingAt, focusAfterPicker } = ws.internals;
 
   // ---- selection ----
@@ -97,7 +97,7 @@ function editor(ws: PageWorkspace) {
   const removeSelection = () => {
     const uids = pagesRef.current.filter((p) => selection.has(p.uid)).map((p) => p.uid);
     if (!uids.length) return;
-    removeUids(uids, uids.length === 1 ? labelOf(pagesRef.current.find((p) => p.uid === uids[0])!) : "");
+    removeUids(uids, uids.length === 1 ? pageName(pagesRef.current.find((p) => p.uid === uids[0])!) : "");
     setSelection(new Set());
   };
 
@@ -179,7 +179,7 @@ function editor(ws: PageWorkspace) {
           const count = selection.has(uid) ? selection.size : selection.size + 1;
           setConfirm({ uid, label: labelOf(page), count });
           setDialogsUsed((d) => ({ ...d, confirm: true }));
-        } else removeUids([uid], labelOf(page));
+        } else removeUids([uid], pageName(page));
         return;
       }
       case "duplicate": {
