@@ -33,8 +33,8 @@
 }
 
 /* Delete, a marked page: grey, under a pale veil (static), with a 1px field-line edge so it still reads as
-   a page on cream, under the solid trash badge; the whole label struck through with a 2px line. No fill
-   on the tile (PT-1 rule 4). */
+   a page on cream, under the solid trash badge; the label reads "n · To delete" in danger red. No fill on
+   the tile (PT-1 rule 4). */
 :is(.mp-tray, .ip-tile)[data-marked] [data-testid="page-visual"] {
   filter: grayscale(1);
   outline: 1px solid var(--ip-field-line);
@@ -47,16 +47,10 @@
   opacity: var(--ip-veil-marked);
   pointer-events: none;
 }
-/* The strike is a 2px band drawn across the label's padded box, so it runs 4px past each side of even a
-   one-digit number (a text-decoration line ends at the glyph; visual gate round 2). */
+/* No strike: a line through a one-digit number read as "+" (F25 visual gate). The words carry the state
+   and the danger red (7.5:1 on cream) backs them up; forced colours keep the words. */
 :is(.mp-tray, .ip-tile)[data-marked] :is(.mp-tray__n, .ip-tile__n) {
-  padding-inline: 4px;
-  background: linear-gradient(currentColor, currentColor) center / 100% 2px no-repeat;
-}
-@media (forced-colors: active) {
-  :is(.mp-tray, .ip-tile)[data-marked] :is(.mp-tray__n, .ip-tile__n) {
-    text-decoration: line-through 2px;
-  }
+  color: var(--danger);
 }
 
 /* Badges that appear (part disc, pick tick, solid trash): fade + scale 0.9 -> 1, 120ms (P1, P4). */

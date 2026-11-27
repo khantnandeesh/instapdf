@@ -451,6 +451,18 @@
     gap: 16px;
     min-width: 0;
   }
+  /* Below 1024 px Download is in the fixed bottom dock: the result's end clears it, and the preview leaves
+     room so the title, the file name and its summary end above the dock on the first screen (F25 visual
+     gate). Above the preview: the header, the title row and the stage edge (41px) and this padding (16px);
+     under it: 20px gap, the 40px title, 16px gap, one 22px name line, the 20px summary, then 8px air. */
+  @media (max-width: 1023px) {
+    .ip-result {
+      padding-bottom: calc(24px + var(--ip-dock-actual, 0px));
+    }
+    .ip-result__preview {
+      height: min(55dvh, 520px, calc(100dvh - var(--ip-header-h) - 57px - 126px - var(--ip-dock-actual, var(--ip-dock-h))));
+    }
+  }
   @media (min-width: 1024px) {
     .ip-result {
       display: grid;

@@ -302,6 +302,33 @@ test.describe("F25 structure", () => {
     [390, 664],
     [320, 568],
   ] as const) {
+    test(`result fit: at ${width}x${height} every tool's result shows its title, name and summary above the Download dock, and its end clears the dock`, async ({ page }, info) => {
+      test.skip(info.project.name !== "mobile", "phones");
+      test.setTimeout(180_000);
+      await page.setViewportSize({ width, height });
+      for (const t of usable) {
+        await open(page, `/${t.slug}`);
+        await page.getByTestId("file-input").setInputFiles(SECOND_FILE[t.slug] ? [fx("three-pages.pdf"), fx(SECOND_FILE[t.slug])] : fx("three-pages.pdf"));
+        await expect(flow(page)).toHaveAttribute("data-state", "ready");
+        await runnable(page);
+        await primary(page).click();
+        await expect(page.getByTestId("result"), t.slug).toBeVisible({ timeout: 20_000 });
+        await page.getByTestId("result").evaluate((r) => Promise.all(r.getAnimations({ subtree: true }).map((a) => a.finished)));
+        const dock = (await page.locator("[data-ip-dock=bar]").boundingBox())!;
+        expect(await page.evaluate(() => window.scrollY), `${t.slug}: the first screen`).toBe(0);
+        for (const [what, el] of [
+          ["title", page.getByTestId("result").getByRole("heading", { level: 2 })],
+          ["name", page.getByTestId("result-name")],
+          ["summary", page.locator("#ip-result-summary")],
+        ] as const) {
+          const b = (await el.boundingBox())!;
+          expect(b.y + b.height, `${t.slug}: the ${what} ends above the dock`).toBeLessThanOrEqual(dock.y);
+        }
+        const pad = await page.getByTestId("result").evaluate((r) => parseFloat(getComputedStyle(r).paddingBottom));
+        expect(pad, `${t.slug}: the result's end clears the dock`).toBeGreaterThanOrEqual(dock.height);
+      }
+    });
+
     test(`AC-645: at ${width}x${height} Download is in the bottom dock, focused, and the preview is as wide as the stage`, async ({ page }, info) => {
       test.skip(info.project.name !== "mobile", "phones");
       await page.setViewportSize({ width, height });

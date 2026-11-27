@@ -54,6 +54,43 @@ test("AC-401, AC-465, AC-466: Remove page 2 marks it in place; the run drops it;
   expect(texts).not.toContain(twelve(2));
 });
 
+// F25 visual gate: a strike through a one-digit number read as "+". A marked tile's label says "n · To delete"
+// in danger red, whole and unstruck, at every gate size (never colour alone).
+for (const [width, height] of [
+  [1280, 632],
+  [1366, 657],
+  [390, 664],
+  [320, 568],
+] as const) {
+  test(`marked label: at ${width}x${height} a marked tile reads "n · To delete" in danger red, whole, with no strike`, async ({ page }) => {
+    test.skip(isDesktop(test.info().project.name) !== width >= 1024, "desktop sizes on desktop, phones on mobile");
+    await page.setViewportSize({ width, height });
+    await openReady(page, "delete-pdf-pages", "twelve.pdf");
+    for (const n of [1, 12]) {
+      await remove(page, n).click();
+      const label = page.locator(`[data-page-index="${n - 1}"] .ip-tile__n`);
+      await expect(label).toHaveText(`${n} · To delete`);
+      await label.scrollIntoViewIfNeeded();
+      await expect(label.getByTestId("marked-label")).toBeVisible();
+      const look = await label.evaluate((el) => {
+        const cs = getComputedStyle(el);
+        const probe = document.createElement("span");
+        probe.style.color = "var(--danger)";
+        document.body.append(probe);
+        const danger = getComputedStyle(probe).color;
+        probe.remove();
+        return { whole: el.scrollWidth <= el.clientWidth, color: cs.color, danger, strike: cs.textDecorationLine, bg: cs.backgroundImage };
+      });
+      expect(look.whole, `${n}: the label is not cut`).toBe(true);
+      expect(look.color, `${n}: danger red`).toBe(look.danger);
+      expect(look.strike, `${n}: no strike`).not.toContain("line-through");
+      expect(look.bg, `${n}: no drawn strike`).toBe("none");
+    }
+    await remove(page, 1).click();
+    await expect(page.locator('[data-page-index="0"] [data-testid=marked-label]')).toHaveCount(0);
+  });
+}
+
 test("AC-467, AC-468: 1-3, 10- marks six pages and keeps 4-9; marking 2, 4, 6 writes 2, 4, 6", async ({ page }) => {
   await openReady(page, "delete-pdf-pages", "twelve.pdf");
   await remove(page, 2).click();

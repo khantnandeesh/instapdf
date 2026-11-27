@@ -650,7 +650,7 @@ No new colours. Add these to `apps/web/src/styles/tokens.css`:
 | `--ip-cut-line` | `var(--ip-slot-bar)` (3px) | The cut line drawn the full tray height when a mark is on. It reuses Merge's insert bar width, so a cut and an insert point look related. |
 | `--ip-part-disc` | 24px | Part-number disc in More options' Files list. (On the tiles a part starts with an 8px tone dot in the number line, `.ip-part-dot`.) |
 | `--ip-dim-left-out` | 0.38 | Opacity of the page image on a Split tile that is in no part. |
-| `--ip-veil-marked` | 0.55 | Opacity of the cream veil over the page image of a Delete tile marked for removal. The image is also `grayscale(1)` with a 1px field-line edge, and the label is struck with a 2px line; all static, never animated (visual review 2026-11-26; was a 0.32 opacity, which almost vanished on cream). |
+| `--ip-veil-marked` | 0.55 | Opacity of the cream veil over the page image of a Delete tile marked for removal. The image is also `grayscale(1)` with a 1px field-line edge, and the label reads "n · To delete" in `danger` (it was struck with a 2px line, which read as "+" on a one-digit number; F25 visual gate); all static, never animated (visual review 2026-11-26; was a 0.32 opacity, which almost vanished on cream). |
 | `--ip-stepper-field-w` | 56px | Number field inside `NumberStepper`. Two 44px buttons sit around it, so it is 152px wide with 4px gaps. |
 | `--ip-mix-card-min` | 330px | Minimum column of the wide Alternate card. This gives 3 per row at 1366 and 1 per row below 640. |
 | `--ip-bubble-gap` | 8px | Gap between a bar field and its floating hint or error bubble. |
@@ -679,7 +679,7 @@ This is a change from §3b's "5 rotating hues" (P-11, decision 5).
 | white on `danger` (icon) | 7.89 | Delete's trash badge |
 | `danger` on `page-tray` / `band` (non-text) | 7.02 / 7.19 | trash badge against the tile |
 | `leaf` on `page-tray` (non-text) / white on `leaf` | 4.74 / 5.33 | Extract pick tick |
-| `muted` on `band` | 4.97 | struck-through page number on a marked Delete tile |
+| `danger` on `cream` | 7.51 | "n · To delete" label on a marked Delete tile |
 | `mp-alert-danger-ink` on `surface`; `danger` border | 9.39; 7.89 | field error bubble |
 | `mp-tool-ink` on `sand` / `surface` | 6.35 / 7.71 | Undo / Redo in the bar; Select / Sort / Remove in the toolbar |
 | `ink` on `sand` | 11.15 | bar status line |
@@ -980,7 +980,7 @@ Changes apply immediately. Done only closes the dialog. Escape and the backdrop 
 | Split | Tray in its part tone; the **first** tile of each part starts its number line with an 8px dot in the part tone (the label already says "Part n"; visual review 2026-11-26: a numbered disc on the page covered its text) | The mark after the tile shows as a white 28px circle, `field-line` edge, `brand-strong` scissors | Mark on: `brand` fill, white scissors rotated 90°, a 3px `brand` cut line the full tray height in the gap |
 | Split, left-out page (Custom) | Dashed `field-line` tray edge, page at 0.38, no disc; marks on either side hidden (and absent from the DOM) | – | – |
 | Extract | Plain tray | An empty 24px ring (`field-line` edge) at the top-right | Picked: 2px `brand` ring on the tray plus the `leaf` tick disc (the F1 leaf tick) in the ring's place |
-| Delete | Plain tray | A ghost trash badge (white circle, `danger` icon) at the top-right | Marked: page at 0.32 + grayscale, `band` tray with a 1.5px `brand-tint-border` edge, a solid `danger` trash badge with a white icon, page number struck through |
+| Delete | Plain tray | A ghost trash badge (white circle, `danger` icon) at the top-right | Marked: page at 0.32 + grayscale, `band` tray with a 1.5px `brand-tint-border` edge, a solid `danger` trash badge with a white icon, the label "n · To delete" in `danger` |
 
 **Mark geometry.** The grid gets `px-2` so a mark in the gap after the last tile of a row never overflows the tray. The mark sits on that row's right edge, and the cut continues at the start of the next row (no line is drawn there).
 
@@ -1106,7 +1106,7 @@ Tokens and presets come from `docs/design/motion.md`. Everything is transform, o
 | P1 | Mode switch / quick pick / typed range → tiles update | Tray tones, rings and badges are colour transitions, 120ms. Part discs and ticks fade + scale 0.9 → 1 in 120ms `--ease-out` (no overshoot). Cut lines `scaleY(0 → 1)` from the centre, 200ms `--ease-out`. No stagger, so a 1,000-page grid changes in one frame. | Colour and opacity only |
 | P2 | Mark hover (fine pointer) | The off-mark fades in, 120ms, as the pointer enters the tile or the gap | Instant |
 | P3 | Mark toggle | Press scale 0.94 at 120ms; fill 120ms; cut line P1 | No scale |
-| P4 | Extract pick / Delete mark | Pick: ring colour 120ms; the tick fades in and scales 0.8 → 1, 120ms. Delete: page opacity 1 → 0.32 in 200ms (grayscale switches at once); the badge goes from ghost to solid in 120ms; the number strike appears with it | Opacity only |
+| P4 | Extract pick / Delete mark | Pick: ring colour 120ms; the tick fades in and scales 0.8 → 1, 120ms. Delete: page opacity 1 → 0.32 in 200ms (grayscale switches at once); the badge goes from ghost to solid in 120ms; the label's "· To delete" appears with it | Opacity only |
 | P5 | Primary count | The text changes on the same frame (no rolling number). The button keeps its slot width, so nothing shifts | Same |
 | P6 | Field bubble (hint or error) | Hint: fade + y 4 → 0, 120ms, after a 300ms focus delay. Error: the same, on the first invalid value after the 300ms input pause. The field shakes 4px, 240ms, only on blur or on pressing a disabled primary (motion.md S10) | Fade only, no shake |
 | P7 | More options | ≥ 640: dialog S11. < 640: sheet S13. Rows of the parts list are never staggered | Fade 120ms |
