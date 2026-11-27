@@ -24,11 +24,19 @@ const BUDGET_KB = {
   // F5 page tools (spec F4/F5 UI P-12).
   "/organize-pdf/page": [150, 160],
   "/combine-reorder-pdf/page": [150, 160],
-  "/alternate-mix-pdf/page": [148, 158],
+  // +1 kB entry (F12, 27 Nov), as Extract below.
+  "/alternate-mix-pdf/page": [149, 158],
   // F4 page tools (spec F4/F5 UI P-12): Rotate + the range parser, field and stepper (+ marks on Split).
   "/split-pdf/page": [145, 155],
-  "/extract-pdf-pages/page": [143, 153],
+  // +1 kB entry on Extract (F12, 27 Nov): three more tools in the registry every route loads, and the shared
+  // LinkButton / IconButton variants.
+  "/extract-pdf-pages/page": [144, 153],
   "/delete-pdf-pages/page": [143, 153],
+  // F12 (spec f12-image-text-tools.md): PDF to image is Extract's page with two option groups; PDF to text is the
+  // bare flow; Image to PDF is Organize's workspace. Their engines (page-images, page-text, tiff-write) are lazy.
+  "/pdf-to-jpg/page": [144, 154],
+  "/pdf-to-text/page": [139, 149],
+  "/jpg-to-pdf/page": [150, 160],
   // The editor's landing (F16 AC-86), measured 124 / 140 on 26 Nov plus ~2 kB (the landing tool cap is 150);
   // its shell, pdf.js and engine are the editor JS budget below.
   "/edit-pdf/page": [126, 142],
@@ -46,6 +54,9 @@ const CLOUD_BUDGET_KB = {
   "/split-pdf/page": [147, 157],
   "/extract-pdf-pages/page": [145, 155],
   "/delete-pdf-pages/page": [145, 155],
+  "/pdf-to-jpg/page": [146, 156],
+  "/pdf-to-text/page": [141, 151],
+  "/jpg-to-pdf/page": [152, 162],
   // The editor's landing with the F23 caret, row and intake (E6): measured 128 / 144 on 26 Nov plus ~2 kB.
   "/edit-pdf/page": [130, 146],
 };

@@ -178,7 +178,9 @@ export function ResultCard({
   }, [file]);
   const pageCount = output.pageCount ?? output.entries?.reduce((s, e) => s + e.pageCount, 0) ?? 0;
   // "5 pages, 21 KB." A ZIP says how many files it holds (spec F4/F5 UI P-3 "Result").
-  const base = isZip && output.entries ? `${copy.files(output.entries.length)}, ${formatBytes(output.size)}.` : `${copy.pages(pageCount)}, ${formatBytes(output.size)}.`;
+  // An output that is not PDF pages names its own unit ("3 images", "1,204 words").
+  const lead = output.lead ?? (isZip && output.entries ? copy.files(output.entries.length) : copy.pages(pageCount));
+  const base = `${lead}, ${formatBytes(output.size)}.`;
   const summary = output.note ? `${base} ${output.note}` : base;
   const titleId = "ip-result-title";
 
@@ -190,7 +192,7 @@ export function ResultCard({
           <span className="mp-tick-in grid size-10 shrink-0 place-items-center rounded-full bg-[var(--mp-alert-ok-bg)] text-leaf">
             <CheckIcon size={24} />
           </span>
-          {copy.resultTitle(isZip)}
+          {copy.resultTitle(output.type)}
         </h2>
         <div>
           <p className="font-display text-[17px] leading-[1.3] font-semibold break-all text-ink-black" data-testid="result-name">
@@ -201,6 +203,7 @@ export function ResultCard({
           </p>
         </div>
         {isZip && output.entries && <EntryList output={output} entries={output.entries} announce={announce} />}
+        {output.copyText !== undefined && <CopyText text={output.copyText} announce={announce} />}
         {canShare && (
           <Button
             variant="line"
@@ -258,7 +261,7 @@ const ROWS_PHONE = 3;
  * which grows the list in place. Each row downloads its own file, sliced from the ZIP (stored entries,
  * nothing is copied), so a phone gets one part in one tap without unzipping.
  */
-function EntryList({ output, entries, announce }: { output: ToolOutput; entries: { name: string; pageCount: number }[]; announce: (message: string) => void }) {
+function EntryList({ output, entries, announce }: { output: ToolOutput; entries: { name: string; pageCount: number; detail?: string }[]; announce: (message: string) => void }) {
   const [all, setAll] = useState(false);
   const [slices, setSlices] = useState<ZipEntrySlice[] | null>(null);
   const list = useRef<HTMLUListElement>(null);
@@ -294,7 +297,7 @@ function EntryList({ output, entries, announce }: { output: ToolOutput; entries:
               <span className="block truncate text-ink" title={e.name}>
                 {e.name}
               </span>
-              <span className="block text-help text-muted tabular-nums">{copy.pages(e.pageCount)}</span>
+              <span className="block text-help text-muted tabular-nums">{e.detail ?? copy.pages(e.pageCount)}</span>
             </span>
             {slices && <EntryDownload name={e.name} blob={() => entryBlob(output.blob, slices[i])} announce={announce} />}
           </li>
@@ -347,6 +350,56 @@ function EntryDownload({ name, blob, announce }: { name: string; blob: () => Blo
   );
 }
 
+/** Result-only wording (kept out of the flow's first-load copy). */
+const copyCopy = { copyText: "Copy text", copied: "Copied", copyFailed: "The text could not be copied. Download the file instead." };
+
+/** "Copy text" on a text result: the label confirms for a moment, and the live region says it. */
+function CopyText({ text, announce }: { text: string; announce: (message: string) => void }) {
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (!done) return;
+    const t = setTimeout(() => setDone(false), 2400);
+    return () => clearTimeout(t);
+  }, [done]);
+  return (
+    <Button
+      variant="line"
+      className="self-start max-sm:w-full"
+      iconStart={done ? <CheckIcon size={16} className="mp-tick-in" /> : <FilesIcon size={16} />}
+      data-testid="copy-text"
+      onClick={() => {
+        navigator.clipboard.writeText(text).then(
+          () => {
+            setDone(true);
+            announce(copyCopy.copied);
+          },
+          () => announce(copyCopy.copyFailed),
+        );
+      }}
+    >
+      {/* Both labels share one grid cell, so the button keeps its width when the label changes. */}
+      <span className="grid text-center *:[grid-area:1/1]">
+        <span className={cx(done && "invisible")}>{copyCopy.copyText}</span>
+        <span className={cx(!done && "invisible")} aria-hidden={!done}>
+          {copyCopy.copied}
+        </span>
+      </span>
+    </Button>
+  );
+}
+
+/** A blob: URL for the result's preview picture, revoked when the result goes. */
+function usePreviewUrl(blob: Blob | undefined): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!blob) return setUrl(null);
+    const u = URL.createObjectURL(blob);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [blob]);
+  return url;
+}
+
 /**
  * The output's first page, big (F25 §7): fitted whole into the preview box (no crop), drawn at the device
  * pixel ratio with a hairline edge. A ZIP shows its first part's first page and a quiet "1 / n files".
@@ -359,6 +412,8 @@ function ResultPreview({ output }: { output: ToolOutput }) {
   useEffect(() => {
     let alive = true;
     let destroy: (() => void) | undefined;
+    // An image or text result brings its own preview: nothing to open as a PDF.
+    if (output.preview || output.previewText !== undefined) return;
     (async () => {
       let blob: Blob = output.blob;
       if (isZip) {
@@ -391,9 +446,21 @@ function ResultPreview({ output }: { output: ToolOutput }) {
       destroy?.();
     };
   }, [output, isZip]);
+  const picture = usePreviewUrl(output.preview);
   return (
     <div className="ip-result__preview" data-testid="result-preview-box">
-      {failed ? <FilesIcon size={64} className="text-brand-strong" /> : <span ref={host} className="ip-result__host" />}
+      {output.previewText !== undefined ? (
+        <pre className="ip-result__text ip-fade-in shadow-paper outline outline-1 outline-sand" aria-label="Start of the text" data-testid="result-preview">
+          {output.previewText}
+        </pre>
+      ) : output.preview ? (
+        // eslint-disable-next-line @next/next/no-img-element -- a blob: URL of the result, drawn as is
+        picture && <img src={picture} alt={isZip ? "Preview of the first image" : "Preview of the image"} className="ip-fade-in shadow-paper outline outline-1 outline-sand" data-testid="result-preview" />
+      ) : failed ? (
+        <FilesIcon size={64} className="text-brand-strong" />
+      ) : (
+        <span ref={host} className="ip-result__host" />
+      )}
       {isZip && count > 1 && (
         <span className="ip-result__counter" data-testid="result-counter">
           {slotCopy.partsCounter(count)}

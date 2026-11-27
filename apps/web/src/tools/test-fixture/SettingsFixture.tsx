@@ -57,7 +57,7 @@ const process: ProcessFn = async (files, signal, onProgress) => {
     onProgress(i / 10);
   }
   const f = files[0];
-  return { name: fixtureTool.flow.outputName([f.name]), type: "application/pdf", blob: f.source, size: f.size, pageCount: f.pageCount, wasEncrypted: false };
+  return { name: fixtureTool.flow.outputName?.([f.name]) ?? f.name, type: "application/pdf", blob: f.source, size: f.size, pageCount: f.pageCount, wasEncrypted: false };
 };
 
 /** The server variant: upload, queue, work and done through the (mocked) job API. */

@@ -11,7 +11,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { isUsable, tools } from "../../src/tools/registry";
-import { cloudOn, fx } from "../support/flow";
+import { cloudOn, fx, toolFixtures } from "../support/flow";
 import { FIXTURES_OFF, fixturesServed } from "../support/fixtures";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
@@ -151,7 +151,7 @@ for (const [project, sizes] of [
           await expectClean(page, "empty state, scrolled to the end");
           await page.evaluate(() => window.scrollTo(0, 0));
 
-          await page.getByTestId("file-input").setInputFiles(fx("sixty-pages.pdf"));
+          await page.getByTestId("file-input").setInputFiles(toolFixtures(tool.slug));
           await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
           await expectClean(page, "loaded");
           const pagesView = page.getByRole("radio", { name: "Pages", exact: true });
@@ -185,7 +185,8 @@ for (const [project, sizes] of [
 
           // Merge's page picker: a long list inside a modal; only the list may scroll.
           const addPages = page.getByTestId("add-pages-menu");
-          if (await addPages.isVisible()) {
+          // (Image to PDF takes no PDF, so it has no long file to pick pages from.)
+          if (tool.flow!.accept.mime.includes("application/pdf") && (await addPages.isVisible())) {
             await addPages.click();
             const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("menuitem", { name: cloudOn ? "This device" : "Pages from a file…", exact: true }).click()]);
             await chooser.setFiles(fx("sixty-pages.pdf"));

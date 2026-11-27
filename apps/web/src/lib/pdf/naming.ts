@@ -218,3 +218,16 @@ export function customName(typed: string): string | null {
   const fitted = stem && fitStem(stem, ".pdf");
   return fitted ? `${fitted}.pdf` : null;
 }
+
+/** PDF to image (spec F12 §2): "<base>-<page>.<ext>", the page number zero-padded to the document's page count so files sort in order. */
+export function pageImageName(inputName: string, page: number, pageCount: number, ext: string): string {
+  const suffix = `-${String(page).padStart(String(pageCount).length, "0")}.${ext}`;
+  const safe = safeFileStem(baseName(inputName));
+  return `${fitStem(safe || "page", suffix)}${suffix}`;
+}
+
+/** "<base><suffix>" for an output that is not a PDF ("report-images.zip", "report.tiff", "report.txt"); the base is cut to fit. */
+export function derivedName(inputName: string | undefined, suffix: string): string {
+  const safe = safeFileStem(inputName ? baseName(inputName) : "");
+  return `${fitStem(safe || "berrypdf", suffix)}${suffix}`;
+}

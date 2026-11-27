@@ -12,6 +12,16 @@ import { PDFDocument } from "pdf-lib";
 export const fx = (name: string) => `tests/fixtures/${name}`;
 
 /**
+ * The files that bring a tool to its loaded state, for the guards that visit every tool: `pdf` for most,
+ * a second file where the tool needs two, pictures where it takes only images.
+ */
+export function toolFixtures(slug: string, pdf = "sixty-pages.pdf"): string[] {
+  // Enough pictures to overflow the pages area, like the 60-page PDF does.
+  if (slug === "jpg-to-pdf") return Array.from({ length: 30 }, (_, i) => fx(["delta.jpg", "charlie.png", "fox.tiff"][i % 3]));
+  return slug === "alternate-mix-pdf" ? [fx(pdf), fx("three-pages.pdf")] : [fx(pdf)];
+}
+
+/**
  * F23: true when the server under test was built with cloud sources on (NEXT_PUBLIC_CLOUD_SOURCES=1,
  * the CI "cloud" job). A few F1/F3 checks of the original menus branch on it.
  */

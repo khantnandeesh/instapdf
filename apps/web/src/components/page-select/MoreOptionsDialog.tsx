@@ -22,7 +22,9 @@ export type PartRow = { key: string; n: number; name: string; range: string };
 export type MoreOptionsContent = {
   parts?: { rows: PartRow[]; onRename: (key: string, name: string) => void };
   pattern?: { value: string; onChange: (value: string) => void };
-  bookmarks: { value: boolean; onChange: (value: boolean) => void };
+  bookmarks?: { value: boolean; onChange: (value: boolean) => void };
+  /** A tool's own on/off options, in order (PDF to image: greyscale, one TIFF for all pages). */
+  toggles?: { id: string; label: string; value: boolean; onChange: (value: boolean) => void }[];
 };
 
 function useMedia(query: string): boolean {
@@ -148,12 +150,17 @@ function MoreOptionsBody({
           </span>
         </div>
       )}
-      <Switch
-        id={`${id}-bookmarks`}
-        label={dialogCopy.removeBookmarks}
-        checked={content.bookmarks.value}
-        onChange={content.bookmarks.onChange}
-      />
+      {content.toggles?.map((t) => (
+        <Switch key={t.id} id={`${id}-${t.id}`} label={t.label} checked={t.value} onChange={t.onChange} />
+      ))}
+      {content.bookmarks && (
+        <Switch
+          id={`${id}-bookmarks`}
+          label={dialogCopy.removeBookmarks}
+          checked={content.bookmarks.value}
+          onChange={content.bookmarks.onChange}
+        />
+      )}
     </div>
   );
 }

@@ -6,12 +6,11 @@
 import { mkdir } from "node:fs/promises";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { isUsable, tools } from "../../src/tools/registry";
-import { flow, fx, primary } from "../support/flow";
+import { flow, fx, primary, toolFixtures } from "../support/flow";
 import { FIXTURES_OFF, fixturesServed } from "../support/fixtures";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
-const SECOND_FILE: Record<string, string> = { "alternate-mix-pdf": "three-pages.pdf" };
-const load = (page: Page, slug: string) => page.getByTestId("file-input").setInputFiles(SECOND_FILE[slug] ? [fx("sixty-pages.pdf"), fx(SECOND_FILE[slug])] : fx("sixty-pages.pdf"));
+const load = (page: Page, slug: string) => page.getByTestId("file-input").setInputFiles(toolFixtures(slug));
 
 async function open(page: Page, path: string) {
   await page.goto(path);
@@ -374,7 +373,7 @@ test.describe("F25 structure", () => {
       await page.setViewportSize({ width, height });
       for (const t of usable) {
         await open(page, `/${t.slug}`);
-        await page.getByTestId("file-input").setInputFiles(SECOND_FILE[t.slug] ? [fx("three-pages.pdf"), fx(SECOND_FILE[t.slug])] : fx("three-pages.pdf"));
+        await page.getByTestId("file-input").setInputFiles(toolFixtures(t.slug, "three-pages.pdf"));
         await expect(flow(page)).toHaveAttribute("data-state", "ready");
         await runnable(page);
         await primary(page).click();

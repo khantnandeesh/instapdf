@@ -9,16 +9,14 @@
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { isUsable, tools } from "../../src/tools/registry";
-import { fx } from "../support/flow";
+import { fx, toolFixtures } from "../support/flow";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
 /** Tools with no options at all (F4/F5 §3e, §3g): their bar holds the status, history and primary only. */
-const NO_OPTIONS = new Set(["organize-pdf", "alternate-mix-pdf"]);
-/** Tools that need a second file before they can run (Alternate & mix mixes two or more). */
-const SECOND_FILE: Record<string, string> = { "alternate-mix-pdf": "three-pages.pdf" };
+const NO_OPTIONS = new Set(["organize-pdf", "alternate-mix-pdf", "pdf-to-text"]);
 /** Loads the test file (and a second one where the tool needs it). */
 async function loadFiles(page: Page, slug: string) {
-  await page.getByTestId("file-input").setInputFiles(SECOND_FILE[slug] ? [fx("sixty-pages.pdf"), fx(SECOND_FILE[slug])] : fx("sixty-pages.pdf"));
+  await page.getByTestId("file-input").setInputFiles(toolFixtures(slug));
 }
 
 const DESKTOP: [number, number][] = [
@@ -134,7 +132,8 @@ for (const tool of usable) {
         await expectInViewport(page, row, "top row (loaded)");
         const rowBox = (await row.boundingBox())!;
         if (NO_OPTIONS.has(tool.slug)) await expect(row.getByTestId("dock-options").or(page.getByTestId("options-button"))).toHaveCount(0);
-        else await expectInViewport(page, row.getByTestId("dock-options").or(page.getByTestId("options-button")), "options in the top row");
+        // Inline options, a full-density tool's row options (from 1280 px) or its More options trigger.
+        else await expectInViewport(page, row.locator(":is([data-testid=dock-options], [data-testid=dock-row-options], [data-testid=options-button]):visible").first(), "options in the top row");
         // Tools with a Files / Pages view (Merge opens on files): the pages checks below run on the pages.
         const pagesView = page.getByRole("radio", { name: "Pages", exact: true });
         if (await pagesView.count()) await pagesView.click();
