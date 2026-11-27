@@ -4,6 +4,9 @@ import { catalogueCopy as copy } from "./copy";
 import { ToolChip } from "./ToolCard";
 import type { ToolIndexItem } from "./types";
 
+/** From 1024 px the inline strip (the All tools panel) keeps to one row beside the search: two chips, three from 1536 px. */
+const INLINE_MAX = 3;
+
 /**
  * "Recently used" heading, chips and a Clear button. Not rendered when empty.
  * `inline` puts all three on one row (the desktop All tools panel, beside its search).
@@ -30,10 +33,11 @@ export function RecentStrip({
         <H id={headingId} className="mp-eyebrow shrink-0 px-0 py-1">
           {copy.recentTitle}
         </H>
-        {/* Swipes sideways below 1024 px (data-ip-scroll="chips"), wraps from 1024 px. */}
+        {/* Swipes sideways below 1024 px (data-ip-scroll="chips"). From 1024 px only the latest two (three from 1536 px) beside the
+            search, on one row (six wrapped into three ragged rows around Clear; UI polish); the home page lists them all. */}
         <ul className="-my-1 flex min-w-0 scroll-px-1.5 gap-2 overflow-x-auto px-1.5 py-1.5 lg:flex-wrap lg:overflow-x-visible" data-ip-scroll="chips">
-          {items.map((item) => (
-            <li key={item.slug} className="shrink-0">
+          {items.map((item, i) => (
+            <li key={item.slug} className={i >= INLINE_MAX ? "shrink-0 lg:hidden" : i === INLINE_MAX - 1 ? "shrink-0 lg:max-2xl:hidden" : "shrink-0"}>
               <ToolChip item={item} />
             </li>
           ))}

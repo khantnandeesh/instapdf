@@ -178,16 +178,19 @@
       min-width: 132px;
     }
   }
+  /* Two balanced lines at most, never a cut-off word ("3 pages · 1 file · No chang…" at 1366; UI polish). */
   .ip-slot__status {
+    display: -webkit-box;
     flex: 1;
     min-width: 0;
     overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     color: var(--muted);
     font-size: 14px;
     line-height: 18px;
     text-align: end;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    text-wrap: balance;
     font-variant-numeric: tabular-nums;
   }
   /* On the sand dock (below 1024px) the status is for screen readers only, as before (muted on sand is

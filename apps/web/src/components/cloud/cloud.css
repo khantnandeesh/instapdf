@@ -32,6 +32,27 @@
   .ip-split__caret svg {
     transition: transform var(--dur-base) var(--ease-standard);
   }
+  /* Keyboard focus on either half: one ring around the whole split, 3px out on its own corners; on the caret,
+     a 2px line inside it too, so the two stops differ. A ring on one half alone ran square across the
+     seam and over the other half (UI polish 2026-11-27; F25 eval M11). A mouse pick stays ring-free
+     ([data-quiet-focus], tool-flow.css). */
+  .ip-split {
+    border-radius: var(--radius-lg);
+  }
+  .ip-split--lg {
+    border-radius: 16px;
+  }
+  .ip-split:has(.mp-btn:focus-visible:not([data-quiet-focus])) {
+    outline: 3px solid var(--link);
+    outline-offset: 3px;
+  }
+  .ip-split .mp-btn:focus-visible {
+    outline: none;
+  }
+  .ip-split .ip-split__caret.mp-btn:focus-visible:not([data-quiet-focus]) {
+    outline: 2px solid currentColor;
+    outline-offset: -6px;
+  }
   .ip-split__caret[aria-expanded="true"] svg {
     transform: rotate(180deg);
   }
