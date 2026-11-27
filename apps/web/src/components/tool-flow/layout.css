@@ -360,8 +360,9 @@
     height: 48px;
     padding: 0 4px 0 14px;
     overflow: hidden;
-    border: 1.5px solid var(--sand);
-    border-radius: 14px;
+    /* The button it replaces, working: the primary's corners, a berry edge, and the fill rising through it. */
+    border: 1.5px solid var(--brand-tint-border);
+    border-radius: var(--radius-lg);
     background: var(--surface);
     outline: none;
     animation: ip-pill-in var(--motion-micro) var(--ease-out) both;
@@ -372,7 +373,13 @@
   }
   /* One width for the spinner (20), the done tick (22) and a short queue number, so the label never
      moves when the lead changes (no layout shift, AC-632). */
+  .ip-pill__lead,
+  .ip-pill__text,
+  .ip-pill__cancel {
+    z-index: 1;
+  }
   .ip-pill__lead {
+    position: relative;
     display: grid;
     flex: none;
     place-items: center;
@@ -402,6 +409,7 @@
     animation: mp-tick-in var(--motion-quick) var(--ease-pop) both;
   }
   .ip-pill__text {
+    position: relative;
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -429,8 +437,8 @@
     align-items: center;
     height: 40px;
     padding: 0 14px;
-    border-radius: 10px;
-    background: var(--band);
+    border-radius: calc(var(--radius-lg) - 5px);
+    background: transparent;
     color: var(--muted);
     font: 500 15px/1 var(--font-display);
     cursor: pointer;
@@ -449,25 +457,26 @@
     position: relative;
   }
   .ip-pill__cancel:hover {
-    background: var(--mp-pink-hover, var(--sand));
+    background: color-mix(in srgb, var(--brand) 10%, transparent);
+    color: var(--brand-strong);
   }
   .ip-pill__cancel:focus-visible {
     outline: 3px solid var(--ip-focus);
     outline-offset: 1px;
   }
+  /* The fill rises through the whole pill (pale berry, with a 3px berry edge along the bottom), so the
+     button itself shows the progress, not a thin bar under a white box (owner polish, 2026-11-27). */
   .ip-pill__bar {
     position: absolute;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    height: 6px;
+    inset: 0;
     overflow: hidden;
-    background: var(--brand-tint);
+    background: linear-gradient(var(--brand-tint), var(--brand-tint)) bottom / 100% 3px no-repeat;
   }
   .ip-pill__bar > i {
     position: absolute;
     inset: 0;
-    background: var(--brand);
+    background: color-mix(in srgb, var(--brand) 14%, var(--surface));
+    box-shadow: inset 0 -3px 0 var(--brand);
     transform: scaleX(0);
     transform-origin: left center;
     transition: transform var(--motion-quick) var(--ease-out);
