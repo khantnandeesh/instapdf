@@ -1,76 +1,66 @@
-# Feature pipeline
+# Feature pipeline (lean, owner decision 27 Nov 2026)
 
-Read `docs/process/mission.md` first: BerryPDF aims to be the industry standard and to beat the reference on every detail.
-
-The lead orchestrator runs this loop. Exactly one feature is in progress at a time.
+Read `docs/process/mission.md` first. The goal is the best PDF product, not the best paperwork. On 27 Nov the owner chose a leaner process: less ceremony on low-risk work, and more of the effort on product and UI quality. When in doubt, spend the time on the product.
 
 ```
-backlog → 1 Analyze → 2 Research → 3 Design → 4 Build → 5 Test → 6 Review → 7 Stage → 8 Evaluate ─┬─ PASS → 9 Release → next feature
-                                                                                                   └─ FAIL → back to 4 with the gap list (max 3 loops, then re-plan in 1)
+1 Spec (one page + mockup) → 2 Build + tests → 3 Review (by risk) → 4 Stage → 5 Key checks vs Sejda ─┬─ PASS → backlog updated
+                                                                                                     └─ FAIL → fix, re-check only what failed
 ```
 
-| Step | Agent | Input | Output |
-|---|---|---|---|
-| 1 Analyze | `site-analyst` | `docs/discovery/pages/<slug>.md` + live Sejda page | `docs/specs/<feature>.md`: behaviors, options, states, errors, limits, acceptance criteria (numbered `AC-n`) |
-| 2 Research | `competitor-researcher` | spec | "Improvements" section added to the spec, each item marked adopt or skip; Sejda's premium-only features listed and planned free where cost allows; where server vs browser quality differs, side-by-side evidence |
-| 3 Design | `ux-designer` | spec | "UI" section: layout, components, states, a11y notes, mobile |
-| 4 Build | `frontend-engineer` / `backend-engineer` | spec | code on branch `feat/<feature>` |
-| 5 Test | `qa-engineer` | spec + branch | unit + e2e tests covering every `AC-n`; fixture PDFs in `tests/fixtures/` |
-| 6 Review | `code-reviewer`, at the PR's [review tier](#review-tiers-step-6) | PR | approve, or request changes (correctness, security, license, budget) |
-| 6b Visual review | `ux-designer` (not the builder) | PR screenshots | approve, or request changes against the [visual-quality checklist](#visual-quality-review-step-6b); required for any PR that changes UI |
-| 7 Stage | `devops-engineer` | merged `main` | staging deploy URL, smoke test green |
-| 8 Evaluate | `parity-evaluator` (independent, never sees code or builder notes) | spec + Sejda URL + staging URL | `docs/evals/<feature>.md` with PASS/FAIL, a score per AC, the micro-comparison table (M1–M12 win/tie/lose with captures of both sites) and the gap list |
-| 9 Release | `devops-engineer` | PASS verdict | tag `v*`, prod deploy, backlog updated |
+| Step | Who | Output |
+|---|---|---|
+| 1 Spec | `site-analyst` with `ux-designer` | `docs/specs/<feature>.md`, **one page**: what the tool does (behaviours, options, limits, errors), P0 acceptance criteria (`AC-n`), where we beat the reference, and a mockup at 1280 and 390. Competitor research goes in only when it changes a decision. |
+| 2 Build + tests | `frontend-engineer` / `backend-engineer`, `qa-engineer` | Code plus automated tests for every P0 AC and every bug fixed. Tests are cheap and catch real breakage; they stay. |
+| 3 Review | by [risk tier](#review-by-risk) | Approve or must-fix |
+| 4 Stage | merge to `main` deploys staging | Staging URL |
+| 5 Key checks | `parity-evaluator` | The short verdict below, in the feature's PR or a short `docs/evals/<feature>.md` |
 
-### Reference (Sejda) runs: once per feature
+**One PR per feature.** The spec, the code, the tests, the eval note and the backlog line all go in the same PR, or in at most one follow-up. There are no separate docs, backlog or eval PRs.
 
-Step 8 needs the reference side only once per feature. The first evaluation runs the real Sejda tasks (at most 3 per hour, project-wide, booked with the lead) and keeps the evidence:
+### Key checks (step 5)
 
-- **Raw evidence** (Sejda's output files, screenshots, recordings, network logs) goes to `/mnt/project-files/evals-cache/<feature>/`, never into git: rule 1 in `CLAUDE.md` keeps Sejda assets out of the repo.
-- **In git**, `docs/evals/cache/<feature>/manifest.json` holds only our own text: the observations per check, timings, SHA-256 hashes of the outputs and the capture date.
+These replace the full every-AC evaluator run. CI already proves the ACs.
 
-After a fix round (FAIL → 4 → 7 → 8), the re-evaluation re-runs **all of BerryPDF's side** on the new staging build (every AC and every micro-check, M1 to M12, at every size) against the cached Sejda evidence, and uses no Sejda tasks. The cache is good for 30 days. After that, or when the owner flags a Sejda change, or when a check needs reference behaviour the cache doesn't hold (a new AC, a fixture Sejda never saw), the next evaluation refreshes just those checks, with slots booked through the lead, and the eval says which check needed it. The pass bar is unchanged: re-evaluations compare against the same Sejda evidence, so no gate gets weaker. The owner's rule to compare Sejda in the browser when they give feedback still applies; reuse cached captures there when they already show the exact thing.
+- **Sejda side by side:** the same task on both, at 1280 and 390. Speed, output quality and size, and how the screen uses its space (micro-checks M1–M12). No *lose* unless the owner waived it.
+- **Real use:** the tool works end to end on staging with real files. A cloud import counts only with a real pick in the owner's signed-in Chrome.
+- **P0 ACs** pass, Lighthouse performance ≥ 90 on mobile, and axe shows no critical violations.
+- **Sejda runs:** at most 3 tasks per hour, booked with the lead. Raw evidence goes to `/mnt/project-files/evals-cache/<feature>/`, never into git. A re-check after fixes re-runs only what failed, using the cached reference evidence.
 
-Steps 6b and 8 judge what the screen looks like, not only whether each `AC-n` passes: a screen can meet every AC and still waste the space it has (the Merge page preview passed the UX and evaluator gates with a small page in a mostly empty modal, a decorative wave and oversized buttons).
+The verdict is a short table: PASS/FAIL, micro-checks, P0 count, Lighthouse, and the gaps.
 
-Every tool also passes the [SEO checklist](#seo-checklist-part-of-the-definition-of-done-for-every-tool) before step 8.
+## Review by risk
 
-## Conventions
-
-- **Branches:** `feat/<feature>`, `fix/<thing>`, `chore/<thing>`. Never push directly to `main` except for docs from the orchestrator.
-- **Commits:** Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `chore:`, `ci:`).
-- **PR:** one feature per PR. The body lists the `AC-n` items it covers and links the spec.
-- **CI gates (required):** lint, typecheck, unit tests, build, e2e. The required check is `web`. See [CI](#ci-what-runs-where) for what runs where.
-- **Evaluator pass bar:** no micro-check (mission.md M1–M12) is a *lose* unless the owner waived it in writing; every P0 AC passes; at least 90% of all ACs pass; Lighthouse performance ≥ 90 on mobile; no critical a11y violations (axe); and, once the Q2 corpus exists, the tool runs over the real-world PDF corpus with zero crashes and its oracle checks green (`qpdf --check`, render diff, text equality).
-- **Design:** all UI follows the owner's BerryPDF system (`docs/design/berrypdf.md`): grid paper, one berry action on its lip, leaf-cornered tool cards coloured by berry category, Fredoka, Phosphor Duotone icons, berry motifs (floating berries, berry loader, jam progress; no vine), light only (dark mode pending the designer's definition). Owner overrides (2026-11-23): minimal text (only what a task needs; details go to tooltips or screen-reader text), quiet CSS motion (entrances ≤ 400ms, all off under reduced motion), no vine; sections separate by spacing. Deviations from BerryPDF are listed there with measured contrast.
-- **Competitor research:** adopt/skip decisions must not rest on unverified claims.
-
-## Review tiers (step 6)
-
-Owner decision, 25 Nov: review effort follows risk. The builder picks the tier in the PR body (`Review tier: light` or `Review tier: full`), and the reviewer or the lead moves it up whenever in doubt. CI, the visual review (6b) and the owner's screenshot checks apply in both tiers.
+Owner decisions, 25 Nov and 27 Nov.
 
 | Tier | When | Review |
 |---|---|---|
-| **Light** | UI-only changes: layout, styling, copy, icons, motion tuning; docs and process; test-only changes that tighten or fix a test | One `code-reviewer` pass with a short brief: does it do what it says, does it break a rule in `CLAUDE.md` or `docs/design/berrypdf.md`, are tests weakened. A clean pass merges. No second round unless it found a must-fix. |
-| **Full** | Anything touching the editor (`tools/editor/`, `lib/editor/`), the Rust engine (`crates/`), what a tool writes into a PDF or downloads, file parsing, passwords or encryption, the worker, infra, CI workflows, budgets, CSP, licences or a new dependency | The full checklist below, re-reviewed after every fix round until it approves. |
+| **UI** | Layout, styling, copy, icons and motion; docs and process; changes to tests only | **No review round.** Merge on green CI after one screenshot look against `docs/design/berrypdf.md` (below), by the lead or the owner. |
+| **Full** | The editor (`tools/editor/`, `lib/editor/`) and the Rust engine (`crates/`); what a tool writes into a PDF or downloads; file parsing, passwords and encryption; privacy (CSP, what leaves the browser) and security; the worker, infra, CI, budgets, licences or a new dependency | `code-reviewer` with the full checklist, re-reviewed after a must-fix |
 
-A PR that mixes both is **full**. A light PR that grows into full territory switches tier, and the PR body says so.
+A PR that mixes both tiers is **full**. The PR body states `Review tier: ui` or `Review tier: full`.
 
-## Visual-quality review (step 6b)
+## Screenshot look (UI changes)
 
-The builder attaches screenshots to the PR at **1280x720 and 390x844** (device scale factor 2) of every screen and state the PR touches: empty, loaded, each dialog, sheet and preview, result. Someone other than the builder reviews them against `docs/design/berrypdf.md` and ticks this checklist in the PR; any unticked item blocks the merge. The evaluator (step 8) repeats it on staging and records it in `docs/evals/<feature>.md` next to the AC scores.
+Attach **3 key states** (for example empty, loaded and result) at **1280 and 390**. Show more only when the change is about a specific state. Check them against:
+- **Space:** the content gets most of the screen, and a page preview fills at least 85% of its box.
+- **Quiet chrome:** minimal text and no decoration.
+- **Controls:** normal-size controls, an on-theme focus ring, and nothing cut off.
+- **Fit:** no sideways scroll, and the main button visible on the first screen.
+- **Sejda:** at least as clear as Sejda.
 
-- [ ] **Space**: the content (pages, preview, form) gets most of the screen; no large empty areas inside a card, panel or dialog; a page preview fills ≥ 85% of the height (desktop) / ≥ 90% of the width (phone).
-- [ ] **Chrome**: titles, counters and toolbars are small and quiet; nothing above the content but title, counter and close; no file name as a second heading.
-- [ ] **No decoration**: no waves, bands, badges, vines or other ornaments (owner overrides); sections separate by spacing.
-- [ ] **Controls**: buttons are a normal size (≤ 48px tall, as wide as their label in dialogs), icon buttons 34–44px; nothing chunky or full-width on desktop.
-- [ ] **Focus**: on-theme `:focus-visible` ring after Tab; none after a mouse click.
-- [ ] **Contrast and edges**: white pages and cards read against their background (edge or shadow).
-- [ ] **Phone**: controls in reach of the thumb, nothing cut off, no sideways scroll.
-- [ ] **Guidelines**: `web-design-guidelines` (`.claude/skills/`) run on the changed UI files; no open accessibility, focus, animation or touch finding.
-- [ ] **Compared with Sejda** at the same two sizes: ours is at least as clear and uses the space at least as well.
+The automated guards in `e2e/ui/` (fit, scroll rules, modals, thumbnail tiles) catch the rest.
 
-Automated where possible (`e2e/ui/modals.spec.ts`, `viewport-fit.spec.ts`, `scroll-rules.spec.ts`); the screenshot review catches what the guards can't measure.
+## UI polish passes and the owner's digest
+
+- Product time goes to the product. Between features, run regular **UI polish passes** over the existing tools: spacing, motion, empty states, phone ergonomics and copy, each shipped as a UI-tier PR.
+- The lead posts **one daily screenshot digest** to the owner: what changed in the product that day, as before and after images.
+
+## Conventions
+
+- **Branches:** `claude/<thread>` or `feat/<feature>`. **Commits:** Conventional Commits.
+- **CI gates (required):** lint, typecheck, unit tests, build, budgets and the affected e2e tests. The required check is `web`.
+- **Design:** `docs/design/berrypdf.md` (BerryPDF system, owner overrides, rule PT-1 for thumbnails, tool layout standard F25).
+- **Rules that stay:** no secrets in git; permissive licences only; browser first with a strict CSP; copy Sejda's behaviour, never its assets; never skip or weaken a test to get green; production tags (`v*`) need the owner's fresh go.
 
 ## SEO checklist (part of the definition of done for every tool)
 
