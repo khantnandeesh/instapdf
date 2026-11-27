@@ -74,12 +74,13 @@ test.describe("desktop", () => {
     await expect(page.getByTestId("mode-hint")).toHaveCount(0);
   });
 
-  test("the selection popover leaves the rotate handle free, and tool options stay in the top bar", async ({ page }) => {
+  test("the selection's properties leave the rotate handle free, and tool options stay in the properties panel", async ({ page }) => {
     await open(page);
     await drawRect(page);
-    await expect(page.locator(".ed-top__slot")).not.toBeEmpty();
+    // F25 E1: tool options and the selection's controls moved to the properties panel.
+    await expect(page.getByTestId("editor-props")).not.toBeEmpty();
     const rot = (await page.locator('.ed-rotate').boundingBox())!;
-    const pop = page.locator("[data-popover].ed-popover");
+    const pop = page.getByTestId("editor-props");
     await expect(pop).toBeVisible();
     const b = (await pop.boundingBox())!;
     const overlap = !(b.x + b.width <= rot.x - 9 || rot.x + rot.width + 9 <= b.x || b.y + b.height <= rot.y - 9 || rot.y + rot.height + 9 <= b.y);

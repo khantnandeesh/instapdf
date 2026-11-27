@@ -222,7 +222,7 @@ test("AC-15, AC-79: remove a card, undo it, and removing the last card empties t
   expect(doc.getPages().map((p) => p.getRotation().angle)).toEqual([0, 0, 0, 90, 90, 0]);
   expect((await textsOf(out.bytes)).map(firstWord)).toEqual(["Alpha 1", "Alpha 2", "Alpha 3", "Bravo 1", "Bravo 2", "Echo 1"]);
 
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   for (const n of ["alpha.pdf", "bravo.pdf", "echo.pdf"]) await cardAction(page, n, "Remove");
   await expect(flow(page)).toHaveAttribute("data-state", "empty");
   await page.keyboard.press("Control+z");

@@ -238,8 +238,8 @@ test("AC-60 AC-26 AC-69: colours have a palette, hex, no-colour fill and recents
   const p = await at(page, 1, 0.5, 0.35);
   await page.mouse.click(p.x, p.y);
   await expect(page.locator('[data-kind="shape"]')).toHaveCount(1);
-  // The selection's own Fill (the top bar keeps the Shapes tool's defaults, with their own Fill).
-  const fill = page.locator(".ed-popover, [data-testid=context-strip]").getByRole("button", { name: /^Fill/ }).first();
+  // The selection's own Fill (with a selection the panel and the strip show its controls, not the tool's defaults).
+  const fill = page.locator("[data-testid=editor-props], [data-testid=context-strip]").getByRole("button", { name: /^Fill/ }).first();
   await fill.click();
   const pop = page.locator("[data-popover]:popover-open");
   await expect(pop.getByRole("radio", { name: "No colour" })).toBeVisible();

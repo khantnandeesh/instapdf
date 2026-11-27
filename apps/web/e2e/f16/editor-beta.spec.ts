@@ -60,7 +60,7 @@ test("landing: noindex, Beta badge, no engine before a file with Data Saver on, 
   await expect(page.getByRole("heading", { level: 1, name: "Edit PDF" })).toBeVisible();
   await expect(page.getByText("Beta", { exact: true })).toBeVisible();
   expect(await page.locator('meta[name="robots"]').getAttribute("content")).toContain("noindex");
-  await expect(page.getByRole("button", { name: "Open PDF" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "Choose PDF" })).toBeInViewport();
   await page.waitForLoadState("networkidle");
   expect(requests.filter((p) => p.startsWith("/engine/"))).toEqual([]);
   await expectNoSeriousAxeViolations(page, "editor landing");

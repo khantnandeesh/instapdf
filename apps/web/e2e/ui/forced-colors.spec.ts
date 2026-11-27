@@ -47,6 +47,8 @@ const border = (el: Locator) =>
 
 test("forced colors: the selected segment has a Highlight border (not told apart by weight alone) and shadow-edged controls get a real border", async ({ page }) => {
   await openRotate(page);
+  // F25 AC-600: the options exist once a file is in (the empty state is the picker card alone).
+  await pickReady(page, "three-pages.pdf");
   const checked = scope(page, "All");
   const unchecked = scope(page, "Odd");
   await expect(checked).toHaveAttribute("aria-checked", "true");

@@ -108,7 +108,6 @@ export function OrganizeTool() {
       <ToolFlow
         tool={tool}
         {...ws.flowProps}
-        emptyLayout="bar"
         process={ws.runList(
           () => pagesRef.current,
           () => ORGANIZE_OPTIONS,

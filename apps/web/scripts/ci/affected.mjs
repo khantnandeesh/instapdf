@@ -87,7 +87,7 @@ export const OUTSIDE = { "crates/": ["f16", "f24"] };
 export const ALWAYS = ["ui", "seo", "q1", "smoke.spec.ts"];
 
 /** The specs the cloud rows run (the build with cloud sources on, ci.yml). */
-export const CLOUD_SPECS = ["e2e/f23/", "e2e/q1/csp.spec.ts", "e2e/f1/", "e2e/f3/", "e2e/ui/", "e2e/seo/"];
+export const CLOUD_SPECS = ["e2e/f23/", "e2e/q1/csp.spec.ts", "e2e/f1/", "e2e/f3/", "e2e/f5/", "e2e/ui/", "e2e/seo/"];
 
 const EXT = [".ts", ".tsx", ".mjs", ".js", ".json", ".css"];
 const IMPORT_RE = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*|\bnew URL\(\s*)["'`]([^"'`$\n]+)["'`]/g;

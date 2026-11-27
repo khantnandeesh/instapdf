@@ -4,11 +4,16 @@ import type { Permission, ToolFlowConfig } from "@/tools/registry";
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
 export const copy = {
-  pickerButton: (multi: boolean) => (multi ? "Choose PDF files" : "Choose PDF file"),
+  /** F25 §2: the picker names what it takes; its label never changes while a file opens. */
+  pickerButton: (multi: boolean) => (multi ? "Choose files" : "Choose PDF"),
   pickerHint: "or drop them here",
+  pickerHintOne: "or drop a PDF here",
   privacyIntro: "Your files stay on this device.",
   privacyResult: "Done on this device. Never uploaded.",
-  limits: (f: ToolFlowConfig) => `${f.multiFile ? `Up to ${plural(f.maxFiles, "file")}` : "1 file"}, ${Math.round(f.maxFileBytes / 1024 / 1024)} MB each`,
+  /** Server tools (F25 AC-603): honest about the upload (CLAUDE.md rule 4). */
+  privacyIntroServer: "Uploaded securely, deleted after 2 hours.",
+  privacyResultServer: "Deleted from our server in 2 hours.",
+  limits: (f: ToolFlowConfig) => `PDF. ${f.multiFile ? `Up to ${plural(f.maxFiles, "file")}` : "1 file"}, ${Math.round(f.maxFileBytes / 1024 / 1024)} MB each.`,
   limitsFull: (f: ToolFlowConfig) =>
     `PDF only · up to ${f.multiFile ? plural(f.maxFiles, "file") : "1 file"}, ${Math.round(f.maxFileBytes / 1024 / 1024)} MB each, ${Math.round(f.maxTotalBytes / 1024 / 1024)} MB and ${f.maxTotalPages.toLocaleString("en-US")} pages in total`,
   statusEmpty: "Add a PDF to start",
@@ -47,6 +52,13 @@ export const copy = {
   errorImage: (name: string) => `${name} couldn't be read as an image.`,
   errorPixels: (name: string) => `${name} is larger than 50 megapixels, the limit for images.`,
   preparingFonts: "Preparing fonts…",
+  /** F25 §6: what the flow says when a run is cancelled or done (the pill's own words: slot-copy.ts). */
+  cancelled: "Cancelled",
+  cancelledBrowser: "Cancelled. Your file is unchanged.",
+  cancelledServer: "Cancelled. Your upload was deleted.",
+  cancelledServerLater: "Cancelled. Your upload will be deleted within 2 hours.",
+  done: "Done",
+  startOver: "Start over",
 };
 
 export const permissionLabels: Record<Permission, string> = {

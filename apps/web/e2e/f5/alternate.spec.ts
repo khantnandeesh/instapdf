@@ -69,7 +69,7 @@ test("AC-525, AC-526: a one-page file repeats between turns (on by default); off
   await expect(repeat(page, "twelve.pdf")).toHaveCount(0);
   await setPerTurn(page, "twelve.pdf", "4");
   expect((await runWords(page)).words).toEqual([...range("Twelve", 1, 4), "Separator", ...range("Twelve", 5, 8), "Separator", ...range("Twelve", 9, 12)]);
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await repeat(page, "separator.pdf").uncheck();
   expect((await runWords(page)).words).toEqual([...range("Twelve", 1, 4), "Separator", ...range("Twelve", 5, 12)]);
 });
@@ -225,8 +225,11 @@ test("AC-481: owner-restricted + short give 5 pages that open without a password
   expect(doc.getPageCount()).toBe(5);
 });
 
-test("P-3: empty state is the drop card and the bar, no side panel; no options after files either", async ({ page }) => {
-  await expect(page.locator("[data-ip-dock]")).toHaveAttribute("data-ip-dock", "bar");
+test("P-3: empty state is the drop card only, no side panel; no options after files either", async ({ page }) => {
+  // F25 AC-600: the empty state is the picker card alone (no dock); the bar arrives with the files.
+  await expect(page.getByTestId("drop-card")).toHaveCount(1);
+  await expect(page.locator("[data-ip-dock]")).toHaveCount(0);
+  await expect(page.locator("[data-ip-options=side]")).toHaveCount(0);
   await pickF5(page, "odd.pdf", "even.pdf");
   await expect(page.getByTestId("options-button")).toHaveCount(0);
   await expect(page.getByTestId("history")).toHaveCount(0);

@@ -20,7 +20,7 @@ import { HistoryBold, ListBold, MoreBold, PagesBold } from "./icons";
 import { release, renderPage, swapCanvas } from "./render";
 import { shallowArray, useStore } from "./store";
 
-const THUMB_W = 112;
+const THUMB_W = 100;
 
 export function SidePanel({ onGo, onPicked, sheet }: { onGo: (i: number) => void; onPicked?: () => void; sheet?: boolean }) {
   const ctl = useCtl();

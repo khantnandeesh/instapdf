@@ -12,6 +12,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { isUsable, tools } from "../../src/tools/registry";
 import { cloudOn, fx } from "../support/flow";
+import { FIXTURES_OFF, fixturesServed } from "../support/fixtures";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
 const comingSoon = tools.find((t) => !isUsable(t));
@@ -116,7 +117,7 @@ for (const [project, sizes] of [
         await expectClean(page, "tools menu open");
       });
 
-      test("/edit-pdf with a file open: the canvas (pages) and the rail scroll side by side; the phone sheet is an overlay", async ({ page }) => {
+      test("/edit-pdf with a file open: the canvas (pages) and the strip scroll side by side; the phone sheet is an overlay", async ({ page }) => {
         await page.goto("/edit-pdf");
         await page.getByTestId("editor-input").setInputFiles(fx("sixty-pages.pdf"));
         await expect(page.getByTestId("page-1")).toHaveAttribute("data-drawn", "true", { timeout: 15_000 });
@@ -130,7 +131,16 @@ for (const [project, sizes] of [
           await chip.click();
           await expect(page.getByRole("tab", { name: "Pages" })).toBeVisible();
           await expectClean(page, "pages sheet open");
-        } else await expect(chip).toHaveCount(0);
+        } else {
+          await expect(chip).toHaveCount(0);
+          // F25 E1: the page strip is always there from 1024 px, and a tool with options opens the
+          // properties panel over the canvas: neither adds a scroller in the page.
+          await expect(page.getByTestId("editor-strip")).toBeVisible();
+          await page.getByTestId("canvas").focus();
+          await page.keyboard.press("t");
+          await expect(page.getByTestId("editor-props")).toBeVisible();
+          await expectClean(page, "editor with the properties panel");
+        }
       });
 
       for (const tool of usable) {
@@ -189,10 +199,33 @@ for (const [project, sizes] of [
           if (await optionsButton.isVisible()) {
             await optionsButton.click();
             await expect(page.getByRole("dialog")).toBeVisible();
-            await expectClean(page, "options sheet open");
+            // From 1024 px the More options popover (F25 §3.3): its body is the only scroller in it.
+            await expectClean(page, width >= 1024 ? "More options popover open" : "options sheet open");
+            await page.keyboard.press("Escape");
+            await expect(page.getByRole("dialog")).toBeHidden();
+          }
+          // Page tools' own More options (Split, Extract, Delete): a popover from 1024 px, a sheet below.
+          const more = page.getByTestId("more-options");
+          if ((await more.count()) && (await more.first().isVisible())) {
+            await more.first().click();
+            await expect(page.getByTestId("more-options-dialog")).toBeVisible();
+            await expectClean(page, "page tool More options open");
           }
         });
       }
+
+      test("the settings fixture (F25 §4): the side panel and a tall one scroll with the page, never inside", async ({ page }) => {
+        test.skip(!fixturesServed, FIXTURES_OFF);
+        for (const q of ["", "?tall=1"]) {
+          await page.goto(`/test-fixtures/settings-tool${q}`);
+          await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
+          await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
+          await expect(page.getByTestId("tool-flow")).toHaveAttribute("data-state", "ready");
+          await expectClean(page, `settings fixture${q} loaded`);
+          await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+          await expectClean(page, `settings fixture${q} scrolled`);
+        }
+      });
     });
   }
 }

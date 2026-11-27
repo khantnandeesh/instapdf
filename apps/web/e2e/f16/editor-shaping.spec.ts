@@ -199,7 +199,14 @@ for (const how of ["Esc", "a newer edit of the line"] as const) {
 async function addTextAt(page: Page, text: string, fx: number, fy: number) {
   await page.getByTestId("canvas").focus();
   await page.keyboard.press("t");
-  const b = (await page.getByTestId("page-1").boundingBox())!;
+  let b = (await page.getByTestId("page-1").boundingBox())!;
+  // F25 E1: the site header stays above the editor, so a low point may start below the fold: bring it up.
+  const vh = page.viewportSize()!.height;
+  if (b.y + b.height * fy > vh - 80) {
+    await page.getByTestId("canvas").evaluate((c, d) => c.scrollBy(0, d), b.y + b.height * fy - vh / 2);
+    await expect.poll(async () => (await page.getByTestId("page-1").boundingBox())!.y).toBeLessThan(b.y);
+    b = (await page.getByTestId("page-1").boundingBox())!;
+  }
   await page.mouse.click(b.x + b.width * fx, b.y + b.height * fy);
   await expect(page.getByTestId("text-input")).toBeFocused();
   await page.keyboard.insertText(text);

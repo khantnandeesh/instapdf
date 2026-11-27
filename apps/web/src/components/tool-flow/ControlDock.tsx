@@ -2,92 +2,77 @@
 import "../ui/dialog.css";
 import "./tool-flow.css";
 import dynamic from "next/dynamic";
-import { forwardRef, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "../ui/Button";
-import { Notice } from "../ui/Notice";
-import { ProgressBar } from "../ui/ProgressBar";
-import { copy } from "./copy";
+import { ActionSlot } from "./ActionSlot";
 
-// The options sheet opens only on a tap: its dialog is a lazy chunk (ToolFlow prefetches it on intent).
+// The options sheet (below 1024px) and the More options popover (from 1024px) open only on a tap: lazy
+// chunks (ToolFlow prefetches them on intent).
 const Dialog = dynamic(() => import("../ui/Dialog").then((m) => m.Dialog), { ssr: false });
+const Popover = dynamic(() => import("../ui/Popover").then((m) => m.Popover), { ssr: false });
 
 /**
- * Options and the primary action. The primary action never leaves the viewport.
+ * Options and the action slot (F25 §3). One element, two places:
  *
- * - `layout="side"` (the empty state): from 1024 px an app Panel at least --ip-work-h tall that
- *   grows with its options. It never scrolls inside itself (one scroller per screen: the page). When
- *   the options run past the fold, status + primary stick to the bottom of the screen (position:
- *   sticky) and the page scrolls to the rest; when they fit, they sit at the panel's bottom.
- * - `layout="bar"` (a file is loaded): one compact row fixed to the bottom, options on the left and
- *   status + primary on the right, so the pages get the rest of the screen (like the phone dock).
+ * - `layout="row"` (from 1024px, a file is in): the right part of the sticky top row, after the h1:
+ *   the tool's compact one-row options after a 1px divider, More options, Undo│Redo, then the action
+ *   slot (status + primary, the pill, the error, Download) right-aligned in a box that never resizes.
+ * - `layout="bar"` (below 1024px): today's strawberry-cream dock fixed to the bottom (F4/F5 P-3 rows).
+ *   While fixed, its measured height goes to --ip-dock-actual so the pages and the footer stay clear.
+ * - `layout="side"`: a settings tool's row (§4): the options live in the side panel, so the row holds
+ *   only the slot.
  *
- * Below 1024 px it is always the bottom bar. Options style themselves with the `dock-side:` /
- * `dock-bar:` variants (globals.css), which read data-ip-dock. While fixed, its measured height is
- * written to --ip-dock-actual on the document so the pages area and the footer stay clear of it.
+ * Options style themselves with the `dock-side:` / `dock-bar:` variants (globals.css): `dock-bar:` covers
+ * both the row and the bar, so every compact form renders unchanged in both.
  */
-/** True at >= 1024 px; null before the first client render (SSR shows the CSS fallback). */
-function useDesktop(): boolean | null {
-  const [desktop, setDesktop] = useState<boolean | null>(null);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const on = () => setDesktop(mq.matches);
-    on();
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-  return desktop;
-}
-
 export function ControlDock({
   label,
-  layout = "side",
+  layout,
   optionsDisabled,
   options,
-  status,
-  footer,
+  slot,
   density = "compact",
   sheet,
   start,
   more,
+  add,
+  dimmed,
+  bare,
 }: {
   label: string;
-  layout?: "side" | "bar";
+  layout: "row" | "bar" | "side";
   optionsDisabled: boolean;
   options: ReactNode;
-  status: ReactNode;
-  footer: ReactNode;
+  /** What the action slot holds now (status + primary, the pill, the error or Download). */
+  slot: ReactNode;
   /**
-   * "full" (spec F1 U-4, F3 M-5): many options. Inline only in the side panel from 1024 px;
-   * in the bottom bar (and always below 1024 px) a compact Options button with its badge opens
-   * them in a bottom sheet, beside the status and primary.
+   * "full" (spec F1 U-4, F3 M-5): many options. A More options trigger opens them: a popover in the row,
+   * the bottom sheet in the bar (where its label stays "Options", with its badge).
    */
   density?: "compact" | "full";
   sheet?: { title: string; badge?: string; footer: (close: () => void) => ReactNode };
-  /**
-   * Bar layout: controls after the options and before the status (F5 Undo│Redo, spec F4/F5 P-3).
-   * Below 640 px they share the options row, or the primary's row when there are no options.
-   */
+  /** Controls after the options and before the slot (F5 Undo│Redo, spec F4/F5 P-3). */
   start?: ReactNode;
-  /**
-   * Page tools (spec F4/F5 UI P-3): the More options trigger. It follows the options (in the side
-   * panel under them; in the bar between them and the status). Below 640 px the options take the
-   * first row and the trigger sits beside the primary in the second.
-   */
+  /** Page tools (spec F4/F5 UI P-3): their own More options trigger, after the options. */
   more?: ReactNode;
+  /** The bar only: a one-file tool's picker, moved out of its tools row on phones (screen fit, eval G-9). */
+  add?: ReactNode;
+  /** Working (spec §6): the options dim to 0.45 and go inert. */
+  dimmed?: boolean;
+  /** The result (spec §7): the row shows no options, only the slot. */
+  bare?: boolean;
 }) {
-  const desktop = useDesktop();
   const [sheetOpen, setSheetOpen] = useState(false);
   const optionsButton = useRef<HTMLButtonElement>(null);
   const full = density === "full";
-  const side = layout === "side";
-  // "full" density: inline options only in the side panel from 1024 px (the SSR render keeps them,
-  // hidden below lg by CSS); everywhere else an Options button opens the same options in a sheet.
-  const inline = options != null && options !== false && (!full || (side && desktop !== false));
-  const sheetMode = full && (!side || desktop !== true);
+  const bar = layout === "bar";
+  const hasOptions = !bare && layout !== "side" && options != null && options !== false;
+  const inline = hasOptions && !full;
+  const sheetMode = hasOptions && full;
   const noOptions = !inline && !sheetMode;
-  useEffect(() => {
-    if (side && desktop) setSheetOpen(false);
-  }, [desktop, side]);
+  const showStart = !bare && !!start;
+  const showMore = !bare && (!!more || !!add);
+  useEffect(() => setSheetOpen(false), [layout]);
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     const el = ref.current;
@@ -106,170 +91,160 @@ export function ControlDock({
       root.style.removeProperty("--ip-dock-actual");
     };
   }, [layout]);
+  const dim = dimmed ? { "data-dim": "", inert: true } : {};
+  const optionsTrigger = sheetMode && (
+    <Button
+      ref={optionsButton}
+      variant={bar ? "secondary" : "soft"}
+      // Beside Undo│Redo on a phone (390-639 px) the trigger is a 44 px icon, so options, Undo│Redo and the
+      // primary share one row and the pages get the height (screen fit, eval G-9).
+      className={bar ? (start ? "relative min-w-0 flex-1 min-[390px]:max-sm:w-11 min-[390px]:max-sm:flex-none min-[390px]:max-sm:px-0" : "sm:flex-1") : "ip-more-trigger ip-dimmable h-11 shrink-0"}
+      aria-haspopup="dialog"
+      aria-expanded={sheetOpen}
+      aria-label={`${bar ? "Options" : "More options"}${sheet?.badge ? `, ${sheet.badge}` : ""}`}
+      onClick={() => setSheetOpen((o) => !o)}
+      data-testid="options-button"
+      {...dim}
+      iconStart={
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+          <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+          <circle cx="16" cy="7" r="2" fill="currentColor" fillOpacity={0.2} />
+          <circle cx="10" cy="17" r="2" fill="currentColor" fillOpacity={0.2} />
+        </svg>
+      }
+    >
+      {/* 1024-1279: icon only, its name in the tooltip (spec §3.1). */}
+      <span className={bar ? (start ? "min-[390px]:max-sm:sr-only" : undefined) : "max-xl:sr-only"}>{bar ? "Options" : "More options"}</span>
+      {bar ? (
+        <span className={`inline-flex min-w-[84px] justify-start${start ? " min-[390px]:max-sm:hidden" : ""}`} aria-hidden="true">
+          {sheet?.badge && <span className="mp-tag mp-tag--sm">{sheet.badge}</span>}
+        </span>
+      ) : null}
+      {/* Icon only: a dot says some options changed (the count is in the button's name). */}
+      {bar && start && sheet?.badge && <span aria-hidden="true" className="absolute top-1.5 right-1.5 hidden size-2.5 rounded-full bg-brand ring-2 ring-surface min-[390px]:max-sm:block" />}
+      {!bar && sheet?.badge && (
+        <span className="mp-tag mp-tag--sm max-xl:hidden" aria-hidden="true">
+          {sheet.badge}
+        </span>
+      )}
+    </Button>
+  );
+  const fieldset = (cls: string) => (
+    <fieldset disabled={optionsDisabled} className={cls} data-testid="dock-options" {...dim}>
+      <legend className="sr-only">{label}</legend>
+      {/* No visible title (minimal text); kept for heading navigation. */}
+      <h2 className="sr-only">Options</h2>
+      {options}
+    </fieldset>
+  );
+  const sheetBody = (testId: string) => (
+    <fieldset disabled={optionsDisabled} className="min-w-0" data-testid={testId}>
+      <legend className="sr-only">{label}</legend>
+      {options}
+    </fieldset>
+  );
+
+  if (!bar)
+    return (
+      <aside ref={ref} data-ip-dock="row" role="region" aria-label={label} className="ip-dock-row">
+        {inline && fieldset("ip-dock-row__options ip-dimmable")}
+        {sheetMode && (
+          <span className="relative ip-dock-row__options">
+            {optionsTrigger}
+            {sheet && (
+              <Popover
+                open={sheetOpen}
+                onClose={() => setSheetOpen(false)}
+                trigger={optionsButton}
+                label={sheet.title}
+                testId="options-popover"
+                footer={sheet.footer(() => {
+                  setSheetOpen(false);
+                  optionsButton.current?.focus();
+                })}
+              >
+                {sheetBody("options-sheet-body")}
+              </Popover>
+            )}
+          </span>
+        )}
+        {showMore && (
+          <div className="ip-dimmable flex shrink-0 items-center" data-testid="dock-more" {...dim}>
+            {more}
+          </div>
+        )}
+        {showStart && (
+          <div className="ip-dimmable flex shrink-0 items-center" data-testid="dock-start" {...dim}>
+            {start}
+          </div>
+        )}
+        <ActionSlot>{slot}</ActionSlot>
+      </aside>
+    );
+
   return (
     <aside
       ref={ref}
-      data-ip-dock={layout}
+      data-ip-dock="bar"
       role="region"
       aria-label={label}
-      // Bar: BerryPDF's strawberry-cream action tab fixed to the bottom (EditorToolbar).
-      // Side (>= 1024 px): an app Panel (white, sand outline, 20px radius, soft pink shadow) that grows with its options.
-      className={[
-        "fixed inset-x-0 bottom-0 z-20 rounded-t-[18px] bg-sand shadow-menu",
-        "px-[15px] pt-3 pb-[calc(14px+env(safe-area-inset-bottom))]",
-        side
-          ? "lg:static lg:z-auto lg:flex lg:min-h-(--ip-work-h) lg:flex-col lg:rounded-panel lg:border-[1.5px] lg:border-panel-border lg:bg-surface-raised lg:p-6 lg:shadow-card"
-          : "mp-dock-bar lg:px-8 lg:pt-3 lg:pb-[calc(12px+env(safe-area-inset-bottom))]",
-      ].join(" ")}
+      // BerryPDF's strawberry-cream action tab fixed to the bottom (EditorToolbar).
+      className="fixed inset-x-0 bottom-0 z-20 rounded-t-[18px] bg-sand px-[15px] pt-3 pb-[calc(14px+env(safe-area-inset-bottom))] shadow-menu"
     >
       <div
         className={[
           "flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4",
-          more || start ? "max-sm:flex-row max-sm:flex-wrap max-sm:items-center" : "",
-          more ? "max-sm:[&>[data-testid=dock-options]]:basis-full" : "",
-          side ? "lg:flex-1 lg:flex-col lg:items-stretch" : "lg:mx-auto lg:max-w-[1216px] lg:gap-8",
+          showMore || showStart ? "max-sm:flex-row max-sm:flex-wrap max-sm:items-center" : "",
+          showMore ? "max-sm:[&>[data-testid=dock-options]]:basis-full" : "",
         ].join(" ")}
       >
-        {inline &&
-          (full ? (
-            // Side panel only (hidden below lg). Full height, no inner scroller (design rule "One scroller").
-            <fieldset disabled={optionsDisabled} className="min-w-0 max-lg:hidden" data-testid="dock-options">
-              <legend className="sr-only">{label}</legend>
-              <h2 className="sr-only">Options</h2>
-              {options}
-            </fieldset>
-          ) : (
-            <fieldset
-              disabled={optionsDisabled}
-              // Side panel: the options keep their height, so More options sits right under the steps and the
-              // status + primary rest at the panel's bottom (visual gate round 2).
-              className={[start ? "min-w-0 flex-1" : "min-w-0 sm:flex-1", side ? "lg:flex-none" : ""].join(" ")}
-              data-testid="dock-options"
-            >
-              <legend className="sr-only">{label}</legend>
-              {/* No visible title (minimal text); kept for heading navigation. */}
-              <h2 className="sr-only">Options</h2>
-              {options}
-            </fieldset>
-          ))}
-        {sheetMode && (
-          <Button
-            ref={optionsButton}
-            variant="secondary"
-            className={side ? "sm:flex-1 lg:hidden" : start ? "min-w-0 flex-1 lg:flex-none" : "sm:flex-1 lg:flex-none"}
-            aria-haspopup="dialog"
-            aria-expanded={sheetOpen}
-            aria-label={sheet?.badge ? `Options, ${sheet.badge}` : "Options"}
-            onClick={() => setSheetOpen(true)}
-            data-testid="options-button"
-            iconStart={
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-                <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
-                <circle cx="16" cy="7" r="2" fill="currentColor" fillOpacity={0.2} />
-                <circle cx="10" cy="17" r="2" fill="currentColor" fillOpacity={0.2} />
-              </svg>
-            }
-          >
-            Options
-            <span className="inline-flex min-w-[84px] justify-start" aria-hidden="true">
-              {sheet?.badge && <span className="mp-tag mp-tag--sm">{sheet.badge}</span>}
-            </span>
-          </Button>
-        )}
-        {start && (
-          <div className="flex shrink-0 items-center" data-testid="dock-start">
+        {inline && fieldset(["min-w-0 ip-dimmable", showStart ? "flex-1" : "sm:flex-1"].join(" "))}
+        {optionsTrigger}
+        {showStart && (
+          <div className="ip-dimmable flex shrink-0 items-center" data-testid="dock-start" {...dim}>
             {start}
           </div>
         )}
-        {more && (
-          <div className={["flex shrink-0 items-center", side ? "lg:self-start" : ""].join(" ")} data-testid="dock-more">
+        {showMore && (
+          <div className="ip-dimmable flex shrink-0 items-center gap-2" data-testid="dock-more" {...dim}>
             {more}
+            {add}
           </div>
         )}
-        {full && !side && <span aria-hidden="true" className="hidden lg:block lg:flex-1" />}
         <div
           className={[
             "flex shrink-0 flex-col gap-2 sm:min-w-[200px]",
-            // Below 640 px: beside More options or a lone Undo│Redo; under the options row when Undo│Redo shares it.
-            more || (start && noOptions) ? "max-sm:min-w-0 max-sm:flex-1" : start ? "max-sm:basis-full" : "",
-            !side && noOptions ? "sm:ms-auto" : "",
-            side
-              ? // Side panel: pinned to the bottom of the screen while the options run past the fold (sticky, so
-                // the page stays the only scroller), resting at the panel's bottom once they end. It covers the
-                // panel's padding so options pass under it; a soft fade above it says there is more.
-                "lg:sticky lg:bottom-0 lg:z-20 lg:-mx-6 lg:mt-auto lg:-mb-6 lg:min-w-0 lg:rounded-b-panel lg:bg-surface-raised lg:px-6 lg:pt-2 lg:pb-6 lg:before:pointer-events-none lg:before:absolute lg:before:inset-x-0 lg:before:-top-4 lg:before:h-4 lg:before:bg-linear-to-b lg:before:from-transparent lg:before:to-surface-raised"
-              : // Bar: the status gives way first (it wraps to two lines), so a long one ("60 pages · 1 file · add
-                // more to merge") never pushes the primary off a 1024 px screen.
-                "ip-bar-footer lg:flex-row lg:items-center lg:gap-5 lg:[&>*:last-child]:w-[260px] lg:[&>*:last-child]:shrink-0",
+            // Below 640 px: beside More options or a lone Undo│Redo; under the options row when Undo│Redo shares it,
+            // except from 390 px beside the icon-only options trigger and Undo│Redo. There the slot takes the rest of
+            // the row from a zero basis, so the wider progress pill never wraps it to a new row (AC-632), and the
+            // pill tightens to fit (layout.css, .ip-slot--beside).
+            showMore || (showStart && noOptions)
+              ? "max-sm:min-w-0 max-sm:flex-1"
+              : showStart
+                ? sheetMode
+                  ? "ip-slot--beside max-sm:basis-full min-[390px]:max-sm:min-w-0 min-[390px]:max-sm:basis-0 min-[390px]:max-sm:flex-1"
+                  : "max-sm:basis-full"
+                : "",
+            noOptions ? "sm:ms-auto" : "",
           ].join(" ")}
           data-testid="dock-footer"
         >
-          {/* On the sand bar the status reads in ink (muted on sand is under 4.5:1), beside the primary. */}
-          <div className={["max-lg:sr-only", side ? "" : "ip-bar-status min-w-0 text-end [&_p]:text-ink"].join(" ")}>{status}</div>
-          {footer}
+          <ActionSlot>{slot}</ActionSlot>
         </div>
       </div>
       {sheetMode && sheet && (
         <Dialog
           open={sheetOpen}
           variant="sheet"
-          // From 1024 px (bar layout) the sheet is a centred column rising from the bottom, not a full-width band.
-          className="lg:mx-auto lg:w-[min(720px,calc(100vw-32px))]"
           title={sheet.title}
           onClose={() => setSheetOpen(false)}
           onCloseButton={() => setSheetOpen(false)}
           returnFocusRef={optionsButton}
           footer={sheet.footer(() => setSheetOpen(false))}
         >
-          <fieldset disabled={optionsDisabled} className="min-w-0" data-testid="options-sheet">
-            <legend className="sr-only">{label}</legend>
-            {options}
-          </fieldset>
+          {sheetBody("options-sheet")}
         </Dialog>
       )}
     </aside>
   );
 }
-
-export function DockStatus({ id, text, extra }: { id: string; text: string; extra?: string }) {
-  return (
-    <p id={id} className="truncate text-sm text-muted tabular-nums" data-testid="dock-status">
-      {text}
-      {extra ? ` · ${extra}` : ""}
-    </p>
-  );
-}
-
-/**
- * Same box as the primary button, so swapping them moves nothing: the "Merging… 42%" line over
- * BerryPDF's JamProgress (the progressbar). `phaseLabel` (e.g. "Preparing fonts…") replaces the
- * percentage with the indeterminate jam.
- */
-export const ProcessingBar = forwardRef<HTMLDivElement, { label: string; value: number; phaseLabel?: string }>(function ProcessingBar({ label, value, phaseLabel }, ref) {
-  const pct = Math.round(value * 100);
-  return (
-    <div ref={ref} tabIndex={-1} className="flex h-[56px] w-full flex-col justify-center gap-1.5 rounded-lg outline-none" data-testid="processing">
-      <span className="font-display text-[17px] leading-5 font-semibold text-ink tabular-nums">{phaseLabel ?? copy.progress(label, pct)}</span>
-      {phaseLabel ? <ProgressBar label={phaseLabel} /> : <ProgressBar label={label} value={pct} valueText={`${pct}%`} />}
-    </div>
-  );
-});
-
-export const ProcessError = forwardRef<HTMLButtonElement, { message: string; onRetry: () => void; onStartOver: () => void }>(function ProcessError(
-  { message, onRetry, onStartOver },
-  ref,
-) {
-  return (
-    <div className="flex flex-col gap-2" data-testid="process-error">
-      <Notice tone="danger">{message}</Notice>
-      <div className="flex gap-2">
-        <Button ref={ref} variant="primary" size="lg" className="flex-1" onClick={onRetry}>
-          Try again
-        </Button>
-        <Button variant="ghost" size="lg" className="flex-1" onClick={onStartOver}>
-          Start over
-        </Button>
-      </div>
-    </div>
-  );
-});

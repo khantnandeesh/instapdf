@@ -111,6 +111,9 @@ export type EditorState = {
    */
   fontNotice: { original: string; /** False when the PDF only names the font (nothing of it is in the file). */ embedded?: boolean; standIn: string; standInId: string; /** Every font that stood in (two may share the letters). */ standInIds?: string[]; fontName: string; src: number; line: number; text: string; key: number } | null;
   busy: "edit" | "save" | null;
+  /** The last download, for the small card under Download (F25 §7, AC-650); cleared by ×, Escape or the next edit. */
+  downloaded: { name: string; size: number; noPassword: boolean; empty: number; blob: Blob; at: number } | null;
+  /** True from 1024 px: the page strip is always shown there (F25 AC-626). */
   panel: boolean;
   panelTab: "pages" | "objects" | "history" | "fields";
   /** Layout width class: rail and side panel (≥1024) or dock (<1024). */

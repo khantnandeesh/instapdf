@@ -1,8 +1,8 @@
 "use client";
 /**
- * Tool options and object properties (U-E4): the same controls in three places, the top bar's
- * centre slot (tool defaults, ≥ 1024), the properties popover next to a selection (≥ 1024) and
- * the context strip above the dock (< 1024, at most 6 controls, the rest in ⋯).
+ * Tool options and object properties (U-E4): the same controls in two places, the floating
+ * properties panel (F25 §5, ≥ 1024: the selection's controls, else the tool's defaults) and the
+ * context strip above the dock (< 1024, at most 6 controls, the rest in ⋯).
  *
  * A property change on a selection applies live, is one undo step, and becomes that tool's
  * default for the next object (AC-96).
@@ -17,7 +17,7 @@ import { layoutText, textBoxSize } from "@/lib/editor/text-layout";
 import { measurer } from "@/lib/editor/fonts-browser";
 import { FontMenuBody, useFontState } from "./FontMenu";
 import { fontLabel } from "./font-service";
-import { canRotate, kindName, type EditorObject, type MarkupKind, type TextObj } from "@/lib/editor/model";
+import { kindName, type EditorObject, type MarkupKind, type TextObj } from "@/lib/editor/model";
 import { useCtl } from "./context";
 import {
   AlignCenterBold,
@@ -560,25 +560,21 @@ function Bar({ controls, more, compact, label }: { controls: Control[]; more: Me
   );
 }
 
-/** Properties of the selection (popover ≥ 1024; the context strip uses `SelectionBar`). */
-export function PropertiesPopover({ objs, anchor, pageHeight }: { objs: EditorObject[]; anchor: { left: number; top: number; width: number; height: number }; pageHeight: number }) {
+/**
+ * The selection's controls: in the context strip below 1024, and from 1024 in the properties panel
+ * (`panel`, F25 §5), where they wrap under the selection's name instead of folding into More.
+ */
+export function SelectionBar({ objs, panel }: { objs: EditorObject[]; panel?: boolean }) {
   const { main, more } = useSelectionControls(objs);
-  // Clear the rotate handle above a rotatable object (it reaches 30 px up, 56 px on touch).
-  const coarse = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
-  const gap = objs.length === 1 && canRotate(objs[0]) ? (coarse ? 84 : 50) : 10;
-  const below = anchor.top < 46 + gap;
   const name = objs.length === 1 ? kindName(objs[0]) : "Selection";
+  const bar = <Bar controls={main} more={more} compact={!panel} label={`${name} properties`} />;
+  if (!panel) return bar;
   return (
-    <div data-popover className={cx("ed-popover", below && "ed-popover--below")} style={{ left: anchor.left + anchor.width / 2, top: below ? Math.min(pageHeight, anchor.top + anchor.height) + 10 : anchor.top - gap }} onPointerDown={(e) => e.stopPropagation()}>
-      <Bar controls={main} more={more} label={`${name} properties`} />
-    </div>
+    <>
+      <h2 className="ed-props__title">{name}</h2>
+      {bar}
+    </>
   );
-}
-
-export function SelectionBar({ objs }: { objs: EditorObject[] }) {
-  const { main, more } = useSelectionControls(objs);
-  const name = objs.length === 1 ? kindName(objs[0]) : "Selection";
-  return <Bar controls={main} more={more} compact label={`${name} properties`} />;
 }
 
 /** The active tool's defaults (top-bar centre slot ≥ 1024, context strip below). */

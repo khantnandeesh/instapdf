@@ -1,7 +1,7 @@
 "use client";
-import "@/components/berry/berry-loader.css";
 import "../ui/dialog.css";
 import "./tool-flow.css";
+import "./layout.css";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { cloneElement, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -12,15 +12,14 @@ import { USER_ERROR } from "@/lib/pdf/user-error";
 import { disposeWorker } from "@/lib/pdf/worker-client";
 import { acceptAttribute, fitsPageBudget, screenFiles } from "@/lib/pdf/validation";
 import { imageFormatOfName } from "@/lib/pdf/image-names";
-import { continueTargets, type FlowTool } from "@/tools/registry";
+import { continueTargets, toolBySlug, isUsable, type FlowTool } from "@/tools/registry";
 import { Button } from "../ui/Button";
-import { BerryLoader } from "../berry/Berry";
 import { isShown, moveFocus, trackInputModality, type InputModality } from "../ui/focus";
 import { PlusIcon, UploadIcon } from "../ui/icons";
 import { LiveRegion } from "../ui/LiveRegion";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { Slider } from "../ui/Slider";
-import { ControlDock, DockStatus, ProcessError, ProcessingBar } from "./ControlDock";
+import type { AnnounceMemo, PillProgress } from "./announce";
 import { copy } from "./copy";
 import { DropCard } from "./DropCard";
 import { DropOverlay } from "./DropOverlay";
@@ -41,8 +40,15 @@ import { enter } from "@/lib/motion/flow";
 import { CloudCaret, CloudRow, useCloud } from "../cloud/tool-cloud";
 
 // Never needed before a file is picked: separate chunks, prefetched on intent (see below).
+// The dock and the action slot (loaded-chrome.ts): fetched on intent and awaited before the first file is
+// drawn, then read synchronously from `chrome`, so the row is complete from its first frame (motion.md T5).
+let chrome: typeof import("./loaded-chrome") | null = null;
+const loadChrome = () => import("./loaded-chrome").then((m) => (chrome = m));
+
 const lazyParts = {
+  chrome: loadChrome,
   result: () => import("./ResultCard"),
+  popover: () => import("../ui/Popover"),
   password: () => import("./PasswordDialog"),
   owner: () => import("./OwnerPassword"),
   replace: () => import("./ReplaceFileDialog"),
@@ -60,6 +66,7 @@ const loadLazyParts = () => void Promise.all(Object.values(lazyParts).map((load)
 const PageGrid = dynamic(() => lazyParts.pageGrid().then((m) => m.PageGrid), { ssr: false });
 const FileGrid = dynamic(() => lazyParts.fileGrid().then((m) => m.FileGrid), { ssr: false });
 const ResultCard = dynamic(() => lazyParts.result().then((m) => m.ResultCard), { ssr: false });
+const ResultDownload = dynamic(() => lazyParts.result().then((m) => m.ResultDownload), { ssr: false });
 const PasswordDialog = dynamic(() => lazyParts.password().then((m) => m.PasswordDialog), { ssr: false });
 const OwnerPasswordDialog = dynamic(() => lazyParts.owner().then((m) => m.OwnerPasswordDialog), { ssr: false });
 const ReplaceFileDialog = dynamic(() => lazyParts.replace().then((m) => m.ReplaceFileDialog), { ssr: false });
@@ -74,8 +81,11 @@ const LeaveGuard = dynamic(() => lazyParts.leave().then((m) => m.LeaveGuard), { 
 
 type Phase = "idle" | "processing" | "done" | "error";
 
-/** Once shown, the processing card stays at least this long, so a fast run does not flash (motion.md T11). */
+/** Once shown, the progress pill stays at least this long, so a fast run does not flash (motion.md T11). */
 const MIN_PROCESSING_MS = 400;
+/** The pill's done tick holds this long before the result swap starts (F25 §6 "Done", AC-639). */
+const DONE_HOLD_MS = 400;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const THUMB_MIN = 80;
 const THUMB_MAX = 400;
 /** Same as --ip-thumb-size in tokens.css, so the server HTML needs no style attribute (strict CSP style-src). */
@@ -134,12 +144,7 @@ export type ToolFlowProps = {
    * sideways). Returns that menu's trigger, which then takes the focus moves that would go to Add files.
    */
   phoneAddMenu?: () => HTMLElement | null;
-  /**
-   * "bar": no side panel before the first file (Organize, Alternate: nothing to set yet, spec F4/F5
-   * P-11 #9). The drop card fills the pages slot and the bottom bar shows from the first paint.
-   */
-  emptyLayout?: "side" | "bar";
-  /** Controls in the bottom bar after the options (F5 Undo│Redo). */
+  /** Controls in the top row (or the bottom dock) after the options (F5 Undo│Redo). */
   dockStart?: (ctx: FlowContext) => ReactNode;
   /** Merge's own wording for the empty state and the wrong-type error. */
   copyOverrides?: { pickerButton?: string; pickerHint?: string; limits?: string; limitsFull?: string; statusEmpty?: string; errorType?: (name: string) => string };
@@ -202,7 +207,6 @@ export function ToolFlow({
   readyStatus,
   viewToggleFromOneFile,
   phoneAddMenu,
-  emptyLayout = "side",
   dockStart,
   copyOverrides,
   optionsBadge,
@@ -239,8 +243,20 @@ export function ToolFlow({
   const phaseRef = useRef<Phase>("idle");
   phaseRef.current = phase;
   const [output, setOutput] = useState<ToolOutput | null>(null);
+  // F23: the result's privacy line after a copy went to a cloud (Save to Drive lives in the slot).
+  const [cloudLine, setCloudLine] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [progressPhase, setProgressPhase] = useState<"fonts" | "pages" | undefined>();
+  /** A server job's phase (upload, queue, work), when the tool reports one (F25 §6). */
+  const [jobPhase, setJobPhase] = useState<PillProgress | null>(null);
+  /** The pill's done tick, held DONE_HOLD_MS before the result swap. */
+  const [pillDone, setPillDone] = useState(false);
+  /** What Cancel does for a server job once it exists (sends DELETE); null for browser jobs. */
+  const serverCancel = useRef<(() => Promise<boolean>) | null>(null);
+  // Bumped on every run, so a late DELETE reply from a cancelled run never shows its notice over the next.
+  const runGen = useRef(0);
+  const memo = useRef<AnnounceMemo | null>(null);
+  const errorNotice = useRef<string | null>(null);
   /** A processing error meant for the user (the job said what to do), shown instead of the generic one. */
   const [processMessage, setProcessMessage] = useState<string | null>(null);
   const [notices, setNotices] = useState<FlowNotice[]>([]);
@@ -294,6 +310,7 @@ export function ToolFlow({
   const intakeTrigger = useRef<HTMLElement | null>(null);
   const progressBox = useRef<HTMLDivElement>(null);
   const retryButton = useRef<HTMLButtonElement>(null);
+  const primaryButton = useRef<HTMLButtonElement>(null);
   const workArea = useRef<HTMLDivElement>(null);
   const abort = useRef<AbortController | null>(null);
   const phoneAddMenuRef = useRef(phoneAddMenu);
@@ -341,10 +358,20 @@ export function ToolFlow({
   const flowCanRun = (state === "ready" || state === "error") && readyFiles.length > 0 && ownerBlocked.length === 0;
   const canPrimary = flowCanRun && runCheck === true;
   const showViewToggle = files.length > 1 || (!!viewToggleFromOneFile && files.length > 0);
+  // Screen fit on phones (F25, F4/F5 eval G-9): with one file and no tool controls the tools row holds
+  // only the picker, so below 1024 px the picker sits in the bottom bar (icon only) and the row keeps
+  // just the size slider (640-1023 px); below 640 px the row is gone and the pages start under the title.
+  const solo = !wide && !showViewToggle && !toolbarStart && !toolbarEnd;
   const view = showViewToggle ? (viewChoice ?? flow.defaultView) : "pages";
   const optionsDisabled = !(state === "ready" || state === "error");
-  /** The empty state's side panel (from 1024 px), unless the tool asks for the bar from the start. */
-  const sidePanel = state === "empty" && emptyLayout === "side";
+  /** Settings tools (F25 §4): the options in a side panel from 1024 px, the row holds only the slot. */
+  const settings = flow.layout === "settings";
+  const loaded = state !== "empty";
+  // A safety net for a way in that skipped intake's await: draw the row once its chunk is here.
+  const [, setChromeTick] = useState(0);
+  useEffect(() => {
+    if (loaded && !chrome) void loadChrome().then(() => setChromeTick((n) => n + 1), () => {});
+  }, [loaded]);
   const statusText =
     state === "empty"
       ? (copyOverrides?.statusEmpty ?? copy.statusEmpty)
@@ -553,6 +580,7 @@ export function ToolFlow({
         flushProblems(problems);
         return;
       }
+      if (!chrome) await loadChrome().catch(() => {});
       updateFiles((prev) => [...prev, ...entries]);
       onFilesAdded?.(entries, opts.tag);
       if (trigger) setFocusToolbarTick((n) => n + 1);
@@ -612,6 +640,18 @@ export function ToolFlow({
   }, [removeFile]);
 
   // ---- run -------------------------------------------------------------------
+  // The live region during a job (F25 §6 "Screen readers"): every phase change, progress at the
+  // 25/50/75% marks at most every 10s, the queue position at most every 30s and when it reaches 1.
+  const sayProgress = useCallback(
+    (p: PillProgress) => {
+      if (!chrome) return;
+      const { text, memo: next } = chrome.announcementFor(memo.current, p, performance.now(), tool.flow.progressLabel);
+      memo.current = next;
+      if (text) announce(text);
+    },
+    [announce, tool.flow.progressLabel],
+  );
+
   const run = useCallback(async () => {
     const ready = filesRef.current.filter(isReady);
     if (!ready.length || phaseRef.current === "processing") return;
@@ -619,42 +659,99 @@ export function ToolFlow({
     phaseRef.current = "processing";
     const controller = new AbortController();
     abort.current = controller;
+    runGen.current++;
+    serverCancel.current = null;
+    memo.current = null;
+    if (errorNotice.current) dismissNotice(errorNotice.current);
+    errorNotice.current = null;
     setProgress(0);
     setProgressPhase(undefined);
+    setJobPhase(null);
+    setPillDone(false);
     setPhase("processing");
     announce(tool.flow.progressLabel);
     const started = performance.now();
     try {
-      const out = await processFiles(ready, controller.signal, (v, ph) => {
-        setProgress(v);
-        setProgressPhase(ph);
-      });
+      const out = await processFiles(
+        ready,
+        controller.signal,
+        (v, ph) => {
+          setProgress(v);
+          setProgressPhase(ph);
+          sayProgress({ phase: "work", fraction: v });
+        },
+        {
+          onPhase: (p) => {
+            if (controller.signal.aborted) return;
+            setJobPhase(p);
+            if (typeof p.fraction === "number") setProgress(p.fraction);
+            sayProgress(p);
+          },
+          onCancel: (fn) => (serverCancel.current = fn),
+        },
+      );
       const wait = MIN_PROCESSING_MS - (performance.now() - started);
-      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      if (wait > 0) await sleep(wait);
       if (controller.signal.aborted) return;
       setProgress(1);
-      // The work area fades out (120ms, inert at once) and the result card rises in its place (T12).
-      // Inert drops the focus it holds (the progress bar) to <body>: park it on the tool heading first,
-      // until the result card focuses Download.
-      if (workArea.current?.contains(document.activeElement)) heading.current?.focus({ preventScroll: true });
+      // The done tick (leaf, "Done") holds, then the stage becomes the result (T12).
+      setPillDone(true);
+      announce(copy.done);
+      await sleep(DONE_HOLD_MS);
+      if (controller.signal.aborted) return;
+      // The work area fades out (120ms, inert at once) and the result rises in its place (T12). The pill
+      // that holds focus is about to go: park focus on the tool heading until the result focuses Download.
+      heading.current?.focus({ preventScroll: true });
       await exit(workArea.current, "result");
       if (controller.signal.aborted) return settle(workArea.current);
       setOutput(out);
       for (const w of out.warnings ?? []) pushNotice({ tone: "warning", title: w });
       setPhase("done");
+      setPillDone(false);
       announce(copy.resultTitle(out.type === "application/zip"));
     } catch (error) {
       if (controller.signal.aborted) return;
       const message = error instanceof Error ? error.message : "unknown error";
       console.error(`[${tool.slug}] processing failed:`, message.startsWith(USER_ERROR) ? "user-facing error" : message);
-      setProcessMessage(message.startsWith(USER_ERROR) ? message.slice(USER_ERROR.length) : null);
+      const shown = message.startsWith(USER_ERROR) ? message.slice(USER_ERROR.length) : null;
+      setProcessMessage(shown);
       setPhase("error");
+      // The full reason and what to do go in NoticeStack (assertive, never auto-dismissed), with Start over.
+      errorNotice.current = pushNotice({ tone: "danger", title: shown ?? copy.errorProcess(tool.flow.progressLabel), action: { label: copy.startOver, onClick: () => startOverRef.current() } });
     }
-  }, [announce, processFiles, pushNotice, tool.flow.progressLabel, tool.slug]);
+  }, [announce, dismissNotice, processFiles, pushNotice, sayProgress, tool.flow.progressLabel, tool.slug]);
   const submitRef = useRef<() => void>(() => {});
   submitRef.current = () => {
     if (flowCanRun) void run(); // run() itself ignores a second call while one is processing
   };
+
+  // Cancel really stops the work (F25 §6): the worker is terminated (runInWorker rejects on abort) and a
+  // server job is deleted (DELETE /jobs/{id}). The slot is back to rest at once and focus returns to the primary.
+  const [focusPrimaryTick, setFocusPrimaryTick] = useState(0);
+  const cancel = useCallback(async () => {
+    if (phaseRef.current !== "processing") return;
+    const server = serverCancel.current;
+    serverCancel.current = null;
+    abort.current?.abort();
+    settle(workArea.current);
+    setPhase("idle");
+    phaseRef.current = "idle";
+    setPillDone(false);
+    setJobPhase(null);
+    setProgress(0);
+    announce(copy.cancelled);
+    setFocusPrimaryTick((n) => n + 1);
+    if (tool.runtime !== "server" && !server) return void pushNotice({ tone: "info", title: copy.cancelledBrowser, timeoutMs: 6000 });
+    // "Deleted" only once DELETE answered 2xx. Cancelled mid-upload there is no job id yet, so the upload
+    // may still land and is deleted by the 2-hour rule. A late reply never speaks over a newer run.
+    const runAtCancel = runGen.current;
+    const deleted = server ? await server() : false;
+    if (runGen.current !== runAtCancel) return;
+    pushNotice({ tone: "info", title: deleted ? copy.cancelledServer : copy.cancelledServerLater, timeoutMs: 8000 });
+  }, [announce, pushNotice, tool.runtime]);
+  useEffect(() => {
+    if (focusPrimaryTick) primaryButton.current?.focus();
+  }, [focusPrimaryTick]);
 
   // Move focus once the processing bar or the error panel has been committed
   // (a requestAnimationFrame can run before React commits under load).
@@ -690,9 +787,15 @@ export function ToolFlow({
 
   const startOver = useCallback(() => {
     abort.current?.abort();
+    runGen.current++;
+    serverCancel.current = null;
+    errorNotice.current = null;
+    setPillDone(false);
+    setJobPhase(null);
     for (const f of filesRef.current) releaseDoc(f.id);
     updateFiles(() => []);
     setOutput(null);
+    setCloudLine(null);
     setPhase("idle");
     phaseRef.current = "idle";
     setNotices([]);
@@ -703,15 +806,17 @@ export function ToolFlow({
     announce("Cleared. Add a PDF to start.");
     setFocusPickerTick((n) => n + 1);
   }, [announce, onReset, releaseDoc, updateFiles]);
+  const startOverRef = useRef(startOver);
+  startOverRef.current = startOver;
 
-  // Back to options (T12 reversed): the work area is back at once and fades in (200ms; opacity only, so the
-  // sticky dock inside it never gets a transformed containing block). Focus moves to the tool heading, not
-  // <body>, as the card goes. The card's own 120ms fade-out first is deferred (docs/design/motion.md T12).
+  // Back to editing (T12 reversed): the work area is back at once and fades in (200ms; opacity only).
+  // Options, selection and marks are intact; focus moves to the tool heading (F25 AC-648).
   const resultCard = useRef<HTMLElement>(null);
   const [workBack, setWorkBack] = useState(0);
   const backToOptions = useCallback(() => {
-    if (resultCard.current?.contains(document.activeElement)) heading.current?.focus({ preventScroll: true });
+    heading.current?.focus({ preventScroll: true });
     setOutput(null);
+    setCloudLine(null);
     setPhase("idle");
     setWorkBack((n) => n + 1);
   }, []);
@@ -734,18 +839,49 @@ export function ToolFlow({
     [intake, output, router, startOver, tool.slug],
   );
 
+  // The fixing tool for an error (F25 §6): Repair PDF for a damaged file, only once that tool is usable.
+  const fixFor = (message: string | null | undefined): FlowTool | null => {
+    if (!message || !/damaged|couldn.t be opened/i.test(message) || tool.slug === "repair-pdf") return null;
+    const t = toolBySlug("repair-pdf");
+    return t && isUsable(t) ? (t as FlowTool) : null;
+  };
+  const continueWithFiles = (target: FlowTool) => {
+    setHandoff(
+      target.slug,
+      files.map((f) => new File([f.source], f.name, { type: f.source.type || "application/pdf" })),
+    );
+    router.push(`/${target.slug}`);
+  };
+
   // Hand-off from another tool's result screen.
   useEffect(() => {
     const handed = takeHandoff(tool.slug);
     if (handed) void intake(handed, null);
   }, [intake, tool.slug]);
 
+  // Closing or leaving the tab mid server job (a full navigation never unmounts React): the job is
+  // deleted with a keepalive DELETE, which outlives the page.
+  useEffect(() => {
+    if (phase !== "processing") return;
+    const onHide = () => {
+      const server = serverCancel.current;
+      serverCancel.current = null;
+      if (server) void server();
+    };
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, [phase]);
+
   // On unmount: stop any running job, shut the processing worker down and
   // release the pdf.js documents.
   useEffect(() => {
     const map = docs.current;
     return () => {
+      // Leaving mid server job deletes it too (the DELETE is sent with keepalive, so it outlives the page).
+      const server = serverCancel.current;
+      serverCancel.current = null;
       abort.current?.abort();
+      if (server) void server();
       disposeWorker();
       for (const d of map.values()) void d.task.destroy();
       map.clear();
@@ -877,17 +1013,41 @@ export function ToolFlow({
   // Page tools state the outcome while the primary can run (I-7, AC-545); the plain verb otherwise.
   const actionText = canPrimary && primaryLabel ? primaryLabel() : flow.actionLabel;
   const primary = (
-    <Button
-      variant="primary"
-      size="lg"
-      className={primaryLabel ? "w-full max-[359px]:px-4" : "w-full"}
-      disabled={!canPrimary}
-      aria-describedby={statusId}
-      onClick={run}
-      data-testid="primary-action"
-    >
+    <Button ref={primaryButton} variant="primary" size="lg" className="ip-slot__main max-[359px]:px-4" disabled={!canPrimary} aria-describedby={statusId} onClick={run} data-testid="primary-action">
       {actionText}
     </Button>
+  );
+  const working = state === "processing";
+  // The action slot (F25 §6): rest, the pill, the error or (on the result) Download, in one box that never resizes.
+  const fix = state === "error" ? fixFor(processMessage) : null;
+  const C = chrome;
+  const slot = !C ? null : working ? (
+    <C.ProgressPill
+      ref={progressBox}
+      action={flow.actionLabel}
+      onCancel={() => void cancel()}
+      state={
+        pillDone
+          ? { phase: "done", verb: flow.progressLabel }
+          : jobPhase && jobPhase.phase !== "work"
+            ? { ...jobPhase, verb: flow.progressLabel }
+            : { phase: "work", fraction: jobPhase && jobPhase.fraction === undefined ? undefined : progress, verb: flow.progressLabel, note: progressPhase === "fonts" ? copy.preparingFonts : undefined }
+      }
+    />
+  ) : state === "error" ? (
+    <C.SlotError
+      ref={retryButton}
+      line={C.shortError(processMessage ?? copy.errorProcess(flow.progressLabel))}
+      onRetry={run}
+      fix={fix ? { label: fix.name, onClick: () => continueWithFiles(fix) } : undefined}
+    />
+  ) : state === "done" && output ? (
+    <ResultDownload output={output} tool={tool} announce={announce} onSaved={setCloudLine} />
+  ) : (
+    <>
+      <C.SlotStatus id={statusId} text={statusText} extra={state === "ready" && runCheck === true ? readyNote : undefined} />
+      {primary}
+    </>
   );
 
   // Elements the F23 branches below extend (cloneElement adds the caret) and the plain branch
@@ -913,15 +1073,15 @@ export function ToolFlow({
       size="sm"
       // Without an Add menu, a multi-file tool's picker drops its word below 400 px (a 44 px icon button,
       // its name kept for assistive tech) so the tools row stays one row (F4/F5 P-3, Alternate & mix).
-      className={phoneAddMenu ? "shadow-tool-lift max-lg:hidden" : flow.multiFile ? "shadow-tool-lift max-[399px]:size-11 max-[399px]:px-0" : "shadow-tool-lift"}
-      labelClassName={!phoneAddMenu && flow.multiFile ? "max-[399px]:sr-only" : undefined}
+      className={phoneAddMenu ? "shadow-tool-lift max-lg:hidden" : solo ? "size-11 px-0" : flow.multiFile ? "shadow-tool-lift max-[399px]:size-11 max-[399px]:px-0" : "shadow-tool-lift"}
+      labelClassName={solo ? "sr-only" : !phoneAddMenu && flow.multiFile ? "max-[399px]:sr-only" : undefined}
       icon={<PlusIcon size={16} />}
       disabled={state === "processing"}
       onFiles={(f, t) => void intake(f, t, { replace: !flow.multiFile })}
       inputTestId="file-input"
     />
   );
-  const pickerHint = () => <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copyOverrides?.pickerHint ?? copy.pickerHint}</p>;
+  const pickerHint = () => <p className="hidden text-sm text-muted [@media(pointer:fine)]:block">{copyOverrides?.pickerHint ?? (flow.multiFile ? copy.pickerHint : copy.pickerHintOne)}</p>;
   const previewDialog = () => (
     <PagePreviewDialog
       target={previewTarget}
@@ -936,208 +1096,212 @@ export function ToolFlow({
   const ownerMounted = useMountOnce(!!ownerFile);
   const leaveMounted = useMountOnce(guardLeave);
   const replaceMounted = useMountOnce(!!pendingReplace);
+  const dim = working ? { "data-dim": "", inert: true } : {};
+  const options = renderOptions(ctx);
+  const rowPicker =
+    process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
+      ? cloneElement(toolbarPicker(), {
+          sources: <CloudCaret hub={cloud!} look="tool" className={phoneAddMenu ? "max-lg:hidden" : undefined} disabled={state === "processing"} />,
+        })
+      : toolbarPicker();
+  const dock = loaded && C && (
+    <C.ControlDock
+      label={`${tool.name} options`}
+      layout={wide ? (settings ? "side" : "row") : "bar"}
+      start={dockStart?.(ctx)}
+      optionsDisabled={optionsDisabled}
+      options={settings && wide ? null : options}
+      more={renderMore?.(ctx)}
+      add={solo && rowPicker}
+      density={flow.optionsDensity}
+      dimmed={working}
+      bare={state === "done"}
+      sheet={{
+        title: wide ? "More options" : `${tool.name} options`,
+        badge: optionsBadge,
+        footer: (close) => (
+          <>
+            <Button variant="secondary" className="flex-1 lg:flex-none" onClick={close}>
+              Done
+            </Button>
+            <Button
+              variant="primary"
+              className="flex-1 lg:flex-none"
+              disabled={!canPrimary}
+              onClick={() => {
+                close();
+                void run();
+              }}
+            >
+              {actionText}
+            </Button>
+          </>
+        ),
+      }}
+      slot={slot}
+    />
+  );
   return (
     <div data-state={state} data-hydrated={watcher ? "" : undefined} data-testid="tool-flow" className="ip-flow" style={thumbSize === THUMB_DEFAULT ? undefined : { ["--ip-thumb-size" as string]: `${thumbSize}px` }}>
       <DropOverlay active={dragging && acceptsDrop} mode={flow.multiFile || files.length === 0 ? "add" : "replace"} />
       <LiveRegion message={message} />
-      <ToolIntro ref={heading} title={flow.title} />
+      {/* The head: the centred h1 while empty; once a file is in, the sticky top row (F25 §3) with the dock
+          as its right part from 1024 px. Below 1024 px the dock is fixed to the bottom and sits outside the
+          row, so the row holds only the h1 (AC-612); it follows the head in the DOM either way. */}
+      <ToolIntro ref={heading} title={flow.title} row={loaded}>
+        {wide && dock}
+      </ToolIntro>
+      {!wide && dock}
 
-      {state === "done" && output ? (
-        <ResultCard
-          ref={resultCard}
-          output={output}
-          tool={tool}
-          continueTargets={continueTargets(output.type)}
-          onContinue={continueWith}
-          onStartOver={startOver}
-          onBack={backToOptions}
-          announce={announce}
-        />
-      ) : (
-        // Empty: the drop area (--ip-work-h, fits the first screen) beside the options panel, which grows
-        // with its options. When the panel runs past the fold the page scrolls (never the panel), the drop
-        // area stays in view (sticky) and the primary stays pinned at the bottom of the screen.
-        // Loaded: the pages take the full width down to the compact bottom bar.
-        <div ref={workArea} className={sidePanel ? "lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-[30px]" : undefined}>
-          <section aria-label="Your files" className={sidePanel ? "min-w-0 lg:sticky lg:top-[calc(var(--ip-header-h)+16px)]" : "min-w-0"}>
-            {state === "empty" ? (
-              <DropCard fill={emptyLayout === "bar" ? "pages" : "work"}>
-                {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
-                  ? cloneElement(introPicker(), { sources: <CloudCaret hub={cloud!} look="primary" /> })
-                  : introPicker()}
-                {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
-                  <>
-                    <CloudRow hub={cloud!} />
-                    {pickerHint()}
-                  </>
-                ) : (
-                  pickerHint()
-                )}
-                <LimitsNote text={copyOverrides?.limits ?? copy.limits(flow)} full={copyOverrides?.limitsFull ?? copy.limitsFull(flow)} />
-                <PrivacyNote runtime={tool.runtime} context="intro" />
-              </DropCard>
-            ) : (
-              // BerryPDF working mode: plain seed-cream, no decoration. A sticky row of editing tools
-              // (blueberry EditorToolbar look, Tabs for the view) above the pink page trays.
-              // From 1024 px the area fills the screen down to the bottom bar (--ip-pages-h)
-              // and the pages scroll inside it with a slim BerryPDF scroll bar (shown only on overflow);
-              // below 1024 px the page scrolls and the tools row sticks under the header.
-              // Below 1024 px the panel clips to its rounded corners (overflow: clip keeps the row sticky) and the
-              // row is square: at rest the panel rounds it, and once stuck under the header its corners cover the
-              // pages scrolling by (a rounded row left them showing at its corners; visual gate round 2).
-              <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 max-lg:overflow-clip sm:px-5 lg:flex lg:h-(--ip-pages-h) lg:flex-col">
-                <div className="sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] shrink-0 items-center gap-2 bg-cream px-3 sm:-mx-5 sm:gap-3 sm:px-5 lg:static lg:gap-4 lg:rounded-t-panel">
-                  {showViewToggle && (
-                    <SegmentedControl
-                      look="tabs"
-                      label="View"
-                      // Below 360 px tighter tabs keep the tools row to one row (F4/F5 P-3).
-                      className="shrink-0 max-[359px]:[&_.mp-tab]:px-3.5"
-                      value={view}
-                      onChange={setViewChoice}
-                      options={
-                        flow.defaultView === "files" || viewToggleFromOneFile
-                          ? [
-                              { value: "files", label: "Files" },
-                              { value: "pages", label: "Pages" },
-                            ]
-                          : [
-                              { value: "pages", label: "Pages" },
-                              { value: "files", label: "Files" },
-                            ]
-                      }
-                    />
-                  )}
-                  {toolbarStart?.(wctx)}
-                  {view === "pages" && (
-                    <Slider
-                      // Tablets: a shorter track so the row (view, sort, size, add) fits 768 px without widening the page.
-                      className="max-sm:hidden max-lg:[&_.ip-range]:w-20"
-                      label="Thumbnail size"
-                      min={THUMB_MIN}
-                      max={THUMB_MAX}
-                      step={8}
-                      value={thumbSize}
-                      onChange={setThumbSize}
-                      valueText={(v) => `Thumbnail size ${v} pixels`}
-                    />
-                  )}
-                  <span className="ms-auto">
-                    {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
-                      ? cloneElement(toolbarPicker(), {
-                          sources: (
-                            <CloudCaret hub={cloud!} look="tool" className={phoneAddMenu ? "max-lg:hidden" : undefined} disabled={state === "processing"} />
-                          ),
-                        })
-                      : toolbarPicker()}
-                  </span>
-                  {toolbarEnd?.(wctx)}
-                </div>
-                <div
-                  ref={setScrollArea}
-                  // overflow-x clip: a page turning in a tile is briefly wider than its tile (page tiles have a 4px
-                  // edge); it must never widen the page (phones zoom out) or flash a sideways scroll bar.
-                  data-testid="pages-scroll"
-                  className="ip-scroll flex flex-col gap-4 overflow-x-clip pt-3 pb-6 max-lg:-mx-2 max-lg:min-h-[calc(var(--ip-thumb-size)+76px)] max-lg:px-2 lg:-mx-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5"
-                  data-ip-scroll="pages"
-                  inert={state === "processing" ? true : undefined}
-                >
-                  {ownerBlocked.map((f) => (
-                    <OwnerPermissionNotice
-                      key={f.id}
-                      fileName={f.name}
-                      denied={flow.requiredPermissions.filter((p) => f.denied.includes(p))}
-                      onEnterPassword={() => setOwnerFor(f.id)}
-                    />
-                  ))}
-                  <ThumbContext.Provider value={thumbs}>
-                    {renderWorkspace ? (
-                      renderWorkspace(wctx)
-                    ) : view === "pages" ? (
-                      <PageGrid
-                        files={files}
-                        decorate={decorate}
-                        renderActions={renderPageActions}
-                        onPageKey={onPageKey}
-                        onTileActivate={onTileActivate}
-                        renderGap={renderGap && ((f, i, t) => renderGap(f, i, t, state === "processing" || state === "done"))}
-                        gridHint={gridHint}
-                        onRemove={(f) => removeFile(f.id)}
-                        onOpen={(f, i) =>
-                          setPreview({ items: Array.from({ length: f.pageCount }, (_, k) => ({ fileId: f.id, index: k, rotation: decorate(f, k).pendingDelta })), at: i })
-                        }
-                        dimmed={state === "processing"}
-                      />
-                    ) : (
-                      <FileGrid files={files} onRemove={(f) => removeFile(f.id)} />
-                    )}
-                    {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
-                      <>
-                        {CloudCards && <CloudCards downloads={cloud!.s.downloads} />}
-                        {previewDialog()}
-                      </>
-                    ) : (
-                      previewDialog()
-                    )}
-                  </ThumbContext.Provider>
-                </div>
-                {state === "processing" && (
-                  // A full wait: the berry loader over the dimmed pages, kept in view while scrolling.
-                  // Decorative; the dock's progress bar and status carry the state for assistive tech.
-                  <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[11]" data-testid="processing-loader">
-                    <div className="sticky top-[calc(var(--ip-header-h)+120px)] flex justify-center pt-16">
-                      {/* The loader alone: the dock's bar says "Splitting… 40%" (one progress text, not two). */}
-                      <div className="mp-loading ip-wait-in rounded-panel border-[1.5px] border-sand bg-surface-raised px-8 py-5 shadow-card">
-                        <BerryLoader size="md" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-
-          <ControlDock
-            label={`${tool.name} options`}
-            layout={sidePanel ? "side" : "bar"}
-            start={dockStart?.(ctx)}
-            optionsDisabled={optionsDisabled}
-            options={renderOptions(ctx)}
-            more={renderMore?.(ctx)}
-            density={flow.optionsDensity}
-            sheet={{
-              title: `${tool.name} options`,
-              badge: optionsBadge,
-              footer: (close) => (
-                <>
-                  <Button variant="secondary" className="flex-1" onClick={close}>
-                    Done
-                  </Button>
-                  <Button
-                    variant="primary"
-                    className="flex-1"
-                    disabled={!canPrimary}
-                    onClick={() => {
-                      close();
-                      void run();
-                    }}
-                  >
-                    {actionText}
-                  </Button>
-                </>
-              ),
-            }}
-            status={<DockStatus id={statusId} text={statusText} extra={state === "ready" && runCheck === true ? readyNote : undefined} />}
-            footer={
-              state === "processing" ? (
-                <ProcessingBar ref={progressBox} label={flow.progressLabel} value={progress} phaseLabel={progressPhase === "fonts" ? copy.preparingFonts : undefined} />
-              ) : state === "error" ? (
-                <ProcessError ref={retryButton} message={processMessage ?? copy.errorProcess(flow.progressLabel)} onRetry={run} onStartOver={startOver} />
-              ) : (
-                primary
-              )
-            }
+      {state === "empty" ? (
+        // The picker card, alone (F25 §2): no options panel, no dock, centred in the first screen.
+        <DropCard>
+          {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1"
+            ? cloneElement(introPicker(), { sources: <CloudCaret hub={cloud!} look="primary" /> })
+            : introPicker()}
+          {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
+            <>
+              <CloudRow hub={cloud!} />
+              {pickerHint()}
+            </>
+          ) : (
+            pickerHint()
+          )}
+          <LimitsNote text={copyOverrides?.limits ?? copy.limits(flow)} full={copyOverrides?.limitsFull ?? copy.limitsFull(flow)} />
+          <PrivacyNote runtime={tool.runtime} context="intro" />
+          {/* Every file undone (F5 history): the files are only held, so Undo│Redo stays reachable here,
+              under the card, to bring them back. Never on a fresh visit or after Start over. */}
+          {workspaceEmpty && files.length > 0 && dockStart && <div className="mt-4 flex justify-center">{dockStart(ctx)}</div>}
+        </DropCard>
+      ) : state === "done" && output ? (
+        // Its own key: the work area's element (faded out and inert by T12) is never reused for the result.
+        <div key="result" className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 sm:px-5 lg:mt-2">
+          <ResultCard
+            ref={resultCard}
+            output={output}
+            tool={tool}
+            continueTargets={continueTargets(output.type)}
+            onContinue={continueWith}
+            onStartOver={startOver}
+            onBack={backToOptions}
+            announce={announce}
+            cloudLine={cloudLine}
           />
+        </div>
+      ) : (
+        // The stage (F25 §3): the cream panel under the row, --ip-stage-h tall from 1024 px, holding the tools
+        // row and the pages (they scroll inside it with a slim BerryPDF bar). Below 1024 px the page scrolls
+        // and the tools row sticks under the header. A settings tool adds its options panel on the right.
+        <div key="work" ref={workArea} className={settings ? "lg:mt-2 lg:grid lg:grid-cols-[minmax(0,1fr)_var(--ip-dock-w)] lg:items-start lg:gap-6" : "lg:mt-2"}>
+          <section aria-label="Your files" className="min-w-0">
+            {/* Below 1024 px the panel clips to its rounded corners (overflow: clip keeps the row sticky) and the
+                row is square: at rest the panel rounds it, and once stuck under the header its corners cover the
+                pages scrolling by (visual gate round 2). */}
+            <div className="relative rounded-panel border-[1.5px] border-sand bg-cream px-3 max-lg:overflow-clip sm:px-5 lg:flex lg:h-(--ip-stage-h) lg:flex-col">
+              <div className={`${solo ? "max-sm:hidden " : ""}sticky top-(--ip-header-h) z-10 -mx-3 flex h-[64px] shrink-0 items-center gap-2 bg-cream px-3 max-[359px]:gap-1.5 max-[359px]:px-2 sm:-mx-5 sm:gap-3 sm:px-5 lg:static lg:gap-4 lg:rounded-t-panel`}>
+                {showViewToggle && (
+                  <SegmentedControl
+                    look="tabs"
+                    label="View"
+                    // Below 360 px tighter tabs (and gaps) keep the tools row to one row (F4/F5 P-3), cloud caret included.
+                    className="shrink-0 max-[359px]:[&_.mp-tab]:px-2"
+                    value={view}
+                    onChange={setViewChoice}
+                    options={
+                      flow.defaultView === "files" || viewToggleFromOneFile
+                        ? [
+                            { value: "files", label: "Files" },
+                            { value: "pages", label: "Pages" },
+                          ]
+                        : [
+                            { value: "pages", label: "Pages" },
+                            { value: "files", label: "Files" },
+                          ]
+                    }
+                  />
+                )}
+                {toolbarStart?.(wctx)}
+                {view === "pages" && (
+                  <Slider
+                    // Tablets: a shorter track so the row (view, sort, size, add) fits 768 px without widening the page.
+                    className="max-sm:hidden max-lg:[&_.ip-range]:w-20"
+                    label="Thumbnail size"
+                    min={THUMB_MIN}
+                    max={THUMB_MAX}
+                    step={8}
+                    value={thumbSize}
+                    onChange={setThumbSize}
+                    valueText={(v) => `Thumbnail size ${v} pixels`}
+                  />
+                )}
+                {!solo && <span className="ms-auto">{rowPicker}</span>}
+                {toolbarEnd?.(wctx)}
+              </div>
+              <div
+                ref={setScrollArea}
+                // overflow-x clip: a page turning in a tile is briefly wider than its tile (page tiles have a 4px
+                // edge); it must never widen the page (phones zoom out) or flash a sideways scroll bar.
+                data-testid="pages-scroll"
+                className="ip-scroll ip-dimmable flex flex-col gap-4 overflow-x-clip pt-3 pb-6 max-lg:-mx-2 max-lg:min-h-[calc(var(--ip-thumb-size)+76px)] max-lg:px-2 lg:-mx-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5"
+                data-ip-scroll="pages"
+                {...dim}
+              >
+                {ownerBlocked.map((f) => (
+                  <OwnerPermissionNotice
+                    key={f.id}
+                    fileName={f.name}
+                    denied={flow.requiredPermissions.filter((p) => f.denied.includes(p))}
+                    onEnterPassword={() => setOwnerFor(f.id)}
+                  />
+                ))}
+                <ThumbContext.Provider value={thumbs}>
+                  {renderWorkspace ? (
+                    renderWorkspace(wctx)
+                  ) : view === "pages" ? (
+                    <PageGrid
+                      files={files}
+                      decorate={decorate}
+                      renderActions={renderPageActions}
+                      onPageKey={onPageKey}
+                      onTileActivate={onTileActivate}
+                      renderGap={renderGap && ((f, i, t) => renderGap(f, i, t, state === "processing" || state === "done"))}
+                      gridHint={gridHint}
+                      onRemove={(f) => removeFile(f.id)}
+                      onOpen={(f, i) =>
+                        setPreview({ items: Array.from({ length: f.pageCount }, (_, k) => ({ fileId: f.id, index: k, rotation: decorate(f, k).pendingDelta })), at: i })
+                      }
+                      dimmed={state === "processing"}
+                    />
+                  ) : (
+                    <FileGrid files={files} onRemove={(f) => removeFile(f.id)} />
+                  )}
+                  {process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" ? (
+                    <>
+                      {CloudCards && <CloudCards downloads={cloud!.s.downloads} />}
+                      {previewDialog()}
+                    </>
+                  ) : (
+                    previewDialog()
+                  )}
+                </ThumbContext.Provider>
+              </div>
+            </div>
+          </section>
+          {settings && wide && (
+            // The settings panel (F25 §4): the numbered steps (dock-side: forms), as tall as the stage and growing
+            // with its steps (never an inner scroller: the page scrolls while the sticky row keeps the primary in view).
+            <aside
+              aria-label={`${tool.name} options`}
+              data-ip-options="side"
+              className="flex min-h-(--ip-stage-h) flex-col rounded-[20px_20px_28px_20px] border-[1.5px] border-panel-border bg-surface-raised p-6 shadow-card"
+            >
+              <fieldset disabled={optionsDisabled} className="ip-dimmable min-w-0" data-testid="dock-options" {...dim}>
+                <legend className="sr-only">{`${tool.name} options`}</legend>
+                <h2 className="sr-only">Options</h2>
+                {options}
+              </fieldset>
+            </aside>
+          )}
         </div>
       )}
 

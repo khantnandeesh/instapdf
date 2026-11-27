@@ -2,30 +2,22 @@
  * Tool-page styles (shared flow). Imported by ToolFlow and ControlDock, so they ship only with tool routes and stay out
  * of the site-wide stylesheet budget (e2e/f2/home.spec.ts AC-55).
  */
-/* Tool pages: below 1024 px (and on desktop once a file is loaded) the F1 dock is fixed at the bottom;
-   keep the footer's end clear of it. */
-@media (max-width: 1023px) {
-  body:has([data-ip-dock]) .ip-site-footer {
-    padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);
-  }
+/* Below 1024 px, once a file is in, the dock is fixed at the bottom: keep the footer's end clear of it. */
+body:has([data-ip-dock="bar"]) .ip-site-footer {
+  padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);
 }
 /* Below 1024 px the page scrolls under the sticky header + tools row and above the fixed bar: whatever the
-   page scrolls into view (a focused tile, its Enlarge) stops clear of both (visual gate round 2). */
+   page scrolls into view (a focused tile, its Enlarge) stops clear of both (visual gate round 2). From
+   1024 px it clears the header and the sticky top row (F25 §3). */
 @media (max-width: 1023px) {
   html:has(.ip-flow [data-ip-dock]) {
     scroll-padding-top: calc(var(--ip-header-h) + 64px + 8px);
     scroll-padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + 8px);
   }
 }
-body:has([data-ip-dock="bar"]) .ip-site-footer {
-  padding-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + env(safe-area-inset-bottom) + 24px);
-}
-/* The desktop bottom bar's content fades in where it ends up once a file is loaded (motion.md T5: no
-   movement, the primary is in its final place from the bar's first frame; reduced motion: the global
-   rule drops it). */
 @media (min-width: 1024px) {
-  .mp-dock-bar {
-    animation: mp-fade-in var(--motion-micro) var(--ease-out) both;
+  html:has(.ip-flow [data-ip-dock]) {
+    scroll-padding-top: calc(var(--ip-header-h) + 64px + 8px);
   }
 }
 
@@ -63,52 +55,10 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
   }
 }
 
-/* Fold fit, working state (>= 1024 px): once a file is in, the head shrinks to a compact title row so
-   the pages get more of the screen (Sejda scrolls its head away; ours stays, smaller). --ip-pages-h is
-   re-declared here because custom properties resolve where they are declared. */
-@media (min-width: 1024px) {
-  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) {
-    --ip-intro-h: 56px;
-    --ip-pages-h: max(320px, calc(100vh - var(--ip-header-h) - var(--ip-intro-h) - var(--ip-dock-actual, 88px) - var(--ip-fold-gap)));
-  }
-  @supports (height: 1dvh) {
-    .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) {
-      --ip-pages-h: max(320px, calc(100dvh - var(--ip-header-h) - var(--ip-intro-h) - var(--ip-dock-actual, 88px) - var(--ip-fold-gap)));
-    }
-  }
-  /* The title drops to the compact size on the frame the files arrive, never animating font-size (T5). */
-  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) .mp-intro h1 {
-    font-size: 26px;
-    line-height: 32px;
-  }
-}
-
-/* Below 1024 px the same: once a file is in, and on the result, the head is compact (the pages, or Download,
-   get the screen). */
-@media (max-width: 1023px) {
-  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"], [data-state="done"]) .mp-intro {
-    padding-top: 12px;
-    padding-bottom: 10px;
-  }
-  /* Never cut (visual gate round 2): one step smaller below 360 px, and a long title wraps to a second
-     compact line rather than an ellipsis. */
-  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"], [data-state="done"]) .mp-intro h1 {
-    font-size: 22px;
-    line-height: 28px;
-    text-wrap: balance;
-  }
-}
-@media (max-width: 359px) {
-  .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"], [data-state="done"]) .mp-intro h1 {
-    font-size: 19px;
-    line-height: 24px;
-  }
-}
-
-/* Floating notices (NoticeStack) never cover the site header or, once files are in, the tools row (view
-   tabs, Sort, Add files): they float under it. The row is 64px (ToolFlow); the head above it is
-   --ip-intro-h from 1024px and one 50px line below (the compact head above). Below 1024px the row sticks
-   under the header after a scroll, so the notice still clears it. */
+/* Floating notices (NoticeStack) never cover the site header, the top row or, once files are in, the stage's
+   tools row (view tabs, Sort, Add files): they float under them. From 1024px the top row is 64px and the
+   stage starts 8px under it; below 1024px the head is one ~50px line and the tools row sticks under the
+   header after a scroll, so the notice still clears it. */
 .ip-flow {
   --ip-notice-top: calc(var(--ip-header-h) + 12px);
 }
@@ -117,17 +67,20 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
 }
 @media (min-width: 1024px) {
   .ip-flow:is([data-state="ready"], [data-state="loading"], [data-state="password"], [data-state="processing"], [data-state="error"]) {
-    --ip-notice-top: calc(var(--ip-header-h) + var(--ip-intro-h) + 64px + 8px);
+    --ip-notice-top: calc(var(--ip-header-h) + 64px + 8px + 64px + 8px);
+  }
+  .ip-flow[data-state="done"] {
+    --ip-notice-top: calc(var(--ip-header-h) + 64px + 8px);
   }
 }
-/* Nor the first screen's primary action: below 1024px the drop card's Choose button sits right under the
+/* Nor the first screen's primary action: below 1024px the picker card's Choose button sits right under the
    title, where two stacked notices (say two cloud errors) would land on it. So with no files in, the stack
-   sits at the bottom instead, above the bar, and grows upwards over the empty decor (NoticeStack reads
-   --ip-notice-bottom; top goes auto). */
+   sits at the bottom instead and grows upwards over the empty decor (NoticeStack reads --ip-notice-bottom;
+   top goes auto). There is no dock in the empty state (F25 §2). */
 @media (max-width: 1023px) {
   .ip-flow[data-state="empty"] {
     --ip-notice-top: auto;
-    --ip-notice-bottom: calc(var(--ip-dock-actual, var(--ip-dock-h)) + 12px);
+    --ip-notice-bottom: calc(12px + env(safe-area-inset-bottom));
   }
 }
 
@@ -148,12 +101,6 @@ body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard::after {
 }
 body:has([data-testid="drop-overlay"][data-active]) .mp-dropcard {
   scale: 1.02;
-}
-
-/* The processing card (motion.md T11): anti-flicker, it appears only once a job has run 300ms (fast jobs
-   never show it), then fades up 8px in 200ms. The dock's progress bar carries the state from frame 0. */
-.ip-wait-in {
-  animation: mp-fade-up var(--motion-quick) var(--ease-out) 300ms backwards;
 }
 
 /*

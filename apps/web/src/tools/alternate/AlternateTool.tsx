@@ -168,7 +168,6 @@ export function AlternateTool() {
       <ToolFlow
         tool={tool}
         {...ws.flowProps}
-        emptyLayout="bar"
         process={ws.runList(
           () => {
             const now = liveCards();

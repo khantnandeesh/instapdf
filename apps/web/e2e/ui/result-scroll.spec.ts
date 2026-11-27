@@ -42,5 +42,12 @@ for (const tool of usable) {
     const box = (await page.getByRole("link", { name: "Download" }).boundingBox())!;
     expect(box.y, "Download top is on screen").toBeGreaterThanOrEqual(0);
     expect(box.y + box.height, "Download bottom is on screen").toBeLessThanOrEqual(657);
+    // F25 §7: the new result fits the stage: the card and its actions are on the first screen.
+    const result = (await page.getByTestId("result").boundingBox())!;
+    expect(result.y + result.height, "the result fits the first screen").toBeLessThanOrEqual(657 + 1);
+    for (const name of ["Back to editing", "Start over"]) {
+      const b = (await page.getByRole("button", { name }).boundingBox())!;
+      expect(b.y + b.height, `${name} is on screen`).toBeLessThanOrEqual(657);
+    }
   });
 }

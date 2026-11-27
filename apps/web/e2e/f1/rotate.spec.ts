@@ -133,7 +133,7 @@ test("AC-38: primary is disabled while empty, loading or waiting for a password,
     snap();
     new MutationObserver(snap).observe(document.body, { subtree: true, childList: true, attributes: true });
   });
-  await expect(primary(page)).toBeDisabled();
+  await expect(primary(page)).toHaveCount(0); // F25 AC-600: no primary while empty
   await pickReady(page, "sixty-pages.pdf");
   await expect(primary(page)).toBeEnabled();
   await pick(page, "user-pw.pdf");

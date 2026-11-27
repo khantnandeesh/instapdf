@@ -1,13 +1,13 @@
 @import "tailwindcss";
 @import "../styles/tokens.css";
 
-/* Tool options layout (docs/design/berrypdf.md "Fit the first screen", rule 6). The ControlDock says
-   which layout it is in with data-ip-dock: "side" (the tall options panel, empty state from 1024 px)
-   or "bar" (one compact row docked at the bottom: phones and tablets always, desktop once a file is
-   loaded so the pages get the screen). Options use these instead of lg:/max-lg: for their layout. */
+/* Tool options layout (docs/design/berrypdf.md "Fit the first screen", F25). `dock-side:` styles a
+   settings tool's options panel (data-ip-options="side", from 1024 px); `dock-bar:` the compact one-row
+   options, in the top row (data-ip-dock="row", from 1024 px) and the bottom dock (data-ip-dock="bar",
+   below 1024 px). Options use these instead of lg:/max-lg: for their layout. */
 @custom-variant dock-side {
   @media (width >= 64rem) {
-    &:where([data-ip-dock="side"] *) {
+    &:where([data-ip-dock="side"] *, [data-ip-options="side"] *) {
       @slot;
     }
   }
@@ -16,7 +16,7 @@
   @media (width < 64rem) {
     @slot;
   }
-  &:where([data-ip-dock="bar"] *) {
+  &:where([data-ip-dock="bar"] *, [data-ip-dock="row"] *) {
     @slot;
   }
 }

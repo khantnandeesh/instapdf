@@ -99,7 +99,7 @@ const annots = (doc: PDFDocument, i: number) => {
 test("AC-85 AC-92: the landing shows the title and Open PDF above the fold; opening fills the screen with pages", async ({ page }) => {
   await page.goto("/edit-pdf");
   await expect(page.getByRole("heading", { level: 1, name: "Edit PDF" })).toBeInViewport();
-  await expect(page.getByRole("button", { name: "Open PDF" })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("button", { name: "Choose PDF" })).toBeInViewport({ ratio: 1 });
   await page.getByTestId("editor-input").setInputFiles(corpus("report-form-3p.pdf"));
   await expect(page.getByTestId("editor-shell")).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "report-form-3p.pdf" })).toBeVisible();
@@ -164,6 +164,9 @@ test("AC-41 AC-55 AC-79: page actions rotate, duplicate, insert and delete; over
   await addText(page, "Stays put");
   await page.getByTestId("canvas").focus();
   if ((page.viewportSize()?.width ?? 0) >= 1024) {
+    // F25 AC-627: a selection opens the properties panel over the canvas's right side; clear it first.
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("editor-props")).toHaveCount(0);
     await page.getByRole("button", { name: "Rotate right, page 1" }).click();
     await page.getByRole("button", { name: "Duplicate page, page 2" }).click();
     await page.getByRole("button", { name: "Insert blank page after, page 1" }).click();
@@ -266,7 +269,7 @@ test("AC-27 AC-71 AC-70: highlight across words makes a Highlight annotation; an
 
 test("AC-95: Mark on a page with no text layer makes an area highlight", async ({ page }) => {
   await page.goto("/edit-pdf");
-  await page.getByRole("button", { name: "Blank page" }).click();
+  await page.getByRole("button", { name: "Start with a blank page" }).click();
   await expect(page.getByTestId("page-1")).toHaveAttribute("data-drawn", "true", { timeout: 15_000 });
   await tool(page, "h");
   await dragPage(page, 1, [0.2, 0.2], [0.6, 0.25]);
@@ -332,7 +335,7 @@ test("AC-73 AC-89: the Objects list names each object; History reverts a chosen 
 test("AC-48 AC-54 AC-83 AC-98: bars fit the screen, stay put while pages scroll, and the active tool stays visible", async ({ page }) => {
   await open(page);
   const vw = page.viewportSize()!.width;
-  const bars = ["header.ed-top", vw >= 1024 ? ".ed-rail" : ".ed-dock"];
+  const bars = ["header.ed-top", vw >= 1024 ? "[data-testid=editor-tools]" : ".ed-dock"];
   for (const sel of bars) {
     const b = (await page.locator(sel).boundingBox())!;
     expect(b.x).toBeGreaterThanOrEqual(0);

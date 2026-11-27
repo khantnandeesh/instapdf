@@ -52,11 +52,13 @@ test("AC-490: pick order, pages view, A1–A12 then B1–B3; no Merge options; S
   await expect(page.getByTestId("dock-status")).toHaveText("15 pages · 2 files");
 });
 
-test("P-3: empty state has no side panel: drop card and the bar with the disabled Save PDF", async ({ page }) => {
+test("P-3: empty state has no side panel: the drop card only, no dock and no Save PDF", async ({ page }) => {
+  // F25 AC-600: the picker card is the empty state's only action; the dock and Save PDF arrive with a file.
   await expect(flow(page)).toHaveAttribute("data-state", "empty");
-  await expect(page.locator("[data-ip-dock]")).toHaveAttribute("data-ip-dock", "bar");
-  await expect(primary(page)).toBeDisabled();
-  await expect(page.getByTestId("dock-status")).toHaveText("Add files to start");
+  await expect(page.getByTestId("drop-card")).toHaveCount(1);
+  await expect(page.locator("[data-ip-dock]")).toHaveCount(0);
+  await expect(page.locator("[data-ip-options=side]")).toHaveCount(0);
+  await expect(primary(page)).toHaveCount(0);
   await expect(page.getByTestId("history")).toHaveCount(0);
 });
 
@@ -340,7 +342,7 @@ test("AC-549: Ctrl/Cmd+Z in the move-to-position field edits the text, not the p
   expect(await tileLabels(page)).toEqual(before);
 });
 
-test("AC-550: Undo│Redo in the bar: disabled states, announced steps, survive the view switch and Back to options; Start over clears", async ({ page }) => {
+test("AC-550: Undo│Redo in the bar: disabled states, announced steps, survive the view switch and Back to editing; Start over clears", async ({ page }) => {
   await pickF5(page, "twelve.pdf", "three-pages.pdf");
   // Adding files is a step.
   await expect(undoButton(page)).not.toHaveAttribute("aria-disabled", "true");
@@ -359,7 +361,7 @@ test("AC-550: Undo│Redo in the bar: disabled states, announced steps, survive 
   expect(await quarterTurns(page, "A1")).toBe(0);
   await redoButton(page).click();
   await run(page);
-  await page.getByRole("button", { name: "Back to options" }).click();
+  await page.getByRole("button", { name: "Back to editing" }).click();
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
   await undoButton(page).click();
   expect(await quarterTurns(page, "A1")).toBe(0);
@@ -418,13 +420,17 @@ test("one-row toolbar and no sideways scroll at every width (P-3)", async ({ pag
   }
 });
 
-test("the selection bar sits above the bottom bar (P-3 bug fix) at 1366x657", async ({ page }) => {
+test("the selection bar is never covered by the dock (P-3 bug fix) at 1366x657", async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 657 });
   await pickF5(page, "twelve.pdf");
   await tileMain(page, "A1").click();
   const bar = (await page.getByTestId("selection-bar").boundingBox())!;
-  const dock = (await page.locator("[data-ip-dock]").boundingBox())!;
-  expect(bar.y + bar.height).toBeLessThanOrEqual(dock.y);
+  // F25 §3: from 1024 the dock is the sticky top row, so the selection bar sits under it and on screen.
+  const dock = page.locator("[data-ip-dock]");
+  await expect(dock).toHaveAttribute("data-ip-dock", "row");
+  const row = (await dock.boundingBox())!;
+  expect(bar.y).toBeGreaterThanOrEqual(row.y + row.height);
+  expect(bar.y + bar.height).toBeLessThanOrEqual(657);
 });
 
 test("AC-481: owner-restricted.pdf loads with no prompt and gives 3 pages that open without a password", async ({ page }) => {
