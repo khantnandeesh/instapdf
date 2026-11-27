@@ -55,7 +55,7 @@ export function SplitBySizeTool() {
       readyStatus={() => c.status(pages, opts.text.trim(), opts.unit)}
       renderOptions={() => (
         <div className="flex min-w-0 items-center gap-3">
-          <span aria-hidden="true" className="hidden text-sm font-semibold whitespace-nowrap text-ink xl:inline">
+          <span aria-hidden="true" className="hidden text-sm font-semibold whitespace-nowrap text-ink xl:inline-block">
             {c.size}
           </span>
           <NumberStepper

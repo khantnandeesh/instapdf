@@ -70,7 +70,4 @@ export const splitTextCopy = {
   areaLabel: "Text area. Arrow keys move it, Shift with arrow keys resizes it.",
   found: "Text here:",
   nothing: "No text in the box on this page",
-  prev: "Previous page",
-  next: "Next page",
-  done: "Done",
 };

@@ -34,3 +34,15 @@
   border-radius: 50%;
   background: var(--brand);
 }
+/* In the area dialog: the page as a sheet of paper with a hairline, and the "3 / 12" counter between the arrows. */
+.ip-area--page {
+  overflow: hidden;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.ip-area__count {
+  min-width: 4.5ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

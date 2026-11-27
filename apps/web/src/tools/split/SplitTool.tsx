@@ -345,7 +345,7 @@ export function SplitTool({ variant }: { variant?: SplitVariant } = {}) {
             </Button>
           ) : variant === "bookmarks" ? (
             <div className="flex min-w-0 items-center gap-3 max-sm:flex-1">
-              <div className="w-[210px] shrink-0 max-sm:w-auto max-sm:flex-1">
+              <div className="w-[200px] shrink-0 max-sm:flex-1">
                 <Select
                   id={levelId}
                   label={c.level}
@@ -358,7 +358,7 @@ export function SplitTool({ variant }: { variant?: SplitVariant } = {}) {
                   }}
                 />
               </div>
-  {titleFilter(containsId, "min-w-0 w-[170px] shrink max-sm:hidden")}
+  {titleFilter(containsId, "min-w-0 w-[150px] shrink max-sm:hidden")}
             </div>
           ) : (
             <div className="flex min-w-0 items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-side:gap-7 max-sm:flex-1">
