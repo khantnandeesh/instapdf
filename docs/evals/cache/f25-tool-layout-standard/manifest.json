@@ -1,42 +1,383 @@
 {
  "feature": "f25-tool-layout-standard",
  "evaluated": "2026-11-27",
- "candidate": {"url": "https://web-staging-qzq5fa2g7q-uc.a.run.app", "health_version": "15687e00f3d056fa8286c10b33a9a1babcd659cc"},
+ "candidate": {
+  "url": "https://web-staging-qzq5fa2g7q-uc.a.run.app",
+  "health_version": "15687e00f3d056fa8286c10b33a9a1babcd659cc"
+ },
  "raw_evidence": "/mnt/project-files/evals-cache/f25-tool-layout-standard/",
  "eval_screenshots": "/mnt/project-files/designs/tool-layout-standard/eval/",
  "side_by_side": "/mnt/project-files/comparisons/f25-tool-layout-standard/",
  "reference_tasks_run": 0,
  "reference_requests": 0,
  "reference_cache_used": [
-  {"feature": "f4-f5-page-tools", "item": "t4 Delete page 5 of twelve.pdf", "captured": "2026-11-26", "file": "eval/t4-delete/sejda-updated_twelve.pdf", "bytes": 3626, "sha256": "a2b2ebf8ef3b0fb42e2bbb87811ca4a1416bf791b933a703e2afaa17cc6f1739", "timings": {"first_thumb_ms": 832, "action_to_download_ms": 3060, "chooser_open_ms_median": 703}, "fit_height_pct": {"1366x657": 59, "1280x632": 57, "1536x730": 63, "1920x969": 65, "390x664": 56}},
-  {"feature": "f3-merge", "item": "sejda-t3 Merge alpha, bravo, echo; TOC file names, footer, double-sided", "captured": "2026-11-24", "file": "sejda-t3-alpha_merged.pdf", "bytes": 7229, "sha256": "e029a7e55e5237001f4d6e8799a81620e6cd1069bb7deb54ab7e6e0a5e6de6dc", "qpdf": "3 warnings (page Resources missing, repaired)", "timings": {"first_thumb_ms": 852, "action_to_download_ms": 3177}, "fit_height_pct": {"1366x657_files": 39, "1366x657_pages": 32, "390x664": 20}},
-  {"feature": "f16-e1-editor", "item": "T2/T3 editor tasks and M12 captures", "captured": "2026-11-24", "files": {"sejda-t2-text-sign-lineedit.pdf": "b5484cdbdec44eab3ef5c566440de98d99cd8e4a1cf7fb5e2118372c0c680b6f", "sejda-t3-whiteout-shapes-annots.pdf": "af5c66cfef04bc61408c41b8ca91e0f3639cc64b47e1aa47121a77b2e1f106cc"}, "timings": {"first_page_ms": 5500, "apply_to_ready_ms": 7700}, "fit_height_pct_after_scroll": {"1280-1536": "90-92", "1920x969": 83, "390x664": "46-69"}}
+  {
+   "feature": "f4-f5-page-tools",
+   "item": "t4 Delete page 5 of twelve.pdf",
+   "captured": "2026-11-26",
+   "file": "eval/t4-delete/sejda-updated_twelve.pdf",
+   "bytes": 3626,
+   "sha256": "a2b2ebf8ef3b0fb42e2bbb87811ca4a1416bf791b933a703e2afaa17cc6f1739",
+   "timings": {
+    "first_thumb_ms": 832,
+    "action_to_download_ms": 3060,
+    "chooser_open_ms_median": 703
+   },
+   "fit_height_pct": {
+    "1366x657": 59,
+    "1280x632": 57,
+    "1536x730": 63,
+    "1920x969": 65,
+    "390x664": 56
+   }
+  },
+  {
+   "feature": "f3-merge",
+   "item": "sejda-t3 Merge alpha, bravo, echo; TOC file names, footer, double-sided",
+   "captured": "2026-11-24",
+   "file": "sejda-t3-alpha_merged.pdf",
+   "bytes": 7229,
+   "sha256": "e029a7e55e5237001f4d6e8799a81620e6cd1069bb7deb54ab7e6e0a5e6de6dc",
+   "qpdf": "3 warnings (page Resources missing, repaired)",
+   "timings": {
+    "first_thumb_ms": 852,
+    "action_to_download_ms": 3177
+   },
+   "fit_height_pct": {
+    "1366x657_files": 39,
+    "1366x657_pages": 32,
+    "390x664": 20
+   }
+  },
+  {
+   "feature": "f16-e1-editor",
+   "item": "T2/T3 editor tasks and M12 captures",
+   "captured": "2026-11-24",
+   "files": {
+    "sejda-t2-text-sign-lineedit.pdf": "b5484cdbdec44eab3ef5c566440de98d99cd8e4a1cf7fb5e2118372c0c680b6f",
+    "sejda-t3-whiteout-shapes-annots.pdf": "af5c66cfef04bc61408c41b8ca91e0f3639cc64b47e1aa47121a77b2e1f106cc"
+   },
+   "timings": {
+    "first_page_ms": 5500,
+    "apply_to_ready_ms": 7700
+   },
+   "fit_height_pct_after_scroll": {
+    "1280-1536": "90-92",
+    "1920x969": 83,
+    "390x664": "46-69"
+   }
+  }
  ],
  "berrypdf_outputs": {
-  "res-delete-pdf-pages-1366-twelve.pdf": {"sha256": "271fca3ff25cc9a662d8a1e6bfcba7e124f6629d2ff1ccea3eaea0332e48ecd5", "bytes": 2742, "pages": 11, "qpdf": "clean", "render_max_diff_vs_source": 0},
-  "m8-merge-alpha_merged.pdf": {"sha256": "b193036fc0729e63a5f9604756a0735c83347ba22371a40e4f4e8aacfbe6092a", "bytes": 3323, "pages": 10, "qpdf": "clean", "links_on_toc": 3, "outline": ["Alpha intro", "Alpha detail", "Alpha end", "Bravo start"]},
-  "res-split-pdf-1366-twelve-split.zip": {"sha256": "e71a62e3ae5ff128c76a1ee47be065c29a1bf5fb2086ae9ef0206bfd6f0bb530", "entries": ["twelve-1-3.pdf", "twelve-4-8.pdf", "twelve-9-12.pdf"]},
-  "out-flow-1.pdf": {"sha256": "409d7c65f288c140d9d0271c4ec8fd0ce4f285908af9d5abf0bf307a11da7084", "bytes": 12299, "qpdf": "clean", "note": "editor 11-object flow, same edits as F16 round 2"},
-  "out-image.pdf": {"sha256": "0911951cecf79b06e92202e943f53d433dc62f36efb18805c69cf28bfa903ac8"},
-  "form-filled.pdf": {"sha256": "e464b8747811f2a6b4da55cb3b5517e4575c7addaf4bdd65240a103061e681bc", "qpdf": "clean"},
-  "edittext.pdf": {"sha256": "d61586921c544aff9b57924b3a787deb1f17c4578c08d8ec817f5b988988a7da", "qpdf": "clean"}
+  "res-delete-pdf-pages-1366-twelve.pdf": {
+   "sha256": "271fca3ff25cc9a662d8a1e6bfcba7e124f6629d2ff1ccea3eaea0332e48ecd5",
+   "bytes": 2742,
+   "pages": 11,
+   "qpdf": "clean",
+   "render_max_diff_vs_source": 0
+  },
+  "m8-merge-alpha_merged.pdf": {
+   "sha256": "b193036fc0729e63a5f9604756a0735c83347ba22371a40e4f4e8aacfbe6092a",
+   "bytes": 3323,
+   "pages": 10,
+   "qpdf": "clean",
+   "links_on_toc": 3,
+   "outline": [
+    "Alpha intro",
+    "Alpha detail",
+    "Alpha end",
+    "Bravo start"
+   ]
+  },
+  "res-split-pdf-1366-twelve-split.zip": {
+   "sha256": "e71a62e3ae5ff128c76a1ee47be065c29a1bf5fb2086ae9ef0206bfd6f0bb530",
+   "entries": [
+    "twelve-1-3.pdf",
+    "twelve-4-8.pdf",
+    "twelve-9-12.pdf"
+   ]
+  },
+  "out-flow-1.pdf": {
+   "sha256": "409d7c65f288c140d9d0271c4ec8fd0ce4f285908af9d5abf0bf307a11da7084",
+   "bytes": 12299,
+   "qpdf": "clean",
+   "note": "editor 11-object flow, same edits as F16 round 2"
+  },
+  "out-image.pdf": {
+   "sha256": "0911951cecf79b06e92202e943f53d433dc62f36efb18805c69cf28bfa903ac8"
+  },
+  "form-filled.pdf": {
+   "sha256": "e464b8747811f2a6b4da55cb3b5517e4575c7addaf4bdd65240a103061e681bc",
+   "qpdf": "clean"
+  },
+  "edittext.pdf": {
+   "sha256": "d61586921c544aff9b57924b3a787deb1f17c4578c08d8ec817f5b988988a7da",
+   "qpdf": "clean"
+  }
  },
  "berrypdf_timings": {
-  "chooser_open_ms_median_1280": {"delete": 1008, "merge": 954, "edit": 952},
-  "first_thumb_ms_median_1280_after_0_5s_idle": {"delete": 1170, "merge": 1236, "edit": 288},
-  "first_thumb_ms_median_1280_after_4s_idle": {"delete": 880, "merge": 656},
-  "action_to_download_ready_ms_median": {"delete": 1872, "merge": 1347, "edit": 933},
-  "cancel_click_to_ready_ms_300_pages": [184, 181, 230],
+  "chooser_open_ms_median_1280": {
+   "delete": 1008,
+   "merge": 954,
+   "edit": 952
+  },
+  "first_thumb_ms_median_1280_after_0_5s_idle": {
+   "delete": 1170,
+   "merge": 1236,
+   "edit": 288
+  },
+  "first_thumb_ms_median_1280_after_4s_idle": {
+   "delete": 880,
+   "merge": 656
+  },
+  "action_to_download_ready_ms_median": {
+   "delete": 1872,
+   "merge": 1347,
+   "edit": 933
+  },
+  "cancel_click_to_ready_ms_300_pages": [
+   184,
+   181,
+   230
+  ],
   "cancel_click_to_ready_ms_990_pages": 880,
-  "result_swap_layout_shift": {"delete_1366": 0.2818, "merge_1366": 0.2818, "split_1280": 0.2996, "organize_1280": 0.2996, "delete_390": 0.0524, "merge_390": 0.0147},
-  "download_present_after_done_ms": {"1366": 0, "390": 301, "320": 306},
-  "editor_download_enabled_before_first_page_ms": {"para-times": 131, "big-990": 989}
+  "result_swap_layout_shift": {
+   "delete_1366": 0.2818,
+   "merge_1366": 0.2818,
+   "split_1280": 0.2996,
+   "organize_1280": 0.2996,
+   "delete_390": 0.0524,
+   "merge_390": 0.0147
+  },
+  "download_present_after_done_ms": {
+   "1366": 0,
+   "390": 301,
+   "320": 306
+  },
+  "editor_download_enabled_before_first_page_ms": {
+   "para-times": 131,
+   "big-990": 989
+  }
  },
  "berrypdf_fit_height_pct": {
-  "page_tools_1366x657": 66.8, "page_tools_1280x632": 65.5, "page_tools_1536x730": 70.1, "page_tools_1920x969": 77.5,
-  "390x664": {"split": 65.2, "extract": 57.4, "delete": 65.2, "organize": 63.4, "combine": 63.4, "alternate": 63.4, "merge": 63.4},
-  "editor_after_scroll": {"1280x632": 71.5, "1366x657": 72.6, "1536x730": 75.3, "1920x969": 81.4, "390x664": 68.4}
+  "page_tools_1366x657": 66.8,
+  "page_tools_1280x632": 65.5,
+  "page_tools_1536x730": 70.1,
+  "page_tools_1920x969": 77.5,
+  "390x664": {
+   "split": 65.2,
+   "extract": 57.4,
+   "delete": 65.2,
+   "organize": 63.4,
+   "combine": 63.4,
+   "alternate": 63.4,
+   "merge": 63.4
+  },
+  "editor_after_scroll": {
+   "1280x632": 71.5,
+   "1366x657": 72.6,
+   "1536x730": 75.3,
+   "1920x969": 81.4,
+   "390x664": 68.4
+  }
  },
- "lighthouse_mobile_perf": {"delete-pdf-pages": [97, 95, 98], "merge-pdf": [92, 89, 94], "edit-pdf": [96, 95, 96]},
- "axe": {"scans": 29, "critical": 0, "serious": 2, "moderate": 1}
+ "lighthouse_mobile_perf": {
+  "delete-pdf-pages": [
+   97,
+   95,
+   98
+  ],
+  "merge-pdf": [
+   92,
+   89,
+   94
+  ],
+  "edit-pdf": [
+   96,
+   95,
+   96
+  ]
+ },
+ "axe": {
+  "scans": 29,
+  "critical": 0,
+  "serious": 2,
+  "moderate": 1
+ },
+ "run2": {
+  "evaluated": "2026-11-27",
+  "candidate": {
+   "url": "http://127.0.0.1:3000",
+   "build": "local production build of e574312 (plain, no cloud sources)",
+   "next_build_id": "xa9ssF6dYQm_0DZ9GedNe",
+   "health_version": "dev"
+  },
+  "raw_evidence": "/mnt/project-files/evals-cache/f25-tool-layout-standard/run2/",
+  "eval_screenshots": "/mnt/project-files/designs/tool-layout-standard/eval-run2/",
+  "reference_tasks_run": 0,
+  "reference_requests": {
+   "count": 5,
+   "captured": "2026-11-27",
+   "why": "M12 needed the reference's behaviour on a small scroll up, which the cache did not hold. One page load of the editor page, no upload, throttled to 1 request per 1.05 s, images/fonts/third-party blocked",
+   "observation": "site header is position:relative in normal flow; after scrolling 1800 px and then up 100 px or 400 px it stays off screen, so the reference keeps its scrolled page share",
+   "files": {
+    "sejda-editor-landing-1366x657-1-rest.png": "509dd4559f8fbd480bfa24ecaec6ddc4f6ec4921bc49eac628d247f8f94c41ad",
+    "sejda-editor-landing-1366x657-2-down.png": "736beaa9e1a70c2ca36541af3240d810e407046e5d7b7c0f3e97cfc6137e416a",
+    "sejda-editor-landing-1366x657-3-up100.png": "edc22042023b23df42855fd6a586554e1161a4c5df1128b1f88a32ba33c0ddea",
+    "sejda-editor-landing-1366x657-4-up400.png": "f2188606e80c8758791cf4725bd853d923b40822a11434eaee0ec7236c33d760"
+   }
+  },
+  "m12_editor_pages_pct_height": {
+   "1366x657": {
+    "rest": 77.8,
+    "scrolled_down_at_62pct": 89.6,
+    "scrolled_down_sweep_mean": 90.7,
+    "small_scroll_up_100px": 78.7,
+    "scroll_up_sweep_mean": 80.3,
+    "reference": {
+     "as_loaded": 43,
+     "scrolled": 91,
+     "after_small_scroll_up": "~91 (header does not return)"
+    }
+   },
+   "1280x632": {
+    "rest": 76.9,
+    "scrolled_down_at_61pct": 89.2,
+    "scrolled_down_sweep_mean": 90.3,
+    "small_scroll_up_100px": 77.8,
+    "scroll_up_sweep_mean": 78.9,
+    "reference": {
+     "scrolled": 90
+    }
+   },
+   "1536x730": {
+    "scrolled_down_sweep_mean": 91.6,
+    "scroll_up_sweep_mean": 81.9,
+    "reference": {
+     "scrolled": 92
+    }
+   },
+   "1920x969": {
+    "scrolled_down_sweep_mean": 93.8,
+    "scroll_up_sweep_mean": 86.9,
+    "reference": {
+     "scrolled": 83
+    }
+   },
+   "navbar_returns_on_scroll_up_px": ">=20 (10 px does not)",
+   "runs": "3 per viewport at 1366 and 1280, identical"
+  },
+  "result_swap_layout_shift_after_click": {
+   "delete_1366x657": 0,
+   "delete_390x664": 0,
+   "delete_1920x1080": 0,
+   "merge_1366x657": 0,
+   "merge_390x664": 0,
+   "merge_1920x1080": 0,
+   "split_1280x632": 0,
+   "organize_1280x632": 0,
+   "runs": "3 each for Delete/Merge, 1 for Split/Organize",
+   "blank_frames": 0,
+   "whole_flow_cls_max": 0.0018
+  },
+  "editor_flow_cls": {
+   "open": 0,
+   "scroll_with_navbar_slide": 0,
+   "download_max": 0.0001
+  },
+  "editor_download_enabled_vs_first_paint": "same frame (para-times 350-390 ms, big-990 2.5-2.7 s)",
+  "result_download_rect_equals_primary": {
+   "1366": "[1114,79,177,48] vs [1114,80,177,48]",
+   "1280": "[1071,79] vs [1071,80]",
+   "390": "[119,601,256,48] vs [119,602,256,48]",
+   "320": "[119,505,186,48] vs [119,506,186,48]"
+  },
+  "download_present_after_done_ms": {
+   "390": 0,
+   "320": 0,
+   "1366": 0
+  },
+  "cancel_990_split_hw_click_to_ready_ms": [
+   65,
+   75,
+   87
+  ],
+  "pill_after_primary_hw_click_ms": [
+   73,
+   77,
+   84
+  ],
+  "post_cancel_longtask_ms": [
+   855,
+   832,
+   735
+  ],
+  "first_thumb_ms_local_real_mouse_pick": {
+   "delete_0_5s_idle": 208,
+   "delete_4s_idle": 224,
+   "merge_0_5s_idle": 276,
+   "merge_4s_idle": 235,
+   "note": "localhost, not comparable with staging or reference"
+  },
+  "lighthouse_mobile_perf_uncontended": {
+   "edit-pdf": [
+    97,
+    96,
+    92
+   ],
+   "merge-pdf": [
+    92,
+    95,
+    85
+   ],
+   "delete-pdf-pages": [
+    93,
+    99,
+    100
+   ],
+   "merge_tbt_ms": [
+    334,
+    262,
+    572
+   ],
+   "discarded_contended_set": {
+    "edit-pdf": [
+     81,
+     83,
+     84
+    ],
+    "merge-pdf": [
+     95,
+     94,
+     93
+    ],
+    "delete-pdf-pages": [
+     90,
+     98,
+     93
+    ]
+   }
+  },
+  "axe": {
+   "scans": 27,
+   "critical": 0,
+   "serious": 0,
+   "moderate": 0,
+   "minor": 0
+  },
+  "screenshots": {
+   "delete-1-loaded-1280x632.png": "d8d67e2b29e8986ce886ed6ff7e0442bda19b12c66b89c6d4f5d435784a8b23d",
+   "delete-1-loaded-390x664.png": "eb93c6ed9db3de0ed4a607757e924bd81b8b56acbc9b44724d486f626c95fb01",
+   "delete-2-working-1280x632.png": "0bf8b99a70a4223fca7d0b7dd3a9c8c6c730eb33e6fcf77c0e815e0970a79299",
+   "delete-2-working-390x664.png": "63570c4d1b2c0933d6db2e2c108d78e84980b7349cfae03bf25c800a655fb913",
+   "delete-3-result-1280x632.png": "3ba55f234b19837908aab45d59437acdfeb62ceb373d8cb6165e9c27595d3004",
+   "delete-3-result-390x664.png": "01067135483643cf89a3fe9ffa8d4419468fbdb10e4937b88cd1cc061fd6754e",
+   "edit-1-loaded-1280x632.png": "7dcd6c52ed602a2c02d4d172caf842f2f495149e8458ba736244918cf8dfd666",
+   "edit-1-loaded-390x664.png": "5518e1265c7136e88202346ff45ac60591a6ebde2d7a74dfc4ae346f172d4876",
+   "edit-2-working-1280x632.png": "641d43d976aaba204f7074570b11a9c7fb7e379b1d73653defa6e7c8000ef0c5",
+   "edit-2-working-390x664.png": "90292afafce99d5455f562a49b82970cfad9f42e8a2afecb6399c0d4617f9f00",
+   "edit-3-result-1280x632.png": "7348ff0b6524e4e86ff71a4d6be4fbf28237bc61599a28bb75dbe9e6e882901f",
+   "edit-3-result-390x664.png": "2709e2414466200e3560062899f8f7c92746318acdf6111248d70c689c9b8daa"
+  }
+ }
 }

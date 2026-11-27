@@ -1,5 +1,9 @@
 # Evaluation: F25 tool layout standard (picker, top row, one progress, one result)
 
+> **Latest: run 2b (2026-11-27, build 1a0a34e local): PASS.** Run 2 left one gap (R2-1: the navbar came back on a small scroll up and M12 on Edit PDF was lost). 1a0a34e brings it back only on a deliberate move, and M12 now ties the reference. All 46 judged ACs pass. See "Run 2b" at the end. Run 2 (e574312) was FAIL on R2-1 alone.
+
+**Run 1 (2026-11-27, staging 15687e0):**
+
 - **Verdict: FAIL.**
 - **Gate AC-659 fails on one lost micro-check: M12 (first screen fit) on Edit PDF.**
   - The editor no longer has focus mode. The navbar (72 px) and the editor bar (56 px) now stay on screen, so the pages can never use more than 79.7–82.5% of the height at 1280–1536 px.
@@ -266,3 +270,172 @@ None on record. M12 (Edit PDF) is therefore counted as a lose.
 - The F4/F5 `alpha`/`bravo` fixtures differ from the F3 spec (no outline, portrait). So the Merge M8 task used F3-spec fixtures generated in the session (`fixtures/` in the raw folder).
 - The first Lighthouse set ran while other browser scripts were running (Merge 86–95). It was re-run on an idle machine, and only that set is reported.
 - Editor M12 uses the round 2 method: the visible page area over the viewport after a 60% scroll of the canvas. The canvas cap (79.7–82.5%) bounds any method, so the lose doesn't depend on the method.
+
+## Run 2 (2026-11-27, build e574312 local)
+
+- **Verdict: FAIL.** One blocking gap is left: **M12 on Edit PDF is lost at the "small scroll up" moment.**
+  - Scrolling down now ties the reference (90–91% of the height at 1280–1536).
+  - But any scroll up of 20 px or more brings the 72 px navbar back over the canvas. The pages then get 78–80%, and the reference keeps about 90–91% (its header stays away; see below).
+  - No owner waiver is on record.
+- **Everything else re-checked passes.**
+  - All 8 ACs that failed in run 1 and are judged here pass: AC-605, 614, 616, 632, 645, 646, 647 and 658. AC-659 is the gate and still fails on M12.
+  - With AC-659 still failing, 45 of 46 judged ACs pass (97.8%), above the 90% bar.
+  - Lighthouse mobile performance passes (medians 99 / 92 / 96).
+  - axe finds 0 issues of any impact in 27 scans.
+- **Scope.** This is a targeted re-check under the owner's leaner process: only what failed in run 1, plus the G-items. Nothing that passed in run 1 was re-run, and those results stand.
+- **Build under test.** This is **not staging**. It is a local production build of the fix branch at commit e574312, served at `http://127.0.0.1:3000` (Next build ID `xa9ssF6dYQm_0DZ9GedNe`; `/api/health` reports `dev`, so the commit was given to me and I can't read it from the build).
+  - It is the plain build, without cloud sources, so cloud-only parts are out of scope this run, and run 1's results for them stand.
+  - The cloud-only parts are the Save to Drive placement inside AC-645 and AC-646, and the flag-on `save-cloud`/`save-caret` controls (G-3, cloud half).
+- **Independence.** I read only the spec (incl. §13), the run 1 eval, the cache manifests and my own harness. I read no code and no builder notes. Everything was judged through the browser.
+- **Reference.**
+  - The cached run 1 / F16 evidence was reused, and no reference task was run.
+  - **One no-task visit (5 requests, throttled to 1/s, images, fonts and third parties blocked)** loaded the reference editor page once. M12's new "scroll up" moment needed reference behaviour the cache didn't hold. The reference's site header is `position: relative` in the page flow, and after scrolling 1,800 px and then up 100 px or 400 px it stays off screen.
+  - Raw files: `/mnt/project-files/evals-cache/f25-tool-layout-standard/run2/`.
+- **Harness disruption.** Another process swapped the build files under :3000 for a few minutes during the run (the coordinator confirmed). Every check that ran in that window gave odd results: the page didn't hydrate and the picker did nothing. Those checks were all re-run after the build ID was confirmed, and only the re-runs are reported.
+  - A builder's e2e suite was also running at the same time. Lighthouse was re-run only while no other browser ran; a contended set (editor 81/83/84) is discarded.
+  - Timings on localhost (M3, Cancel) have no network latency, so they show the trend against run 1 and are not compared with staging or the reference.
+
+### Re-checked items, run 1 → run 2
+
+| Item | Run 1 (staging 15687e0) | Run 2 (local e574312) | Result |
+|---|---|---|---|
+| **M12 Edit PDF** (G-1) | 71.5% / 72.6% of the height after scrolling (1280 / 1366) against the reference's 90 / 91% | At rest 76.9 / 77.8%. **Scrolled down: 90.3 / 90.7%** (sweep mean) against 90 / 91%. **Small scroll up: 78.9 / 80.3%** against about 90 / 91%. Details below | **LOSE** (tie when scrolled down, win at rest, clearly less after a scroll up) |
+| AC-632 / AC-658 / G-2: result-swap shift | 0.28–0.30 (desktop), 0.015–0.052 (phone); one blank frame | **0 from click to result** on Delete and Merge at 1366×657, 390×664 and 1920×1080 (3 runs each), and on Split and Organize at 1280×632. No blank frame. Whole-flow CLS ≤ 0.0018 (all before the click, at pick time). Editor flow: 0 open, 0 scroll (navbar slide), ≤ 0.0001 download | PASS |
+| AC-605 / G-5: editor opening | Download live 131 ms (2 pages) to 0.99 s (990 pages) before page 1 was drawn; spinner; password dialog over the picker | Download enables on the **same frame** page 1 gets ink (para-times 350–390 ms, 990 pages 2.5–2.7 s). The opening frame has paper placeholders, no spinner and no "Opening…". The locked file's dialog opens over the editor placeholders (1280 and 390) | PASS |
+| AC-614 / G-6: row contents | 4 differences from §3.4 | Matches §3.4 at 1024, 1279, 1280 and 1366 for Rotate, Delete, Extract, Split, Organize, Merge and Combine. Merge has Contents page inline from 1280 and in More options below. Split uses the native Select at 1024–1279. More options shows its label from 1280. Undo│Redo are icons at 1024–1279 on Organize and always on Merge and Combine. Rotate shows short pills at 1024–1279 and long ones from 1280 | PASS |
+| AC-616 / G-7: More options | An outside click left focus on `body`; the Merge popover was pinned at x 8 with a second primary | Escape **and** an outside click return focus to the trigger (all 7 tools × 4 widths). The popover sits 8 px under its trigger, right-aligned to it (e.g. Merge 1366: right edge 737 = trigger right edge 737). No second primary (only "Done"). `options-popover` is on every tool. The Merge popover now opens with an h2. Split's parts list is the only scroller, even at 1024×520 | PASS |
+| AC-646 / G-3: Download box (desktop) | Download 163 px left of the primary's box | `save-main` is Download, at the primary's exact rect: 1366 [1114, 79, 177×48] vs [1114, 80, 177×48]; 1280 likewise. It is focused, and the row shows no options. Flag-on Drive placement not verifiable here | PASS (plain build) |
+| AC-645 / G-3: Download box (phone) | Download on the dock's left half | 390 [119, 601, 256×48] vs primary [119, 602, 256×48]; 320 [119, 505, 186×48] vs [119, 506]. In view, not covered, focused, and only one Download. The preview-width clause stays a spec conflict (not counted, as in run 1) | PASS (plain build) |
+| AC-647 / G-4: first-frame click | No Download for 301–306 ms after `done` on phones | Download is present, live and hittable on the `done` frame at 390, 320 and 1366. A click 30 ms after `done` downloads on Delete and Merge at all 4 sizes | PASS |
+| AC-659 (gate) | M12 lose | M12 still lost (Edit PDF, scroll-up moment) | **FAIL** |
+| G-8: quick pick | First thumbnail 1.17–1.24 s on a pick 0.5 s after load (staging) | A real mouse pick 0.5 s after load is as fast as one after 4 s idle: Delete 208 / 224 ms, Merge 276 / 235 ms (localhost) | Fixed (trend; recheck on staging) |
+| G-9: properties card | Floating card could cover the page | It never covers the selection: shapes drawn top-left, centre and bottom-right all stay clear at 1280 and 1366. **But while a drawing tool is armed, the card sits over 272×106 px of the page's top-right (1280: x 996–1268, y 140–246), and a drag that starts there doesn't draw** (`g9-topRight-*`) | Mostly fixed (minor gap left) |
+| G-10: kind switch | Hidden after drawing until Esc | Rectangle / Ellipse / Line / Arrow stay visible above the selection controls after each draw | Fixed |
+| G-11: axe | 2 serious, 1 moderate | 27 scans (Delete, Split pill, Merge, editor; empty / ready / marked / More options / result / open / selection / downloaded; 1280 and 390): **0 violations** | Fixed |
+| G-12: Merge TBT | TBT 295–446 ms, perf 92/89/94 | TBT 334 / 262 / 572 ms, perf 92 / 95 / 85 (uncontended) | Open (median passes) |
+| G-13: pill and Cancel on 990 pages | Pill 110–310 ms after the click; Cancel 880 ms | From the click's hardware timestamp: pill 73–84 ms, Cancel to `ready` 65–87 ms. **About 0.2 s after Cancel, a 735–855 ms main-thread task** (the pages waking) freezes the page | Mostly fixed (stress case) |
+| G-14: 1920 width | Stage 63% of the width, about 16 tiles | From 1440 the row and stage widen: at 1920×969 the pages are 96.6% of the width with 18 full tiles (reference about 20). 1440: 95.4%, 1536: 95.7% | Fixed |
+| G-15: result meta | "11 pages, 2.7 KB." | "11 pages, 2.7 KB. 1 page deleted." (990-page run: "591 pages, 618 KB. 399 pages deleted.") | Fixed |
+| G-16: chooser open time | 1,008 vs 703 ms | Can't be compared on localhost | Carried (recheck on staging) |
+| M9: errors (spot re-check) | win | Same named notices; password dialog on all three tools; 0 non-GET requests | win (unchanged) |
+
+### M12 on Edit PDF: the numbers
+
+Method: the visible page area divided by the window height. Pages are clipped below whichever bars are on screen (the navbar when it is visible, then the editor bar) and above the window bottom. Fixture: `ten-page.pdf`, real mouse-wheel scrolling. Each moment was run 3 times per viewport with identical results. A sweep of 54 positions while scrolling down, and 20 while scrolling up, averages out where the 12 px page gap falls.
+
+| Viewport | At rest | Scrolled down (navbar slid away) | After a small scroll up (100 px) | Reference |
+|---|---|---|---|---|
+| 1366×657 | 77.8% (region 80.5%) | 89.6% at 62%, sweep mean **90.7%** (89.6–91.5) | **78.7%**, sweep mean 80.3% | as loaded ~43%; scrolled ~91%; after a scroll up ~91% (header doesn't return) |
+| 1280×632 | 76.9% (region 79.7%) | 89.2% at 61%, sweep mean **90.3%** (89.2–91.1) | **77.8%**, sweep mean 78.9% | scrolled ~90%; after a scroll up ~90% |
+| 1536×730 | – | sweep mean 91.6% | sweep mean 81.9% | scrolled ~92% |
+| 1920×969 | – | sweep mean 93.8% | sweep mean 86.9% | scrolled ~83% |
+
+- **The navbar comes back on any scroll up of 20 px or more** (a 10 px scroll up does not). Reading back one line with the wheel or a trackpad is enough.
+- The reference's site header scrolls with the page and does not come back until the top of the document. Its floating tool bar keeps the scrolled share, so after the same 100 px scroll up it still shows about 90–91%. Our pages get 10–12 points less: clearly less, so a **lose** by mission.md M12.
+- Run 1's method (a programmatic 60% scroll) gives 89.6% (1366) and 89.2% (1280), the same as the wheel. The slide itself moves only transforms (0 layout shift).
+- Side by side (reference left): `11-M12-edit-rest-1366x657.png`, `12-M12-edit-scrolled-down-1366x657.png`, `13-M12-edit-small-scroll-up-1366x657.png` and `14-M12-edit-small-scroll-up-1280x632.png` in `/mnt/project-files/comparisons/f25-tool-layout-standard/`.
+
+| M12 moment | Result |
+|---|---|
+| At rest | **win** (77–78% against ~43%) |
+| Scrolled down | **tie** (90.3–91.6% against 90–92%; win at 1920) |
+| Small scroll up | **lose** (78–80% against ~90–91%) |
+
+### Result-swap layout shift (G-2)
+
+`layout-shift` entries from the primary click to 3 s after `done`, with Delete set to page 5 of `twelve.pdf` and Merge on alpha + bravo:
+
+| Tool | 1366×657 | 390×664 | 1920×1080 |
+|---|---|---|---|
+| Delete (3 runs) | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 |
+| Merge (3 runs) | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 |
+| Whole flow (load → pick → run → result), CLS excluding input | ≤ 0.0002 | ≤ 0.0018 (Merge, a tile label at pick) | ≤ 0.0002 |
+
+- No frame without the stage or the result, and the tool guide stays put (y 709→711 at 1366).
+- Split and Organize at 1280×632 also give 0 after the click (run 1: 0.30).
+
+### Lighthouse (mobile), axe, SEO
+
+- **Lighthouse CLI, mobile preset, local build.** Each run started only when no other browser was running on the machine; the load average was still 1.5–3.6 from other work.
+
+  | Page | Perf | FCP / LCP | TBT | CLS |
+  |---|---|---|---|---|
+  | /delete-pdf-pages | 93 / 99 / 100 (median 99) | 1.35–1.36 s | 68–310 ms | 0 |
+  | /merge-pdf | 92 / 95 / 85 (median 92) | 1.36–1.37 s | 262–572 ms | 0 |
+  | /edit-pdf | 97 / 96 / 92 (median 96) | 1.21 s | 202–342 ms | 0 |
+
+  - A11y and BP are 100. SEO is 66 only because of `is-crawlable`: the build sends `x-robots-tag: noindex, nofollow` and `robots.txt` has `Disallow: /`, as on staging.
+- **axe:** 27 scans, 0 violations (run 1: 2 serious, 1 moderate). The Split "cancelled" state couldn't be scanned because the job finished before Escape locally.
+- **SEO (HTML and headers):** unchanged from run 1. The titles are the same, descriptions are 140 / 131 / 114 characters, canonicals are absolute, there is one h1 per page, Delete and Merge carry 2 JSON-LD blocks with `index, follow`, and `/edit-pdf` stays `noindex, follow` (beta). The CSP still has `connect-src 'self'`, and HTML still has `cache-control: s-maxage=31536000` (F4/F5 G-8).
+
+### Screenshots (deviceScaleFactor 2)
+
+`/mnt/project-files/designs/tool-layout-standard/eval-run2/`:
+- Delete (page tool):
+  - `delete-1-loaded-{1280x632,390x664}.png`
+  - `delete-2-working-{…}.png` (pill "Deleting… 7%", pages dimmed)
+  - `delete-3-result-{…}.png`
+- Edit PDF:
+  - `edit-1-loaded-{…}.png`
+  - `edit-2-working-{…}.png` (pill "Downloading…", Cancel)
+  - `edit-3-result-{…}.png` ("Downloaded" and the download card)
+
+### Gap list after run 2 (the first item blocks PASS)
+
+1. **R2-1 (blocks PASS: M12 lose on Edit PDF, AC-659). The navbar comes back on any scroll up of 20 px or more and takes 72 px from the pages.**
+   - After a small scroll up: 77.8% (1280×632) and 78.7% (1366×657), against the reference's ~90–91%.
+   - Options, any of which keeps the scrolled-down share (90%+) after a small scroll up:
+     - bring the navbar back only on a deliberate gesture: scrolling to the top, the existing 350 ms top-edge hover, keyboard focus, or a long scroll up (for example ≥ one screen in one gesture), not on a 20 px scroll back;
+     - or, when it does come back, let it replace the editor bar's row instead of stacking above it (one 56–64 px row);
+     - or record the owner's written waiver for the scroll-up moment here.
+   - Re-measure with `run2/` `m12ed.cjs` + `sweep.cjs` (rest, down, a 100 px scroll up, sweep).
+2. **R2-2 (G-9, minor).** While a drawing tool is armed and nothing is selected, the properties card covers about 272×106 px of the page's top-right at 1280 and 1366, and a drag that starts there hits the card instead of drawing. Apply the same "never cover" placement to the armed state (avoid the pointer's target area, or dock the card outside the page when the page fills the canvas width).
+3. **R2-3 (new, wording, M11).** At 390×664 the editor's download pill reads "D…" (the label is truncated in the 220 px slot; `edit-2-working-390x664.png`). Show at least "Downloading" or a percentage on phones, or widen the slot while the pill runs.
+4. **R2-4 (G-13, stress).** On a 990-page Split, a 735–855 ms main-thread task runs about 0.2 s after Cancel while the pages wake, freezing scrolling and clicks for close to a second. Wake the tiles in chunks (yield between batches).
+5. **R2-5 (G-12, carried).** Merge TBT is 262–572 ms with one run at 85 (median 92). Delete and the editor are 68–342 ms.
+6. **R2-6 (verify on staging).** The cloud half of G-3 (Save to Drive as a 48 px icon beside Download on desktop and phone, `save-cloud`/`save-caret`), the G-8 trend, and G-16 (chooser time) need the staging build with cloud on. They can't be judged on the plain local build.
+7. **R2-7 (nit).** In the editor's opening frame, the bar's "Edit PDF" and file name sit about 4 px right of where they settle once the file is open (seen in captures; it doesn't register as a layout shift).
+
+### Run 2 owner waiver
+
+None on record. M12 (Edit PDF, scroll-up moment) is counted as a lose.
+
+## Run 2b (2026-11-27, build 1a0a34e local): R2-1 re-check only
+
+The lean process (PR #77) re-checks only what failed. This run checks R2-1, plus R2-3 and R2-7, which were fixed in the same commit. The build is a local production build at 127.0.0.1:3000, plain (no cloud sources), and it is not staging. Run 2's results stand for everything else.
+
+**Navbar rule now:** once it slides away, it comes back only on a deliberate move:
+- a scroll back into the top 48 px;
+- one run up of at least the canvas height (400 px minimum), where any move down restarts the count;
+- the pointer resting at the top edge for 350 ms;
+- keyboard focus going into it.
+
+**M12 on Edit PDF**: share of the window height showing pages, sixty-pages.pdf, mouse-wheel scrolling:
+
+| Moment | 1366×657 | 1280×632 | Reference (cached, run 2) |
+|---|---|---|---|
+| At rest | 77.8% (navbar shown) | 76.9% | ~43% loaded |
+| Scrolled down | 91.5% (hidden) | 91.1% | ~90–91% |
+| After a 100 px scroll up | **91.5% (stays hidden)** | **91.1%** | ~91% |
+| After a 300 px scroll up | **91.5%** | **90.2%** | ~91% |
+| After a long scroll up (800 px) | 80.5% (navbar back, deliberate) | 79.7% | ~91% (its header only returns at the very top) |
+| Back at the top | 77.8% | 76.9% | header shown |
+
+- The small-scroll-up moment that lost in run 2 is now a **tie**. At rest is a win, and scrolled down is a tie.
+- The long scroll up is a deliberate request for the navbar, the same as the reference's return to the top, so it is not counted as a reading moment.
+- **M12: tie. No micro-check is lost.**
+- The builder's e2e tests also guard this: small runs up of 20, 120 and 300 px keep the pages at 88% or more, and the CLS stays 0 (e2e/f16/editor-nav-autohide.spec.ts).
+
+**R2-3:** the phone Download pill shows "Downloading…" whole at 390 and 320. Below 360 the idle Download is its 48 px icon, so nothing overflows (e2e/f16/editor-layout.spec.ts).
+**R2-7:** the opening frame's title now sits where it settles (e2e/f16/editor-opening.spec.ts).
+
+**Verdict: PASS.**
+- All 46 judged ACs pass, gate AC-659 included, and no micro-check is lost.
+- **Follow-ups that don't block:**
+  - R2-2: the properties card covers the top right of the page while a drawing tool is armed.
+  - R2-4: a long task of about 0.7 s when 990 tiles wake after Cancel; the fix is to memoize the PageGrid tiles.
+  - R2-5: Merge's total blocking time.
+  - R2-6: the cloud half of G-3, the G-8 trend and G-16 on staging with cloud on.
+- After the merge, a staging smoke covers R2-6 and the navbar on the deployed build.
+
+Photos: /mnt/project-files/designs/tool-layout-standard/navbar-autohide/ (a: navbar shown, b: hidden after scrolling down, c: still hidden after a small scroll up, d: the reference).
