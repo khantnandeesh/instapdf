@@ -1,5 +1,6 @@
 # Evaluation: F4+F5 page tools (Split, Extract pages, Delete pages, Organize, Combine & reorder, Alternate & mix)
 
+- **Current verdict (run 2, 2026-11-27, staging 763fe53): PASS.** See "Run 2" at the end. The run 1 record below is kept as it was.
 - **Verdict: FAIL.** Two micro-checks are a *lose*: **M4 (document display)**, because our page thumbnails are drawn from a canvas smaller than the space they fill, so they look soft next to the reference at both 1x and 2x; and **M8 (output fidelity)**, because on the same tasks our files are 6–96% larger than the reference's (every other fidelity measure is equal or better). No owner waiver is on record. Everything else clears the bar: **109/109 ACs pass (P0 52/52)**, all 15 inherited F1 ACs run pass, Lighthouse mobile performance is 95–100 on all six pages (median 97–99 per page), and axe finds **0 violations of any impact** in 58 scans.
 - To turn this into PASS: fix G-1 (thumbnail backing resolution) and G-2 (object streams), then re-run BerryPDF's side against the cached reference evidence. No new Sejda task is needed for that. Fix G-3 in the same round as well: it does not fail an AC as written, but pasting ranges into Split and pressing Enter at once gives the wrong file.
 - Evaluated: 2026-11-26, 19:20–21:35 UTC, by parity-evaluator. Independent: I read only `docs/specs/f4-f5-page-tools.md`, `docs/process/mission.md` and earlier evals. I did not read any code, PR text or builder notes.
@@ -277,3 +278,99 @@ None recorded.
 - Lighthouse twice returned a run with no performance score (a runtime error in the headless browser, once on Extract and once on Combine); both runs were repeated and only complete runs are reported.
 - §8b.6 (run-time page cap), the "Delete all pages" error (§8b.4, second half) and §8b.7 (every even page card) are still open; see the runs table. One booked slot covers §8b.6; §8b.4b and §8b.7 need one each.
 - Fixtures and raw AC results were in the session scratchpad and are not committed; the fixtures are copied to `/mnt/project-files/evals-cache/f4-f5-page-tools/eval/fixtures/` and `mkfx.mjs` in the scripts folder regenerates them.
+
+## Run 2 (re-evaluation after the fix round), 2026-11-27
+
+- **Verdict: PASS.** No micro-check is a *lose* (7 win, 5 tie). **109/109 ACs pass (P0 52/52)**, plus the inherited F1 subset. Lighthouse mobile performance is 96–100 on all 18 runs. axe finds 0 violations of any impact in 54 scans. Both run 1 losses are fixed: M4 is now a tie (G-1) and M8 is now a win (G-2). G-3, G-6, G-7 and G-11 are fixed.
+- Candidate: staging https://web-staging-qzq5fa2g7q-uc.a.run.app. `/api/health` reports `763fe532f4f7913cd6d6d365800ce2cdf629604d`. Evaluated 2026-11-27, 01:40–02:50 UTC, by parity-evaluator. I read only the spec, the mission, this eval and the run 1 cache. I read no code, PR text or builder notes.
+- **No reference tasks and no reference requests this run.** Everything is compared against the 2026-11-26 cache (`eval/`, `micro/`, manifest). Two sub-measures can't be judged from the cache and are marked "needs reference run" below. Neither one decides a check.
+- Raw evidence: `/mnt/project-files/evals-cache/f4-f5-page-tools/run2/`. Side-by-side captures (reference left, from the cache): `/mnt/project-files/comparisons/f4-f5-page-tools/run2/`. Numbers and hashes: the `run2` block in `docs/evals/cache/f4-f5-page-tools/manifest.json`.
+- Harness: the run 1 scripts, plus a strict pdf.js pass (pdfjs-dist legacy build, `stopAtErrors`, warnings captured, outline destinations resolved). I also added adversarial fixtures for the new compact writer (below). Note on run 1: its 60-page scroll timing scrolled the window, but the grid scrolls inside its own container on desktop. Run 2 scrolls the grid itself with wheel events.
+
+### Summary against the pass bar (run 2)
+
+| Gate | Bar | Run 2 result | OK |
+|---|---|---|---|
+| Micro-checks M1–M12 | no *lose* unless waived | 7 win, 5 tie, 0 lose | yes |
+| P0 ACs | all pass | 52 / 52 | yes |
+| All ACs | ≥ 90% | 109 / 109. Inherited F1 subset (drop, wrong type and corrupt, 20-file cap, password, focus to Download, Continue with, Back to options, Start over, 375 px, leave guard, "Never uploaded") all pass | yes |
+| Lighthouse performance (mobile) | ≥ 90 | 96–100 on all 18 complete runs | yes |
+| axe critical issues | none | 0 of any impact, 54 scans | yes |
+
+### AC delta against run 1
+
+Every AC was run again end to end on 763fe53, and every output was checked again (pikepdf/qpdf, PDFium text, outline, MediaBox, `/Rotate`, encryption). **No AC changed result**: 109/109 pass in both runs. The rows below are the ACs whose behaviour the fix round touched, and what run 2 measured.
+
+| AC | P | Run 1 | Run 2 (763fe53) | Pass |
+|---|---|---|---|---|
+| AC-499 (text changed for G-6) | P0 | `twelve_organized.pdf`, 15 pages | No edits → `twelve_organized.pdf`, 15 pages, all `/Rotate 0`, not encrypted. After Sort → Reverse order (B3 first): still `twelve_organized.pdf`. After Keep only `three-pages.pdf`: `three-pages_organized.pdf`. Extra G-6 check: B3 moved to position 1 and rotated → still `twelve_organized.pdf` | PASS |
+| AC-426, AC-436, AC-421, AC-422 (G-3 field flow) | P0/P1 | pass (typed slowly) | Same results. Also 63/63 paste-then-act runs correct (see G-3 below) | PASS |
+| AC-528 (G-7 card focus) | P0 | pass | Drag and Alt+ArrowUp both give Page 2, 1, 4, 3 … 10, 9. Focus stays on "even.pdf, 5 pages" and the move is announced as "even.pdf moved to position 1 of 2." | PASS |
+| AC-536 / AC-537 (writer, G-2) | P0/P1 | 8.4%, 1.01× | Unchanged: largest entry 8.4% of input, total 1.01×, max pixel diff 0, qpdf clean (shared-res and inherited-res). Extract p1 / Delete 2–12 / Organize keep A1: 44,168–44,169 B (8.4%) | PASS |
+| AC-538–AC-542 (writer, G-2) | P0/P1 | pass | Unchanged: 4 links on page 1 (→3, →5, →4 /Fit, URI), no L2. One page object per Split entry. Outline colour, flags, closed state and `/FitH 300` kept. Document info and `/TwoColumnRight` copied. Form field "name" = "Ada" can be set to "Bo" | PASS |
+| AC-420–AC-475, AC-480–AC-535, AC-543–AC-550 (all others) | – | pass | Pass with the same observations as the run 1 table. Selected numbers: AC-438 60 entries, largest 1.7%, total 1.02×. AC-461 20,290 B. AC-549 six undos and six redos each match the recorded states, and the output is identical. AC-550 Undo/Redo 44×44 at 390×844, "Undone: rotate" / "Redone: rotate" announced, 52 edits then 50 undos with Undo still enabled, Start over clears history | PASS |
+
+### Micro-comparison, run 2
+
+Same viewports and method as run 1. The reference column is the cached run 1 evidence. Captures are in `comparisons/f4-f5-page-tools/run2/`.
+
+| # | Check | Reference (cache) | BerryPDF run 2 | Numbers | Result | Captures |
+|---|---|---|---|---|---|---|
+| M1 | Landing | Chooser opens 703–839 ms (Combine 1,145). Lighthouse perf 89–91 | Lighthouse perf 96–100, FCP 1.26–1.35 s, LCP 1.41–1.88 s. Chooser opens 905–1,057 ms (median of 3). 16–38 words above the action on desktop, 9–12 on phone | chooser ref vs ours: Split 779 vs 967, Extract 839 vs 993, Delete 703 vs 954, Organize 711 vs 905, Combine 1,145 vs 1,057, Alternate 734 vs 1,017 ms | **tie** (unchanged; G-4 still open, not in this fix round) | `01-M1-landing-1280.png`, `02-M1-landing-375.png` |
+| M2 | Upload start | Click, drop, 3 cloud sources, link. Uploads on pick | Click, drop, paste, Google Drive. Nothing uploaded | – | **tie** (unchanged, G-10) | `03-M2-M3-loaded-extract.png` |
+| M3 | First thumbnail | 817 ms (Extract), 832 ms (Delete) at 1280 | Desktop 833–944 ms (first visible canvas). Phone 390×664, painted-pixel check, median of 3: Split 780, Extract 766, Delete 777, Organize 882, Combine 843, Alternate 792 ms (run 1: Extract ~0.8–0.95 s, Organize ~1.0 s, Alternate ~0.95 s). With 4× CPU and slow 4G (150 ms RTT, 1.6 Mbps): 4.28–4.60 s on all six; CPU-only 4×: 1.1 s | desktop ~840 vs ~825 ms | **tie**. G-11 fixed: Organize is +0.12 s over Extract, and Alternate is level with it. Throttled phone: **needs reference run**, because the reference also downloads `pdf.min.js` and `pdf.worker.min.js` only after the pick (t3 network log, 20:30:05.62). See G-14 | `03-M2-M3-loaded-extract.png` |
+| M4 | Document display | Canvas 300×424 at 165 CSS px: **1.82** backing px per CSS px at every DPR, so 0.91 of what 2x needs and ≤ 0.61 of what 3x needs | Backing px per CSS px on Split, Extract, Delete, Organize (pages and files), Combine (pages and files), Alternate (files and pages), Merge (files and pages) and Rotate: **1.13 at 1280@1x** (Alternate file cards 1.05; landscape and rotated tiles 1.0), **2.12 at 1280@2x**, **2.51–2.58 at 390@3x**, **2.07–2.19 at 320@2x**. Re-renders on zoom (1.02–1.10 at 1x and 2.00–2.09 at 2x across six steps). Rotated A2 is drawn landscape at the right aspect. 60 pages, wheel scroll of the grid: frame p50 16.7 ms, p95 16.8 ms, no frame over 50 ms, every tile in view drawn | Text edge energy per unit of ink (top-left of page 1): reference 1x 3.01; ours 1x 2.07 (run 1: 1.12; an ideal PDFium render at 160 px: 2.32); ours 2x 1.99 (ideal at 320 px: 2.06) | **tie** (run 1: lose). At 2x and 3x ours has more device pixels than the reference (2.12 vs 1.82, 2.5 vs 1.82), so ours is sharper on every high-DPR screen. At 1x it is no longer blurred (≥ 1 device px per CSS px; run 1 was 0.71), but its glyph edges are still a little softer than the reference's, whose rasterizer draws harder edges than even an ideal render (G-1b). Reference at 2x/3x: judged from its fixed canvas, not captured (**needs reference run** to show it, though it can't change the ratio) | `04-M4-thumbnail-sharpness.png`, `05-M4-display-organize.png` |
+| M5 | Interaction | Click, modifier and typed ranges, drag on Organize. No undo. Tiles not keyboard reachable | As run 1, plus the paste-then-Enter race fixed (G-3). Alternate cards are named Tab stops with 2-D arrow keys (Left/Right step, Home/End, Down steps on phones), and Alt+arrows move | Clicks from landing to download: 3 / 3 on Extract, Delete, Split | **win** | `06-M5-interaction-delete.png` |
+| M6 | Options | Free tier 200 pages per document (Organize/Combine 50), 3 tasks/h | Unchanged: all options at parity or above, 1,000 pages, no hourly cap | – | **win** | `07-M6-options-split.png` |
+| M7 | Processing | 3.06–3.08 s from the action to Download (t2–t5) | Medians of 3 runs: Split 872, Extract 873, Delete 866, Organize 887, Combine 876, Alternate 868 ms. Phone medians 856–886 ms | Extract 3.07 vs 0.87 s; Delete 3.06 vs 0.87 s; Alternate 3.06 vs 0.87 s | **win** | `08-M7-result-extract.png` |
+| M8 | Output fidelity | Extract 1,592 B; Delete 3,626 B; Alternate 4,400 B (26 p); Organize 4,478 B (16 p, one qpdf repair); Split parts 1,678 B (1–3) and 1,360 B (8–9) | **Every comparable output is now 24–26% smaller**: Extract 1,179 B (−26%); Delete 2,742 B (−24%); Alternate 3,249 B (25 p, −26%); Organize, same task as t5 with A2 rotated and one blank page, 16 p, 3,367 B (−25%); Split 1–3 1,265 B (−25%), 8–9 1,005 B (−26%). Every output: qpdf syntax check clean (the reference's Organize needs a repair), pdf.js strict 0 warnings (the reference's are also 0), PDFium render max pixel diff 0 against the source pages, text, sizes, `/Rotate` and outline as specified. Object streams used, 12–46 objects per file (reference 27–112) | Writer safety: three adversarial fixtures (40 pages with 9,000-byte content streams of equal length differing only in a few bytes at 40 offsets; 24 images of equal raw length, raw and Flate, each differing in one 6×6 block at 24 offsets), run through Split, Extract, Delete, Organize, Alternate, Combine and Merge. All 15 outputs (Split as 88 single-page ZIP entries) render with max diff 0 against their sources, and the text is intact: the writer merges no objects that merely look alike | **win** (run 1: lose) | `09-M8-output-extract.png`, `09-M8-output-delete.png`, `09-M8-output-alt.png`, `09-M8-output-org.png`, `09-M8-output-split.png` |
+| M9 | Errors and limits | Generic failure on corrupt; paywall caps | Unchanged: named per-file messages ("notes.txt isn't a PDF, so it was skipped…", "corrupt.pdf couldn't be opened…"), password dialog with a wrong-password message and unlock, 20- and 50-file caps named, other files stay | – | **win** | `10-M9-errors.png`, `10b-M9-password-ours.png` |
+| M10 | Privacy and cost | Uploads every file on pick | 0 uploads and 0 cross-origin requests in all 12 micro contexts (six tools × desktop and phone); 0 non-GET requests in the error/password flow; CSP `connect-src 'self'` | – | **win** | – |
+| M11 | Look and motion | Plain, dense, many repeated hints | G-7 fixed: after a mouse pick (Choose, then Add files) "Add files" keeps focus but shows no ring (`:focus-visible` false, outline none) on all six pages; keyboard focus shows a 3 px ring | – | **win** (run 1: tie, held back only by the G-7 nit) | `11-M11-look-alternate.png`, `12-M11-G7-no-ring-after-mouse-pick.png`, `12b-M11-G7-ring-on-keyboard-focus.png` |
+| M12 | First screen fit | Delete loaded: 59/57/63/65/56% of height (1366/1280/1536/1920/390); Organize ~43% at 390 | Identical to run 1 (layout not changed): primary in view at all five viewports in every state, no sideways scroll; pages 56–58% (1366), 55–56% (1280), 61–62% (1536), 70–71% (1920); at 390×664 Split 52, Extract 44, Delete 52, Organize 60, Combine 52, Alternate 59% | Delete 390: 56 vs 52; Organize 390: ~43 vs 60 | **tie** (unchanged, close to the line; G-9 still open) | `13-M12-fit-390x664-delete.png`, `14-M12-fit-1366x657-delete.png`, `15-M12-fit-1366x657-organize.png` |
+
+### Focus items asked for this run
+
+1. **M4 / G-1, thumbnail backing resolution: fixed.** Backing px per CSS px is 1.13 (1x), 2.12 (2x), 2.51–2.58 (390@3x) and 2.07–2.19 (320@2x), the same on all twelve views measured (Split, Extract, Delete, Organize pages/files, Combine pages/files, Alternate files/pages, Merge files/pages, Rotate). The reference is 1.82 at every DPR. The only places below 1.13 at 1x are Alternate's file cards (1.05) and landscape or rotated tiles (1.00), and all of these are at or above 1.0 × DPR.
+2. **M8 / G-2, output size: fixed.** See the M8 row. Every output passed all four oracles: pikepdf `check_pdf_syntax`, PDFium text and render diff against the input pages, and strict pdf.js load with outline resolution.
+3. **G-3, paste race: fixed.** On Split Custom (`links.pdf`, `1-2, 3-12`), with the field filled in one go, inserted as a paste, or replacing an earlier `1-4`; on Extract and Delete (`2-3, 9` over `1`); and on Every N (`5`, and the stepper clicked three times): Enter at once, Tab to the primary then Enter, Tab then click, and click all gave the right file in 3 of 3 runs each (63 runs in all). Two quick Enters give one run and one result.
+4. **G-6: fixed** (AC-499 as rewritten, plus moving and rotating B3 to the front).
+5. **G-7: fixed.** No ring after a mouse pick. Alternate cards are named Tab stops ("odd.pdf, 5 pages") with roving focus and 2-D arrow keys. At 1280 the cards sit in one row, so ArrowDown clamps to the last card, as in the page grid, and Left/Right step through every card. Merge, Combine and Organize file cards behave the same way.
+6. **G-11: fixed** for the unthrottled phone case (Organize +0.12 s over Extract, Alternate level with it; run 1 had +0.1–0.2 s). Throttled phone numbers are new (no run 1 baseline): 4.3–4.6 s, dominated by downloading the PDF engine after the pick (G-14).
+
+### Lighthouse (mobile) and axe, run 2
+
+| Page | Perf (3 runs) | A11y | Best practices | SEO | FCP | LCP | TBT | CLS |
+|---|---|---|---|---|---|---|---|---|
+| /split-pdf | 99 / 99 / 99 (one run returned no score, a headless runtime error as in run 1; repeated) | 100 | 100 | 66* | 1.26–1.27 s | 1.41–1.86 s | 92–135 ms | 0 |
+| /extract-pdf-pages | 99 / 100 / 99 | 100 | 100 | 66* | 1.26–1.30 s | 1.49–1.67 s | 64–70 ms | 0 |
+| /delete-pdf-pages | 99 / 99 / 99 | 100 | 100 | 66* | 1.26–1.28 s | 1.56–1.88 s | 54–104 ms | 0 |
+| /organize-pdf | 96 / 98 / 96 | 100 | 100 | 66* | 1.34–1.35 s | 1.49–1.50 s | 148–221 ms | 0 |
+| /combine-reorder-pdf | 98 / 99 / 97 | 100 | 100 | 66* | 1.27–1.35 s | 1.42–1.50 s | 107–205 ms | 0 |
+| /alternate-mix-pdf | 99 / 97 / 96 | 100 | 100 | 66* | 1.34–1.35 s | 1.49–1.50 s | 128–220 ms | 0 |
+
+\* As in run 1, the only failing SEO audit is `is-crawlable`: staging sends `x-robots-tag: noindex, nofollow` and `robots.txt` has `Disallow: /`. HTTP and SEO checks are unchanged from run 1: one title (43–52 characters), a description (135–155), a self-referencing absolute canonical, one `h1`, JSON-LD BreadcrumbList/HowTo/FAQPage, and all six routes in the sitemap. HTML still has `cache-control: s-maxage=31536000` (G-8), though `/api/health` shows the new build is the one served. Core Web Vitals: lab only (no CrUX on staging). LCP 1.41–1.88 s and CLS 0 are good. TBT, the INP proxy, is 54–221 ms; Organize, Combine and Alternate have runs just over 200 ms.
+
+axe-core 4.14.1 (wcag2a/aa, 21a/aa, 22aa, best-practice): **0 violations of any impact** in 54 scans. That covers the six pages at 1280 and 375 px in the empty, loaded and result states, plus Split custom, invalid range and More options; Extract odd; Delete marked and all-marked; Organize Select menu and selection; and Alternate's result-order preview.
+
+### Gap list after run 2
+
+Fixed and verified: G-1, G-2, G-3, G-6, G-7, G-11 (unthrottled). G-5 is decided by the lead. None of the items below is a micro-check loss; they are follow-ups, not blockers.
+
+1. **G-4 (M1, open, tie).** The chooser still opens 905–1,057 ms after navigation against the reference's 703–839 ms on 5 of 6 pages. Make the first click work before hydration (a native file input or a bound label). This is the main thing between M1 and a win.
+2. **G-9 (M12, open, tie close to the line).** Numbers are unchanged from run 1. At 390×664, Extract gives pages 44% of the height (reference Delete ~56%), and Split, Delete and Combine give 52%. Fix as described in run 1 so M12 becomes a clear win.
+3. **G-1b (M4, new, small).** At 1x, thumbnail glyph edges carry 2.07 units of edge energy per unit of ink against the reference's 3.01. Ours renders at 1.13× and the browser scales it down, which costs ~11% against an exact 1.0× render (2.32). Render at exactly CSS width × DPR, rounded to whole device pixels, and consider a crisper text rasterization setting for small tiles. This would make M4 a win at 1x as well as at 2x and 3x.
+4. **G-14 (M3, new).** On a throttled phone (4× CPU, slow 4G), the first thumbnail takes 4.3–4.6 s because the PDF renderer and worker are fetched only after the pick, even after 8 s idle on the page (CPU-only throttling: 1.1 s). Prefetch them at idle after the page loads, or on hover/focus of "Choose PDF files". The reference fetches its engine after the pick too (and also uploads), so this is a chance to win M3 on slow phones; confirming it needs a throttled reference run.
+5. **G-8 (deploy hygiene, open).** HTML is still `s-maxage=31536000`.
+6. **G-10 (M2, info, open).** Dropbox, OneDrive and a link source are not offered (F23).
+7. **G-15 (info, for the lead).** With nothing selected, Organize's Add pages → Blank page puts the blank page at the **end**, while the reference (t5) put it at the **front**. Ours seems more natural. This is not in G-5's decided list, so I record it as a reference difference to confirm.
+8. Still open from run 1 for a later booked slot (not blocking): §8b.6 (run-time page cap), §8b.4b (Delete all pages), §8b.7 (every even page card). New "needs reference run" items: a throttled-phone M3 run and a 2x/3x M4 capture.
+
+### Run 2 harness notes
+
+- My tile helper first read only the first page list and the first labelled button in each list item. That made AC-407/408/460/491/492 read short or wrong lists, and an AC-412 click hit the header link instead of the Continue-with button. I fixed and re-ran them; the table above uses the re-runs. The Tab+Enter variant of the race test first timed out because Tab from a field lands on the next control (More options), not the primary. The re-run tabs to the primary.
+- The adversarial fixtures are synthetic (pikepdf, generated in the session). They and their outputs are in `run2/outputs/trap/`, and the generator is `run2/scripts/trap.py`.
+
+### Lead decision on G-15 (2026-11-27)
+
+Keep ours: with nothing selected, Organize's blank page goes at the end. Adding after the existing content is the common convention, and a selection still places it exactly. Recorded as a decided reference difference alongside G-5; not a loss.
