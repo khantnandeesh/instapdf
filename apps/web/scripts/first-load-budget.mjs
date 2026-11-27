@@ -36,7 +36,7 @@ const BUDGET_KB = {
   "/delete-pdf-pages/page": [145, 154],
   // F12 (spec f12-image-text-tools.md): PDF to image is Extract's page with two option groups; PDF to text is the
   // bare flow; Image to PDF is Organize's workspace. Their engines (page-images, page-text, tiff-write) are lazy.
-  // F11 adds two tools to the registry every route carries (~0.3 kB): the routes within that of their
+  // F12 and F11 added six tools to the registry every route carries: the routes within that of their
   // budget (home, Split, Delete, PDF to JPG, JPG to PDF) move up 1 kB.
   // F11: Protect is the bare flow plus the password field and three switches; Unlock is the bare flow.
   "/protect-pdf/page": [142, 152],
