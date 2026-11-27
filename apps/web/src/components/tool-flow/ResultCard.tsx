@@ -132,6 +132,9 @@ export function ResultDownload({
   );
 }
 
+/** Next-step chips shown before "More tools": two rows at most on a desktop card. */
+const CONTINUE_SHOWN = 8;
+
 /**
  * The result (F25 §7): the stage becomes it. From 1024px the output preview on the left (at least 85%
  * of the stage's height, at the page's aspect) and the info column on the right (max 420px, centred);
@@ -169,6 +172,14 @@ export function ResultCard({
   const isZip = output.type === "application/zip";
   const file = useMemo(() => new File([output.blob], output.name, { type: output.type }), [output]);
   const [canShare, setCanShare] = useState(false);
+  // The first tools show; the rest wait behind "More tools" so the card and its actions fit the screen.
+  const targets = continueTargets;
+  const [allTargets, setAllTargets] = useState(false);
+  const chipsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // The chip that was pressed is gone: focus goes to the first tool it revealed.
+    if (allTargets) chipsRef.current?.querySelectorAll("button")[CONTINUE_SHOWN]?.focus();
+  }, [allTargets]);
   useEffect(() => {
     try {
       setCanShare(typeof navigator.canShare === "function" && navigator.canShare({ files: [file] }));
@@ -228,15 +239,20 @@ export function ResultCard({
           )}
           {output.wasEncrypted && <Notice tone="warning">{copy.resultUnencrypted}</Notice>}
         </div>
-        {!isZip && continueTargets.length > 0 && (
+        {!isZip && targets.length > 0 && (
           <div>
             <h3 className="font-display text-[15px] font-semibold text-ink">{copy.resultContinue}</h3>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {continueTargets.map((t) => (
+            <div className="mt-2 flex flex-wrap gap-2" ref={chipsRef}>
+              {(allTargets ? targets : targets.slice(0, CONTINUE_SHOWN)).map((t) => (
                 <Button key={t.slug} variant="soft" onClick={() => onContinue(t)}>
                   {t.name}
                 </Button>
               ))}
+              {!allTargets && targets.length > CONTINUE_SHOWN && (
+                <Button variant="ghost" aria-expanded={false} onClick={() => setAllTargets(true)} data-testid="continue-more">
+                  {copy.resultContinueMore}
+                </Button>
+              )}
             </div>
           </div>
         )}

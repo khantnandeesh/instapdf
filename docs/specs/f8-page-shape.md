@@ -67,3 +67,7 @@ grows so pages keep full size. Each page is placed as a form of itself. Links ar
 - AC-1036 All four pages pass the every-tool guards (first-screen fit, one scroller, budgets, axe).
 
 Tests: `src/lib/pdf/page-shape.test.ts`, `e2e/f8/page-shape.spec.ts`.
+
+## Result screen
+
+The result shows the first eight "Keep going" tools and a "More tools" chip for the rest, so the card and its actions fit the first screen however many tools there are (guard: `e2e/ui/result-scroll.spec.ts`).

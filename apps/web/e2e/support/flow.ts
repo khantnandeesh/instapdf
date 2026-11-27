@@ -195,7 +195,7 @@ export async function makeRunnable(page: Page) {
   const tile = page.locator("[data-tile-button][aria-pressed]").first();
   const area = page.getByTestId("choose-area");
   if (await password.count()) await password.fill("correct horse battery");
-  else if (await area.count()) {
+  else if (await area.isVisible()) {
     // Split by text: the box starts over the top left of the page, where the fixture's text is.
     await area.click();
     await page.getByRole("dialog").getByRole("button", { name: "Done", exact: true }).click();
