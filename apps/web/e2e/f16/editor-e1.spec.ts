@@ -164,6 +164,9 @@ test("AC-41 AC-55 AC-79: page actions rotate, duplicate, insert and delete; over
   await addText(page, "Stays put");
   await page.getByTestId("canvas").focus();
   if ((page.viewportSize()?.width ?? 0) >= 1024) {
+    // F25 AC-627: a selection opens the properties panel over the canvas's right side; clear it first.
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("editor-props")).toHaveCount(0);
     await page.getByRole("button", { name: "Rotate right, page 1" }).click();
     await page.getByRole("button", { name: "Duplicate page, page 2" }).click();
     await page.getByRole("button", { name: "Insert blank page after, page 1" }).click();

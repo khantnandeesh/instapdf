@@ -20,7 +20,6 @@ import * as H from "@/lib/editor/history";
 import { useCtl } from "./context";
 import { LineLayer } from "./LineLayer";
 import { ObjectView, boxStyle } from "./ObjectView";
-import { PropertiesPopover } from "./Properties";
 import { lineAt } from "@/lib/editor/line-hit";
 import { release, renderPage, swapCanvas } from "./render";
 import { shallowArray, useStore, type EditorState } from "./store";
@@ -42,7 +41,7 @@ let penSeen = false;
 
 const EMPTY: EditorObject[] = [];
 
-export const PageView = memo(function PageView({ entry, index, total, scale, wide, root, firstOfSrc }: { entry: PageEntry; index: number; total: number; scale: number; wide: boolean; root: HTMLElement | null; firstOfSrc: boolean }) {
+export const PageView = memo(function PageView({ entry, index, total, scale, root, firstOfSrc }: { entry: PageEntry; index: number; total: number; scale: number; root: HTMLElement | null; firstOfSrc: boolean }) {
   const ctl = useCtl();
   const { store, rt } = ctl;
   const rotation = totalRotation(entry);
@@ -687,9 +686,6 @@ export const PageView = memo(function PageView({ entry, index, total, scale, wid
           <div ref={ghost} aria-hidden="true" className="ed-ghost">
             <img src={placement.preview} alt="" />
           </div>
-        )}
-        {wide && selectedHere.length > 0 && !draft && !editing && (
-          <PropertiesPopover objs={selectedHere} anchor={displayedBounds(unionBox(selectedHere.map(objectBounds)), entry, scale)} pageHeight={disp.height} />
         )}
         <FieldPopover entry={entry} place={(b) => displayedBounds(b, entry, scale)} pageWidth={disp.width} pageHeight={disp.height} />
       </section>

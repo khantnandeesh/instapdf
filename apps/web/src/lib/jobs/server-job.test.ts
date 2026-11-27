@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PillProgress } from "@/components/tool-flow/announce";
 import { USER_ERROR } from "@/lib/pdf/user-error";
-import { runServerJob, type JobApi, type JobStatus } from "./server-job";
+import { httpJobApi, runServerJob, type JobApi, type JobStatus } from "./server-job";
 
 function fakeApi(statuses: JobStatus[]): JobApi & { cancelled: string[] } {
   const cancelled: string[] = [];
@@ -51,5 +51,32 @@ describe("runServerJob (F25 §6 server phases)", () => {
     const ac = new AbortController();
     const run = runServerJob(api, input, { signal: ac.signal, onPhase: (p) => p.phase === "queue" && ac.abort(), onCancel: () => {}, pollMs: 60_000 });
     await expect(run).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("polling leaves no abort listener behind on the signal", async () => {
+    const api = fakeApi([{ state: "working" }, { state: "working" }, { state: "working" }, { state: "done", url: "/r", name: "a.pdf" }]);
+    const ac = new AbortController();
+    const add = vi.spyOn(ac.signal, "addEventListener");
+    const remove = vi.spyOn(ac.signal, "removeEventListener");
+    await runServerJob(api, input, { signal: ac.signal, onPhase: () => {}, onCancel: () => {}, pollMs: 0 });
+    expect(add.mock.calls.length).toBe(3);
+    expect(remove.mock.calls.length).toBe(add.mock.calls.length);
+  });
+});
+
+describe("httpJobApi.cancel", () => {
+  it("sends DELETE with keepalive and is true only on a 2xx", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      expect(await httpJobApi("/api/jobs").cancel("j 1")).toBe(true);
+      expect(fetchMock).toHaveBeenCalledWith("/api/jobs/j%201", { method: "DELETE", keepalive: true });
+      fetchMock.mockResolvedValueOnce(new Response(null, { status: 500 }));
+      expect(await httpJobApi().cancel("j2")).toBe(false);
+      fetchMock.mockRejectedValueOnce(new TypeError("offline"));
+      expect(await httpJobApi().cancel("j3")).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

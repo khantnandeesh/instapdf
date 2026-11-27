@@ -90,23 +90,76 @@ test("AC-626: the page strip is shown on open at every width from 1024, beside t
   }
 });
 
-test("AC-627 (partial): no properties panel with nothing selected; selecting an object never moves it", async ({ page }) => {
+test("AC-627: no properties panel with nothing selected; selecting shows it in the same frame without moving the object; deselecting hides it", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 632 });
   await open(page);
-  await expect(page.getByTestId("editor-props")).toHaveCount(0);
+  const props = page.getByTestId("editor-props");
+  await expect(props).toHaveCount(0);
   await addText(page, "Hold still");
   await page.keyboard.press("v");
-  await expect(page.getByTestId("editor-props")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator('[data-selected="true"]')).toHaveCount(0);
+  await expect(props).toHaveCount(0);
+  // The first frame after the press already has the panel.
+  await page.evaluate(() => {
+    const w = window as unknown as { __propsAtFrame?: boolean };
+    document.addEventListener("pointerdown", () => requestAnimationFrame(() => (w.__propsAtFrame = !!document.querySelector("[data-testid=editor-props]"))), { capture: true, once: true });
+  });
   const box = page.getByRole("group", { name: /Hold still/ });
   const before = (await box.boundingBox())!;
   await box.click();
+  await expect(props).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __propsAtFrame?: boolean }).__propsAtFrame)).toBe(true);
+  await expect(props.getByRole("toolbar", { name: /properties/ })).toBeVisible();
   const after = (await box.boundingBox())!;
   expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(1);
   expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(1);
+  // It never covers what is selected.
+  const p = (await props.boundingBox())!;
+  const covers = !(p.x + p.width <= after.x || after.x + after.width <= p.x || p.y + p.height <= after.y || after.y + after.height <= p.y);
+  expect(covers).toBe(false);
+  // Deselecting hides it: Escape, and a click on empty canvas.
+  await page.keyboard.press("Escape");
+  await expect(props).toHaveCount(0);
+  await box.click();
+  await expect(props).toBeVisible();
+  // Empty space on the page.
+  const c = (await page.getByTestId("page-1").boundingBox())!;
+  await page.mouse.click(c.x + c.width * 0.6, c.y + 300);
+  await expect(page.locator('[data-selected="true"]')).toHaveCount(0);
+  await expect(props).toHaveCount(0);
   // A tool with options shows them in the panel.
   await page.getByTestId("canvas").focus();
   await page.keyboard.press("t");
-  await expect(page.getByTestId("editor-props")).toBeVisible();
+  await expect(props).toBeVisible();
+});
+
+test("AC-627: a selection under the panel's spot moves the panel to the canvas's left, so nothing selected is covered", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 632 });
+  await open(page);
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("t");
+  const b = (await page.getByTestId("page-1").boundingBox())!;
+  // Just under the panel (it shows the Text tool's options now), so the click reaches the page.
+  const tp = (await page.getByTestId("editor-props").boundingBox())!;
+  await page.mouse.click(b.x + b.width * 0.86, tp.y + tp.height + 16);
+  await expect(page.getByTestId("text-input")).toBeFocused();
+  await page.keyboard.type("Edge");
+  await page.getByTestId("text-input").press("Escape");
+  await page.keyboard.press("v");
+  await page.keyboard.press("Escape");
+  const box = page.getByRole("group", { name: /Edge/ });
+  await box.click();
+  const props = page.getByTestId("editor-props");
+  await expect(props).toBeVisible();
+  const o = (await box.boundingBox())!;
+  const p = (await props.boundingBox())!;
+  const covers = !(p.x + p.width <= o.x || o.x + o.width <= p.x || p.y + p.height <= o.y || o.y + o.height <= p.y);
+  expect(covers, "the panel leaves the selected object visible").toBe(false);
+  await expect(props).toHaveAttribute("data-side", "left");
+  // On the canvas's left means beside the page strip, never over it.
+  const strip = (await page.getByTestId("editor-strip").boundingBox())!;
+  expect(p.x).toBeGreaterThanOrEqual(strip.x + strip.width);
 });
 
 test("AC-629: a header link with edits not downloaded asks; Cancel stays, Download anyway downloads then leaves; no edits leaves at once", async ({ page }) => {
@@ -135,12 +188,15 @@ test("AC-650: Download runs the pill, says Downloaded for about 2.4s, and opens 
   await open(page);
   await addText(page, "Ready to go");
   await page.evaluate(() => {
-    const w = window as unknown as { __dl: { pill?: number; done?: number; back?: number } };
+    const w = window as unknown as { __dl: { pill?: number; done?: number; back?: number; pillFocused?: boolean } };
     w.__dl = {};
     new MutationObserver(() => {
       const now = performance.now();
       const btn = document.querySelector("[data-testid=download]");
-      if (!w.__dl.pill && document.querySelector("[data-testid=processing]")) w.__dl.pill = now;
+      const pill = document.querySelector("[data-testid=processing]");
+      if (!w.__dl.pill && pill) w.__dl.pill = now;
+      // The pill takes focus while it runs (so Escape cancels).
+      if (pill && document.activeElement === pill) w.__dl.pillFocused = true;
       if (!w.__dl.done && btn?.hasAttribute("data-done")) w.__dl.done = now;
       if (w.__dl.done && !w.__dl.back && btn && !btn.hasAttribute("data-done")) w.__dl.back = now;
     }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-done"] });
@@ -148,6 +204,9 @@ test("AC-650: Download runs the pill, says Downloaded for about 2.4s, and opens 
   const [dl] = await Promise.all([page.waitForEvent("download"), downloadBtn(page).click()]);
   const bytes = new Uint8Array(await readFile((await dl.path())!));
   await expect(page.getByTestId("download")).toHaveText("Downloaded");
+  // Focus went to the pill and back to Download when the run settled.
+  await expect(page.getByTestId("download")).toBeFocused();
+  expect(await page.evaluate(() => (window as unknown as { __dl: { pillFocused?: boolean } }).__dl.pillFocused), "the pill held focus while it ran").toBe(true);
   const card = page.getByTestId("download-card");
   await expect(card).toBeVisible();
   await expect(card).toContainText(`report-form-3p.pdf, `);
@@ -167,6 +226,37 @@ test("AC-650: Download runs the pill, says Downloaded for about 2.4s, and opens 
   await expect(card).toBeVisible();
   await addText(page, "One more", 260);
   await expect(card).toHaveCount(0);
+});
+
+test("AC-650: from 1024 the pill reads 'Downloading…' whole beside Cancel, and the editor bar doesn't move", async ({ page }) => {
+  for (const width of [1024, 1280]) {
+    await page.setViewportSize({ width, height: 700 });
+    await open(page);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    await page.route(/berry-build\.[^/]*\.js/, async (r) => {
+      await gate;
+      await r.continue().catch(() => {});
+    });
+    const bar = () => page.evaluate(() => ["[data-testid=editor-tools]", "[aria-label=Undo]", "[data-testid=action-slot]"].map((s) => document.querySelector(s)!.getBoundingClientRect().x));
+    const before = await bar();
+    await downloadBtn(page).click();
+    const pill = page.getByTestId("processing");
+    await expect(pill).toBeVisible();
+    await expect(pill).toContainText("Downloading…");
+    const fit = await pill.evaluate((p) => {
+      const l = p.querySelector<HTMLElement>(".ip-pill__label")!;
+      const c = p.querySelector<HTMLElement>(".ip-pill__cancel")!.getBoundingClientRect();
+      const r = p.getBoundingClientRect();
+      return { whole: l.scrollWidth <= l.clientWidth, cancelInside: c.right <= r.right + 0.5 };
+    });
+    expect(fit.whole, `the label is not truncated at ${width}`).toBe(true);
+    expect(fit.cancelInside, `Cancel sits inside the pill at ${width}`).toBe(true);
+    expect(await bar(), `the bar keeps its place at ${width}`).toEqual(before);
+    release();
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await expect(pill).toHaveCount(0, { timeout: 20_000 });
+  }
 });
 
 // AC-650 no-password-note: its testid and text are asserted in editor-e1-qa.spec.ts:164.

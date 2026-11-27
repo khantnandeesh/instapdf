@@ -152,7 +152,8 @@ body:has(.ed-shell) div:has(> main) {
 .ed-chip:focus-visible,
 .ed-menurow:focus-visible,
 .ed-pagechip:focus-visible,
-.ed-home:focus-visible {
+.ed-home:focus-visible,
+.ed-dlcard__close:focus-visible {
   outline: 2.5px solid var(--color-focus);
   outline-offset: 1px;
 }
@@ -312,7 +313,7 @@ body:has(.ed-shell) div:has(> main) {
   animation: ip-popover-in 140ms var(--ease-out) both;
 }
 .ed-dlcard__name {
-  padding-right: 28px;
+  padding-right: 36px;
   overflow-wrap: anywhere;
   color: var(--color-ink-black);
   font-weight: 600;
@@ -328,19 +329,29 @@ body:has(.ed-shell) div:has(> main) {
   gap: 6px;
   margin-top: 8px;
 }
+/* A 44px hit target around the 32px circle that shows on hover. */
 .ed-dlcard__close {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 2px;
+  right: 2px;
   display: grid;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border-radius: 99px;
   color: var(--color-muted);
 }
-.ed-dlcard__close:hover {
+.ed-dlcard__close::before {
+  position: absolute;
+  inset: 6px;
+  border-radius: 99px;
+  content: "";
+}
+.ed-dlcard__close:hover::before {
   background: var(--color-hover);
+}
+.ed-dlcard__close > svg {
+  position: relative;
 }
 .ed-opening .ed-top {
   padding: 0 20px;
@@ -742,26 +753,6 @@ body:has(.ed-shell) div:has(> main) {
 .ed-fonts__msg[role="alert"] {
   color: var(--color-danger-strong);
 }
-/* Selection properties, floating above the object (≥ 1024). */
-.ed-popover {
-  position: absolute;
-  z-index: 6;
-  display: flex;
-  align-items: center;
-  height: 48px;
-  padding: 0 6px;
-  border: 1px solid rgb(255 255 255 / 0.75);
-  border-radius: 99px;
-  background: color-mix(in srgb, var(--surface) 86%, transparent);
-  -webkit-backdrop-filter: blur(18px) saturate(1.7);
-  backdrop-filter: blur(18px) saturate(1.7);
-  box-shadow: var(--shadow-menu);
-  transform: translate(-50%, -100%);
-  white-space: nowrap;
-}
-.ed-popover--below {
-  transform: translate(-50%, 0);
-}
 
 /* ---- canvas ----------------------------------------------------------------------------- */
 .ed-canvas {
@@ -792,6 +783,13 @@ body:has(.ed-shell) div:has(> main) {
   border-radius: var(--radius-panel, 16px);
   background: var(--surface);
   box-shadow: var(--shadow-menu);
+}
+/* The selection's name over its controls (F25 §5). */
+.ed-props__title {
+  margin: 0 0 8px;
+  color: var(--color-ink-black);
+  font-size: 14px;
+  font-weight: 600;
 }
 /* The options were one row in the old top bar: in the 280px panel they wrap. */
 .ed-props :is(.ed-options, .ed-bar, .bf-formopts, .bf-kinds) {
@@ -1986,6 +1984,25 @@ body:has(.ed-shell) div:has(> main) {
   flex: 1;
   max-width: none;
   padding: 0 8px;
+  container-type: inline-size;
+}
+.ed-file__icon {
+  display: none;
+}
+/* A name cut to a letter or two says nothing: below about six characters the chip shows a file icon. The
+   name stays as a heading for screen readers (visually hidden), and the button's name is unchanged. */
+@container (max-width: 96px) {
+  .ed-file h2 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .ed-file__icon {
+    display: block;
+  }
 }
 
 /* ---- motion (quiet; off under reduced motion, AC-50) ----------------------------------- */
@@ -2006,9 +2023,6 @@ body:has(.ed-shell) div:has(> main) {
   /* The hint pill rises in at full opacity: muted text on glass has no contrast to spare mid-fade. */
   .ed-hint {
     animation: ed-rise-solid var(--motion-quick) var(--ease-out) both;
-  }
-  .ed-popover {
-    animation: ed-pop-in 140ms var(--ease-out) both;
   }
   /* Anchored panels (E3): fade and lift in from the trigger, fade out (the panel stays in the top
      layer while it fades; Pop keeps its content, inert and hidden). */
@@ -2076,13 +2090,6 @@ body:has(.ed-shell) div:has(> main) {
     transform: translateY(var(--motion-rise));
   }
 }
-@keyframes ed-pop-in {
-  from {
-    opacity: 0;
-    scale: 0.96;
-    translate: 0 4px;
-  }
-}
 @keyframes ed-pulse {
   0% {
     opacity: 1;
@@ -2110,7 +2117,6 @@ body:has(.ed-shell) div:has(> main) {
 @media (forced-colors: active) {
   .ed-glass,
   .ed-panel,
-  .ed-popover,
   .ed-pop {
     border: 1px solid CanvasText;
     background: Canvas;

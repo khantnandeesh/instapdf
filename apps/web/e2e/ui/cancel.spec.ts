@@ -51,16 +51,21 @@ async function holdScript(page: Page, pattern: RegExp) {
 }
 const workers = (page: Page) => page.evaluate(() => (window as unknown as { __ipWorkers: Hook }).__ipWorkers);
 
-/** A 300-page PDF (AC-635's slow fixture): Split, Every page makes 300 files. */
+/** A 300-page PDF (AC-635's slow fixture): Split, Every page makes 300 files. Each page carries 120 lines of
+ * text, so the split runs long enough (about a second) for Cancel to land mid-run. */
 async function make300(path: string) {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
-  for (let i = 1; i <= 300; i++) doc.addPage([595, 842]).drawText(`Page ${i}`, { x: 72, y: 760, size: 36, font });
+  for (let i = 1; i <= 300; i++) {
+    const p = doc.addPage([595, 842]);
+    p.drawText(`Page ${i}`, { x: 72, y: 760, size: 36, font });
+    for (let k = 0; k < 120; k++) p.drawText(`Line ${k} of page ${i}: words that give the page real content ${k * i}`, { x: 40, y: 740 - k * 6, size: 5, font });
+  }
   const { writeFile } = await import("node:fs/promises");
   await writeFile(path, await doc.save());
 }
 
-test("AC-635: Cancel during a browser job stops the worker, starts no download, and a second run completes", async ({ page }, info) => {
+test("AC-635: Cancel mid-run (progress under way) stops the worker, the job never finishes, no download; focus goes pill then primary; a second run completes", async ({ page }, info) => {
   test.skip(!isDesktop(info.project.name), "one engine run is enough; the slot is the same on phones");
   test.setTimeout(120_000);
   const file = info.outputPath("three-hundred.pdf");
@@ -73,30 +78,53 @@ test("AC-635: Cancel during a browser job stops the worker, starts no download, 
   await page.getByRole("radio", { name: "Every page" }).click();
   let downloads = 0;
   page.on("download", () => downloads++);
-  // The job's worker script loads slowly, so the job is still running when Cancel lands.
+  // The job's worker script is held until the pill is up and focused.
   const release = await holdScript(page, /instapdf-processing\.[^/]*\.js/);
   await primary(page).click();
   const pill = page.getByTestId("processing");
   await expect(pill).toBeVisible();
+  await expect(pill, "the pill takes focus when the run starts").toBeFocused();
   await expect.poll(async () => (await workers(page)).live["instapdf-processing"] ?? 0).toBe(1);
-  await pill.getByRole("button", { name: "Cancel" }).click();
+  // Cancel the moment the bar first moves (from the page, so no test round trip lets the job finish first).
+  await page.evaluate(() => {
+    const w = window as unknown as { __cancelAt?: number };
+    const mo = new MutationObserver(() => {
+      const now = Number(document.querySelector("[data-testid=pill-bar]")?.getAttribute("aria-valuenow") ?? 0);
+      if (now > 0) {
+        mo.disconnect();
+        w.__cancelAt = now;
+        document.querySelector<HTMLButtonElement>("[data-testid=processing] [data-testid=cancel]")?.click();
+      }
+    });
+    mo.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["aria-valuenow"] });
+  });
+  release();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __cancelAt?: number }).__cancelAt ?? 0), { timeout: 60_000 }).toBeGreaterThan(0);
+  const at = await page.evaluate(() => (window as unknown as { __cancelAt: number }).__cancelAt);
+  expect(at, "cancelled while the work was under way").toBeLessThan(100);
   const t0 = Date.now();
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
   await expect(primary(page)).toBeVisible();
   expect(Date.now() - t0, "the slot is back at rest within 300ms").toBeLessThan(300 + 200); // + Playwright's polling slack
+  // The click came from a script, so the pill still held focus: it returns to the primary.
+  await expect(primary(page), "focus returns to the primary").toBeFocused();
   const w = await workers(page);
   expect(w.terminated["instapdf-processing"], "the processing worker was terminated").toBe(1);
   expect(w.live["instapdf-processing"]).toBe(0);
   await expect(page.getByTestId("notice")).toContainText("Cancelled. Your file is unchanged.");
-  release();
-  await page.waitForTimeout(500);
+  // The work really stopped: well past when it would have finished, still at rest, no result, no download.
+  await page.waitForTimeout(3000);
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await expect(page.getByTestId("result")).toHaveCount(0);
+  await expect(page.getByTestId("processing")).toHaveCount(0);
   expect(downloads, "no download starts").toBe(0);
 
-  // A second run completes normally (a fresh worker).
+  // A second run completes normally (a fresh worker); focus ends on Download.
   await primary(page).click();
   await expect(flow(page)).toHaveAttribute("data-state", "done", { timeout: 60_000 });
   await expect(page.getByTestId("result")).toBeVisible();
   await expect(page.getByTestId("result-counter")).toHaveText("1 / 300 files");
+  await expect(page.getByTestId("action-slot").getByRole("link", { name: /Download/ }).first()).toBeFocused();
 });
 
 test("AC-636: Cancel during the editor's download fires no download, keeps edits and undo, disposes the build; the next Download works", async ({ page }, info) => {
@@ -127,9 +155,12 @@ test("AC-636: Cancel during the editor's download fires no download, keeps edits
   await page.getByRole("button", { name: "Download PDF" }).click();
   const pill = page.getByTestId("processing");
   await expect(pill).toBeVisible();
-  await pill.getByRole("button", { name: "Cancel" }).click();
+  // The pill holds focus, so Escape cancels from the keyboard; focus then returns to Download.
+  await expect(pill).toBeFocused();
+  await page.keyboard.press("Escape");
   await expect(pill).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Download PDF" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download PDF" })).toBeFocused();
   await page.waitForTimeout(800);
   expect(downloads, "no download event fires").toBe(0);
   const w = await workers(page);
@@ -146,4 +177,26 @@ test("AC-636: Cancel during the editor's download fires no download, keeps edits
   const bytes = new Uint8Array(await readFile((await dl.path())!));
   expect(bytes.byteLength).toBeGreaterThan(1000);
   await expect(page.getByTestId("download-card")).toBeVisible();
+});
+
+test("AC-636: leaving the editor mid-build (no edits) never downloads after the visitor has left", async ({ page }, info) => {
+  test.skip(!isDesktop(info.project.name), "the build worker is the same on phones");
+  test.setTimeout(120_000);
+  const large = info.outputPath("large.pdf");
+  await makeLargePdf(large);
+  await page.goto("/edit-pdf");
+  await page.getByTestId("editor-input").setInputFiles(large);
+  await expect(page.getByTestId("editor")).toHaveAttribute("data-state", "open", { timeout: 30_000 });
+  await expect(page.getByTestId("page-1")).toHaveAttribute("data-drawn", "true", { timeout: 30_000 });
+  let downloads = 0;
+  page.on("download", () => downloads++);
+  const release = await holdScript(page, /berry-build\.[^/]*\.js/);
+  await page.getByRole("button", { name: "Download PDF" }).click();
+  await expect(page.getByTestId("processing")).toBeVisible();
+  // No edits, so a header link leaves at once, while the build is still waiting for its worker.
+  await page.getByRole("banner").first().getByRole("link", { name: /rotate/i }).first().click();
+  await expect(page).not.toHaveURL(/\/edit-pdf/);
+  release();
+  await page.waitForTimeout(1500);
+  expect(downloads, "nothing is downloaded after leaving").toBe(0);
 });

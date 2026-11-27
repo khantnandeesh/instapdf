@@ -87,6 +87,8 @@ const writeLocal = (k: string, v: string) => {
   }
 };
 
+/** A cancelled build (Cancel) or one stopped because the editor closed (disposeBuild). */
+const isAbort = (e: unknown) => e instanceof DOMException && e.name === "AbortError";
 const reducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function initialState(pages: PageEntry[], wide: boolean): EditorState {
@@ -357,7 +359,8 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   const [confirm, setConfirm] = useState<"close" | "clear" | null>(null);
   /** Opening another file (or a blank one) while there are edits not downloaded: asks first. */
   const [replace, setReplace] = useState<{ run: () => void; label: string } | null>(null);
-  const [missingAsk, setMissingAsk] = useState<{ chars: string[]; unchecked: boolean; name?: string } | null>(null);
+  // `then`: what to do once "Download anyway" has downloaded (leave the editor, when it came from the leave dialog).
+  const [missingAsk, setMissingAsk] = useState<{ chars: string[]; unchecked: boolean; name?: string; then?: () => void } | null>(null);
   const readOnly = useStore(store, (s) => s.readOnly);
   const [ownerOpen, setOwnerOpen] = useState(false);
   const [ownerError, setOwnerError] = useState<string | undefined>();
@@ -760,7 +763,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
   // Cancel (F25 §6): stops the build worker; the edits and the document stay as they were.
   const saveAbort = useRef<AbortController | null>(null);
   const download = useCallback(
-    async (name?: string, force = false): Promise<"done" | "failed" | "cancelled" | "stopped"> => {
+    async (name?: string, force = false, then?: () => void): Promise<"done" | "failed" | "cancelled" | "stopped"> => {
       if (store.get().busy === "save") return "stopped";
       // A field property still being typed in the popover commits on blur: do that first.
       const typing = document.activeElement;
@@ -784,7 +787,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         const chars = [...new Set([...objs.chars, ...form.chars])];
         const unchecked = objs.unchecked || form.unchecked;
         if (chars.length || unchecked) {
-          setMissingAsk({ chars, unchecked, name });
+          setMissingAsk({ chars, unchecked, name, then });
           return "stopped";
         }
       }
@@ -809,10 +812,15 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
             forms: doc.forms ? { state: doc.forms, original: s.forms.original ?? emptyForm() } : undefined,
           }, { signal: controller.signal });
         } catch (err) {
-          if (controller.signal.aborted || !isPristine(doc, s.forms.original ?? undefined)) throw err;
+          // Cancelled, or the editor closed under the build (disposeBuild): nothing is downloaded.
+          if (controller.signal.aborted || isAbort(err) || !isPristine(doc, s.forms.original ?? undefined)) throw err;
           out = base;
         }
-        const url = URL.createObjectURL(new Blob([out as Uint8Array<ArrayBuffer>], { type: "application/pdf" }));
+        if (controller.signal.aborted) throw new DOMException("Cancelled", "AbortError");
+        // One copy of the file: the Blob backs both the link and "Keep going" (no extra Uint8Array kept).
+        const blob = new Blob([out as Uint8Array<ArrayBuffer>], { type: "application/pdf" });
+        const size = out.byteLength;
+        const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = file;
@@ -823,12 +831,12 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         setTimeout(() => URL.revokeObjectURL(url), 30_000);
         const empty = nudgeAfterDownload(ctl);
         // No toast (F25 §7): the slot says "Downloaded" and a small card under it gives the details.
-        store.set({ downloadedAt: at, downloaded: { name: file, size: out.byteLength, noPassword: rt.wasEncrypted && !s.readOnly, empty, bytes: out, at } });
+        store.set({ downloadedAt: at, downloaded: { name: file, size, noPassword: rt.wasEncrypted && !s.readOnly, empty, blob, at } });
         ctl.announce(`Downloaded ${file}`);
         return "done";
-      } catch {
-        if (controller.signal.aborted) {
-          ctl.announce("Cancelled");
+      } catch (err) {
+        if (controller.signal.aborted || isAbort(err)) {
+          if (!closed.current) ctl.announce("Cancelled");
           return "cancelled";
         }
         ctl.toast({ text: "The PDF couldn’t be made. Your edits are still here; please try again.", tone: "danger" });
@@ -840,6 +848,15 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
     },
     [ctl, store, rt, original],
   );
+  // Leaving the editor mid-build cancels the download: it never starts after the visitor has left.
+  const closed = useRef(false);
+  useEffect(() => {
+    closed.current = false;
+    return () => {
+      closed.current = true;
+      saveAbort.current?.abort();
+    };
+  }, []);
   useEffect(() => {
     ctl.cancelDownload = () => saveAbort.current?.abort();
     ctl.download = (n) => download(n);
@@ -1240,8 +1257,32 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
 
   const pageList = pages.map((p, i) => ({ p, i, first: pages.findIndex((x) => x.src === p.src) === i }));
   const strip = !wide && (selectionObjs.length > 0 || tool !== "select" || !!placement);
-  // The properties panel (F25 §5, from 1024 px): the active tool's options, only for a tool that has them.
-  const props = wide && PROPS_TOOLS.has(tool);
+  // The properties panel (F25 §5, AC-627, from 1024 px): the selection's controls while something is
+  // selected, otherwise the active tool's options (only for a tool that has them); absent otherwise.
+  const selected = selectionObjs.length > 0;
+  const props = wide && (selected || PROPS_TOOLS.has(tool));
+  const selKey = selectionObjs.map((o) => o.id).join(" ");
+  // It floats over the canvas, so opening it never moves the page. When it would cover the selected
+  // object it sits on the canvas's left instead (decided before paint, so it never jumps).
+  const propsEl = useRef<HTMLElement>(null);
+  const [propsLeft, setPropsLeft] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const panel = propsEl.current;
+    const canvas = scroller;
+    if (!panel || !canvas || !selKey) return setPropsLeft(null);
+    const boxes = Array.from(canvas.querySelectorAll('[data-selected="true"], [data-handle]'), (el) => el.getBoundingClientRect());
+    if (!boxes.length) return setPropsLeft(null);
+    const sel = { l: Math.min(...boxes.map((b) => b.left)), r: Math.max(...boxes.map((b) => b.right)), t: Math.min(...boxes.map((b) => b.top)), b: Math.max(...boxes.map((b) => b.bottom)) };
+    panel.style.left = "";
+    const p = panel.getBoundingClientRect();
+    const c = canvas.getBoundingClientRect();
+    const covered = (l: number) => Math.max(0, Math.min(sel.r, l + p.width) - Math.max(sel.l, l)) * Math.max(0, Math.min(sel.b, p.bottom) - Math.max(sel.t, p.top));
+    // Beside the page strip, never over it.
+    const strip = panel.closest(".ed-frame-root")?.querySelector("[data-testid=editor-strip]")?.getBoundingClientRect();
+    const leftAt = Math.max(c.left, strip?.right ?? c.left) + 12;
+    const parent = panel.offsetParent?.getBoundingClientRect().left ?? 0;
+    setPropsLeft(covered(p.left) > 0 && covered(leftAt) < covered(p.left) ? leftAt - parent : null);
+  }, [selKey, props, scroller]);
   // The strip hides itself when a tool has no options: what sits above it then sits on the dock.
   useLayoutEffect(() => {
     const mark = () => document.querySelector(".ed-frame-root")?.classList.toggle("ed-strip-empty", strip && !document.querySelector(".ed-strip :is(button, input)"));
@@ -1281,7 +1322,7 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
               {pageList.map(({ p, i, first }) => (
                 <div key={p.id} className="ed-slot" data-index={i}>
                   {wide && <PageHeader pageId={p.id} index={i} total={pages.length} />}
-                  <PageView entry={p} index={i} total={pages.length} scale={pageScale(p)} wide={wide} root={scroller} firstOfSrc={first} />
+                  <PageView entry={p} index={i} total={pages.length} scale={pageScale(p)} root={scroller} firstOfSrc={first} />
                 </div>
               ))}
             </div>
@@ -1303,8 +1344,16 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
         </div>
       </div>
       {props && (
-        <aside className="ed-props" aria-label="Properties" data-ip-scroll="overlay" data-testid="editor-props">
-          <ToolOptions />
+        <aside
+          ref={propsEl}
+          className="ed-props"
+          aria-label="Properties"
+          data-ip-scroll="overlay"
+          data-testid="editor-props"
+          data-side={propsLeft !== null ? "left" : "right"}
+          style={propsLeft !== null ? { left: propsLeft, right: "auto" } : undefined}
+        >
+          {selected ? <SelectionBar objs={selectionObjs} panel /> : <ToolOptions />}
         </aside>
       )}
       {!wide && (
@@ -1443,7 +1492,8 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
               onClick={() => {
                 const to = leaveTo;
                 setLeaveTo(null);
-                void download().then((r) => r === "done" && to && leave(to));
+                // The missing-characters question may come first: its "Download anyway" then still leaves.
+                void download(undefined, false, to ? () => leave(to) : undefined).then((r) => r === "done" && to && leave(to));
               }}
             >
               Download anyway
@@ -1478,8 +1528,9 @@ function Frame({ recovery, setRecovery, toast, setToast, onClose, onOpenFile, on
               variant="primary"
               onClick={() => {
                 const n = missingAsk?.name;
+                const then = missingAsk?.then;
                 setMissingAsk(null);
-                void download(n, true);
+                void download(n, true).then((r) => r === "done" && then?.());
               }}
             >
               Download anyway

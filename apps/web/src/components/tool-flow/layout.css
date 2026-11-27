@@ -126,6 +126,19 @@
     flex: none;
     width: 220px;
   }
+  /* The editor's slot is narrower than a tool's: the pill tightens so "Downloading…" and Cancel both fit
+     whole from 1024px (the slot keeps one width, so the editor bar never moves). */
+  .ip-slot--editor .ip-pill {
+    gap: 8px;
+    padding-left: 10px;
+  }
+  .ip-slot--editor .ip-pill__label {
+    font-size: 15px;
+  }
+  .ip-slot--editor .ip-pill__cancel {
+    padding: 0 8px;
+    font-size: 14px;
+  }
   @media (max-width: 1023px) {
     .ip-slot--editor {
       width: auto;
@@ -188,6 +201,17 @@
     line-height: 20px;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  /* A phone's slot is narrow: the short line wraps to two lines instead of losing its end. */
+  @media (max-width: 479px) {
+    .ip-slot__errline {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      font-size: 14px;
+      line-height: 18px;
+      white-space: normal;
+    }
   }
   .ip-slot__error .mp-btn--line {
     height: 40px;
@@ -414,8 +438,9 @@
     z-index: 40;
     display: flex;
     flex-direction: column;
-    width: 360px;
-    /* Capped to the screen under the row, footer included; only the body scrolls. */
+    width: min(360px, calc(100vw - 16px));
+    /* Capped to the screen under the row, footer included; only the body scrolls (vh where dvh is unknown). */
+    max-height: calc(100vh - var(--ip-header-h) - var(--ip-row-h) - 16px);
     max-height: calc(100dvh - var(--ip-header-h) - var(--ip-row-h) - 16px);
     border: 1.5px solid var(--border);
     border-radius: var(--radius-panel);
@@ -430,6 +455,31 @@
     padding: 20px;
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+  /* One scroller (house rule): with Split's parts list inside, the list is the popover's only scroller. The
+     body stops scrolling and the list takes the height left (two rows at least), so the name pattern,
+     bookmarks and Done stay in view. */
+  .ip-popover__body:has(.ip-parts-scroller) {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .ip-popover__body:has(.ip-parts-scroller) > .ip-more-body {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .ip-popover .ip-more-body > * {
+    flex: none;
+  }
+  .ip-popover .ip-more-body > .ip-parts {
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .ip-popover .ip-parts-scroller {
+    flex: 0 1 auto;
+    min-height: calc(2 * var(--ip-tap-min));
   }
   .ip-popover__foot {
     display: flex;

@@ -7,6 +7,7 @@ import { mkdir } from "node:fs/promises";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { isUsable, tools } from "../../src/tools/registry";
 import { flow, fx, primary } from "../support/flow";
+import { FIXTURES_OFF, fixturesServed } from "../support/fixtures";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
 const SECOND_FILE: Record<string, string> = { "alternate-mix-pdf": "three-pages.pdf" };
@@ -123,6 +124,36 @@ test.describe("F25 structure", () => {
         });
         expect(Math.abs(stage - Math.max(320, want)), `${t.slug}: stage height`).toBeLessThanOrEqual(1.5);
       }
+    });
+  }
+
+  for (const [width, height] of [
+    [1024, 700],
+    [1280, 632],
+    [1366, 657],
+  ] as const) {
+    test(`AC-614: at ${width}x${height} every tool's More options popover sits wholly inside the viewport`, async ({ page }, info) => {
+      test.skip(info.project.name !== "desktop", "the popover is the 1024px+ layout");
+      await page.setViewportSize({ width, height });
+      let seen = 0;
+      for (const t of usable) {
+        await open(page, `/${t.slug}`);
+        await load(page, t.slug);
+        await expect(flow(page), t.slug).toHaveAttribute("data-state", "ready", { timeout: 20_000 });
+        if (!(await moreOptions(page))) continue;
+        seen++;
+        const pop = page.locator(".ip-popover");
+        await expect(pop, t.slug).toBeVisible();
+        // After its entrance (opacity and a 4px rise only).
+        await pop.evaluate((p) => Promise.all(p.getAnimations().map((a) => a.finished)));
+        const b = (await pop.boundingBox())!;
+        expect(b.x, `${t.slug}: left edge`).toBeGreaterThanOrEqual(0);
+        expect(b.x + b.width, `${t.slug}: right edge`).toBeLessThanOrEqual(width);
+        expect(b.y, `${t.slug}: top`).toBeGreaterThanOrEqual(0);
+        expect(b.y + b.height, `${t.slug}: bottom`).toBeLessThanOrEqual(height);
+        await closeMore(page);
+      }
+      expect(seen, "at least one tool has a popover").toBeGreaterThan(0);
     });
   }
 
@@ -305,6 +336,7 @@ test.describe("shots", () => {
     for (const t of SHOT_TOOLS) {
       test(`shots ${t.name} ${vp[0]}x${vp[1]}`, async ({ page }, info) => {
         test.skip(info.project.name !== "desktop", "one engine; the viewport is set per test");
+        test.skip(t.path.startsWith("/test-fixtures") && !fixturesServed, FIXTURES_OFF);
         test.setTimeout(120_000);
         await page.setViewportSize({ width: vp[0], height: vp[1] });
         await open(page, t.path);
@@ -351,6 +383,7 @@ test.describe("shots", () => {
 
     test(`shots settings server phases ${vp[0]}x${vp[1]}`, async ({ page }, info) => {
       test.skip(info.project.name !== "desktop", "one engine");
+      test.skip(!fixturesServed, FIXTURES_OFF);
       await page.setViewportSize({ width: vp[0], height: vp[1] });
       let release!: () => void;
       const posted = new Promise<void>((r) => (release = r));

@@ -1,11 +1,13 @@
 "use client";
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
 
 /**
  * A non-modal popover under its trigger, right-aligned to it (F25 §3.3, More options from 1024px):
  * white, panel corners, the menu shadow. Its body is the only scroller in it (`data-ip-scroll="overlay"`),
  * capped to the screen under the row. Focus goes to its first control; Escape, a click outside or the
  * trigger again close it, and focus returns to the trigger. The trigger's wrapper must be `relative`.
+ * When right-aligning would push it past a screen edge (a trigger near the row's left), it slides
+ * back inside with an 8px margin, measured before paint so it never jumps.
  */
 export function Popover({
   open,
@@ -27,6 +29,20 @@ export function Popover({
   const box = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!open || !el) return;
+    const fit = () => {
+      el.style.translate = "";
+      const r = el.getBoundingClientRect();
+      const vw = document.documentElement.clientWidth;
+      const dx = r.left < 8 ? 8 - r.left : r.right > vw - 8 ? vw - 8 - r.right : 0;
+      if (dx) el.style.translate = `${Math.round(dx)}px 0`;
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const el = box.current;

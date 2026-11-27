@@ -54,12 +54,21 @@ export function httpJobApi(base = "/api/jobs"): JobApi {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", base);
         xhr.responseType = "json";
-        xhr.upload.onprogress = (e) => e.lengthComputable && onUpload(e.loaded / e.total);
-        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 && xhr.response?.id ? resolve({ id: String(xhr.response.id) }) : reject(new Error(xhr.response?.message ?? `Upload failed (${xhr.status})`)));
-        xhr.onerror = () => reject(new Error("Upload failed"));
         const stop = () => {
           xhr.abort();
           reject(abortError());
+        };
+        // The abort listener lives only as long as the upload.
+        const done = () => signal.removeEventListener("abort", stop);
+        xhr.upload.onprogress = (e) => e.lengthComputable && onUpload(e.loaded / e.total);
+        xhr.onload = () => {
+          done();
+          if (xhr.status >= 200 && xhr.status < 300 && xhr.response?.id) resolve({ id: String(xhr.response.id) });
+          else reject(new Error(xhr.response?.message ?? `Upload failed (${xhr.status})`));
+        };
+        xhr.onerror = () => {
+          done();
+          reject(new Error("Upload failed"));
         };
         if (signal.aborted) return stop();
         signal.addEventListener("abort", stop, { once: true });
@@ -78,7 +87,8 @@ export function httpJobApi(base = "/api/jobs"): JobApi {
     },
     async cancel(id) {
       try {
-        const r = await fetch(`${base}/${encodeURIComponent(id)}`, { method: "DELETE" });
+        // keepalive: the DELETE still goes out when Cancel is the page closing or the visitor leaving.
+        const r = await fetch(`${base}/${encodeURIComponent(id)}`, { method: "DELETE", keepalive: true });
         return r.ok;
       } catch {
         return false;
@@ -90,8 +100,16 @@ export function httpJobApi(base = "/api/jobs"): JobApi {
 const wait = (ms: number, signal: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
     if (signal.aborted) return reject(abortError());
-    const t = setTimeout(resolve, ms);
-    signal.addEventListener("abort", () => (clearTimeout(t), reject(abortError())), { once: true });
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(abortError());
+    };
+    // One listener per wait, removed when the wait ends: polling never piles listeners on the signal.
+    const t = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
   });
 
 /** Upload, wait in the queue, work, done: each step reported as a pill phase. Polling stops at once on abort. */

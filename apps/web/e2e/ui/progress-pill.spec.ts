@@ -7,6 +7,7 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { flow, fx, isDesktop, primary } from "../support/flow";
+import { FIXTURES_OFF, fixturesServed } from "../support/fixtures";
 
 const SLOT_VIEWPORTS: [number, number][] = [
   [1366, 657],
@@ -96,6 +97,7 @@ for (const [width, height] of SLOT_VIEWPORTS) {
 
 test("AC-634 AC-640: the label reads '<verb>… n%', the fill tracks n and never goes back; the pill has focus and an accessible progressbar", async ({ page }, info) => {
   test.skip(!isDesktop(info.project.name), "one run is enough");
+  test.skip(!fixturesServed, FIXTURES_OFF);
   await openTool(page, "/test-fixtures/settings-tool");
   await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
@@ -124,6 +126,7 @@ test("AC-634 AC-640: the label reads '<verb>… n%', the fill tracks n and never
 
 test("AC-639: the Done tick shows for at least 400ms, and the result is in view within 900ms of the job finishing", async ({ page }, info) => {
   test.skip(!isDesktop(info.project.name), "one run is enough");
+  test.skip(!fixturesServed, FIXTURES_OFF);
   await openTool(page, "/test-fixtures/settings-tool");
   await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
@@ -146,6 +149,7 @@ test("AC-639: the Done tick shows for at least 400ms, and the result is in view 
 
 test("AC-640: Escape on the pill cancels", async ({ page }, info) => {
   test.skip(!isDesktop(info.project.name), "keyboard");
+  test.skip(!fixturesServed, FIXTURES_OFF);
   await openTool(page, "/test-fixtures/settings-tool");
   await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
   await expect(flow(page)).toHaveAttribute("data-state", "ready");
@@ -158,6 +162,7 @@ test("AC-640: Escape on the pill cancels", async ({ page }, info) => {
 
 test("AC-641: reduced motion: the spinner pulses instead of turning, the glide stops, and nothing else runs 5s in", async ({ page }, info) => {
   test.skip(!isDesktop(info.project.name), "one run is enough");
+  test.skip(!fixturesServed, FIXTURES_OFF);
   await page.emulateMedia({ reducedMotion: "reduce" });
   const job = await mockJobs(page, { queue: [25], hold: "queue" });
   await openTool(page, "/test-fixtures/settings-tool?server=1");
@@ -184,14 +189,15 @@ test("AC-641: reduced motion: the spinner pulses instead of turning, the glide s
 
 // ---- Server phases (AC-637, AC-638) -------------------------------------------------------------
 
-type MockOpts = { queue?: number[]; eta?: number; hold?: "queue"; deleteStatus?: number; fail?: string };
+type MockOpts = { queue?: number[]; eta?: number; hold?: "queue"; deleteStatus?: number; fail?: string; holdUpload?: Promise<void>; holdDelete?: Promise<void> };
 
 /**
  * Mocks `/api/jobs`: POST answers `{ id }`, each GET steps through the queue positions, then working
  * 50%, then done with a result URL serving the fixture's bytes. `hold: "queue"` stays at the first
- * position until `release()`. DELETE answers `deleteStatus` (default 204).
+ * position until `release()`. DELETE answers `deleteStatus` (default 204). `holdUpload` / `holdDelete`
+ * keep the POST / the DELETE reply back until they resolve.
  */
-async function mockJobs(page: Page, { queue = [25, 3, 1], eta, hold, deleteStatus = 204, fail }: MockOpts = {}) {
+async function mockJobs(page: Page, { queue = [25, 3, 1], eta, hold, deleteStatus = 204, fail, holdUpload, holdDelete }: MockOpts = {}) {
   const pdf = await readFile(fx("three-pages.pdf"));
   const calls = { post: 0, get: 0, del: 0 };
   let step = 0;
@@ -202,11 +208,14 @@ async function mockJobs(page: Page, { queue = [25, 3, 1], eta, hold, deleteStatu
     const path = new URL(req.url()).pathname;
     if (req.method() === "POST" && path === "/api/jobs") {
       calls.post++;
-      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ id: "j1" }) });
+      if (holdUpload) await holdUpload;
+      // The page may have aborted the upload meanwhile (Cancel): the request is gone then.
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ id: "j1" }) }).catch(() => undefined);
     }
     if (req.method() === "DELETE" && path === "/api/jobs/j1") {
       calls.del++;
-      return route.fulfill({ status: deleteStatus, body: "" });
+      if (holdDelete) await holdDelete;
+      return route.fulfill({ status: deleteStatus, body: "" }).catch(() => undefined);
     }
     if (path === "/api/jobs/j1/result") return route.fulfill({ status: 200, contentType: "application/pdf", body: pdf });
     if (req.method() === "GET" && path === "/api/jobs/j1") {
@@ -228,6 +237,7 @@ async function mockJobs(page: Page, { queue = [25, 3, 1], eta, hold, deleteStatu
 
 test("AC-637: server phases step through upload, queue (#25, #3, #1), work and done; the second line says to keep the tab open", async ({ page }, info) => {
   test.skip(!isDesktop(info.project.name), "one run is enough");
+  test.skip(!fixturesServed, FIXTURES_OFF);
   const job = await mockJobs(page);
   await openTool(page, "/test-fixtures/settings-tool?server=1");
   await expect(page.getByTestId("privacy-intro")).toHaveText("Uploaded securely, deleted after 2 hours.");
@@ -249,6 +259,7 @@ test("AC-637: server phases step through upload, queue (#25, #3, #1), work and d
 
 test("AC-637: an estimate shows 'About 2 min'; Cancel in the queue sends one DELETE and says the upload was deleted", async ({ page }, info) => {
   test.skip(!isDesktop(info.project.name), "one run is enough");
+  test.skip(!fixturesServed, FIXTURES_OFF);
   const job = await mockJobs(page, { eta: 120, hold: "queue" });
   await openTool(page, "/test-fixtures/settings-tool?server=1");
   await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
@@ -268,6 +279,7 @@ test("AC-637: an estimate shows 'About 2 min'; Cancel in the queue sends one DEL
 
 test("AC-637: when DELETE fails, Cancel says the upload will be deleted within 2 hours", async ({ page }, info) => {
   test.skip(!isDesktop(info.project.name), "one run is enough");
+  test.skip(!fixturesServed, FIXTURES_OFF);
   const job = await mockJobs(page, { hold: "queue", deleteStatus: 500 });
   await openTool(page, "/test-fixtures/settings-tool?server=1");
   await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
@@ -281,6 +293,7 @@ test("AC-637: when DELETE fails, Cancel says the upload will be deleted within 2
 
 test("AC-638: a failed job puts the danger line and Try again in the slot (focused), the full message in a notice, the slot box unchanged", async ({ page }, info) => {
   test.skip(!isDesktop(info.project.name), "one run is enough");
+  test.skip(!fixturesServed, FIXTURES_OFF);
   await mockJobs(page, { queue: [1], fail: "Server tools are paused until tomorrow." });
   await openTool(page, "/test-fixtures/settings-tool?server=1");
   await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
@@ -315,4 +328,65 @@ test("AC-638: a job that fails on Delete puts the danger line and Try again (foc
   await expect(page.getByTestId("notice").getByRole("button", { name: "Start over" })).toBeVisible();
   const after = (await slot.boundingBox())!;
   for (const k of ["x", "y", "width", "height"] as const) expect(Math.abs(after[k] - before[k])).toBeLessThanOrEqual(0.5);
+});
+
+test("AC-637: Cancel during the upload (no job yet, no DELETE answered) says the upload will be deleted within 2 hours", async ({ page }, info) => {
+  test.skip(!isDesktop(info.project.name), "one run is enough");
+  test.skip(!fixturesServed, FIXTURES_OFF);
+  let release!: () => void;
+  const job = await mockJobs(page, { holdUpload: new Promise<void>((r) => (release = r)) });
+  await openTool(page, "/test-fixtures/settings-tool?server=1");
+  await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await primary(page).click();
+  await expect(page.getByTestId("processing")).toHaveAttribute("data-progress", "upload");
+  await expect.poll(() => job.calls.post).toBe(1);
+  await page.getByTestId("processing").getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByTestId("notice")).toContainText("Cancelled. Your upload will be deleted within 2 hours.");
+  await expect(page.getByTestId("notice")).not.toContainText("Your upload was deleted.");
+  release();
+  await page.waitForTimeout(400);
+  expect(job.calls.del).toBe(0);
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+});
+
+test("AC-637: a late DELETE reply never shows its notice during the next run", async ({ page }, info) => {
+  test.skip(!isDesktop(info.project.name), "one run is enough");
+  test.skip(!fixturesServed, FIXTURES_OFF);
+  let answer!: () => void;
+  const job = await mockJobs(page, { hold: "queue", holdDelete: new Promise<void>((r) => (answer = r)) });
+  await openTool(page, "/test-fixtures/settings-tool?server=1");
+  await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await primary(page).click();
+  await expect(page.getByTestId("queue-position")).toHaveText("#25");
+  await page.getByTestId("processing").getByRole("button", { name: "Cancel" }).click();
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await expect.poll(() => job.calls.del).toBe(1);
+  // The next run starts before the DELETE answers.
+  await primary(page).click();
+  await expect(page.getByTestId("queue-position")).toHaveText("#25");
+  answer();
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId("notice").filter({ hasText: "Cancelled." })).toHaveCount(0);
+  await expect(page.getByTestId("processing")).toBeVisible();
+});
+
+test("AC-637: leaving the tool mid job deletes it (one DELETE; its keepalive flag is unit-tested in server-job.test.ts)", async ({ page }, info) => {
+  test.skip(!isDesktop(info.project.name), "one run is enough");
+  test.skip(!fixturesServed, FIXTURES_OFF);
+  const job = await mockJobs(page, { hold: "queue" });
+  const deletes: string[] = [];
+  page.on("request", (r) => r.method() === "DELETE" && deletes.push(r.url()));
+  await openTool(page, "/test-fixtures/settings-tool?server=1");
+  await page.getByTestId("file-input").setInputFiles(fx("three-pages.pdf"));
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+  await primary(page).click();
+  await expect(page.getByTestId("queue-position")).toHaveText("#25");
+  // An in-app link asks first; Leave unmounts the tool.
+  await page.getByRole("banner").first().getByRole("link", { name: /rotate/i }).first().click();
+  await page.getByRole("dialog", { name: "Leave this tool?" }).getByRole("button", { name: "Leave" }).click();
+  await expect(page).not.toHaveURL(/settings-tool/);
+  await expect.poll(() => job.calls.del).toBe(1);
+  expect(deletes).toHaveLength(1);
 });

@@ -52,7 +52,7 @@ export function DownloadCard() {
               variant="soft"
               size="sm"
               onClick={() => {
-                if (isUsable(t)) setHandoff(slug, [new File([d.bytes as Uint8Array<ArrayBuffer>], d.name, { type: "application/pdf" })]);
+                if (isUsable(t)) setHandoff(slug, [new File([d.blob], d.name, { type: "application/pdf" })]);
                 ctl.store.set({ downloaded: null });
                 router.push(`/${slug}`);
               }}

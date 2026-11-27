@@ -6,7 +6,7 @@
  * Icons only (Phosphor Bold, no boxes); names and shortcuts are in tooltips and accessible names.
  */
 import { FieldsChipSlot } from "@/tools/forms/lazy";
-import { lazy, Suspense, useEffect, useId, useLayoutEffect, useState, type KeyboardEvent, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ActionSlot, ProgressPill, SlotError } from "@/components/tool-flow/ActionSlot";
@@ -18,6 +18,7 @@ import { useCtl } from "./context";
 import { TOOL_NAMES } from "./controller";
 import {
   CaretDownBold,
+  FileBold,
   CaretLeftBold,
   CaretRightBold,
   CheckBold,
@@ -288,6 +289,28 @@ export function DownloadButton({ compact }: { compact?: boolean }) {
     const t = setTimeout(() => setDone(false), 2400);
     return () => clearTimeout(t);
   }, [done]);
+  // Focus (F25 §6): the pill takes it when the build starts, so Escape cancels and Tab reaches Cancel; when
+  // the run settles, Download (or Try again) takes it back, unless the visitor has moved on elsewhere.
+  const box = useRef<HTMLSpanElement>(null);
+  const pill = useRef<HTMLDivElement>(null);
+  const main = useRef<HTMLButtonElement>(null);
+  const retry = useRef<HTMLButtonElement>(null);
+  const restore = useRef(false);
+  useLayoutEffect(() => {
+    const a = document.activeElement;
+    const free = !a || a === document.body || !!box.current?.contains(a);
+    if (busy) {
+      restore.current = true;
+      const typing = a instanceof HTMLElement && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+      if (free || !typing) pill.current?.focus({ preventScroll: true });
+      return;
+    }
+    if (!restore.current) return;
+    if (free) (failed && !compact ? retry : main).current?.focus({ preventScroll: true });
+    // The outcome (failed or done) can land a render after the pill goes: keep restoring until then.
+    const t = setTimeout(() => (restore.current = false));
+    return () => clearTimeout(t);
+  }, [busy, failed, compact]);
   const run = async (n?: string) => {
     setFailed(false);
     const r = await ctl.download?.(n);
@@ -296,15 +319,16 @@ export function DownloadButton({ compact }: { compact?: boolean }) {
   };
   const warm = () => void import("@/lib/editor/build-client").then((m) => m.warmBuild());
   return (
-    <span className="ed-download" onPointerEnter={warm} onPointerDown={warm} onFocus={warm}>
+    <span ref={box} className="ed-download" onPointerEnter={warm} onPointerDown={warm} onFocus={warm}>
       <ActionSlot kind="editor">
         {busy ? (
-          <ProgressPill state={{ phase: "work", verb: "Downloading" }} action="Download" onCancel={() => ctl.cancelDownload?.()} />
+          <ProgressPill ref={pill} state={{ phase: "work", verb: "Downloading" }} action="Download" onCancel={() => ctl.cancelDownload?.()} />
         ) : failed && !compact ? (
-          <SlotError line="Couldn’t make the PDF." onRetry={() => void run()} />
+          <SlotError ref={retry} line="Couldn’t make the PDF." onRetry={() => void run()} />
         ) : (
           <>
             <Button
+              ref={main}
               variant="primary"
               size={compact ? "sm" : "md"}
               className="ip-slot__main min-w-0"
@@ -380,6 +404,8 @@ export function TopBar({ wide, fileMenu }: { wide: boolean; fileMenu: MenuEntry[
       </span>
       <MenuButton label={`File: ${ctl.rt.name}`} items={fileMenu} className="ed-file" data-testid="file-menu">
         <h2 className="truncate">{ctl.rt.name}</h2>
+        {/* Shown instead of the name when too little of it would fit (a phone's bar). */}
+        <FileBold size={18} className="ed-file__icon shrink-0" />
         <CaretDownBold size={12} className="shrink-0" />
       </MenuButton>
       <div className="ed-top__slot">{wide && <ToolBar />}</div>

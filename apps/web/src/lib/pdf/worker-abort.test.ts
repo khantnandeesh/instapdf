@@ -41,7 +41,9 @@ describe("Cancel stops the work (F25 §6)", () => {
     expect(FakeWorker.made[0].terminated).toBe(true);
   });
 
-  it("buildInWorker: abort terminates the build worker, rejects with AbortError and warms a fresh one", async () => {
+  it("buildInWorker: abort terminates the build worker, rejects with AbortError and warms a fresh one when idle", async () => {
+    const idle: (() => void)[] = [];
+    vi.stubGlobal("requestIdleCallback", (fn: () => void) => idle.push(fn));
     const { buildInWorker } = await import("@/lib/editor/build-client");
     const ac = new AbortController();
     const build = buildInWorker({} as never, { signal: ac.signal });
@@ -49,6 +51,9 @@ describe("Cancel stops the work (F25 §6)", () => {
     ac.abort();
     await expect(build).rejects.toMatchObject({ name: "AbortError" });
     expect(FakeWorker.made[0].terminated).toBe(true);
+    // The fresh worker waits for an idle moment, so Cancel itself stays quick.
+    expect(FakeWorker.made).toHaveLength(1);
+    for (const fn of idle) fn();
     expect(FakeWorker.made).toHaveLength(2);
     expect(FakeWorker.made[1].posted).toEqual([{ id: 0, warm: true }]);
   });

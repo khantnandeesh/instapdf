@@ -253,6 +253,8 @@ export function ToolFlow({
   const [pillDone, setPillDone] = useState(false);
   /** What Cancel does for a server job once it exists (sends DELETE); null for browser jobs. */
   const serverCancel = useRef<(() => Promise<boolean>) | null>(null);
+  // Bumped on every run, so a late DELETE reply from a cancelled run never shows its notice over the next.
+  const runGen = useRef(0);
   const memo = useRef<AnnounceMemo | null>(null);
   const errorNotice = useRef<string | null>(null);
   /** A processing error meant for the user (the job said what to do), shown instead of the generic one. */
@@ -650,6 +652,7 @@ export function ToolFlow({
     if (!ready.length) return;
     const controller = new AbortController();
     abort.current = controller;
+    runGen.current++;
     serverCancel.current = null;
     memo.current = null;
     if (errorNotice.current) dismissNotice(errorNotice.current);
@@ -727,8 +730,13 @@ export function ToolFlow({
     setProgress(0);
     announce(copy.cancelled);
     setFocusPrimaryTick((n) => n + 1);
-    if (server) pushNotice({ tone: "info", title: (await server()) ? copy.cancelledServer : copy.cancelledServerLater, timeoutMs: 8000 });
-    else pushNotice({ tone: "info", title: tool.runtime === "server" ? copy.cancelledServer : copy.cancelledBrowser, timeoutMs: 6000 });
+    if (tool.runtime !== "server" && !server) return void pushNotice({ tone: "info", title: copy.cancelledBrowser, timeoutMs: 6000 });
+    // "Deleted" only once DELETE answered 2xx. Cancelled mid-upload there is no job id yet, so the upload
+    // may still land and is deleted by the 2-hour rule. A late reply never speaks over a newer run.
+    const runAtCancel = runGen.current;
+    const deleted = server ? await server() : false;
+    if (runGen.current !== runAtCancel) return;
+    pushNotice({ tone: "info", title: deleted ? copy.cancelledServer : copy.cancelledServerLater, timeoutMs: 8000 });
   }, [announce, pushNotice, tool.runtime]);
   useEffect(() => {
     if (focusPrimaryTick) primaryButton.current?.focus();
@@ -768,6 +776,7 @@ export function ToolFlow({
 
   const startOver = useCallback(() => {
     abort.current?.abort();
+    runGen.current++;
     serverCancel.current = null;
     errorNotice.current = null;
     setPillDone(false);
@@ -839,12 +848,29 @@ export function ToolFlow({
     if (handed) void intake(handed, null);
   }, [intake, tool.slug]);
 
+  // Closing or leaving the tab mid server job (a full navigation never unmounts React): the job is
+  // deleted with a keepalive DELETE, which outlives the page.
+  useEffect(() => {
+    if (phase !== "processing") return;
+    const onHide = () => {
+      const server = serverCancel.current;
+      serverCancel.current = null;
+      if (server) void server();
+    };
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, [phase]);
+
   // On unmount: stop any running job, shut the processing worker down and
   // release the pdf.js documents.
   useEffect(() => {
     const map = docs.current;
     return () => {
+      // Leaving mid server job deletes it too (the DELETE is sent with keepalive, so it outlives the page).
+      const server = serverCancel.current;
+      serverCancel.current = null;
       abort.current?.abort();
+      if (server) void server();
       disposeWorker();
       for (const d of map.values()) void d.task.destroy();
       map.clear();

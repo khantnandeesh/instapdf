@@ -12,6 +12,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { isUsable, tools } from "../../src/tools/registry";
 import { cloudOn, fx } from "../support/flow";
+import { FIXTURES_OFF, fixturesServed } from "../support/fixtures";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
 const comingSoon = tools.find((t) => !isUsable(t));
@@ -214,6 +215,7 @@ for (const [project, sizes] of [
       }
 
       test("the settings fixture (F25 §4): the side panel and a tall one scroll with the page, never inside", async ({ page }) => {
+        test.skip(!fixturesServed, FIXTURES_OFF);
         for (const q of ["", "?tall=1"]) {
           await page.goto(`/test-fixtures/settings-tool${q}`);
           await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();

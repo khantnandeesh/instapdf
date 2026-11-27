@@ -13,7 +13,9 @@ ARG NEXT_PUBLIC_CLOUD_SOURCES="" NEXT_PUBLIC_DROPBOX_APP_KEY="" NEXT_PUBLIC_GOOG
 # Set (https://storage.googleapis.com/<bucket>) when the fonts bucket holds a library: /fonts/lib/*
 # is then passed through to it and no copy of the fonts is built into the image.
 ARG FONTS_ORIGIN=""
-RUN FONTS_ORIGIN="$FONTS_ORIGIN" pnpm --filter web build
+# IP_DEPLOY_BUILD=1: the deployed image builds the test-only fixture routes (/test-fixtures/*) as plain
+# 404s, a second gate after the middleware's runtime IP_TEST_FIXTURES check (F25 AC-623).
+RUN FONTS_ORIGIN="$FONTS_ORIGIN" IP_DEPLOY_BUILD=1 pnpm --filter web build
 
 FROM mirror.gcr.io/library/node:22-alpine AS run
 WORKDIR /app

@@ -115,7 +115,7 @@ function MoreOptionsBody({
   content: MoreOptionsContent;
 }) {
   return (
-    <div className="flex flex-col gap-5" data-testid="more-options-dialog">
+    <div className="ip-more-body flex flex-col gap-5" data-testid="more-options-dialog">
       {content.parts && (
         <PartsList
           rows={content.parts.rows}
@@ -233,7 +233,7 @@ function PartsList({
   }, [virtual, rows.length]);
   const [from, to] = virtual ? win : [0, rows.length];
   return (
-    <section aria-labelledby="ip-parts-title">
+    <section className="ip-parts" aria-labelledby="ip-parts-title">
       <h3 id="ip-parts-title" className="mb-1.5 text-sm font-semibold text-ink">
         {dialogCopy.files}{" "}
         <span className="text-muted tabular-nums">

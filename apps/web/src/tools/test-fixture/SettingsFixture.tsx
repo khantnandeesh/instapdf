@@ -74,7 +74,7 @@ const serverProcess: ProcessFn = async (files, signal, _onProgress, job) => {
 
 const LEVELS = [
   { value: "less", label: "Less" },
-  { value: "recommended", label: "Recommended" },
+  { value: "recommended", label: "Balanced" },
   { value: "extreme", label: "Extreme" },
 ];
 const COLOURS = [
