@@ -93,6 +93,19 @@ test.describe("redraws", () => {
     }
   });
 
+  test("a turn keeps a canvas that is still sharp enough (Organize)", async ({ page }) => {
+    await load(page, ROUTES[3]);
+    await sharp(page, 1, "organize");
+    const canvas = page.getByTestId("page-tile").first().locator("[data-rendered] > canvas");
+    await canvas.evaluate((c) => ((c as HTMLCanvasElement).dataset.kept = "1"));
+    await page.getByTestId("page-tile").first().hover();
+    // Right, then right again: a portrait page turned fits smaller, then back at its first size.
+    for (let i = 0; i < 2; i++) await page.getByRole("button", { name: "Rotate A1 right" }).click();
+    await page.waitForTimeout(500); // past a redraw's settle time
+    await sharp(page, 1, "organize turned");
+    await expect(page.getByTestId("page-tile").first().locator("[data-rendered] > canvas")).toHaveAttribute("data-kept", "1");
+  });
+
   test("a new pixel ratio redraws the pages sharp (Rotate, Merge, Extract)", async ({ page }) => {
     for (const r of [ROUTES[7], ROUTES[8], ROUTES[1]]) {
       await load(page, r);

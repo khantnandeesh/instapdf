@@ -4,7 +4,9 @@
  * files), every object but the streams in object streams, and the pages unchanged.
  */
 import { readFile } from "node:fs/promises";
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, PDFRef, type PDFContext, type PDFObject } from "@cantoo/pdf-lib";
+import { createHash } from "node:crypto";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, PDFRef, decodePDFRawStream, type PDFContext, type PDFObject } from "@cantoo/pdf-lib";
+import { zlibSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { interleave } from "@/lib/mix-plan";
 import { parsePageRanges } from "@/lib/page-ranges";
@@ -12,7 +14,7 @@ import { pagesPerFile, planDelete, planExtract, type OutputPlan, type PlanFile }
 import { buildDocuments } from "./build";
 import { mergePdf, type MergePageInput, type MergeSourceInput } from "./merge";
 import { ALTERNATE_OPTIONS, ORGANIZE_OPTIONS, defaultMergeOptions } from "./merge-options";
-import { saveCompact } from "./write";
+import { bucketOf, compact, saveCompact } from "./write";
 
 const dir = new URL("../../../tests/fixtures/", import.meta.url);
 const fx: Record<string, Uint8Array> = {};
@@ -68,7 +70,71 @@ function waste(context: PDFContext) {
 /** Plain (not in an object stream) objects written in the file, besides streams. */
 const plainDicts = (bytes: Uint8Array) => (Buffer.from(bytes).toString("latin1").match(/\d+ 0 obj\s*<<(?![^]*?>>\s*stream)/g) ?? []).length;
 
+/**
+ * What an object means, as plain data: references followed (back links such as /Parent, /Prev, /Last
+ * and an annotation's /P left out, so shared objects and cycles read the same either way), streams
+ * decoded (their /Length and /Filter are how they are stored, not what they say), entries that say
+ * nothing (an empty array or dictionary) left out, as the writer leaves them out.
+ */
+const BACK = new Set(["Parent", "Prev", "Last", "P"]);
+const STORAGE = new Set(["Length", "Filter", "DecodeParms"]);
+function meaning(obj: PDFObject | undefined, ctx: PDFContext, depth = 0): unknown {
+  if (depth > 60) return "…";
+  if (obj instanceof PDFRef) return meaning(ctx.lookup(obj), ctx, depth + 1);
+  if (obj instanceof PDFRawStream) {
+    let data: Uint8Array;
+    let filter: unknown = null;
+    try {
+      data = decodePDFRawStream(obj).decode();
+    } catch {
+      data = obj.getContents(); // an image codec pdf-lib does not decode: the writer never touches those
+      filter = meaning(obj.dict.get(PDFName.of("Filter")), ctx, depth + 1);
+    }
+    return { dict: meaning(obj.dict, ctx, depth + 1), filter, data: createHash("sha256").update(data).digest("hex") };
+  }
+  if (obj instanceof PDFDict) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of obj.entries()) {
+      const key = k.decodeText();
+      if (BACK.has(key) || STORAGE.has(key)) continue;
+      const m = meaning(v, ctx, depth + 1);
+      if ((Array.isArray(m) && !m.length) || (m && typeof m === "object" && !Array.isArray(m) && !Object.keys(m).length)) continue;
+      out[key] = m;
+    }
+    return Object.fromEntries(Object.entries(out).sort(([a], [b]) => (a < b ? -1 : 1)));
+  }
+  if (obj instanceof PDFArray) return obj.asArray().map((v) => meaning(v, ctx, depth + 1));
+  return obj?.toString();
+}
+const BOXES = ["MediaBox", "CropBox", "BleedBox", "TrimBox", "ArtBox"] as const;
+async function meaningOfFile(bytes: Uint8Array) {
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
+  const ctx = doc.context;
+  const pages = doc.getPages().map((p) => ({
+    contents: meaning(p.node.get(PDFName.of("Contents")), ctx),
+    resources: meaning(p.node.Resources(), ctx),
+    annots: meaning(p.node.Annots(), ctx) ?? [],
+    boxes: BOXES.map((b) => meaning(p.node.lookup(PDFName.of(b)) ?? (b === "MediaBox" ? p.node.MediaBox() : undefined), ctx)),
+    rotate: p.getRotation().angle,
+  }));
+  const cat = doc.catalog;
+  const part = (k: string) => meaning(cat.get(PDFName.of(k)), ctx);
+  return { pages, outlines: part("Outlines"), acroForm: part("AcroForm"), names: part("Names"), pageLabels: part("PageLabels") };
+}
+
 describe("saveCompact (eval G-2)", () => {
+  it.each(["twelve.pdf", "links.pdf", "form.pdf", "lang-labels.pdf", "tagged-features.pdf", "inherited-res.pdf", "pre-rotated.pdf", "indirect-box.pdf", "shared-res.pdf", "scanned.pdf"])(
+    "means what save() writes: %s (page contents, resources, annotations, boxes, rotation; outline, form, names, labels)",
+    async (name) => {
+      const bytes = await load(name);
+      const plain = await (await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false })).save();
+      const small = await saveCompact(await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false }));
+      expect(await meaningOfFile(small)).toEqual(await meaningOfFile(plain));
+    },
+    30_000,
+  );
+
+
   it("writes the eval's outputs at or below the reference sizes", async () => {
     const twelve = await file("twelve.pdf");
     const extract = (await build(planExtract([twelve], pagesPerFile(items("9,2-3"), [twelve]))))[0].bytes;
@@ -126,5 +192,53 @@ describe("saveCompact (eval G-2)", () => {
     expect(out.context.enumerateIndirectObjects().some(([, o]) => o instanceof PDFDict && o.has(PDFName.of("Orphan")))).toBe(false);
     expect(out.getPageCount()).toBe(1);
     expect(out.getPage(0).node.Contents()).toBeDefined();
+  });
+
+  /** A document whose pages each draw one of `streams` (as an XObject), so nothing is pruned. */
+  async function withStreams(streams: { dict: Record<string, unknown>; bytes: Uint8Array }[]) {
+    const doc = await PDFDocument.create();
+    streams.forEach(({ dict, bytes }, n) => {
+      const ref = doc.context.register(PDFRawStream.of(doc.context.obj({ ...dict, Length: bytes.length } as never) as unknown as PDFDict, bytes));
+      doc.addPage([100, 100]).node.setXObject(PDFName.of(`X${n}`), ref);
+    });
+    return doc;
+  }
+  const rawStreams = (ctx: PDFContext) => ctx.enumerateIndirectObjects().filter(([, o]) => o instanceof PDFRawStream).length;
+  const IMAGE = { Type: "XObject", Subtype: "Image", Width: 1024, Height: 1024, BitsPerComponent: 8, ColorSpace: "DeviceGray", Filter: "DCTDecode" };
+  function noise(n: number, seed: number) {
+    const b = new Uint8Array(n);
+    let x = seed;
+    for (let i = 0; i < n; i++) b[i] = (x = (Math.imul(x, 1103515245) + 12345) >>> 0) >>> 24;
+    return b;
+  }
+
+  it("keeps the merge key small whatever the stream's size (no copy of its bytes)", async () => {
+    const doc = await withStreams([{ dict: IMAGE, bytes: noise(4 * 1024 * 1024, 7) }]);
+    const [, stream] = doc.context.enumerateIndirectObjects().find(([, o]) => o instanceof PDFRawStream)!;
+    const key = bucketOf(stream)!;
+    expect(key.length).toBeLessThan(300);
+  });
+
+  it("merges equal streams only: a stream that differs where the hash does not look stays", async () => {
+    const big = noise(1024 * 1024, 3);
+    const twin = big.slice();
+    const near = big.slice();
+    near[1] ^= 0xff; // between two sampled bytes: same bucket, different bytes
+    const doc = await withStreams([big, twin, near].map((bytes) => ({ dict: IMAGE, bytes })));
+    expect(bucketOf(doc.context.lookup(doc.getPage(2).node.Resources()!.lookup(PDFName.of("XObject"), PDFDict).get(PDFName.of("X2")) as PDFRef)!)).toBe(
+      bucketOf(doc.context.lookup(doc.getPage(0).node.Resources()!.lookup(PDFName.of("XObject"), PDFDict).get(PDFName.of("X0")) as PDFRef)!),
+    );
+    compact(doc.context);
+    expect(rawStreams(doc.context)).toBe(2);
+  });
+
+  it("merges one stream saved at two deflate levels", async () => {
+    const plain = new TextEncoder().encode("0 0 m 10 10 l S\n".repeat(600));
+    const form = { Type: "XObject", Subtype: "Form", BBox: [0, 0, 10, 10], Filter: "FlateDecode" };
+    const doc = await withStreams([1, 9].map((level) => ({ dict: form, bytes: zlibSync(plain, { level: level as 1 | 9 }) })));
+    compact(doc.context);
+    const left = doc.context.enumerateIndirectObjects().filter(([, o]) => o instanceof PDFRawStream) as [PDFRef, PDFRawStream][];
+    expect(left).toHaveLength(1);
+    expect(new TextDecoder().decode(decodePDFRawStream(left[0][1]).decode())).toBe(new TextDecoder().decode(plain));
   });
 });

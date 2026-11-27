@@ -14,8 +14,9 @@
  *    equal, which makes the fonts equal);
  * 3. leaves out entries that say nothing: an empty /Annots, empty resource categories and
  *    /Rotate 0 where no parent sets a rotation;
- * 4. stores small Flate streams that deflate cannot shrink as they are, and compresses streams
- *    that came in uncompressed when that makes them smaller;
+ * 4. re-encodes small Flate streams in one canonical way (or stores them plain when deflate does
+ *    not help), never larger, and compresses streams that came in uncompressed when that makes them
+ *    smaller; this runs before step 2, so one stream saved two ways merges;
  * 5. writes every non-stream object, the page dictionaries included, into compressed object
  *    streams, with a cross-reference stream.
  *
@@ -88,8 +89,8 @@ export async function saveCompact(doc: PDFDocument): Promise<Uint8Array> {
 export function compact(context: PDFContext): void {
   prune(context);
   tidyPages(context);
+  recode(context); // first, so one font saved at two deflate levels comes out as the same bytes and merges
   dedupe(context);
-  recode(context);
   prune(context); // merged-away objects
 }
 
@@ -139,40 +140,64 @@ function inheritsRotate(page: PDFDict): boolean {
   return false;
 }
 
-/** A merge key for an object that may be shared, or null. Refs are written as "n R", so keys only match when targets match. */
-function keyOf(obj: PDFObject): string | null {
+/** Bytes of a stream that go into its bucket hash, spread evenly over it (a full compare settles a match). */
+const HASH_SAMPLES = 4096;
+
+/** FNV-1a over at most HASH_SAMPLES bytes of `b`, read in place: no copy, no string. */
+function sampleHash(b: Uint8Array): number {
+  const step = Math.max(1, Math.floor(b.length / HASH_SAMPLES));
+  let h = 0x811c9dc5;
+  for (let i = 0; i < b.length; i += step) h = Math.imul(h ^ b[i], 0x01000193);
+  return h >>> 0;
+}
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+/**
+ * The bucket of an object that may be shared, or null (exported for the unit tests). A stream's bucket
+ * is its dictionary, length and a sampled hash, never its bytes, so the key stays small whatever the
+ * stream's size (a 4 MB scan costs ~100 bytes of key); streams in one bucket are compared byte for byte.
+ * Refs are written "n R", so keys only match when targets match.
+ */
+export function bucketOf(obj: PDFObject): string | null {
   if (obj instanceof PDFRawStream) {
     const type = obj.dict.lookup(TYPE);
     if (type instanceof PDFName && NO_MERGE_STREAM.has(type.decodeText())) return null;
-    return `S${obj.dict.toString()}\u0000${bytesKey(obj.getContents())}`;
+    const bytes = obj.getContents();
+    return `S${obj.dict.toString()}\u0000${bytes.length}:${sampleHash(bytes)}`;
   }
   if (obj instanceof PDFStream) return null; // streams pdf-lib builds at save time (content written by us)
   if (obj instanceof PDFDict) {
     const type = obj.lookup(TYPE);
     if (!(type instanceof PDFName) || !SHAREABLE.has(type.decodeText())) return null;
-    return `D${obj.toString()}`;
+    return `D${obj.toString()}`; // the whole dictionary: equal keys are equal objects
   }
   return null;
-}
-
-/** The bytes as a string key (a latin-1 view: exact, and Map hashes strings well). */
-function bytesKey(b: Uint8Array): string {
-  let s = `${b.length}:`;
-  for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode.apply(null, b.subarray(i, i + 8192) as unknown as number[]);
-  return s;
 }
 
 /** Points every reference to a merged object at the one kept (step 2), until nothing more merges. */
 function dedupe(context: PDFContext): void {
   for (let round = 0; round < 8; round++) {
-    const keep = new Map<string, PDFRef>();
+    const buckets = new Map<string, PDFRef[]>();
     const alias = new Map<PDFRef, PDFRef>();
     for (const [ref, obj] of context.enumerateIndirectObjects()) {
-      const key = keyOf(obj);
+      const key = bucketOf(obj);
       if (key === null) continue;
-      const first = keep.get(key);
-      if (first) alias.set(ref, first);
-      else keep.set(key, ref);
+      const kept = buckets.get(key);
+      if (!kept) {
+        buckets.set(key, [ref]);
+        continue;
+      }
+      const same =
+        obj instanceof PDFRawStream
+          ? kept.find((k) => sameBytes((context.lookup(k) as PDFRawStream).getContents(), obj.getContents()))
+          : kept[0];
+      if (same) alias.set(ref, same);
+      else kept.push(ref);
     }
     if (!alias.size) return;
     for (const [, obj] of context.enumerateIndirectObjects()) rewrite(obj, alias);
@@ -230,12 +255,15 @@ function recode(context: PDFContext): void {
     const useFlate = deflated.length + 20 < plain.length;
     const best = useFlate ? deflated : plain;
     const current = contents.length + (filter === undefined ? 0 : 20);
-    if (best.length + (useFlate ? 20 : 0) < current) replace(context, ref, dict, best, useFlate, current);
+    // Not larger is enough: one canonical encoding makes a stream saved two ways (another deflate
+    // level, another writer) the same bytes, so it merges (step 2).
+    if (useFlate === (filter !== undefined) && sameBytes(best, contents)) continue;
+    if (best.length + (useFlate ? 20 : 0) <= current) replace(context, ref, dict, best, useFlate, current);
   }
 }
 
 function replace(context: PDFContext, ref: PDFRef, dict: PDFDict, bytes: Uint8Array, flate: boolean, current: number): void {
-  if (flate && bytes.length + 20 >= current) return;
+  if (flate && bytes.length + 20 > current) return;
   const next = dict.clone(context);
   if (flate) next.set(FILTER, FLATE);
   else next.delete(FILTER);
