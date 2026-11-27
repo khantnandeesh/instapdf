@@ -167,10 +167,18 @@ test("AC-41 AC-55 AC-79: page actions rotate, duplicate, insert and delete; over
     // F25 AC-627: a selection opens the properties panel over the canvas's right side; clear it first.
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("editor-props")).toHaveCount(0);
-    await page.getByRole("button", { name: "Rotate right, page 1" }).click();
-    await page.getByRole("button", { name: "Duplicate page, page 2" }).click();
-    await page.getByRole("button", { name: "Insert blank page after, page 1" }).click();
-    await page.getByRole("button", { name: "Delete page, page 5" }).click();
+    // The page actions show (and take the pointer) with the pointer in the page's top band (eval G-1).
+    const act = async (name: string, n: number) => {
+      const btn = page.getByRole("button", { name: `${name}, page ${n}` });
+      await btn.scrollIntoViewIfNeeded();
+      const b = (await btn.boundingBox())!;
+      await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+      await btn.click();
+    };
+    await act("Rotate right", 1);
+    await act("Duplicate page", 2);
+    await act("Insert blank page after", 1);
+    await act("Delete page", 5);
   } else {
     await page.getByTestId("page-chip").click();
     await page.getByRole("button", { name: "Page 1 actions" }).click();
@@ -345,7 +353,10 @@ test("AC-48 AC-54 AC-83 AC-98: bars fit the screen, stay put while pages scroll,
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const top = (await page.locator("header.ed-top").boundingBox())!;
   await page.getByTestId("canvas").evaluate((el) => el.scrollBy(0, 900));
-  expect((await page.locator("header.ed-top").boundingBox())!.y).toBe(top.y);
+  // F25 eval G-1: from 1024 (and over 600px tall) the navbar slides away while the pages scroll down and
+  // the bar takes its place at the very top; below that the bar does not move at all.
+  const lifts = vw >= 1024 && page.viewportSize()!.height > 600 && process.env.NEXT_PUBLIC_EDITOR_NAV_AUTOHIDE !== "0";
+  await expect.poll(async () => (await page.locator("header.ed-top").boundingBox())!.y).toBe(lifts ? 0 : top.y);
   await expect(page.getByRole("button", { name: "Download PDF" })).toBeInViewport();
   if (vw < 1024) {
     // Shapes lives in More on phones: the More button shows it.

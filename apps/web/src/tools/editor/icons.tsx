@@ -26,17 +26,9 @@
  * SOFTWARE.
  */
 
-import type { SVGProps } from "react";
+import { Icon, type IconProps } from "./icons-landing";
 
-type IconProps = SVGProps<SVGSVGElement> & { size?: number };
-
-function Icon({ size = 18, children, ...rest }: IconProps & { children: React.ReactNode }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" focusable="false" {...rest}>
-      {children}
-    </svg>
-  );
-}
+export { FileUpBold, FilePlusBold } from "./icons-landing";
 
 /** Phosphor "arrow-u-up-left" (bold). */
 export const UndoBold = (p: IconProps) => <Icon {...p}><path d="M236,144a68.07,68.07,0,0,1-68,68H80a12,12,0,0,1,0-24h88a44,44,0,0,0,0-88H61l27.52,27.51a12,12,0,0,1-17,17l-48-48a12,12,0,0,1,0-17l48-48a12,12,0,1,1,17,17L61,76H168A68.08,68.08,0,0,1,236,144Z" /></Icon>;
@@ -49,9 +41,6 @@ export const DownloadBold = (p: IconProps) => <Icon {...p}><path d="M228,144v64a
 
 /** Phosphor "x" (bold). */
 export const CloseBold = (p: IconProps) => <Icon {...p}><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z" /></Icon>;
-
-/** Phosphor "file-arrow-up" (bold). */
-export const FileUpBold = (p: IconProps) => <Icon {...p}><path d="M216.49,79.52l-56-56A12,12,0,0,0,152,20H56A20,20,0,0,0,36,40V216a20,20,0,0,0,20,20H200a20,20,0,0,0,20-20V88A12,12,0,0,0,216.49,79.52ZM183,80H160V57ZM60,212V44h76V92a12,12,0,0,0,12,12h48V212Zm100.49-72.49a12,12,0,0,1-17,17L140,153v31a12,12,0,0,1-24,0V153l-3.51,3.52a12,12,0,0,1-17-17l24-24a12,12,0,0,1,17,0Z" /></Icon>;
 
 /** Phosphor "pencil-simple" (bold). */
 export const PencilBold = (p: IconProps) => <Icon {...p}><path d="M230.14,70.54,185.46,25.85a20,20,0,0,0-28.29,0L33.86,149.17A19.85,19.85,0,0,0,28,163.31V208a20,20,0,0,0,20,20H92.69a19.86,19.86,0,0,0,14.14-5.86L230.14,98.82a20,20,0,0,0,0-28.28ZM91,204H52V165l84-84,39,39ZM192,103,153,64l18.34-18.34,39,39Z" /></Icon>;
@@ -109,9 +98,6 @@ export const RotateRightBold = (p: IconProps) => <Icon {...p}><path d="M244,56v4
 
 /** Phosphor "copy" (bold). */
 export const CopyBold = (p: IconProps) => <Icon {...p}><path d="M216,28H88A12,12,0,0,0,76,40V76H40A12,12,0,0,0,28,88V216a12,12,0,0,0,12,12H168a12,12,0,0,0,12-12V180h36a12,12,0,0,0,12-12V40A12,12,0,0,0,216,28ZM156,204H52V100H156Zm48-48H180V88a12,12,0,0,0-12-12H100V52H204Z" /></Icon>;
-
-/** Phosphor "file-plus" (bold). */
-export const FilePlusBold = (p: IconProps) => <Icon {...p}><path d="M216.49,79.51l-56-56A12,12,0,0,0,152,20H56A20,20,0,0,0,36,40V216a20,20,0,0,0,20,20H200a20,20,0,0,0,20-20V88A12,12,0,0,0,216.49,79.51ZM160,57l23,23H160ZM60,212V44h76V92a12,12,0,0,0,12,12h48V212Zm104-60a12,12,0,0,1-12,12H140v12a12,12,0,0,1-24,0V164H104a12,12,0,0,1,0-24h12V128a12,12,0,0,1,24,0v12h12A12,12,0,0,1,164,152Z" /></Icon>;
 
 /** Phosphor "trash" (bold). */
 export const TrashBold = (p: IconProps) => <Icon {...p}><path d="M216,48H180V36A28,28,0,0,0,152,8H104A28,28,0,0,0,76,36V48H40a12,12,0,0,0,0,24h4V208a20,20,0,0,0,20,20H192a20,20,0,0,0,20-20V72h4a12,12,0,0,0,0-24ZM100,36a4,4,0,0,1,4-4h48a4,4,0,0,1,4,4V48H100Zm88,168H68V72H188ZM116,104v64a12,12,0,0,1-24,0V104a12,12,0,0,1,24,0Zm48,0v64a12,12,0,0,1-24,0V104a12,12,0,0,1,24,0Z" /></Icon>;

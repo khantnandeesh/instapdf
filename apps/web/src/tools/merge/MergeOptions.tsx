@@ -63,13 +63,41 @@ function SwitchRow({ id, label, description, checked, onChange }: { id: string; 
   );
 }
 
-/** The options panel (spec F3 M-5); the same component in the dock column and in the sheet. */
-export function MergeOptions({ value, onChange, announce }: { value: Options; onChange: (next: Options) => void; announce: (m: string) => void }) {
+/**
+ * Contents page in Merge's top row from 1280 px (F25 §3.4): "Contents page" None · Names · Titles. Below
+ * 1280 it folds back into More options (MergeOptions with `tocInRow`).
+ */
+export function MergeTocRow({ value, onChange }: { value: Options; onChange: (next: Options) => void }) {
+  return (
+    <div className="flex items-center gap-2.5" title={tocDescriptions[value.toc]} data-testid="merge-toc-row">
+      <span aria-hidden="true" className="text-sm font-semibold whitespace-nowrap text-ink">
+        Contents page
+      </span>
+      <SegmentedControl<TocMode>
+        label="Contents page"
+        look="tabs"
+        value={value.toc}
+        onChange={(v) => onChange({ ...value, toc: v })}
+        options={[
+          { value: "none", label: "None" },
+          { value: "names", label: "Names" },
+          { value: "titles", label: "Titles" },
+        ]}
+      />
+    </div>
+  );
+}
+
+/**
+ * The options panel (spec F3 M-5); the same component in the popover and in the sheet. `tocInRow`: the
+ * contents page choice is in the top row from 1280 px, so the popover leaves it out there.
+ */
+export function MergeOptions({ value, onChange, announce, tocInRow }: { value: Options; onChange: (next: Options) => void; announce: (m: string) => void; tocInRow?: boolean }) {
   const set = <K extends keyof Options>(key: K, v: Options[K]) => onChange({ ...value, [key]: v });
   return (
     <div className="flex flex-col gap-4 lg:gap-6" data-testid="merge-options">
       <Group n={1} title="Contents page">
-        <div title={tocDescriptions[value.toc]}>
+        <div title={tocDescriptions[value.toc]} className={tocInRow ? "xl:hidden" : undefined}>
           <SegmentedControl<TocMode>
             label="Contents page"
             look="tiles"

@@ -10,7 +10,7 @@ const PROVIDERS = /Google Drive|Dropbox|OneDrive/;
 test("AC-120: no sources trigger or provider name on /rotate-pdf, empty, ready or done", async ({ page }) => {
   await openRotate(page);
   const none = async (what: string) => {
-    for (const id of ["cloud-caret", "cloud-caret-toolbar", "cloud-row", "save-main"]) await expect(page.getByTestId(id), `${what}: ${id}`).toHaveCount(0);
+    for (const id of ["cloud-caret", "cloud-caret-toolbar", "cloud-row", "save-cloud"]) await expect(page.getByTestId(id), `${what}: ${id}`).toHaveCount(0);
     expect(await page.locator("body").innerText(), what).not.toMatch(PROVIDERS);
     await expect(page.locator("[aria-haspopup=menu]").filter({ hasText: PROVIDERS }), what).toHaveCount(0);
   };

@@ -333,14 +333,14 @@ for (const size of SIZES) {
         await expect(pop).toBeVisible();
         await expect(pop).toHaveAttribute("role", "dialog");
         await expect(pop).toHaveAttribute("aria-modal", "false");
-        // Under its trigger, right-aligned to it where that fits, else slid in to 8px from the screen's
-        // edge; always wholly inside the screen (a trigger near the row's left must not clip it).
+        // Under its trigger, right-aligned to it where that fits, else left-aligned to it (eval G-7: always
+        // anchored to its button); always wholly inside the screen.
         await pop.evaluate((p) => Promise.all(p.getAnimations().map((a) => a.finished)));
         const t = (await trigger.boundingBox())!;
         const b = (await pop.boundingBox())!;
         expect(b.y).toBeGreaterThanOrEqual(t.y + t.height);
         if (t.x + t.width - b.width >= 8) expect(Math.abs(b.x + b.width - (t.x + t.width))).toBeLessThanOrEqual(1);
-        else expect(Math.abs(b.x - 8)).toBeLessThanOrEqual(1);
+        else expect(Math.abs(b.x - t.x), "left-aligned to its trigger").toBeLessThanOrEqual(1);
         expect(b.x).toBeGreaterThanOrEqual(0);
         expect(b.x + b.width).toBeLessThanOrEqual(size.width);
         expect(b.y + b.height).toBeLessThanOrEqual(size.height);
@@ -354,6 +354,13 @@ for (const size of SIZES) {
         await expect(pop).toBeVisible();
         await page.getByRole("heading", { level: 1 }).click();
         await expect(pop).toHaveCount(0);
+        // ...and focus returns to the trigger (eval G-7), not to the page or <body>.
+        await expect(trigger).toBeFocused();
+        // The popover holds no second primary: the primary lives only in the slot (eval G-7).
+        await trigger.click();
+        await expect(pop.getByRole("button", { name: /Merge/ })).toHaveCount(0);
+        await expect(pop.getByRole("button", { name: "Done" })).toBeVisible();
+        await page.keyboard.press("Escape");
       } else {
         const dialog = openDialog(page);
         await expect(dialog.getByTestId("options-sheet")).toBeVisible();

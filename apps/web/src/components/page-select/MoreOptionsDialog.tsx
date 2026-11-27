@@ -13,6 +13,7 @@ import { Dialog } from "../ui/Dialog";
 import { Popover } from "../ui/Popover";
 import { Switch } from "../ui/Switch";
 import { dialogCopy } from "./dialog-copy";
+import { formatCount } from "@/lib/format-count";
 
 /** One output of Split, as the parts list shows it. */
 export type PartRow = { key: string; n: number; name: string; range: string };
@@ -64,6 +65,7 @@ export function MoreOptionsDialog({
         onClose={onClose}
         trigger={returnFocusRef}
         label={dialogCopy.title}
+        testId="options-popover"
         footer={
           <Button
             variant="primary"
@@ -237,7 +239,7 @@ function PartsList({
       <h3 id="ip-parts-title" className="mb-1.5 text-sm font-semibold text-ink">
         {dialogCopy.files}{" "}
         <span className="text-muted tabular-nums">
-          {rows.length.toLocaleString("en")}
+          {formatCount(rows.length)}
         </span>
       </h3>
       {/* About five rows, then the list scrolls inside, so the name pattern, bookmarks and Done stay in view.

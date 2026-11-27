@@ -280,6 +280,8 @@ export function DownloadButton({ compact }: { compact?: boolean }) {
   // files download unchanged, so they keep theirs.
   const noPassword = useStore(ctl.store, (s) => ctl.rt.wasEncrypted && !s.readOnly);
   const hasCard = useStore(ctl.store, (s) => !!s.downloaded);
+  // Enabled with the first page's paint, never over the placeholders (F25 AC-605).
+  const painted = useStore(ctl.store, (s) => s.painted);
   const [done, setDone] = useState(false);
   const [failed, setFailed] = useState(false);
   const [edited, setEdited] = useState(false);
@@ -332,9 +334,11 @@ export function DownloadButton({ compact }: { compact?: boolean }) {
               variant="primary"
               size={compact ? "sm" : "md"}
               className="ip-slot__main min-w-0"
-              aria-label="Download PDF"
+              // Its name holds the visible words (axe label-content-name-mismatch, eval G-11).
+              aria-label={done ? "Downloaded" : "Download PDF"}
               aria-keyshortcuts="Control+S Meta+S"
               iconStart={done ? <CheckBold size={18} /> : <DownloadBold size={18} />}
+              disabled={!painted}
               onClick={() => void run()}
               data-testid="download"
               data-done={done || undefined}
@@ -342,7 +346,8 @@ export function DownloadButton({ compact }: { compact?: boolean }) {
               <span className="max-[359px]:sr-only">{done ? "Downloaded" : "Download"}</span>
             </Button>
             {!compact && (
-              <Pop label="Save as" title="Save as" className="ed-download__more" trigger={<CaretDownBold size={14} />} panelClassName="w-[280px] p-4">
+              // Held with Download until the first page is drawn (G-5): Save as downloads too.
+              <Pop label="Save as" title="Save as" className="ed-download__more" trigger={<CaretDownBold size={14} />} panelClassName="w-[280px] p-4" disabled={!painted}>
                 {(close) => (
                   <form
                     className="flex flex-col gap-3"

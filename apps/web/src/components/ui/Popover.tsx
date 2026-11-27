@@ -36,17 +36,26 @@ export function Popover({
       el.style.translate = "";
       const r = el.getBoundingClientRect();
       const vw = document.documentElement.clientWidth;
-      const dx = r.left < 8 ? 8 - r.left : r.right > vw - 8 ? vw - 8 - r.right : 0;
+      // Right-aligned to the trigger; a trigger near the row's left would push it off screen, so there it
+      // is left-aligned to the trigger instead (eval G-7: always under its button), then kept 8px inside.
+      const t = trigger.current?.getBoundingClientRect();
+      let dx = r.left < 8 && t ? t.left - r.left : 0;
+      if (r.right + dx > vw - 8) dx = vw - 8 - r.right;
+      if (r.left + dx < 8) dx = 8 - r.left;
       if (dx) el.style.translate = `${Math.round(dx)}px 0`;
     };
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
-  }, [open]);
+  }, [open, trigger]);
   useEffect(() => {
     if (!open) return;
     const el = box.current;
-    el?.querySelector<HTMLElement>("input:not([disabled]), select:not([disabled]), textarea, button:not([disabled]), [tabindex]:not([tabindex='-1'])")?.focus();
+    // The first control that is shown: a form can hide some at this width (Merge's Contents page sits in the row from 1280).
+    const first = Array.from(
+      el?.querySelectorAll<HTMLElement>("input:not([disabled]), select:not([disabled]), textarea, button:not([disabled]), [tabindex]:not([tabindex='-1'])") ?? [],
+    ).find((c) => c.getClientRects().length > 0);
+    first?.focus();
     const shut = (refocus: boolean) => {
       close.current();
       if (refocus) trigger.current?.focus();
@@ -62,6 +71,13 @@ export function Popover({
       const t = e.target as Node;
       if (el?.contains(t) || trigger.current?.contains(t)) return;
       shut(false);
+      // Focus returns to the trigger (§3.3, eval G-7), unless the click went to another control, which
+      // keeps its focus (a click on the page, a heading or <body> gives it back to the trigger).
+      setTimeout(() => {
+        const a = document.activeElement;
+        if (!a?.isConnected || !a.matches("a[href], button, input, select, textarea, [contenteditable], [role=button], [role=menuitem], [role=tab]"))
+          trigger.current?.focus({ preventScroll: true });
+      }, 0);
     };
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onDown, true);

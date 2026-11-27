@@ -1,6 +1,7 @@
 /** Shared F4 page-tool copy (spec F4/F5 UI P-13). Our own wording. The dialog's is in dialog-copy.ts and the range errors in range-errors.ts (both out of the first load). */
+import { formatCount } from "@/lib/format-count";
 
-const n = (v: number) => v.toLocaleString("en");
+const n = formatCount;
 
 export const selectCopy = {
   placeholderDiffers: "Differs per file",

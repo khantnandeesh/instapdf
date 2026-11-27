@@ -68,6 +68,15 @@
     }
   }
 
+  /* Large screens (eval G-14): once a file is in, the row and the stage widen past the 1280px main column,
+     up to 1856px with 32px gutters, so the pages get the width (as before F25). The tool guide below keeps
+     the column. Their containing block is main (the flow gives up its box, below). */
+  @media (min-width: 1440px) {
+    .ip-flow:not([data-state="empty"]) > :is(.ip-toolrow, .ip-wide) {
+      margin-inline: calc((100% - min(100vw - 64px, 1856px)) / 2);
+    }
+  }
+
   /* A sticky element sticks only inside its parent, and the flow ends where the tool guide begins. From
      1024px, once a file is in, the stage wrapper and the flow give up their boxes (their custom properties
      still inherit), so the row's containing block is main and it stays pinned to the end of the page
@@ -76,6 +85,12 @@
     .mp-toolstage:has(> .ip-flow:not([data-state="empty"])),
     .mp-toolstage > .ip-flow:not([data-state="empty"]) {
       display: contents;
+    }
+    /* With More options open, the row (and its popover) lifts over the floating selection bar (z 25), which
+       would otherwise cover the popover's footer now that it hangs under its button (eval G-7, AC-74);
+       notices (30) stay above it. */
+    .ip-toolrow:has(.ip-popover) {
+      z-index: calc(var(--ip-z-selbar) + 1);
     }
   }
 
@@ -99,6 +114,13 @@
     border-inline-start: 1px solid var(--sand);
     padding-inline-start: 16px;
   }
+  /* Merge from 1280: Contents page in the row, then More options, under one divider (§3.4). */
+  @media (min-width: 1280px) {
+    .ip-dock-row__options + .ip-dock-row__options {
+      border-inline-start: 0;
+      padding-inline-start: 0;
+    }
+  }
 
   /* ---- Working: the options, pages and settings panel dim and go inert (spec §6) ------------- */
   .ip-dimmable {
@@ -106,6 +128,11 @@
   }
   .ip-dimmable[data-dim] {
     opacity: 0.45;
+  }
+  /* The pages hold still while the work runs (ToolFlow HoldWhile, eval G-13): their per-tile buttons hide
+     here rather than by re-rendering every tile. */
+  .ip-dimmable[data-dim] :is(.ip-corner-enlarge, [data-testid="tile-row"] > *) {
+    visibility: hidden;
   }
 
   /* ---- The action slot ------------------------------------------------------------------------ */
@@ -210,6 +237,52 @@
   [data-ip-dock="row"] .ip-slot__main {
     flex: none;
     max-width: 100%;
+  }
+  /* The primary and Download are one box (eval G-3): each holds the other's words invisibly in the same grid
+     cell (the primary "Download" plus its 20px icon and 8px gap; Download the run's label), so both are as
+     wide as the wider of the two, with no measuring. */
+  .ip-slot__size {
+    display: inline-grid;
+    justify-items: center;
+    min-width: 0;
+  }
+  .ip-slot__size > *,
+  .ip-slot__size::after {
+    grid-area: 1 / 1;
+    min-width: 0;
+  }
+  .ip-slot__size > * {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ip-slot__size::after {
+    content: attr(data-size);
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    white-space: nowrap;
+  }
+  .ip-slot__size--dl::after {
+    padding-inline-start: 28px;
+  }
+  /* The result's slot: Save to Drive (F23) before Download, the pair right-aligned from 1024 px. */
+  [data-ip-dock="row"] .ip-slot {
+    justify-content: flex-end;
+  }
+  /* Below 1024 px Drive sits left of the slot when the dock row has room there (the invisible parts the
+     slot shares its row with, ControlDock data-room), so Download keeps the primary's box. */
+  [data-ip-dock="bar"] [data-room="all"] .ip-slot__drive {
+    position: absolute;
+    top: 0;
+    right: calc(100% + 8px);
+  }
+  @media (min-width: 390px) {
+    [data-ip-dock="bar"] [data-room="390"] .ip-slot__drive {
+      position: absolute;
+      top: 0;
+      right: calc(100% + 8px);
+    }
   }
   [data-ip-dock="bar"] .ip-slot__main {
     flex: 1;
@@ -453,6 +526,18 @@
     flex-direction: column;
     gap: 16px;
     min-width: 0;
+  }
+  /* Below 1024 px Download is in the fixed bottom dock: the result's end clears it, and the preview leaves
+     room so the title, the file name and its summary end above the dock on the first screen (F25 visual
+     gate). Above the preview: the header, the title row and the stage edge (41px) and this padding (16px);
+     under it: 20px gap, the 40px title, 16px gap, one 22px name line, the 20px summary, then 8px air. */
+  @media (max-width: 1023px) {
+    .ip-result {
+      padding-bottom: calc(24px + var(--ip-dock-actual, 0px));
+    }
+    .ip-result__preview {
+      height: min(55dvh, 520px, calc(100dvh - var(--ip-header-h) - 57px - 126px - var(--ip-dock-actual, var(--ip-dock-h))));
+    }
   }
   @media (min-width: 1024px) {
     .ip-result {

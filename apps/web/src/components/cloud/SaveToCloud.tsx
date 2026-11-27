@@ -5,7 +5,7 @@ import { newRequestId } from "@/lib/cloud/protocol";
 import { configuredProviders, providerName, routeFor, SAVE_PROVIDERS, type CloudProvider } from "@/lib/cloud/providers";
 import { buttonClasses } from "../ui/Button";
 import { MenuButton, type MenuButtonHandle } from "./CloudMenu";
-import { CheckIcon, ChevronDownIcon } from "../ui/icons";
+import { CheckIcon, ChevronDownIcon, UploadIcon } from "../ui/icons";
 import { cloudCopy } from "./copy";
 import { transferCopy } from "./transfer-copy";
 import { ProviderMark } from "./ProviderMark";
@@ -15,8 +15,8 @@ import { cloudOrigin } from "./intake-engine";
 import { pageHub, type CloudDeps } from "./tool-cloud";
 
 /**
- * Result screen "Save to Drive" (spec U-2 E5, AC-160 to AC-164, AC-169): a `line` split next to
- * Download. The result goes from this browser into the provider's own window (over the request's
+ * Result screen "Save to Drive" (spec U-2 E5, AC-160 to AC-164, AC-169; F25 eval G-3): a 48 px `line`
+ * icon button next to Download, which keeps the primary's box. The result goes from this browser into the provider's own window (over the request's
  * channel, only after that window says it is ready), which uploads it straight to the provider.
  * Our server never sees it; the result's privacy line changes after a save (onSaved).
  */
@@ -128,51 +128,56 @@ export function SaveToCloud({ file, toolName, announce, onSaved }: SaveToCloudPr
 
   const idle = main ? transferCopy.saveTo(main) : transferCopy.saveToAny;
   const label = busy ? transferCopy.saving(busy.pct) : saved ? transferCopy.saved : idle;
-  // Every label it can show, stacked invisibly in one grid cell: the button never changes width (AC-169).
-  const text = (
-    <span className="ip-save__label tabular-nums">
-      {[idle, transferCopy.saving(100), transferCopy.saved].map((t) => (
-        <span key={t} className="ip-save__ghost" aria-hidden="true">
-          {t}
-        </span>
-      ))}
-      <span>{label}</span>
+  // A 48 px `line` icon button beside Download (eval G-3: Download keeps the primary's box). Its name is
+  // the label it would show ("Save to Drive", "Saving… 40%", "Saved"), and the tooltip says the same.
+  const face = busy ? (
+    <span className="text-[13px] leading-none font-semibold tabular-nums" aria-hidden="true">
+      {busy.pct}%
     </span>
+  ) : saved ? (
+    <CheckIcon size={20} />
+  ) : main ? (
+    <ProviderMark provider={main} size={22} />
+  ) : (
+    <UploadIcon size={22} />
   );
-  const items = providerItems(providers, save, "save");
+  const cls = buttonClasses("line", "md", "ip-save__icon");
+  const others = main ? providers.filter((p) => p !== main) : [];
   return (
-    <span className="ip-split ip-save inline-flex max-sm:w-full" data-testid="save-to-cloud">
+    <span className={main && others.length ? "ip-save ip-split inline-flex" : "ip-save inline-flex"} data-testid="save-to-cloud">
+      {/* After a pick from a cloud (or with one cloud set up), one press saves there (AC-169); a narrow caret
+          beside it offers the other clouds (eval G-3: the icon keeps 48 px). Otherwise the icon opens the menu. */}
       {main ? (
-        <button type="button" className={buttonClasses("line", "md")} aria-busy={busy ? true : undefined} disabled={!!busy} onClick={() => save(main)} data-testid="save-main">
-          {saved ? <CheckIcon size={18} /> : <ProviderMark provider={main} size={18} />}
-          {text}
+        <button type="button" className={cls} aria-label={label} title={label} aria-busy={busy ? true : undefined} disabled={!!busy} onClick={() => save(main)} data-testid="save-cloud">
+          {face}
         </button>
       ) : (
         <MenuButton
           ref={menu}
           label={label}
+          title={label}
+          placement="bottom-end"
           presentation="auto"
           popupClassName="ip-menu-wide"
-          className={buttonClasses("line", "md")}
+          className={cls}
           disabled={!!busy}
-          items={items}
+          items={providerItems(providers, save, "save")}
           footnote={cloudFootnote(transferCopy.saveFootnote)}
-          data-testid="save-main"
+          data-testid="save-cloud"
         >
-          {text}
-          <ChevronDownIcon size={16} />
+          {face}
         </MenuButton>
       )}
-      {main && providers.length > 1 && (
+      {main && others.length > 0 && (
         <MenuButton
           label={transferCopy.saveAnother}
           title={transferCopy.saveAnother}
           placement="bottom-end"
           presentation="auto"
           popupClassName="ip-menu-wide"
-          className={buttonClasses("line", "md", "ip-split__caret")}
+          className={buttonClasses("line", "md", "ip-split__caret ip-save__caret")}
           disabled={!!busy}
-          items={items}
+          items={providerItems(others, save, "save")}
           footnote={cloudFootnote(transferCopy.saveFootnote)}
           data-testid="save-caret"
         >

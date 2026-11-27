@@ -137,7 +137,7 @@ export function ExtractTool() {
             onBlur={s.blur}
             onClear={s.clear}
             onEnter={submit}
-            className="min-w-0 flex-1 dock-bar:lg:w-[190px] dock-bar:lg:flex-none dock-bar:xl:w-[300px] max-[399px]:basis-full"
+            className="min-w-0 flex-1 dock-bar:lg:max-xl:max-w-[190px] dock-bar:xl:flex-none dock-bar:xl:max-[1439px]:w-[220px] dock-bar:min-[1440px]:w-[300px] max-[399px]:basis-full"
           />
         </div>
       )}

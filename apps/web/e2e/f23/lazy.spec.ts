@@ -133,7 +133,7 @@ test("Save to cloud speaks for itself on a page that never touched a cloud contr
   // The browser refuses the window: the save says so in the tool's own notices.
   await page.evaluate(() => (window.open = () => null));
   // Two clouds to save to and none the files came from: "Save to…" opens a menu.
-  await page.getByTestId("save-main").click();
+  await page.getByTestId("save-cloud").click();
   await page.getByRole("menuitem", { name: /^Google Drive/ }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Your browser blocked the Google Drive window." })).toBeVisible();
 });

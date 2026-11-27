@@ -24,8 +24,10 @@ import { blankPdf, defaultPaper } from "@/lib/editor/blank";
 import { earlyFetchAllowed } from "@/lib/editor/engine-load";
 import { openPdf, prefetchPdfjs, type OpenedPdf } from "@/lib/pdf/pdfjs";
 import { warmPdfjs } from "@/lib/pdf/pdfjs-warm";
-import { FilePlusBold, FileUpBold } from "./icons";
+// From icons-landing, not icons: the full set would join the first load (gen-editor-icons.mjs).
+import { FilePlusBold, FileUpBold } from "./icons-landing";
 import { prefetchEditorChunks } from "./idle-prefetch";
+import { OpeningBody } from "./Opening";
 import type { ShellProps } from "./EditorShell";
 import { EDITOR_MAX_BYTES } from "./limits";
 
@@ -214,18 +216,18 @@ export function EditorTool() {
   return (
     <div data-testid="editor" data-state={open ? "open" : busy ? "opening" : "empty"} data-hydrated={hydrated || undefined}>
       <DropOverlay active={dragging && !open} mode="add" />
-      {pending && !open ? (
-        // Opening (F25 §8): the editor's layout with placeholders, from the frame the file is picked.
-        <div className="ed-shell" data-testid="editor-opening" aria-busy="true">
+      {(pending || locked) && !open ? (
+        // Opening (F25 §8): the editor's layout with placeholders, from the frame the file is picked. A locked
+        // file's password is asked for over it (eval G-5), and Skip goes back to the picker.
+        // Busy only while it really opens: a password the dialog waits for is not "Opening…".
+        <div className="ed-shell" data-testid="editor-opening" aria-busy={pending || busy ? true : undefined}>
           <div className="ed-opening">
             <header className="ed-top" role="group" aria-label="Document">
               <h1 className="ed-title">Edit PDF</h1>
               <Badge tone="beta">Beta</Badge>
-              <h2 className="ed-file truncate">{pending}</h2>
+              <h2 className="ed-file truncate">{pending ?? locked?.name}</h2>
             </header>
-            <div className="grid flex-1 place-items-center">
-              <span className="ed-loader" aria-label="Opening" role="progressbar" />
-            </div>
+            <OpeningBody busy={!!pending || busy} />
           </div>
         </div>
       ) : (
@@ -281,7 +283,10 @@ export function EditorTool() {
           setBusy(true);
           void finish(locked.name, locked.bytes, pw).finally(() => setBusy(false));
         }}
-        onSkip={() => setLocked(null)}
+        onSkip={() => {
+          setLocked(null);
+          requestAnimationFrame(() => picker.current?.focus());
+        }}
         fallbackFocus={() => picker.current?.element ?? null}
       />
     </div>

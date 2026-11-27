@@ -1,3 +1,4 @@
+import { formatCount } from "@/lib/format-count";
 /**
  * The action slot's and the progress pill's words (F25 §6, §7). Their own module so they ship with the
  * loaded chrome (loaded-chrome.ts), the result and the editor, never in a tool's first load.
@@ -15,7 +16,7 @@ export const slotCopy = {
   startOver: "Start over",
   pillGroup: (action: string) => `${action} progress`,
   queueText: (n: number, minutes?: number) => `${ordinal(n)} in line${minutes ? `, about ${minutes} ${minutes === 1 ? "minute" : "minutes"}` : ""}`,
-  partsCounter: (n: number) => `1 / ${n.toLocaleString("en-US")} files`,
+  partsCounter: (n: number) => `1 / ${formatCount(n)} files`,
   progress: (verb: string, percent: number) => `${verb}… ${percent}%`,
 };
 

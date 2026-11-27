@@ -355,41 +355,23 @@
     color: var(--danger);
   }
 
-  /* ---- Save to cloud (result) ----------------------------------------------------------------- */
+  /* ---- Save to cloud (result): a 48 px icon button beside Download (F25 eval G-3) ---------------- */
   .ip-save {
+    flex: none;
     align-self: center;
   }
-  .ip-save .mp-btn--line {
-    min-height: 44px;
-    padding-inline: 14px;
+  .ip-save .ip-save__icon.mp-btn--line {
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    min-height: 48px;
+    padding: 0;
   }
-  .ip-save > .mp-btn--line:first-child {
-    min-width: 168px;
-  }
-  .ip-save__label {
-    display: inline-grid;
-    text-align: start;
-  }
-  .ip-save__label > * {
-    grid-area: 1 / 1;
-  }
-  .ip-save__ghost {
-    visibility: hidden;
-  }
-  .ip-save .ip-split__caret.mp-btn--line {
-    width: 40px;
-    margin-inline-start: -1.5px;
-  }
-  @media (max-width: 639px) {
-    .ip-save {
-      width: 100%;
-    }
-    .ip-save > .mp-btn--line:first-child {
-      flex: 1;
-    }
-    .ip-save .ip-split__caret.mp-btn--line {
-      width: 52px;
-    }
+  /* After a cloud pick: a narrow caret joined to the icon offers the other clouds (the icon keeps 48 px). */
+  .ip-save.ip-split .ip-save__caret.mp-btn {
+    width: 28px;
+    height: 48px;
+    min-height: 48px;
   }
 
   /* ---- The /cloud/<provider> window ---------------------------------------------------------- */

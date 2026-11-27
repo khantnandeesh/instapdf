@@ -42,6 +42,62 @@ body:has(.ed-shell) div:has(> main) {
     --ip-header-h: 0px;
   }
 }
+/*
+ * G-1 (nav-autohide.ts): from 1024 px the canvas runs up behind the site navbar (--ed-under), which
+ * covers it at rest. Scrolling the pages down sets html[data-ed-nav="hidden"]: the navbar slides up out
+ * of view and everything that hangs from the top of the editor (the bar, the page strip, the
+ * properties card, the hints) slides up by the same amount (--ed-lift), so the pages get the navbar's
+ * height. Only translates move, so nothing counts as a layout shift; no motion under reduced motion.
+ */
+.ed-wide {
+  --ed-under: var(--ip-header-h);
+  --ed-lift: 0px;
+}
+html[data-ed-nav="hidden"] .ed-wide {
+  --ed-lift: calc(-1 * var(--ed-under));
+}
+html[data-ed-nav="hidden"] body:has(.ed-wide) .ip-site-header {
+  transform: translateY(calc(-100% - 2px));
+}
+.ed-wide .ed-canvas {
+  top: calc(-1 * var(--ed-under));
+  background-color: var(--color-canvas);
+  padding-top: calc(var(--ed-rest-top) + var(--ed-under));
+  /* What scrolls into view (focus, scrollIntoView) stops under the bars that are on screen now: the
+     navbar while it shows, and the editor bar. */
+  scroll-padding-top: calc(var(--ed-rest-top) - var(--ed-rest-gap) + var(--ed-under) + var(--ed-lift));
+}
+.ed-wide :is(.ed-top, .ed-props) {
+  translate: 0 var(--ed-lift);
+}
+.ed-wide :is(.ed-hint, .ed-recover, .ed-owner) {
+  translate: -50% var(--ed-lift);
+}
+/* The page strip starts behind the bar; its contents sit under the bar and move up with it. Its box ends at
+   the panel's bottom at rest and with the navbar away. It grows the moment the navbar starts to leave and
+   shrinks only once it is back (data-ed-box, nav-autohide.ts), so during the slide the box only ever runs
+   past the panel's bottom, which clips it: never a gap, and never a jump of what shows. */
+.ed-wide .ed-panel {
+  top: calc(var(--ed-top-h) - var(--ed-under));
+}
+.ed-wide .ed-panel > .ed-side {
+  height: calc(100% - var(--ed-under) - var(--ed-box-lift, 0px));
+  translate: 0 calc(var(--ed-under) + var(--ed-lift));
+}
+html[data-ed-box] .ed-wide {
+  --ed-box-lift: calc(-1 * var(--ed-under));
+}
+@media (prefers-reduced-motion: no-preference) {
+  body:has(.ed-wide) .ip-site-header {
+    transition: transform var(--motion-quick) var(--ease-out);
+  }
+  /* Only the lift tweens: the properties card's own move off the selection (transform) is instant, so
+     it never passes over what is selected (eval G-9). */
+  .ed-wide :is(.ed-top, .ed-props, .ed-hint, .ed-recover, .ed-owner, .ed-panel > .ed-side) {
+    transition: translate var(--motion-quick) var(--ease-out);
+  }
+}
+
 .ed-frame-root,
 .ed-opening {
   /*
@@ -353,8 +409,10 @@ body:has(.ed-shell) div:has(> main) {
 .ed-dlcard__close > svg {
   position: relative;
 }
+/* The opening frame's bar lines up with the editor's (eval run 2, R2-7): 16px from 1024, the narrow
+   bar's sizes below (narrow layout section). */
 .ed-opening .ed-top {
-  padding: 0 20px;
+  padding: 0 16px;
 }
 .ed-home {
   display: grid;
@@ -761,6 +819,8 @@ body:has(.ed-shell) div:has(> main) {
   /* ip-scroll: pages */
   overflow: auto;
   padding: var(--ed-rest-top) 16px 80px;
+  /* Focus and scrollIntoView stop under the floating bars, never behind them. */
+  scroll-padding-top: calc(var(--ed-rest-top) - var(--ed-rest-gap));
   outline: none;
   touch-action: pan-x pan-y;
 }
@@ -784,6 +844,12 @@ body:has(.ed-shell) div:has(> main) {
   background: var(--surface);
   box-shadow: var(--shadow-menu);
 }
+/* The armed tool's options over the selection's controls (eval G-10), with a hairline between. */
+.ed-props > .ed-options:not(:last-child) {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-sand, var(--sand));
+}
 /* The selection's name over its controls (F25 §5). */
 .ed-props__title {
   margin: 0 0 8px;
@@ -804,6 +870,12 @@ body:has(.ed-shell) div:has(> main) {
 }
 .ed-canvas--drop {
   box-shadow: inset 0 0 0 3px var(--color-brand);
+}
+/* From 1024 the canvas starts behind the navbar: its top ring edge is drawn under the navbar's bottom. */
+.ed-wide .ed-canvas--drop {
+  box-shadow:
+    inset 0 0 0 3px var(--color-brand),
+    inset 0 calc(var(--ed-under) + var(--ed-lift) + 3px) 0 0 var(--color-brand);
 }
 .ed-pages {
   display: flex;
@@ -858,31 +930,84 @@ body:has(.ed-shell) div:has(> main) {
 .ed-pagewrap--place {
   touch-action: none;
 }
+/* The page header (F16 AC-55, wide only): the page number and the page actions float over the page's
+   top edge instead of taking a 32px row above it (F25 eval G-1, M12): between two pages the canvas
+   shows only the 12px gap. Shown on hover or focus within; the current page keeps its number. */
+.ed-slot {
+  position: relative;
+}
+.ed-wide .ed-pages {
+  gap: 12px;
+}
 .ed-pagehead {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  left: 8px;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 32px;
-  padding: 0 2px;
+  pointer-events: none;
+}
+.ed-pagehead > * {
   opacity: 0;
   transition: opacity var(--dur-base);
 }
-.ed-pagehead--current {
-  opacity: 0.6;
+/* The number is a label and never takes the pointer. The actions show, and take the pointer, only while
+   the pointer is in the page's top band (data-head, set by the canvas, EditorShell) or focus is in them:
+   at rest, and anywhere lower on the page, what is under them is the page's (review nit, G-1). With a
+   drawing or placing tool armed the pointer always goes to the page, but Tab still reaches them. */
+.ed-pagehead__acts {
+  pointer-events: none;
 }
-.ed-slot:hover .ed-pagehead,
-.ed-pagehead:focus-within {
+.ed-frame-root:is([data-tool="select"], [data-tool="edit"]) :is(.ed-slot[data-head], .ed-pagehead:focus-within) .ed-pagehead__acts {
+  pointer-events: auto;
+}
+.ed-pagehead--current .ed-pagehead__n,
+.ed-slot:hover .ed-pagehead__n,
+.ed-slot[data-head] .ed-pagehead__acts,
+.ed-pagehead:focus-within > * {
   opacity: 1;
 }
+.ed-frame-root:not([data-tool="select"], [data-tool="edit"]) .ed-slot[data-head]:not(:focus-within) .ed-pagehead__acts {
+  opacity: 0;
+}
 .ed-pagehead__n {
+  min-width: 28px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: 0 0 0 1px var(--color-sand, var(--sand));
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  line-height: 18px;
+  text-align: center;
   color: var(--color-muted);
 }
 .ed-pagehead__acts {
   display: flex;
   gap: 2px;
+  padding: 2px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--color-sand, var(--sand)),
+    0 6px 16px -10px rgb(140 30 60 / 0.35);
+}
+/* Without hover (a touch screen from 1024px) nothing hides there: only the current page has the row. */
+@media (hover: none) {
+  .ed-pagehead:not(.ed-pagehead--current) {
+    visibility: hidden;
+  }
+  .ed-pagehead--current > * {
+    opacity: 1;
+  }
+  .ed-frame-root:is([data-tool="select"], [data-tool="edit"]) .ed-pagehead--current .ed-pagehead__acts {
+    pointer-events: auto;
+  }
 }
 .ed-panel {
   position: absolute;
@@ -1939,14 +2064,63 @@ body:has(.ed-shell) div:has(> main) {
   background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 0 0 / 16px 16px;
 }
 
-/* ---- loading ---------------------------------------------------------------------------- */
-.ed-loader {
-  display: block;
-  width: 28px;
-  height: 28px;
-  border: 3px solid var(--color-brand-tint);
-  border-top-color: var(--color-brand);
-  border-radius: 99px;
+/* ---- opening (motion.md E1): the layout with paper-tinted placeholders, no spinner ---------- */
+.ed-opening__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.ed-opening__strip {
+  display: none;
+}
+.ed-opening__canvas {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  /* Where the first page rests: under the page chip's band on phones, under the bar from 1024. */
+  padding: 54px 8px 0;
+}
+.ed-opening__page,
+.ed-opening__thumb {
+  flex: none;
+  aspect-ratio: var(--ed-paper, 210 / 297);
+  border-radius: 3px;
+  background: #f7f0ed; /* as an undrawn page; pages stay light in dark mode */
+  box-shadow:
+    0 1px 2px rgb(58 20 30 / 0.1),
+    0 8px 24px -12px rgb(58 20 30 / 0.28);
+}
+.ed-opening__page {
+  width: 100%;
+}
+@media (min-width: 1024px) {
+  .ed-opening__strip {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    width: 132px;
+    padding-top: 52px;
+    border-right: 1px solid var(--color-sand, var(--sand));
+    background: var(--surface);
+  }
+  .ed-opening__thumb {
+    width: 92px;
+  }
+  .ed-opening__canvas {
+    padding: var(--ed-rest-gap) 16px 0 148px;
+  }
+  .ed-opening__page {
+    width: calc(100% - 32px);
+  }
 }
 .ed-opening .ed-top {
   position: relative;
@@ -1979,6 +2153,59 @@ body:has(.ed-shell) div:has(> main) {
 }
 .ed-narrow .ip-slot--editor {
   width: 132px;
+}
+/* While Download runs, the pill takes Undo│Redo's room too (they are off while it runs), with Cancel as an
+   ×, so "Downloading…" shows whole (eval run 2, R2-3). It lies over them: nothing in the bar moves. */
+.ed-narrow .ip-slot--editor .ip-pill {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 216px; /* the slot (132), the gap (4) and Undo│Redo (80) */
+}
+.ed-narrow .ip-slot--editor .ip-pill__cancel {
+  justify-content: center;
+  width: 40px;
+  padding: 0;
+}
+.ed-narrow .ip-slot--editor .ip-pill__cancel-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.ed-narrow .ip-slot--editor .ip-pill__cancel-x {
+  display: block;
+}
+/* Below 360 Download is its icon (Chrome.tsx), so its slot is too and the bar fits 320. The pill then lies
+   over the file menu as well, which steps out of Tab's way while it does. */
+@media (max-width: 359px) {
+  .ed-narrow .ip-slot--editor {
+    width: 48px;
+    min-width: 0;
+  }
+  .ed-narrow .ed-top:has(.ip-pill) > :not(.ed-title, .ed-download) {
+    visibility: hidden;
+  }
+}
+@media (max-width: 1023px) {
+  .ed-opening .ed-top {
+    gap: 4px;
+    padding: 0 8px;
+  }
+  .ed-opening .ed-title {
+    font-size: 18px;
+  }
+  .ed-opening .ed-file {
+    padding: 0 8px;
+  }
+}
+@media (max-width: 639px) {
+  .ed-opening .ed-top > .mp-pill {
+    display: none;
+  }
 }
 .ed-narrow .ed-file {
   flex: 1;
@@ -2067,9 +2294,6 @@ body:has(.ed-shell) div:has(> main) {
   .ed-tool:active {
     transform: scale(0.94);
   }
-  .ed-loader {
-    animation: ed-spin 0.9s linear infinite;
-  }
   .ed-guide {
     animation: ed-fade 80ms ease-out both;
   }
@@ -2107,12 +2331,6 @@ body:has(.ed-shell) div:has(> main) {
     opacity: 0;
   }
 }
-@keyframes ed-spin {
-  to {
-    rotate: 360deg;
-  }
-}
-
 /* ---- forced colours --------------------------------------------------------------------- */
 @media (forced-colors: active) {
   .ed-glass,

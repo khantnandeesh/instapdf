@@ -158,6 +158,8 @@ export function PageTile({
         {part?.first && partDot(part.n)}
         {index + 1}
         {part && <span data-testid="part-label"> · Part {part.n}</span>}
+        {/* Delete: the word says it, the danger colour backs it up (never colour alone; no strike across the digit). */}
+        {marked && <span data-testid="marked-label"> · To delete</span>}
       </span>
       {compact && (actions || cornerRow) && (
         <div className="flex h-11 items-center justify-center gap-2.5" data-testid="tile-row">

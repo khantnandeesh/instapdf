@@ -59,7 +59,9 @@ export function DeleteTool() {
     const { planDelete } = await import("@/lib/page-plans");
     const run = planDelete(planFiles(files), now.state.sets);
     const { runPlan } = await import("@/components/page-select/job");
-    return runPlan("delete", run, files, optsLive.current.removeBookmarks, signal, onProgress);
+    const out = await runPlan("delete", run, files, optsLive.current.removeBookmarks, signal, onProgress);
+    // The meta line says what was removed (spec F25 §7 item 2, eval G-15): "11 pages, 2.7 KB. 1 page deleted."
+    return { ...out, note: c.deleted(now.count) };
   };
   /** Enter in the field: run when the pages as typed mark something and keep a page of every file. */
   const submit = () => {
@@ -119,7 +121,7 @@ export function DeleteTool() {
             onBlur={s.blur}
             onClear={s.clear}
             onEnter={submit}
-            className="min-w-0 flex-1 dock-bar:lg:w-[190px] dock-bar:lg:flex-none dock-bar:xl:w-[300px]"
+            className="min-w-0 flex-1 dock-bar:lg:max-xl:max-w-[190px] dock-bar:xl:flex-none dock-bar:xl:max-[1439px]:w-[240px] dock-bar:min-[1440px]:w-[300px]"
           />
         </div>
       )}

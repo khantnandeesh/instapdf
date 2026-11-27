@@ -162,6 +162,111 @@ test("AC-627: a selection under the panel's spot moves the panel to the canvas's
   expect(p.x).toBeGreaterThanOrEqual(strip.x + strip.width);
 });
 
+test("G-9: a selection under both of the panel's spots: the panel moves below or above it, and stays clear while the pages scroll", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 632 });
+  await open(page);
+  const props = page.getByTestId("editor-props");
+  const clear = async () => {
+    const r = await page.evaluate(() => {
+      const boxes = Array.from(document.querySelectorAll('[data-testid=canvas] [data-selected="true"], [data-testid=canvas] [data-handle]'), (e) => e.getBoundingClientRect());
+      const p = document.querySelector("[data-testid=editor-props]")?.getBoundingClientRect();
+      if (!p || !boxes.length) return null;
+      const s = { l: Math.min(...boxes.map((b) => b.left)), r: Math.max(...boxes.map((b) => b.right)), t: Math.min(...boxes.map((b) => b.top)), b: Math.max(...boxes.map((b) => b.bottom)) };
+      const visible = (y: number) => Math.max(0, Math.min(y, innerHeight));
+      // Only the part of the selection on screen counts.
+      const covers = Math.min(p.right, s.r) > Math.max(p.left, s.l) && Math.min(p.bottom, visible(s.b)) > Math.max(p.top, visible(s.t));
+      return { covers, side: document.querySelector("[data-testid=editor-props]")!.getAttribute("data-side") };
+    });
+    return r;
+  };
+  // A wide rectangle across the whole page, under the panel's spot on the right and on the left.
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("r");
+  const b = (await page.getByTestId("page-1").boundingBox())!;
+  const tp = (await props.boundingBox())!;
+  await page.mouse.move(b.x + b.width * 0.03, tp.y + 30);
+  await page.mouse.down();
+  // It ends below the panel, so the pointer never goes over it.
+  await page.mouse.move(b.x + b.width * 0.5, tp.y + tp.height + 12, { steps: 4 });
+  await page.mouse.move(b.x + b.width * 0.97, tp.y + tp.height + 12, { steps: 4 });
+  await page.mouse.up();
+  // The shape just drawn is selected (Shapes stays armed, so its kind switch shows above: a taller panel).
+  await expect(page.locator('[data-kind="shape"][data-selected="true"]')).toHaveCount(1);
+  await expect(props).toBeVisible();
+  await expect.poll(async () => (await clear())?.covers).toBe(false);
+  expect(["below", "above"]).toContain((await clear())?.side);
+  // The pages scroll under it: it follows, never covering what is still on screen.
+  for (const dy of [40, 80, 120, -200]) {
+    await page.getByTestId("canvas").evaluate((el, dy) => el.scrollBy(0, dy), dy);
+    await expect.poll(async () => (await clear())?.covers ?? false).toBe(false);
+  }
+});
+
+test("G-10: with Shapes armed, a shape just drawn keeps the kind switch above its own controls until Esc", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 632 });
+  await open(page);
+  const props = page.getByTestId("editor-props");
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("r");
+  const kinds = props.getByRole("radiogroup", { name: "Shape" });
+  await expect(kinds).toBeVisible();
+  const b = (await page.getByTestId("page-1").boundingBox())!;
+  await page.mouse.move(b.x + b.width * 0.2, b.y + 220);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width * 0.35, b.y + 300, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.locator('[data-kind="shape"]')).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Shapes", pressed: true })).toBeVisible();
+  // Still armed: the kind switch stays, above the drawn shape's controls.
+  await expect(kinds).toBeVisible();
+  await expect(props.getByRole("toolbar", { name: /properties/ })).toBeVisible();
+  const k = (await kinds.boundingBox())!;
+  const t = (await props.getByRole("toolbar", { name: /properties/ }).boundingBox())!;
+  expect(k.y + k.height).toBeLessThanOrEqual(t.y);
+  // A second kind applies to the next shape.
+  await kinds.getByRole("radio", { name: "Ellipse" }).click();
+  await expect(kinds.getByRole("radio", { name: "Ellipse" })).toHaveAttribute("aria-checked", "true");
+});
+
+test("G-1 page actions: they take the pointer only in the page's top band; lower on the page what is under them is the page's; Tab reaches them with a drawing tool armed", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "a mouse (a touch screen keeps the current page's actions shown)");
+  await page.setViewportSize({ width: 1280, height: 632 });
+  await open(page);
+  const rotate = page.getByRole("button", { name: "Rotate right, page 1" });
+  const p1 = (await page.getByTestId("page-1").boundingBox())!;
+  const r = (await rotate.boundingBox())!;
+  const hit = () => page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest(".ed-pagehead button")?.getAttribute("aria-label") ?? null, [r.x + r.width / 2, r.y + r.height / 2]);
+  // At rest, and with the pointer lower on the page, the action's spot is the page's.
+  expect(await hit()).toBe(null);
+  await page.mouse.move(p1.x + p1.width / 2, p1.y + 200);
+  await page.waitForTimeout(250);
+  expect(await hit()).toBe(null);
+  expect(Number(await rotate.evaluate((b) => getComputedStyle(b.parentElement!).opacity))).toBe(0);
+  // In the top band they show and take the pointer.
+  await page.mouse.move(p1.x + p1.width / 2, p1.y + 20);
+  await expect.poll(() => hit()).toBe("Rotate right, page 1");
+  // The pages scrolling under a still pointer take the band with them: page 1's actions go once its top
+  // has scrolled away, and come back when it scrolls back under the pointer.
+  const head0 = () => page.locator('.ed-slot[data-index="0"]').evaluate((el) => el.hasAttribute("data-head"));
+  await page.mouse.wheel(0, 200);
+  await expect.poll(head0).toBe(false);
+  await page.mouse.wheel(0, -200);
+  await expect.poll(head0).toBe(true);
+  await expect.poll(() => hit()).toBe("Rotate right, page 1");
+  await rotate.click();
+  await expect(page.getByTestId("live")).not.toBeEmpty();
+  // A drawing tool armed: the band is the page's for the pointer, but Tab still reaches the actions.
+  await page.getByTestId("canvas").focus();
+  await page.keyboard.press("p");
+  await expect(page.locator(".ed-frame-root")).toHaveAttribute("data-tool", "draw");
+  await page.mouse.move(p1.x + p1.width / 2, p1.y + 20);
+  await page.waitForTimeout(250);
+  expect(await hit()).toBe(null);
+  await page.getByRole("button", { name: "Rotate left, page 1" }).focus();
+  await expect(page.getByRole("button", { name: "Rotate left, page 1" })).toBeFocused();
+  await expect.poll(() => rotate.evaluate((b) => getComputedStyle(b.parentElement!).opacity)).toBe("1");
+});
+
 test("AC-629: a header link with edits not downloaded asks; Cancel stays, Download anyway downloads then leaves; no edits leaves at once", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 632 });
   await open(page);
@@ -253,6 +358,53 @@ test("AC-650: from 1024 the pill reads 'Downloading…' whole beside Cancel, and
     expect(fit.whole, `the label is not truncated at ${width}`).toBe(true);
     expect(fit.cancelInside, `Cancel sits inside the pill at ${width}`).toBe(true);
     expect(await bar(), `the bar keeps its place at ${width}`).toEqual(before);
+    release();
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await expect(pill).toHaveCount(0, { timeout: 20_000 });
+  }
+});
+
+test("AC-650 (eval run 2, R2-3): on a phone, 390 and 320, the bar fits and the pill reads 'Downloading…' whole with Cancel as an ×; nothing in the bar moves", async ({ page }) => {
+  for (const [width, height] of [
+    [390, 664],
+    [320, 640],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await open(page);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    await page.route(/berry-build\.[^/]*\.js/, async (r) => {
+      await gate;
+      await r.continue().catch(() => {});
+    });
+    // Every item in the bar is on screen, none over another.
+    const items = () =>
+      page.evaluate(() =>
+        [...document.querySelector(".ed-top")!.children]
+          .map((c) => c.getBoundingClientRect())
+          .filter((r) => r.width > 0)
+          .map((r) => [Math.round(r.left), Math.round(r.right)]),
+      );
+    const before = await items();
+    expect(before.at(-1)![1], `Download is inside the window at ${width}`).toBeLessThanOrEqual(width);
+    for (let i = 1; i < before.length; i++) expect(before[i][0], `bar items don't overlap at ${width}`).toBeGreaterThanOrEqual(before[i - 1][1]);
+    await downloadBtn(page).click();
+    const pill = page.getByTestId("processing");
+    await expect(pill).toBeVisible();
+    await expect(pill.locator(".ip-pill__label")).toHaveText("Downloading…");
+    const fit = await pill.evaluate((p) => {
+      const l = p.querySelector<HTMLElement>(".ip-pill__label")!;
+      const c = p.querySelector<HTMLElement>(".ip-pill__cancel")!;
+      const r = p.getBoundingClientRect();
+      const title = document.querySelector(".ed-top .ed-title")!.getBoundingClientRect();
+      return { whole: l.scrollWidth <= l.clientWidth, left: r.left, right: r.right, title: title.right, cancel: c.getBoundingClientRect().width, name: c.textContent };
+    });
+    expect(fit.whole, `the label is not truncated at ${width}`).toBe(true);
+    expect(fit.right, `the pill is inside the window at ${width}`).toBeLessThanOrEqual(width);
+    expect(fit.left, `the pill leaves the title clear at ${width}`).toBeGreaterThanOrEqual(fit.title);
+    expect(fit.cancel, `Cancel is the 40px × at ${width}`).toBe(40);
+    await expect(pill.getByRole("button", { name: "Cancel" })).toBeVisible();
+    expect(await items(), `the bar keeps its place at ${width}`).toEqual(before);
     release();
     await page.unrouteAll({ behavior: "ignoreErrors" });
     await expect(pill).toHaveCount(0, { timeout: 20_000 });

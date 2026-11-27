@@ -1,9 +1,11 @@
 "use client";
 /**
- * Editor-only warm-up, kept out of lib/pdf/pdfjs so the other tools' routes don't carry it.
+ * pdf.js worker warm-up, kept out of lib/pdf/pdfjs so routes that never render pages don't carry it. Used
+ * by Edit PDF's idle prefetch (tools/editor/EditorTool, which checks Data Saver itself) and, through
+ * ./pdfjs-warm-intent, by the page tools on a real sign of intent (eval G-8).
  * Fetches pdf.js's two workers into the HTTP cache at the given priority, so the first page after
- * a pick needs no download. pdf.js itself is not loaded here: tools/editor/idle-prefetch loads its
- * chunk without evaluating it, since evaluating it is a long main-thread task (left to intent or the pick).
+ * a pick needs no download. pdf.js itself is not loaded here: its chunk is fetched without being
+ * evaluated elsewhere, since evaluating it is a long main-thread task (left to intent or the pick).
  * Resolves when both are in (or failed: the pick fetches them).
  */
 import { workerUrls } from "./pdfjs";

@@ -127,6 +127,47 @@ test("AC-635: Cancel mid-run (progress under way) stops the worker, the job neve
   await expect(page.getByTestId("action-slot").getByRole("link", { name: /Download/ }).first()).toBeFocused();
 });
 
+test("S6: with 990 pages dimmed, Cancel brings the primary back on screen within 300ms (the pages wake a frame later) @serial", async ({ page }, info) => {
+  test.skip(!isDesktop(info.project.name), "one engine run is enough");
+  test.setTimeout(180_000);
+  const file = info.outputPath("nine-ninety.pdf");
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  for (let i = 1; i <= 990; i++) doc.addPage([595, 842]).drawText(`Page ${i}`, { x: 72, y: 760, size: 36, font });
+  const { writeFile } = await import("node:fs/promises");
+  await writeFile(file, await doc.save());
+  await page.setViewportSize({ width: 1366, height: 657 });
+  await page.goto("/split-pdf");
+  await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
+  await page.getByTestId("file-input").setInputFiles(file);
+  await expect(flow(page)).toHaveAttribute("data-state", "ready", { timeout: 60_000 });
+  await expect(page.getByTestId("page-tile")).toHaveCount(990, { timeout: 60_000 });
+  await page.getByRole("radio", { name: "Every page" }).click();
+  // The job's worker is held, so the run stays in progress with all 990 tiles dimmed and inert.
+  await holdScript(page, /instapdf-processing\.[^/]*\.js/);
+  await primary(page).click();
+  await expect(page.getByTestId("pages-scroll")).toHaveAttribute("data-dim", "", { timeout: 10_000 });
+  await page.waitForTimeout(1000);
+  // From the click to the frame that paints the primary back (measured in the page): the first frame
+  // callback that finds it in the DOM, since that frame's paint follows it. Waiting one more frame would
+  // also count the pages' wake, the deliberately later re-render of all 990 tiles.
+  const ms = await page.evaluate(
+    () =>
+      new Promise<number>((done) => {
+        const t0 = performance.now();
+        document.querySelector<HTMLButtonElement>("[data-testid=processing] [data-testid=cancel]")!.click();
+        const look = () => {
+          if (document.querySelector("[data-testid=primary-action]")) done(performance.now() - t0);
+          else requestAnimationFrame(look);
+        };
+        requestAnimationFrame(look);
+      }),
+  );
+  expect(ms, `the primary is back within 300ms (${Math.round(ms)}ms)`).toBeLessThan(300);
+  await expect(page.getByTestId("pages-scroll")).not.toHaveAttribute("data-dim", "");
+  await expect(flow(page)).toHaveAttribute("data-state", "ready");
+});
+
 test("AC-636: Cancel during the editor's download fires no download, keeps edits and undo, disposes the build; the next Download works", async ({ page }, info) => {
   test.skip(!isDesktop(info.project.name), "the build worker is the same on phones");
   test.setTimeout(120_000);

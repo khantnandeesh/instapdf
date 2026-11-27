@@ -1,8 +1,9 @@
 /** F23 copy for the cloud windows, download cards, notices and saves (our own words; spec U-6). Intake problems reuse the F1 strings. */
 import { formatBytes } from "@/lib/pdf/naming";
 import { providerName, providerShort, type CloudProvider } from "@/lib/cloud/providers";
+import { formatCount } from "@/lib/format-count";
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+const plural = (n: number, one: string, many = `${one}s`) => `${formatCount(n)} ${n === 1 ? one : many}`;
 
 export const transferCopy = {
   status: (n: number, p: CloudProvider) => `Getting ${plural(n, "file")} from ${providerName[p]}…`,

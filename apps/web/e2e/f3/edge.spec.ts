@@ -454,6 +454,43 @@ test.describe("dark mode", () => {
   });
 });
 
+// ================================================================ layering (review B2)
+
+// More options hangs under its button in the sticky top row; the floating selection bar (z 25) sits over the
+// bottom of the screen. With pages selected, the popover's Done must stay on top of that bar (layout.css).
+for (const [width, height] of [
+  [1024, 640],
+  [1280, 632],
+] as const)
+  test(`B2: at ${width}x${height} with 2 pages selected, More options' Done is on top of the selection bar and closes it`, async ({ page }, info) => {
+    test.skip(info.project.name !== "desktop", "the top row and its popover are from 1024px");
+    await page.setViewportSize({ width, height });
+    await openMerge(page);
+    await pickMerge(page, "alpha.pdf", "bravo.pdf");
+    await showPages(page);
+    await tileMain(page, "A1").click();
+    await tileMain(page, "B1").click({ modifiers: ["ControlOrMeta"] });
+    const bar = page.getByTestId("selection-bar");
+    await expect(bar).toBeVisible();
+    const panel = await mergeOptions(page);
+    const done = panel.getByRole("button", { name: "Done" });
+    await expect(done).toBeVisible();
+    const d = (await done.boundingBox())!;
+    const b = (await bar.boundingBox())!;
+    // The case that matters: the bar's box reaches Done's (otherwise this checks nothing).
+    expect(Math.min(d.y + d.height, b.y + b.height) - Math.max(d.y, b.y), "the selection bar and Done overlap vertically").toBeGreaterThan(0);
+    expect(Math.min(d.x + d.width, b.x + b.width) - Math.max(d.x, b.x), "the selection bar and Done overlap sideways").toBeGreaterThan(0);
+    const hit = await done.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return top && el.contains(top) ? "" : (top?.outerHTML.slice(0, 140) ?? "nothing");
+    });
+    expect(hit, "Done is on top at its centre").toBe("");
+    await done.click();
+    await expect(panel).toBeHidden();
+    await expect(bar).toBeVisible();
+  });
+
 // ================================================================ catalogue (F2 hand-off)
 
 test("AC-77: the catalogue card and the menu entry link to /merge-pdf with Beta, not Coming soon; the tool renders", async ({ page }) => {

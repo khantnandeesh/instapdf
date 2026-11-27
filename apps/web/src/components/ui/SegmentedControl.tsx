@@ -91,8 +91,9 @@ export function SegmentedControl<T extends string>({
               o.node
             ) : o.shortLabel ? (
               <>
-                <span className="lg:hidden">{o.shortLabel}</span>
-                <span className="hidden lg:inline">{o.label}</span>
+                {/* The short label on phones, and in the top row at 1024–1279 where three whole labels don't fit (§3.4). */}
+                <span className="lg:hidden dock-bar:max-xl:block">{o.shortLabel}</span>
+                <span className="hidden lg:inline dock-bar:max-xl:hidden">{o.label}</span>
               </>
             ) : (
               o.label
