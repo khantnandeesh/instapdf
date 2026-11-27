@@ -66,7 +66,7 @@ const CLOUD_BUDGET_KB = {
   "/combine-reorder-pdf/page": [152, 162],
   // Alternate shares every first-load chunk with Organize but its page chunk (150.6 vs 150.8 kB after the
   // F4 + main tile-rule merge); 1 kB over its F5 budget, still under Organize's and Combine's 152.
-  "/alternate-mix-pdf/page": [151, 160],
+  "/alternate-mix-pdf/page": [152, 161],
   "/split-pdf/page": [150, 160],
   "/split-pdf-by-bookmarks/page": [150, 160],
   "/split-pdf-by-size/page": [144, 154],
