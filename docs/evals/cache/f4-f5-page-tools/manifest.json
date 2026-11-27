@@ -1234,5 +1234,220 @@
    "bytes": 3109,
    "sha256": "b43673228ec2d1373e17644e35bd9eaf14e50753cf103c2566fb82778385c035"
   }
- ]
+ ],
+ "run2": {
+  "date": "2026-11-27",
+  "evaluated_build": "763fe532f4f7913cd6d6d365800ce2cdf629604d",
+  "raw_evidence": "/mnt/project-files/evals-cache/f4-f5-page-tools/run2/",
+  "comparisons": "/mnt/project-files/comparisons/f4-f5-page-tools/run2/",
+  "reference_tasks_used": 0,
+  "note": "BerryPDF side only, compared against the 2026-11-26 reference cache. No reference requests were made.",
+  "thumbnail_backing_px_per_css_px": {
+   "1280@1x": 1.13,
+   "1280@2x": 2.12,
+   "390@3x": "2.51-2.58",
+   "320@2x": "2.07-2.19",
+   "alternate_file_cards_1280@1x": 1.05,
+   "rotated_or_landscape_tiles_1x": 1.0,
+   "reference_all": 1.82
+  },
+  "thumbnail_text_edge_energy_per_ink": {
+   "reference_1x": 3.01,
+   "ours_run1_1x": 1.12,
+   "ours_run2_1x": 2.07,
+   "ideal_pdfium_160px": 2.32,
+   "ours_run2_2x": 1.99,
+   "ideal_pdfium_320px": 2.06
+  },
+  "scroll_60_pages_inner_grid": {
+   "frame_p50_ms": 16.7,
+   "frame_p95_ms": 16.8,
+   "frames_over_50ms": 0,
+   "tiles_in_view_rendered": "all"
+  },
+  "same_task_sizes_bytes_ours_vs_reference": {
+   "extract_9,2-3": [
+    1179,
+    1592
+   ],
+   "delete_5": [
+    2742,
+    3626
+   ],
+   "alternate_twelve+short+separator": [
+    3249,
+    4400
+   ],
+   "organize_rotA2_blank": [
+    3367,
+    4478
+   ],
+   "organize_rotA2_noblank": [
+    3348,
+    null
+   ],
+   "split_part_1-3": [
+    1265,
+    1678
+   ],
+   "split_part_8-9": [
+    1005,
+    1360
+   ]
+  },
+  "output_oracles": "all outputs: pikepdf check_pdf_syntax clean, pdf.js strict 0 warnings, PDFium render max diff 0 vs source pages; 15 adversarial equal-length-stream outputs also max diff 0",
+  "run_time_median_ms": {
+   "split": 872,
+   "extract": 873,
+   "delete": 866,
+   "organize": 887,
+   "combine": 876,
+   "alternate": 868
+  },
+  "first_thumbnail_ms": {
+   "desktop_1280": {
+    "split": 839,
+    "extract": 880,
+    "delete": 836,
+    "organize": 833,
+    "combine": 851,
+    "alternate": 944
+   },
+   "phone_390_unthrottled_median": {
+    "split": 780,
+    "extract": 766,
+    "delete": 777,
+    "organize": 882,
+    "combine": 843,
+    "alternate": 792
+   },
+   "phone_390_dpr3_4xcpu_slow4g_median": {
+    "split": 4330,
+    "extract": 4284,
+    "delete": 4365,
+    "organize": 4602,
+    "combine": 4510,
+    "alternate": 4490
+   },
+   "phone_cpu_only_4x_extract": 1100
+  },
+  "chooser_open_median_ms": {
+   "split": 967,
+   "extract": 993,
+   "delete": 954,
+   "organize": 905,
+   "combine": 1057,
+   "alternate": 1017
+  },
+  "g3_race": "63/63 paste-then-act runs correct (Split custom, Extract, Delete, Every N; Enter, Tab to primary + Enter, Tab + click, click, double Enter = one run)",
+  "lighthouse_perf_runs": {
+   "split-pdf": [
+    99,
+    99,
+    99
+   ],
+   "extract-pdf-pages": [
+    99,
+    100,
+    99
+   ],
+   "delete-pdf-pages": [
+    99,
+    99,
+    99
+   ],
+   "organize-pdf": [
+    96,
+    98,
+    96
+   ],
+   "combine-reorder-pdf": [
+    98,
+    99,
+    97
+   ],
+   "alternate-mix-pdf": [
+    99,
+    97,
+    96
+   ]
+  },
+  "axe": "0 violations of any impact in 54 scans",
+  "acs": "109/109 (P0 52/52)",
+  "output_hashes": {
+   "micro/berrypdf/alternate-d-out-twelve_mixed.pdf": [
+    3249,
+    "24c5a89381843a4eaaa7e480441bf0e42c3269a1115f4814490e25fe07f0b283"
+   ],
+   "micro/berrypdf/alternate-m-out-twelve_mixed.pdf": [
+    3249,
+    "24c5a89381843a4eaaa7e480441bf0e42c3269a1115f4814490e25fe07f0b283"
+   ],
+   "micro/berrypdf/combine-d-out-alpha_merged.pdf": [
+    1398,
+    "63e7759be8df3898538a067d94c18e7a35d327da1e3b464bcbfc84fbdb0a335d"
+   ],
+   "micro/berrypdf/combine-m-out-alpha_merged.pdf": [
+    1398,
+    "63e7759be8df3898538a067d94c18e7a35d327da1e3b464bcbfc84fbdb0a335d"
+   ],
+   "micro/berrypdf/delete-d-out-twelve.pdf": [
+    2742,
+    "db6ad90936d3703568dea6295cfe0041c5f112d45f0988f672afd9746b5142ce"
+   ],
+   "micro/berrypdf/delete-m-out-twelve.pdf": [
+    2742,
+    "6cd15471fe5889687ff140c7391bfa13183a6035aff68ec0941e9bdb1f9ea12d"
+   ],
+   "micro/berrypdf/extract-d-out-twelve.pdf": [
+    1179,
+    "2ac9685367d01b20f2fea694e04789005efcd99c231535ef4ca528449e563c28"
+   ],
+   "micro/berrypdf/extract-m-out-twelve.pdf": [
+    1178,
+    "636327f93e6425abcf1667f579b8269921a096386a1b315a4531d97d66bdd3a1"
+   ],
+   "micro/berrypdf/organize-d-out-twelve_organized.pdf": [
+    3348,
+    "ed2db4df3945d693036dc4188fd483a59aaa4fddbc0d2c1cb9c03505a580f17d"
+   ],
+   "micro/berrypdf/organize-m-out-twelve_organized.pdf": [
+    3348,
+    "ed2db4df3945d693036dc4188fd483a59aaa4fddbc0d2c1cb9c03505a580f17d"
+   ],
+   "micro/berrypdf/split-d-out-twelve-split.zip": [
+    3480,
+    "c45b46ee388c1bbe4b3b545a59e34866c7e45e31d1c17a2e70f7442a93dbd63f"
+   ],
+   "micro/berrypdf/split-m-out-twelve-split.zip": [
+    3479,
+    "07f8a36a47757f11809415b32f3b39466a09cad4e60b09a8629ad5adf2bc7d2a"
+   ],
+   "outputs/ours-t5-blank__twelve_organized.pdf": [
+    3367,
+    "558efc13d8f99b9fd72f5d1ece834fbf2c1e2943570d2627c1f01efd71c278c7"
+   ]
+  },
+  "verdict": {
+   "result": "PASS",
+   "micro": {
+    "M1": "tie",
+    "M2": "tie",
+    "M3": "tie",
+    "M4": "tie",
+    "M5": "win",
+    "M6": "win",
+    "M7": "win",
+    "M8": "win",
+    "M9": "win",
+    "M10": "win",
+    "M11": "win",
+    "M12": "tie"
+   }
+  },
+  "needs_reference_run": [
+   "M3 under phone throttling (both sides fetch the PDF engine after the pick)",
+   "M4 reference capture at 2x/3x (judged from its fixed 300 px canvas)"
+  ]
+ }
 }
