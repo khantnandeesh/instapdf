@@ -155,9 +155,9 @@ export function TileActions({ children, className, ...rest }: { children: ReactN
 }
 
 /** The row under the page below 1024 px (the actions, never on the page; PT-1 rule 6). */
-export function TileRow({ children, className, ...rest }: { children?: ReactNode } & HTMLAttributes<HTMLDivElement>) {
+export function TileRow({ children, className, tight, ...rest }: { children?: ReactNode; /** No gap: three 44 px targets fit a phone tile. */ tight?: boolean } & HTMLAttributes<HTMLDivElement>) {
   return (
-    <div data-no-drag="" {...rest} className={cx("flex h-11 items-center justify-center gap-2.5", className)}>
+    <div data-no-drag="" {...rest} className={cx("flex h-11 items-center justify-center", tight ? "-mx-1" : "gap-2.5", className)}>
       {children}
     </div>
   );

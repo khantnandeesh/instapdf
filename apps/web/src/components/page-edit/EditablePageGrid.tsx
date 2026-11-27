@@ -486,7 +486,7 @@ export default function EditablePageGrid({
                       {t.label}
                     </TileLabel>
                   </div>
-                  <TileRow className="-mx-1 gap-0" data-testid="tile-row">
+                  <TileRow tight data-testid="tile-row">
                     {t.status === "ready" && !dimmed && (
                       <>
                         {rowActions.map(actionButton)}
