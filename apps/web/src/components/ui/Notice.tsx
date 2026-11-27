@@ -68,7 +68,7 @@ export function Notice({
           className={cx("shrink-0", kind === "callout" && (tone === "danger" ? "text-danger" : tone === "warning" ? "text-brand-strong" : "text-leaf"))}
         />
       )}
-      <div className="min-w-0 flex-1 break-words">
+      <div className="min-w-0 flex-1 break-words text-pretty">
         {title && <p className="font-semibold">{title}</p>}
         {children && <div className={cx(kind === "alert" && title && "font-normal")}>{children}</div>}
         {action &&

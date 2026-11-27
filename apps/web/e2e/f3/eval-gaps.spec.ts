@@ -20,7 +20,13 @@ const visibleAddButtons = (page: Page) =>
 /** The toolbar's Add files button (the grid's end tile has the same name). */
 const toolbarAddFiles = (page: Page) => page.getByRole("button", { name: "Add files", exact: true }).and(page.locator(":not([data-testid=add-tile])"));
 
-const outlineWidth = (el: Locator) => el.evaluate((e) => (getComputedStyle(e).outlineStyle === "none" ? 0 : parseFloat(getComputedStyle(e).outlineWidth)));
+// The button's own ring, or, for one half of a split button (upload + cloud caret), the split's (cloud.css).
+const outlineWidth = (el: Locator) =>
+  el.evaluate((e) => {
+    const w = (n: Element) => (getComputedStyle(n).outlineStyle === "none" ? 0 : parseFloat(getComputedStyle(n).outlineWidth));
+    const split = e.parentElement?.closest(".ip-split");
+    return Math.max(w(e), split ? w(split) : 0);
+  });
 
 // ---------------------------------------------------------------- G-2: one Add menu on phones
 

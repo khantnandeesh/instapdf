@@ -1074,6 +1074,9 @@ export function ToolFlow({
       // Without an Add menu, a multi-file tool's picker drops its word below 400 px (a 44 px icon button,
       // its name kept for assistive tech) so the tools row stays one row (F4/F5 P-3, Alternate & mix).
       className={phoneAddMenu ? "shadow-tool-lift max-lg:hidden" : solo ? "size-11 px-0" : flow.multiFile ? "shadow-tool-lift max-[399px]:size-11 max-[399px]:px-0" : "shadow-tool-lift"}
+      // Its halves hide below 1024 px (the Add menu takes over); the split's glow goes with them, or it stays
+      // behind as a stray dot beside the Add menu.
+      wrapperClassName={phoneAddMenu ? "max-lg:shadow-none" : undefined}
       labelClassName={solo ? "sr-only" : !phoneAddMenu && flow.multiFile ? "max-[399px]:sr-only" : undefined}
       icon={<PlusIcon size={16} />}
       disabled={state === "processing"}

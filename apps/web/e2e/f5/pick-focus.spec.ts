@@ -7,10 +7,13 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { f5fx, flow } from "./support";
 
+// The ring is the button's own, or, for one half of a split button (upload + cloud caret), the split's
+// (one ring around both halves; cloud.css).
 const ring = (el: Locator) =>
   el.evaluate((n) => {
-    const s = getComputedStyle(n);
-    return n.matches(":focus-visible") && s.outlineStyle !== "none" && parseFloat(s.outlineWidth) > 0;
+    const drawn = (e: Element) => getComputedStyle(e).outlineStyle !== "none" && parseFloat(getComputedStyle(e).outlineWidth) > 0;
+    const split = n.parentElement?.closest(".ip-split");
+    return n.matches(":focus-visible") && (drawn(n) || (!!split && drawn(split)));
   });
 
 async function choose(page: Page, button: Locator, names: string[]) {

@@ -37,7 +37,7 @@ test("AC-401, AC-450: twelve.pdf is ready with nothing picked, Custom chosen, th
   await expect(pick(page, "Custom")).toHaveAttribute("aria-checked", "true");
   await expect(primary(page)).toBeDisabled();
   await expect(primary(page)).toHaveText("Extract pages");
-  await expect(status(page)).toHaveText("Pick the pages to keep");
+  await expect(status(page)).toHaveText("Pick pages to keep");
 });
 
 test("AC-402: typed ranges pick tiles (aria-pressed); blur writes the canonical list", async ({ page }) => {

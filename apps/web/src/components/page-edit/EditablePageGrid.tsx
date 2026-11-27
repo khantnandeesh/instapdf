@@ -17,6 +17,7 @@ import type { MoveStep, PageSize } from "@/lib/page-list";
 import { editCopy as c } from "@/tools/merge/copy-edit";
 import { gridColumns, loadDragFor, moveStepFor, navTarget, useSettled, useWarmDrag } from "./grid-keys";
 import { buildTiles, type ListModel } from "./view-model";
+import { AddTileFace, addTileClass } from "./AddTile";
 
 export type TileView = {
   uid: string;
@@ -535,23 +536,9 @@ export default function EditablePageGrid({
           );
         })}
         {!readOnly && (
-        <div role="listitem" className="flex min-w-0 flex-col" data-flip>
-          <MenuButton
-            label={labels.addAtEnd}
-            items={insertItems(tiles.length)}
-            disabled={dimmed}
-            className={cx(
-              "group/add grid aspect-square w-full place-items-center rounded-tray border-2 border-dashed border-brand-tint-border bg-surface-raised/60 text-brand-strong",
-              "transition-[background-color,border-color,transform] duration-(--dur-base) hover:-translate-y-0.5 hover:border-brand hover:bg-brand-tint active:translate-y-0 disabled:opacity-50",
-            )}
-            data-testid="add-tile"
-          >
-            <span className="flex flex-col items-center gap-1.5 font-display text-[15px] font-semibold">
-              <span className="grid size-11 place-items-center rounded-full bg-brand text-white shadow-menu transition-transform duration-(--dur-base) group-hover/add:rotate-90 group-focus-visible/add:rotate-90 motion-reduce:rotate-0">
-                <PlusIcon size={20} />
-              </span>
-              {labels.addTile}
-            </span>
+        <div role="listitem" className="flex min-w-0 flex-col items-center" data-flip>
+          <MenuButton label={labels.addAtEnd} items={insertItems(tiles.length)} disabled={dimmed} className={addTileClass()} data-testid="add-tile">
+            <AddTileFace label={labels.addTile} />
           </MenuButton>
         </div>
         )}

@@ -4,6 +4,7 @@ import { prefetchPdfjs } from "@/lib/pdf/pdfjs";
 import { Button, type ButtonSize, type ButtonVariant } from "../ui/Button";
 import { pickedFromDevice } from "../cloud/tool-cloud";
 import { markQuietFocus } from "../ui/focus";
+import { cx } from "../ui/cx";
 
 export type FilePickerHandle = { open: () => void; focus: () => void; element: HTMLButtonElement | null };
 
@@ -25,11 +26,13 @@ export const FilePicker = forwardRef<
     sources?: ReactNode;
     disabled?: boolean;
     className?: string;
+    /** Classes for the wrapper (with a cloud caret, the span that draws the split button's shared glow). */
+    wrapperClassName?: string;
     /** Classes for the label (for example `max-[399px]:sr-only` for an icon-only button on narrow screens). */
     labelClassName?: string;
     inputTestId?: string;
   }
->(function FilePicker({ accept, multiple, onFiles, label, variant = "primary", size = "lg", icon, sources, disabled, className, labelClassName, inputTestId }, ref) {
+>(function FilePicker({ accept, multiple, onFiles, label, variant = "primary", size = "lg", icon, sources, disabled, className, wrapperClassName, labelClassName, inputTestId }, ref) {
   const input = useRef<HTMLInputElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   useImperativeHandle(ref, () => ({
@@ -41,7 +44,7 @@ export const FilePicker = forwardRef<
   }));
   return (
     // With a `sources` slot (F23 caret) the two halves form one split button (components/cloud/cloud.css).
-    <span className={process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && sources ? `ip-split inline-flex ${variant === "tool" ? "ip-split--tool" : "ip-split--lg"}` : "inline-flex"}>
+    <span className={cx(process.env.NEXT_PUBLIC_CLOUD_SOURCES === "1" && sources ? `ip-split inline-flex ${variant === "tool" ? "ip-split--tool" : "ip-split--lg"}` : "inline-flex", wrapperClassName)}>
       <Button
         ref={button}
         variant={variant}

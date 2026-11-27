@@ -13,7 +13,7 @@ export const copy = {
   /** Server tools (F25 AC-603): honest about the upload (CLAUDE.md rule 4). */
   privacyIntroServer: "Uploaded securely, deleted after 2 hours.",
   privacyResultServer: "Deleted from our server in 2 hours.",
-  limits: (f: ToolFlowConfig) => `PDF. ${f.multiFile ? `Up to ${plural(f.maxFiles, "file")}` : "1 file"}, ${Math.round(f.maxFileBytes / 1024 / 1024)} MB each.`,
+  limits: (f: ToolFlowConfig) => (f.multiFile ? `PDFs, up to ${plural(f.maxFiles, "file")}, ${Math.round(f.maxFileBytes / 1024 / 1024)} MB each` : `One PDF, up to ${Math.round(f.maxFileBytes / 1024 / 1024)} MB`),
   limitsFull: (f: ToolFlowConfig) =>
     `PDF only · up to ${f.multiFile ? plural(f.maxFiles, "file") : "1 file"}, ${Math.round(f.maxFileBytes / 1024 / 1024)} MB each, ${Math.round(f.maxTotalBytes / 1024 / 1024)} MB and ${f.maxTotalPages.toLocaleString("en-US")} pages in total`,
   statusEmpty: "Add a PDF to start",

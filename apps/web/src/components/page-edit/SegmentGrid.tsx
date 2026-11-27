@@ -7,7 +7,7 @@ import { pageBoxStyle, pageTransform, pageTurnScale } from "@/components/tool-fl
 import { PageThumb } from "@/components/tool-flow/Thumbnail";
 import { cx } from "@/components/ui/cx";
 import { IconButton } from "@/components/ui/IconButton";
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, EnlargeIcon, LockIcon, PlusIcon, RotateLeftIcon, RotateRightIcon } from "@/components/ui/icons";
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, EnlargeIcon, LockIcon, RotateLeftIcon, RotateRightIcon } from "@/components/ui/icons";
 import { Kbd } from "@/components/ui/Kbd";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatDelta } from "@/lib/pdf/rotation";
@@ -17,6 +17,7 @@ import type { MoveStep, PageSize } from "@/lib/page-list";
 import { editCopy as c } from "@/tools/merge/copy-edit";
 import { gridColumns, loadDragFor, moveStepFor, navTarget, useSettled, useWarmDrag } from "./grid-keys";
 import { buildCards, type ListModel } from "./view-model";
+import { AddTileFace, addTileClass } from "./AddTile";
 
 export type CardView = {
   key: string;
@@ -381,11 +382,11 @@ export function SegmentGrid({
                 {(!compact || badge) && (
                   <span aria-hidden="true" className="pointer-events-none absolute -top-1.5 -left-1.5 z-[1] flex gap-1">
                     {!compact && (
-                      <span className="grid h-6 min-w-6 place-items-center rounded-pill bg-surface-raised px-1.5 font-display text-help font-semibold text-brand-strong" data-testid="source-badge">
+                      <span className="grid h-6 min-w-6 place-items-center rounded-pill bg-surface-raised px-1.5 font-display text-help font-semibold text-brand-strong shadow-menu" data-testid="source-badge">
                         {card.letter}
                       </span>
                     )}
-                    {badge && <span className="rounded-pill bg-surface-raised px-2 py-1 font-display text-help font-semibold text-brand-strong tabular-nums">{badge}</span>}
+                    {badge && <span className="rounded-pill bg-surface-raised px-2 py-1 font-display text-help font-semibold text-brand-strong tabular-nums shadow-menu">{badge}</span>}
                   </span>
                 )}
                 {!compact && (
@@ -471,25 +472,9 @@ export function SegmentGrid({
             </div>
           );
         })}
-        <div role="listitem" className="flex min-w-0 flex-col" data-flip>
-          <button
-            type="button"
-            onClick={(e) => onAddFiles(e.currentTarget)}
-            disabled={dimmed}
-            title={labels.addFiles}
-            className={cx(
-              mix ? "group/add grid h-full min-h-[120px] w-full place-items-center sm:min-h-[200px]" : "group/add grid aspect-square w-full place-items-center",
-              "rounded-tray border-2 border-dashed border-brand-tint-border bg-surface-raised/60 text-brand-strong",
-              "transition-[background-color,border-color,transform] duration-(--dur-base) hover:-translate-y-0.5 hover:border-brand hover:bg-brand-tint active:translate-y-0 disabled:opacity-50",
-            )}
-            data-testid="add-tile"
-          >
-            <span className="flex flex-col items-center gap-1.5 font-display text-[15px] font-semibold">
-              <span className="grid size-11 place-items-center rounded-full bg-brand text-white shadow-menu transition-transform duration-(--dur-base) group-hover/add:rotate-90 group-focus-visible/add:rotate-90 motion-reduce:rotate-0">
-                <PlusIcon size={20} />
-              </span>
-              {labels.addFiles}
-            </span>
+        <div role="listitem" className={cx("flex min-w-0 flex-col", !mix && "items-center")} data-flip>
+          <button type="button" onClick={(e) => onAddFiles(e.currentTarget)} disabled={dimmed} title={labels.addFiles} className={addTileClass(mix)} data-testid="add-tile">
+            <AddTileFace label={labels.addFiles} />
           </button>
         </div>
       </div>
