@@ -252,7 +252,16 @@ test.describe("F25 structure", () => {
     await expect(page.getByRole("link", { name: "Download" })).toHaveCount(1);
     const dl = (await page.getByRole("link", { name: "Download" }).boundingBox())!;
     expect(dl.y + dl.height, "Download in the row's slot").toBeLessThanOrEqual(slotBox.y + slotBox.height + 1);
-    expect(Math.abs(dl.x + dl.width - (slotBox.x + slotBox.width)), "same right edge as the primary").toBeLessThanOrEqual(1);
+    // The slot keeps the primary's right edge. With cloud sources on, Save to cloud shares the slot to
+    // Download's right (F23 AC-169), so the slot's edge is measured, with Download inside it.
+    const slot = await page.getByRole("link", { name: "Download" }).evaluate((a) => {
+      const r = a.closest(".ip-slot")!.getBoundingClientRect();
+      return { x: r.x, right: r.right };
+    });
+    expect(Math.abs(slot.right - (slotBox.x + slotBox.width)), "the slot keeps the primary's right edge").toBeLessThanOrEqual(1);
+    expect(dl.x, "Download inside the slot").toBeGreaterThanOrEqual(slot.x - 1);
+    if ((await page.getByTestId("save-main").count()) === 0)
+      expect(Math.abs(dl.x + dl.width - (slotBox.x + slotBox.width)), "same right edge as the primary").toBeLessThanOrEqual(1);
     await expect(page.getByRole("link", { name: "Download" })).toBeFocused();
     await expect(page.locator("[data-ip-dock] [data-testid=dock-options]")).toHaveCount(0);
   });

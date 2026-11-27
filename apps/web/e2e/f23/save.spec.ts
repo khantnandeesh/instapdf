@@ -89,8 +89,9 @@ test("AC-169: Download is the only berry fill, keeps the focus, and both control
   const save = page.getByTestId("save-main");
   await expect(save).toHaveAccessibleName("Save to OneDrive");
   await expect(downloadLink(page)).toBeFocused();
-  // One filled action: no other control on the result has Download's background.
-  const fills = await page.getByTestId("result").evaluate((root) => {
+  // One filled action: no other control in the tool (row, slot and result) has Download's background.
+  // Download sits in the row's action slot since F25 (spec §7), outside the result card.
+  const fills = await flow(page).evaluate((root) => {
     const bg = (el: Element) => getComputedStyle(el).backgroundColor;
     const dl = [...root.querySelectorAll("a")].find((a) => a.textContent?.trim() === "Download")!;
     return [...root.querySelectorAll("a, button")].filter((el) => (el as HTMLElement).offsetParent && bg(el) === bg(dl)).map((el) => el.textContent?.trim());

@@ -396,13 +396,18 @@ async function expectSheet(page: import("@playwright/test").Page, width: number)
   await page.waitForTimeout(400); // the sheet's entrance (a short scale-in) has settled
   for (const item of await page.getByRole("menuitem").all()) expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(48);
   const sheet = (await page.locator(".ip-menu-sheet").boundingBox())!;
-  const dock = (await page.locator("[data-ip-dock]").boundingBox())!;
+  // Since F25 the empty state is the picker card alone (no dock until a file is in): the sheet then
+  // sits on the bottom edge of the screen instead.
+  const dockEl = page.locator("[data-ip-dock]");
+  const floor = (await dockEl.count()) ? (await dockEl.boundingBox())!.y : page.viewportSize()!.height;
   expect(sheet.y).toBeGreaterThanOrEqual(0);
-  expect(sheet.y + sheet.height).toBeLessThanOrEqual(dock.y + 1);
-  expect(dock.y - (sheet.y + sheet.height)).toBeLessThan(32); // it sits on the dock, not at the top
+  expect(sheet.y + sheet.height).toBeLessThanOrEqual(floor + 1);
+  expect(floor - (sheet.y + sheet.height)).toBeLessThan(32); // it sits on the dock (or the screen's foot), not at the top
   expect(sheet.x).toBeLessThanOrEqual(12);
   expect(sheet.width).toBeGreaterThanOrEqual(width - 24);
-  expect(await uncovered(primary(page))).toBe(true);
+  // The main action stays uncovered: the dock's primary once a file is in, the picker card's button before.
+  const main = (await primary(page).count()) ? primary(page) : page.getByRole("button", { name: /^Choose (files|PDF)/ }).first();
+  expect(await uncovered(main)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 }
 
