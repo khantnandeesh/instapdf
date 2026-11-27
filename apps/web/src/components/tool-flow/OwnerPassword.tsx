@@ -3,8 +3,8 @@ import { useId, useRef, useState } from "react";
 import type { Permission } from "@/tools/registry";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
-import { IconButton } from "../ui/IconButton";
-import { AlertIcon, EyeIcon } from "../ui/icons";
+import { AlertIcon } from "../ui/icons";
+import { PasswordInput } from "../ui/PasswordInput";
 import { permissionLabels } from "./copy";
 
 // The notice is its own module so a tool page's first load carries it without this dialog.
@@ -29,7 +29,6 @@ export function OwnerPasswordDialog({
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
-  const [visible, setVisible] = useState(false);
   const inputId = useId();
   const errorId = useId();
   return (
@@ -64,25 +63,7 @@ export function OwnerPasswordDialog({
           onSubmit(value);
         }}
       >
-        <label htmlFor={inputId} className="sr-only">
-          Owner password
-        </label>
-        <div className="relative">
-          <input
-            ref={input}
-            id={inputId}
-            type={visible ? "text" : "password"}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Owner password"
-            autoComplete="off"
-            spellCheck={false}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? errorId : undefined}
-            className="ip-field h-12 w-full ps-[14px] pe-12"
-          />
-          <IconButton label="Show password" pressed={visible} size="sm" tooltip={false} className="absolute top-[7px] right-[7px]" icon={<EyeIcon size={18} />} onClick={() => setVisible((v) => !v)} />
-        </div>
+        <PasswordInput ref={input} id={inputId} label="Owner password" value={value} onChange={setValue} invalid={!!error} describedBy={error ? errorId : undefined} />
         <p id={errorId} role="alert" className="flex min-h-5 items-center gap-1.5 text-sm font-semibold text-danger">
           {error && (
             <>

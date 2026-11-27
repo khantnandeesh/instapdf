@@ -2,8 +2,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
-import { IconButton } from "../ui/IconButton";
-import { AlertIcon, EyeIcon } from "../ui/icons";
+import { AlertIcon } from "../ui/icons";
+import { PasswordInput } from "../ui/PasswordInput";
 import { copy } from "./copy";
 
 /** Middle-truncates long names so the start and the extension stay visible. */
@@ -93,42 +93,8 @@ export function PasswordDialog({
           if (!busy) onSubmit(value, showApplyToAll && applyAll);
         }}
       >
-        {/* BerryPDF AuthForm field: placeholder in view, the label visually hidden (still the accessible name). */}
-        <label htmlFor={inputId} className="sr-only">
-          Password
-        </label>
-        <div key={attempt} className={error && attempt > 0 ? "ip-shake relative" : "relative"}>
-          <input
-            ref={input}
-            id={inputId}
-            type={visible ? "text" : "password"}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            readOnly={busy}
-            placeholder="Password"
-            autoComplete="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? errorId : undefined}
-            className="ip-field h-12 w-full ps-[14px] pe-12"
-          />
-          <IconButton
-            label="Show password"
-            pressed={visible}
-            size="sm"
-            tooltip={false}
-            className="absolute top-[7px] right-[7px]"
-            icon={<EyeIcon size={18} />}
-            onClick={() => {
-              const el = input.current;
-              const pos = el ? [el.selectionStart, el.selectionEnd] : null;
-              setVisible((v) => !v);
-              requestAnimationFrame(() => {
-                if (el && pos) el.setSelectionRange(pos[0], pos[1]);
-              });
-            }}
-          />
+        <div key={attempt} className={error && attempt > 0 ? "ip-shake" : undefined}>
+          <PasswordInput ref={input} id={inputId} label="Password" value={value} onChange={setValue} readOnly={busy} shown={visible} onShownChange={setVisible} invalid={!!error} describedBy={error ? errorId : undefined} />
         </div>
         <p id={errorId} role="alert" className="flex min-h-5 items-start gap-1.5 text-sm text-danger" data-testid="password-error">
           {error && (

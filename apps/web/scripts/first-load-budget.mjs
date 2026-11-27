@@ -36,8 +36,11 @@ const BUDGET_KB = {
   "/delete-pdf-pages/page": [145, 154],
   // F12 (spec f12-image-text-tools.md): PDF to image is Extract's page with two option groups; PDF to text is the
   // bare flow; Image to PDF is Organize's workspace. Their engines (page-images, page-text, tiff-write) are lazy.
-  // The four F12 tools grew the registry every route carries: the routes within that of their
+  // F12 and F11 added six tools to the registry every route carries: the routes within that of their
   // budget (home, Split, Delete, PDF to JPG, JPG to PDF) move up 1 kB.
+  // F11: Protect is the bare flow plus the password field and three switches; Unlock is the bare flow.
+  "/protect-pdf/page": [142, 152],
+  "/unlock-pdf/page": [139, 149],
   "/pdf-to-jpg/page": [145, 155],
   "/extract-images/page": [142, 152],
   "/pdf-to-text/page": [139, 149],
@@ -59,6 +62,8 @@ const CLOUD_BUDGET_KB = {
   "/split-pdf/page": [148, 158],
   "/extract-pdf-pages/page": [146, 156],
   "/delete-pdf-pages/page": [146, 156],
+  "/protect-pdf/page": [144, 154],
+  "/unlock-pdf/page": [141, 151],
   "/pdf-to-jpg/page": [147, 157],
   "/extract-images/page": [144, 154],
   "/pdf-to-text/page": [141, 151],

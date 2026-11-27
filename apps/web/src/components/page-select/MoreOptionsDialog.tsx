@@ -6,6 +6,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ReactNode,
   type RefObject,
 } from "react";
 import { Button } from "../ui/Button";
@@ -24,7 +25,11 @@ export type MoreOptionsContent = {
   pattern?: { value: string; onChange: (value: string) => void };
   bookmarks?: { value: boolean; onChange: (value: boolean) => void };
   /** A tool's own on/off options, in order (PDF to image: greyscale, one TIFF for all pages). */
+  /** A heading over the toggles; with it they fill the row, label at the start and switch at the end. */
+  togglesTitle?: string;
   toggles?: { id: string; label: string; value: boolean; onChange: (value: boolean) => void }[];
+  /** A tool's own field after its toggles (Protect: the password that lifts the restrictions). */
+  extra?: ReactNode;
 };
 
 function useMedia(query: string): boolean {
@@ -150,9 +155,11 @@ function MoreOptionsBody({
           </span>
         </div>
       )}
+      {content.togglesTitle && <h3 className="text-sm font-semibold text-ink">{content.togglesTitle}</h3>}
       {content.toggles?.map((t) => (
-        <Switch key={t.id} id={`${id}-${t.id}`} label={t.label} checked={t.value} onChange={t.onChange} />
+        <Switch key={t.id} id={`${id}-${t.id}`} label={t.label} checked={t.value} onChange={t.onChange} spread={!!content.togglesTitle} />
       ))}
+      {content.extra}
       {content.bookmarks && (
         <Switch
           id={`${id}-bookmarks`}

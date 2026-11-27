@@ -13,7 +13,9 @@ export { USER_ERROR } from "./user-error";
 import { buildDocuments } from "./build";
 import { mergePdf, type MergeEnv, type MergeInput } from "./merge";
 import { pdfOutputName, uniqueNames } from "./naming";
+import { protectPdf, unlockPdf, type ProtectOptions } from "./protect";
 import { rotatePdf } from "./rotate";
+import { USER_ERROR } from "./user-error";
 import { createZipWriter } from "./zip";
 import type { DocumentsJob, JobFile } from "./documents-job";
 export { documentsJob, type DocumentsJob, type JobFile } from "./documents-job";
@@ -27,7 +29,12 @@ export type RotateJob = {
 
 export type MergeJob = { kind: "merge"; name: string } & MergeInput;
 
-export type Job = RotateJob | MergeJob | DocumentsJob;
+/** Protect (F11): every file encrypted with the same passwords and restrictions. */
+export type ProtectJob = { kind: "protect"; files: JobFile[]; zipName: string; options: ProtectOptions };
+/** Unlock (F11): every file saved with no password and no restrictions. */
+export type UnlockJob = { kind: "unlock"; files: JobFile[]; zipName: string };
+
+export type Job = RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob;
 
 export type JobOutput = {
   name: string;
@@ -37,7 +44,7 @@ export type JobOutput = {
   pageCount?: number;
   /** ZIP entries (name and page count), in order. */
   entries?: { name: string; pageCount: number }[];
-  /** True when any input was encrypted (the output never is). */
+  /** True when any input was encrypted and the output is not (Protect's output is, so it says false). */
   wasEncrypted: boolean;
   /** Non-blocking notes for the user about the result. */
   warnings?: string[];
@@ -55,6 +62,15 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       return runRotate(job, onProgress);
     case "merge":
       return runMerge(job, onProgress, env);
+    case "protect":
+      // The output is encrypted, so "this copy has no password" never applies.
+      return { ...(await runPerFile(job.files, job.zipName, onProgress, async (bytes, file) => protectPdf({ bytes, password: file.password, options: job.options }))), wasEncrypted: false };
+    case "unlock": {
+      const out = await runPerFile(job.files, job.zipName, onProgress, (bytes, file) => unlockPdf({ bytes, password: file.password }));
+      if (!out.wasEncrypted) throw new Error(`${USER_ERROR}${job.files.length === 1 ? "This PDF has" : "These PDFs have"} no password or restrictions, so there is nothing to remove.`);
+      // Removing the password is the point here, not a side effect to warn about.
+      return { ...out, wasEncrypted: false };
+    }
     case "split":
     case "extract":
     case "delete":
@@ -111,46 +127,67 @@ async function runMerge(job: MergeJob, onProgress: ProgressFn, env: JobEnv): Pro
   };
 }
 
-async function runRotate(job: RotateJob, onProgress: ProgressFn): Promise<JobOutput> {
-  const weights = job.files.map((f) => Math.max(1, f.deltas.length));
+type FileResult = { bytes: Uint8Array; pageCount: number; wasEncrypted: boolean; warnings?: string[] };
+
+/**
+ * One output per input file, each kept under its own name: a single PDF, or a ZIP of them. `weights`
+ * share the progress bar between files; `work` reports progress inside its file (F1 eval G-2).
+ */
+async function runPerFile<F extends JobFile>(
+  files: readonly F[],
+  zipName: string,
+  onProgress: ProgressFn,
+  work: (bytes: Uint8Array, file: F, progress: (fraction: number) => void) => Promise<FileResult>,
+  weights: number[] = files.map(() => 1),
+): Promise<JobOutput> {
   const total = weights.reduce((a, b) => a + b, 0);
   let done = 0;
   onProgress(0);
   let wasEncrypted = false;
-
-  /** Reports progress inside file `i`, so the bar moves during long single-file runs (F1 eval G-2). */
-  const within = (i: number) => (fraction: number) => onProgress(Math.min(0.99, (done + weights[i] * fraction) / total));
-
-  const rotateOne = async (file: RotateJob["files"][number], i: number) => {
+  // Each note once, however many files it applies to.
+  const notes = new Set<string>();
+  const warnings = () => (notes.size ? { warnings: [...notes] } : {});
+  const one = async (file: F, i: number) => {
+    const within = (fraction: number) => onProgress(Math.min(0.99, (done + weights[i] * fraction) / total));
     const bytes = new Uint8Array(await file.source.arrayBuffer());
-    within(i)(0.1);
-    const r = await rotatePdf({ bytes, deltas: file.deltas, password: file.password }, (f) => within(i)(0.1 + 0.9 * f));
+    within(0.1);
+    const r = await work(bytes, file, (f) => within(0.1 + 0.9 * f));
     wasEncrypted ||= r.wasEncrypted;
+    r.warnings?.forEach((w) => notes.add(w));
     return r;
   };
 
-  if (job.files.length === 1) {
-    const [file] = job.files;
-    const r = await rotateOne(file, 0);
+  if (files.length === 1) {
+    const r = await one(files[0], 0);
     onProgress(1);
     return {
-      name: pdfOutputName(file.name),
+      name: pdfOutputName(files[0].name),
       type: "application/pdf",
       blob: new Blob([r.bytes as Uint8Array<ArrayBuffer>], { type: "application/pdf" }),
       pageCount: r.pageCount,
       wasEncrypted,
+      ...warnings(),
     };
   }
 
-  const names = uniqueNames(job.files.map((f) => pdfOutputName(f.name)));
+  const names = uniqueNames(files.map((f) => pdfOutputName(f.name)));
   const zip = createZipWriter();
   const entries: { name: string; pageCount: number }[] = [];
-  for (let i = 0; i < job.files.length; i++) {
-    const r = await rotateOne(job.files[i], i);
+  for (let i = 0; i < files.length; i++) {
+    const r = await one(files[i], i);
     zip.add(names[i], r.bytes); // copied into the ZIP Blob; r.bytes can be collected now
     entries.push({ name: names[i], pageCount: r.pageCount });
     done += weights[i];
     onProgress(done / total);
   }
-  return { name: job.zipName, type: "application/zip", blob: zip.finish(), entries, wasEncrypted };
+  return { name: zipName, type: "application/zip", blob: zip.finish(), entries, wasEncrypted, ...warnings() };
 }
+
+const runRotate = (job: RotateJob, onProgress: ProgressFn): Promise<JobOutput> =>
+  runPerFile(
+    job.files,
+    job.zipName,
+    onProgress,
+    (bytes, file, progress) => rotatePdf({ bytes, deltas: file.deltas, password: file.password }, progress),
+    job.files.map((f) => Math.max(1, f.deltas.length)),
+  );

@@ -9,11 +9,13 @@
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { isUsable, tools } from "../../src/tools/registry";
-import { fx, toolFixtures } from "../support/flow";
+import { fx, makeRunnable, toolFixtures } from "../support/flow";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
 /** Tools with no options at all (F4/F5 §3e, §3g): their bar holds the status, history and primary only. */
-const NO_OPTIONS = new Set(["organize-pdf", "alternate-mix-pdf", "pdf-to-text", "extract-images"]);
+const NO_OPTIONS = new Set(["organize-pdf", "alternate-mix-pdf", "pdf-to-text", "extract-images", "unlock-pdf"]);
+/** Settings tools (F25 §4): from 1024 px the options are a side panel beside the pages, under the top row. */
+const SIDE_PANEL = 340;
 /** Loads the test file (and a second one where the tool needs it). */
 async function loadFiles(page: Page, slug: string) {
   await page.getByTestId("file-input").setInputFiles(toolFixtures(slug));
@@ -80,16 +82,6 @@ async function openFirstPagePreview(page: Page) {
   await page.getByRole("menuitem", { name: "Enlarge" }).click();
 }
 
-/**
- * Tools whose primary waits for a choice (Extract: pick a page; Delete: mark one) get one: the first
- * toggle tile (spec F4/F5 UI decision 12). Other tools run as loaded.
- */
-async function makeRunnable(page: Page) {
-  if (await page.getByTestId("primary-action").isEnabled()) return;
-  await page.locator("[data-tile-button][aria-pressed]").first().click();
-  await expect(page.getByTestId("primary-action")).toBeEnabled();
-}
-
 async function open(page: Page, slug: string) {
   await page.goto(`/${slug}`);
   await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
@@ -131,7 +123,9 @@ for (const tool of usable) {
         await expect(row).toHaveAttribute("data-ip-dock", "row");
         await expectInViewport(page, row, "top row (loaded)");
         const rowBox = (await row.boundingBox())!;
-        if (NO_OPTIONS.has(tool.slug)) await expect(row.getByTestId("dock-options").or(page.getByTestId("options-button"))).toHaveCount(0);
+        const settings = tool.flow?.layout === "settings";
+        if (settings) await expectInViewport(page, page.getByTestId("dock-options"), "options in the side panel");
+        else if (NO_OPTIONS.has(tool.slug)) await expect(row.getByTestId("dock-options").or(page.getByTestId("options-button"))).toHaveCount(0);
         // Inline options, a full-density tool's row options (from 1280 px) or its More options trigger.
         else await expectInViewport(page, row.locator(":is([data-testid=dock-options], [data-testid=dock-row-options], [data-testid=options-button]):visible").first(), "options in the top row");
         // Tools with a Files / Pages view (Merge opens on files): the pages checks below run on the pages.
@@ -140,13 +134,13 @@ for (const tool of usable) {
         const pages = page.getByTestId("pages-scroll");
         await expectInViewport(page, pages, "pages area");
         const box = (await pages.boundingBox())!;
-        expect(box.width, "pages use the full content width").toBeGreaterThanOrEqual(Math.min(width, 1280) - 120);
+        expect(box.width, "pages use the full content width").toBeGreaterThanOrEqual(Math.min(width, 1280) - 120 - (settings ? SIDE_PANEL : 0));
         // From 1440 the row and the stage widen past the 1280 column, up to 1856px with 32px gutters (G-14).
         if (width >= 1440) {
           const wide = Math.min(width - 64, 1856);
           const toolRow = (await page.getByTestId("tool-intro").boundingBox())!;
           expect(toolRow.width, "the top row widens on a large screen").toBeGreaterThanOrEqual(wide - 2);
-          expect(box.width, "the pages widen with it").toBeGreaterThanOrEqual(wide - 120);
+          expect(box.width, "the pages widen with it").toBeGreaterThanOrEqual(wide - 120 - (settings ? SIDE_PANEL : 0));
         }
         expect(box.height, "pages get at least half of the screen height").toBeGreaterThanOrEqual(height * 0.5 - 40);
         // 60 pages overflow the area (wait for the grid to lay out, e.g. right after a view switch).

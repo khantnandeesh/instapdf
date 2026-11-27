@@ -18,6 +18,8 @@ export const fx = (name: string) => `tests/fixtures/${name}`;
 export function toolFixtures(slug: string, pdf = "sixty-pages.pdf"): string[] {
   // Enough pictures to overflow the pages area, like the 60-page PDF does.
   if (slug === "jpg-to-pdf") return Array.from({ length: 30 }, (_, i) => fx(["delta.jpg", "charlie.png", "fox.tiff"][i % 3]));
+  // Unlock needs a protected file, or its run ends in "nothing to remove".
+  if (slug === "unlock-pdf") return [fx(pdf), fx("owner-restricted.pdf")];
   // Extract images needs a file that has images, or its run ends in "none found".
   if (slug === "extract-images") return [fx(pdf), fx("with-images.pdf")];
   return slug === "alternate-mix-pdf" ? [fx(pdf), fx("three-pages.pdf")] : [fx(pdf)];
@@ -176,4 +178,17 @@ export async function cardAction(page: Page, file: string, action: "Remove" | "E
   await more.click();
   await page.getByRole("menuitem", { name: action, exact: true }).click();
   return more;
+}
+
+/**
+ * Gives a tool whose primary waits for a choice what it needs, for the guards that run every tool:
+ * Protect a password; Extract and Delete the first toggle tile (spec F4/F5 UI decision 12). Other
+ * tools run as loaded.
+ */
+export async function makeRunnable(page: Page) {
+  if (await primary(page).isEnabled()) return;
+  const password = page.locator("#protect-open");
+  if (await password.count()) await password.fill("correct horse battery");
+  else await page.locator("[data-tile-button][aria-pressed]").first().click();
+  await expect(primary(page)).toBeEnabled();
 }

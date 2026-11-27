@@ -15,6 +15,7 @@ export function Switch({
   className,
   describedBy,
   ariaLabel,
+  spread,
 }: {
   id: string;
   label: string;
@@ -25,9 +26,11 @@ export function Switch({
   onChange: (checked: boolean) => void;
   className?: string;
   describedBy?: string;
+  /** Fills its row: label at the start, switch at the end (a list of settings in a panel or sheet). */
+  spread?: boolean;
 }) {
   return (
-    <label htmlFor={id} className={cx("relative inline-flex min-h-11 cursor-pointer items-center gap-3 text-[16px] leading-6 text-ink select-none", className)}>
+    <label htmlFor={id} className={cx("relative min-h-11 cursor-pointer items-center gap-3 text-[16px] leading-6 text-ink select-none", spread ? "flex w-full justify-between" : "inline-flex", className)}>
       <input
         id={id}
         type="checkbox"
