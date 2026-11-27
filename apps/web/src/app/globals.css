@@ -247,12 +247,13 @@
     box-shadow: none;
   }
 
-  /* Joined toolbar: blueberry tools sharing edges inside a soft blueberry halo. */
+  /* Joined toolbar: blueberry tools sharing edges, with the tool buttons' soft lift (no 4px halo at rest:
+     it read as a focus ring). */
   .mp-toolbar {
     display: inline-flex;
     border-radius: var(--radius-md);
     background: var(--surface);
-    box-shadow: var(--shadow-glow);
+    box-shadow: var(--shadow-tool-lift);
   }
   .mp-toolbar > * {
     border-radius: 0;
@@ -1166,6 +1167,11 @@
     }
     /* The hero's back layer is placed for a wide hero; on phones it would sit on the words. */
     .mp-floaties--hero .mp-floaty--back {
+      display: none;
+    }
+    /* Word-only empty states (404): on a phone the words span the width, so any berry would sit on them.
+       The picker's drop card keeps its berries around the card. */
+    .mp-empty:not(:has(.mp-dropcard)) .mp-floaties--empty .mp-floaty {
       display: none;
     }
   }

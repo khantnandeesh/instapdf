@@ -50,9 +50,12 @@ test.describe("polish guards (desktop)", () => {
         await slider.fill(String(size));
         await page.waitForTimeout(400);
         const gaps = await page.locator(".ip-tile-grid").first().evaluate((grid) => {
-          const g = grid.getBoundingClientRect();
-          const s = getComputedStyle(grid);
-          const inner = { left: g.left + parseFloat(s.paddingLeft) + parseFloat(s.borderLeftWidth), right: g.right - parseFloat(s.paddingRight) - parseFloat(s.borderRightWidth) };
+          // Measured against the visible panel the pages sit on, not the grid: a scroll gutter or padding on
+          // one side only (it once reserved 10px on the right) shifts the whole grid off centre.
+          const panel = grid.closest(".rounded-panel") ?? grid;
+          const g = panel.getBoundingClientRect();
+          const s = getComputedStyle(panel);
+          const inner = { left: g.left + parseFloat(s.borderLeftWidth), right: g.right - parseFloat(s.borderRightWidth) };
           const kids = [...grid.children].map((c) => c.getBoundingClientRect()).filter((r) => r.width > 0);
           const top = Math.min(...kids.map((r) => r.top));
           const row = kids.filter((r) => Math.abs(r.top - top) < 2);
@@ -99,5 +102,40 @@ test.describe("polish guards (desktop)", () => {
     }
     expect(m.align).toBe("center");
     expect(Math.abs(m.value.left + m.value.width / 2 - m.cx)).toBeLessThanOrEqual(1);
+  });
+
+  test("the selected pill's tick stays clear of the next pill; the status line never wraps around a '·'", async ({ page }) => {
+    await ready(page, "/split-pdf");
+    const gap = await page.getByRole("radiogroup", { name: "Split" }).evaluate((g) => {
+      const [a, b] = [...g.querySelectorAll('[role="radio"]')].slice(0, 2);
+      const tick = getComputedStyle(a, "::after");
+      return b.getBoundingClientRect().left - (a.getBoundingClientRect().right - parseFloat(tick.right));
+    });
+    expect(gap, "space between the tick's right edge and the next pill").toBeGreaterThanOrEqual(4);
+    const status = page.getByTestId("dock-status");
+    await expect(status).toHaveText("250 pages · 250 files");
+    for (const width of [1280, 1100]) {
+      await page.setViewportSize({ width, height: 800 });
+      const lines = await status.evaluate((p) => {
+        const tops = new Map<number, string>();
+        for (const n of p.querySelectorAll("span")) {
+          if (!n.getClientRects().length) continue;
+          const t = Math.round(n.getBoundingClientRect().top);
+          tops.set(t, ((tops.get(t) ?? "") + n.textContent).trim());
+        }
+        return [...tops.values()];
+      });
+      for (const line of lines) expect(line, `${width}px: ${JSON.stringify(lines)}`).not.toMatch(/^·|·$/);
+    }
+  });
+
+  test("no 4px halo at rest on tool buttons (it reads as a focus ring); the zoom slider rings its thumb, not a box", async ({ page }) => {
+    await ready(page, "/split-pdf");
+    const shadows = await page.locator(".ip-split--tool, .mp-toolbar").evaluateAll((els) => els.map((e) => getComputedStyle(e).boxShadow));
+    for (const s of shadows) expect(s).not.toMatch(/0px 0px 0px 4px/);
+    const slider = page.getByRole("slider", { name: "Thumbnail size" });
+    await slider.focus();
+    await page.keyboard.press("ArrowRight");
+    expect(await slider.evaluate((e) => getComputedStyle(e).outlineStyle)).toBe("none");
   });
 });

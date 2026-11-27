@@ -47,7 +47,7 @@ body:has([data-ip-dock="bar"]) .ip-site-footer {
 @media (min-width: 1024px) {
   .ip-scroll {
     overscroll-behavior: contain;
-    scrollbar-gutter: stable;
+    scrollbar-gutter: stable both-edges;
   }
   @supports not selector(::-webkit-scrollbar) {
     .ip-scroll {

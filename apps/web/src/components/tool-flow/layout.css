@@ -222,6 +222,12 @@
   }
   /* On the sand dock (below 1024px) the status is for screen readers only, as before (muted on sand is
      under 4.5:1); the primary takes the row. */
+  .ip-slot__status[data-stacked] .ip-slot__sep {
+    display: none;
+  }
+  .ip-slot__status[data-stacked] [data-part] {
+    display: block;
+  }
   [data-ip-dock="bar"] .ip-slot__status {
     position: absolute;
     width: 1px;
@@ -290,6 +296,22 @@
   }
   .ip-slot--editor .ip-slot__main {
     flex: 1;
+  }
+  /* The editor's bar is 56px: a 48px button (plus its 3px lip) filled it edge to edge. The editor's slot is
+     40px (44px touch target on phones), so the bar keeps 8px of air above and below, like its tools. */
+  .ip-slot--editor,
+  .ip-slot--editor .ip-slot__main,
+  .ip-slot--editor .ip-pill,
+  .ip-slot--editor .ip-slot__error {
+    height: 40px;
+  }
+  @media (max-width: 1023px) {
+    .ip-slot--editor,
+    .ip-slot--editor .ip-slot__main,
+    .ip-slot--editor .ip-pill,
+    .ip-slot--editor .ip-slot__error {
+      height: 44px;
+    }
   }
   .ip-slot__error {
     display: flex;
@@ -638,5 +660,27 @@
   from {
     opacity: 0;
     transform: translateY(var(--motion-rise, 8px)) scale(0.98);
+  }
+}
+
+/* Compact choice pills (the one-row options, dock-bar): a smaller tick tucked 5px over the corner, so it never
+   reaches the next pill across the 10px gap (polish rule: badges stay on their own element). Tool pages only,
+   so it stays out of the site-wide stylesheet budget (AC-55). */
+@layer components {
+  @media (width < 64rem) {
+    .ip-flow .mp-choice:is([aria-checked="true"], [aria-pressed="true"])::after {
+      top: -5px;
+      right: -5px;
+      width: 16px;
+      height: 16px;
+      background-size: 9px 8px;
+    }
+  }
+  .ip-flow :where([data-ip-dock="bar"], [data-ip-dock="row"]) .mp-choice:is([aria-checked="true"], [aria-pressed="true"])::after {
+    top: -5px;
+    right: -5px;
+    width: 16px;
+    height: 16px;
+    background-size: 9px 8px;
   }
 }
