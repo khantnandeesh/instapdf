@@ -43,7 +43,7 @@ export const copy = {
     type === "application/zip" ? "Your files are ready" : type.startsWith("image/") ? "Your image is ready" : type === "text/plain" ? "Your text is ready" : "Your PDF is ready",
   resultUnencrypted: "This copy has no password. Anyone who has the file can open it.",
   resultContinue: "Keep going with this file",
-  resultContinueMore: "More tools",
+  resultContinueMore: (n: number) => `+${n} more`,
   reading: (name: string) => `Reading ${name}…`,
   readingCount: (n: number) => `Reading ${plural(n, "file")}`,
   fileReady: (name: string, pages: number) => `${name} ready, ${plural(pages, "page")}`,

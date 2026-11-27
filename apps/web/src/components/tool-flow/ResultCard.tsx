@@ -249,8 +249,8 @@ export function ResultCard({
                 </Button>
               ))}
               {!allTargets && targets.length > CONTINUE_SHOWN && (
-                <Button variant="ghost" aria-expanded={false} onClick={() => setAllTargets(true)} data-testid="continue-more">
-                  {copy.resultContinueMore}
+                <Button variant="soft" aria-expanded={false} onClick={() => setAllTargets(true)} data-testid="continue-more">
+                  {copy.resultContinueMore(targets.length - CONTINUE_SHOWN)}
                 </Button>
               )}
             </div>
