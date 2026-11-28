@@ -45,7 +45,7 @@ import {
 } from "@cantoo/pdf-lib";
 import type { FormState } from "@/lib/forms/types";
 import { covers, faceOf, type EditorFontManifest, type FaceEntry } from "./fonts";
-import { norm360, pageSize, totalRotation, type EditorObject, type InkObj, type MarkupObj, type PageEntry, type Pt } from "./model";
+import { LINE_HEIGHT, norm360, pageSize, totalRotation, type EditorObject, type InkObj, type MarkupObj, type PageEntry, type Pt } from "./model";
 import { alignOffset, baselineOffset } from "./text-layout";
 import { color255, needsShaping, type ShapedLine } from "./shaping";
 import { arrowHead, boxPoint, fitTypedSize, hexToRgb, quadPoints, svgPolyline, toPdf, typedSignatureSize } from "./draw-math";
@@ -317,14 +317,18 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
           const line = o.lines[li];
           if (!line) continue;
           const defer = !!shaped && needsShaping(line);
-          const lw = defer ? await shaped.measure(line, o) : await text!.width(face, line, o.size);
+          const asked = defer ? await shaped.measure(line, o) : await text!.width(face, line, o.size);
+          // A stamp's line is drawn smaller when it would run past its box; it stays centred on its own height.
+          const k = o.fit && asked > o.w && asked > 0 ? o.w / asked : 1;
+          const size = o.size * k;
+          const lw = asked * k;
           const lx = alignOffset(o.align, o.w, lw);
-          const base = baselineOffset(face, o.size, li);
+          const base = baselineOffset(face, size, li) + ((o.size - size) * LINE_HEIGHT) / 2;
           if (defer) {
             // Right alignment is x = right − width, so the line ends at the box's right edge.
             const [x, y] = toPdf(entry, boxPoint(o, o.rot, lx, base));
-            shaped.lines.push({ page: i, text: line, font: o.font, families: [shaped.family(o.font), "Noto Sans"], bold: o.bold, italic: o.italic, size: o.size, x, y, angle: -o.rot, color: color255(faded(hexToRgb(o.color), o.opacity)) });
-          } else await text!.draw(page, entry, face, line, boxPoint(o, o.rot, lx, base), o.size, o.color, o.rot, o.opacity);
+            shaped.lines.push({ page: i, text: line, font: o.font, families: [shaped.family(o.font), "Noto Sans"], bold: o.bold, italic: o.italic, size, x, y, angle: -o.rot, color: color255(faded(hexToRgb(o.color), o.opacity)) });
+          } else await text!.draw(page, entry, face, line, boxPoint(o, o.rot, lx, base), size, o.color, o.rot, o.opacity);
           if (o.underline) {
             const t = Math.max(0.5, o.size * 0.06);
             const a = toPdf(entry, boxPoint(o, o.rot, lx, base + o.size * 0.12));
@@ -380,6 +384,7 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
     await applyForms(doc, out, input.pages, input.forms.state, input.forms.original, { fonts: fonts.fallback, fontkit });
   }
 
+  shareGraphicsStates(doc);
   doc.setProducer(PRODUCER);
   doc.setModificationDate(new Date());
   // Field appearances are written by applyForms only: fields the user didn't touch stay as they
@@ -436,6 +441,25 @@ function rectOf(points: Pt[], pad: number): [number, number, number, number] {
   const xs = points.map((p) => p[0]);
   const ys = points.map((p) => p[1]);
   return [Math.min(...xs) - pad, Math.min(...ys) - pad, Math.max(...xs) + pad, Math.max(...ys) + pad];
+}
+
+/**
+ * Each see-through draw adds its own graphics state to the page, all alike (a tiled watermark adds
+ * one per copy). Equal ones become one shared object.
+ */
+function shareGraphicsStates(doc: PDFDocument) {
+  const shared = new Map<string, PDFRef>();
+  for (const page of doc.getPages()) {
+    const states = page.node.Resources()?.lookupMaybe(PDFName.of("ExtGState"), PDFDict);
+    if (!states) continue;
+    for (const [name, value] of states.entries()) {
+      if (!(value instanceof PDFDict)) continue;
+      const key = value.toString();
+      let ref = shared.get(key);
+      if (!ref) shared.set(key, (ref = doc.context.register(value)));
+      states.set(name, ref);
+    }
+  }
 }
 
 function appearance(doc: PDFDocument, rect: [number, number, number, number], ops: PDFOperator[], gs?: { opacity: number; multiply: boolean }) {

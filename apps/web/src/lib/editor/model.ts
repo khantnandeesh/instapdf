@@ -51,6 +51,8 @@ export type TextObj = {
   align: "left" | "center" | "right";
   /** 0–1; absent = solid. Set by the stamping tools (a watermark), not by the editor. */
   opacity?: number;
+  /** One line that must stay inside `w`: the build draws it smaller when it measures wider. Set by the stamping tools. */
+  fit?: boolean;
 };
 
 export type ImageObj = { kind: "image"; id: string; page: string; x: number; y: number; w: number; h: number; rot: number; asset: string; opacity: number };

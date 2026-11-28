@@ -25,7 +25,7 @@ All three run in the browser; nothing is uploaded. They are settings tools (F25 
 
 ## Acceptance checks
 
-Engine (`stamp.test.ts`): AC-1100 tokens; AC-1101 roman numerals; AC-1102 numbering counts stamped pages from the first number; AC-1103 watermark text never outgrows its room; AC-1110 a line sits in the margin, aligned by its place; AC-1111 on a turned page the line reads upright along the edge the reader sees; AC-1112 an empty line draws nothing; AC-1113 watermark centred, turned, see-through, or tiled; AC-1114 a picture keeps its shape and stays on the page; AC-1120 numbers land in the footer of picked pages; AC-1121 opacity is written, the page's own text stays; AC-1122 nothing to stamp gives the file back unchanged; AC-1123 a password-opened file is saved without it.
+Engine (`stamp.test.ts`): AC-1100 tokens; AC-1101 roman numerals; AC-1102 numbering counts stamped pages from the first number; AC-1103 watermark text never outgrows its room; AC-1110 a line sits in the margin, aligned by its place; AC-1111 on a turned page the line reads upright along the edge the reader sees; AC-1112 an empty line draws nothing; AC-1113 watermark centred, turned, see-through, or tiled; AC-1114 a picture keeps its shape and stays on the page; AC-1120 numbers land in the footer of picked pages; AC-1121 opacity is written, the page's own text stays; AC-1122 nothing to stamp gives the file back unchanged; AC-1123 a password-opened file is saved without it. Review cases: AC-1115 quarter turn the other way with a visible box off the origin; AC-1116 lines on one edge share its width (alone: all of it; left and right: half each; with a centre line: a third each) and never overlap; AC-1124 a line wider than its box is drawn smaller, measured with its real font, so wide letters stay on the page (the preview does the same); AC-1125 a tiled see-through watermark adds one shared graphics state; a password-opened file leaves no `/Encrypt` pointer behind (fixed for every tool that opens locked files).
 
 Browser (`e2e/f9/stamp.spec.ts`, desktop and phone): AC-1130/1131 numbers on every page, previewed first; AC-1132 format, first number, picked pages; AC-1133 a bad first number keeps the button waiting; AC-1134 position moves the number; AC-1140/1141 header and footer lines with tokens, button waits for text; AC-1142 Hindi and Arabic lines read back as typed; AC-1150/1151 watermark text, picked pages, opacity; AC-1152 repeated across the page; AC-1153 picture watermark; AC-1154 several files come back as a ZIP.
 
@@ -33,6 +33,8 @@ Layout: the options panel fits the first screen at 1280×632 and up (`e2e/ui/vie
 
 ## Known limits
 
+- A file opened with a password is read twice (once to open it, once by the build); very large locked files use more memory than plain ones.
+- Characters no font here can write (emoji) print as "?"; tabs, line breaks and zero-width spaces are cleaned first.
 - Watermarks are drawn over the page content, not under it.
 - Custom colours, custom angles and dragging the watermark by hand are not in this version; the editor does free placement.
 - A see-through watermark in a shaped script is drawn in a lighter solid colour.

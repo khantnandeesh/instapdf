@@ -1,6 +1,6 @@
 /** F9 stamping tools: spec docs/specs/f9-stamps.md, AC-1130 onwards. */
 import { expect, test, type Page } from "@playwright/test";
-import { PDFDocument, PDFName } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFName } from "pdf-lib";
 import { expectNoSeriousAxeViolations } from "../support/axe";
 import { downloadResult, flow, fx, pick, primary, run, textsOf, tiles, unzip } from "../support/flow";
 
@@ -119,7 +119,8 @@ test.describe("Watermark", () => {
     expect(texts[1]).not.toContain("SAMPLE");
     // See-through: the page has a graphics state with the chosen strength.
     const doc = await PDFDocument.load(out.bytes);
-    expect(String(doc.getPage(0).node.Resources()!.lookup(PDFName.of("ExtGState")))).toContain("/ca 0.3");
+    const states = doc.getPage(0).node.Resources()!.lookup(PDFName.of("ExtGState"), PDFDict);
+    expect(states.values().map((v) => String(doc.context.lookup(v))).join(" ")).toContain("/ca 0.3");
   });
 
   test("AC-1152: repeated across the page", async ({ page }) => {

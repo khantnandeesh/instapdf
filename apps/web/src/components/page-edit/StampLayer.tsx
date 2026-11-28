@@ -1,8 +1,28 @@
+"use client";
+
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import "./stamp-layer.css";
 import type { EditorObject } from "@/lib/editor/model";
 
 const pct = (n: number) => `${Math.round(n * 1e4) / 100}%`;
 const JUSTIFY = { left: "flex-start", center: "center", right: "flex-end" } as const;
+
+/** A line drawn smaller when it is wider than its box, as the file's build does (TextObj.fit). */
+function FitLine({ align, children }: { align: keyof typeof JUSTIFY; children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const room = el?.parentElement?.clientWidth;
+    if (!el || !room) return;
+    const k = el.offsetWidth > room ? room / el.offsetWidth : 1;
+    el.style.transform = k < 1 ? `scale(${Math.round(k * 1e3) / 1e3})` : "";
+  });
+  return (
+    <span ref={ref} style={{ flex: "none", transformOrigin: align }}>
+      {children}
+    </span>
+  );
+}
 
 /**
  * Draws stamp objects (lib/pdf/stamp, laid out for the page as shown) over a page tile: the same
@@ -31,7 +51,7 @@ export function StampLayer({ page, objects, images }: { page: { w: number; h: nu
             data-testid="stamp-text"
             style={{ ...box, justifyContent: JUSTIFY[o.align], color: o.color, fontWeight: o.bold ? 700 : 400, fontSize: `${Math.round((o.size / page.h) * 1e4) / 100}cqh` }}
           >
-            {o.lines[0]}
+            {o.fit ? <FitLine align={o.align}>{o.lines[0]}</FitLine> : o.lines[0]}
           </span>
         );
       })}

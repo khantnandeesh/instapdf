@@ -51,14 +51,17 @@ export function roman(n: number): string {
 
 export type TokenValues = { /** This page's number. */ n: number; /** The last number. */ total: number; /** The file's name without ".pdf". */ file: string; /** Today, as the reader writes dates. */ date: string };
 
+/** What cannot be printed on a line: tabs and line breaks become spaces, other control characters and zero-width spaces go. */
+const printable = (text: string) => text.replace(/[\t\n\r]+/g, " ").replace(/[\u0000-\u001f\u007f-\u009f\u200b\ufeff]/g, "");
+
 /** Replaces {n}, {total}, {roman}, {ROMAN}, {file} and {date}; anything else in braces stays as typed. */
 export function fillTokens(text: string, v: TokenValues): string {
-  return text.replace(/\{(n|total|roman|ROMAN|file|date)\}/g, (_, key: string) => {
+  return printable(text).replace(/\{(n|total|roman|ROMAN|file|date)\}/g, (_, key: string) => {
     if (key === "n") return String(v.n);
     if (key === "total") return String(v.total);
     if (key === "ROMAN") return roman(v.n);
     if (key === "roman") return roman(v.n).toLowerCase();
-    return key === "file" ? v.file : v.date;
+    return printable(key === "file" ? v.file : v.date);
   });
 }
 
@@ -114,11 +117,13 @@ function textObject(page: PageShape, id: string, text: string, style: TextStyle,
     underline: false,
     color: style.color,
     align,
+    // The build measures the line with its real font and draws it smaller when it is wider than the box.
+    fit: true,
     ...(opacity !== undefined && opacity < 1 ? { opacity } : {}),
   };
 }
 
-/** A rough width for text we cannot measure here: wide enough for capitals in the three faces. */
+/** A rough width for text we cannot measure here (the build has the last word: it fits the line to its box). */
 export const roughWidth = (text: string, size: number) => [...text].length * size * 0.62;
 
 /** The watermark's text size: as asked, but never so large that the text runs off the page. */
@@ -151,6 +156,9 @@ function turnedExtent(w: number, h: number, angle: number): { w: number; h: numb
 export function stampObjects(page: PageShape, stamps: readonly Stamp[], values: TokenValues): EditorObject[] {
   const shown = shownSizeOf(page);
   const out: EditorObject[] = [];
+  // Lines that share an edge share its width: each keeps to its own part, so they never print over each other.
+  const sides = (edge: string) => new Set(stamps.flatMap((s) => (s.kind === "line" && s.place.startsWith(edge) && fillTokens(s.text, values).trim() ? [s.place.split("-")[1]] : [])));
+  const used = { top: sides("top"), bottom: sides("bottom") };
   stamps.forEach((stamp, k) => {
     const id = `stamp-${page.id}-${k}`;
     if (stamp.kind === "line") {
@@ -160,7 +168,12 @@ export function stampObjects(page: PageShape, stamps: readonly Stamp[], values: 
       const margin = clamp(stamp.margin, 0, Math.min(shown.w, shown.h) / 3);
       const h = size * LINE_HEIGHT;
       const [edge, side] = stamp.place.split("-") as ["top" | "bottom", TextObj["align"]];
-      const box = { cx: shown.w / 2, cy: edge === "top" ? margin + h / 2 : shown.h - margin - h / 2, w: Math.max(1, shown.w - 2 * margin), h, rot: 0 };
+      const full = Math.max(1, shown.w - 2 * margin);
+      // Alone on its edge: the whole width. Left and right: half each. With a centre line: a third each.
+      const parts = used[edge].size < 2 ? 1 : used[edge].has("center") ? 3 : 2;
+      const w = parts === 1 ? full : Math.max(1, full / parts - size / 2);
+      const cx = parts === 1 || side === "center" ? shown.w / 2 : side === "left" ? margin + w / 2 : shown.w - margin - w / 2;
+      const box = { cx, cy: edge === "top" ? margin + h / 2 : shown.h - margin - h / 2, w, h, rot: 0 };
       out.push(textObject(page, id, text, { ...stamp.style, size }, box, side));
       return;
     }
@@ -174,9 +187,10 @@ export function stampObjects(page: PageShape, stamps: readonly Stamp[], values: 
       const span = Math.min(shown.w / Math.max(Math.abs(Math.cos(a)), 0.01), shown.h / Math.max(Math.abs(Math.sin(a)), 0.01));
       const room = stamp.layout === "tile" ? Math.min(shown.w, shown.h) * 0.4 : span * 0.9;
       const size = fittedSize(text, stamp.style.size, room);
-      const w = roughWidth(text, size);
       const h = size * LINE_HEIGHT;
-      const extent = turnedExtent(w, h, stamp.angle);
+      // Laid out by the rough width; the box is the room, and the build keeps the real line inside it.
+      const extent = turnedExtent(Math.min(room, roughWidth(text, size)), h, stamp.angle);
+      const w = room;
       centres(stamp.layout, shown, extent.w, extent.h).forEach(([cx, cy], i) =>
         out.push(textObject(page, `${id}-${i}`, text, { ...stamp.style, size }, { cx, cy, w, h, rot }, "center", opacity)),
       );

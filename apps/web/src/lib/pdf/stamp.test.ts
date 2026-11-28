@@ -1,5 +1,5 @@
 import fontkit from "@cantoo/fontkit";
-import { PDFDocument, PDFName, StandardFonts, degrees } from "@cantoo/pdf-lib";
+import { PDFDict, PDFDocument, PDFName, StandardFonts, degrees } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
 import { buildPdf } from "@/lib/editor/build";
 import { nodeFonts } from "@/lib/editor/node-fonts";
@@ -16,6 +16,8 @@ describe("stamp text (F9 AC-1100 to AC-1103)", () => {
     expect(fillTokens("Page {n} of {total}", values)).toBe("Page 4 of 9");
     expect(fillTokens("{file} · {date} · {ROMAN} · {roman}", values)).toBe("report · 28 Nov 2026 · IV · iv");
     expect(fillTokens("{name} {N}", values)).toBe("{name} {N}");
+    // What cannot be printed goes: a tab is a space, a zero-width space is nothing.
+    expect(fillTokens("a\tb {file}", { ...values, file: "re\u200bport\n2" })).toBe("a b report 2");
   });
   it("AC-1101: roman numerals, and digits where there are none", () => {
     expect([1, 4, 9, 14, 40, 90, 400, 1994, 3999].map(roman)).toEqual(["I", "IV", "IX", "XIV", "XL", "XC", "CD", "MCMXCIV", "MMMCMXCIX"]);
@@ -52,6 +54,22 @@ describe("stamp layout (F9 AC-1110 to AC-1114)", () => {
     const [half] = stampObjects({ ...upright, baseRotate: 180 }, [line("top-left")], values) as TextObj[];
     expect(half.rot).toBe(180);
     expect(half.y + half.h / 2).toBe(800 - 37.5);
+  });
+  it("AC-1115: a quarter turn the other way, on a page whose visible box starts off the origin", () => {
+    // /Rotate 270: the reader sees 800 × 600; shown (x, y) is frame (600 − y, x). The frame has no origin offset: the build adds the box's.
+    const [o] = stampObjects({ id: "p0", view: [50, 100, 650, 900], baseRotate: 270 }, [line("top-left")], values) as TextObj[];
+    expect(o.rot).toBe(90);
+    expect([o.x + o.w / 2, o.y + o.h / 2]).toEqual([600 - 37.5, 400]);
+  });
+  it("AC-1116: lines on the same edge share its width and never overlap", () => {
+    const [l, c, r] = stampObjects(upright, [line("top-left"), line("top-center"), line("top-right"), line("bottom-left")], values) as TextObj[];
+    expect(l.x + l.w).toBeLessThan(c.x);
+    expect(c.x + c.w).toBeLessThan(r.x);
+    expect(c.x + c.w / 2).toBe(300);
+    expect(r.x + r.w).toBe(570);
+    const [a, b] = stampObjects(upright, [line("bottom-left"), line("bottom-right")], values) as TextObj[];
+    expect(a.w).toBeGreaterThan(250);
+    expect(a.x + a.w).toBeLessThan(b.x);
   });
   it("lines are as tall as the editor's", () => {
     expect(STAMP_LINE_HEIGHT).toBe(LINE_HEIGHT);
@@ -96,10 +114,10 @@ describe("stamped files (F9 AC-1120 to AC-1123)", () => {
     const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
     const task = getDocument({ data: bytes.slice(), verbosity: 0 });
     const doc = await task.promise;
-    const out: { str: string; x: number; y: number }[][] = [];
+    const out: { str: string; x: number; y: number; w: number }[][] = [];
     for (let i = 1; i <= doc.numPages; i++) {
       const content = await (await doc.getPage(i)).getTextContent();
-      out.push((content.items as { str: string; transform: number[] }[]).filter((it) => it.str?.trim()).map((it) => ({ str: it.str, x: it.transform[4], y: it.transform[5] })));
+      out.push((content.items as { str: string; width: number; transform: number[] }[]).filter((it) => it.str?.trim()).map((it) => ({ str: it.str, x: it.transform[4], y: it.transform[5], w: it.width })));
     }
     await task.destroy();
     return out;
@@ -127,15 +145,39 @@ describe("stamped files (F9 AC-1120 to AC-1123)", () => {
     const mark: TextMark = { kind: "text", text: "DRAFT", style: { ...style, size: 60, color: "#cc0000" }, opacity: 0.25, angle: 45, layout: "center" };
     const r = await stampPdf({ bytes: await source(), pages: [0], stamps: [mark], first: 1, file: "f", date: "" }, await build());
     const doc = await PDFDocument.load(r.bytes);
-    const states = doc.getPage(0).node.Resources()!.lookup(PDFName.of("ExtGState"));
-    expect(String(states)).toContain("/ca 0.25");
+    expect(String(doc.context.lookup(doc.getPage(0).node.Resources()!.lookup(PDFName.of("ExtGState"), PDFDict).values()[0]))).toContain("/ca 0.25");
     expect((await items(r.bytes))[0].map((t) => t.str).sort()).toEqual(["Body 1", "DRAFT"]);
+  });
+  it("AC-1124: wide letters are drawn smaller, so the line stays on the page", async () => {
+    const wide = "W".repeat(24);
+    const mark: TextMark = { kind: "text", text: wide, style: { ...style, size: 72, bold: true }, opacity: 1, angle: 0, layout: "center" };
+    const header: LineStamp = { kind: "line", place: "top-left", text: "M".repeat(80), style: { ...style, size: 14 }, margin: 30 };
+    const r = await stampPdf({ bytes: await source(), pages: [0], stamps: [mark, header], first: 1, file: "f", date: "" }, await build());
+    const drawn = (await items(r.bytes))[0].filter((t) => /^[WM]+$/.test(t.str));
+    expect(drawn.map((t) => t.str.length).sort()).toEqual([24, 80]);
+    for (const t of drawn) {
+      expect(t.x).toBeGreaterThanOrEqual(29);
+      expect(t.x + t.w).toBeLessThanOrEqual(571);
+    }
+  });
+  it("AC-1125: a tiled see-through watermark adds one graphics state, not one per copy", async () => {
+    const mark: TextMark = { kind: "text", text: "DRAFT", style: { ...style, size: 30 }, opacity: 0.25, angle: 45, layout: "tile" };
+    const r = await stampPdf({ bytes: await source(), pages: [0, 1], stamps: [mark], first: 1, file: "f", date: "" }, await build());
+    const doc = await PDFDocument.load(r.bytes);
+    const refs = new Set<string>();
+    for (const i of [0, 1]) {
+      const states = doc.getPage(i).node.Resources()!.lookup(PDFName.of("ExtGState"), PDFDict);
+      for (const [, v] of states.entries()) if (String(doc.context.lookup(v)).includes("/ca 0.25")) refs.add(String(v));
+    }
+    expect(refs.size).toBe(1);
   });
   it("AC-1122: no pages picked, or only empty text, gives the file back unchanged", async () => {
     const bytes = await source();
     const r = await stampPdf({ bytes, pages: [], stamps: [footer], first: 1, file: "f", date: "" }, async () => { throw new Error("not built"); });
     expect(r.bytes).toBe(bytes);
     expect(r.pageCount).toBe(3);
+    const blank = await stampPdf({ bytes, pages: [0, 1], stamps: [{ ...footer, text: "  " }], first: 1, file: "f", date: "" }, async () => { throw new Error("not built"); });
+    expect(blank.bytes).toBe(bytes);
   });
   it("AC-1123: a file opened with a password is stamped and saved without it", async () => {
     const plain = await PDFDocument.load(await source());
@@ -145,6 +187,7 @@ describe("stamped files (F9 AC-1120 to AC-1123)", () => {
     expect(r.wasEncrypted).toBe(true);
     const out = await PDFDocument.load(r.bytes);
     expect(out.isEncrypted).toBe(false);
+    expect(new TextDecoder("latin1").decode(r.bytes)).not.toContain("/Encrypt");
     expect((await items(r.bytes))[0].map((t) => t.str)).toContain("Page 7 of 7");
   });
 });
