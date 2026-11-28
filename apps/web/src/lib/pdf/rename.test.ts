@@ -27,4 +27,10 @@ describe("Rename by content (spec F10 §5)", () => {
     expect(cut.endsWith("word")).toBe(true);
     expect(nameText("Two\n lines")).toBe("Two lines");
   });
+  it("AC-1265: unseen and direction-turning characters are dropped, and a cut never splits a character", () => {
+    expect(nameText("In\u200bvoice\u202e 7\u00ad")).toBe("Invoice 7");
+    const cut = nameText("😀".repeat(150));
+    expect(Array.from(cut).length).toBe(MAX_TEXT);
+    expect(cut).toBe("😀".repeat(MAX_TEXT));
+  });
 });

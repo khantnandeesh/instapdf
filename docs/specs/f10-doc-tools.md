@@ -50,9 +50,9 @@ Where we differ from the reference: it uploads the files and takes 5 per task on
 
 Engine (`f10.test.ts`): AC-1200 kinds group subtypes, fields are never a kind; AC-1201 counts by kind; AC-1202 chosen kinds on chosen pages only; AC-1203 a note takes its pop-up and replies; AC-1204 an emptied list leaves no `/Annots`; AC-1205 nothing to remove returns the file unchanged; AC-1206 an appearance is fitted to its rectangle through its matrix; AC-1210 annotations with a drawn form become content, links stay, the rest stays with a note; AC-1211 fields are drawn and the form goes; AC-1212 fields only leaves annotations; AC-1220 fields are read, standard first, no dates; AC-1221 update writes listed fields, drops the rest, keeps the creation date; AC-1222 remove all leaves nothing, not even in unreachable objects; AC-1223 a bare file gets its details; AC-1224 names are checked; AC-1225 fields the form never showed, odd names and long values survive an update; AC-1226 remove all clears page-level details, private notes and the identifier, and calls out PDF/A. Review cases: AC-1207 shared annotations; AC-1208 pop-ups never by kind; AC-1213 attachments and redaction marks are not flattened; AC-1214, AC-1215 what goes undrawn is said, print-only stamps are drawn; AC-1216 signed files.
 
-Rename (`rename.test.ts`): AC-1260 text becomes a safe name; AC-1261 pattern tokens; AC-1262 no text keeps the old name; AC-1263 equal texts get different names; AC-1264 long text is cut at a word.
+Rename (`rename.test.ts`): AC-1260 text becomes a safe name; AC-1261 pattern tokens; AC-1262 no text keeps the old name; AC-1263 equal texts get different names; AC-1264 long text is cut at a word; AC-1265 unseen characters are dropped.
 
-Browser (`e2e/f10/doc-tools.spec.ts`): AC-1230 to AC-1232 Remove annotations; AC-1240, AC-1241 Flatten; AC-1242 Flatten to pictures; AC-1250 to AC-1253 Metadata; AC-1270, AC-1271 Rename.
+Browser (`e2e/f10/doc-tools.spec.ts`): AC-1230 to AC-1232 Remove annotations; AC-1240, AC-1241 Flatten; AC-1242, AC-1243 Flatten to pictures; AC-1250 to AC-1253 Metadata; AC-1270, AC-1271 Rename.
 
 ## Known limits
 

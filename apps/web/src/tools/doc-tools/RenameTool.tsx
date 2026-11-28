@@ -27,9 +27,12 @@ type Remembered = { pattern: string };
 const defaults: Remembered = { pattern: RENAME_PATTERN };
 const check = (s: Record<string, unknown>): Partial<Remembered> => (typeof s.pattern === "string" && s.pattern.length <= 200 ? { pattern: s.pattern } : {});
 
-/** Every ready file's first-page text, read once per file. Renders nothing. */
-function ReadTexts({ files, onFirst, onRead }: { files: ReadyFile[]; onFirst: (first: ReadyFile | undefined) => void; onRead: (id: string, points: TextPoint[], tx: TextModule) => void }) {
-  const asked = useRef(new Set<string>());
+/**
+ * Every ready file's first-page text, read once per file (`asked` lives in the tool, so coming back
+ * from the result reads nothing again). A file that could not be read is forgotten, so the run
+ * tries it once more. Renders nothing.
+ */
+function ReadTexts({ files, asked, onFirst, onRead }: { files: ReadyFile[]; asked: Set<string>; onFirst: (first: ReadyFile | undefined) => void; onRead: (id: string, points: TextPoint[], tx: TextModule) => void }) {
   const report = useRef(onRead);
   report.current = onRead;
   const first = files[0];
@@ -38,14 +41,18 @@ function ReadTexts({ files, onFirst, onRead }: { files: ReadyFile[]; onFirst: (f
   useEffect(() => tellFirst.current(first), [first]);
   useEffect(() => {
     for (const f of files) {
-      if (asked.current.has(f.id)) continue;
-      asked.current.add(f.id);
-      void loadText().then(async (tx) => {
-        const pages = await tx.readPagePoints(f.source, f.password, 1).catch(() => []);
-        report.current(f.id, pages[0] ?? [], tx);
-      });
+      if (asked.has(f.id)) continue;
+      asked.add(f.id);
+      void loadText()
+        .then(async (tx) => {
+          const pages = await tx.readPagePoints(f.source, f.password, 1);
+          // No pages at all means the file could not be opened here, not that it has no text.
+          if (pages.length) report.current(f.id, pages[0], tx);
+          else asked.delete(f.id);
+        })
+        .catch(() => asked.delete(f.id));
     }
-  }, [files]);
+  }, [files, asked]);
   return null;
 }
 
@@ -62,6 +69,7 @@ export function RenameTool() {
   const [open, setOpen] = useState(false);
   const [areaDialog, setAreaDialog] = useState<DialogModule | null>(null);
   const apiRef = useRef<FlowApi | null>(null);
+  const asked = useRef(new Set<string>()).current;
 
   const process: ProcessFn = async (files, signal, onProgress) => {
     const text = await loadText();
@@ -120,6 +128,7 @@ export function RenameTool() {
         onReset={() => {
           setArea(null);
           setPoints({});
+          asked.clear();
           setFirst(undefined);
           setOpen(false);
         }}
@@ -128,7 +137,16 @@ export function RenameTool() {
           <div className="flex min-w-0 items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-bar:flex-1">
             <ReadTexts
               files={ctx.readyFiles}
-              onFirst={setFirst}
+              asked={asked}
+              onFirst={(f) => {
+                setFirst(f);
+                // Every file taken away: the box was drawn for a file that is gone.
+                if (!f) {
+                  setArea(null);
+                  setPoints({});
+                  asked.clear();
+                }
+              }}
               onRead={(id, pts, mod) => {
                 setTx(mod);
                 setPoints((all) => ({ ...all, [id]: pts }));
@@ -163,7 +181,8 @@ export function RenameTool() {
           help={c.dialogHelp}
           areaLabel={c.areaLabel}
           status={() => {
-            const text = first && tx ? tx.textIn(points[first.id] ?? [], area) : "";
+            if (!first || !tx || !points[first.id]) return c.reading;
+            const text = tx.textIn(points[first.id], area);
             return text ? (<>{c.found} <strong className="font-semibold text-ink-black">{text}</strong></>) : c.nothing;
           }}
         />

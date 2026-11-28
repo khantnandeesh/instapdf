@@ -109,6 +109,16 @@ test.describe("Flatten to pictures", () => {
       expect(res?.lookup(PDFName.of("XObject"), PDFDict).keys().length).toBe(1);
     }
   });
+  test("AC-1243: several files as pictures come back in a ZIP, each with its own pages", async ({ page }) => {
+    await open(page, "flatten-pdf", "annotated.pdf", "three-pages.pdf");
+    await page.locator(`#flatten-what-${wide(page) ? "side" : "bar"}`).selectOption("pictures");
+    await page.locator(`#flatten-dpi-${wide(page) ? "side" : "bar"}`).selectOption("75");
+    await run(page);
+    const out = await downloadResult(page);
+    const files = unzip(out.bytes);
+    expect(Object.keys(files)).toEqual(["annotated.pdf", "three-pages.pdf"]);
+    expect((await PDFDocument.load(files["three-pages.pdf"], { updateMetadata: false })).getPageCount()).toBe(3);
+  });
 });
 
 test.describe("Rename by content", () => {

@@ -3,9 +3,11 @@
  * the picture becomes the whole page of a new PDF. Nothing on it can be selected, copied or edited
  * afterwards: text, fields, annotations and hidden layers are gone, only what the page showed stays.
  * The pages are drawn in this tab (a canvas is needed), one at a time; the processing worker puts
- * the pictures into the new files.
+ * each file's pictures into its new PDF before the next file is drawn, so only one file's pictures
+ * are held at a time.
  */
 import type { ToolOutput } from "@/components/tool-flow/types";
+import { pdfOutputName, uniqueNames } from "./naming";
 import { canvasBlob, drawPage } from "./page-images";
 import type { PictureDpi } from "./picture-dpi";
 import { openPdf } from "./pdfjs";
@@ -21,17 +23,23 @@ const aborted = () => new DOMException("Cancelled", "AbortError");
 
 export async function flattenToPictures(sources: readonly PictureSource[], dpi: PictureDpi, zipName: string, signal: AbortSignal, onProgress: (fraction: number) => void): Promise<ToolOutput> {
   const total = sources.reduce((n, s) => n + s.pageCount, 0) || 1;
+  const names = uniqueNames(sources.map((s) => pdfOutputName(s.name)));
   let done = 0;
   let reduced = 0;
-  const files: { name: string; title?: string; encrypted: boolean; pages: { jpg: Blob; width: number; height: number }[] }[] = [];
-  for (const src of sources) {
+  let wasEncrypted = false;
+  const built: { name: string; blob: Blob; pageCount: number }[] = [];
+  for (let i = 0; i < sources.length; i++) {
+    const src = sources[i];
     const opened = await openPdf(new Uint8Array(await src.source.arrayBuffer()), src.password);
     if (!opened.ok) throw new Error(`${USER_ERROR}${src.name} could not be read.`);
     const { doc, task } = opened.pdf;
+    const before = done;
+    let pages: { jpg: Blob; width: number; height: number }[] = [];
+    let title: string | undefined;
     try {
       // The title survives, so the file still says what it is; nothing else is carried over.
       const info = (await doc.getMetadata().catch(() => null))?.info as { Title?: unknown } | undefined;
-      const pages: { jpg: Blob; width: number; height: number }[] = [];
+      if (typeof info?.Title === "string" && info.Title.trim()) title = info.Title;
       for (let n = 1; n <= doc.numPages; n++) {
         if (signal.aborted) throw aborted();
         const page = await doc.getPage(n);
@@ -47,16 +55,32 @@ export async function flattenToPictures(sources: readonly PictureSource[], dpi: 
           if (canvas) canvas.width = canvas.height = 0;
           page.cleanup();
         }
-        onProgress((++done / total) * DRAWN);
+        onProgress(((before + (n / doc.numPages) * src.pageCount * DRAWN) / total) * 0.99);
         // Let the pill paint and Cancel land between pages.
         await new Promise((r) => setTimeout(r, 0));
       }
-      files.push({ name: src.name, title: typeof info?.Title === "string" && info.Title.trim() ? info.Title : undefined, encrypted: opened.pdf.wasEncrypted, pages });
     } finally {
       void task.destroy();
     }
+    // One file at a time: its pictures are built into its PDF and let go before the next file is drawn.
+    const out = await runInWorker(
+      { kind: "pictures", zipName: "", files: [{ name: src.name, title, encrypted: opened.pdf.wasEncrypted, pages }] },
+      { signal, onProgress: (f) => onProgress(((before + src.pageCount * (DRAWN + f * (1 - DRAWN))) / total) * 0.99) },
+    );
+    pages = [];
+    wasEncrypted ||= out.wasEncrypted;
+    built.push({ name: names[i], blob: out.blob, pageCount: out.pageCount ?? src.pageCount });
+    done = before + src.pageCount;
   }
-  const out = await runInWorker({ kind: "pictures", zipName, files }, { signal, onProgress: (f) => onProgress(DRAWN + f * (1 - DRAWN)) });
-  const notes = [...(out.warnings ?? []), ...(reduced ? [reduced === 1 ? "1 large page was drawn at a lower resolution." : `${reduced} large pages were drawn at a lower resolution.`] : [])];
-  return { name: out.name, type: out.type, blob: out.blob, size: out.blob.size, pageCount: out.pageCount, entries: out.entries, wasEncrypted: out.wasEncrypted, warnings: notes.length ? notes : undefined };
+  const warnings = reduced ? [reduced === 1 ? "1 large page was drawn at a lower resolution." : `${reduced} large pages were drawn at a lower resolution.`] : undefined;
+  if (built.length === 1) return { name: built[0].name, type: "application/pdf", blob: built[0].blob, size: built[0].blob.size, pageCount: built[0].pageCount, wasEncrypted, warnings };
+  const { createZipWriter } = await import("./zip");
+  const zip = createZipWriter();
+  for (const b of built) {
+    if (signal.aborted) throw aborted();
+    zip.add(b.name, new Uint8Array(await b.blob.arrayBuffer()));
+  }
+  const blob = zip.finish();
+  onProgress(1);
+  return { name: zipName, type: "application/zip", blob, size: blob.size, entries: built.map((b) => ({ name: b.name, pageCount: b.pageCount })), wasEncrypted, warnings };
 }
