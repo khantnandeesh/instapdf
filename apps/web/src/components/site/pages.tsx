@@ -14,8 +14,8 @@ const container = "mx-auto w-full max-w-[1170px] px-[15px]";
  * Usable tools as BerryPDF tool cards (coming-soon and 404 pages), on the grid paper, set off from
  * the empty state above by spacing only. Omitted when none are usable.
  */
-export function AvailableNow({ idPrefix }: { idPrefix: string }) {
-  const ready = buildToolIndex().items.filter(usable);
+export function AvailableNow({ idPrefix, limit }: { idPrefix: string; limit?: number }) {
+  const ready = buildToolIndex().items.filter(usable).slice(0, limit);
   if (!ready.length) return null;
   return (
     <section aria-labelledby={`${idPrefix}-available`} className="pt-(--space-6)" data-testid="available-now">
@@ -93,7 +93,8 @@ export function NotFoundPage() {
           </Link>
         </div>
       </div>
-      <AvailableNow idPrefix="nf" />
+      {/* A first few only: this page is part of every page's payload, and its button leads to them all. */}
+      <AvailableNow idPrefix="nf" limit={8} />
     </main>
   );
 }
