@@ -12,6 +12,12 @@ export type ContentEnv = {
   grayPattern(): string | null;
   /** A form, pattern or glyph: until it sets a colour space of its own, it paints in whatever its caller had set. */
   inherits?: boolean;
+  /**
+   * Dark text is written in pure black instead of its grey: "objects" inside text objects (BT … ET),
+   * "all" for a stream that only sets a text colour (a form field's default appearance). Light text
+   * (on a dark ground) keeps its grey, or it would vanish.
+   */
+  blackText?: "objects" | "all";
 };
 
 export type ContentResult = { bytes: Uint8Array; changed: boolean; /** Inline pictures that keep their colour (a packed form this tool does not unpack). */ inlineKept: number; /** Colours set in a space that could not be read, or handed down from a caller that cannot be known: they stay as written. */ unknownKept: number };
@@ -35,6 +41,9 @@ const latin = (b: Uint8Array, from: number, to: number) => {
   return s;
 };
 
+/** Text at least this dark becomes black; lighter text is light on purpose. */
+const DARK_TEXT = 0.6;
+
 const INLINE_SPACES: Record<string, Space> = { RGB, DeviceRGB: RGB, CMYK, DeviceCMYK: CMYK, G: GRAY, DeviceGray: GRAY, CalGray: GRAY };
 
 export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
@@ -48,7 +57,28 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
   let stroke: Space | null = env.inherits ? null : GRAY;
   /** "Paints nothing": the pair of operators is left exactly as written. */
   const isNone = (s: Space | null) => s?.kind === "tint" && s.none === true;
-  const saved: [Space | null, Space | null][] = [];
+  // Black text: the grey each colour really is (null when it is not a plain grey this code set or read),
+  // and whether black stands in for it until the text object ends.
+  const black = env.blackText;
+  let inText = black === "all";
+  let fillReal: number | null = env.inherits ? null : 0;
+  let strokeReal: number | null = env.inherits ? null : 0;
+  let fillForced = false;
+  let strokeForced = false;
+  const saved: [Space | null, Space | null, number | null, number | null][] = [];
+  /** Writes a grey for fill or stroke in place of [start, end); dark text gets black. */
+  const paint = (isFill: boolean, start: number, end: number, v: number, asWritten = false) => {
+    const forced = !!black && inText && v > 0 && v <= DARK_TEXT;
+    if (isFill) [fillReal, fillForced] = [v, forced];
+    else [strokeReal, strokeForced] = [v, forced];
+    if (forced) put(start, end, isFill ? "0 g" : "0 G");
+    else if (!asWritten) put(start, end, `${level(v)} ${isFill ? "g" : "G"}`);
+  };
+  /** The colour was set in a way that leaves no plain grey to go back to. */
+  const unknown = (isFill: boolean) => {
+    if (isFill) [fillReal, fillForced] = [null, false];
+    else [strokeReal, strokeForced] = [null, false];
+  };
   const n = src.length;
   let i = 0;
 
@@ -69,6 +99,7 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
     const nums = operands.filter((o) => o.num !== undefined).map((o) => o.num!);
     const last = operands[operands.length - 1];
     let space = isFill ? fill : stroke;
+    unknown(isFill);
     if (last?.name !== undefined) {
       // A pattern. A coloured one carries its own colours (converted where it is defined); an
       // uncoloured one is painted in the colour given here.
@@ -81,8 +112,19 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
       space = nums.length === 3 ? RGB : nums.length === 4 ? CMYK : null;
       if (!space) unknownKept++;
     }
-    if (!space || space.kind === "gray") return;
-    put(start, end, `${level(toGray(space, nums))} ${isFill ? "g" : "G"}`);
+    if (!space) return;
+    // Already grey: left as written, unless it is dark text to blacken.
+    if (space.kind === "gray") {
+      if (nums.length === 1) {
+        paint(isFill, start, end, nums[0], true);
+        if (isFill ? fillForced : strokeForced) {
+          if (isFill) fill = GRAY;
+          else stroke = GRAY;
+        }
+      }
+      return;
+    }
+    paint(isFill, start, end, toGray(space, nums));
   };
 
   const operator = (op: string, opStart: number, opEnd: number) => {
@@ -90,28 +132,50 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
     const nums = operands.map((o) => o.num);
     switch (op) {
       case "q":
-        saved.push([fill, stroke]);
+        saved.push([fill, stroke, fillReal, strokeReal]);
         break;
       case "Q": {
         const s = saved.pop();
-        if (s) [fill, stroke] = s;
+        if (s) [fill, stroke, fillReal, strokeReal] = s;
+        break;
+      }
+      case "BT": {
+        if (!black) break;
+        inText = true;
+        // Dark colours set before the text object: black from here to its end.
+        fillForced = fillReal !== null && fillReal > 0 && fillReal <= DARK_TEXT;
+        strokeForced = strokeReal !== null && strokeReal > 0 && strokeReal <= DARK_TEXT;
+        if (fillForced || strokeForced) put(opEnd, opEnd, `${fillForced ? " 0 g" : ""}${strokeForced ? " 0 G" : ""}`);
+        break;
+      }
+      case "ET": {
+        if (!black || black === "all") break;
+        inText = false;
+        // What follows the text is drawn in the colours the file set, not in the text's black.
+        if (fillForced || strokeForced) put(opEnd, opEnd, `${fillForced ? ` ${level(fillReal!)} g` : ""}${strokeForced ? ` ${level(strokeReal!)} G` : ""}`);
+        fillForced = strokeForced = false;
         break;
       }
       case "g":
-        fill = GRAY;
+      case "G": {
+        const v = nums[nums.length - 1];
+        if (op === "g") fill = GRAY;
+        else stroke = GRAY;
+        if (v === undefined) unknown(op === "g");
+        else paint(op === "g", operands[operands.length - 1].start, opEnd, v, true);
         break;
-      case "G":
-        stroke = GRAY;
-        break;
+      }
       case "rg":
       case "RG":
-        if (nums.length >= 3 && nums.slice(-3).every((v) => v !== undefined)) put(operands[operands.length - 3].start, opEnd, `${level(toGray(RGB, nums.slice(-3) as number[]))} ${op === "rg" ? "g" : "G"}`);
+        if (nums.length >= 3 && nums.slice(-3).every((v) => v !== undefined)) paint(op === "rg", operands[operands.length - 3].start, opEnd, toGray(RGB, nums.slice(-3) as number[]));
+        else unknown(op === "rg");
         if (op === "rg") fill = GRAY;
         else stroke = GRAY;
         break;
       case "k":
       case "K":
-        if (nums.length >= 4 && nums.slice(-4).every((v) => v !== undefined)) put(operands[operands.length - 4].start, opEnd, `${level(toGray(CMYK, nums.slice(-4) as number[]))} ${op === "k" ? "g" : "G"}`);
+        if (nums.length >= 4 && nums.slice(-4).every((v) => v !== undefined)) paint(op === "k", operands[operands.length - 4].start, opEnd, toGray(CMYK, nums.slice(-4) as number[]));
+        else unknown(op === "k");
         if (op === "k") fill = GRAY;
         else stroke = GRAY;
         break;
@@ -121,9 +185,15 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
         const space = name === undefined ? null : env.space(name);
         if (op === "cs") fill = space;
         else stroke = space;
+        unknown(op === "cs");
+        // A grey space starts at black.
+        if (space?.kind === "gray") {
+          if (op === "cs") fillReal = 0;
+          else strokeReal = 0;
+        }
         if (name === undefined || !space || space.kind === "gray" || isNone(space)) break;
         // Choosing a space also sets its first colour (full ink for a spot colour): say that colour in grey.
-        if (space.kind !== "pattern") put(start, opEnd, `${level(toGray(space, initial(space)))} ${op === "cs" ? "g" : "G"}`);
+        if (space.kind !== "pattern") paint(op === "cs", start, opEnd, toGray(space, initial(space)));
         else if (space.base && space.base.kind !== "gray") {
           const gray = env.grayPattern();
           if (gray) put(start, opEnd, `/${gray} ${op}`);

@@ -43,6 +43,7 @@ describe("repair (spec F13 §2)", () => {
     const cut = file.subarray(0, latin(file).lastIndexOf("\nxref"));
     const out = await repairPdf({ bytes: cut });
     expect(out.warnings).toBeUndefined();
+    expect(out.notes).toEqual(["The file was damaged. All 5 pages were recovered."]);
     expect((await sound(out.bytes, 5)).getTitle()).toBe("Sample");
   });
 
@@ -139,6 +140,7 @@ describe("repair (spec F13 §2)", () => {
     for (const compact of [false, true]) {
       const out = await repairPdf({ bytes: await sample(3, compact) });
       expect(out.warnings).toBeUndefined();
+      expect(out.notes).toBeUndefined();
       await sound(out.bytes, 3);
     }
   });

@@ -18,6 +18,7 @@ export async function repairFiles(sources: readonly RepairSource[], zipName: str
   const names = uniqueNames(sources.map((s) => pdfOutputName(s.name)));
   const built: BuiltPdf[] = [];
   const notes = new Set<string>();
+  const good = new Set<string>();
   let wasEncrypted = false;
   for (let i = 0; i < sources.length; i++) {
     const src = sources[i];
@@ -27,6 +28,7 @@ export async function repairFiles(sources: readonly RepairSource[], zipName: str
       wasEncrypted ||= out.wasEncrypted;
       // In a batch, a note says which file it is about.
       out.warnings?.forEach((w) => notes.add(sources.length > 1 ? `${src.name}: ${w}` : w));
+      out.notes?.forEach((w) => good.add(sources.length > 1 ? `${src.name}: ${w}` : w));
       built.push({ name: names[i], blob: out.blob, pageCount: out.pageCount ?? 0 });
     } catch (error) {
       if (isAbort(error) || signal.aborted || src.damaged) throw error;
@@ -44,7 +46,7 @@ export async function repairFiles(sources: readonly RepairSource[], zipName: str
     }
   }
   if (!built.length) throw new Error(`${USER_ERROR}Nothing could be repaired.`);
-  const out = await packBuilt(built, zipName, signal, { wasEncrypted, warnings: notes.size ? [...notes] : undefined });
+  const out = await packBuilt(built, zipName, signal, { wasEncrypted, warnings: notes.size ? [...notes] : undefined, notes: good.size ? [...good] : undefined });
   onProgress(1);
   return out;
 }

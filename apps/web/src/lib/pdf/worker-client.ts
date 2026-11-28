@@ -13,6 +13,11 @@ function getWorker(): Worker {
   return worker;
 }
 
+/** Starts the worker ahead of its first job, so the job does not wait for the worker's code to arrive. */
+export function warmWorker(): void {
+  getWorker();
+}
+
 /** Terminates the worker (stopping any running job) and rejects jobs in flight. */
 export function disposeWorker(): void {
   worker?.terminate();

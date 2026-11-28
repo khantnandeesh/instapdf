@@ -16,6 +16,10 @@ import { runInWorker } from "./worker-client";
 export type GraySource = { name: string; source: Blob; password?: string; pageCount: number };
 /** Everything, or only the text and drawings, or only the pictures. */
 export type GrayWhat = "all" | "vector" | "pictures";
+/** `blackText`: dark text in pure black. `smaller`: photos packed harder, for a smaller file. */
+export type GrayExtras = { blackText: boolean; smaller: boolean };
+/** JPEG quality for photos when the file should be small: fine for reading and printing, softer under a magnifier. */
+const SMALL_QUALITY = 60;
 type Wanted = { lossy: boolean; width: number; height: number };
 type Packed = { ref: string; width: number; height: number; jpeg: boolean; data: Blob };
 
@@ -73,7 +77,7 @@ export function shrinkGray(px: Uint8Array, width: number, height: number, toWidt
 type OpList = { fnArray: ArrayLike<number>; argsArray: ArrayLike<unknown[] | null> };
 
 /** Decodes the wanted pictures of one file and has each packed; a picture this device cannot read is left out (the worker says so in its result). */
-async function greyPictures(src: GraySource, want: Map<string, Wanted>, signal: AbortSignal, onProgress: (fraction: number) => void): Promise<Packed[]> {
+async function greyPictures(src: GraySource, want: Map<string, Wanted>, quality: number | undefined, signal: AbortSignal, onProgress: (fraction: number) => void): Promise<Packed[]> {
   const opened = await openPdf(new Uint8Array(await src.source.arrayBuffer()), src.password, { plainImages: true });
   if (!opened.ok) throw new Error(`${USER_ERROR}${src.name} could not be read.`);
   const { OPS } = await loadPdfjs();
@@ -106,7 +110,7 @@ async function greyPictures(src: GraySource, want: Map<string, Wanted>, signal: 
           // Smaller than the file says (a device limit): left as it is rather than saved with less detail.
           if (!grey || img.width < stated.width || img.height < stated.height) continue;
           if (img.width !== stated.width || img.height !== stated.height) grey = shrinkGray(grey, img.width, img.height, stated.width, stated.height);
-          const packed = await runInWorker({ kind: "grayEncode", pixels: new Blob([grey as Uint8Array<ArrayBuffer>]), width: stated.width, height: stated.height, lossy: stated.lossy }, { signal });
+          const packed = await runInWorker({ kind: "grayEncode", pixels: new Blob([grey as Uint8Array<ArrayBuffer>]), width: stated.width, height: stated.height, lossy: stated.lossy, quality }, { signal });
           images.push({ ref, width: stated.width, height: stated.height, jpeg: packed.blob.type === "image/jpeg", data: packed.blob });
         }
       } finally {
@@ -122,7 +126,7 @@ async function greyPictures(src: GraySource, want: Map<string, Wanted>, signal: 
   return images;
 }
 
-export async function toGrayscale(sources: readonly GraySource[], what: GrayWhat, zipName: string, signal: AbortSignal, onProgress: (fraction: number) => void): Promise<ToolOutput> {
+export async function toGrayscale(sources: readonly GraySource[], what: GrayWhat, extras: GrayExtras, zipName: string, signal: AbortSignal, onProgress: (fraction: number) => void): Promise<ToolOutput> {
   const total = sources.reduce((n, s) => n + s.pageCount, 0) || 1;
   const names = uniqueNames(sources.map((s) => pdfOutputName(s.name)));
   const built: BuiltPdf[] = [];
@@ -140,10 +144,10 @@ export async function toGrayscale(sources: readonly GraySource[], what: GrayWhat
       images = [];
       if (found.length) {
         drawn = DRAWN;
-        images = await greyPictures(src, new Map(found.map((f) => [f.ref, f])), signal, (f) => within(0.05 + f * (DRAWN - 0.05)));
+        images = await greyPictures(src, new Map(found.map((f) => [f.ref, f])), extras.smaller ? SMALL_QUALITY : undefined, signal, (f) => within(0.05 + f * (DRAWN - 0.05)));
       }
     }
-    const out = await runInWorker({ kind: "grayscale", zipName: "", vector: what !== "pictures", files: [{ ...file, images }] }, { signal, onProgress: (f) => within(drawn + f * (1 - drawn)) });
+    const out = await runInWorker({ kind: "grayscale", zipName: "", vector: what !== "pictures", blackText: extras.blackText, files: [{ ...file, images }] }, { signal, onProgress: (f) => within(drawn + f * (1 - drawn)) });
     wasEncrypted ||= out.wasEncrypted;
     out.warnings?.forEach((w) => notes.add(w));
     built.push({ name: names[i], blob: out.blob, pageCount: out.pageCount ?? src.pageCount });

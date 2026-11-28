@@ -16,5 +16,5 @@ const process: ProcessFn = async (files, signal, onProgress) => {
 };
 
 export function PdfToTextTool() {
-  return <ToolFlow tool={tool} process={process} renderOptions={() => null} />;
+  return <ToolFlow tool={tool} process={process} warm={() => void import("@/lib/pdf/page-text")} renderOptions={() => null} />;
 }

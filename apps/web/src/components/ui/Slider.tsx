@@ -13,6 +13,7 @@ export function Slider({
   onChange,
   valueText,
   className,
+  wide,
 }: {
   label: string;
   min: number;
@@ -22,6 +23,8 @@ export function Slider({
   onChange: (value: number) => void;
   valueText?: (v: number) => string;
   className?: string;
+  /** The track takes the room its row has (fine settings such as an angle). */
+  wide?: boolean;
 }) {
   const id = useId();
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
@@ -40,7 +43,7 @@ export function Slider({
         value={value}
         aria-valuetext={valueText?.(value)}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="ip-range h-11 w-28"
+        className={`ip-range h-11 ${wide ? "min-w-28 flex-1" : "w-28"}`}
       />
       <IconButton label={`Larger ${label.toLowerCase()}`} variant="soft" icon={<PlusIcon size={16} />} onClick={() => onChange(clamp(value + step))} disabled={value >= max} />
     </div>

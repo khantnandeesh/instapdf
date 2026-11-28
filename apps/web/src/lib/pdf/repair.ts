@@ -14,7 +14,7 @@ import { USER_ERROR } from "./user-error";
 import { saveCompact } from "./write";
 
 export type RepairInput = { bytes: Uint8Array; password?: string; name?: string };
-export type RepairResult = { bytes: Uint8Array; pageCount: number; wasEncrypted: boolean; warnings?: string[] };
+export type RepairResult = { bytes: Uint8Array; pageCount: number; wasEncrypted: boolean; warnings?: string[]; notes?: string[] };
 
 const N = (s: string) => PDFName.of(s);
 const HEADER = [0x25, 0x50, 0x44, 0x46, 0x2d]; // %PDF-
@@ -35,6 +35,14 @@ export function fromHeader(bytes: Uint8Array): Uint8Array {
   out.set(head);
   out.set(bytes, head.length);
   return out;
+}
+
+/** True when the file ends in a pointer to an index that is really there: a reader that trusts the index can open it. */
+export function indexSound(bytes: Uint8Array): boolean {
+  const latin = (from: number, to: number) => String.fromCharCode(...bytes.subarray(Math.max(0, from), Math.min(bytes.length, to)));
+  const at = /startxref\s+(\d+)\s+%%EOF\s*$/.exec(latin(bytes.length - 64, bytes.length));
+  if (!at) return false;
+  return /^\s*(xref|\d+\s+\d+\s+obj)/.test(latin(Number(at[1]), Number(at[1]) + 24));
 }
 
 const cannot = (name?: string) => new Error(`${USER_ERROR}${name ?? "This file"} has too little left to repair: no page could be read from it.`);
@@ -69,6 +77,7 @@ function stillEncrypted(ctx: PDFContext): boolean {
 
 export async function repairPdf({ bytes, password, name }: RepairInput, onProgress?: (fraction: number) => void): Promise<RepairResult> {
   const data = fromHeader(bytes);
+  const damaged = data !== bytes || !indexSound(data);
   let ctx: PDFContext;
   let wasEncrypted: boolean;
   try {
@@ -204,5 +213,7 @@ export async function repairPdf({ bytes, password, name }: RepairInput, onProgre
   const warnings: string[] = [];
   if (declared > pages.length) warnings.push(`${pages.length} of ${declared} pages were recovered. The rest of the file is missing or cannot be read.`);
   if (emptied) warnings.push(emptied === 1 ? "One page lost its content and is blank." : `${emptied} pages lost their content and are blank.`);
-  return { bytes: out, pageCount: pages.length, wasEncrypted, ...(warnings.length ? { warnings } : {}) };
+  // A damaged file that lost nothing: say so, or the result looks like nothing was done.
+  const notes = damaged && !warnings.length ? [pages.length === 1 ? "The file was damaged. Its page was recovered." : `The file was damaged. All ${pages.length} pages were recovered.`] : [];
+  return { bytes: out, pageCount: pages.length, wasEncrypted, ...(warnings.length ? { warnings } : {}), ...(notes.length ? { notes } : {}) };
 }

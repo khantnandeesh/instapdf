@@ -49,6 +49,8 @@ export type ToolOutput = {
   wasEncrypted: boolean;
   /** Non-blocking notes about the result, shown as warning notices. */
   warnings?: string[];
+  /** Good news about the result, shown as success notices (Repair: what was recovered). */
+  notes?: string[];
   /** A sentence the result's meta line ends with ("3 pages deleted.", spec §7 item 2). */
   note?: string;
 };
@@ -86,6 +88,10 @@ export type PageDecoration = {
   pressed?: boolean;
   /** Flip: the page picture is shown mirrored ("none" keeps the turn animated back). */
   flip?: "horizontal" | "vertical" | "none";
+  /** Deskew: the page picture is shown turned by this many degrees clockwise inside its frame, as the result will be. */
+  tilt?: number;
+  /** A short pill on the page's top-left corner when the page has no quarter turn to show there (Deskew's angle). */
+  badge?: string;
   /** Crop: the part of the page that stays, in fractions of the page; the rest is dimmed. */
   keep?: { x: number; y: number; w: number; h: number };
   /** A picture of what the tool will add, drawn over the page (the stamping tools' preview). Decorative. */

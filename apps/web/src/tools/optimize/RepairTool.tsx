@@ -1,6 +1,7 @@
 "use client";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
 import type { ProcessFn } from "@/components/tool-flow/types";
+import { warmWorker } from "@/lib/pdf/worker-client";
 import { flowTool } from "@/tools/registry";
 
 const tool = flowTool("repair-pdf");
@@ -19,5 +20,13 @@ export function RepairTool() {
       onProgress,
     );
   };
-  return <ToolFlow tool={tool} process={process} renderOptions={() => null} />;
+  return <ToolFlow
+      tool={tool}
+      process={process}
+      warm={() => {
+        warmWorker();
+        void import("@/lib/pdf/repair-run");
+      }}
+      renderOptions={() => null}
+    />;
 }

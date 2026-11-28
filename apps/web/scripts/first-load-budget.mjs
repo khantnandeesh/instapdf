@@ -20,31 +20,36 @@ import { gzipSync } from "node:zlib";
 const BUDGET_KB = {
   // +1 kB preloads (F12): four more live tools in the catalogue and the registry.
   "/page": [121, 128],
-  "/merge-pdf/page": [151, 161],
+  "/merge-pdf/page": [152, 162],
   "/rotate-pdf/page": [142, 152],
   // F5 page tools (spec F4/F5 UI P-12).
   // +1 kB on four routes that sat at their limit: the registry every page carries grew by Grayscale and Repair (F13).
   "/organize-pdf/page": [151, 161],
-  "/combine-reorder-pdf/page": [151, 161],
+  "/combine-reorder-pdf/page": [152, 162],
   // +1 kB entry (F12, 27 Nov), as Extract below.
-  "/alternate-mix-pdf/page": [150, 160],
+  "/alternate-mix-pdf/page": [151, 161],
   // F4 page tools (spec F4/F5 UI P-12): Rotate + the range parser, field and stepper (+ marks on Split).
   // +1 kB entry on Split and Delete (F12 Extract images): each live tool adds its flow entry to the registry every route loads.
-  "/split-pdf/page": [149, 159],
-  "/split-pdf-by-bookmarks/page": [149, 159],
-  "/split-pdf-by-size/page": [143, 153],
-  "/split-pdf-by-text/page": [149, 159],
-  "/split-pdf-in-half/page": [144, 154],
+  "/split-pdf/page": [150, 160],
+  "/split-pdf-by-bookmarks/page": [150, 160],
+  "/split-pdf-by-size/page": [144, 154],
+  "/split-pdf-by-text/page": [150, 160],
+  "/split-pdf-in-half/page": [145, 155],
   "/crop-pdf/page": [145, 155],
-  "/resize-pdf/page": [145, 155],
+  // +1 kB on thirteen more routes at their limit: the shared flow now fetches the run's code ahead of the click, offers Repair
+  // on a file that will not open and shows a result's good news (F13 key checks M7, M9).
+  // +1 kB on Resize, Clear annotations and Metadata, which sat at their limit: the registry every page carries grew by Deskew (F15).
+  // F15 Deskew: the bare flow; the skew detector and the dialog load on demand.
+  "/deskew-pdf/page": [145, 155],
+  "/resize-pdf/page": [146, 156],
   "/flip-pdf/page": [145, 155],
   "/n-up-pdf/page": [145, 155],
-  "/add-page-numbers/page": [149, 159],
+  "/add-page-numbers/page": [150, 160],
   "/pdf-header-footer/page": [149, 159],
   "/watermark-pdf/page": [150, 160],
   // +1 kB entry on Extract (F12, 27 Nov): three more tools in the registry every route loads, and the shared
   // LinkButton / IconButton variants.
-  "/extract-pdf-pages/page": [145, 155],
+  "/extract-pdf-pages/page": [146, 156],
   "/delete-pdf-pages/page": [145, 155],
   // F12 (spec f12-image-text-tools.md): PDF to image is Extract's page with two option groups; PDF to text is the
   // bare flow; Image to PDF is Organize's workspace. Their engines (page-images, page-text, tiff-write) are lazy.
@@ -55,17 +60,17 @@ const BUDGET_KB = {
   // +1 kB entry (F10, 28 Nov): three more tools in the registry every route loads.
   "/unlock-pdf/page": [140, 150],
   // F10 document tools: the pick-pages flow with switches; the bare flow with one select; the bare flow with a form.
-  "/remove-pdf-annotations/page": [145, 155],
+  "/remove-pdf-annotations/page": [146, 156],
   // Flatten: +1 kB for the pictures choice (a second select and its copy).
-  "/flatten-pdf/page": [143, 153],
+  "/flatten-pdf/page": [144, 154],
   // F13 Grayscale: the bare flow with one select.
-  "/grayscale-pdf/page": [143, 153],
+  "/grayscale-pdf/page": [144, 154],
   "/repair-pdf/page": [143, 153],
   "/rename-pdf/page": [145, 155],
   "/pdf-bookmarks/page": [145, 155],
-  "/edit-pdf-metadata/page": [144, 154],
+  "/edit-pdf-metadata/page": [145, 155],
   "/pdf-to-jpg/page": [146, 156],
-  "/extract-images/page": [142, 152],
+  "/extract-images/page": [143, 153],
   // +1 kB: the tool registry every page carries grew by Grayscale (F13).
   "/pdf-to-text/page": [140, 150],
   "/jpg-to-pdf/page": [152, 162],
@@ -83,13 +88,15 @@ const CLOUD_BUDGET_KB = {
   "/combine-reorder-pdf/page": [153, 163],
   // Alternate shares every first-load chunk with Organize but its page chunk (150.6 vs 150.8 kB after the
   // F4 + main tile-rule merge); 1 kB over its F5 budget, still under Organize's and Combine's 152.
-  "/alternate-mix-pdf/page": [152, 161],
+  "/alternate-mix-pdf/page": [152, 162],
   "/split-pdf/page": [151, 161],
   "/split-pdf-by-bookmarks/page": [151, 161],
   "/split-pdf-by-size/page": [145, 155],
   "/split-pdf-by-text/page": [151, 161],
   "/split-pdf-in-half/page": [146, 156],
   "/crop-pdf/page": [147, 157],
+  "/deskew-pdf/page": [147, 157],
+  // +1 kB on Alternate (preloads), Delete, Protect and Unlock, at their limit: the shared-flow changes of the F13 key checks (see the table above).
   "/resize-pdf/page": [147, 157],
   "/flip-pdf/page": [147, 157],
   "/n-up-pdf/page": [147, 157],
@@ -97,9 +104,9 @@ const CLOUD_BUDGET_KB = {
   "/pdf-header-footer/page": [151, 161],
   "/watermark-pdf/page": [152, 162],
   "/extract-pdf-pages/page": [147, 157],
-  "/delete-pdf-pages/page": [146, 156],
-  "/protect-pdf/page": [144, 154],
-  "/unlock-pdf/page": [141, 151],
+  "/delete-pdf-pages/page": [147, 157],
+  "/protect-pdf/page": [145, 155],
+  "/unlock-pdf/page": [142, 152],
   "/remove-pdf-annotations/page": [147, 157],
   "/flatten-pdf/page": [145, 155],
   "/grayscale-pdf/page": [145, 155],

@@ -14,7 +14,7 @@ import { saveCompact } from "./write";
 
 /** A picture's grey replacement: 8 bits a pixel, as a JPEG or as Flate data (with the PNG row predictor when `predictor`). */
 export type GrayImage = { ref: string; width: number; height: number; jpeg: boolean; predictor?: boolean; data: Uint8Array };
-export type GrayInput = { bytes: Uint8Array; password?: string; /** Text, drawings and gradients. */ vector: boolean; images?: readonly GrayImage[] };
+export type GrayInput = { bytes: Uint8Array; password?: string; /** Text, drawings and gradients. */ vector: boolean; /** Dark text in pure black instead of its grey. */ blackText?: boolean; images?: readonly GrayImage[] };
 export type GrayResult = { bytes: Uint8Array; pageCount: number; wasEncrypted: boolean; warnings?: string[] };
 
 const N = (s: string) => PDFName.of(s);
@@ -37,7 +37,11 @@ class Walk {
   gradientsKept = 0;
   unread = 0;
 
-  constructor(private readonly doc: PDFDocument) {
+  constructor(
+    private readonly doc: PDFDocument,
+    /** Dark text is written in pure black (the option). */
+    private readonly blackText = false,
+  ) {
     this.ctx = doc.context;
   }
 
@@ -214,6 +218,7 @@ class Walk {
   private env(res: PDFDict | undefined, inherits = false): ContentEnv {
     return {
       inherits,
+      ...(this.blackText ? { blackText: "objects" as const } : {}),
       space: (name) => {
         if (name === "DeviceGray" || name === "DeviceRGB" || name === "DeviceCMYK" || name === "Pattern") return this.space(N(name));
         return this.space(this.dict(res?.get(N("ColorSpace")))?.get(N(name)));
@@ -425,7 +430,7 @@ class Walk {
   private daString(d: PDFDict) {
     const da = this.look(d.get(N("DA")));
     if (!(da instanceof PDFString || da instanceof PDFHexString)) return;
-    const r = grayContent(da.asBytes(), this.env(undefined));
+    const r = grayContent(da.asBytes(), this.blackText ? { ...this.env(undefined), blackText: "all" } : this.env(undefined));
     if (!r.changed) return;
     let hex = "";
     for (const b of r.bytes) hex += b.toString(16).padStart(2, "0");
@@ -634,10 +639,10 @@ export async function colourImages({ bytes, password }: { bytes: Uint8Array; pas
   return { images: new Walk(doc).colourImages(), pageCount: doc.getPageCount() };
 }
 
-export async function grayscalePdf({ bytes, password, vector, images }: GrayInput, onProgress?: (fraction: number) => void): Promise<GrayResult> {
+export async function grayscalePdf({ bytes, password, vector, blackText, images }: GrayInput, onProgress?: (fraction: number) => void): Promise<GrayResult> {
   const { doc, wasEncrypted } = await loadForEdit(bytes, password);
   onProgress?.(0.2);
-  const walk = new Walk(doc);
+  const walk = new Walk(doc, blackText);
   const warnings: string[] = [];
   if (images) {
     // Pictures no page draws are left alone and not counted: nobody sees them.

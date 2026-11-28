@@ -28,6 +28,8 @@ export function toolFixtures(slug: string, pdf = "sixty-pages.pdf"): string[] {
   if (slug === "remove-pdf-annotations") return [fx(pdf), fx("annotated.pdf")];
   // Split by text needs a file whose text changes from page to page.
   if (slug === "split-pdf-by-text") return [fx(pdf), fx("invoices.pdf")];
+  // Deskew needs a file with tilted pages, or the button waits with "every page is straight".
+  if (slug === "deskew-pdf") return [fx(pdf), fx("tilted.pdf")];
   // Rename: the first file has text where the box starts, so the name shown changes.
   if (slug === "rename-pdf") return [fx("invoices.pdf"), fx(pdf)];
   return slug === "alternate-mix-pdf" ? [fx(pdf), fx("three-pages.pdf")] : [fx(pdf)];

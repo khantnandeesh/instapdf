@@ -42,6 +42,7 @@ export function PickPagesFlow({
   renderOptions,
   renderMore,
   canRun,
+  warm,
   decorate,
 }: {
   tool: FlowTool;
@@ -54,6 +55,8 @@ export function PickPagesFlow({
   renderMore?: (ctx: FlowContext) => ReactNode;
   /** Why the run must wait (the status line says it), or true. */
   canRun?: () => true | string;
+  /** See ToolFlow `warm`: for a tool whose run is not in the processing worker. */
+  warm?: () => void;
   /** Extra marks on a page: `applies` is true when the run will change it (picked, or nothing is picked). */
   decorate?: (applies: boolean, at: PageSpot) => Partial<PageDecoration>;
 }) {
@@ -74,6 +77,7 @@ export function PickPagesFlow({
         return run(pickedSources(files, now.state.sets, now.count > 0), signal, onProgress);
       }}
       canRun={canRun}
+      warm={warm}
       onFilesChange={s.onFilesChange}
       onReset={s.reset}
       readyStatus={() => pickCopy.status(pages, s.total)}

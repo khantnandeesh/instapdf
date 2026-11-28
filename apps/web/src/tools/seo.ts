@@ -295,7 +295,7 @@ export const toolSeo: Record<string, ToolSeo> = {
   "deskew-pdf": {
     keyword: "deskew pdf",
     title: "Deskew PDF: Straighten Scanned Pages Free",
-    description: `Deskew PDF scans: straighten tilted pages automatically so they read and print straight. Free, no sign-up. ${serverNote}`,
+    description: `Deskew PDF scans: straighten tilted pages automatically, or set each page by hand. Free, no sign-up. ${privateNote}`,
     also: ["straighten pdf", "fix skewed scan", "auto rotate scanned pdf"],
   },
   workflows: {
@@ -1066,6 +1066,41 @@ export const seoContent: Record<string, ToolSeoContent> = {
       },
     ],
     related: ["compress-pdf", "flatten-pdf", "pdf-to-jpg", "protect-pdf", "merge-pdf", "edit-pdf"],
+  },
+  "deskew-pdf": {
+    howTo: "How to deskew a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop the scanned PDF on the page, or choose it from your device. Nothing is uploaded." },
+      { name: "Check the pages", text: "Every page is measured and shown straightened. Click a page to set its turn by hand with a slider, a tenth of a degree at a time." },
+      { name: "Download", text: "Select Straighten and download the file. Pages that were already straight are left as they were." },
+    ],
+    faq: [
+      {
+        q: "How do I straighten a crooked scan?",
+        a: "Add the PDF. The tilt of each page is found from its lines of text and corrected, and the pages on screen show the result before you download anything.",
+      },
+      {
+        q: "Does straightening lower the quality?",
+        a: "No. The page is turned, not redrawn: scanned pictures keep every pixel and the file barely grows. Tools that redraw the page as a new picture lose sharpness each time.",
+      },
+      {
+        q: "Will searchable text still work after deskewing?",
+        a: "Yes. A text layer from OCR turns with the page, so search and copy keep working and stay lined up with the picture.",
+      },
+      {
+        q: "Can I straighten only some pages?",
+        a: "Yes. Only pages found tilted are changed. Click any page to set its own turn, or set it to zero to leave it alone. Skip slight tilts leaves pages tilted by less than 1° as they are.",
+      },
+      {
+        q: "What if a page is upside down or on its side?",
+        a: "That is a rotation, not a skew. Use Rotate PDF for quarter turns, then deskew for the last few degrees. Tilts up to 15° are corrected here.",
+      },
+      {
+        q: "Are my scans uploaded?",
+        a: "No. Pages are measured and straightened in your browser, on your device. They never leave it.",
+      },
+    ],
+    related: ["rotate-pdf", "crop-pdf", "ocr-pdf", "split-pdf-in-half", "grayscale-pdf", "compress-pdf"],
   },
   "repair-pdf": {
     howTo: "How to repair a PDF",

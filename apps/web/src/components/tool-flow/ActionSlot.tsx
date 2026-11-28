@@ -162,7 +162,7 @@ export const ProgressPill = forwardRef(function ProgressPill(
  * NoticeStack), the fixing tool when one is ready, and "Try again" in the primary's place.
  */
 export const SlotError = forwardRef(function SlotError(
-  { line, onRetry, fix }: { line: string; onRetry: () => void; fix?: { label: string; onClick: () => void } },
+  { line, onRetry, retryLabel, fix }: { line: string; onRetry: () => void; /** When trying again cannot help (Repair): what the button does instead. */ retryLabel?: string; fix?: { label: string; onClick: () => void } },
   ref: Ref<HTMLButtonElement>,
 ) {
   return (
@@ -177,7 +177,7 @@ export const SlotError = forwardRef(function SlotError(
         </button>
       )}
       <button ref={ref} type="button" className="mp-btn ip-slot__main shrink-0" onClick={onRetry}>
-        {slotCopy.tryAgain}
+        {retryLabel ?? slotCopy.tryAgain}
       </button>
     </div>
   );

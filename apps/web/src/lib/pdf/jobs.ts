@@ -19,6 +19,7 @@ import { pdfOutputName, uniqueNames } from "./naming";
 import { protectPdf, unlockPdf, type ProtectOptions } from "./protect";
 import { planSplit, type SplitMode } from "../page-plans";
 import { cropPdf } from "./crop";
+import { deskewPdf } from "./deskew";
 import { flipPdf, type FlipDirection } from "./flip";
 import { nupPdf, type NupOptions } from "./nup";
 import { resizePdf, type ResizeOptions } from "./resize";
@@ -53,6 +54,8 @@ export type SplitSizeJob = { kind: "splitSize"; files: (JobFile & { id: string; 
 export type SplitHalfJob = { kind: "splitHalf"; files: (JobFile & { cut: number[] })[]; zipName: string; options: HalfOptions };
 
 /** Page-shape tools (F8). `pages` are the 0-based pages to change; `areas` the part of each page to keep. */
+/** Deskew (F15): `turns` maps a 0-based page to the degrees it is turned clockwise. */
+export type DeskewJob = { kind: "deskew"; files: (JobFile & { turns: Record<number, number> })[]; zipName: string };
 export type FlipJob = { kind: "flip"; files: (JobFile & { pages: number[] })[]; zipName: string; direction: FlipDirection };
 export type ResizeJob = { kind: "resize"; files: (JobFile & { pages: number[] })[]; zipName: string; options: ResizeOptions };
 export type CropJob = { kind: "crop"; files: (JobFile & { areas: Record<number, Area> })[]; zipName: string };
@@ -71,10 +74,10 @@ export type PicturesJob = { kind: "pictures"; files: { name: string; title?: str
 export type BookmarksJob = { kind: "bookmarks"; files: JobFile[]; zipName: string; items: import("./bookmark-edit").BookmarkNode[] };
 /** Grayscale (spec F13 §1): which pictures hold colour; one grey picture packed; the file converted. */
 export type GrayScanJob = { kind: "grayScan"; file: JobFile };
-export type GrayEncodeJob = { kind: "grayEncode"; pixels: Blob; width: number; height: number; lossy: boolean };
-export type GrayscaleJob = { kind: "grayscale"; files: (JobFile & { images?: { ref: string; width: number; height: number; jpeg: boolean; data: Blob }[] })[]; zipName: string; vector: boolean };
+export type GrayEncodeJob = { kind: "grayEncode"; pixels: Blob; width: number; height: number; lossy: boolean; /** JPEG quality, 1 to 100 (the engine's own when left out). */ quality?: number };
+export type GrayscaleJob = { kind: "grayscale"; files: (JobFile & { images?: { ref: string; width: number; height: number; jpeg: boolean; data: Blob }[] })[]; zipName: string; vector: boolean; blackText?: boolean };
 export type RepairJob = { kind: "repair"; files: JobFile[]; zipName: string };
-export type Job = RepairJob | GrayScanJob | GrayEncodeJob | GrayscaleJob | BookmarksJob | PicturesJob | AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
+export type Job = DeskewJob | RepairJob | GrayScanJob | GrayEncodeJob | GrayscaleJob | BookmarksJob | PicturesJob | AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
 
 export type JobOutput = {
   name: string;
@@ -88,6 +91,8 @@ export type JobOutput = {
   wasEncrypted: boolean;
   /** Non-blocking notes for the user about the result. */
   warnings?: string[];
+  /** Good news about the result (Repair: what was recovered). */
+  notes?: string[];
   /** grayScan only: the pictures that hold colour, by object reference as pdf.js writes it. */
   found?: { ref: string; lossy: boolean; width: number; height: number }[];
 };
@@ -117,6 +122,8 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       return runSplitSize(job, onProgress, env);
     case "splitHalf":
       return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => splitHalfPdf({ bytes, password: file.password, cut: file.cut, options: job.options }, progress));
+    case "deskew":
+      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => deskewPdf({ bytes, password: file.password, turns: file.turns }, progress));
     case "flip":
       return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => flipPdf({ bytes, password: file.password, pages: file.pages, direction: job.direction }, progress));
     case "resize":
@@ -156,14 +163,14 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       const px = new Uint8Array(await job.pixels.arrayBuffer());
       // A JPEG holds at most 65,535 pixels a side.
       const jpeg = job.lossy && job.width <= 65535 && job.height <= 65535;
-      const data = jpeg ? encodeGrayJpeg(px, job.width, job.height) : encodeGrayFlate(px, job.width, job.height);
+      const data = jpeg ? encodeGrayJpeg(px, job.width, job.height, job.quality) : encodeGrayFlate(px, job.width, job.height);
       return { name: "", type: "application/pdf", blob: new Blob([data as Uint8Array<ArrayBuffer>], { type: jpeg ? "image/jpeg" : "application/octet-stream" }), wasEncrypted: false };
     }
     case "grayscale": {
       const { grayscalePdf } = await import("./grayscale");
       return runPerFile(job.files, job.zipName, onProgress, async (bytes, file, progress) => {
         const images = file.images && (await Promise.all(file.images.map(async (i) => ({ ref: i.ref, width: i.width, height: i.height, jpeg: i.jpeg, predictor: !i.jpeg, data: new Uint8Array(await i.data.arrayBuffer()) }))));
-        return grayscalePdf({ bytes, password: file.password, vector: job.vector, images }, progress);
+        return grayscalePdf({ bytes, password: file.password, vector: job.vector, blackText: job.blackText, images }, progress);
       });
     }
     case "bookmarks": {
@@ -291,7 +298,7 @@ async function runMerge(job: MergeJob, onProgress: ProgressFn, env: JobEnv): Pro
   };
 }
 
-type FileResult = { bytes: Uint8Array; pageCount: number; wasEncrypted: boolean; warnings?: string[] };
+type FileResult = { bytes: Uint8Array; pageCount: number; wasEncrypted: boolean; warnings?: string[]; notes?: string[] };
 
 /**
  * One output per input file, each kept under its own name: a single PDF, or a ZIP of them. `weights`
@@ -310,7 +317,8 @@ async function runPerFile<F extends JobFile>(
   let wasEncrypted = false;
   // Each note once, however many files it applies to.
   const notes = new Set<string>();
-  const warnings = () => (notes.size ? { warnings: [...notes] } : {});
+  const good = new Set<string>();
+  const warnings = () => ({ ...(notes.size ? { warnings: [...notes] } : {}), ...(good.size ? { notes: [...good] } : {}) });
   const one = async (file: F, i: number) => {
     const within = (fraction: number) => onProgress(Math.min(0.99, (done + weights[i] * fraction) / total));
     const bytes = new Uint8Array(await file.source.arrayBuffer());
@@ -318,6 +326,7 @@ async function runPerFile<F extends JobFile>(
     const r = await work(bytes, file, (f) => within(0.1 + 0.9 * f));
     wasEncrypted ||= r.wasEncrypted;
     r.warnings?.forEach((w) => notes.add(w));
+    r.notes?.forEach((w) => good.add(w));
     return r;
   };
 

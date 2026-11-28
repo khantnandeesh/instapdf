@@ -66,7 +66,7 @@ export function PageTile({
   /** Below 1024 px: the 44px number line the gap marks sit level with (every tile of a grid with marks). */
   numberLine?: boolean;
 }) {
-  const badge = formatDelta(pendingDelta);
+  const badge = formatDelta(pendingDelta) || decor?.badge;
   const label = decor?.label ?? `Page ${index + 1} of ${pageCount}, ${describeDelta(pendingDelta)}`;
   const part = decor?.part;
   const picked = decor?.picked;
@@ -91,7 +91,7 @@ export function PageTile({
     >
       <div className="ip-tile__box relative grid place-items-center" data-testid="page-tile" data-rotation={pendingDelta}>
         <TilePage size={size} rotation={pendingDelta} data-testid="page-visual">
-          <PageThumb fileId={fileId} index={index} scale={pageTurnScale(size, pendingDelta)} className={decor?.flip && `ip-flip ip-flip--${decor.flip}`} />
+          <PageThumb fileId={fileId} index={index} scale={pageTurnScale(size, pendingDelta)} className={cx(decor?.flip && `ip-flip ip-flip--${decor.flip}`, decor?.tilt !== undefined && "ip-tilt")} style={decor?.tilt ? { transform: `rotate(${decor.tilt}deg)` } : undefined} />
           {decor?.keep && (
             <span
               aria-hidden="true"
