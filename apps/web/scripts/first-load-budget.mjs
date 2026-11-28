@@ -41,7 +41,8 @@ const BUDGET_KB = {
   // +1 kB on Resize, Clear annotations and Metadata, which sat at their limit: the registry every page carries grew by Deskew (F15).
   // F15 Deskew: the flow and its "Only these pages" field (+2 kB, key check G-1); the skew detector and the dialog load on demand.
   "/deskew-pdf/page": [147, 157],
-  "/ocr-pdf/page": [145, 155],
+  // +1 kB: the names of 72 languages for the two lists (key check G-1); the data itself is fetched on use.
+  "/ocr-pdf/page": [146, 156],
   "/resize-pdf/page": [146, 156],
   "/flip-pdf/page": [145, 155],
   "/n-up-pdf/page": [145, 155],
@@ -100,7 +101,7 @@ const CLOUD_BUDGET_KB = {
   "/split-pdf-in-half/page": [146, 156],
   "/crop-pdf/page": [147, 157],
   "/deskew-pdf/page": [149, 159],
-  "/ocr-pdf/page": [147, 157],
+  "/ocr-pdf/page": [148, 158],
   // +1 kB on Alternate (preloads), Delete, Protect and Unlock, at their limit: the shared-flow changes of the F13 key checks (see the table above).
   "/resize-pdf/page": [147, 157],
   "/flip-pdf/page": [147, 157],

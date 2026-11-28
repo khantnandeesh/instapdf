@@ -16,7 +16,7 @@ import { OCR_PATHS } from "./languages";
 
 export type OcrSource = { name: string; source: Blob; password?: string; pageCount: number };
 export type OcrOutput = "pdf" | "text" | "both";
-export type OcrOptions = { languages: readonly string[]; output: OcrOutput; /** Pages that already hold text are not read again. */ skipText: boolean };
+export type OcrOptions = { languages: readonly string[]; output: OcrOutput; /** Text an earlier OCR left on the pages is taken out first, and those pages are read again. Typed text is never touched: a page that has it is left as it is. */ replace: boolean };
 
 /** What a scanner makes of a printed page: enough for small print, and what the recogniser was trained on. */
 const DPI = 300;
@@ -122,7 +122,7 @@ async function readFile(src: OcrSource, opts: OcrOptions, pool: Reader[], signal
       let canvas: HTMLCanvasElement | undefined;
       try {
         const own = pageText((await page.getTextContent()).items as TextPiece[]);
-        if (opts.skipText && hasText(own)) {
+        if (hasText(own)) {
           pages[n - 1] = { text: own, layer: null, read: false };
           onPage();
           continue;
@@ -163,6 +163,7 @@ async function readFile(src: OcrSource, opts: OcrOptions, pool: Reader[], signal
   return pages;
 }
 
+const out0 = (o: { wasEncrypted?: boolean }) => !!o.wasEncrypted;
 const wordsLead = (words: number) => (words === 1 ? "1 word" : `${words.toLocaleString("en-US")} words`);
 
 export async function ocrPdfs(sources: readonly OcrSource[], opts: OcrOptions, zipName: string, signal: AbortSignal, onProgress: (fraction: number) => void): Promise<ToolOutput> {
@@ -184,7 +185,13 @@ export async function ocrPdfs(sources: readonly OcrSource[], opts: OcrOptions, z
     if (signal.aborted) throw aborted();
     onProgress(READY);
     for (let i = 0; i < sources.length; i++) {
-      const src = sources[i];
+      let src = sources[i];
+      if (opts.replace) {
+        // The file without its old OCR text: what is read, and what the new text is laid on.
+        const bare = await runInWorker({ kind: "ocrLayer", zipName: "", strip: true, files: [{ name: src.name, source: src.source, password: src.password, layers: [] }] }, { signal });
+        wasEncrypted ||= out0(bare);
+        src = { ...src, source: bare.blob, password: undefined };
+      }
       const pages = await readFile(src, opts, pool, signal, () => onProgress(READY + (++done / total) * (READ - READY)));
       recognised += pages.filter((p) => p.read && p.text).length;
       kept += pages.filter((p) => !p.read).length;

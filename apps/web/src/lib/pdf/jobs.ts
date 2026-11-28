@@ -79,7 +79,7 @@ export type GrayEncodeJob = { kind: "grayEncode"; pixels: Blob; width: number; h
 export type GrayscaleJob = { kind: "grayscale"; files: (JobFile & { images?: { ref: string; width: number; height: number; jpeg: boolean; data: Blob }[] })[]; zipName: string; vector: boolean; blackText?: boolean };
 export type RepairJob = { kind: "repair"; files: JobFile[]; zipName: string };
 /** OCR (F15): each layer is a text-only page from the recogniser, laid over the 0-based page it was read from. */
-export type OcrLayerJob = { kind: "ocrLayer"; files: (JobFile & { layers: { page: number; pdf: Blob }[] })[]; zipName: string };
+export type OcrLayerJob = { kind: "ocrLayer"; files: (JobFile & { layers: { page: number; pdf: Blob }[] })[]; zipName: string; /** Take out the text an earlier OCR left, before anything is added. */ strip?: boolean };
 export type Job = OcrLayerJob | DeskewJob | RepairJob | GrayScanJob | GrayEncodeJob | GrayscaleJob | BookmarksJob | PicturesJob | AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
 
 /** The code a job loads on first use, by kind: a tool that knows its job fetches it ahead (`warmWorker`), so the run does not wait for it. */
@@ -138,7 +138,7 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => splitHalfPdf({ bytes, password: file.password, cut: file.cut, options: job.options }, progress));
     case "ocrLayer":
       return runPerFile(job.files, job.zipName, onProgress, async (bytes, file, progress) =>
-        addTextLayers({ bytes, password: file.password, layers: await Promise.all(file.layers.map(async (l) => ({ page: l.page, pdf: new Uint8Array(await l.pdf.arrayBuffer()) }))) }, progress),
+        addTextLayers({ bytes, password: file.password, strip: job.strip, layers: await Promise.all(file.layers.map(async (l) => ({ page: l.page, pdf: new Uint8Array(await l.pdf.arrayBuffer()) }))) }, progress),
       );
     case "deskew":
       return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => deskewPdf({ bytes, password: file.password, turns: file.turns }, progress));

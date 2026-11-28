@@ -1,0 +1,53 @@
+{
+  "feature": "f15-ocr",
+  "captured": "2026-11-28T12:00:14Z/12:01:33Z",
+  "expires": "2026-12-28",
+  "raw_evidence": "/mnt/project-files/evals-cache/f15-ocr/ (ref/ reference outputs, captures and network logs; out/ our outputs, one HAR and Lighthouse JSON; shots/; scripts/). Not in git.",
+  "reference_tasks_used": 2,
+  "reference_page_loads": 1,
+  "harness": "Playwright headless Chromium, 1280x632; 390x664 by resizing the same session. Result read by polling the result frame every 25 ms.",
+  "input": {
+    "file": "scan.pdf",
+    "bytes": 67092,
+    "pages": "3: an upright scanned picture (1240x1754 JPEG), a typed page, a scanned picture on a page with a 90 degree turn"
+  },
+  "reference": {
+    "flow": [
+      "Choosing the file uploads it at once (two POSTs: an upload check, then the upload, about 0.8 s after choosing). Pages are then shown one under the other.",
+      "Options: a language list of 61 entries (one per run; Arabic is not in it), output format ticks PDF (on) and Text (off), a tick to replace text from a previous OCR (off), and a per-page quick mode with its own language list and button beside each page.",
+      "Stated free limits: 10 pages or 50 MB per task, 3 tasks per hour. No sign-in or payment was asked for.",
+      "Result opens in an overlay frame: Download, Back to editing, Start over, Delete files."
+    ],
+    "landing_load_ms": 1292,
+    "task1": {
+      "settings": "English, PDF only, replace tick off, 1280 wide",
+      "at": "2026-11-28T12:00:49Z",
+      "timing_ms": {"click_to_task_post": 73, "click_to_result_frame": 1076, "click_to_download_visible": 6254},
+      "output_bytes": 72578,
+      "output_sha256": "555dfc0fecc93302baddd19cf0c720d63e4eb7629405a0182f737758fb67b4df"
+    },
+    "task2": {
+      "settings": "English, PDF and Text, replace tick off, 390 wide",
+      "at": "2026-11-28T12:01:26Z",
+      "timing_ms": {"click_to_task_post": 67, "click_to_result_frame": 1279, "click_to_download_visible": 5936},
+      "output_bytes": 73170,
+      "output_sha256": "3fa415d3b91178fae21a113a2550d7b4f7e4d16477674cdfca016c96f06def3e",
+      "zip_holds": "a PDF of 72,578 B and a text file of 339 B, 60 words, all correct"
+    },
+    "output_observations": [
+      "Words exact on all three pages; the typed page is not doubled.",
+      "Text layer: invisible, one run per word with a trailing space and a horizontal scale. Word box left edge within 0.16-0.24 pt of the ink (median), right edge 5.1-5.7 pt short (median). Same geometry as ours.",
+      "Both picture streams byte-identical to the source; render difference 0 on every page; page sizes and the 90 degree turn kept; qpdf check clean.",
+      "72,578 B from 67,092 B (+8.2%): the same byte count as ours, a different file."
+    ],
+    "phone_390": "Sideways scroll: document 482 px wide on landing and 457 px with a file in. The per-page button runs past the right edge. Run button at y=604 of 664; result Download at y=244.",
+    "not_captured": "Per-page quick mode run; replace-previous-OCR tick on; a non-English run; a file over 10 pages; error states; a noisy or photographed scan."
+  },
+  "ours_2026-11-28_bd8d90b": {
+    "searchable_sha256": "33183ff0910c20153b1cdd801c2da7dab6d06cf8c720186e30fcb94b3aa1c558",
+    "searchable_bytes": 72578,
+    "click_to_download_ms": {"cold": [3593, 3145, 3714], "warm_reload": [2493, 2324, 2391], "phone_cold": 3937},
+    "non_get_requests": 0,
+    "off_origin_requests": 0
+  }
+}

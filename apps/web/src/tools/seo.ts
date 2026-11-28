@@ -289,7 +289,7 @@ export const toolSeo: Record<string, ToolSeo> = {
   "ocr-pdf": {
     keyword: "ocr pdf",
     title: "OCR PDF: Make Scanned PDFs Searchable Free",
-    description: `OCR scanned PDFs to make their text searchable and copyable, in 12 languages. Free, no sign-up, no page limit. ${privateNote}`,
+    description: `OCR scanned PDFs to make their text searchable and copyable, in 72 languages. Free, no sign-up, no daily limit. ${privateNote}`,
     also: ["searchable pdf", "pdf ocr online", "scanned pdf to text", "image to text pdf"],
   },
   "deskew-pdf": {
@@ -1159,15 +1159,15 @@ export const seoContent: Record<string, ToolSeoContent> = {
       },
       {
         q: "Is there a page limit?",
-        a: "No. Every page is read on your own device, so there is no page count or daily limit. Long documents take longer, and you can cancel at any time.",
+        a: "Up to 20 files and 1,000 pages at a time, and there is no daily limit: every page is read on your own device. Long documents take longer, and you can cancel at any time.",
       },
       {
         q: "Which languages can it read?",
-        a: "English, Hindi, Spanish, French, German, Portuguese, Italian, Dutch, Russian, Arabic, Simplified Chinese and Japanese. You can pick two at once for a mixed document.",
+        a: "72 languages, among them English, Hindi, Spanish, French, German, Portuguese, Arabic, Russian, Chinese, Japanese and Korean. You can pick two at once for a mixed document.",
       },
       {
         q: "What about pages that already have text?",
-        a: "They are left as they are, so a file that mixes typed and scanned pages does not end up with doubled text. Turn Skip pages that already have text off to read every page again.",
+        a: "They are left as they are, so a file that mixes typed and scanned pages does not end up with doubled text. If the text came from an earlier OCR, turn on Replace text from an earlier OCR: the old hidden text is taken out and the pages are read afresh.",
       },
       {
         q: "How accurate is it?",

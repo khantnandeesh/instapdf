@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { degrees, PDFArray, PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from "@cantoo/pdf-lib";
+import { degrees, PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, StandardFonts, decodePDFRawStream } from "@cantoo/pdf-lib";
 import { addTextLayers } from "./ocr-layer";
 
 /** A text-only page as the recogniser hands it back: `width` by `height` points, for the page as shown. */
 async function layer(width: number, height: number) {
   const doc = await PDFDocument.create();
   doc.addPage([width, height]).drawText("word", { x: 10, y: height - 20, size: 10 });
+  return doc.save();
+}
+
+/** The same, with its text hidden (render mode 3), as a recogniser writes it. */
+async function hiddenLayer(width: number, height: number) {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([width, height]);
+  const name = page.node.newFontDictionary("F", (await doc.embedFont(StandardFonts.Helvetica)).ref);
+  page.node.addContentStream(doc.context.register(doc.context.stream(`BT ${name.toString()} 10 Tf 3 Tr 10 ${height - 20} Td (word) Tj ET`)));
   return doc.save();
 }
 
@@ -68,5 +77,29 @@ describe("OCR text layer", () => {
     expect(await placed(out.bytes, 0)).toEqual([1, 0, 0, 1, 0, 0]);
     expect(after.getPage(0).node.lookup(PDFName.of("Contents"), PDFArray).size()).toBeGreaterThan(1);
     expect(after.getPage(1).node.lookup(PDFName.of("Contents"), PDFArray).size()).toBe(1);
+  });
+
+  it("AC-1544: replacing takes out an earlier layer and hidden text written on the page, and leaves typed text", async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([300, 300]);
+    page.drawText("typed", { x: 20, y: 200, size: 12 });
+    const once = await addTextLayers({ bytes: await doc.save(), layers: [{ page: 0, pdf: await hiddenLayer(300, 300) }] });
+    expect(await placed(once.bytes, 0)).not.toBeNull();
+    // Hidden text written straight into the page, the way some OCR tools do.
+    const withInline = await PDFDocument.load(once.bytes);
+    const font = withInline.getPage(0).node.Resources()!.lookup(PDFName.of("Font"), PDFDict).keys()[0];
+    withInline.getPage(0).node.addContentStream(withInline.context.register(withInline.context.stream(`BT ${font.toString()} 9 Tf 3 Tr 20 100 Td (ghost) Tj ET`)));
+    const again = await addTextLayers({ bytes: await withInline.save(), layers: [], strip: true });
+    const out = await PDFDocument.load(again.bytes);
+    const content = out.getPage(0).node.Contents() as PDFRawStream;
+    const text = new TextDecoder("latin1").decode(decodePDFRawStream(content).decode());
+    expect(text).not.toContain("Do");
+    expect(text).not.toContain("ghost");
+    expect(text).toContain("Tj");
+    expect(out.getPage(0).node.Resources()?.lookup(PDFName.of("XObject"))?.toString() ?? "").not.toContain("OcrText");
+    // And a new layer goes on as usual afterwards.
+    const twice = await addTextLayers({ bytes: once.bytes, layers: [{ page: 0, pdf: await hiddenLayer(300, 300) }], strip: true });
+    const last = await PDFDocument.load(twice.bytes);
+    expect((last.getPage(0).node.Resources()?.lookup(PDFName.of("XObject"), PDFDict).keys() ?? []).filter((k) => k.toString().includes("OcrText")).length).toBe(1);
   });
 });

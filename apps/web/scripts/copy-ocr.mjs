@@ -41,6 +41,8 @@ for (const { code } of config.languages) {
   const dir = pkgDir(`@tesseract.js-data/${code}`);
   expect(`@tesseract.js-data/${code}`, await version(dir), config.data);
   // The integer LSTM model: the accurate one, a quarter the size of the file that also holds the old engine.
-  await copyFile(join(dir, "4.0.0_best_int", `${code}.traineddata.gz`), join(dataOut, `${code}.traineddata.gz`));
+  // A few languages ship one model only, under "4.0.0".
+  const file = `${code}.traineddata.gz`;
+  await copyFile(join(dir, "4.0.0_best_int", file), join(dataOut, file)).catch(() => copyFile(join(dir, "4.0.0", file), join(dataOut, file)));
 }
 console.log(`copy-ocr: engine ${config.engine}, ${config.languages.length} languages`);

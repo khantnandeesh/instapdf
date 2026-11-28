@@ -16,15 +16,15 @@ import "../doc-tools/doc-tools.css";
 
 const tool = flowTool("ocr-pdf");
 
-type Remembered = { language: string; second: string; output: OcrOutput; skipText: boolean };
-const defaults: Remembered = { language: OCR_DEFAULT, second: "", output: "pdf", skipText: true };
+type Remembered = { language: string; second: string; output: OcrOutput; replace: boolean };
+const defaults: Remembered = { language: OCR_DEFAULT, second: "", output: "pdf", replace: false };
 const OUTPUTS: OcrOutput[] = ["pdf", "text", "both"];
 const LANGUAGES = OCR_LANGUAGES.map((l) => ({ value: l.code, label: l.name }));
 const check = (s: Record<string, unknown>): Partial<Remembered> => ({
   ...(isOcrLanguage(s.language) ? { language: s.language } : {}),
   ...(s.second === "" || isOcrLanguage(s.second) ? { second: s.second as string } : {}),
   ...(OUTPUTS.includes(s.output as OcrOutput) ? { output: s.output as OcrOutput } : {}),
-  ...(typeof s.skipText === "boolean" ? { skipText: s.skipText } : {}),
+  ...(typeof s.replace === "boolean" ? { replace: s.replace } : {}),
 });
 
 /**
@@ -43,7 +43,7 @@ export function OcrTool() {
     const o = optsLive.current;
     return ocrPdfs(
       files.map((f) => ({ name: f.name, source: f.source, password: f.password, pageCount: f.pageCount })),
-      { languages: o.second && o.second !== o.language ? [o.language, o.second] : [o.language], output: o.output, skipText: o.skipText },
+      { languages: o.second && o.second !== o.language ? [o.language, o.second] : [o.language], output: o.output, replace: o.replace },
       tool.flow.outputName?.(files.map((f) => f.name)) ?? "",
       signal,
       onProgress,
@@ -56,8 +56,8 @@ export function OcrTool() {
   const output = (where: string) => (
     <Select id={`ocr-output-${where}`} label={c.output} hideLabel={where === "side"} value={opts.output} options={OUTPUTS.map((value) => ({ value, label: c.outputs[value] }))} onChange={(v) => setOpts({ output: v })} />
   );
-  const skip = (where: string) => ({ id: `ocr-skip-${where}`, label: c.skipText, value: opts.skipText, onChange: (skipText: boolean) => setOpts({ skipText }) });
-  const changed = Number(!!opts.second) + Number(opts.output !== defaults.output) + Number(!opts.skipText);
+  const skip = (where: string) => ({ id: `ocr-replace-${where}`, label: c.replace, value: opts.replace, onChange: (replace: boolean) => setOpts({ replace }) });
+  const changed = Number(!!opts.second) + Number(opts.output !== defaults.output) + Number(opts.replace);
   return (
     <ToolFlow
       tool={tool}
