@@ -3,7 +3,7 @@
  * page. The content is drawn through a matrix, not redrawn: text stays text, pictures keep every
  * pixel, and the page keeps its size. Worker-only: this module pulls in the PDF library.
  */
-import { shownBox, transformAnnotations, transformContent, type Box, type Matrix } from "./page-geometry";
+import { hidesContent, shownBox, transformAnnotations, transformContent, type Box, type Matrix } from "./page-geometry";
 import { loadForEdit } from "./rotate";
 
 export type DeskewInput = { bytes: Uint8Array; password?: string; /** 0-based page → degrees to turn it clockwise, as the reader sees it. */ turns: Readonly<Record<number, number>> };
@@ -24,9 +24,11 @@ export async function deskewPdf({ bytes, password, turns }: DeskewInput, onProgr
   all.forEach((page, i) => {
     const turn = turns[i];
     if (turn && Number.isFinite(turn)) {
-      const m = turnMatrix(shownBox(page).box, turn);
-      transformContent(doc, page, m);
-      transformAnnotations(doc, page, m);
+      const { box } = shownBox(page);
+      const m = turnMatrix(box, turn);
+      // What the page box hid stays hidden: a turn must not swing it into a corner.
+      transformContent(doc, page, m, hidesContent(page, box) ? box : undefined);
+      transformAnnotations(doc, page, m, true);
     }
     onProgress?.((0.6 * (i + 1)) / all.length);
   });

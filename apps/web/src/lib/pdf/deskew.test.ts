@@ -116,4 +116,40 @@ describe("deskew (spec F15 §1)", () => {
     // Right of the middle, a clockwise turn moves things down the page (PDF y falls).
     expect(y).toBeLessThan(90);
   });
+
+  it("AC-1513: a field keeps its size and its picture turns with the page", async () => {
+    const { PDFDict, PDFName, PDFNumber, PDFStream } = await import("@cantoo/pdf-lib");
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([600, 200]);
+    const look = doc.context.register(doc.context.stream("0 0 400 12 re f", { Type: "XObject", Subtype: "Form", BBox: [0, 0, 400, 12] }));
+    const stamp = (rect: number[]) => doc.context.register(doc.context.obj({ Type: "Annot", Subtype: "Stamp", Rect: rect, AP: { N: look } }));
+    page.node.set(PDFName.of("Annots"), doc.context.obj([stamp([100, 94, 500, 106]), stamp([100, 20, 500, 32])]));
+    const made = await PDFDocument.load((await deskewPdf({ bytes: await doc.save(), turns: { 0: 5 } })).bytes);
+    const annots = made.getPage(0).node.Annots()!;
+    const rect = annots.lookup(0, PDFDict).lookup(PDFName.of("Rect"), PDFArray);
+    const n = [0, 1, 2, 3].map((i) => rect.lookup(i, PDFNumber).asNumber());
+    // The box around a 400 by 12 strip turned 5 degrees: 400cos5 + 12sin5 wide, 400sin5 + 12cos5 high.
+    expect(n[2] - n[0]).toBeCloseTo(399.52, 1);
+    expect(n[3] - n[1]).toBeCloseTo(46.82, 1);
+    const ap = (i: number) => annots.lookup(i, PDFDict).lookup(PDFName.of("AP"), PDFDict);
+    const matrix = ap(0).lookup(PDFName.of("N"), PDFStream).dict.lookup(PDFName.of("Matrix"), PDFArray);
+    const m = [0, 1, 2, 3].map((i) => matrix.lookup(i, PDFNumber).asNumber());
+    expect(m[0]).toBeCloseTo(Math.cos((5 * Math.PI) / 180), 4);
+    expect(m[1]).toBeCloseTo(-Math.sin((5 * Math.PI) / 180), 4);
+    // The picture the two shared was copied for each: neither is turned twice.
+    expect(ap(0).get(PDFName.of("N"))).not.toBe(ap(1).get(PDFName.of("N")));
+    const second = ap(1).lookup(PDFName.of("N"), PDFStream).dict.lookup(PDFName.of("Matrix"), PDFArray);
+    expect(second.lookup(0, PDFNumber).asNumber()).toBeCloseTo(m[0], 4);
+  });
+
+  it("AC-1514: what the page box hid stays hidden after a turn", async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([400, 400]);
+    page.setCropBox(100, 100, 200, 200);
+    page.drawText("x", { x: 150, y: 150, size: 10 });
+    const made = await PDFDocument.load((await deskewPdf({ bytes: await doc.save(), turns: { 0: 3 } })).bytes);
+    const { PDFArray: Arr, PDFName, PDFStream } = await import("@cantoo/pdf-lib");
+    const first = made.getPage(0).node.lookup(PDFName.of("Contents"), Arr).lookup(0, PDFStream);
+    expect(new TextDecoder().decode(first.getContents())).toMatch(/cm\n100 100 200 200 re W n/);
+  });
 });

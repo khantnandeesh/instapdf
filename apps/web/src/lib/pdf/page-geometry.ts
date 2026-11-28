@@ -3,7 +3,7 @@
  * the page as shown lies in the page's own coordinates, and how to move a page's content and its
  * links, notes and fields by one matrix. Nothing is redrawn: text stays text.
  */
-import { PDFArray, PDFDict, PDFName, PDFNumber, type PDFDocument, type PDFObject, type PDFPage } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFName, PDFNumber, PDFRawStream, PDFRef, type PDFDocument, type PDFObject, type PDFPage } from "@cantoo/pdf-lib";
 import type { Area } from "./area";
 import { visibleBox, type Box } from "./split-half";
 
@@ -106,8 +106,46 @@ function movePairs(arr: PDFArray, m: Matrix, doc: PDFDocument): PDFObject {
   return doc.context.obj(out);
 }
 
-/** Moves the page's links, notes and form fields with the content: their rectangles and their point lists. */
-export function transformAnnotations(doc: PDFDocument, page: PDFPage, m: Matrix) {
+/**
+ * One appearance drawn through the linear part of `m` as well: a copy, since two annotations may share
+ * a stream. The reader fits the turned picture into the annotation's rectangle, so no shift is needed.
+ */
+function turnedAppearance(doc: PDFDocument, value: PDFObject | undefined, m: Matrix): PDFObject | undefined {
+  const stream = value instanceof PDFRef ? doc.context.lookup(value) : value;
+  if (!(stream instanceof PDFRawStream)) return value;
+  const dict = stream.dict.clone(doc.context);
+  const old = dict.lookupMaybe(PDFName.of("Matrix"), PDFArray);
+  const o = old && old.size() === 6 ? numbers(old) : [1, 0, 0, 1, 0, 0];
+  // The appearance's own matrix first, then the turn.
+  dict.set(
+    PDFName.of("Matrix"),
+    doc.context.obj([o[0] * m[0] + o[1] * m[2], o[0] * m[1] + o[1] * m[3], o[2] * m[0] + o[3] * m[2], o[2] * m[1] + o[3] * m[3], o[4] * m[0] + o[5] * m[2], o[4] * m[1] + o[5] * m[3]]),
+  );
+  return doc.context.register(PDFRawStream.of(dict, stream.contents));
+}
+
+function turnAppearances(doc: PDFDocument, annot: PDFDict, m: Matrix) {
+  const ap = annot.lookupMaybe(PDFName.of("AP"), PDFDict);
+  if (!ap) return;
+  const made = doc.context.obj({});
+  for (const [key, value] of ap.entries()) {
+    const states = value instanceof PDFRef ? doc.context.lookup(value) : value;
+    if (states instanceof PDFDict) {
+      // A set of states (a checkbox's on and off): each one is turned.
+      const turned = doc.context.obj({});
+      for (const [state, each] of states.entries()) turned.set(state, turnedAppearance(doc, each, m) ?? each);
+      made.set(key, turned);
+    } else made.set(key, turnedAppearance(doc, value, m) ?? value);
+  }
+  annot.set(PDFName.of("AP"), made);
+}
+
+/**
+ * Moves the page's links, notes and form fields with the content: their rectangles and their point
+ * lists. A rectangle becomes the box around its four moved corners. With `appearances` (a turn by an
+ * odd angle), what each one draws is turned too, so a stamp or a field stays on what it covered.
+ */
+export function transformAnnotations(doc: PDFDocument, page: PDFPage, m: Matrix, appearances = false) {
   const annots = page.node.Annots();
   if (!annots) return;
   for (let k = 0; k < annots.size(); k++) {
@@ -116,10 +154,12 @@ export function transformAnnotations(doc: PDFDocument, page: PDFPage, m: Matrix)
     const rect = dict.lookupMaybe(PDFName.of("Rect"), PDFArray);
     if (rect && rect.size() === 4) {
       const n = numbers(rect);
-      const [ax, ay] = applyMatrix(m, n[0], n[1]);
-      const [bx, by] = applyMatrix(m, n[2], n[3]);
-      dict.set(PDFName.of("Rect"), doc.context.obj([Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by)]));
+      const corners = [applyMatrix(m, n[0], n[1]), applyMatrix(m, n[2], n[1]), applyMatrix(m, n[2], n[3]), applyMatrix(m, n[0], n[3])];
+      const xs = corners.map((c) => c[0]);
+      const ys = corners.map((c) => c[1]);
+      dict.set(PDFName.of("Rect"), doc.context.obj([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]));
     }
+    if (appearances) turnAppearances(doc, dict, m);
     for (const key of ["QuadPoints", "Vertices", "L", "CL"]) {
       const points = dict.lookupMaybe(PDFName.of(key), PDFArray);
       if (points) dict.set(PDFName.of(key), movePairs(points, m, doc));

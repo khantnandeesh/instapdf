@@ -97,9 +97,10 @@ const LeaveGuard = dynamic(() => lazyParts.leave().then((m) => m.LeaveGuard), { 
 
 type Phase = "idle" | "processing" | "done" | "error";
 
-/** Once shown, the progress pill (its done tick included) stays at least this long, so a fast run does not flash (motion.md T11). */
-const MIN_PROCESSING_MS = 400;
-/** The pill's done tick holds this long before the result swap starts (F25 §6 "Done", AC-639). */
+/**
+ * The pill's done tick holds this long before the result swap starts (F25 §6 "Done", AC-639). It is also
+ * the pill's floor: once shown it stays at least this long, so a fast run does not flash (motion.md T11).
+ */
 const DONE_HOLD_MS = 400;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const THUMB_MIN = 80;
@@ -773,7 +774,6 @@ export function ToolFlow({
     setPagesDim(false);
     setPhase("processing");
     announce(tool.flow.progressLabel);
-    const started = performance.now();
     try {
       // The pill shows on the click (F25 §6, eval G-13): let it paint before the work starts.
       await new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 0)));
@@ -797,10 +797,8 @@ export function ToolFlow({
           onCancel: (fn) => (serverCancel.current = fn),
         },
       );
-      // The pill's floor (motion.md T11) counts its done tick: a fast run shows "Done" for DONE_HOLD_MS and
-      // waits no longer than that (key check M7: the floors used to stack to 800ms).
-      const wait = MIN_PROCESSING_MS - DONE_HOLD_MS - (performance.now() - started);
-      if (wait > 0) await sleep(wait);
+      // The pill's floor (motion.md T11) is its done tick: a fast run shows "Done" for DONE_HOLD_MS and
+      // waits no longer than that (key check M7: a second floor used to stack on it).
       if (controller.signal.aborted) return;
       setProgress(1);
       // The done tick (leaf, "Done") holds, then the stage becomes the result (T12).

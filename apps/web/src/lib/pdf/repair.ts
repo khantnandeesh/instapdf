@@ -40,7 +40,8 @@ export function fromHeader(bytes: Uint8Array): Uint8Array {
 /** True when the file ends in a pointer to an index that is really there: a reader that trusts the index can open it. */
 export function indexSound(bytes: Uint8Array): boolean {
   const latin = (from: number, to: number) => String.fromCharCode(...bytes.subarray(Math.max(0, from), Math.min(bytes.length, to)));
-  const at = /startxref\s+(\d+)\s+%%EOF\s*$/.exec(latin(bytes.length - 64, bytes.length));
+  // The last pointer in the tail: a sound file may carry a few stray bytes after its end mark.
+  const at = [...latin(bytes.length - 1024, bytes.length).matchAll(/startxref\s+(\d+)\s+%%EOF/g)].pop();
   if (!at) return false;
   return /^\s*(xref|\d+\s+\d+\s+obj)/.test(latin(Number(at[1]), Number(at[1]) + 24));
 }

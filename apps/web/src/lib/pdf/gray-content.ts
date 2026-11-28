@@ -65,7 +65,7 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
   let strokeReal: number | null = env.inherits ? null : 0;
   let fillForced = false;
   let strokeForced = false;
-  const saved: [Space | null, Space | null, number | null, number | null][] = [];
+  const saved: [Space | null, Space | null, number | null, number | null, boolean, boolean][] = [];
   /** Writes a grey for fill or stroke in place of [start, end); dark text gets black. */
   const paint = (isFill: boolean, start: number, end: number, v: number, asWritten = false) => {
     const forced = !!black && inText && v > 0 && v <= DARK_TEXT;
@@ -132,11 +132,11 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
     const nums = operands.map((o) => o.num);
     switch (op) {
       case "q":
-        saved.push([fill, stroke, fillReal, strokeReal]);
+        saved.push([fill, stroke, fillReal, strokeReal, fillForced, strokeForced]);
         break;
       case "Q": {
         const s = saved.pop();
-        if (s) [fill, stroke, fillReal, strokeReal] = s;
+        if (s) [fill, stroke, fillReal, strokeReal, fillForced, strokeForced] = s;
         break;
       }
       case "BT": {

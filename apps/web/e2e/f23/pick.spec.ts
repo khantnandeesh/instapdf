@@ -202,7 +202,9 @@ test("AC-146, AC-152: wrong type and corrupt files get the local messages; the g
   await expect(tiles(page)).toHaveCount(3);
   await openRotate(page);
   await pick(page, "corrupt.pdf");
-  const local = await page.getByRole("alert").filter({ hasText: "corrupt.pdf" }).innerText();
+  // textContent, as toHaveText reads it: the notice also holds the Repair button now.
+  const local = (await page.getByRole("alert").filter({ hasText: "corrupt.pdf" }).textContent()) ?? "";
+  expect(local).toContain("corrupt.pdf");
   await openRotate(page);
   await pickFromRow(page, "Google Drive", ["corrupt.pdf"]);
   await expect(page.getByRole("alert").filter({ hasText: "corrupt.pdf" })).toHaveText(local);
