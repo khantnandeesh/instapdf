@@ -110,9 +110,11 @@ const CLOUD_BUDGET_KB = {
   "/flip-pdf/page": [147, 157],
   "/n-up-pdf/page": [147, 157],
   // +1 kB entry with Bates numbering (see the note in the table above).
-  "/add-page-numbers/page": [152, 161],
+  // +1 kB (28 Nov): Page numbers, Header and footer and Remove annotations were within 90 B of their limits (CI builds
+  // differ from local ones by a few bytes) after the stamp tools gained the result name prefix.
+  "/add-page-numbers/page": [153, 162],
   "/bates-numbering/page": [153, 163],
-  "/pdf-header-footer/page": [152, 161],
+  "/pdf-header-footer/page": [153, 162],
   "/watermark-pdf/page": [153, 163],
   "/extract-pdf-pages/page": [147, 157],
   "/delete-pdf-pages/page": [147, 157],
@@ -120,7 +122,7 @@ const CLOUD_BUDGET_KB = {
   // sat within 130 B of their limits when Compress joined the registry every route loads.
   "/protect-pdf/page": [146, 156],
   "/unlock-pdf/page": [142, 152],
-  "/remove-pdf-annotations/page": [147, 157],
+  "/remove-pdf-annotations/page": [148, 158],
   "/flatten-pdf/page": [145, 155],
   "/compress-pdf/page": [147, 157],
   "/grayscale-pdf/page": [145, 155],
