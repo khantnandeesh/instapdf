@@ -49,6 +49,8 @@ export type TextObj = {
   underline: boolean;
   color: string;
   align: "left" | "center" | "right";
+  /** 0–1; absent = solid. Set by the stamping tools (a watermark), not by the editor. */
+  opacity?: number;
 };
 
 export type ImageObj = { kind: "image"; id: string; page: string; x: number; y: number; w: number; h: number; rot: number; asset: string; opacity: number };

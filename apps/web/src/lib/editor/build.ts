@@ -77,6 +77,8 @@ export type BuildFonts = {
 };
 
 const color = (hex: string) => rgb(...hexToRgb(hex));
+/** The engine draws shaped lines solid: a see-through one gets the colour it would show on white paper. */
+const faded = (c: [number, number, number], opacity?: number): [number, number, number] => (opacity === undefined || opacity >= 1 ? c : (c.map((v) => 1 - (1 - v) * Math.max(0, opacity)) as [number, number, number]));
 
 /**
  * Added text that needs shaping (Hindi, Arabic and similar, AC-224) is left for the shaping
@@ -168,13 +170,13 @@ class TextFonts {
   }
 
   /** Draws `text` with its baseline starting at frame point `p`, running `rot`° clockwise. */
-  async draw(page: PDFPage, entry: PageEntry, face: FaceEntry, text: string, p: Pt, size: number, hex: string, rot: number): Promise<number> {
+  async draw(page: PDFPage, entry: PageEntry, face: FaceEntry, text: string, p: Pt, size: number, hex: string, rot: number, opacity?: number): Promise<number> {
     const r = (rot * Math.PI) / 180;
     let [x, y] = p;
     let total = 0;
     for (const run of await this.runs(face, text)) {
       const [px, py] = toPdf(entry, [x, y]);
-      page.drawText(run.text, { x: px, y: py, size, font: run.font, color: color(hex), rotate: degrees(-rot) });
+      page.drawText(run.text, { x: px, y: py, size, font: run.font, color: color(hex), rotate: degrees(-rot), ...(opacity !== undefined && opacity < 1 ? { opacity } : {}) });
       const w = run.font.widthOfTextAtSize(run.text, size);
       x += Math.cos(r) * w;
       y += Math.sin(r) * w;
@@ -321,8 +323,8 @@ export async function buildPdf(input: BuildInput, fonts: BuildFonts, fontkit?: F
           if (defer) {
             // Right alignment is x = right − width, so the line ends at the box's right edge.
             const [x, y] = toPdf(entry, boxPoint(o, o.rot, lx, base));
-            shaped.lines.push({ page: i, text: line, font: o.font, families: [shaped.family(o.font), "Noto Sans"], bold: o.bold, italic: o.italic, size: o.size, x, y, angle: -o.rot, color: color255(hexToRgb(o.color)) });
-          } else await text!.draw(page, entry, face, line, boxPoint(o, o.rot, lx, base), o.size, o.color, o.rot);
+            shaped.lines.push({ page: i, text: line, font: o.font, families: [shaped.family(o.font), "Noto Sans"], bold: o.bold, italic: o.italic, size: o.size, x, y, angle: -o.rot, color: color255(faded(hexToRgb(o.color), o.opacity)) });
+          } else await text!.draw(page, entry, face, line, boxPoint(o, o.rot, lx, base), o.size, o.color, o.rot, o.opacity);
           if (o.underline) {
             const t = Math.max(0.5, o.size * 0.06);
             const a = toPdf(entry, boxPoint(o, o.rot, lx, base + o.size * 0.12));
