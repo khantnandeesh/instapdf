@@ -46,11 +46,12 @@ jobs:
           node-version: 22
       # The latest nightly's measured durations (job "timings" below), when there are any: they
       # replace the checked-in e2e/timings.json, so new specs get real weights without a commit.
+      # The key carries the checked-in file's hash, so a hand edit to it wins until the next nightly.
       - uses: actions/cache/restore@v4
         with:
           path: apps/web/e2e/timings.json
           key: e2e-timings-none
-          restore-keys: e2e-timings-
+          restore-keys: e2e-timings-${{ hashFiles('apps/web/e2e/timings.json') }}-
       - id: plan
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -179,7 +180,7 @@ jobs:
   # and saves it to the Actions cache, where the next runs' plan job picks it up. Rows that failed
   # still report their durations. Nothing is committed.
   timings:
-    if: always() && github.event_name == 'schedule' && needs.e2e.result != 'skipped'
+    if: ${{ !cancelled() && github.event_name == 'schedule' && needs.e2e.result != 'skipped' }}
     needs: e2e
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -192,6 +193,9 @@ jobs:
         with:
           pattern: e2e-timings-*
           path: reports
+      # Hash of the checked-in file, taken before the merge rewrites it (see the plan job).
+      - id: base
+        run: echo "h=${{ hashFiles('apps/web/e2e/timings.json') }}" >> "$GITHUB_OUTPUT"
       - name: Merge the durations
         run: |
           shopt -s nullglob
@@ -199,7 +203,7 @@ jobs:
       - uses: actions/cache/save@v4
         with:
           path: apps/web/e2e/timings.json
-          key: e2e-timings-${{ github.run_id }}
+          key: e2e-timings-${{ steps.base.outputs.h }}-${{ github.run_id }}
 
   # The one check other things wait for: passes only if every job the plan asked for passed.
   web:
