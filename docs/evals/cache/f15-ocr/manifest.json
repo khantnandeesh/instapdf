@@ -22,14 +22,22 @@
     "task1": {
       "settings": "English, PDF only, replace tick off, 1280 wide",
       "at": "2026-11-28T12:00:49Z",
-      "timing_ms": {"click_to_task_post": 73, "click_to_result_frame": 1076, "click_to_download_visible": 6254},
+      "timing_ms": {
+        "click_to_task_post": 73,
+        "click_to_result_frame": 1076,
+        "click_to_download_visible": 6254
+      },
       "output_bytes": 72578,
       "output_sha256": "555dfc0fecc93302baddd19cf0c720d63e4eb7629405a0182f737758fb67b4df"
     },
     "task2": {
       "settings": "English, PDF and Text, replace tick off, 390 wide",
       "at": "2026-11-28T12:01:26Z",
-      "timing_ms": {"click_to_task_post": 67, "click_to_result_frame": 1279, "click_to_download_visible": 5936},
+      "timing_ms": {
+        "click_to_task_post": 67,
+        "click_to_result_frame": 1279,
+        "click_to_download_visible": 5936
+      },
       "output_bytes": 73170,
       "output_sha256": "3fa415d3b91178fae21a113a2550d7b4f7e4d16477674cdfca016c96f06def3e",
       "zip_holds": "a PDF of 72,578 B and a text file of 339 B, 60 words, all correct"
@@ -46,7 +54,79 @@
   "ours_2026-11-28_bd8d90b": {
     "searchable_sha256": "33183ff0910c20153b1cdd801c2da7dab6d06cf8c720186e30fcb94b3aa1c558",
     "searchable_bytes": 72578,
-    "click_to_download_ms": {"cold": [3593, 3145, 3714], "warm_reload": [2493, 2324, 2391], "phone_cold": 3937},
+    "click_to_download_ms": {
+      "cold": [
+        3593,
+        3145,
+        3714
+      ],
+      "warm_reload": [
+        2493,
+        2324,
+        2391
+      ],
+      "phone_cold": 3937
+    },
+    "non_get_requests": 0,
+    "off_origin_requests": 0
+  },
+  "ours_run2_2026-11-28_145061c": {
+    "at": "2026-11-28T13:18Z/13:27Z",
+    "reference_tasks_used": 0,
+    "raw_evidence": "/mnt/project-files/evals-cache/f15-ocr/run2/",
+    "languages_offered": 72,
+    "reference_languages_also_ours": 54,
+    "reference_languages_missing": [
+      "Ancient Greek",
+      "Cherokee",
+      "Old English",
+      "Esperanto",
+      "Frankish",
+      "Old French",
+      "Old Spanish"
+    ],
+    "languages_run": {
+      "Polish": "pol 200",
+      "Korean": "kor 200",
+      "Welsh": "cym 200",
+      "Khmer": "khm 200"
+    },
+    "copy": "FAQ and meta description state 20 files and 1,000 pages a run, no daily limit; no 'no page limit' claim left",
+    "replace_check": {
+      "gen1.pdf": {
+        "bytes": 72578,
+        "sha256": "33183ff0910c20153b1cdd801c2da7dab6d06cf8c720186e30fcb94b3aa1c558"
+      },
+      "gen2-replace-on.pdf": {
+        "bytes": 76310,
+        "sha256": "9cff9c593fe5ba2790dc784e345daaac7fee42fcc7e44a8248aa18b3f9113fee"
+      },
+      "gen3-replace-on.pdf": {
+        "bytes": 80017,
+        "sha256": "21fa03934b1e330d0ee58682d5aaa0072e833aac531effeec94e02b9da3d81ff"
+      },
+      "gen2-replace-off.pdf": {
+        "bytes": 72583,
+        "sha256": "551c15d5cd0b1cc8ee053167300a90ee5da353ca21375e9b39def438480af5e1"
+      },
+      "gen2-replace-on-390.pdf": {
+        "bytes": 76310,
+        "sha256": "9cff9c593fe5ba2790dc784e345daaac7fee42fcc7e44a8248aa18b3f9113fee"
+      },
+      "refout-replace-on.pdf": {
+        "bytes": 76076,
+        "sha256": "b237c902d17ff5997b3cc3a500e790db35d485e498c06b1ab72225d6c091df52"
+      },
+      "refout-replace-off.pdf": {
+        "bytes": 70823,
+        "sha256": "2d72895f7052b3fe0ae6f864be957700f12bf9c1da8fb1f8f94f08b73b88358d"
+      }
+    },
+    "replace_observations": [
+      "Words per page 23/20/17 in every output, identical to the first pass; one hidden layer drawn per scanned page; typed page untouched; render difference 0.",
+      "Replace on leaves the old layer's objects in the file: 34, 48, 62 objects over three generations.",
+      "One Replace-off run stalled for over two minutes and was stopped; not reproduced in nine further runs."
+    ],
     "non_get_requests": 0,
     "off_origin_requests": 0
   }

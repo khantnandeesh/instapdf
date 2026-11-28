@@ -101,6 +101,10 @@ describe("OCR text layer", () => {
     const twice = await addTextLayers({ bytes: once.bytes, layers: [{ page: 0, pdf: await hiddenLayer(300, 300) }], strip: true });
     const last = await PDFDocument.load(twice.bytes);
     expect((last.getPage(0).node.Resources()?.lookup(PDFName.of("XObject"), PDFDict).keys() ?? []).filter((k) => k.toString().includes("OcrText")).length).toBe(1);
+    // Replaced again and again, the file does not grow by a layer each time: the old one leaves with its font.
+    const thrice = await addTextLayers({ bytes: twice.bytes, layers: [{ page: 0, pdf: await hiddenLayer(300, 300) }], strip: true });
+    const fourth = await addTextLayers({ bytes: thrice.bytes, layers: [{ page: 0, pdf: await hiddenLayer(300, 300) }], strip: true });
+    expect(Math.abs(fourth.bytes.length - thrice.bytes.length)).toBeLessThan(300);
   });
 
   it("AC-1557: two pages drawing one earlier layer both lose it, and a layer one page still needs stays in the file", async () => {

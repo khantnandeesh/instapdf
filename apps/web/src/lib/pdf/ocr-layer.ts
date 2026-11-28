@@ -58,6 +58,23 @@ const contentRefs = (doc: PDFDocument, page: PDFPage): PDFRef[] => {
   return [contents, ...(held instanceof PDFArray ? held.asArray() : [])].filter((r): r is PDFRef => r instanceof PDFRef);
 };
 
+/** Every object that can be reached from `from`. */
+function reach(doc: PDFDocument, from: readonly unknown[]): Set<PDFRef> {
+  const seen = new Set<PDFRef>();
+  const todo = [...from];
+  while (todo.length) {
+    const o = todo.pop();
+    if (o instanceof PDFRef) {
+      if (seen.has(o)) continue;
+      seen.add(o);
+      todo.push(doc.context.lookup(o));
+    } else if (o instanceof PDFArray) todo.push(...o.asArray());
+    else if (o instanceof PDFDict) todo.push(...o.values());
+    else if (o instanceof PDFStream) todo.push(o.dict);
+  }
+  return seen;
+}
+
 /**
  * Takes hidden text out of the pages: in a page's own content, and any form it draws that holds
  * nothing but hidden text (how OCR tools, ours too, add their layer). Forms are not rewritten, only no
@@ -127,17 +144,20 @@ export function removeHiddenText(doc: PDFDocument, pages: readonly PDFPage[]): S
     page.node.set(CONTENTS, doc.context.register(doc.context.flateStream(kept)));
     changed.add(index);
   });
-  // A layer still drawn by some page stays; the rest go, with their entries (pages may share one list of resources).
+  // A layer still drawn by some page stays; the rest lose their entries (pages may share one list of resources).
+  const loose: PDFRef[] = [...new Set(replaced)];
   for (const ref of dropped) {
     if (drawn.has(ref)) continue;
+    loose.push(ref);
     for (const page of pages) {
       const forms = dictIn(page.node.Resources(), "XObject");
       for (const [key, v] of forms?.entries() ?? []) if (v === ref) forms!.delete(key);
     }
-    doc.context.delete(ref);
   }
-  const inUse = new Set(pages.flatMap((page) => contentRefs(doc, page)));
-  for (const ref of new Set(replaced)) if (!inUse.has(ref)) doc.context.delete(ref);
+  // What only they held (a layer's font, the content streams replaced) leaves the file with them: whatever the document still reaches stays.
+  const { Root, Info, Encrypt } = doc.context.trailerInfo;
+  const live = reach(doc, [Root, Info, Encrypt]);
+  for (const ref of reach(doc, loose)) if (!live.has(ref)) doc.context.delete(ref);
   return changed;
 }
 

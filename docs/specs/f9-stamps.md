@@ -38,7 +38,9 @@ Options, two groups so the panel fits the first screen at 1280×632: Where (posi
 | Room for the line | Margins on every side | A strip at the line's edge only |
 | Limits | 50 pages, 3 tasks an hour free | None |
 
-Not in this version: a colour for the line (always black), and a different line per file.
+The line takes a font, a size from 6 to 60 pt and a colour, on one row. With "Your own" the first row holds Line, Digits and Starts at, and Files from shows beside the line only when it uses `{doc}`, so the panel still ends above the fold at 1280×632.
+
+Not in this version: a name pattern for the result files (they keep their names), and a different line per file.
 
 ## Acceptance checks
 
@@ -46,7 +48,7 @@ Engine (`stamp.test.ts`): AC-1100 tokens; AC-1101 roman numerals; AC-1102 number
 
 Browser (`e2e/f9/stamp.spec.ts`, desktop and phone): AC-1130/1131 numbers on every page, previewed first; AC-1132 format, first number, picked pages; AC-1133 a bad first number keeps the button waiting; AC-1134 position moves the number; AC-1140/1141 header and footer lines with tokens, button waits for text; AC-1142 Hindi and Arabic lines read back as typed; AC-1150/1151 watermark text, picked pages, opacity; AC-1152 repeated across the page; AC-1153 picture watermark; AC-1154 several files come back as a ZIP.
 
-Bates (`stamp.test.ts`, `e2e/f9/stamp.spec.ts`): AC-1160 padding; AC-1161 the line from style and text before, tokens filled only where the run gives them; AC-1162 a file counts on from where its run starts and carries its file number; AC-1163 an added strip grows the stamped pages at that edge; AC-1170/1171 numbers count on from file to file, previewed first, each file comes back numbered; AC-1172 line, digits, text before, start and file number; AC-1173 your own line with tokens, a bad start keeps the button waiting; AC-1174 the added strip in the browser; AC-1164 the strip on a locked file and a turned page; AC-1175 pages picked in the second file only; AC-1176 an empty file number does not hold up a line that does not use it.
+Bates (`stamp.test.ts`, `e2e/f9/stamp.spec.ts`): AC-1160 padding; AC-1161 the line from style and text before, tokens filled only where the run gives them; AC-1162 a file counts on from where its run starts and carries its file number; AC-1163 an added strip grows the stamped pages at that edge; AC-1170/1171 numbers count on from file to file, previewed first, each file comes back numbered; AC-1172 line, digits, text before, start and file number; AC-1173 your own line with tokens, a bad start keeps the button waiting; AC-1174 the added strip in the browser; AC-1164 the strip on a locked file and a turned page; AC-1175 pages picked in the second file only; AC-1176 an empty file number does not hold up a line that does not use it. AC-1177 the number takes a colour and sizes from 6 to 60 pt, and a line of your own still ends above the fold.
 
 Layout: the options panel fits the first screen at 1280×632 and up (`e2e/ui/viewport-fit.spec.ts`); below 1024 px the bar holds the key control and the rest is in More options.
 

@@ -1,0 +1,124 @@
+{
+  "feature": "f9-bates",
+  "captured": "2026-11-28T13:13:43Z/13:16:21Z",
+  "expires": "2026-12-28",
+  "raw_evidence": "/mnt/project-files/evals-cache/f9-bates/ (ref/ reference outputs, captures and network logs; out/ our outputs, one HAR, Lighthouse JSON and logs; shots/; scripts/). Side-by-side captures: /mnt/project-files/comparisons/f9-bates/. Not in git.",
+  "reference_tasks_used": 2,
+  "reference_page_loads": 1,
+  "booked_slot": "13:00-13:59 UTC",
+  "harness": "Playwright headless Chromium, 1280x632 and 390x664. Result read by polling the result frame every 25 ms (reference) and by a mutation observer (ours).",
+  "inputs": {
+    "alpha.pdf": "1,944 B, 3 pages A4 portrait",
+    "bravo.pdf": "1,480 B, 2 pages 792x612"
+  },
+  "reference": {
+    "flow": [
+      "Choosing files uploads them at once (an upload check, then the upload; 0.3-0.4 s for these files).",
+      "Two files chosen together: the free tier keeps the first and shows a notice that one file per task is allowed without paying. No task was spent on this.",
+      "Options: one list of 20 preset lines (3 line shapes x 5 number widths of 1, 3, 4, 5, 6 digits, plus number only x 5) and a custom line with file-number and running-number tokens; the label words of a preset can be edited; 6 positions; start of the running number; start of the file counter; margins left alone or increased; 3 fonts; 18 sizes from 6 to 60; a colour picker; a pattern for the result's file name. Font, size, colour and name sit behind a 'more options' link.",
+      "The preview is three sample lines of text; it refreshes on a key press, not when a value is set otherwise.",
+      "Stated free limits on this page: 200 pages or 50 MB, 3 tasks an hour.",
+      "Result opens in an overlay frame."
+    ],
+    "landing_load_ms": 1103,
+    "task1": {
+      "settings": "alpha.pdf; prefix line with 6 digits, prefix ACME; bottom right; start 1; margins unchanged; serif 10; black; 1280 wide",
+      "at": "2026-11-28T13:14:56Z",
+      "timing_ms": {
+        "click_to_task_post": 38,
+        "click_to_result_frame": 1049,
+        "click_to_download_visible": 1924
+      },
+      "output_bytes": 2396,
+      "output_sha256": "6a2f3f2c06f1c317c3cc23e28415d72c28bb33350f6bde226c244c12f4a8db5a"
+    },
+    "task2": {
+      "settings": "bravo.pdf; custom line 'ACME <running number> Doc <file number>'; top centre; running number from 4; file counter from 2; margins increased; sans 14; red #fa0505; 390 wide",
+      "at": "2026-11-28T13:16:18Z",
+      "timing_ms": {
+        "click_to_task_post": 40,
+        "click_to_result_frame": 919,
+        "click_to_download_visible": 1593
+      },
+      "output_bytes": 2130,
+      "output_sha256": "1a34c0c682d251c2b63ce7e11d5dce200e23247d10491379248cb40ed81aa160"
+    },
+    "output_observations": [
+      "Task 1: ACME 000001..000003, one per page, real text in a standard serif font (not embedded), 21 pt from the right edge and 20 pt from the bottom; page size kept; nothing else on the page changed (render difference only in the number's box). +452 B.",
+      "Task 2: ACME 000004 Doc 2 and ACME 000005 Doc 2, red, sans 14, centred 17 pt from the top; page size kept at 792x612; the page content is drawn at 90% to make the margin (the source's heading went from 114 pt wide to 103 pt). +650 B."
+    ],
+    "phone_390": "Landing 390 wide, no sideways scroll. With a file in: document 405 px wide (15 px sideways scroll). The run button is at the end of a 1,200 px form (y=1162), reached by scrolling. The colour panel opens at x 364-514, off the 390 px screen; the colour was set at 1280. Result: Download at y=244.",
+    "not_captured": "A paid multi-file run; error states; a file over 200 pages; the other preset lines; a turned or full-bleed page."
+  },
+  "ours_2026-11-28_145061c": {
+    "t1_zip": {
+      "bytes": 8449,
+      "sha256": "3daa42c3889ce3e8904bd3b9e7c33c5200f93f2f3adb655033fe88e1328dc456",
+      "holds": {
+        "alpha.pdf": {
+          "bytes": 4514,
+          "sha256": "1c5c1d6718dc192e6509928bb5a268201ed60e0728e46e7d71770d2f175c6c6b"
+        },
+        "bravo.pdf": {
+          "bytes": 3693,
+          "sha256": "f415038bfd3ec90a40063146f884cc5909b7ec7b35d04047c420e7a0dfcb8643"
+        }
+      }
+    },
+    "t2_bravo": {
+      "bytes": 4118,
+      "sha256": "898e7d34f0aa1ecbda676e392ba307e53d00667a7316dba5aa91035c67f1e573"
+    },
+    "click_to_download_ms": {
+      "two_files_cold": [
+        1696,
+        1587,
+        1628
+      ],
+      "alpha_only_cold": [
+        1520,
+        1532,
+        1696
+      ],
+      "alpha_only_same_session": [
+        824,
+        794,
+        794
+      ],
+      "phone_task2": 1572,
+      "sixty_pages": 1460,
+      "250_pages": 1613
+    },
+    "button_ready_after_choosing_ms": [
+      232,
+      230,
+      224
+    ],
+    "numbers_previewed_after_choosing_ms": [
+      1528,
+      1522,
+      1516
+    ],
+    "non_get_requests": 0,
+    "off_origin_requests": 0,
+    "websockets": 0,
+    "lighthouse_mobile": [
+      {
+        "performance": 94,
+        "lcp_s": 1.6,
+        "tbt_ms": 260
+      },
+      {
+        "performance": 98,
+        "lcp_s": 1.5,
+        "tbt_ms": 150
+      },
+      {
+        "performance": 97,
+        "lcp_s": 1.4,
+        "tbt_ms": 200
+      }
+    ],
+    "axe_violations": 0
+  }
+}
