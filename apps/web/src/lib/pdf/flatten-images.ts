@@ -8,6 +8,7 @@
  */
 import type { ToolOutput } from "@/components/tool-flow/types";
 import { pdfOutputName, uniqueNames } from "./naming";
+import { packBuilt, type BuiltPdf } from "./pack-built";
 import { canvasBlob, drawPage } from "./page-images";
 import type { PictureDpi } from "./picture-dpi";
 import { openPdf } from "./pdfjs";
@@ -27,7 +28,7 @@ export async function flattenToPictures(sources: readonly PictureSource[], dpi: 
   let done = 0;
   let reduced = 0;
   let wasEncrypted = false;
-  const built: { name: string; blob: Blob; pageCount: number }[] = [];
+  const built: BuiltPdf[] = [];
   for (let i = 0; i < sources.length; i++) {
     const src = sources[i];
     const opened = await openPdf(new Uint8Array(await src.source.arrayBuffer()), src.password);
@@ -73,14 +74,7 @@ export async function flattenToPictures(sources: readonly PictureSource[], dpi: 
     done = before + src.pageCount;
   }
   const warnings = reduced ? [reduced === 1 ? "1 large page was drawn at a lower resolution." : `${reduced} large pages were drawn at a lower resolution.`] : undefined;
-  if (built.length === 1) return { name: built[0].name, type: "application/pdf", blob: built[0].blob, size: built[0].blob.size, pageCount: built[0].pageCount, wasEncrypted, warnings };
-  const { createZipWriter } = await import("./zip");
-  const zip = createZipWriter();
-  for (const b of built) {
-    if (signal.aborted) throw aborted();
-    zip.add(b.name, new Uint8Array(await b.blob.arrayBuffer()));
-  }
-  const blob = zip.finish();
+  const out = await packBuilt(built, zipName, signal, { wasEncrypted, warnings });
   onProgress(1);
-  return { name: zipName, type: "application/zip", blob, size: blob.size, entries: built.map((b) => ({ name: b.name, pageCount: b.pageCount })), wasEncrypted, warnings };
+  return out;
 }

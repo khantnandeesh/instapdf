@@ -69,7 +69,12 @@ export type MetadataJob = { kind: "metadata"; files: JobFile[]; zipName: string 
 /** Flatten to pictures: the pages were drawn in the tab (a canvas is needed); the worker puts each file's pictures into a PDF. */
 export type PicturesJob = { kind: "pictures"; files: { name: string; title?: string; encrypted: boolean; pages: { jpg: Blob; width: number; height: number }[] }[]; zipName: string };
 export type BookmarksJob = { kind: "bookmarks"; files: JobFile[]; zipName: string; items: import("./bookmark-edit").BookmarkNode[] };
-export type Job = BookmarksJob | PicturesJob | AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
+/** Grayscale (spec F13 §1): which pictures hold colour; one grey picture packed; the file converted. */
+export type GrayScanJob = { kind: "grayScan"; file: JobFile };
+export type GrayEncodeJob = { kind: "grayEncode"; pixels: Blob; width: number; height: number; lossy: boolean };
+export type GrayscaleJob = { kind: "grayscale"; files: (JobFile & { images?: { ref: string; width: number; height: number; jpeg: boolean; data: Blob }[] })[]; zipName: string; vector: boolean };
+export type RepairJob = { kind: "repair"; files: JobFile[]; zipName: string };
+export type Job = RepairJob | GrayScanJob | GrayEncodeJob | GrayscaleJob | BookmarksJob | PicturesJob | AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
 
 export type JobOutput = {
   name: string;
@@ -83,6 +88,8 @@ export type JobOutput = {
   wasEncrypted: boolean;
   /** Non-blocking notes for the user about the result. */
   warnings?: string[];
+  /** grayScan only: the pictures that hold colour, by object reference as pdf.js writes it. */
+  found?: { ref: string; lossy: boolean; width: number; height: number }[];
 };
 
 /** `phase` "fonts" = a font download (indeterminate); "pages" = back to the fraction. */
@@ -134,6 +141,30 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       });
       if (!removed) throw new Error(`${USER_ERROR}No annotations of the chosen kinds were found on ${job.files.length === 1 ? "these pages" : "the pages of these files"}, so there is nothing to remove.`);
       return out;
+    }
+    case "repair": {
+      const { repairPdf } = await import("./repair");
+      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => repairPdf({ bytes, password: file.password, name: file.name }, progress));
+    }
+    case "grayScan": {
+      const { colourImages } = await import("./grayscale");
+      const r = await colourImages({ bytes: new Uint8Array(await job.file.source.arrayBuffer()), password: job.file.password });
+      return { name: "", type: "application/pdf", blob: new Blob([]), pageCount: r.pageCount, wasEncrypted: false, found: r.images };
+    }
+    case "grayEncode": {
+      const { encodeGrayFlate, encodeGrayJpeg } = await import("./gray-encode");
+      const px = new Uint8Array(await job.pixels.arrayBuffer());
+      // A JPEG holds at most 65,535 pixels a side.
+      const jpeg = job.lossy && job.width <= 65535 && job.height <= 65535;
+      const data = jpeg ? encodeGrayJpeg(px, job.width, job.height) : encodeGrayFlate(px, job.width, job.height);
+      return { name: "", type: "application/pdf", blob: new Blob([data as Uint8Array<ArrayBuffer>], { type: jpeg ? "image/jpeg" : "application/octet-stream" }), wasEncrypted: false };
+    }
+    case "grayscale": {
+      const { grayscalePdf } = await import("./grayscale");
+      return runPerFile(job.files, job.zipName, onProgress, async (bytes, file, progress) => {
+        const images = file.images && (await Promise.all(file.images.map(async (i) => ({ ref: i.ref, width: i.width, height: i.height, jpeg: i.jpeg, predictor: !i.jpeg, data: new Uint8Array(await i.data.arrayBuffer()) }))));
+        return grayscalePdf({ bytes, password: file.password, vector: job.vector, images }, progress);
+      });
     }
     case "bookmarks": {
       const { writeBookmarks } = await import("./bookmarks");

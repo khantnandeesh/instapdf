@@ -60,10 +60,18 @@ const PERMISSION_FLAGS: Record<Permission, number> = {
  * Opens a PDF for reading (page sizes and thumbnails). `data` is transferred to
  * pdf.js, so pass a buffer the caller no longer needs.
  */
-export async function openPdf(data: Uint8Array, password?: string): Promise<OpenResult> {
+export async function openPdf(data: Uint8Array, password?: string, options?: { /** Pictures come back as exact pixel data, never through a canvas (which some browsers falsify or shrink). */ plainImages?: boolean }): Promise<OpenResult> {
   const pdfjs = await loadPdfjs();
-  sharedWorker ??= new pdfjs.PDFWorker();
-  const task = pdfjs.getDocument({ data, password, worker: sharedWorker, verbosity: 0 });
+  // pdf.js settles how it decodes pictures once per worker, so plain data needs a worker of its own.
+  const own = options?.plainImages ? new pdfjs.PDFWorker() : null;
+  const task = pdfjs.getDocument({ data, password, worker: own ?? (sharedWorker ??= new pdfjs.PDFWorker()), verbosity: 0, ...(own ? { isOffscreenCanvasSupported: false, isImageDecoderSupported: false } : {}) });
+  if (own) {
+    const destroy = task.destroy.bind(task);
+    task.destroy = async () => {
+      await destroy();
+      own.destroy();
+    };
+  }
   try {
     const doc = await task.promise;
     const [metadata, allowed] = await Promise.all([doc.getMetadata().catch(() => null), doc.getPermissions().catch(() => null)]);
