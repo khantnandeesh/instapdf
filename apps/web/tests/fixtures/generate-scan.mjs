@@ -38,3 +38,13 @@ p3.drawImage(await doc.embedJpg(third), { x: a4[1], y: 0, width: a4[0], height: 
 p3.setRotation(degrees(90));
 await writeFile(join(here, "scan.pdf"), await doc.save({ useObjectStreams: false }));
 console.log("wrote scan.pdf");
+
+// typed-sixty.pdf: sixty typed pages, for the guards that visit every tool with a long file. Every page
+// has its text already, so an OCR run leaves them alone (sixty-pages.pdf has only a page number each,
+// which OCR rightly reads again: twenty seconds a run).
+const typed = await PDFDocument.create();
+const typedFont = await typed.embedFont(StandardFonts.Helvetica);
+for (let n = 1; n <= 60; n++) typed.addPage(a4).drawText(`Typed page ${n} of sixty, with its text already in place.`, { x: 60, y: a4[1] - 90, size: 14, font: typedFont });
+typed.setCreationDate(new Date(0));
+typed.setModificationDate(new Date(0));
+await writeFile(join(dirname(fileURLToPath(import.meta.url)), "typed-sixty.pdf"), await typed.save());

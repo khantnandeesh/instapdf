@@ -163,6 +163,8 @@ type ExitWatch = {
   exitGap?: number;
   /** Each frame's time after the key (ms), for the failure message. */
   frames?: number[];
+  /** Whether the part was shown when the key came: false means it had gone before Escape, not because of it. */
+  atKey?: boolean;
   done?: boolean;
   cssMs?: number;
   tweenMs?: number;
@@ -233,6 +235,7 @@ async function armExitWatch(page: Page, kind: "tool-menu" | "dialog" | "menu") {
         const t0 = e.timeStamp;
         let lastShownTs = t0;
         watch.frames = [];
+        watch.atKey = shown();
         const frame = (ts: number) => {
           watch.frames!.push(Math.round(ts - t0));
           const on = shown();
@@ -279,11 +282,11 @@ async function expectExit(page: Page, what: string, limitMs: number, tween: bool
   const r = await page.evaluate(
     () => (window as unknown as { exitWatch: Required<ExitWatch> }).exitWatch,
   );
+  const frames = `frames at ${r.frames.join(", ")}ms after Escape`;
   expect(
     r.afterFrame,
-    `${what} is still shown the frame after Escape (it exits, not vanishes)`,
+    `${what} is still shown the frame after Escape (it exits, not vanishes; shown at the key: ${r.atKey}; ${frames})`,
   ).toBe(true);
-  const frames = `frames at ${r.frames.join(", ")}ms after Escape`;
   // Input latency on its own: a blocked main thread fails here, not as a slow animation.
   expect(r.firstFrame, `${what}: the first frame after Escape comes within 200ms of it (${frames})`).toBeLessThanOrEqual(200);
   // The exit itself runs from the first frame after the key.
