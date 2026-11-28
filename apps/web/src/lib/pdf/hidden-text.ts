@@ -43,23 +43,32 @@ export function cut(src: Uint8Array, ranges: readonly { start: number; end: numb
   return out;
 }
 
-export function stripHiddenText(src: Uint8Array): HiddenTextResult {
-  const cuts: { start: number; end: number; text?: string }[] = [];
+/**
+ * `solid` names the fonts whose glyphs show whatever the render mode (Type 3): text set in one of them
+ * is never taken for hidden. Hidden text is cut a whole text object (BT to ET) at a time, and only when
+ * nothing in that object shows: text that shows may stand where it does because of the hidden text
+ * before it, so an object that mixes the two is left exactly as written.
+ */
+export function stripHiddenText(src: Uint8Array, solid?: ReadonlySet<string>): HiddenTextResult {
+  type Cut = { start: number; end: number; text?: string };
+  const cuts: Cut[] = [];
   const draws: HiddenTextResult["draws"] = [];
   let paints = false;
-  // The text render mode is part of the graphics state: saved and restored with it.
+  // The text render mode and the font are part of the graphics state: saved and restored with it.
   let mode = 0;
-  const saved: number[] = [];
-  // Where the operands of the operator being read start, and the last one as text.
-  let first = -1;
-  let last = "";
+  let font = "";
+  const saved: { mode: number; font: string }[] = [];
+  // The text object being read: its hidden text, held until its ET shows nothing else was in it.
+  let inText = false;
+  let pending: Cut[] = [];
+  let shows = false;
+  // The operands of the operator being read.
+  let ops: { start: number; text: string }[] = [];
   const n = src.length;
   let i = 0;
-  const operand = (start: number, text: string) => {
-    if (first < 0) first = start;
-    last = text;
-  };
+  const operand = (start: number, text: string) => ops.push({ start, text });
   const text = (from: number, to: number) => String.fromCharCode(...src.subarray(from, Math.min(to, from + 64)));
+  const NUMBER = /^[+-]?(\d+\.?\d*|\.\d+)$/;
   while (i < n) {
     const b = src[i];
     if (WS.has(b)) {
@@ -97,20 +106,33 @@ export function stripHiddenText(src: Uint8Array): HiddenTextResult {
       const start = i;
       while (i < n && !WS.has(src[i]) && !DELIM.has(src[i])) i++;
       const word = text(start, i);
-      if (/^[+-]?(\d+\.?\d*|\.\d+)$/.test(word) || word === "true" || word === "false" || word === "null") {
+      if (NUMBER.test(word) || word === "true" || word === "false" || word === "null") {
         operand(start, word);
         continue;
       }
       // An operator.
-      if (word === "q") saved.push(mode);
-      else if (word === "Q") mode = saved.pop() ?? mode;
+      const last = ops.at(-1)?.text ?? "";
+      const from = ops[0]?.start ?? start;
+      if (word === "q") saved.push({ mode, font });
+      else if (word === "Q") ({ mode, font } = saved.pop() ?? { mode, font });
       else if (word === "Tr") mode = Number(last) || 0;
-      else if (SHOWS.has(word)) {
-        if (mode === 3) {
-          // ' and " also start a new line, which later text may count on.
-          cuts.push({ start: first < 0 ? start : first, end: i, text: word === "'" || word === '"' ? "T*" : undefined });
-        } else paints = true;
-      } else if (word === "Do") draws.push({ name: last, start: first < 0 ? start : first, end: i });
+      else if (word === "Tf") font = ops.at(-2)?.text ?? "";
+      else if (word === "BT") {
+        inText = true;
+        pending = [];
+        shows = false;
+      } else if (word === "ET") {
+        if (!shows) cuts.push(...pending);
+        inText = false;
+        pending = [];
+      } else if (SHOWS.has(word)) {
+        // A font not named in this stream comes from whoever draws it: hidden only when no font here always shows.
+        const hidden = mode === 3 && inText && !(solid?.size && (font === "" || solid.has(font)));
+        // ' starts a new line and " also sets the word and letter spacing, which later text may count on.
+        const spacing = word === '"' && ops.length === 3 && NUMBER.test(ops[0].text) && NUMBER.test(ops[1].text) ? ` ${ops[0].text} Tw ${ops[1].text} Tc T* ` : null;
+        if (hidden && (word !== '"' || spacing)) pending.push({ start: from, end: i, text: word === "'" ? " T* " : (spacing ?? undefined) });
+        else paints = shows = true;
+      } else if (word === "Do") draws.push({ name: last, start: from, end: i });
       else if (word === "BI") {
         // An inline picture: its data runs from ID to an EI that stands alone.
         paints = true;
@@ -119,8 +141,7 @@ export function stripHiddenText(src: Uint8Array): HiddenTextResult {
         while (i < n && !(src[i] === 69 && src[i + 1] === 73 && WS.has(src[i - 1]) && (i + 2 >= n || WS.has(src[i + 2]) || DELIM.has(src[i + 2])))) i++;
         i += 2;
       } else if (PAINTS.has(word)) paints = true;
-      first = -1;
-      last = "";
+      ops = [];
     }
   }
   return { bytes: cut(src, cuts), removed: cuts.length, paints, draws };

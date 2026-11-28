@@ -102,4 +102,21 @@ describe("OCR text layer", () => {
     const last = await PDFDocument.load(twice.bytes);
     expect((last.getPage(0).node.Resources()?.lookup(PDFName.of("XObject"), PDFDict).keys() ?? []).filter((k) => k.toString().includes("OcrText")).length).toBe(1);
   });
+
+  it("AC-1557: two pages drawing one earlier layer both lose it, and a layer one page still needs stays in the file", async () => {
+    const doc = await PDFDocument.create();
+    doc.addPage([300, 300]).drawText("typed", { x: 20, y: 200, size: 12 });
+    const once = await PDFDocument.load((await addTextLayers({ bytes: await doc.save(), layers: [{ page: 0, pdf: await hiddenLayer(300, 300) }] })).bytes);
+    const first = once.getPage(0);
+    const second = once.addPage([300, 300]);
+    second.node.set(PDFName.of("Contents"), first.node.get(PDFName.of("Contents"))!);
+    second.node.set(PDFName.of("Resources"), first.node.get(PDFName.of("Resources"))!);
+    const out = await PDFDocument.load((await addTextLayers({ bytes: await once.save(), layers: [], strip: true })).bytes);
+    for (const page of out.getPages()) {
+      const content = page.node.Contents() as PDFRawStream;
+      expect(new TextDecoder("latin1").decode(decodePDFRawStream(content).decode())).not.toContain("Do");
+      expect(page.node.Resources()?.lookup(PDFName.of("XObject"))?.toString() ?? "").not.toContain("OcrText");
+    }
+    expect(out.context.enumerateIndirectObjects().filter(([, o]) => o instanceof PDFRawStream && o.dict.get(PDFName.of("Subtype")) === PDFName.of("Form")).length).toBe(0);
+  });
 });

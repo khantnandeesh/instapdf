@@ -96,8 +96,30 @@ async function startReaders(count: number, languages: readonly string[], signal:
 
 type Page = { text: string; layer: Blob | null; read: boolean };
 
-/** Reads one file: the text of every page, and a text layer for each page that was recognised. */
-async function readFile(src: OcrSource, opts: OcrOptions, pool: Reader[], signal: AbortSignal, onPage: () => void): Promise<Page[]> {
+/** The text each page holds, as the file stands. */
+async function ownTexts(src: OcrSource): Promise<string[]> {
+  const opened = await openPdf(new Uint8Array(await src.source.arrayBuffer()), src.password);
+  if (!opened.ok) throw new Error(`${USER_ERROR}${src.name} could not be read.`);
+  const { doc, task } = opened.pdf;
+  try {
+    const out: string[] = [];
+    for (let n = 1; n <= doc.numPages; n++) {
+      const page = await doc.getPage(n);
+      out.push(pageText((await page.getTextContent()).items as TextPiece[]));
+      page.cleanup();
+    }
+    return out;
+  } finally {
+    void task.destroy();
+  }
+}
+
+/**
+ * Reads one file: the text of every page, and a text layer for each page that was recognised.
+ * `before` is each page's text before old OCR text was taken out: a page that lost some is read
+ * whatever it still holds, so it never ends up with less text than it came with.
+ */
+async function readFile(src: OcrSource, opts: OcrOptions, pool: Reader[], signal: AbortSignal, onPage: () => void, before?: readonly string[]): Promise<Page[]> {
   const opened = await openPdf(new Uint8Array(await src.source.arrayBuffer()), src.password);
   if (!opened.ok) throw new Error(`${USER_ERROR}${src.name} could not be read.`);
   const { doc, task } = opened.pdf;
@@ -122,7 +144,7 @@ async function readFile(src: OcrSource, opts: OcrOptions, pool: Reader[], signal
       let canvas: HTMLCanvasElement | undefined;
       try {
         const own = pageText((await page.getTextContent()).items as TextPiece[]);
-        if (hasText(own)) {
+        if (hasText(own) && !(before && before[n - 1] !== own)) {
           pages[n - 1] = { text: own, layer: null, read: false };
           onPage();
           continue;
@@ -186,13 +208,16 @@ export async function ocrPdfs(sources: readonly OcrSource[], opts: OcrOptions, z
     onProgress(READY);
     for (let i = 0; i < sources.length; i++) {
       let src = sources[i];
+      let before: string[] | undefined;
       if (opts.replace) {
+        before = await ownTexts(src);
+        if (signal.aborted) throw aborted();
         // The file without its old OCR text: what is read, and what the new text is laid on.
         const bare = await runInWorker({ kind: "ocrLayer", zipName: "", strip: true, files: [{ name: src.name, source: src.source, password: src.password, layers: [] }] }, { signal });
         wasEncrypted ||= out0(bare);
         src = { ...src, source: bare.blob, password: undefined };
       }
-      const pages = await readFile(src, opts, pool, signal, () => onProgress(READY + (++done / total) * (READ - READY)));
+      const pages = await readFile(src, opts, pool, signal, () => onProgress(READY + (++done / total) * (READ - READY)), before);
       recognised += pages.filter((p) => p.read && p.text).length;
       kept += pages.filter((p) => !p.read).length;
       const text = pages.map((p) => p.text).filter(Boolean).join("\n\n");
