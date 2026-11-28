@@ -1,0 +1,50 @@
+{
+  "feature": "f15-deskew",
+  "captured": "2026-11-28T08:49:00Z/09:05:00Z",
+  "expires": "2026-12-28",
+  "raw_evidence": "/mnt/project-files/evals-cache/f15/ (ref/ reference outputs, captures and network logs; out/ our outputs; scripts/). Not in git.",
+  "reference_tasks_used": 2,
+  "reference_page_loads": 4,
+  "harness": "Playwright headless Chromium, 1280x632; 390x664 by resizing the same session. Tilt measured by a projection-profile search on a 144 dpi render (checked on the source: 3.0, -1.5, 0.0, 0.6) and from the turn matrix written at the head of each page's content.",
+  "input": {
+    "file": "tilted.pdf",
+    "bytes": 9504,
+    "sha256": "bda3d5d9ba9f0b4cf37e1495ba18bda856f37c85687c4c2b67c3aafc03f99ebb",
+    "pages": "4 pages of real text, 420x594, tilted +3.0, -1.5, 0.0, +0.6 degrees (clockwise positive)"
+  },
+  "reference": {
+    "flow": [
+      "Choosing the file uploads it at once (POST /api/files/upload). No page is shown.",
+      "Step 1, 'Choose an option': Automatic (preselected) or Manually page by page, then Continue.",
+      "Automatic, step 2: an 'Only specific pages' range field (optional, e.g. 1-10,13) and an 'Only straighten strongly skewed pages' tick, off by default; then the run button.",
+      "Manual: one page at a time on a canvas with dashed guide lines, Previous / Next and a page number box, a rotation slider and six step buttons (-1, -0.5, -0.1, +0.1, +0.5, +1 degrees). Every page starts at 0.0; nothing is detected for you in this mode. The run button sits below the fold at 1280x632 (y=800) and at 390.",
+      "No detected angle is shown anywhere before the run; automatic and manual cannot be mixed in one run.",
+      "Result opens in an overlay frame: Download, save to cloud, share, Back to editing, Start over, Delete files.",
+      "Stated free limits: 200 pages or 100 MB, 3 tasks per hour."
+    ],
+    "clicks_file_to_download": 4,
+    "task1": {
+      "settings": "Automatic, defaults (no page range, strong-skew-only off)",
+      "at": "2026-11-28T08:53:35Z",
+      "timing_ms": {"file_to_choice_screen": "330-585 (250 ms polling)", "continue_to_options": "<=300", "run_click_to_task_post": 91, "run_click_to_result_frame_request": 812},
+      "output_bytes": 10886,
+      "output_sha256": "50d836d92d9a796a3f5b5b4ac9e05075e41585c86d72f37a264d7ec29e3ef157"
+    },
+    "task2": {
+      "settings": "Automatic, same settings as task 1 (the tick was already off, so this did not test strong-skew-only on). Run for an exact end-to-end time: every button clicked the moment it appeared, 25 ms polling inside the result frame.",
+      "at": "2026-11-28T09:04:13Z",
+      "timing_ms": {"file_to_choice_screen": 171, "file_to_options": 340, "run_clicked": 419, "task_post": 1416, "result_frame_request": 1659, "download_visible": 2893, "task_post_to_download_visible": 1477},
+      "output_bytes": 10886,
+      "output_sha256": "0780948c54315f4a97649b569b304c1ba398425c7d36192ad5fcd5b62fb604e3"
+    },
+    "output_observations": [
+      "Both outputs render identically, pixel for pixel.",
+      "Measured tilt after: 0.0, 0.0, 0.0, 0.0. Turn applied per the page matrices: 3.011, 1.484, none, 0.600 degrees, so what is left is 0.011, 0.016, 0, 0.000 degrees.",
+      "Page 3 (straight) content is byte-identical to the source.",
+      "Text is still text: 27 text objects per page, extracted words identical to the source on all 4 pages. Page size unchanged, no ink at the page edge, qpdf check clean.",
+      "10,886 B from 9,504 B (+14.5%)."
+    ],
+    "phone_390": "No sideways scroll on any step. Options and run button in view on the automatic path; result Download at y=244. Manual mode: page, Previous/Next and slider in view, step buttons and run button below the fold.",
+    "not_captured": "Strong-skew-only switched on; a page-range run; a manual-mode run; error states; a scanned (image-only) file. No task budget left. A re-check of our side needs no new reference tasks."
+  }
+}

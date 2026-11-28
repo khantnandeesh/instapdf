@@ -73,3 +73,25 @@ One run each (task budget), so these are single values, not medians.
 - **G-4 (M9, wording).** After a failed repair the blue notice "… is damaged. It can still be repaired." stays on screen under the red "… has too little left to repair", and the top row shows "That didn't work." with a Try again that can only fail the same way. Remove the stale notice and offer only Start over.
 - **G-5 (M9, wording).** Repairing `cut-short.pdf` ends on the plain "Your PDF is ready, 12 pages" with no word that anything was fixed; the reference says how many pages it recovered. The spec's "N of M pages were recovered" line shows only on loss. Also, Grayscale's "couldn't be opened. It may be damaged" message does not point to Repair.
 - **G-6 (coverage).** Not compared against the reference: its error states and its cloud/URL import menu (no task budget). Cached reference evidence covers one small file per tool; a re-check after fixes needs no new reference tasks.
+
+## Run 2
+
+**Verdict: FAIL.** M6 now passes. M7 is still lost: 0.99 s against the reference's 0.79 s. No owner waiver is on record.
+
+- Run: 2026-11-28, 08:58–09:06 UTC, by parity-evaluator. Re-check of the two lost checks on Grayscale only (M6, M7); nothing else was re-run, Repair included.
+- Candidate: staging `/grayscale-pdf`, `/api/health` reported `9cc4ce0`.
+- Reference: **no new tasks.** Its side is the cached run-1 evidence (`docs/evals/cache/f13/manifest.json`, `/mnt/project-files/evals-cache/f13/ref/`).
+- Same file as run 1 (`colours.pdf`, 6,348 B) and the same timing method (in-page observer, click on the main button → Download button present), 1280×632.
+- Evidence (not in git): `/mnt/project-files/evals-cache/f13/run2/` (outputs and scripts). Key screenshots: `/mnt/project-files/designs/f13/eval/` (`1-loaded`, `2-options`, `3-result` at 1280 and 390).
+
+| # | Check | Reference (cached) | BerryPDF, run 2 | Result |
+|---|---|---|---|---|
+| M6 | Options | Text grey or black; pictures grey or left; compress-pictures tick (on). Behind "More options" | What to convert: Everything / Text and drawings only (the reference's "pictures left") / Pictures only. **Make text black** switch and **Smaller photos** switch, both off by default; at 390 they sit behind "More options". Both do what they say: with Make text black the text is drawn at pure black (7,059 pixels under level 16 at 144 dpi against 0 without it, and 0 in the reference's grey-text output); Smaller photos re-packs the photo JPEG (2,065 → 1,963 B) | **PASS** (tie; we add "Pictures only") |
+| M7 | Processing | 0.79 s, one run, read by polling every 250 ms, so the true value is 0.54–0.79 s | Median of 3: **0.99 s** (0.992, 0.993, 0.978). At 390: 1.07 s. Truthful % and Cancel. Was 1.68 s in run 1 | **FAIL** (lose) |
+
+### Gaps, run 2
+
+- **G-1 (M7, blocks), narrowed.** 0.99 s is 0.2 s behind the reference at best and up to 0.45 s behind. Where the time goes, same in all three runs: 0% is shown for about 0.41 s after the click while 4 requests are still fetched (down from 8–9), the work itself takes about 30 ms, then "Done" is held for a fixed 0.54 s before Download appears (Done at 0.44–0.46 s, Download at 0.98–0.99 s). Cutting the hold to 0.15 s or less would land at about 0.6 s; fetching the last chunks while the file loads (1.0–1.5 s idle before the first thumbnail) would land under 0.3 s. Either the hold alone or both clears the check.
+- **G-2 (M6): closed.**
+- **G-3 (M8, does not block), still open.** With both switches on, `colours.pdf` comes out at 5,523 B (5,625 B with them off) against the reference's 4,032 B. Smaller photos saves 102 B here. The larger part is the lossless picture: ours is 1,002 B as one-channel Flate, larger than the 934 B three-channel original, where the reference stores the same picture in 441 B. The reference's compress tick is also on by default; ours is off.
+- G-4 to G-6 were not re-checked.

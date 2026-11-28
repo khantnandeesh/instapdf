@@ -3,10 +3,11 @@
  * Processing Web Worker: runs browser tools off the main thread.
  * Files arrive as Blobs (passed by reference) and never leave the device.
  */
-import { runJob, USER_ERROR, type Job, type JobEnv, type JobOutput } from "./jobs";
+import { runJob, USER_ERROR, warmJobs, type Job, type JobEnv, type JobOutput } from "./jobs";
 import type { FontManifest } from "./text";
 
-export type WorkerRequest = { id: number; job: Job };
+/** `warm`: no job yet, only the code these kinds of job will need. */
+export type WorkerRequest = { id: number; job: Job } | { warm: Job["kind"][] };
 export type WorkerResponse =
   | { id: number; type: "progress"; value: number; phase?: "fonts" | "pages" }
   | { id: number; type: "done"; output: JobOutput }
@@ -70,6 +71,7 @@ const env: JobEnv = {
 };
 
 scope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
+  if ("warm" in event.data) return warmJobs(event.data.warm);
   const { id, job } = event.data;
   const post = (msg: WorkerResponse) => scope.postMessage(msg);
   try {

@@ -19,4 +19,25 @@ export const deskewCopy = {
   found: (turn: number) => (turn ? `Turned ${describeTilt(turn)}` : "Not turned"),
   byHand: "set by hand",
   reset: "Use detected",
+  leave: "Leave as is",
+  only: "Only these pages",
+  onlyPlaceholder: "All pages",
+  onlyClear: "Clear pages",
+};
+
+/** OCR copy (spec F15 §2). */
+export const ocrCopy = {
+  stepLanguage: "Language",
+  language: "Language of the document",
+  second: "Second language",
+  none: "None",
+  languageNote: "Pick the language the pages are written in. Add a second one for a document that mixes two.",
+  stepResult: "Result",
+  output: "What to make",
+  outputs: { pdf: "Searchable PDF", text: "Text file", both: "Searchable PDF and text file" },
+  /** The bar below 1024 px has room for short names only. */
+  outputsShort: { pdf: "Searchable PDF", text: "Text file", both: "PDF and text" },
+  skipText: "Skip pages that already have text",
+  resultNote: "The pages keep their look: the text found is laid over them, invisible, so it can be searched, selected and copied. Check the result, since no recogniser reads every character right.",
+  more: "Options",
 };

@@ -65,4 +65,32 @@ test.describe("Deskew", () => {
     await expect(page.getByText("Every page is straight").first()).toBeVisible();
     await expect(primary(page)).toBeDisabled();
   });
+
+  test("AC-1523: the run can be kept to chosen pages, and one click in the dialog leaves a page as it is", async ({ page }) => {
+    await page.goto("/deskew-pdf");
+    await page.getByTestId("file-input").setInputFiles(fx("tilted.pdf"));
+    await expect(page.getByText("3 pages to straighten")).toBeVisible();
+    const only = page.getByRole("textbox", { name: "Only these pages" });
+    await only.fill("2-4");
+    await expect(page.getByText("2 pages to straighten")).toBeVisible();
+    await expect(page.locator("[data-page-index='0']")).not.toContainText("°");
+    // A page number the file does not have is said, and the run waits.
+    await only.fill("2-9");
+    await expect(primary(page)).toBeDisabled();
+    await only.fill("2-4");
+    // Page 2: left as it is with one click, and brought back with another.
+    await page.locator("[data-page-index='1'] [data-tile-button]").click();
+    const dialog = page.getByRole("dialog", { name: "Straighten this page" });
+    await dialog.getByTestId("leave-as-is").click();
+    await expect(dialog.getByTestId("turn-value")).toHaveText("0.0°");
+    await expect(dialog.getByTestId("leave-as-is")).toBeDisabled();
+    await dialog.getByRole("button", { name: "Done" }).click();
+    await expect(page.getByText("1 page to straighten")).toBeVisible();
+    await run(page);
+    const out = await downloadResult(page);
+    expect(await turnOf(out.bytes, 0)).toBe(0);
+    expect(await turnOf(out.bytes, 1)).toBe(0);
+    expect(await turnOf(out.bytes, 2)).toBe(0);
+    expect(Math.abs((await turnOf(out.bytes, 3)) + 0.6)).toBeLessThanOrEqual(0.15);
+  });
 });

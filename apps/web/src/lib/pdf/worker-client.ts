@@ -13,9 +13,10 @@ function getWorker(): Worker {
   return worker;
 }
 
-/** Starts the worker ahead of its first job, so the job does not wait for the worker's code to arrive. */
-export function warmWorker(): void {
-  getWorker();
+/** Starts the worker ahead of its first job, so the job does not wait for the worker's code to arrive; with `kinds`, the code those jobs load on first use is fetched too. */
+export function warmWorker(kinds?: Job["kind"][]): void {
+  const w = getWorker();
+  if (kinds?.length) w.postMessage({ warm: kinds } satisfies WorkerRequest);
 }
 
 /** Terminates the worker (stopping any running job) and rejects jobs in flight. */

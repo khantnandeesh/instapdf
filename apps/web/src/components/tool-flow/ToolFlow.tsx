@@ -101,7 +101,7 @@ type Phase = "idle" | "processing" | "done" | "error";
  * The pill's done tick holds this long before the result swap starts (F25 §6 "Done", AC-639). It is also
  * the pill's floor: once shown it stays at least this long, so a fast run does not flash (motion.md T11).
  */
-const DONE_HOLD_MS = 400;
+const DONE_HOLD_MS = 250;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const THUMB_MIN = 80;
 const THUMB_MAX = 400;
@@ -340,7 +340,11 @@ export function ToolFlow({
   warmRef.current = warm;
   useEffect(() => {
     if (!anyReady) return;
-    const go = () => (warmRef.current ?? warmWorker)();
+    const go = () => {
+      (warmRef.current ?? warmWorker)();
+      // The result card too: the done tick should not wait on it.
+      void loadResult().catch(() => {});
+    };
     if (typeof requestIdleCallback === "function") {
       const id = requestIdleCallback(go, { timeout: 1500 });
       return () => cancelIdleCallback(id);

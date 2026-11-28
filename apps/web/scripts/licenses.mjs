@@ -24,6 +24,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { copyrightLines, EXCEPTIONS, findViolations, isFontOnlyPackage, licenseExpression } from "./license-policy.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -230,7 +231,24 @@ function assetEntries() {
   }
   const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
   const text = readFileSync(join(dir, "LICENSE"), "utf8").trim();
+  // The text recogniser's language data (scripts/copy-ocr.mjs): Tesseract's own trained models
+  // (tessdata_best, Apache-2.0), installed from the @tesseract.js-data wrapper packages (MIT, no
+  // licence file of their own). The Apache text is the one tesseract.js-core ships.
+  const ocr = JSON.parse(readFileSync(join(root, "src", "lib", "ocr", "ocr.json"), "utf8"));
+  const main = createRequire(join(root, "package.json")).resolve("tesseract.js/package.json");
+  const coreLicense = join(dirname(createRequire(main).resolve("tesseract.js-core/package.json")), "LICENSE");
+  const apache = readFileSync(coreLicense, "utf8").trim();
   return [
+    {
+      kind: "asset",
+      name: `Tesseract language data (${ocr.languages.map((l) => l.code).join(", ")})`,
+      version: ocr.data,
+      license: "Apache-2.0",
+      copyright: ["Copyright Google Inc. and the Tesseract OCR contributors"],
+      author: null,
+      homepage: "https://github.com/tesseract-ocr/tessdata_best",
+      texts: [{ file: "LICENSE", text: apache }],
+    },
     {
       kind: "asset",
       name: "Phosphor icons (Duotone icon paths)",

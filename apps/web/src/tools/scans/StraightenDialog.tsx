@@ -44,9 +44,15 @@ export function StraightenDialog({
       help={c.dialogHelp}
       status={(index) => `${c.found(turnOf(index))}${byHand(index) ? ` (${c.byHand})` : ""}`}
       action={(index) => (
-        <Button variant="ghost" disabled={!byHand(index) || detected(index) === undefined} onClick={() => onTurn(index, undefined)} data-testid="use-detected">
-          {c.reset}
-        </Button>
+        <>
+          {/* One click leaves a page out of the run: its turn is set to none by hand. */}
+          <Button variant="ghost" disabled={turnOf(index) === 0} onClick={() => onTurn(index, 0)} data-testid="leave-as-is">
+            {c.leave}
+          </Button>
+          <Button variant="ghost" disabled={!byHand(index) || detected(index) === undefined} onClick={() => onTurn(index, undefined)} data-testid="use-detected">
+            {c.reset}
+          </Button>
+        </>
       )}
       frame={(page, index) => (
         <span className="ip-straighten" data-testid="straighten-frame" data-turn={turnOf(index)}>

@@ -462,7 +462,7 @@ Cancel is hidden during `done`.
   - "Repair PDF" shows only when a `repair-pdf` tool is `ready` (mocked registry in a unit test).
   - The full message is in NoticeStack.
   - The slot box is unchanged (AC-632).
-- **AC-639.** The done tick shows "Done" for at least 400ms before `data-state` becomes `done`. Total time from the job finishing to `result` visible ≤ 900ms (400 tick + 120 exit + 320 enter + slack).
+- **AC-639.** The done tick shows "Done" for at least 250ms before `data-state` becomes `done`. Total time from the job finishing to `result` visible ≤ 750ms (250 tick + 120 exit + 320 enter + slack). (Was 400 and 900 until 28 Nov 2026: the key check on speed, M7, was lost to the hold alone on small files.)
 - **AC-640.**
   - Accessibility:
     - the progressbar has the right `aria-valuenow` / `aria-valuetext` per phase;

@@ -289,7 +289,7 @@ export const toolSeo: Record<string, ToolSeo> = {
   "ocr-pdf": {
     keyword: "ocr pdf",
     title: "OCR PDF: Make Scanned PDFs Searchable Free",
-    description: `OCR scanned PDFs to make their text searchable and copyable, in many languages. Free, no sign-up, no watermark. Small files stay in your browser.`,
+    description: `OCR scanned PDFs to make their text searchable and copyable, in 12 languages. Free, no sign-up, no page limit. ${privateNote}`,
     also: ["searchable pdf", "pdf ocr online", "scanned pdf to text", "image to text pdf"],
   },
   "deskew-pdf": {
@@ -1101,6 +1101,45 @@ export const seoContent: Record<string, ToolSeoContent> = {
       },
     ],
     related: ["rotate-pdf", "crop-pdf", "ocr-pdf", "split-pdf-in-half", "grayscale-pdf", "compress-pdf"],
+  },
+  "ocr-pdf": {
+    howTo: "How to OCR a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop the scanned PDF on the page, or choose it from your device. Nothing is uploaded." },
+      { name: "Pick the language", text: "Choose the language the pages are written in, and a second one if the document mixes two. Choose a searchable PDF, a text file, or both." },
+      { name: "Download", text: "Select Recognize text and download the result. The pages look the same, and their text can now be searched, selected and copied." },
+    ],
+    faq: [
+      {
+        q: "How do I make a scanned PDF searchable?",
+        a: "Add the PDF, pick its language and select Recognize text. The text found on each page is laid over it, invisible, exactly where the words are, so search, select and copy work in any PDF reader.",
+      },
+      {
+        q: "Does OCR change how my pages look?",
+        a: "No. The scan is not redrawn or compressed again. Only an invisible layer of text is added, so the file grows by a few kilobytes a page.",
+      },
+      {
+        q: "Is there a page limit?",
+        a: "No. Every page is read on your own device, so there is no page count or daily limit. Long documents take longer, and you can cancel at any time.",
+      },
+      {
+        q: "Which languages can it read?",
+        a: "English, Hindi, Spanish, French, German, Portuguese, Italian, Dutch, Russian, Arabic, Simplified Chinese and Japanese. You can pick two at once for a mixed document.",
+      },
+      {
+        q: "What about pages that already have text?",
+        a: "They are left as they are, so a file that mixes typed and scanned pages does not end up with doubled text. Turn Skip pages that already have text off to read every page again.",
+      },
+      {
+        q: "How accurate is it?",
+        a: "Clean scans at 300 dpi read very well. Small, faint or tilted print reads worse, so check the result before relying on it. Straightening the pages first with Deskew PDF helps.",
+      },
+      {
+        q: "Are my scans uploaded?",
+        a: "No. The recogniser and its language data are downloaded to your browser once, and the pages are read there. They never leave your device.",
+      },
+    ],
+    related: ["deskew-pdf", "pdf-to-text", "rotate-pdf", "grayscale-pdf", "compress-pdf", "extract-images"],
   },
   "repair-pdf": {
     howTo: "How to repair a PDF",

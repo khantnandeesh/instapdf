@@ -3,7 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLazyModule, useLiveState, useRemembered } from "@/components/page-select/hooks";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
 import type { FlowApi, LoadedFile, ProcessFn } from "@/components/tool-flow/types";
+import { RangeField } from "@/components/page-select/RangeField";
+import { rangeErrorText } from "@/components/page-select/range-errors";
 import { Switch } from "@/components/ui/Switch";
+import { selectedPages, validatePageRanges } from "@/lib/page-ranges";
 import { formatTilt } from "@/lib/pdf/tilt-text";
 import { runInWorker } from "@/lib/pdf/worker-client";
 import { flowTool } from "@/tools/registry";
@@ -41,6 +44,8 @@ export function DeskewTool() {
   const [loaded, setLoaded] = useState<LoadedFile[]>([]);
   const [found, setFound, foundLive] = useLiveState<Turns>({});
   const [manual, setManual] = useState<Turns>({});
+  /** "Only these pages": the pages whose found tilt is corrected. Empty means every page. */
+  const [only, setOnly] = useState("");
   const [open, setOpen] = useState<{ fileId: string; index: number } | null>(null);
   const [shown, setShown] = useState(false);
   const [straighten, setStraighten] = useState<DialogModule | null>(null);
@@ -108,20 +113,26 @@ export function DeskewTool() {
     };
   }, [skew, loaded, foundLive, setFound]);
 
-  /** The turn each page will get: the one set by hand, else the one found when it is large enough to count. */
+  const counts = useMemo(() => loaded.map((f) => f.pageCount), [loaded]);
+  const range = useMemo(() => (only.trim() ? validatePageRanges(only, counts) : null), [only, counts]);
+  const rangeError = range && !range.ok ? rangeErrorText(range.error, counts) : null;
+
+  /** The turn each page will get: the one set by hand, else the one found when it is large enough to count and the page is among those asked for. */
   const turns = useMemo(() => {
     const least = opts.strongOnly ? STRONG : LEAST;
     const out: Record<string, number[]> = {};
     for (const f of loaded) {
+      const asked = range?.ok ? new Set(selectedPages(range.items, f.pageCount)) : null;
       out[f.id] = Array.from({ length: f.pageCount }, (_, i) => {
         const hand = manual[f.id]?.[i];
         if (hand !== undefined) return hand;
+        if (asked && !asked.has(i)) return 0;
         const auto = found[f.id]?.[i] ?? 0;
         return Math.abs(auto) >= least - 1e-9 ? auto : 0;
       });
     }
     return out;
-  }, [loaded, found, manual, opts.strongOnly]);
+  }, [loaded, found, manual, opts.strongOnly, range]);
   const turnsLive = useRef(turns);
   turnsLive.current = turns;
 
@@ -153,9 +164,11 @@ export function DeskewTool() {
         onReset={() => {
           setFound({});
           setManual({});
+          setOnly("");
           setOpen(null);
         }}
         canRun={() => {
+          if (rangeError) return rangeError;
           if (turned) return true;
           return done < total ? c.measuring(done, total) : c.nothing;
         }}
@@ -170,7 +183,25 @@ export function DeskewTool() {
           setShown(true);
           if (!straighten) void loadDialog().then(setStraighten);
         }}
-        renderOptions={() => <Switch id="deskew-strong" label={c.strongOnly} ariaLabel={c.strongOnlyName} checked={opts.strongOnly} onChange={(strongOnly) => setOpts({ strongOnly })} />}
+        renderOptions={() => (
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 dock-bar:flex-1">
+            <Switch id="deskew-strong" label={c.strongOnly} ariaLabel={c.strongOnlyName} checked={opts.strongOnly} onChange={(strongOnly) => setOpts({ strongOnly })} />
+            <RangeField
+              label={c.only}
+              value={only}
+              placeholder={c.onlyPlaceholder}
+              error={rangeError}
+              clearLabel={c.onlyClear}
+              canClear={!!only}
+              onChange={setOnly}
+              onBlur={() => {}}
+              onClear={() => setOnly("")}
+              onEnter={() => !rangeError && turned > 0 && apiRef.current?.submit()}
+              className="min-w-0 flex-1 dock-bar:lg:max-w-[220px]"
+              testId="deskew-only"
+            />
+          </div>
+        )}
       />
       {straighten && open && (
         <straighten.StraightenDialog

@@ -1,0 +1,18 @@
+{
+  "engine": "7.0.0",
+  "data": "1.0.0",
+  "languages": [
+    { "code": "eng", "name": "English", "locales": ["en"] },
+    { "code": "hin", "name": "Hindi", "locales": ["hi"] },
+    { "code": "spa", "name": "Spanish", "locales": ["es"] },
+    { "code": "fra", "name": "French", "locales": ["fr"] },
+    { "code": "deu", "name": "German", "locales": ["de"] },
+    { "code": "por", "name": "Portuguese", "locales": ["pt"] },
+    { "code": "ita", "name": "Italian", "locales": ["it"] },
+    { "code": "nld", "name": "Dutch", "locales": ["nl"] },
+    { "code": "rus", "name": "Russian", "locales": ["ru"] },
+    { "code": "ara", "name": "Arabic", "locales": ["ar"] },
+    { "code": "chi_sim", "name": "Chinese (Simplified)", "locales": ["zh"] },
+    { "code": "jpn", "name": "Japanese", "locales": ["ja"] }
+  ]
+}
