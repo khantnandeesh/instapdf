@@ -38,7 +38,7 @@ test.describe("Compress", () => {
     await open(page, "photo.pdf");
     await expectNoSeriousAxeViolations(page, "Compress, loaded");
     await run(page);
-    await expect(flow(page)).toContainText(/\d+ KB before, \d+% smaller\./);
+    await expect(flow(page)).toContainText(/\d+% smaller\./);
     await expectNoSeriousAxeViolations(page, "Compress, result");
     const out = await downloadResult(page);
     expect(out.name).toBe("photo.pdf");

@@ -15,7 +15,7 @@ Screens: `designs/f6-compress/{picker,loaded,result}-{1280,390}.png`, `designs/f
   - Pictures in grey: off at first. Text and drawings keep their colours.
 - Left exactly as they are: text (still selectable and searchable), drawings, fonts, links, bookmarks, fields and metadata; pictures in print colours (CMYK), spot colours and Lab; stencils and one-bit line art; pictures with a colour key; pictures under 3 kB; a picture drawn inside a pattern is packed but never scaled. Soft masks are kept, so see-through edges stay. A picture in an annotation (a stamp) is packed but never scaled. A picture with a colour profile keeps it. A picture over 65,535 pixels a side is left as it is.
 - The file is written by the compact writer: nothing unused, repeated objects stored once, old page thumbnails dropped.
-- The result says what was saved: "499 KB before, 98% smaller." A ZIP lists each file's before and after.
+- The result says what was saved: "98% smaller." A ZIP lists each file's before and after.
 - Never larger: a file that would not get smaller comes back byte for byte, and the result says it is already as small as this tool can make it.
 - A file that opened with a password is saved without one, as in every tool.
 

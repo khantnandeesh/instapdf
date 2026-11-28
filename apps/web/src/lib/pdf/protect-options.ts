@@ -33,10 +33,12 @@ export const MAX_OLD_PASSWORD_BYTES = 32;
  * The form a password is stored in. Revision 6 asks for a normalised password (SASLprep); NFKC is its
  * core, so "é" typed as one character or as e + accent, or a full-width letter, opens the same file in a
  * reader that normalises what is typed.
+ * AES-128 readers use what is typed as it is: there the password is only composed (NFC), so "²" stays "²"
+ * and an accent typed apart still joins its letter.
  */
-export const normalPassword = (p: string) => p.normalize("NFKC");
-export const passwordTooLong = (p: string, strength: ProtectStrength = "aes256") => (strength === "aes128" ? normalPassword(p).length > MAX_OLD_PASSWORD_BYTES : new TextEncoder().encode(normalPassword(p)).length > MAX_PASSWORD_BYTES);
+export const normalPassword = (p: string, strength: ProtectStrength = "aes256") => p.normalize(strength === "aes128" ? "NFC" : "NFKC");
+export const passwordTooLong = (p: string, strength: ProtectStrength = "aes256") => (strength === "aes128" ? normalPassword(p, strength).length > MAX_OLD_PASSWORD_BYTES : new TextEncoder().encode(normalPassword(p)).length > MAX_PASSWORD_BYTES);
 /** AES-128 stores a password one byte a character: letters outside the Western European set have no place in it. */
-export const passwordUnfit = (p: string, strength: ProtectStrength = "aes256") => strength === "aes128" && [...normalPassword(p)].some((ch) => ch.codePointAt(0)! > 0xff);
+export const passwordUnfit = (p: string, strength: ProtectStrength = "aes256") => strength === "aes128" && [...normalPassword(p, strength)].some((ch) => ch.codePointAt(0)! > 0xff);
 /** With restrictions, the password that lifts them must not be the one that opens the file. */
-export const ownerSameAsOpen = (o: ProtectOptions) => restricts(o.allow) && o.ownerPassword.length > 0 && normalPassword(o.ownerPassword) === normalPassword(o.openPassword);
+export const ownerSameAsOpen = (o: ProtectOptions) => restricts(o.allow) && o.ownerPassword.length > 0 && normalPassword(o.ownerPassword, o.strength) === normalPassword(o.openPassword, o.strength);

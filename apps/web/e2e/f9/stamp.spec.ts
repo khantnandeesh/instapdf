@@ -248,14 +248,18 @@ test.describe("Bates numbering", () => {
     expect(sizes.at(-1)).toBe("60");
     await panel.getByLabel("Colour", { exact: true }).selectOption({ label: "Red" });
     await panel.getByLabel("Line", { exact: true }).selectOption({ label: "Your own" });
-    await panel.getByLabel("Your line", { exact: true }).fill("ACME {bates} Doc {doc}");
+    await panel.getByLabel("Your line", { exact: true }).fill("ACME {bates} Doc {doc} of {file}");
     await expect(panel.getByLabel("Files from", { exact: true })).toBeVisible();
     // The result's name takes a prefix; what a file name cannot hold is dropped.
-    await panel.getByLabel("Result name starts with", { exact: true }).fill("ACME/-");
+    await panel.getByLabel("Result name starts with", { exact: true }).fill("X9/-");
     expect(await panel.evaluate((e) => e.getBoundingClientRect().bottom)).toBeLessThanOrEqual(632);
     await run(page);
     const out = await downloadResult(page);
-    expect(out.name).toBe("ACME-scan.pdf");
+    expect(out.name).toBe("X9-scan.pdf");
+    // The {file} token still gives the name the file came with.
+    const line = (await textsOf(out.bytes))[0];
+    expect(line).toContain("of scan");
+    expect(line).not.toContain("X9-");
     const doc = await PDFDocument.load(out.bytes);
     const text = doc.context
       .enumerateIndirectObjects()

@@ -83,6 +83,10 @@ class Pictures {
     if (kind !== "ICCBased") return plain;
     const profile = this.look(v.get(1));
     const n = profile instanceof PDFRawStream ? this.num(profile.dict.get(N("N"))) : undefined;
+    // A profile that names another space to fall back on (Lab, a calibrated one) is decoded through that
+    // space: the values that come back are already plain, and keeping the profile would convert them twice.
+    const alternate = profile instanceof PDFRawStream ? this.look(profile.dict.get(N("Alternate"))) : undefined;
+    if (alternate && !(alternate instanceof PDFName && ["DeviceRGB", "DeviceGray"].includes(alternate.decodeText()))) return plain;
     // In the file as it stands when it is referenced (the usual case), so nothing is copied.
     return n === (gray ? 1 : 3) ? (space instanceof PDFRef ? space : v) : plain;
   }

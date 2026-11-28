@@ -227,7 +227,8 @@ export async function compressPdfs(sources: readonly CompressSource[], opts: Com
   const after = built.reduce((n, b) => n + b.blob.size, 0);
   const same = built.filter((b) => b.unchanged);
   // What was saved, said plainly; and plainly too when a file had nothing to give.
-  const note = after < before ? `${formatBytes(before)} before, ${savedText(before, after)}.` : undefined;
+  // Short enough to stay on the summary's one line on a 320 px phone.
+  const note = after < before ? `${savedText(before, after)}.` : undefined;
   const warnings = same.length === 0 ? undefined : [built.length === 1 ? "This PDF is already as small as this tool can make it, so it comes back as it was." : same.length === 1 ? `${same[0].name} is already as small as this tool can make it.` : `${same.length === built.length ? "These PDFs" : `${same.length} of these PDFs`} are already as small as this tool can make them.`];
   const rest = { wasEncrypted, ...(note ? { note } : {}), ...(warnings ? { warnings } : {}) };
   onProgress(1);

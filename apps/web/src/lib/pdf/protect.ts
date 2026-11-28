@@ -55,8 +55,8 @@ export async function protectPdf({ bytes, password, options }: ProtectInput): Pr
   const { doc, wasEncrypted } = await loadForEdit(bytes, password);
   const { allow } = options;
   const wasPdfA = dropPdfAClaim(doc);
-  const openPassword = normalPassword(options.openPassword);
-  const ownerPassword = normalPassword(options.ownerPassword);
+  const openPassword = normalPassword(options.openPassword, options.strength);
+  const ownerPassword = normalPassword(options.ownerPassword, options.strength);
   doc.encrypt({
     algorithm: options.strength === "aes128" ? "AES-128" : "AES-256",
     userPassword: openPassword,

@@ -160,7 +160,8 @@ describe("review fixes", () => {
     expect(await rights({ print: "none", copy: true, edit: "pages" })).toEqual({ print: false, fine: false, copy: true, modify: false, comment: false, forms: false, pages: true });
   });
   it("AC-813: AES-128 for old readers: the password is needed and opens the file; long passwords are refused", async () => {
-    for (const pw of ["s3cret", "caf\u00e9-\u00fc"]) {
+    // "²", "µ" and "½" are kept as typed: an old reader does not fold them to "2", "μ" or "1/2".
+    for (const pw of ["s3cret", "caf\u00e9-\u00fc", "m\u00b2 \u00b5\u00bd"]) {
       const out = await protectPdf({ bytes: await fx("alpha.pdf"), options: { openPassword: pw, ownerPassword: "", allow: ALLOW_ALL, strength: "aes128" } });
       expect(new TextDecoder("latin1").decode(out.bytes)).toMatch(/\/V 4\b[\s\S]*\/AESV2/);
       expect(await needsPassword(out.bytes)).toBe(true);
@@ -171,6 +172,9 @@ describe("review fixes", () => {
     // The old scheme has no way to store letters outside Western European ones.
     expect(passwordUnfit("ключ", "aes128")).toBe(true);
     expect(passwordUnfit("ключ", "aes256")).toBe(false);
+    expect(passwordUnfit("\u00b5\u00bd\u00b4", "aes128")).toBe(false);
+    // An accent typed apart joins its letter.
+    expect(passwordUnfit("e\u0301", "aes128")).toBe(false);
     await expect(protectPdf({ bytes: await fx("alpha.pdf"), options: { openPassword: "ключ", ownerPassword: "", allow: ALLOW_ALL, strength: "aes128" } })).rejects.toThrow(/AES-256/);
     expect(passwordTooLong("a".repeat(33))).toBe(false);
   });

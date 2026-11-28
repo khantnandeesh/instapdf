@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/Switch";
 import { warmPlainImages } from "@/lib/pdf/pdfjs";
 import { warmWorker } from "@/lib/pdf/worker-client";
 import { flowTool } from "@/tools/registry";
-import { compressCopy as c } from "./copy";
+import { compressCopy as c } from "./compress-copy";
 import "../doc-tools/doc-tools.css";
 
 const tool = flowTool("compress-pdf");

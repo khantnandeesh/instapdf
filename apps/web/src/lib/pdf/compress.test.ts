@@ -129,6 +129,10 @@ describe("review fixes (F6)", () => {
     const doc = await PDFDocument.load(grey.bytes);
     const spaces = doc.context.enumerateIndirectObjects().flatMap(([, o]) => (o instanceof PDFRawStream && o.dict.get(N("Subtype")) === N("Image") ? [o.dict.get(N("ColorSpace"))] : []));
     expect(spaces).toEqual([N("DeviceGray")]);
+    // A profile that falls back on another space is decoded through it: the new picture is plain.
+    (ctx.lookup(profile) as PDFRawStream).dict.set(N("Alternate"), ctx.obj(["Lab", {}]));
+    const lab = await pictureOf((await compressPdf({ bytes: await base.doc.save({ useObjectStreams: false }), images: [{ ref, width: 40, height: 30, gray: false, data: small(40, 30) }] })).bytes);
+    expect(lab.dict.get(N("ColorSpace"))).toBe(N("DeviceRGB"));
   });
   it("AC-1619: a JPEG 2000 picture that states no colour space is left alone", async () => {
     const { doc, image } = await sample();

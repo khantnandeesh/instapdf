@@ -248,8 +248,10 @@ describe("result name prefix (F9 Bates, key check G-2)", () => {
     expect(cleanNamePrefix("Дело 12 ")).toBe("Дело 12 ");
     expect(cleanNamePrefix("x".repeat(80))).toHaveLength(60);
     expect(cleanNamePrefix("\u0000\u001f")).toBe("");
+    expect(cleanNamePrefix("a\u202eb\u0085")).toBe("ab");
+    expect(cleanNamePrefix("x".repeat(59) + "\ud83d\ude00")).toBe("x".repeat(59));
   });
-  it("AC-1179: each result's name takes the prefix; the {file} token still gives the name the file came with", async () => {
+  it("AC-1179: each result's name takes the prefix, cleaned", async () => {
     const { runJob } = await import("./jobs");
     const { readFile } = await import("node:fs/promises");
     const bytes = new Uint8Array(await readFile("tests/fixtures/three-pages.pdf"));

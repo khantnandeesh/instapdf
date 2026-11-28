@@ -106,17 +106,19 @@ const CLOUD_BUDGET_KB = {
   "/deskew-pdf/page": [149, 159],
   "/ocr-pdf/page": [147, 157],
   // +1 kB on Alternate (preloads), Delete, Protect and Unlock, at their limit: the shared-flow changes of the F13 key checks (see the table above).
-  "/resize-pdf/page": [147, 157],
+  "/resize-pdf/page": [148, 158],
   "/flip-pdf/page": [147, 157],
   "/n-up-pdf/page": [147, 157],
   // +1 kB entry with Bates numbering (see the note in the table above).
   "/add-page-numbers/page": [152, 161],
-  "/bates-numbering/page": [152, 162],
+  "/bates-numbering/page": [153, 163],
   "/pdf-header-footer/page": [152, 161],
-  "/watermark-pdf/page": [152, 162],
+  "/watermark-pdf/page": [153, 163],
   "/extract-pdf-pages/page": [147, 157],
   "/delete-pdf-pages/page": [147, 157],
-  "/protect-pdf/page": [145, 155],
+  // +1 kB each (28 Nov): Protect (finer rights, AES-128), Bates and Watermark (result name prefix, shared stamp code) and Resize
+  // sat within 130 B of their limits when Compress joined the registry every route loads.
+  "/protect-pdf/page": [146, 156],
   "/unlock-pdf/page": [142, 152],
   "/remove-pdf-annotations/page": [147, 157],
   "/flatten-pdf/page": [145, 155],
