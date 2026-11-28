@@ -208,4 +208,31 @@ test.describe("Bates numbering", () => {
     expect(after.height).toBeGreaterThan(before.height + 30);
     expect(after.height).toBeLessThan(before.height + 60);
   });
+
+  test("AC-1175: pages picked in the second file only: the count starts there, and the pages show what the file gets", async ({ page }) => {
+    await open(page, "bates-numbering", "three-pages.pdf", "twelve.pdf");
+    await tiles(page).nth(4).getByRole("button", { name: /^Page 2/ }).click();
+    await tiles(page).nth(6).getByRole("button", { name: /^Page 4/ }).click();
+    await expect(primary(page)).toHaveText("Number 2 pages");
+    await expect(stamps(page)).toHaveText(["000001", "000002"]);
+    await run(page);
+    const zip = unzip((await downloadResult(page)).bytes);
+    const second = await textsOf(zip["twelve.pdf"]);
+    expect((await textsOf(zip["three-pages.pdf"])).some((t) => /0000\d\d/.test(t))).toBe(false);
+    expect(/0000\d\d/.exec(second[1])?.[0]).toBe("000001");
+    expect(/0000\d\d/.exec(second[3])?.[0]).toBe("000002");
+    expect(/0000\d\d/.test(second[0])).toBe(false);
+  });
+
+  test("AC-1176: a file number left empty does not hold up a line that does not use it", async ({ page }) => {
+    await open(page, "bates-numbering", "three-pages.pdf");
+    await inOptions(page, async (where) => {
+      await page.locator(`#bates-style-${where}`).selectOption("exhibit");
+      await page.locator(`#bates-doc-${where}`).fill("");
+    });
+    await expect(primary(page)).toBeDisabled();
+    await inOptions(page, (where) => page.locator(`#bates-style-${where}`).selectOption("number").then(() => {}));
+    await expect(primary(page)).toBeEnabled();
+    await expect(stamps(page).first()).toHaveText("000001");
+  });
 });

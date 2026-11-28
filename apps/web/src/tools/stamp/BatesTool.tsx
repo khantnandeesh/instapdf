@@ -20,9 +20,8 @@ const check = (s: Record<string, unknown>): Partial<Remembered> => ({
   ...(typeof s.margin === "string" && (s.margin in MARGINS || s.margin === "room") ? { margin: s.margin as Remembered["margin"] } : {}),
   ...(BATES_STYLES.some((b) => b.value === s.style) ? { style: s.style as BatesStyle } : {}),
   ...(BATES_DIGITS.some((d) => String(d) === s.digits) ? { digits: s.digits as string } : {}),
-  ...(typeof s.prefix === "string" && s.prefix.length <= 60 ? { prefix: s.prefix } : {}),
   ...(typeof s.custom === "string" && s.custom.length <= 120 ? { custom: s.custom } : {}),
-  // Where the count starts belongs to one job: it is not carried to the next visit.
+  // The case name and where the count starts belong to one job: they are not carried to the next visit.
 });
 
 const PLACE_OPTIONS = PLACES.map((value) => ({ value, label: sc.place[value] }));
@@ -38,10 +37,13 @@ export const wholeNumber = (text: string, max: number): number | null => {
   return /^\d{1,9}$/.test(t) && Number(t) <= max ? Number(t) : null;
 };
 
+/** Whether the line counts the files: only then is the file number shown, and asked for. */
+const countsFiles = (style: BatesStyle) => style === "exhibit" || style === "exhibit-page" || style === "custom";
+
 /** What is missing before the run, or null. */
 function missing(o: Remembered): string | null {
   if (wholeNumber(o.start, BATES_LIMITS.start) === null) return c.needsStart;
-  if (wholeNumber(o.doc, BATES_LIMITS.doc) === null) return c.needsDoc;
+  if (countsFiles(o.style) && wholeNumber(o.doc, BATES_LIMITS.doc) === null) return c.needsDoc;
   if (o.style === "custom" && !o.custom.trim()) return c.needsLine;
   return null;
 }
@@ -57,7 +59,8 @@ const roomFor = (o: Remembered) => {
 /** Where the count starts, from the options; null while a number is missing. */
 function runOf(o: Remembered): BatesRun | null {
   const start = wholeNumber(o.start, BATES_LIMITS.start);
-  const doc = wholeNumber(o.doc, BATES_LIMITS.doc);
+  // A hidden file number that was left unreadable counts as 1: the line does not print it.
+  const doc = wholeNumber(o.doc, BATES_LIMITS.doc) ?? (countsFiles(o.style) ? null : 1);
   return start === null || doc === null ? null : { start, doc, digits: Number(o.digits) };
 }
 
@@ -88,7 +91,7 @@ export function BatesTool() {
   const position = (where: string) => <Select id={`bates-place-${where}`} label={c.position} hideLabel={where === "bar"} value={opts.place} options={PLACE_OPTIONS} onChange={(place) => setOpts({ place })} />;
   const margin = (where: string) => <Select id={`bates-margin-${where}`} label={sc.margin} value={opts.margin} options={EDGE_OPTIONS} onChange={(margin) => setOpts({ margin })} />;
   // The file number shows only where the line uses it.
-  const counts = opts.style === "exhibit" || opts.style === "exhibit-page" || opts.style === "custom";
+  const counts = countsFiles(opts.style);
   const number = (where: string, n: number) => (
     <Group n={n} title={c.stepNumber}>
       <div className="grid grid-cols-2 gap-2.5">

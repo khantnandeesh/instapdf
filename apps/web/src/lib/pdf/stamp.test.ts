@@ -218,4 +218,23 @@ describe("stamped files (F9 AC-1120 to AC-1123)", () => {
     expect(out.getPage(1).getSize().height).toBeCloseTo(before.height, 3);
     expect((await items(r.bytes))[0].map((t) => t.str)).toContain("000001");
   });
+  it("AC-1164: the added strip on a locked file and on a page shown turned: no password left, the strip at the edge the reader sees, the line inside it", async () => {
+    const plain = await PDFDocument.load(await source());
+    plain.getPage(0).setRotation(degrees(90));
+    const before = plain.getPage(0).getSize();
+    plain.encrypt({ userPassword: "pw", ownerPassword: "owner" });
+    const r = await stampPdf({ bytes: await plain.save(), password: "pw", pages: [0], stamps: [{ ...footer, text: "{bates}" }], first: 1, file: "f", date: "", bates: { start: 5, digits: 3, doc: 1 }, room: { top: 0, bottom: 40 } }, await build());
+    expect(r.wasEncrypted).toBe(true);
+    expect(new TextDecoder("latin1").decode(r.bytes)).not.toContain("/Encrypt");
+    const page = (await PDFDocument.load(r.bytes)).getPage(0);
+    // Shown turned a quarter: the reader's bottom edge is a side of the stored page, so the stored width grows.
+    expect(page.getSize().width).toBeCloseTo(before.width + 40, 3);
+    expect(page.getSize().height).toBeCloseTo(before.height, 3);
+    const line = (await items(r.bytes))[0].find((t) => t.str === "005")!;
+    expect(line).toBeDefined();
+    const box = page.getCropBox();
+    const x = line.x;
+    // Inside the strip: within 40 points of one of the stored page's side edges.
+    expect(Math.min(x - box.x, box.x + box.width - x)).toBeLessThan(40);
+  });
 });
