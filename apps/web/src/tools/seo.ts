@@ -861,8 +861,8 @@ export const seoContent: Record<string, ToolSeoContent> = {
     howTo: "How to add Bates numbers to PDF files",
     steps: [
       { name: "Add your PDFs", text: "Drop one PDF or a whole set on the page, in the order they should be numbered. Nothing is uploaded." },
-      { name: "Set the number", text: "Choose the line, the number of digits, the text before the number and the first number. The pages on screen show their numbers." },
-      { name: "Download", text: "Select Add Bates numbers and download the files. The count runs on from each file to the next." },
+      { name: "Set the number", text: "Choose the line, the digits, the text before the number and where the count starts, then the font, size and colour. The pages on screen show their numbers." },
+      { name: "Download", text: "Select the Number pages button and download the files. The count runs on from each file to the next." },
     ],
     faq: [
       {
@@ -875,11 +875,11 @@ export const seoContent: Record<string, ToolSeoContent> = {
       },
       {
         q: "Can I pick up where an earlier set stopped?",
-        a: "Yes. Set First number to the next number in your sequence, and First file number if your line counts the files as exhibits.",
+        a: "Yes. Set Starts at to the next number in your sequence, and Files from if your line counts the files as exhibits.",
       },
       {
         q: "Can I write my own line?",
-        a: "Yes. Choose Your own line and type it, with {bates} where the number goes. You can also use {doc} for the file number, {n} for the page in its file, {file} for the file name and {date} for today.",
+        a: "Yes. Set Line to Your own and type it, with {bates} where the number goes. You can also use {doc} for the file number, {n} for the page in its file, {file} for the file name and {date} for today.",
       },
       {
         q: "Will the number cover what is on the page?",
@@ -891,7 +891,7 @@ export const seoContent: Record<string, ToolSeoContent> = {
       },
       {
         q: "Is there a limit?",
-        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up and no cap on tasks per hour.",
+        a: "Up to 20 PDFs at a time, up to 100 MB each, 500 MB and 1,000 pages in total. It is free, with no sign-up and no cap on tasks per hour.",
       },
     ],
     related: ["add-page-numbers", "pdf-header-footer", "watermark-pdf", "merge-pdf", "organize-pdf", "protect-pdf"],

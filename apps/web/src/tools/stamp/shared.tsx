@@ -40,9 +40,9 @@ const FACE_OPTIONS = STAMP_FONTS.flatMap((f) => [
 ]);
 
 /** The controls of a text style, two to a row. `where` keeps the ids apart when the panel and the sheet both hold them; `beside` shares the colour's row. */
-export function StyleFields({ where, style, sizes, onChange, beside, colour = true }: { where: string; style: StyleState; sizes: readonly string[]; onChange: (patch: Partial<StyleState>) => void; beside?: ReactNode; /** False where the text is always black (Bates numbers). */ colour?: boolean }) {
+export function StyleFields({ where, style, sizes, onChange, beside, colour = true, oneRow }: { where: string; style: StyleState; sizes: readonly string[]; onChange: (patch: Partial<StyleState>) => void; beside?: ReactNode; colour?: boolean; /** All three on one row, where the panel has no room for two (Bates numbers). */ oneRow?: boolean }) {
   return (
-    <div className="grid grid-cols-2 gap-2.5">
+    <div className={oneRow ? "ip-style-row" : "grid grid-cols-2 gap-2.5"}>
       <Select
         id={`stamp-font-${where}`}
         label={c.font}
@@ -50,7 +50,7 @@ export function StyleFields({ where, style, sizes, onChange, beside, colour = tr
         options={FACE_OPTIONS}
         onChange={(v) => onChange({ font: v.replace(/-bold$/, "") as StampFont, bold: v.endsWith("-bold") })}
       />
-      <Select id={`stamp-size-${where}`} label={c.size} value={style.size} options={sizes.map((v) => ({ value: v, label: `${v} pt` }))} onChange={(size) => onChange({ size })} />
+      <Select id={`stamp-size-${where}`} label={c.size} value={style.size} options={sizes.map((v) => ({ value: v, label: oneRow ? v : `${v} pt` }))} onChange={(size) => onChange({ size })} />
       {colour && <Select id={`stamp-colour-${where}`} label={c.colour} value={style.colour} options={COLOUR_OPTIONS} onChange={(colour) => onChange({ colour })} />}
       {beside}
     </div>

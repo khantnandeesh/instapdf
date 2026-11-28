@@ -1,5 +1,7 @@
 # Key checks: F15 OCR
 
+**Latest: Run 2, PASS** (2026-11-28, `145061c`; see the end). Run 1 below is kept as written.
+
 **Verdict: FAIL.** One check is lost: options (12 languages against the reference's 61, and no way to replace an old text layer). One copy defect also has to go: the page says there is no page limit, and there is one. Quality ties; speed, limits, privacy and the phone layout are ours. No owner waiver is on record.
 
 - Run: 2026-11-28, 11:35–12:02 UTC, by parity-evaluator. Lean key checks (six checks set by the lead), not an every-AC run.
@@ -37,3 +39,25 @@
 5. **G-5 (look).** The result note ("Text was recognised on 2 of 3 pages…") covers the "Your PDF is ready" heading and the file line at 390, and "Back to editing" at 1280, until it is closed (`ocr-3-result-390.png`).
 6. **G-6 (check 2, shared with the reference).** Each word's box in the text layer ends about one letter short, so a search highlight misses the last letter. The reference has the same flaw; fixing it would turn the tie into a win.
 7. **G-7 (coverage).** Not compared: a real photographed or noisy scan (the task file is clean print, which both read perfectly), a non-English file, the reference's per-page mode and its replace tick, its error states, and a file over its 10-page limit. The Rich Results and Schema.org checks wait for a public URL. A re-check of our side needs no new reference tasks.
+
+## Run 2 (re-check of G-1, G-2, G-3)
+
+**Verdict: PASS.** The three gaps that failed run 1 are closed. Only those three were re-run, on our staging alone; the other checks stand as measured in run 1 (on `bd8d90b`) and were not repeated on this build.
+
+- Run: 2026-11-28, 13:18–13:27 UTC, by parity-evaluator. Staging `/api/health` reported `145061c`. **0 reference tasks**; the reference side is the cached run-1 evidence.
+- File: `scan.pdf`. Outputs checked with pypdfium2 (text per page, renders) and pikepdf (content streams, what each page draws).
+- Evidence (not in git): `/mnt/project-files/evals-cache/f15-ocr/run2/` (outputs, logs, screenshots `a-`, `b-` at 1280 and `c-` at 390).
+
+| Gap | Run 1 | Run 2, measured | Result |
+|---|---|---|---|
+| G-1 Languages | 12 against 61 | **72 offered** in both lists (second language: None + 71). 54 of the reference's 61 are among them, plus 18 it lacks (Arabic, Urdu, Marathi, Gujarati, Punjabi, Nepali, Khmer, Welsh and others). Polish, Korean, Welsh and Khmer were run: each language file came from our own origin with a 200 and the run finished | **PASS** (win) |
+| G-2 Limits wording | FAQ and meta description said there is no page limit | FAQ: 20 files and 1,000 pages at a time, no daily limit. Meta, Open Graph and Twitter descriptions and the FAQPage data: "no daily limit", no claim about pages. The page's own line: 20 files, 100 MB each, 500 MB and 1,000 pages. No untrue claim found in the rendered page or its HTML | **PASS** |
+| G-3 Replace an old text layer | No such option; switch off doubled the typed page | "Replace text from an earlier OCR" is offered (off by default), in the panel at 1280 and under More options at 390. Our own searchable PDF fed back with it **on**: words per page 23 / 20 / 17, the same words in the same order as before, each page draws one hidden layer, the typed page's 20 words and two text objects untouched, render difference 0. Same result at 390, a third pass, and on the reference's own cached output (its old layer is no longer drawn; ours is the only one). Fed back with it **off** (5 runs, and the reference's output once): "Every page already has its text, so nothing was changed", words 23 / 20 / 17, nothing doubled | **PASS** |
+
+Gaps left, none blocking:
+
+1. **R2-1 (file size).** Replace takes the old layer off the page but leaves it in the file: 72,578 B → 76,310 B → 80,017 B over two passes, object count 34 → 48 → 62. About 3.7 KB (5%) of dead weight a pass on this file. On the reference's output the old layer also stays listed in the page's resources, undrawn. Save without the unused objects.
+2. **R2-2 (languages).** Seven of the reference's 61 are not offered: Ancient Greek, Cherokee, Old English, Esperanto, Frankish, Old French, Old Spanish. All have open Tesseract data.
+3. **R2-3 (one stall, not reproduced).** One Replace-off run on the fed-back file sat with no result for over two minutes before I stopped it. Nine identical runs after it finished in 2.4–3.3 s, with waits of 0 to 1.5 s before the click. No screenshot of the stalled state exists. Worth a look at what a run does when it never reports back.
+4. **R2-4 (wording).** With Replace off, a file handed back "unchanged" is re-saved (72,583 B against 72,578 B; the reference's output 70,823 B against 72,578 B). Content is the same; the bytes are not.
+5. G-4 to G-7 of run 1 were not re-checked.

@@ -8,14 +8,16 @@ import { BATES_DIGITS, BATES_LIMITS, BATES_STYLES, batesNumber, batesTemplate, P
 import { flowTool } from "@/tools/registry";
 import { PickPagesFlow } from "@/tools/to-image/PickPagesFlow";
 import { batesCopy as c, stampCopy as sc } from "./copy";
-import { checkStyle, Group, LINE_SIZES, MARGIN_OPTIONS, MARGINS, stampFlow, StyleFields, textStyle, type StyleState } from "./shared";
+import { checkStyle, Group, MARGIN_OPTIONS, MARGINS, stampFlow, StyleFields, textStyle, type StyleState } from "./shared";
 
 const tool = flowTool("bates-numbering");
 
 type Remembered = StyleState & { place: Place; margin: keyof typeof MARGINS | "room"; style: BatesStyle; digits: string; prefix: string; custom: string; start: string; doc: string };
 const defaults: Remembered = { place: "bottom-right", margin: "normal", style: "number", digits: "6", prefix: "", custom: "{bates}", start: "1", doc: "1", font: "arimo", size: "10", colour: "#000000", bold: false };
+/** Text sizes in points: small print for a crowded margin up to a number read across a room. */
+const SIZES = ["6", "7", "8", "9", "10", "11", "12", "14", "16", "18", "20", "24", "28", "36", "48", "60"];
 const check = (s: Record<string, unknown>): Partial<Remembered> => ({
-  ...checkStyle(s, LINE_SIZES),
+  ...checkStyle(s, SIZES),
   ...(PLACES.includes(s.place as Place) ? { place: s.place as Place } : {}),
   ...(typeof s.margin === "string" && (s.margin in MARGINS || s.margin === "room") ? { margin: s.margin as Remembered["margin"] } : {}),
   ...(BATES_STYLES.some((b) => b.value === s.style) ? { style: s.style as BatesStyle } : {}),
@@ -29,6 +31,8 @@ const STYLE_OPTIONS = BATES_STYLES.map((b) => ({ value: b.value, label: c.styles
 // The last choice gives the line a strip of its own: the page grows at that edge, and what is on it is not covered.
 const EDGE_OPTIONS = [...MARGIN_OPTIONS, { value: "room" as const, label: c.room }];
 const edge = (o: Remembered) => MARGINS[o.margin === "room" ? "normal" : o.margin];
+// Beside a line of the reader's own the box is narrow: the count alone.
+const DIGIT_COUNTS = BATES_DIGITS.map((d) => ({ value: String(d), label: String(d) }));
 const DIGIT_OPTIONS = BATES_DIGITS.map((d) => ({ value: String(d), label: batesNumber(1, d) }));
 
 /** A whole number from 0 to `max` as typed, or null. */
@@ -38,12 +42,12 @@ export const wholeNumber = (text: string, max: number): number | null => {
 };
 
 /** Whether the line counts the files: only then is the file number shown, and asked for. */
-const countsFiles = (style: BatesStyle) => style === "exhibit" || style === "exhibit-page" || style === "custom";
+const countsFiles = (o: Pick<Remembered, "style" | "custom">) => o.style === "exhibit" || o.style === "exhibit-page" || (o.style === "custom" && o.custom.includes("{doc}"));
 
 /** What is missing before the run, or null. */
 function missing(o: Remembered): string | null {
   if (wholeNumber(o.start, BATES_LIMITS.start) === null) return c.needsStart;
-  if (countsFiles(o.style) && wholeNumber(o.doc, BATES_LIMITS.doc) === null) return c.needsDoc;
+  if (countsFiles(o) && wholeNumber(o.doc, BATES_LIMITS.doc) === null) return c.needsDoc;
   if (o.style === "custom" && !o.custom.trim()) return c.needsLine;
   return null;
 }
@@ -60,7 +64,7 @@ const roomFor = (o: Remembered) => {
 function runOf(o: Remembered): BatesRun | null {
   const start = wholeNumber(o.start, BATES_LIMITS.start);
   // A hidden file number that was left unreadable counts as 1: the line does not print it.
-  const doc = wholeNumber(o.doc, BATES_LIMITS.doc) ?? (countsFiles(o.style) ? null : 1);
+  const doc = wholeNumber(o.doc, BATES_LIMITS.doc) ?? (countsFiles(o) ? null : 1);
   return start === null || doc === null ? null : { start, doc, digits: Number(o.digits) };
 }
 
@@ -91,25 +95,34 @@ export function BatesTool() {
   const position = (where: string) => <Select id={`bates-place-${where}`} label={c.position} hideLabel={where === "bar"} value={opts.place} options={PLACE_OPTIONS} onChange={(place) => setOpts({ place })} />;
   const margin = (where: string) => <Select id={`bates-margin-${where}`} label={sc.margin} value={opts.margin} options={EDGE_OPTIONS} onChange={(margin) => setOpts({ margin })} />;
   // The file number shows only where the line uses it.
-  const counts = countsFiles(opts.style);
+  const counts = countsFiles(opts);
+  const own = opts.style === "custom";
+  const start = (where: string) => <TextInput id={`bates-start-${where}`} label={c.start} value={opts.start} maxLength={9} inputMode="numeric" onChange={(start) => setOpts({ start })} />;
+  const doc = (where: string) => <TextInput id={`bates-doc-${where}`} label={c.doc} value={opts.doc} maxLength={5} inputMode="numeric" onChange={(doc) => setOpts({ doc })} />;
   const number = (where: string, n: number) => (
     <Group n={n} title={c.stepNumber}>
-      <div className="grid grid-cols-2 gap-2.5">
+      {/* Your own line takes a row, so the first row holds three and the panel still ends above the fold. */}
+      <div className={own ? "ip-bates-own" : "grid grid-cols-2 gap-2.5"}>
         <Select id={`bates-style-${where}`} label={c.style} value={opts.style} options={STYLE_OPTIONS} onChange={(style) => setOpts({ style })} />
-        <Select id={`bates-digits-${where}`} label={c.digits} value={opts.digits} options={DIGIT_OPTIONS} onChange={(digits) => setOpts({ digits })} />
+        <Select id={`bates-digits-${where}`} label={c.digits} value={opts.digits} options={own ? DIGIT_COUNTS : DIGIT_OPTIONS} onChange={(digits) => setOpts({ digits })} />
+        {own && start(where)}
       </div>
-      {opts.style === "custom" && (
+      {own ? (
         <div className="flex flex-col gap-1">
-          <TextInput id={`bates-custom-${where}`} label={c.custom} value={opts.custom} maxLength={120} onChange={(custom) => setOpts({ custom })} />
+          <div className={counts ? "ip-bates-line" : undefined}>
+            <TextInput id={`bates-custom-${where}`} label={c.custom} value={opts.custom} maxLength={120} onChange={(custom) => setOpts({ custom })} />
+            {counts && doc(where)}
+          </div>
           <p className="ip-stamp-hint">{c.tokens}</p>
         </div>
+      ) : (
+        <div className={counts ? "ip-bates-three" : "grid grid-cols-2 gap-2.5"}>
+          <TextInput id={`bates-prefix-${where}`} label={c.prefix} placeholder={c.prefixPlaceholder} value={opts.prefix} maxLength={60} onChange={(prefix) => setOpts({ prefix })} />
+          {start(where)}
+          {counts && doc(where)}
+        </div>
       )}
-      <div className={counts && opts.style !== "custom" ? "ip-bates-three" : "grid grid-cols-2 gap-2.5"}>
-        {opts.style !== "custom" && <TextInput id={`bates-prefix-${where}`} label={c.prefix} placeholder={c.prefixPlaceholder} value={opts.prefix} maxLength={60} onChange={(prefix) => setOpts({ prefix })} />}
-        <TextInput id={`bates-start-${where}`} label={c.start} value={opts.start} maxLength={9} inputMode="numeric" onChange={(start) => setOpts({ start })} />
-        {counts && <TextInput id={`bates-doc-${where}`} label={c.doc} value={opts.doc} maxLength={5} inputMode="numeric" onChange={(doc) => setOpts({ doc })} />}
-      </div>
-      <StyleFields where={`bates-${where}`} style={opts} sizes={LINE_SIZES} onChange={setOpts} colour={false} />
+      <StyleFields where={`bates-${where}`} style={opts} sizes={SIZES} onChange={setOpts} oneRow />
     </Group>
   );
   return (

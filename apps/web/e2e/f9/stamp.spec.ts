@@ -1,8 +1,8 @@
 /** F9 stamping tools: spec docs/specs/f9-stamps.md, AC-1130 onwards. */
 import { expect, test, type Page } from "@playwright/test";
-import { PDFDict, PDFDocument, PDFName } from "pdf-lib";
+import { decodePDFRawStream, PDFDict, PDFDocument, PDFName, PDFRawStream } from "pdf-lib";
 import { expectNoSeriousAxeViolations } from "../support/axe";
-import { downloadResult, flow, fx, pick, primary, run, textsOf, tiles, unzip } from "../support/flow";
+import { downloadResult, flow, fx, isDesktop, pick, primary, run, textsOf, tiles, unzip } from "../support/flow";
 
 async function open(page: Page, slug: string, ...names: string[]) {
   await page.goto(`/${slug}`);
@@ -234,5 +234,37 @@ test.describe("Bates numbering", () => {
     await inOptions(page, (where) => page.locator(`#bates-style-${where}`).selectOption("number").then(() => {}));
     await expect(primary(page)).toBeEnabled();
     await expect(stamps(page).first()).toHaveText("000001");
+  });
+
+  test("AC-1177: the number takes a colour and sizes from 6 to 60 pt, and a line of your own still ends above the fold", async ({ page }, info) => {
+    test.skip(!isDesktop(info.project.name), "the phone sheet scrolls; AC-1175 covers the phone layout");
+    await page.setViewportSize({ width: 1280, height: 632 });
+    await page.goto("/bates-numbering");
+    await page.getByTestId("file-input").setInputFiles(fx("scan.pdf"));
+    await expect(flow(page)).toHaveAttribute("data-state", "ready");
+    const panel = page.locator(".ip-opt-side").last();
+    const sizes = await panel.getByLabel("Text size", { exact: true }).locator("option").allTextContents();
+    expect(sizes[0]).toBe("6");
+    expect(sizes.at(-1)).toBe("60");
+    await panel.getByLabel("Colour", { exact: true }).selectOption({ label: "Red" });
+    await panel.getByLabel("Line", { exact: true }).selectOption({ label: "Your own" });
+    await panel.getByLabel("Your line", { exact: true }).fill("ACME {bates} Doc {doc}");
+    await expect(panel.getByLabel("Files from", { exact: true })).toBeVisible();
+    expect(await panel.evaluate((e) => e.getBoundingClientRect().bottom)).toBeLessThanOrEqual(632);
+    await run(page);
+    const out = await downloadResult(page);
+    const doc = await PDFDocument.load(out.bytes);
+    const text = doc.context
+      .enumerateIndirectObjects()
+      .map(([, o]) => {
+        try {
+          return o instanceof PDFRawStream ? new TextDecoder("latin1").decode(decodePDFRawStream(o).decode()) : "";
+        } catch {
+          return "";
+        }
+      })
+      .join("\n");
+    // Red, as the fill colour of the line.
+    expect(text).toMatch(/0?\.75\d* 0?\.22\d* 0?\.1[67]\d* (rg|sc|scn)\b/);
   });
 });

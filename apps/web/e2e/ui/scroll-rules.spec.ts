@@ -87,6 +87,10 @@ async function openTool(page: Page, slug: string) {
 
 const pages = ["/", "/about", "/help", "/licenses", "/security", "/cookies", "/privacy", "/terms", "/edit-pdf", "/no-such-page", ...(comingSoon ? [`/${comingSoon.slug}`] : [])];
 
+// One test per tool and screen size, each on a page of its own: the file's tests are shared out among the
+// workers, so the file does not take longer on one machine with every tool added.
+test.describe.configure({ mode: "parallel" });
+
 for (const [project, sizes] of [
   ["desktop", DESKTOP],
   ["mobile", PHONE],
