@@ -55,7 +55,9 @@ const BUDGET_KB = {
   "/unlock-pdf/page": [140, 150],
   // F10 document tools: the pick-pages flow with switches; the bare flow with one select; the bare flow with a form.
   "/remove-pdf-annotations/page": [145, 155],
-  "/flatten-pdf/page": [142, 152],
+  // Flatten: +1 kB for the pictures choice (a second select and its copy).
+  "/flatten-pdf/page": [143, 153],
+  "/rename-pdf/page": [145, 155],
   "/edit-pdf-metadata/page": [144, 154],
   "/pdf-to-jpg/page": [145, 155],
   "/extract-images/page": [142, 152],
@@ -92,7 +94,8 @@ const CLOUD_BUDGET_KB = {
   "/protect-pdf/page": [144, 154],
   "/unlock-pdf/page": [141, 151],
   "/remove-pdf-annotations/page": [147, 157],
-  "/flatten-pdf/page": [144, 154],
+  "/flatten-pdf/page": [145, 155],
+  "/rename-pdf/page": [147, 157],
   "/edit-pdf-metadata/page": [146, 156],
   "/pdf-to-jpg/page": [147, 157],
   "/extract-images/page": [144, 154],

@@ -27,7 +27,12 @@ export const flattenCopy = {
   what: "What to flatten",
   both: "Form fields and annotations",
   fields: "Form fields only",
-  note: { both: "Filled-in fields, highlights, notes and stamps become part of the page. Text stays selectable.", fields: "Fields keep what they show and can no longer be filled in. Annotations stay as they are." },
+  pictures: "Whole pages, as pictures",
+  quality: "Picture quality",
+  /** The bar below 1024 px has room for short names only. */
+  short: { both: "Fields and annotations", fields: "Fields only", pictures: "Pages as pictures" },
+  dpi: { 75: "Smallest file (75 dpi)", 100: "Small (100 dpi)", 150: "Balanced (150 dpi)", 220: "Print quality (220 dpi)" } as Record<number, string>,
+  note: { pictures: "Each page becomes one picture. Text can no longer be selected, copied or edited.", both: "Filled-in fields, highlights, notes and stamps become part of the page. Text stays selectable.", fields: "Fields keep what they show and can no longer be filled in. Annotations stay as they are." },
 };
 
 /** Metadata copy (spec F10 §3). */
@@ -44,4 +49,24 @@ export const metadataCopy = {
   removeField: (name: string) => `Remove ${name}`,
   many: "The same details are written to every file.",
   errors: { empty: "Name the field", characters: "This field name is too long", reserved: "This name is kept for the file's dates", taken: "There is already a field with this name" },
+};
+
+/** Rename by content copy (spec F10 §5). */
+export const renameCopy = {
+  stepText: "Text to use",
+  choose: "Choose text area",
+  change: "Change text area",
+  needsArea: "Choose the text area",
+  reading: "Reading text…",
+  stepName: "New name",
+  pattern: "Name pattern",
+  patternHelp: "{text} is the text found, {name} the old name, {n} the file's number.",
+  becomes: "First file becomes",
+  noText: "No text there in the first file. It keeps its name.",
+  dialogTitle: "Which text names the file?",
+  dialogHelp: "Drag a box around the text to use as the name, such as a title or an invoice number. It is read from the first page of every file.",
+  areaLabel: "Text area. Arrow keys move it, Shift with arrow keys resizes it.",
+  found: "Text here:",
+  nothing: "No text in the box",
+  kept: (names: string[]) => (names.length === 1 ? `${names[0]} has no text there, so it keeps its name.` : `${names.length} files have no text there, so they keep their names.`),
 };

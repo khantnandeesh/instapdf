@@ -290,6 +290,7 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
   // F10. Document tools: settings tools (F25 §4).
   "remove-pdf-annotations": { status: "beta", flow: clientPdfFlow("remove-pdf-annotations", { title: "Clear annotations", actionLabel: "Clear annotations", progressLabel: "Removing" }, { layout: "settings" }) },
   "flatten-pdf": { status: "beta", flow: clientPdfFlow("flatten-pdf", { title: "Flatten PDF", actionLabel: "Flatten PDF", progressLabel: "Flattening" }, { layout: "settings" }) },
+  "rename-pdf": { status: "beta", flow: clientPdfFlow("rename-pdf", { title: "Rename PDF by content", actionLabel: "Rename", progressLabel: "Renaming" }, { layout: "settings" }) },
   "edit-pdf-metadata": { status: "beta", flow: clientPdfFlow("edit-pdf-metadata", { title: "Edit PDF metadata", actionLabel: "Save metadata", progressLabel: "Saving" }, { layout: "settings" }) },
   "extract-pdf-pages": {
     status: "beta",

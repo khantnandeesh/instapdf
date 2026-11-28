@@ -32,13 +32,13 @@ export function pointsOf(items: readonly TextItem[], viewport: Viewport): TextPo
 }
 
 /** Every page's text points ([] when the file cannot be opened: the tool then says no text was found). */
-export async function readPagePoints(source: Blob, password?: string): Promise<TextPoint[][]> {
+export async function readPagePoints(source: Blob, password?: string, maxPages = Infinity): Promise<TextPoint[][]> {
   const opened = await openPdf(new Uint8Array(await source.arrayBuffer()), password);
   if (!opened.ok) return [];
   const { doc, task } = opened.pdf;
   try {
     const pages: TextPoint[][] = [];
-    for (let i = 1; i <= doc.numPages; i++) {
+    for (let i = 1; i <= Math.min(doc.numPages, maxPages); i++) {
       const page = await doc.getPage(i);
       try {
         const content = await page.getTextContent();
