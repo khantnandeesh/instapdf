@@ -28,9 +28,17 @@ export type SourceBookmark = BookmarkStyle & {
   /** Target page index in the source, or null when it cannot be resolved. */
   pageIndex: number | null;
   children: SourceBookmark[];
+  /** The item's own dictionary, for a writer that keeps a target this reader cannot express (a web link, a heading with no target). */
+  raw?: PDFDict;
 };
 
-export type OutBookmark = BookmarkStyle & { title: string; page: PDFRef; children: OutBookmark[] };
+export type OutBookmark = BookmarkStyle & {
+  title: string;
+  page: PDFRef;
+  children: OutBookmark[];
+  /** Written as it is in place of a page destination (`page` is then not used): an action or a destination kept from the source, or null for a heading that goes nowhere. */
+  target?: { key: "A" | "Dest"; value: PDFObject } | null;
+};
 
 const MAX_ITEMS = 10_000;
 
@@ -195,6 +203,7 @@ export function readOutline(doc: PDFDocument): SourceBookmark[] {
         pageIndex: dest ? (pageIndex.get(dest.page.toString()) ?? null) : null,
         children: walk(node.get(PDFName.of("First")), depth + 1),
         ...styleOf(node),
+        raw: node,
       };
       if (view) item.view = view;
       out.push(item);
@@ -248,7 +257,8 @@ export function writeOutline(doc: PDFDocument, items: OutBookmark[]): void {
       dict.set(PDFName.of("Title"), PDFHexString.fromText(item.title));
       dict.set(PDFName.of("Parent"), parent);
       const view = item.view ? [PDFName.of(item.view.kind), ...item.view.args.map((a) => (a === null ? PDFNull : PDFNumber.of(a)))] : [PDFName.of("XYZ"), PDFNull, PDFNull, PDFNull];
-      dict.set(PDFName.of("Dest"), ctx.obj([item.page, ...view]));
+      if (item.target) dict.set(PDFName.of(item.target.key), item.target.value);
+      else if (item.target === undefined) dict.set(PDFName.of("Dest"), ctx.obj([item.page, ...view]));
       if (item.color) dict.set(PDFName.of("C"), ctx.obj(item.color));
       if (item.flags) dict.set(PDFName.of("F"), PDFNumber.of(item.flags));
       if (i > 0) dict.set(PDFName.of("Prev"), refs[i - 1]);

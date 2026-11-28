@@ -927,6 +927,41 @@ export const seoContent: Record<string, ToolSeoContent> = {
     ],
     related: ["flatten-pdf", "edit-pdf-metadata", "edit-pdf", "protect-pdf", "merge-pdf", "organize-pdf"],
   },
+  "pdf-bookmarks": {
+    howTo: "How to add or edit bookmarks in a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. Nothing is uploaded." },
+      { name: "Edit the list", text: "Select Edit bookmarks. Type a name and a page for each bookmark. The menu on a row adds a bookmark below or inside it, moves it, nests it or deletes it." },
+      { name: "Download", text: "Select Save bookmarks and download the file. Readers show the list beside the pages." },
+    ],
+    faq: [
+      {
+        q: "What are PDF bookmarks?",
+        a: "They are the clickable contents list a PDF reader shows beside the pages, also called the outline. Each one jumps to a page.",
+      },
+      {
+        q: "Can I nest bookmarks to make chapters and sections?",
+        a: "Yes. Choose Add inside on a row to put a bookmark under it, or Move in a level to nest an existing one. Up to twelve levels.",
+      },
+      {
+        q: "Does it keep the bookmarks the file already has?",
+        a: "Yes. They are listed when the file opens. The ones you leave alone keep their colour, bold or italic style and the exact place they jump to.",
+      },
+      {
+        q: "Can I remove all bookmarks?",
+        a: "Yes. Delete every row and save. A deleted bookmark's name is taken out of the file, not just hidden.",
+      },
+      {
+        q: "Will the file open with the bookmarks showing?",
+        a: "A file that gets bookmarks is set to open with the bookmarks panel, unless it already asks for another view.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The bookmarks are read and written in your browser, on your device. The file never leaves it.",
+      },
+    ],
+    related: ["split-pdf-by-bookmarks", "edit-pdf-metadata", "add-page-numbers", "organize-pdf", "merge-pdf", "edit-pdf"],
+  },
   "rename-pdf": {
     howTo: "How to rename PDF files by their content",
     steps: [

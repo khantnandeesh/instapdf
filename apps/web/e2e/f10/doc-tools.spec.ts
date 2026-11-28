@@ -2,7 +2,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { PDFArray, PDFDict, PDFDocument, PDFName } from "pdf-lib";
 import { expectNoSeriousAxeViolations } from "../support/axe";
-import { downloadResult, flow, pick, primary, run, tiles, unzip } from "../support/flow";
+import { backToOptions, downloadResult, flow, pick, primary, run, tiles, unzip } from "../support/flow";
 
 async function open(page: Page, slug: string, ...names: string[]) {
   await page.goto(`/${slug}`);
@@ -150,6 +150,100 @@ test.describe("Rename by content", () => {
     const out = await downloadResult(page);
     expect(out.name).toBe("1 Invoice 1001 (invoices).pdf");
     expect((await PDFDocument.load(out.bytes, { updateMetadata: false })).getPageCount()).toBe(6);
+  });
+});
+
+test.describe("Bookmarks", () => {
+  const editor = async (page: Page) => {
+    await page.getByTestId(`bm-edit-${wide(page) ? "side" : "bar"}`).click();
+    return page.getByRole("dialog");
+  };
+  async function outline(bytes: Uint8Array) {
+    const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+    const pages = doc.getPages().map((p) => p.ref.toString());
+    const walk = (first: unknown, level: number): string[] => {
+      const out: string[] = [];
+      let node = first ? doc.context.lookup(first as never, PDFDict) : undefined;
+      while (node) {
+        const dest = node.lookup(PDFName.of("Dest"), PDFArray);
+        const title = node.lookup(PDFName.of("Title")) as unknown as { decodeText(): string };
+        out.push(`${"-".repeat(level)}${title.decodeText()}@${pages.indexOf(String(dest.get(0))) + 1}`, ...walk(node.get(PDFName.of("First")), level + 1));
+        const next = node.get(PDFName.of("Next"));
+        node = next ? doc.context.lookup(next as never, PDFDict) : undefined;
+      }
+      return out;
+    };
+    const root = doc.catalog.lookupMaybe(PDFName.of("Outlines"), PDFDict);
+    return root ? walk(root.get(PDFName.of("First")), 0) : [];
+  }
+
+  test("AC-1300: a file with no bookmarks gets two, one nested, and opens with them", async ({ page }) => {
+    await open(page, "pdf-bookmarks", "three-pages.pdf");
+    await expect(page.getByTestId("bm-count").locator("visible=true")).toHaveText("No bookmarks yet");
+    await expect(primary(page)).toBeDisabled();
+    const box = await editor(page);
+    await expect(box).toContainText("This file has no bookmarks yet.");
+    await box.getByTestId("bm-add").click();
+    await expect(box.getByRole("textbox", { name: "Name of bookmark 1" })).toBeFocused();
+    await page.keyboard.type("Chapter one");
+    await expect(box.getByTestId("bm-error")).toHaveText("\u00a0");
+    await box.getByTestId("bm-more").first().click();
+    await page.getByRole("menuitem", { name: "Add inside", exact: true }).click();
+    await page.keyboard.type("Section");
+    await box.getByRole("textbox", { name: "Page for Section" }).fill("3");
+    await expectNoSeriousAxeViolations(page, "Bookmarks, list");
+    await box.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(page.getByTestId("bm-count").locator("visible=true")).toHaveText("2 bookmarks");
+    await run(page);
+    const out = await downloadResult(page);
+    expect(await outline(out.bytes)).toEqual(["Chapter one@1", "-Section@3"]);
+  });
+
+  test("AC-1301: the file's bookmarks are listed; rename, move, delete and a bad page", async ({ page }) => {
+    await open(page, "pdf-bookmarks", "bookmarks.pdf");
+    await expect(page.getByTestId("bm-count").locator("visible=true")).toHaveText(/^\d+ bookmarks$/);
+    await expect(primary(page)).toBeDisabled();
+    const out0 = page.getByTestId("bm-count").locator("visible=true");
+    const before = Number((await out0.innerText()).split(" ")[0]);
+    const box = await editor(page);
+    const names = box.getByRole("textbox", { name: /^Name of bookmark/ });
+    await expect(names).toHaveCount(before);
+    const first = await names.first().inputValue();
+    await names.first().fill("Renamed");
+    await box.getByRole("textbox", { name: "Page for Renamed" }).fill("999");
+    await expect(box.getByTestId("bm-error")).toContainText("Page numbers go from 1 to");
+    await box.getByRole("textbox", { name: "Page for Renamed" }).fill("1");
+    await box.getByTestId("bm-more").last().click();
+    await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+    await expect(names).toHaveCount(before - 1);
+    await box.getByRole("button", { name: "Done", exact: true }).click();
+    await run(page);
+    const got = await outline((await downloadResult(page)).bytes);
+    expect(got.length).toBe(before - 1);
+    expect(got[0]).toBe("Renamed@1");
+    expect(got.join(" ")).not.toContain(first);
+  });
+
+  test("AC-1302: edits stay after going back from the result; the keyboard keeps its place", async ({ page }) => {
+    await open(page, "pdf-bookmarks", "three-pages.pdf");
+    let box = await editor(page);
+    await box.getByTestId("bm-add").click();
+    await page.keyboard.type("One");
+    await box.getByTestId("bm-add").click();
+    await page.keyboard.type("Two");
+    await box.getByTestId("bm-more").last().click();
+    await page.getByRole("menuitem", { name: "Move in a level", exact: true }).click();
+    await expect(box.getByRole("textbox", { name: "Name of bookmark 2, level 2" })).toBeFocused();
+    await expect(box.getByTestId("bm-said")).toHaveText("Moved in, now level 2");
+    await box.getByTestId("bm-more").last().click();
+    await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+    await expect(box.getByRole("textbox", { name: "Name of bookmark 1" })).toBeFocused();
+    await box.getByRole("button", { name: "Done", exact: true }).click();
+    await run(page);
+    await backToOptions(page);
+    await expect(page.getByTestId("bm-count").locator("visible=true")).toHaveText("1 bookmark");
+    box = await editor(page);
+    await expect(box.getByRole("textbox", { name: "Name of bookmark 1" })).toHaveValue("One");
   });
 });
 

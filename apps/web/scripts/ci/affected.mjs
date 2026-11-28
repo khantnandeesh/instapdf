@@ -81,7 +81,7 @@ export const AREAS = {
   f4: ["src/app/split-pdf/", "src/app/extract-pdf-pages/", "src/app/delete-pdf-pages/"],
   f11: ["src/app/protect-pdf/", "src/app/unlock-pdf/"],
   f9: ["src/app/add-page-numbers/", "src/app/pdf-header-footer/", "src/app/watermark-pdf/"],
-  f10: ["src/app/remove-pdf-annotations/", "src/app/flatten-pdf/", "src/app/edit-pdf-metadata/", "src/app/rename-pdf/"],
+  f10: ["src/app/remove-pdf-annotations/", "src/app/flatten-pdf/", "src/app/edit-pdf-metadata/", "src/app/rename-pdf/", "src/app/pdf-bookmarks/"],
   f7: ["src/app/split-pdf-by-bookmarks/", "src/app/split-pdf-by-size/", "src/app/split-pdf-by-text/", "src/app/split-pdf-in-half/"],
   f8: ["src/app/crop-pdf/", "src/app/resize-pdf/", "src/app/flip-pdf/", "src/app/n-up-pdf/"],
   f12: ["src/app/pdf-to-jpg/", "src/app/jpg-to-pdf/", "src/app/pdf-to-text/", "src/app/extract-images/"],
