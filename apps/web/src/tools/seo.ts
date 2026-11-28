@@ -211,7 +211,7 @@ export const toolSeo: Record<string, ToolSeo> = {
   "grayscale-pdf": {
     keyword: "grayscale pdf",
     title: "Convert PDF to Grayscale Online Free",
-    description: `Convert a color PDF to grayscale or black and white for cheaper printing. Free, no sign-up, no watermark. ${serverNote}`,
+    description: `Convert a color PDF to grayscale for black and white printing. Text stays sharp and selectable. Free. ${privateNote}`,
     also: ["pdf to black and white", "greyscale pdf", "remove color from pdf"],
   },
   "repair-pdf": {
@@ -1031,6 +1031,41 @@ export const seoContent: Record<string, ToolSeoContent> = {
       },
     ],
     related: ["remove-pdf-annotations", "protect-pdf", "edit-pdf", "create-fillable-pdf", "merge-pdf", "edit-pdf-metadata"],
+  },
+  "grayscale-pdf": {
+    howTo: "How to convert a PDF to grayscale",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. You can add several. Nothing is uploaded." },
+      { name: "Choose what to convert", text: "Everything, only text and drawings, or only pictures." },
+      { name: "Download", text: "Select Convert to grayscale and download the file. Every colour is now a shade of grey." },
+    ],
+    faq: [
+      {
+        q: "Is the result a real grayscale PDF?",
+        a: "Yes. Colours are rewritten as grey values in the file itself, and pictures are saved as grey pictures. A printer needs only black ink for it.",
+      },
+      {
+        q: "Will the text still be selectable and sharp?",
+        a: "Yes. Text stays text and drawings stay drawings. Nothing is turned into a picture, so pages print as sharp as before.",
+      },
+      {
+        q: "Does grayscale make a PDF smaller?",
+        a: "Often, when the file has photos or scans: a grey picture holds one value per dot where a colour picture holds three or four. Files with only text stay about the same size.",
+      },
+      {
+        q: "Is grayscale the same as black and white?",
+        a: "Not quite. Grayscale keeps every shade between black and white, so photos and soft edges still look right. Pure black and white has no shades in between.",
+      },
+      {
+        q: "Are links, bookmarks and form fields kept?",
+        a: "Yes. Only colours change. Links, bookmarks, form fields and the text layer of a scan stay as they are.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The file is converted in your browser, on your device. It never leaves it.",
+      },
+    ],
+    related: ["compress-pdf", "flatten-pdf", "pdf-to-jpg", "protect-pdf", "merge-pdf", "edit-pdf"],
   },
   "edit-pdf-metadata": {
     howTo: "How to edit PDF metadata",

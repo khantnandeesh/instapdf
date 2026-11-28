@@ -290,6 +290,7 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
   // F10. Document tools: settings tools (F25 §4).
   "remove-pdf-annotations": { status: "beta", flow: clientPdfFlow("remove-pdf-annotations", { title: "Clear annotations", actionLabel: "Clear annotations", progressLabel: "Removing" }, { layout: "settings" }) },
   "flatten-pdf": { status: "beta", flow: clientPdfFlow("flatten-pdf", { title: "Flatten PDF", actionLabel: "Flatten PDF", progressLabel: "Flattening" }, { layout: "settings" }) },
+  "grayscale-pdf": { status: "beta", flow: clientPdfFlow("grayscale-pdf", { title: "Grayscale PDF", actionLabel: "Convert to grayscale", progressLabel: "Converting" }, { layout: "settings" }) },
   "pdf-bookmarks": { status: "beta", flow: clientPdfFlow("pdf-bookmarks", { title: "Edit PDF bookmarks", actionLabel: "Save bookmarks", progressLabel: "Saving" }, { layout: "settings", multiFile: false, maxFiles: 1 }) },
   "rename-pdf": { status: "beta", flow: clientPdfFlow("rename-pdf", { title: "Rename PDF by content", actionLabel: "Rename", progressLabel: "Renaming" }, { layout: "settings" }) },
   "edit-pdf-metadata": { status: "beta", flow: clientPdfFlow("edit-pdf-metadata", { title: "Edit PDF metadata", actionLabel: "Save metadata", progressLabel: "Saving" }, { layout: "settings" }) },
@@ -410,7 +411,7 @@ export const tools: Tool[] = [
   t("remove-pdf-annotations", "Clear annotations", "Remove highlights, comments and markup", "edit", "client", "eraser", "delete-pdf-annotations"),
   t("flatten-pdf", "Flatten", "Lock form fields and annotations into the page", "edit", "client", "stack-simple"),
   t("compress-pdf", "Compress", "Make your PDF smaller", "optimize", "server", "arrows-in"),
-  t("grayscale-pdf", "Grayscale", "Convert colors to shades of gray", "optimize", "server", "circle-half"),
+  t("grayscale-pdf", "Grayscale", "Convert colors to shades of gray", "optimize", "client", "circle-half"),
   t("repair-pdf", "Repair", "Recover content from a damaged file", "optimize", "server", "wrench"),
   t("protect-pdf", "Protect", "Add a password and permissions", "security", "client", "lock", "encrypt-pdf"),
   t("unlock-pdf", "Unlock", "Remove passwords and restrictions", "security", "client", "lock-open", "unlock-pdf"),

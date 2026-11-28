@@ -57,12 +57,15 @@ const BUDGET_KB = {
   "/remove-pdf-annotations/page": [145, 155],
   // Flatten: +1 kB for the pictures choice (a second select and its copy).
   "/flatten-pdf/page": [143, 153],
+  // F13 Grayscale: the bare flow with one select.
+  "/grayscale-pdf/page": [143, 153],
   "/rename-pdf/page": [145, 155],
   "/pdf-bookmarks/page": [145, 155],
   "/edit-pdf-metadata/page": [144, 154],
   "/pdf-to-jpg/page": [145, 155],
   "/extract-images/page": [142, 152],
-  "/pdf-to-text/page": [139, 149],
+  // +1 kB: the tool registry every page carries grew by Grayscale (F13).
+  "/pdf-to-text/page": [140, 150],
   "/jpg-to-pdf/page": [151, 161],
   // The editor's landing (F16 AC-86), measured 124 / 140 on 26 Nov plus ~2 kB (the landing tool cap is 150);
   // its shell, pdf.js and engine are the editor JS budget below.
@@ -96,12 +99,13 @@ const CLOUD_BUDGET_KB = {
   "/unlock-pdf/page": [141, 151],
   "/remove-pdf-annotations/page": [147, 157],
   "/flatten-pdf/page": [145, 155],
+  "/grayscale-pdf/page": [145, 155],
   "/rename-pdf/page": [147, 157],
   "/pdf-bookmarks/page": [147, 157],
   "/edit-pdf-metadata/page": [146, 156],
   "/pdf-to-jpg/page": [147, 157],
   "/extract-images/page": [144, 154],
-  "/pdf-to-text/page": [141, 151],
+  "/pdf-to-text/page": [142, 152],
   "/jpg-to-pdf/page": [153, 163],
   // The editor's landing with the F23 caret, row and intake (E6): measured 128 / 144 on 26 Nov plus ~2 kB.
   "/edit-pdf/page": [130, 146],
