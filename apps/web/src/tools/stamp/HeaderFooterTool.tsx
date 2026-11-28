@@ -85,8 +85,8 @@ export function HeaderFooterTool() {
       renderOptions={() => (
         <div className="flex min-w-0 items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-side:gap-7 dock-bar:flex-1">
           {/* The bar holds the line most headers are; the panel lists all six. */}
-          <div className="ip-stamp-bar flex min-w-0 flex-col gap-3.5 dock-bar:flex-1">{field("bar", "top-center")}</div>
-          <div className="ip-stamp-side">{rest("side")}</div>
+          <div className="ip-opt-bar flex min-w-0 flex-col gap-3.5 dock-bar:flex-1">{field("bar", "top-center")}</div>
+          <div className="ip-opt-side">{rest("side")}</div>
         </div>
       )}
     />

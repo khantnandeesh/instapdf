@@ -1,0 +1,34 @@
+/*
+ * Option groups of a settings tool (shared: stamps, annotations, flatten, metadata). In the side panel (from 1024 px) every group shows, one
+ * under the other; in the bar only the tool's key control does, and the rest is in More options.
+ */
+.ip-opt-side {
+  display: none;
+}
+@media (width >= 64rem) {
+  [data-ip-options="side"] .ip-opt-side {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+  }
+  [data-ip-options="side"] .ip-opt-bar {
+    display: none;
+  }
+  /* The numbered step shows the group's name there: the legend stays for assistive tech only. */
+  [data-ip-options="side"] .ip-opt-legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+/* A pair of controls in the panel; in the bar only the first shows. */
+@media (width >= 64rem) {
+  [data-ip-options="side"] .ip-opt-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625rem;
+  }
+}

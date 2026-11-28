@@ -1,0 +1,22 @@
+/* The document tools' own pieces (spec F10); the groups are components/page-select/option-groups.css. */
+.ip-doc-note {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+/* Metadata: the six standard fields, two of them side by side where they are short. */
+.ip-doc-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+}
+.ip-doc-fields > .ip-doc-wide {
+  grid-column: 1 / -1;
+}
+/* A field of the maker's own: its name, its value and the button that removes it. */
+.ip-doc-own {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
+  gap: 0.5rem;
+  align-items: end;
+}

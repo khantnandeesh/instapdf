@@ -51,7 +51,12 @@ const BUDGET_KB = {
   // budget (home, Split, Delete, PDF to JPG, JPG to PDF) move up 1 kB.
   // F11: Protect is the bare flow plus the password field and three switches; Unlock is the bare flow.
   "/protect-pdf/page": [143, 153],
-  "/unlock-pdf/page": [139, 149],
+  // +1 kB entry (F10, 28 Nov): three more tools in the registry every route loads.
+  "/unlock-pdf/page": [140, 150],
+  // F10 document tools: the pick-pages flow with switches; the bare flow with one select; the bare flow with a form.
+  "/remove-pdf-annotations/page": [145, 155],
+  "/flatten-pdf/page": [142, 152],
+  "/edit-pdf-metadata/page": [144, 154],
   "/pdf-to-jpg/page": [145, 155],
   "/extract-images/page": [142, 152],
   "/pdf-to-text/page": [139, 149],
@@ -86,6 +91,9 @@ const CLOUD_BUDGET_KB = {
   "/delete-pdf-pages/page": [146, 156],
   "/protect-pdf/page": [144, 154],
   "/unlock-pdf/page": [141, 151],
+  "/remove-pdf-annotations/page": [147, 157],
+  "/flatten-pdf/page": [144, 154],
+  "/edit-pdf-metadata/page": [146, 156],
   "/pdf-to-jpg/page": [147, 157],
   "/extract-images/page": [144, 154],
   "/pdf-to-text/page": [141, 151],
