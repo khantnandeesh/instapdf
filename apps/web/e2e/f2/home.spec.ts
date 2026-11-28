@@ -159,12 +159,12 @@ test.describe("catalogue", () => {
     expect(order).toEqual([
       "/rotate-pdf",
       "/edit-pdf",
+      "/compress-pdf",
       "/delete-pdf-pages",
       "/merge-pdf",
       "/split-pdf",
       "/crop-pdf",
       "/extract-pdf-pages",
-      "/compress-pdf",
       "/sign-pdf",
       "/pdf-to-word",
     ]);

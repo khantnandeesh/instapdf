@@ -54,16 +54,15 @@ test.describe("Protect", () => {
   test("AC-802, AC-806: restrictions alone protect a file; the field for their password appears without moving anything", async ({ page }) => {
     await open(page, "protect-pdf", "alpha.pdf");
     await ready(page);
-    const print = page.getByRole("switch", { name: "Print", exact: true });
     if (isDesktop(page)) {
       const copyBox = await page.getByRole("switch", { name: "Copy text and images" }).boundingBox();
-      await print.click();
+      await page.getByLabel("Printing").selectOption("none");
       await expect(page.getByLabel("Password to change these")).toBeVisible();
       expect(await page.getByRole("switch", { name: "Copy text and images" }).boundingBox()).toEqual(copyBox);
     } else {
       await page.getByRole("button", { name: /More options/ }).click();
       const dialog = page.getByRole("dialog");
-      await dialog.getByRole("switch", { name: "Print", exact: true }).click();
+      await dialog.getByLabel("Printing").selectOption("none");
       await expect(dialog.getByLabel("Password to change these")).toBeVisible();
       await dialog.getByRole("button", { name: "Done" }).click();
     }

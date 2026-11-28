@@ -234,6 +234,16 @@ export function numbering(pageCount: number, picked: readonly number[], first: n
 /** Bates numbering (spec F9 §4): where the count starts, how many digits each number is padded to, and the first file's number. */
 export type BatesRun = { start: number; digits: number; doc: number };
 export const BATES_DIGITS = [1, 3, 4, 5, 6, 8] as const;
+/** What a result's name may start with: no path signs, nothing a file system refuses, no dots or spaces in front, 60 characters. */
+export const cleanNamePrefix = (text: string) =>
+  text
+    .replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g, "")
+    // Signs that turn the reading direction can make a name show as something it is not.
+    .replace(/[\u0080-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "")
+    .replace(/^[.\s]+/, "")
+    .slice(0, 60)
+    // Never half of a character that takes two units.
+    .replace(/[\ud800-\udbff]$/, "");
 export const BATES_LIMITS = { start: 999_999_999, doc: 99_999 };
 /** 7 padded to six digits is 000007; a number longer than the padding is written whole. */
 export const batesNumber = (n: number, digits: number) => String(Math.max(0, Math.round(n))).padStart(clamp(digits, 1, 12), "0");

@@ -1,0 +1,95 @@
+{
+  "feature": "f11-protect-unlock",
+  "captured": "2026-11-28T15:15:44Z/15:17:57Z",
+  "expires": "2026-12-28",
+  "raw_evidence": "/mnt/project-files/evals-cache/f11-protect-unlock/ (ref/ reference outputs, captures and network logs; out/ our outputs, two HARs, Lighthouse JSON and logs; shots/; scripts/). Side-by-side captures: /mnt/project-files/comparisons/f11-protect-unlock/. Not in git.",
+  "reference_tasks_used": 2,
+  "reference_page_loads": 2,
+  "booked_slot": "15:00-15:59 UTC",
+  "harness": "Playwright headless Chromium, 1280x632 and 390x664. Result read by polling the result frame every 25 ms (reference) and by a mutation observer (ours). Outputs read with pikepdf 10 (qpdf) and pypdfium2.",
+  "inputs": {
+    "alpha.pdf": "1,944 B, 3 pages, not encrypted, sha256 a921e4a764f06b314166ef724f8878cf03aa8babee83b9c90c903b0fdbced273",
+    "user-pw.pdf": "2,821 B, 3 pages, AES-256 R6, open password and owner password; its document info strings are stored unencrypted, sha256 0c7005b534ad4bd698ec0c3e4afd039dfe0937e2836178cc283768f3f644dca7",
+    "passwords": "made up for this run; kept in the scripts under raw_evidence, not here"
+  },
+  "reference": {
+    "flow": [
+      "Choosing a file uploads it at once (an upload check, then the upload, starting 0.4-0.6 s after choosing).",
+      "Protect options: open password; owner password; encryption RC4 128, AES 128 or AES 256, with AES 256 preselected, shown after a 'more options' link; seven permission checkboxes, all off at first: modify, copy, print, high-resolution print, fill forms, comment, insert/rotate/delete pages; a warning that readers may ignore permissions. Password fields show their text.",
+      "Unlock: a locked file opens a dialog asking for the owner password. The file's open password was refused there with a short 'incorrect' label; the owner password was accepted. Each try posts the password to a per-file check endpoint. Then one run button, no options.",
+      "The protect task request carries both passwords, the algorithm and the permission list as JSON.",
+      "Result opens in an overlay frame.",
+      "Stated free limits on these pages: 200 pages or 50 MB, 3 tasks an hour."
+    ],
+    "landing_load_ms": { "protect": 1984, "unlock": 946 },
+    "task1_protect": {
+      "settings": "alpha.pdf; open password and a different owner password; AES 256; print and high-resolution print allowed, the other five not; 1280 wide",
+      "at": "2026-11-28T15:16:53Z",
+      "timing_ms": { "click_to_task_post": 32, "click_to_result_frame": 1247, "click_to_download_visible": 2326 },
+      "output_bytes": 2403,
+      "output_sha256": "a946f529d4db5876d28436fba1a6fbb20ada2517fc68570e16be78f2bd782579"
+    },
+    "task2_unlock": {
+      "settings": "user-pw.pdf; owner password given in the dialog; 390 wide",
+      "at": "2026-11-28T15:17:53Z",
+      "timing_ms": { "click_to_task_post": 67, "click_to_result_frame": 744, "click_to_download_visible": 1478 },
+      "output_bytes": 1676,
+      "output_sha256": "89ac1222059f5a7826242f50b1df758ebea82d6cb2337dc09cdc95cc029fc5be"
+    },
+    "output_observations": [
+      "Task 1: refused with no password and a wrong one (qpdf, PDFium); open password gives user rights, owner password owner rights. V5, R6, AES-256, P=-1532: print and high-res print allowed, extract, modify, annotate, forms and assembly refused, accessibility allowed. Metadata encrypted. 3 pages, text and render equal to the source. Title kept, producer and modification date replaced. +459 B.",
+      "Task 2: not encrypted, 3 pages, text and render equal to the source. Title and creation date read correctly although the source stores them unencrypted; producer and modification date replaced. -1,145 B."
+    ],
+    "phone_390": "No sideways scroll on landing, protect form, unlock dialog or result. Protect form is 1,165 px tall with the run button at y=1075 (scroll needed). Unlock run button at y=307. Result: Download at y=244.",
+    "not_captured": "An unprotected file through unlock; restrictions with no owner password; RC4 and AES-128 outputs; a wrong password on a real task; a paid multi-file run."
+  },
+  "ours_2026-11-28_742ade4": {
+    "p1_protect_alpha": { "settings": "open + owner password, Print on, Copy off, Edit off", "bytes": 2773, "sha256": "5563b470a44b70e833ab82663d6e634855bec13e48046ddc6e6404081200539f", "enc": "V5 R6 AES-256, P=-1340", "allow": "print, high-res print, accessibility; nothing else" },
+    "p2_restrictions_only": { "settings": "no open password, Print off, owner left empty", "bytes": 2773, "sha256": "0a2b12032e4e846e9a43881a3430b9127d25fbde1dfb0f9af12bfc68d2f79951", "enc": "V5 R6 AES-256, P=-2056", "note": "opens with no password as user; empty, open and typed-owner passwords are not the owner password" },
+    "p3_protect_390": { "bytes": 2773, "sha256": "6aa87fc1990940c817fd45951a9296a38d89bcfa9d18cb5a61f6b7c9d3abac2c" },
+    "p4_zip_three_files": { "bytes": 33479, "sha256": "adc8bf70abbddd7a627d6a5837adbeb2fc15c561becf313db2aba8caf8b0de37", "note": "alpha, bravo, sixty-pages; each AES-256 R6, refused without the password" },
+    "p6_reprotect_user_pw": { "bytes": 2662, "sha256": "6a155a5e7923472dfc0412eb72915f8d02330c0cb0fa662a4a89929af7b08349", "note": "old open and owner passwords refused; document info garbage, as in the source when read by qpdf" },
+    "u1_unlock_user_pw": { "bytes": 2016, "sha256": "159b05cb1f3d5dba9329b408e62a2fd2d074601490f6a6cd3f10fdb6c8e584e1", "note": "not encrypted, text and render equal; title, producer garbage and dates empty (source stores them unencrypted)" },
+    "u2_unlock_owner_restricted": { "bytes": 1902, "sha256": "78673d246ad13f548e83e75af4ec9f800a81626e38785f79e90b3acaaa508183", "note": "no prompt" },
+    "u8_unlock_titled_aes256": { "bytes": 1308, "sha256": "2023ae3277d876463407ade20750f685003ce06ec97d37165468ab267fabdd89", "note": "title, author, subject, keywords kept" },
+    "u7_zip_three_files": { "bytes": 5781, "sha256": "33c188c4401371bf0e84f7edfd45ebc451885f6b2e842e3d99b6da80442887dc" },
+    "also_unlocked_ok": "rc4-128.pdf, aes-128.pdf, encryption/r6.pdf, the reference's task 1 output, our p1 output",
+    "click_to_download_ms": {
+      "protect_cold_1280": [720, 754, 790],
+      "protect_390": 767,
+      "protect_three_files": 1389,
+      "protect_restrictions_only": 821,
+      "unlock_cold_1280": [684, 813, 1032],
+      "unlock_390": 677,
+      "unlock_dialog_to_pages_ms": [592, 718, 586]
+    },
+    "button_ready_after_choosing_ms": [226, 227, 219],
+    "messages": {
+      "wrong_password": "That password didn't work. Check it and try again.",
+      "nothing_to_remove": "This PDF has no password or restrictions, so there is nothing to remove. (shown with 'That didn't work.' and Try again)",
+      "owner_same_as_open": "Use a different password from the one that opens the file",
+      "too_long": "That password is too long",
+      "waiting": "Enter a password"
+    },
+    "non_get_requests": 0,
+    "off_origin_requests": 0,
+    "websockets": 0,
+    "requests_holding_a_password": 0,
+    "storage_holding_a_password": 0,
+    "phone_390": "scroll width 390 on landing, loaded, options sheet, password dialog and result; run button y=602, Download y=601",
+    "first_screen": "run button bottom y=128 and Download y=127 at 1366x657, 1280x632, 1536x730, 1920x969; y=650 at 390x664; owner field ends y=523",
+    "lighthouse_mobile": {
+      "protect-pdf": [
+        { "performance": 76, "lcp_s": 2.4, "tbt_ms": 986, "note": "host busy during this run" },
+        { "performance": 95, "lcp_s": 1.7, "tbt_ms": 242 },
+        { "performance": 99, "lcp_s": 1.4, "tbt_ms": 120 }
+      ],
+      "unlock-pdf": [
+        { "performance": 98, "lcp_s": 2.2, "tbt_ms": 76 },
+        { "performance": 97, "lcp_s": 2.0, "tbt_ms": 162 },
+        { "performance": 92, "lcp_s": 1.9, "tbt_ms": 331 }
+      ]
+    },
+    "axe_violations": 0
+  }
+}

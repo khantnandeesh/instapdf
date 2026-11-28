@@ -238,3 +238,25 @@ describe("stamped files (F9 AC-1120 to AC-1123)", () => {
     expect(Math.min(x - box.x, box.x + box.width - x)).toBeLessThan(40);
   });
 });
+
+describe("result name prefix (F9 Bates, key check G-2)", () => {
+  it("AC-1178: keeps what a file name can hold, drops the rest, and never starts with a dot or a space", async () => {
+    const { cleanNamePrefix } = await import("./stamp");
+    expect(cleanNamePrefix("ACME-")).toBe("ACME-");
+    expect(cleanNamePrefix('a/b\\c:d*e?f"g<h>i|j')).toBe("abcdefghij");
+    expect(cleanNamePrefix("  ..hidden")).toBe("hidden");
+    expect(cleanNamePrefix("Дело 12 ")).toBe("Дело 12 ");
+    expect(cleanNamePrefix("x".repeat(80))).toHaveLength(60);
+    expect(cleanNamePrefix("\u0000\u001f")).toBe("");
+    expect(cleanNamePrefix("a\u202eb\u0085")).toBe("ab");
+    expect(cleanNamePrefix("x".repeat(59) + "\ud83d\ude00")).toBe("x".repeat(59));
+  });
+  it("AC-1179: each result's name takes the prefix, cleaned", async () => {
+    const { runJob } = await import("./jobs");
+    const { readFile } = await import("node:fs/promises");
+    const bytes = new Uint8Array(await readFile("tests/fixtures/three-pages.pdf"));
+    const file = (name: string) => ({ name, source: new Blob([bytes as Uint8Array<ArrayBuffer>]), pages: [0] });
+    const out = await runJob({ kind: "stamp", zipName: "out.zip", stamps: [], first: 1, date: "2026-11-28", namePrefix: "ACME/-", bates: { start: 1, digits: 6, doc: 1 }, files: [file("a.pdf"), file("b.pdf")] }, () => {});
+    expect(out.entries?.map((e) => e.name)).toEqual(["ACME-a.pdf", "ACME-b.pdf"]);
+  });
+});

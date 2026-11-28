@@ -84,8 +84,13 @@ export const batesCopy = {
   start: "Starts at",
   doc: "Files from",
   custom: "Your line",
-  tokens: "{bates} number, {doc} file, {n} page, {file} name, {date}",
+  // One line in the side panel: the panel has to end above the fold.
+  tokens: "{bates} number, {doc} file, {n} page, {file}, {date}",
   room: "Added strip",
+  // The side panel shows these without a label above: each says what it measures.
+  edges: { narrow: "Edge: close", normal: "Edge: normal", wide: "Edge: far" },
+  name: "Result name starts with",
+  namePlaceholder: "File name starts with (optional)",
   needsStart: "Enter the first number",
   needsDoc: "Enter the first file number",
   needsLine: "Type your line, with {bates} where the number goes",

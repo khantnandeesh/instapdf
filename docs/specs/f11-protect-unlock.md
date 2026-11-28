@@ -13,8 +13,8 @@ not grow.
 | | Reference | BerryPDF |
 |---|---|---|
 | Privacy | The file and its password are uploaded | Done on the device; the CSP blocks uploads; the password is never stored |
-| Encryption | AES-128 by default, AES-256 behind "More options" | Always AES-256 (PDF 2.0, revision 6) |
-| Restrictions | A second step with many checkboxes | Three plain switches (print, copy, edit) beside the pages |
+| Encryption | AES-256 preselected; AES-128 and RC4-128 also offered | AES-256 by default; AES-128 for old readers. The broken RC4 is not offered |
+| Restrictions | A second step with seven checkboxes | Printing (any quality, draft only, none), Changes (anything, comments and forms, forms only, pages only, none) and a Copy switch, beside the pages |
 | Restrictions without an open password | Needs an owner password typed | Works on its own; a random owner password is set when the field is left empty |
 | Several files | One at a time on the free tier | Any number, back as a ZIP |
 | Limits | Daily task and size limits | None |
@@ -41,6 +41,8 @@ for files you own or may change.
 
 - AC-800 The Protect button is disabled with "Enter a password" until a password or a restriction is set.
 - AC-801 Output is AES-256 encrypted and opens only with the password (checked with pdf.js as a second reader).
+- AC-812 Finer rights are stored as chosen: draft-only printing, forms without editing, comments and forms, page changes alone (key check run 1, 28 Nov).
+- AC-813 AES-128 output needs its password and opens with it; a password it cannot hold (over 32 characters, or letters outside Western European ones) is refused with a pointer to AES-256.
 - AC-802 Restrictions alone protect a file that opens freely; the stored rights match the switches.
 - AC-803 A blank owner password with restrictions sets a random one; the open password never lifts them.
 - AC-804 Passwords over 127 bytes and an owner password equal to the open one are refused with a message.

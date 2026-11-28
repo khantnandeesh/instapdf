@@ -1,12 +1,12 @@
 /**
  * Protect and Unlock (spec F11). Protect encrypts with AES-256 (PDF 2.0 revision 6, read by every
- * reader since Acrobat 9); Unlock saves a copy with no password and no restrictions. Both run on the
+ * reader since Acrobat 9), or with AES-128 when an older reader has to open the file; Unlock saves a copy with no password and no restrictions. Both run on the
  * device: neither the file nor the password is sent anywhere.
  */
 import { decodePDFRawStream, PDFName, PDFRawStream, PDFRef, type PDFDocument } from "@cantoo/pdf-lib";
 import { loadForEdit } from "./rotate";
 import { USER_ERROR } from "./user-error";
-import { canProtect, normalPassword, ownerSameAsOpen, passwordTooLong, restricts, type ProtectOptions } from "./protect-options";
+import { canProtect, normalPassword, ownerSameAsOpen, passwordTooLong, passwordUnfit, restricts, type ProtectOptions } from "./protect-options";
 
 export * from "./protect-options";
 
@@ -49,28 +49,29 @@ function dropPdfAClaim(doc: PDFDocument): boolean {
 
 export async function protectPdf({ bytes, password, options }: ProtectInput): Promise<SecurityResult> {
   if (!canProtect(options)) throw new Error(`${USER_ERROR}Enter a password, or switch off something people may do.`);
-  if (passwordTooLong(options.openPassword) || passwordTooLong(options.ownerPassword)) throw new Error(`${USER_ERROR}That password is too long. Use a shorter one.`);
+  if (passwordTooLong(options.openPassword, options.strength) || passwordTooLong(options.ownerPassword, options.strength)) throw new Error(`${USER_ERROR}That password is too long. Use a shorter one.`);
+  if (passwordUnfit(options.openPassword, options.strength) || passwordUnfit(options.ownerPassword, options.strength)) throw new Error(`${USER_ERROR}AES-128 cannot hold this password. Choose AES-256.`);
   if (ownerSameAsOpen(options)) throw new Error(`${USER_ERROR}Use a different password from the one that opens the file.`);
   const { doc, wasEncrypted } = await loadForEdit(bytes, password);
   const { allow } = options;
   const wasPdfA = dropPdfAClaim(doc);
-  const openPassword = normalPassword(options.openPassword);
-  const ownerPassword = normalPassword(options.ownerPassword);
+  const openPassword = normalPassword(options.openPassword, options.strength);
+  const ownerPassword = normalPassword(options.ownerPassword, options.strength);
   doc.encrypt({
-    algorithm: "AES-256",
+    algorithm: options.strength === "aes128" ? "AES-128" : "AES-256",
     userPassword: openPassword,
     // The same password for both gives whoever opens the file full rights, which is right when nothing is
     // restricted. With restrictions, a different owner password is what makes readers keep to them.
     ownerPassword: ownerPassword || (restricts(allow) ? randomPassword() : openPassword),
     permissions: {
-      printing: allow.print ? "highResolution" : false,
+      printing: allow.print === "any" ? "highResolution" : allow.print === "low" ? "lowResolution" : false,
       copying: allow.copy,
       // Screen readers keep their access to the text whatever copying says.
       contentAccessibility: true,
-      modifying: allow.edit,
-      annotating: allow.edit,
-      fillingForms: allow.edit,
-      documentAssembly: allow.edit,
+      modifying: allow.edit === "any",
+      annotating: allow.edit === "any" || allow.edit === "comment",
+      fillingForms: allow.edit === "any" || allow.edit === "comment" || allow.edit === "forms",
+      documentAssembly: allow.edit === "any" || allow.edit === "pages",
     },
   });
   return { bytes: await doc.save(), pageCount: doc.getPageCount(), wasEncrypted, ...(wasPdfA ? { warnings: [PDFA_NOTE] } : {}) };

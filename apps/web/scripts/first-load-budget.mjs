@@ -60,7 +60,8 @@ const BUDGET_KB = {
   // F12 and F11 added six tools to the registry every route carries: the routes within that of their
   // budget (home, Split, Delete, PDF to JPG, JPG to PDF) move up 1 kB.
   // F11: Protect is the bare flow plus the password field and three switches; Unlock is the bare flow.
-  "/protect-pdf/page": [143, 153],
+  // +1 kB (F6, 28 Nov): it sat at its limit and Compress added its entry to the registry every route loads.
+  "/protect-pdf/page": [144, 154],
   // +1 kB entry (F10, 28 Nov): three more tools in the registry every route loads.
   "/unlock-pdf/page": [140, 150],
   // F10 document tools: the pick-pages flow with switches; the bare flow with one select; the bare flow with a form.
@@ -68,6 +69,8 @@ const BUDGET_KB = {
   // Flatten: +1 kB for the pictures choice (a second select and its copy).
   "/flatten-pdf/page": [144, 154],
   // F13 Grayscale: the bare flow with one select.
+  // F6 Compress: the settings flow with two selects and a switch.
+  "/compress-pdf/page": [146, 156],
   "/grayscale-pdf/page": [144, 154],
   "/repair-pdf/page": [143, 153],
   // +1 kB: it sat at its limit and the shared flow grew by the OCR job's registry entry (F15).
@@ -103,20 +106,25 @@ const CLOUD_BUDGET_KB = {
   "/deskew-pdf/page": [149, 159],
   "/ocr-pdf/page": [147, 157],
   // +1 kB on Alternate (preloads), Delete, Protect and Unlock, at their limit: the shared-flow changes of the F13 key checks (see the table above).
-  "/resize-pdf/page": [147, 157],
+  "/resize-pdf/page": [148, 158],
   "/flip-pdf/page": [147, 157],
   "/n-up-pdf/page": [147, 157],
   // +1 kB entry with Bates numbering (see the note in the table above).
-  "/add-page-numbers/page": [152, 161],
-  "/bates-numbering/page": [152, 162],
-  "/pdf-header-footer/page": [152, 161],
-  "/watermark-pdf/page": [152, 162],
+  // +1 kB (28 Nov): Page numbers, Header and footer and Remove annotations were within 90 B of their limits (CI builds
+  // differ from local ones by a few bytes) after the stamp tools gained the result name prefix.
+  "/add-page-numbers/page": [153, 162],
+  "/bates-numbering/page": [153, 163],
+  "/pdf-header-footer/page": [153, 162],
+  "/watermark-pdf/page": [153, 163],
   "/extract-pdf-pages/page": [147, 157],
   "/delete-pdf-pages/page": [147, 157],
-  "/protect-pdf/page": [145, 155],
+  // +1 kB each (28 Nov): Protect (finer rights, AES-128), Bates and Watermark (result name prefix, shared stamp code) and Resize
+  // sat within 130 B of their limits when Compress joined the registry every route loads.
+  "/protect-pdf/page": [146, 156],
   "/unlock-pdf/page": [142, 152],
-  "/remove-pdf-annotations/page": [147, 157],
+  "/remove-pdf-annotations/page": [148, 158],
   "/flatten-pdf/page": [145, 155],
+  "/compress-pdf/page": [147, 157],
   "/grayscale-pdf/page": [145, 155],
   "/repair-pdf/page": [145, 155],
   "/rename-pdf/page": [147, 157],

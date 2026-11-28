@@ -205,7 +205,7 @@ export const toolSeo: Record<string, ToolSeo> = {
   "compress-pdf": {
     keyword: "compress pdf",
     title: "Compress PDF: Reduce PDF File Size Free",
-    description: `Compress PDF files to reduce their size while keeping them sharp. Free, no sign-up, no watermark. ${serverNote}`,
+    description: `Compress PDF files to reduce their size while text stays sharp. Free, no sign-up, no watermark. ${privateNote}`,
     also: ["reduce pdf size", "shrink pdf", "pdf compressor", "compress pdf to 100kb", "make pdf smaller"],
   },
   "grayscale-pdf": {
@@ -1070,6 +1070,37 @@ export const seoContent: Record<string, ToolSeoContent> = {
       },
     ],
     related: ["remove-pdf-annotations", "protect-pdf", "edit-pdf", "create-fillable-pdf", "merge-pdf", "edit-pdf-metadata"],
+  },
+  "compress-pdf": {
+    howTo: "How to compress a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. You can add several. Nothing is uploaded." },
+      { name: "Choose the picture quality", text: "Regular suits most files. Pick Low for the smallest file or Best to keep photos close to the original." },
+      { name: "Download", text: "Select Compress and download the smaller file. The result shows how much room you saved." },
+    ],
+    faq: [
+      {
+        q: "How does it make a PDF smaller?",
+        a: "Pictures are what makes most PDFs heavy. Each one is scaled to the size the page shows it at and packed again, and the file is written without anything it does not use. Scans and photo-heavy files shrink the most.",
+      },
+      {
+        q: "Will the text get blurry?",
+        a: "No. Text stays text and drawings stay drawings, exactly as sharp as before, and you can still select and search the text. Only pictures are packed harder.",
+      },
+      {
+        q: "Can the file come out larger?",
+        a: "No. If a PDF is already as small as this tool can make it, you get it back as it was, and the page says so.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The PDF is compressed in your browser, on your device. It never leaves it, so there is nothing to delete afterwards.",
+      },
+      {
+        q: "Which setting should I pick for email or a web form?",
+        a: "Start with Regular quality at 72 ppi. If the file is still over the limit, pick Low, or turn on Pictures in grey. For printing, pick 150 ppi or more.",
+      },
+    ],
+    related: ["grayscale-pdf", "merge-pdf", "split-pdf", "pdf-to-jpg", "repair-pdf", "protect-pdf"],
   },
   "grayscale-pdf": {
     howTo: "How to convert a PDF to grayscale",
