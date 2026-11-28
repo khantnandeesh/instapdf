@@ -101,7 +101,7 @@ const CLOUD_BUDGET_KB = {
   "/split-pdf-in-half/page": [146, 156],
   "/crop-pdf/page": [147, 157],
   "/deskew-pdf/page": [149, 159],
-  "/ocr-pdf/page": [148, 158],
+  "/ocr-pdf/page": [147, 157],
   // +1 kB on Alternate (preloads), Delete, Protect and Unlock, at their limit: the shared-flow changes of the F13 key checks (see the table above).
   "/resize-pdf/page": [147, 157],
   "/flip-pdf/page": [147, 157],
