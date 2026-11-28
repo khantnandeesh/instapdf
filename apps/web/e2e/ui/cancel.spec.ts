@@ -73,13 +73,14 @@ test("AC-635: Cancel mid-run (progress under way) stops the worker, the job neve
   await trackWorkers(page);
   await page.goto("/split-pdf");
   await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
+  // The job's worker script is held until the pill is up and focused. Held before the file is in:
+  // the flow fetches the worker ahead once a file is ready.
+  const release = await holdScript(page, /instapdf-processing\.[^/]*\.js/);
   await page.getByTestId("file-input").setInputFiles(file);
   await expect(flow(page)).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
   await page.getByRole("radio", { name: "Every page" }).click();
   let downloads = 0;
   page.on("download", () => downloads++);
-  // The job's worker script is held until the pill is up and focused.
-  const release = await holdScript(page, /instapdf-processing\.[^/]*\.js/);
   await primary(page).click();
   const pill = page.getByTestId("processing");
   await expect(pill).toBeVisible();
@@ -139,12 +140,13 @@ test("S6: with 990 pages dimmed, Cancel brings the primary back on screen within
   await page.setViewportSize({ width: 1366, height: 657 });
   await page.goto("/split-pdf");
   await expect(page.locator("[data-testid=tool-flow][data-hydrated]")).toBeVisible();
+  // The job's worker is held (before the file is in: the flow fetches it ahead once a file is ready),
+  // so the run stays in progress with all 990 tiles dimmed and inert.
+  await holdScript(page, /instapdf-processing\.[^/]*\.js/);
   await page.getByTestId("file-input").setInputFiles(file);
   await expect(flow(page)).toHaveAttribute("data-state", "ready", { timeout: 60_000 });
   await expect(page.getByTestId("page-tile")).toHaveCount(990, { timeout: 60_000 });
   await page.getByRole("radio", { name: "Every page" }).click();
-  // The job's worker is held, so the run stays in progress with all 990 tiles dimmed and inert.
-  await holdScript(page, /instapdf-processing\.[^/]*\.js/);
   await primary(page).click();
   await expect(page.getByTestId("pages-scroll")).toHaveAttribute("data-dim", "", { timeout: 10_000 });
   await page.waitForTimeout(1000);
