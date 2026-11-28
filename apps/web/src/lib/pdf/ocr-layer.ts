@@ -5,7 +5,7 @@
  * text can be searched, selected and copied. Nothing on the page is redrawn or re-compressed.
  * Worker-only: this module pulls in the PDF library.
  */
-import { concatTransformationMatrix, decodePDFRawStream, drawObject, PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, PDFRef, PDFStream, popGraphicsState, pushGraphicsState, type PDFPage } from "@cantoo/pdf-lib";
+import { concatTransformationMatrix, decodePDFRawStream, drawObject, PDFArray, PDFDict, PDFDocument, PDFInvalidObject, PDFName, PDFRawStream, PDFRef, PDFStream, popGraphicsState, pushGraphicsState, type PDFPage } from "@cantoo/pdf-lib";
 import { cut, stripHiddenText } from "./hidden-text";
 import { shownBox, shownToPage } from "./page-geometry";
 import { loadForEdit } from "./rotate";
@@ -155,6 +155,8 @@ export function removeHiddenText(doc: PDFDocument, pages: readonly PDFPage[]): S
     }
   }
   // What only they held (a layer's font, the content streams replaced) leaves the file with them: whatever the document still reaches stays.
+  // An object that could not be parsed may point at anything: with one in the file, nothing is swept.
+  if (doc.context.enumerateIndirectObjects().some(([, o]) => o instanceof PDFInvalidObject)) return changed;
   const { Root, Info, Encrypt } = doc.context.trailerInfo;
   const live = reach(doc, [Root, Info, Encrypt]);
   for (const ref of reach(doc, loose)) if (!live.has(ref)) doc.context.delete(ref);
