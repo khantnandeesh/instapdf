@@ -37,6 +37,13 @@ const pending = new Set<() => void>();
  */
 const live = new Set<gsap.core.Animation>();
 
+/**
+ * Brings GSAP's clock to now before an animation is made. A new tween starts at the time of the last
+ * tick; when the frame before was a long one (a busy page), that is far enough back for a short exit to
+ * be over on its first frame: the part would vanish instead of leaving.
+ */
+const sync = () => gsap.ticker.tick();
+
 /** How many animations are running: 0 once everything has settled. */
 export const liveCount = () => live.size;
 
@@ -149,6 +156,7 @@ export function enter(el: HTMLElement | HTMLElement[], p: Preset): void {
   // Stagger only what is in view, at most 10, and land by the 400ms cap; the rest arrive with the last one.
   const inView = els.filter((e) => e.getBoundingClientRect().top < innerHeight).slice(0, 10);
   const each = Math.min(STAGGER.each, STAGGER.max / Math.max(1, inView.length - 1), (CAP - duration) / Math.max(1, inView.length - 1));
+  sync();
   track(
     gsap.fromTo(els, start, {
       // Back to identity on what the preset moves, and nothing else: an opacity-only preset writes no
@@ -184,6 +192,7 @@ export function exit(el: HTMLElement, p: Preset): Promise<void> {
       resolve();
     };
     pending.add(done);
+    sync();
     track(gsap.to(el, { ...to, ease: EASE.in.gsap, overwrite: "auto", onComplete: done, onInterrupt: done }));
   });
 }
@@ -205,6 +214,7 @@ export function flip(container: HTMLElement, mutate: () => void, p: Preset): voi
   if (before.length > 40) {
     // Too many moving things shimmer: crossfade the list instead (motion.md rule 7).
     mutate();
+    sync();
     track(gsap.fromTo(container, { opacity: 0 }, { opacity: 1, duration: DUR.micro, ease: EASE.out.gsap, overwrite: "auto", clearProps: "opacity" }));
     return;
   }
@@ -214,6 +224,7 @@ export function flip(container: HTMLElement, mutate: () => void, p: Preset): voi
   // A CSS entrance on a re-inserted item would fight the move: GSAP owns these items now.
   for (const el of after) for (const a of el.getAnimations()) if (a instanceof CSSAnimation) a.finish();
   const end = () => void (running = undefined);
+  sync();
   running = track(
     Flip.from(state, {
       targets: after,
@@ -237,6 +248,7 @@ export function swap(outEl: HTMLElement, inEl: HTMLElement, p: Preset): void {
   const from = pick(FROM, p);
   if (!from) return;
   const { duration, ...start } = from;
+  sync();
   track(gsap.fromTo(outEl, { opacity: 1 }, { opacity: 0, duration: DUR.micro, ease: EASE.in.gsap, overwrite: "auto", clearProps: "opacity" }));
   track(gsap.fromTo(inEl, start, { opacity: 1, scale: 1, y: 0, duration, ease: ease(p), overwrite: "auto", clearProps: "transform,opacity" }));
 }

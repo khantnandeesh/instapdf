@@ -7,6 +7,7 @@ import type { ProcessFn } from "@/components/tool-flow/types";
 import { Select } from "@/components/ui/Select";
 import { Switch } from "@/components/ui/Switch";
 import type { GrayWhat } from "@/lib/pdf/grayscale-run";
+import { warmPlainImages } from "@/lib/pdf/pdfjs";
 import { warmWorker } from "@/lib/pdf/worker-client";
 import { flowTool } from "@/tools/registry";
 import { grayscaleCopy as c } from "./copy";
@@ -55,8 +56,9 @@ export function GrayscaleTool() {
       tool={tool}
       process={process}
       warm={() => {
-        warmWorker();
+        warmWorker(["grayscale", "grayEncode"]);
         void import("@/lib/pdf/grayscale-run");
+        warmPlainImages();
       }}
       renderMore={(ctx) => <MoreOptions changed={Number(opts.blackText) + Number(opts.smaller)} disabled={ctx.disabled} content={{ togglesTitle: c.extras, toggles: extras("more") }} />}
       renderOptions={() => (

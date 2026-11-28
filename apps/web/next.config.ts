@@ -115,6 +115,9 @@ const nextConfig: NextConfig = {
       // Content-addressed library files never change; manifest.json names the current ones.
       { source: "/fonts/lib/:dir(index|families|fonts)/:path*", headers: [immutable] },
       { source: "/fonts/lib/manifest.json", headers: [{ key: "Cache-Control", value: "public, max-age=300" }] },
+      // The text recogniser (scripts/copy-ocr.mjs): folders named by version, so the files never change.
+      // Its worker runs under the same hash-free policy as our own workers: it can reach this site only.
+      { source: "/ocr/:path*", headers: [immutable, { key: "Content-Security-Policy", value: contentSecurityPolicy({ dev: process.env.NODE_ENV === "development" }) }] },
       // Pages get a per-page CSP (with their inline-script hashes) from src/middleware.ts.
       // Static files skip the middleware; workers loaded from here run under this hash-free policy.
       {

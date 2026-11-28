@@ -296,6 +296,8 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
   "repair-pdf": { status: "beta", flow: clientPdfFlow("repair-pdf", { title: "Repair PDF", actionLabel: "Repair PDF", progressLabel: "Repairing" }, { defaultView: "files", acceptDamaged: true }) },
   // F15 (spec f15-deskew-ocr.md): Deskew measures each page in the tab and turns its content in place.
   "deskew-pdf": { status: "beta", flow: clientPdfFlow("deskew-pdf", { title: "Deskew PDF", actionLabel: "Straighten", progressLabel: "Straightening" }) },
+  // OCR reads the pages in the tab (Tesseract as WebAssembly, served from this site) and lays the text over them.
+  "ocr-pdf": { status: "beta", flow: clientPdfFlow("ocr-pdf", { title: "OCR PDF", actionLabel: "Read text", progressLabel: "Reading" }, { layout: "settings" }) },
   "pdf-bookmarks": { status: "beta", flow: clientPdfFlow("pdf-bookmarks", { title: "Edit PDF bookmarks", actionLabel: "Save bookmarks", progressLabel: "Saving" }, { layout: "settings", multiFile: false, maxFiles: 1 }) },
   "rename-pdf": { status: "beta", flow: clientPdfFlow("rename-pdf", { title: "Rename PDF by content", actionLabel: "Rename", progressLabel: "Renaming" }, { layout: "settings" }) },
   "edit-pdf-metadata": { status: "beta", flow: clientPdfFlow("edit-pdf-metadata", { title: "Edit PDF metadata", actionLabel: "Save metadata", progressLabel: "Saving" }, { layout: "settings" }) },
@@ -429,7 +431,7 @@ export const tools: Tool[] = [
   t("jpg-to-pdf", "Image to PDF", "Turn JPG, PNG and other images into a PDF", "convert-to", "client", "file-image", "jpg-to-pdf"),
   t("word-to-pdf", "Word to PDF", "Convert .docx documents", "convert-to", "server", "file-pdf"),
   t("html-to-pdf", "Web page to PDF", "Capture URLs or HTML as PDF", "convert-to", "server", "globe"),
-  t("ocr-pdf", "OCR", "Make scanned PDFs searchable", "scans", "server", "scan"),
+  t("ocr-pdf", "OCR", "Make scanned PDFs searchable", "scans", "client", "scan"),
   t("deskew-pdf", "Deskew", "Straighten tilted scans", "scans", "client", "angle"),
   t("workflows", "Workflows", "Chain tools and run them in one go", "automate", "client", "flow-arrow"),
 ];

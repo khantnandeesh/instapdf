@@ -156,7 +156,7 @@ test("AC-634 AC-640: the label reads '<verb>… n%', the fill tracks n and never
   for (let i = 1; i < fills.length; i++) expect(fills[i], "the fill never decreases").toBeGreaterThanOrEqual(fills[i - 1]);
 });
 
-test("AC-639: the Done tick shows for at least 400ms, and the result is in view within 900ms of the job finishing", async ({ page }, info) => {
+test("AC-639: the Done tick shows for at least 250ms, and the result is in view within 750ms of the job finishing", async ({ page }, info) => {
   test.skip(!isDesktop(info.project.name), "one run is enough");
   test.skip(!fixturesServed, FIXTURES_OFF);
   await openTool(page, "/test-fixtures/settings-tool");
@@ -175,8 +175,8 @@ test("AC-639: the Done tick shows for at least 400ms, and the result is in view 
   await primary(page).click();
   await expect(page.getByTestId("result")).toBeVisible({ timeout: 10_000 });
   const t = await page.evaluate(() => (window as unknown as { __t: { done: number; state: number; result: number } }).__t);
-  expect(t.state - t.done, "Done shows for at least 400ms").toBeGreaterThanOrEqual(400);
-  expect(t.result - t.done, "the result is in within 900ms").toBeLessThanOrEqual(900);
+  expect(t.state - t.done, "Done shows for at least 250ms").toBeGreaterThanOrEqual(250);
+  expect(t.result - t.done, "the result is in within 750ms").toBeLessThanOrEqual(750);
 });
 
 test("AC-640: Escape on the pill cancels", async ({ page }, info) => {

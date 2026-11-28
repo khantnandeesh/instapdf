@@ -24,6 +24,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { copyrightLines, EXCEPTIONS, findViolations, isFontOnlyPackage, licenseExpression } from "./license-policy.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -222,6 +223,30 @@ function fontEntries() {
   return entries;
 }
 
+const LEPTONICA = `Copyright (C) 2001-2020 Leptonica. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above
+   copyright notice, this list of conditions and the following
+   disclaimer in the documentation and/or other materials
+   provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL ANY
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
+
 function assetEntries() {
   const dir = join(root, "node_modules", "@phosphor-icons", "core");
   if (!existsSync(join(dir, "LICENSE"))) {
@@ -230,7 +255,40 @@ function assetEntries() {
   }
   const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
   const text = readFileSync(join(dir, "LICENSE"), "utf8").trim();
+  // The text recogniser's language data (scripts/copy-ocr.mjs): Tesseract's own trained models
+  // (tessdata_best, Apache-2.0), installed from the @tesseract.js-data wrapper packages (MIT, no
+  // licence file of their own). The Apache text is the one tesseract.js-core ships.
+  const ocr = JSON.parse(readFileSync(join(root, "src", "lib", "ocr", "ocr.json"), "utf8"));
+  const main = createRequire(join(root, "package.json")).resolve("tesseract.js/package.json");
+  const coreLicense = join(dirname(createRequire(main).resolve("tesseract.js-core/package.json")), "LICENSE");
+  const apache = readFileSync(coreLicense, "utf8").trim();
   return [
+    {
+      kind: "asset",
+      name: `Tesseract language data (${ocr.languages.map((l) => l.code).join(", ")})`,
+      version: ocr.data,
+      license: "Apache-2.0",
+      copyright: ["Copyright Google Inc. and the Tesseract OCR contributors"],
+      author: null,
+      homepage: "https://github.com/tesseract-ocr/tessdata_best",
+      texts: [{ file: "LICENSE", text: apache }],
+    },
+    {
+      // tesseract.js-core's binary has Leptonica and the image readers it uses linked in; the package
+      // ships only its own Apache text, so their notices are given here.
+      kind: "asset",
+      name: "Leptonica and image readers (inside the text recogniser's binary)",
+      version: ocr.engine,
+      license: "BSD-2-Clause",
+      copyright: [
+        "Copyright (C) 2001-2020 Leptonica. All rights reserved.",
+        "Also linked in: libpng (libpng licence), zlib (zlib licence), libjpeg (Independent JPEG Group licence), libtiff (libtiff licence), giflib (MIT), libwebp (BSD-3-Clause).",
+        "This software is based in part on the work of the Independent JPEG Group.",
+      ],
+      author: null,
+      homepage: "https://github.com/DanBloomberg/leptonica",
+      texts: [{ file: "leptonica-license.txt", text: LEPTONICA }],
+    },
     {
       kind: "asset",
       name: "Phosphor icons (Duotone icon paths)",

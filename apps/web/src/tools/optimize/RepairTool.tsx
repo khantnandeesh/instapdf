@@ -24,7 +24,7 @@ export function RepairTool() {
       tool={tool}
       process={process}
       warm={() => {
-        warmWorker();
+        warmWorker(["repair"]);
         void import("@/lib/pdf/repair-run");
       }}
       renderOptions={() => null}

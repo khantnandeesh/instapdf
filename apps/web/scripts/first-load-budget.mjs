@@ -39,8 +39,9 @@ const BUDGET_KB = {
   // +1 kB on thirteen more routes at their limit: the shared flow now fetches the run's code ahead of the click, offers Repair
   // on a file that will not open and shows a result's good news (F13 key checks M7, M9).
   // +1 kB on Resize, Clear annotations and Metadata, which sat at their limit: the registry every page carries grew by Deskew (F15).
-  // F15 Deskew: the bare flow; the skew detector and the dialog load on demand.
-  "/deskew-pdf/page": [145, 155],
+  // F15 Deskew: the flow and its "Only these pages" field (+2 kB, key check G-1); the skew detector and the dialog load on demand.
+  "/deskew-pdf/page": [147, 157],
+  "/ocr-pdf/page": [145, 155],
   "/resize-pdf/page": [146, 156],
   "/flip-pdf/page": [145, 155],
   "/n-up-pdf/page": [145, 155],
@@ -66,7 +67,8 @@ const BUDGET_KB = {
   // F13 Grayscale: the bare flow with one select.
   "/grayscale-pdf/page": [144, 154],
   "/repair-pdf/page": [143, 153],
-  "/rename-pdf/page": [145, 155],
+  // +1 kB: it sat at its limit and the shared flow grew by the OCR job's registry entry (F15).
+  "/rename-pdf/page": [146, 156],
   "/pdf-bookmarks/page": [145, 155],
   "/edit-pdf-metadata/page": [145, 155],
   "/pdf-to-jpg/page": [146, 156],
@@ -95,7 +97,8 @@ const CLOUD_BUDGET_KB = {
   "/split-pdf-by-text/page": [151, 161],
   "/split-pdf-in-half/page": [146, 156],
   "/crop-pdf/page": [147, 157],
-  "/deskew-pdf/page": [147, 157],
+  "/deskew-pdf/page": [149, 159],
+  "/ocr-pdf/page": [147, 157],
   // +1 kB on Alternate (preloads), Delete, Protect and Unlock, at their limit: the shared-flow changes of the F13 key checks (see the table above).
   "/resize-pdf/page": [147, 157],
   "/flip-pdf/page": [147, 157],
