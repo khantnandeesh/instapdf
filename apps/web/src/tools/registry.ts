@@ -283,6 +283,10 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
   "resize-pdf": { status: "beta", flow: clientPdfFlow("resize-pdf", { title: "Resize PDF", actionLabel: "Resize PDF", progressLabel: "Resizing" }) },
   "flip-pdf": { status: "beta", flow: clientPdfFlow("flip-pdf", { title: "Flip PDF", actionLabel: "Flip PDF", progressLabel: "Flipping" }) },
   "n-up-pdf": { status: "beta", flow: clientPdfFlow("n-up-pdf", { title: "N-up PDF", actionLabel: "Arrange pages", progressLabel: "Arranging" }) },
+  // F9. Stamping tools: settings tools (F25 §4), drawn by the editor's build.
+  "add-page-numbers": { status: "beta", flow: clientPdfFlow("add-page-numbers", { title: "Add page numbers", actionLabel: "Add page numbers", progressLabel: "Numbering" }, { layout: "settings" }) },
+  "pdf-header-footer": { status: "beta", flow: clientPdfFlow("pdf-header-footer", { title: "Header and footer", actionLabel: "Add header and footer", progressLabel: "Adding" }, { layout: "settings" }) },
+  "watermark-pdf": { status: "beta", flow: clientPdfFlow("watermark-pdf", { title: "Watermark PDF", actionLabel: "Add watermark", progressLabel: "Watermarking" }, { layout: "settings" }) },
   "extract-pdf-pages": {
     status: "beta",
     flow: clientPdfFlow(

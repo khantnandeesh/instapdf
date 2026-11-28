@@ -100,6 +100,7 @@ export function PageTile({
               style={{ left: `${decor.keep.x * 100}%`, top: `${decor.keep.y * 100}%`, width: `${decor.keep.w * 100}%`, height: `${decor.keep.h * 100}%` }}
             />
           )}
+          {decor?.overlay}
         </TilePage>
         <TileHit
           tabIndex={active ? 0 : -1}

@@ -3,8 +3,8 @@ import { PDFDocument, PDFName, StandardFonts, degrees } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
 import { buildPdf } from "@/lib/editor/build";
 import { nodeFonts } from "@/lib/editor/node-fonts";
-import type { ImageObj, TextObj } from "@/lib/editor/model";
-import { fillTokens, fittedSize, numbering, roman, stampObjects, type LineStamp, type PageShape, type TextMark } from "./stamp";
+import { LINE_HEIGHT, type ImageObj, type TextObj } from "@/lib/editor/model";
+import { fillTokens, fittedSize, numbering, roman, stampObjects, STAMP_LINE_HEIGHT, type LineStamp, type PageShape, type TextMark } from "./stamp";
 import { stampPdf, type StampBuild } from "./stamp-run";
 
 const style = { font: "arimo", size: 12, color: "#000000", bold: false } as const;
@@ -52,6 +52,9 @@ describe("stamp layout (F9 AC-1110 to AC-1114)", () => {
     const [half] = stampObjects({ ...upright, baseRotate: 180 }, [line("top-left")], values) as TextObj[];
     expect(half.rot).toBe(180);
     expect(half.y + half.h / 2).toBe(800 - 37.5);
+  });
+  it("lines are as tall as the editor's", () => {
+    expect(STAMP_LINE_HEIGHT).toBe(LINE_HEIGHT);
   });
   it("AC-1112: an empty line draws nothing", () => {
     expect(stampObjects(upright, [{ ...line("top-left"), text: "   " }], values)).toEqual([]);

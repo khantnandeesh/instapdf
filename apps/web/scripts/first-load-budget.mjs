@@ -38,6 +38,9 @@ const BUDGET_KB = {
   "/resize-pdf/page": [145, 155],
   "/flip-pdf/page": [145, 155],
   "/n-up-pdf/page": [145, 155],
+  "/add-page-numbers/page": [149, 159],
+  "/pdf-header-footer/page": [149, 159],
+  "/watermark-pdf/page": [150, 160],
   // +1 kB entry on Extract (F12, 27 Nov): three more tools in the registry every route loads, and the shared
   // LinkButton / IconButton variants.
   "/extract-pdf-pages/page": [145, 155],
@@ -47,7 +50,7 @@ const BUDGET_KB = {
   // F12 and F11 added six tools to the registry every route carries: the routes within that of their
   // budget (home, Split, Delete, PDF to JPG, JPG to PDF) move up 1 kB.
   // F11: Protect is the bare flow plus the password field and three switches; Unlock is the bare flow.
-  "/protect-pdf/page": [142, 152],
+  "/protect-pdf/page": [143, 153],
   "/unlock-pdf/page": [139, 149],
   "/pdf-to-jpg/page": [145, 155],
   "/extract-images/page": [142, 152],
@@ -76,6 +79,9 @@ const CLOUD_BUDGET_KB = {
   "/resize-pdf/page": [147, 157],
   "/flip-pdf/page": [147, 157],
   "/n-up-pdf/page": [147, 157],
+  "/add-page-numbers/page": [151, 161],
+  "/pdf-header-footer/page": [151, 161],
+  "/watermark-pdf/page": [152, 162],
   "/extract-pdf-pages/page": [146, 156],
   "/delete-pdf-pages/page": [146, 156],
   "/protect-pdf/page": [144, 154],

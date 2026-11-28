@@ -86,6 +86,8 @@ export type PageDecoration = {
   flip?: "horizontal" | "vertical" | "none";
   /** Crop: the part of the page that stays, in fractions of the page; the rest is dimmed. */
   keep?: { x: number; y: number; w: number; h: number };
+  /** A picture of what the tool will add, drawn over the page (the stamping tools' preview). Decorative. */
+  overlay?: ReactNode;
 };
 
 /** Context handed to the tool's options and page actions. */

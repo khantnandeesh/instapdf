@@ -822,6 +822,111 @@ export const seoContent: Record<string, ToolSeoContent> = {
     ],
     related: ["rotate-pdf", "crop-pdf", "resize-pdf", "organize-pdf", "n-up-pdf", "merge-pdf"],
   },
+  "add-page-numbers": {
+    howTo: "How to add page numbers to a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. Nothing is uploaded." },
+      { name: "Choose where and how", text: "Pick a corner or the middle of the top or bottom edge, a format such as Page 1 of 9, and the first number. The pages on screen show the numbers." },
+      { name: "Download", text: "Select Add page numbers and download the numbered file." },
+    ],
+    faq: [
+      {
+        q: "How do I start numbering on the second page?",
+        a: "Click the pages that should get a number and leave the cover out. Numbering starts at the first number on the first page you picked.",
+      },
+      {
+        q: "Can I start at a number other than 1?",
+        a: "Yes. Set First number to the number the first page should get, for example 5 for a chapter that follows page 4.",
+      },
+      {
+        q: "Which formats can I use?",
+        a: "Plain numbers, Page 1, 1 of 9, Page 1 of 9, 1 / 9, a number between dashes, and Roman numerals in capitals or small letters.",
+      },
+      {
+        q: "Will the numbers cover my text?",
+        a: "They sit in the margin, at the distance from the edge you choose. If a page has text there too, pick another corner or a smaller distance; the preview shows each page before you download.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The text is added in your browser, on your device. The file never leaves it.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up.",
+      },
+    ],
+    related: ["pdf-header-footer", "watermark-pdf", "organize-pdf", "merge-pdf", "resize-pdf", "edit-pdf"],
+  },
+  "pdf-header-footer": {
+    howTo: "How to add a header and footer to a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. Nothing is uploaded." },
+      { name: "Type your lines", text: "Fill in any of the six places: left, centre and right of the top and of the bottom edge. Use {n} for the page number, {total} for the last one, {file} for the file name and {date} for today." },
+      { name: "Download", text: "Select Add header and footer and download the file. Click pages first to change only those." },
+    ],
+    faq: [
+      {
+        q: "Can I have a header and a footer at the same time?",
+        a: "Yes. There are three places along the top and three along the bottom, and you can fill in as many as you need in one go.",
+      },
+      {
+        q: "How do I add the date or the file name?",
+        a: "Type {date} or {file} where it should appear. Each is replaced on every page; {n} and {total} give Page {n} of {total}.",
+      },
+      {
+        q: "Can I skip the first page?",
+        a: "Yes. Click the pages that should get the lines and leave the others out. With no page picked, every page gets them.",
+      },
+      {
+        q: "Does it work for Hindi, Arabic and other scripts?",
+        a: "Yes. Text is written with open fonts that cover many scripts, and joined or right-to-left writing is shaped properly, the same way as in our editor.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The text is added in your browser, on your device. The file never leaves it.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up.",
+      },
+    ],
+    related: ["add-page-numbers", "watermark-pdf", "edit-pdf", "resize-pdf", "merge-pdf", "organize-pdf"],
+  },
+  "watermark-pdf": {
+    howTo: "How to add a watermark to a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. Nothing is uploaded." },
+      { name: "Type the text or choose a picture", text: "Type a word such as DRAFT, or pick a logo. Set where it goes, the angle and how strong it is. The pages on screen show the result." },
+      { name: "Download", text: "Select Add watermark and download the file. Click pages first to mark only those." },
+    ],
+    faq: [
+      {
+        q: "Can I use my logo as a watermark?",
+        a: "Yes. Switch to Picture and choose a PNG or JPG. A PNG with a see-through background blends in best. You can set its size and strength.",
+      },
+      {
+        q: "How do I make the watermark lighter?",
+        a: "Lower Strength. At 20 to 30 percent the watermark is clear to see while the page under it stays easy to read.",
+      },
+      {
+        q: "Can I repeat the watermark across the page?",
+        a: "Yes. Set Position to Repeated and it is laid out in rows that cover the whole page.",
+      },
+      {
+        q: "Can the watermark be removed later?",
+        a: "It becomes part of each page, so it does not come off by accident. Keep your original file if you may need a clean copy.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The watermark is added in your browser, on your device. The file never leaves it.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up.",
+      },
+    ],
+    related: ["add-page-numbers", "pdf-header-footer", "protect-pdf", "edit-pdf", "compress-pdf", "merge-pdf"],
+  },
   "n-up-pdf": {
     howTo: "How to put several PDF pages on one sheet",
     steps: [

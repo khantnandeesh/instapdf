@@ -4,7 +4,11 @@
  * editor's build draws them, so the fonts, the scripts it can write and the output are the same
  * as for text added in the editor. Pure, with no PDF library: the tools' option panels use it too.
  */
-import { LINE_HEIGHT, type EditorObject, type ImageObj, type PageEntry, type TextObj } from "@/lib/editor/model";
+import type { EditorObject, ImageObj, PageEntry, TextObj } from "@/lib/editor/model";
+
+/** The editor's line height (model.ts LINE_HEIGHT; a test keeps the two the same). Not imported: the option panels stay light. */
+export const STAMP_LINE_HEIGHT = 1.25;
+const LINE_HEIGHT = STAMP_LINE_HEIGHT;
 
 export const PLACES = ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"] as const;
 export type Place = (typeof PLACES)[number];
