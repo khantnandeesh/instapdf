@@ -28,6 +28,8 @@ export function toolFixtures(slug: string, pdf = "sixty-pages.pdf"): string[] {
   if (slug === "remove-pdf-annotations") return [fx(pdf), fx("annotated.pdf")];
   // Split by text needs a file whose text changes from page to page.
   if (slug === "split-pdf-by-text") return [fx(pdf), fx("invoices.pdf")];
+  // Rename: the first file has text where the box starts, so the name shown changes.
+  if (slug === "rename-pdf") return [fx("invoices.pdf"), fx(pdf)];
   return slug === "alternate-mix-pdf" ? [fx(pdf), fx("three-pages.pdf")] : [fx(pdf)];
 }
 
@@ -188,14 +190,15 @@ export async function cardAction(page: Page, file: string, action: "Remove" | "E
 
 /**
  * Gives a tool whose primary waits for a choice what it needs, for the guards that run every tool:
- * Protect a password; Extract and Delete the first toggle tile (spec F4/F5 UI decision 12). Other
+ * Protect a password; Split by text and Rename a text area; Extract and Delete the first toggle tile (spec F4/F5 UI decision 12). Other
  * tools run as loaded, some a moment after the file is in. Header and footer gets a line of text.
  */
 export async function makeRunnable(page: Page) {
   if (await primary(page).isEnabled()) return;
   const password = page.locator("#protect-open");
   const tile = page.locator("[data-tile-button][aria-pressed]").first();
-  const area = page.getByTestId("choose-area");
+  // Split by text, and Rename (one button in the bar, one in the side panel; the shown one).
+  const area = page.locator('[data-testid="choose-area"], [data-testid^="rename-area-"]').locator("visible=true").first();
   // Header and footer: one of its six lines (the panel's field from 1024 px, the bar's below).
   const header = page.locator("#hf-top-center-side, #hf-top-center-bar").locator("visible=true");
   if (await password.count()) await password.fill("correct horse battery");
