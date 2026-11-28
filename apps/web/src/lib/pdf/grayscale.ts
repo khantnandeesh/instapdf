@@ -21,6 +21,7 @@ const N = (s: string) => PDFName.of(s);
 const GRAY_PATTERN = "IpGrayPattern";
 const DROP = new Set(["Filter", "DecodeParms", "Length", "DL", "F", "FFilter", "FDecodeParms"]);
 /** pdf.js writes an object reference as "12R", or "12R1" with a generation. */
+export type ColourImage = { ref: string; lossy: boolean; /** The size the picture's dictionary states. */ width: number; height: number };
 export const refKey = (ref: PDFRef) => `${ref.objectNumber}R${ref.generationNumber || ""}`;
 
 const nameOf = (o: PDFObject | undefined) => (o instanceof PDFName ? o.decodeText() : undefined);
@@ -32,6 +33,7 @@ class Walk {
   private readonly seen = new Set<PDFObject>();
   private readonly seenRefs = new Set<string>();
   inlineKept = 0;
+  unknownKept = 0;
   gradientsKept = 0;
   unread = 0;
 
@@ -58,6 +60,10 @@ class Walk {
     return out;
   }
   private bytes(stream: PDFRawStream): Uint8Array | null {
+    // The library unpacks Flate and LZW but does not undo a row predictor: such data is not read at all.
+    const parms = this.look(stream.dict.get(N("DecodeParms")));
+    const predicted = (parms instanceof PDFArray ? parms.asArray() : [parms]).some((p) => (numOf(this.look(this.dict(p)?.get(N("Predictor")))) ?? 1) > 1);
+    if (predicted) return null;
     try {
       return decodePDFRawStream(stream).decode();
     } catch {
@@ -205,8 +211,9 @@ class Walk {
 
   /* ── Content ─────────────────────────────────────────────────────────────────────────────── */
 
-  private env(res: PDFDict | undefined): ContentEnv {
+  private env(res: PDFDict | undefined, inherits = false): ContentEnv {
     return {
+      inherits,
       space: (name) => {
         if (name === "DeviceGray" || name === "DeviceRGB" || name === "DeviceCMYK" || name === "Pattern") return this.space(N(name));
         return this.space(this.dict(res?.get(N("ColorSpace")))?.get(N(name)));
@@ -225,7 +232,7 @@ class Walk {
   }
 
   /** Rewrites one content stream under its reference. */
-  private stream(ref: PDFRef, res: PDFDict | undefined) {
+  private stream(ref: PDFRef, res: PDFDict | undefined, inherits = true) {
     const stream = this.ctx.lookup(ref);
     if (!(stream instanceof PDFRawStream)) return;
     const data = this.bytes(stream);
@@ -233,8 +240,9 @@ class Walk {
       this.unread++;
       return;
     }
-    const r = grayContent(data, this.env(res));
+    const r = grayContent(data, this.env(res, inherits));
     this.inlineKept += r.inlineKept;
+    this.unknownKept += r.unknownKept;
     if (r.changed) this.replace(ref, stream, r.bytes);
   }
 
@@ -315,7 +323,8 @@ class Walk {
     if (d.has(N("Function"))) {
       const fns = this.fns(d.get(N("Function")));
       const two = type === 1;
-      const domain = this.nums(d.get(N("Domain"))) ?? (two ? [0, 1, 0, 1] : [0, 1]);
+      // A mesh has no /Domain: its corners carry values of the function's own domain.
+      const domain = this.nums(d.get(N("Domain"))) ?? (two ? [0, 1, 0, 1] : type >= 4 && fns.length ? fns[0].domain.slice(0, 2) : [0, 1]);
       const size = two ? [32, 32] : [256];
       const data = new Uint8Array(two ? 1024 : 256);
       let ok = fns.length > 0 && domain.length >= (two ? 4 : 2);
@@ -358,7 +367,8 @@ class Walk {
     const n = components(space);
     const src = this.bytes(stream);
     if (!bitsXY || !bitsC || bitsF === undefined || !decode || decode.length < 4 + 2 * n || !src || bitsXY > 32 || bitsC > 16) return null;
-    const out = new Uint8Array(src.length + 16);
+    // A colour of fewer than 8 bits in all grows to one byte.
+    const out = new Uint8Array(src.length * Math.max(1, Math.ceil(8 / (n * bitsC))) + 16);
     let rp = 0; // bit positions
     let wp = 0;
     const left = () => src.length * 8 - rp;
@@ -404,8 +414,8 @@ class Walk {
         write(flag, bitsF);
         copy(bitsXY, points * 2);
         for (let k = 0; k < colours; k++) colour();
-        align();
       }
+      wp = (wp + 7) & ~7;
     }
     return { data: out.subarray(0, (wp + 7) >> 3), decode: [...decode.slice(0, 4), 0, 1] };
   }
@@ -459,7 +469,7 @@ class Walk {
       if (same) node.set(N("Contents"), same);
       else if (refs.length === 1 && refs[0] instanceof PDFRef && !this.seenRefs.has(refs[0].tag)) {
         this.seenRefs.add(refs[0].tag);
-        this.stream(refs[0], res);
+        this.stream(refs[0], res, false);
       } else if (refs.length > 1) {
         // Several streams are one stream cut anywhere between two words: join, rewrite, write one.
         const parts: Uint8Array[] = [];
@@ -482,6 +492,7 @@ class Walk {
           }
           const r = grayContent(joined, this.env(res));
           this.inlineKept += r.inlineKept;
+          this.unknownKept += r.unknownKept;
           if (r.changed) {
             const made = this.ctx.register(this.ctx.flateStream(r.bytes));
             node.set(N("Contents"), made);
@@ -521,8 +532,8 @@ class Walk {
   /* ── Pictures ────────────────────────────────────────────────────────────────────────────── */
 
   /** The pictures that hold colour: every image that is not a stencil and not already in a grey space. */
-  colourImages(): { ref: string; lossy: boolean }[] {
-    const out: { ref: string; lossy: boolean }[] = [];
+  colourImages(): ColourImage[] {
+    const out: ColourImage[] = [];
     for (const [ref, obj] of this.ctx.enumerateIndirectObjects()) {
       if (!(obj instanceof PDFRawStream)) continue;
       const d = obj.dict;
@@ -532,7 +543,10 @@ class Walk {
       const cs = d.get(N("ColorSpace"));
       // A JPEG 2000 picture may leave its colour space to the picture itself: take it as colour.
       if (cs && this.space(cs)?.kind === "gray") continue;
-      out.push({ ref: refKey(ref), lossy: filters.some((f) => f === "DCTDecode" || f === "DCT" || f === "JPXDecode") });
+      const width = numOf(this.look(d.get(N("Width"))));
+      const height = numOf(this.look(d.get(N("Height"))));
+      if (!width || !height) continue;
+      out.push({ ref: refKey(ref), lossy: filters.some((f) => f === "DCTDecode" || f === "DCT" || f === "JPXDecode"), width, height });
     }
     return out;
   }
@@ -572,9 +586,9 @@ class Walk {
     return found;
   }
 
-  /** Swaps in the grey pictures; returns how many were swapped. */
-  swap(images: readonly GrayImage[]): number {
-    let n = 0;
+  /** Swaps in the grey pictures; returns the references of those swapped. */
+  swap(images: readonly GrayImage[]): Set<string> {
+    const swapped = new Set<string>();
     for (const img of images) {
       const m = /^(\d+)R(\d*)$/.exec(img.ref);
       const ref = m ? PDFRef.of(Number(m[1]), m[2] ? Number(m[2]) : 0) : null;
@@ -582,6 +596,8 @@ class Walk {
       if (!ref || !(old instanceof PDFRawStream) || nameOf(this.look(old.dict.get(N("Subtype")))) !== "Image") continue;
       const space = this.space(old.dict.get(N("ColorSpace")));
       if (space?.kind === "gray") continue;
+      // A JPEG 2000 picture that carries its own transparency would lose it: it is left as it is.
+      if ((numOf(this.look(old.dict.get(N("SMaskInData")))) ?? 0) > 0) continue;
       const entries: Record<string, unknown> = {};
       for (const [k, v] of old.dict.entries()) {
         const key = k.decodeText();
@@ -595,20 +611,25 @@ class Walk {
         if (img.predictor) entries.DecodeParms = this.ctx.obj({ Predictor: 15, Colors: 1, BitsPerComponent: 8, Columns: img.width });
       }
       this.ctx.assign(ref, PDFRawStream.of(this.ctx.obj(entries as never) as unknown as PDFDict, img.data));
-      // A soft mask blended against a colour names it in the picture's space.
-      const mask = this.look(old.dict.get(N("SMask")));
-      const matte = mask instanceof PDFRawStream ? this.grayArray(mask.dict.get(N("Matte")), space) : null;
-      if (mask instanceof PDFRawStream && matte) mask.dict.set(N("Matte"), matte);
-      n++;
+      // pdf.js hands over pixels with a mask's matte colour already taken out, so the mask must not
+      // ask for that again. The mask may serve other pictures: this one gets its own copy without it.
+      const maskRef = old.dict.get(N("SMask"));
+      const mask = this.look(maskRef);
+      if (mask instanceof PDFRawStream && mask.dict.has(N("Matte"))) {
+        const plain = new Map(mask.dict.entries());
+        plain.delete(N("Matte"));
+        (this.ctx.lookup(ref) as PDFRawStream).dict.set(N("SMask"), this.ctx.register(PDFRawStream.of(PDFDict.fromMapWithContext(plain, this.ctx), mask.contents)));
+      }
+      swapped.add(img.ref);
     }
-    return n;
+    return swapped;
   }
 }
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many.replace("{n}", String(n)));
 
 /** The colour pictures of a file, for the caller to draw in grey. */
-export async function colourImages({ bytes, password }: { bytes: Uint8Array; password?: string }): Promise<{ images: { ref: string; lossy: boolean }[]; pageCount: number }> {
+export async function colourImages({ bytes, password }: { bytes: Uint8Array; password?: string }): Promise<{ images: ColourImage[]; pageCount: number }> {
   const { doc } = await loadForEdit(bytes, password);
   return { images: new Walk(doc).colourImages(), pageCount: doc.getPageCount() };
 }
@@ -621,15 +642,16 @@ export async function grayscalePdf({ bytes, password, vector, images }: GrayInpu
   if (images) {
     // Pictures no page draws are left alone and not counted: nobody sees them.
     const drawn = walk.drawnImages();
-    const given = new Set(images.map((i) => i.ref));
-    const left = walk.colourImages().filter((i) => drawn.has(i.ref) && !given.has(i.ref)).length;
-    walk.swap(images);
+    const colour = walk.colourImages();
+    const swapped = walk.swap(images);
+    const left = colour.filter((i) => drawn.has(i.ref) && !swapped.has(i.ref)).length;
     if (left > 0) warnings.push(plural(left, "One picture could not be converted, so it keeps its colour.", "{n} pictures could not be converted, so they keep their colour."));
   }
   if (vector) {
     walk.run((f) => onProgress?.(0.2 + 0.5 * f));
     if (walk.unread) warnings.push(plural(walk.unread, "One part of a page could not be read, so it keeps its colours.", "{n} parts of pages could not be read, so they keep their colours."));
     if (walk.gradientsKept) warnings.push(plural(walk.gradientsKept, "One gradient is in a form this tool cannot convert, so it keeps its colours.", "{n} gradients are in a form this tool cannot convert, so they keep their colours."));
+    if (walk.unknownKept) warnings.push(plural(walk.unknownKept, "One colour is set in a way this tool cannot read, so it stays as it is.", "{n} colours are set in a way this tool cannot read, so they stay as they are."));
     if (walk.inlineKept) warnings.push(plural(walk.inlineKept, "One small picture inside the page content keeps its colour.", "{n} small pictures inside the page content keep their colour."));
   }
   onProgress?.(0.7);

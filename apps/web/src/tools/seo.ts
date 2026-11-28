@@ -217,7 +217,7 @@ export const toolSeo: Record<string, ToolSeo> = {
   "repair-pdf": {
     keyword: "repair pdf",
     title: "Repair PDF: Fix Damaged PDF Files Free",
-    description: `Repair a corrupt or damaged PDF and recover as much of its content as possible. Free, no sign-up. ${serverNote}`,
+    description: `Repair a corrupt or damaged PDF and recover as many of its pages as possible. Free. ${privateNote}`,
     also: ["fix corrupted pdf", "recover pdf", "pdf won't open"],
   },
   "protect-pdf": {
@@ -1066,6 +1066,41 @@ export const seoContent: Record<string, ToolSeoContent> = {
       },
     ],
     related: ["compress-pdf", "flatten-pdf", "pdf-to-jpg", "protect-pdf", "merge-pdf", "edit-pdf"],
+  },
+  "repair-pdf": {
+    howTo: "How to repair a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop the damaged PDF on the page, or choose it from your device. A file that will not open anywhere is taken too. Nothing is uploaded." },
+      { name: "Repair", text: "Select Repair PDF. The file is read piece by piece and written out as a sound PDF." },
+      { name: "Download", text: "Download the repaired file. You are told when some pages could not be recovered." },
+    ],
+    faq: [
+      {
+        q: "What kind of damage can be repaired?",
+        a: "A file that was cut short by a failed download or copy, has text in front of it from an email, or has a broken index. Every page that is still whole in the file is recovered.",
+      },
+      {
+        q: "Can every damaged PDF be repaired?",
+        a: "No. What is missing from the file cannot be brought back. If only half of it arrived, the pages in that half are recovered and you are told how many are gone.",
+      },
+      {
+        q: "Will the text still be selectable?",
+        a: "Yes. Pages are recovered as they were, with their text, fonts, pictures and links. Only when a file can be shown but not rebuilt are its pages saved as pictures, and you are told.",
+      },
+      {
+        q: "My PDF opens in one app but not another. Will this help?",
+        a: "Often. The repaired file gets a clean structure and a fresh index, which stricter apps need.",
+      },
+      {
+        q: "Does it work on password-protected files?",
+        a: "Yes, if you know the password. You are asked for it, and the repaired file is saved without one.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The file is repaired in your browser, on your device. It never leaves it.",
+      },
+    ],
+    related: ["compress-pdf", "unlock-pdf", "merge-pdf", "extract-pdf-pages", "pdf-to-jpg", "flatten-pdf"],
   },
   "edit-pdf-metadata": {
     howTo: "How to edit PDF metadata",

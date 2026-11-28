@@ -24,6 +24,8 @@ export const copy = {
   statusReady: (pages: number, files: number) => `${plural(pages, "page")} · ${plural(files, "file")}`,
   progress: (label: string, pct: number) => `${label}… ${pct}%`,
   errorType: (name: string) => `${name} isn't a PDF, so it was skipped. This tool accepts PDF files.`,
+  fileDamaged: (name: string) => `${name} is damaged. It can still be repaired.`,
+  damaged: "Damaged",
   errorCorrupt: (name: string) => `${name} couldn't be opened. It may be damaged or not really a PDF.`,
   errorSize: (name: string, mb: number) => `${name} is larger than ${mb} MB, the limit for this tool.`,
   errorTotal: (name: string, mb: number) => `${name} would take this task past ${mb} MB in total, so it was skipped.`,

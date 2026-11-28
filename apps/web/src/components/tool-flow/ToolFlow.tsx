@@ -503,6 +503,8 @@ export function ToolFlow({
         announce(copy.fileReady(entry.name, frames.length));
         return "ok";
       }
+      // Repair takes a file nothing here can open: it stands in the task as one placeholder page.
+      const takeDamaged = async () => (await import("@/lib/pdf/damaged-page")).takeDamaged(id, renderer, () => filesRef.current.some((f) => f.id === id), patchFile, () => pushNotice({ tone: "warning", title: copy.fileDamaged(entry.name), sticky: true }));
       // The inspector loads beside pdf.js, never before it (eval G-11); its scan runs in a worker.
       const inspection = inspectPdf?.().then((i) => [i, i.scan(entry.source)] as const, () => null);
       const result = await openPdf(bytes, password);
@@ -512,6 +514,7 @@ export function ToolFlow({
       }
       if (!result.ok) {
         if (result.reason === "corrupt") {
+          if (flow.acceptDamaged) return takeDamaged();
           problems.push(copy.errorCorrupt(entry.name));
           removeFile(id);
           return "rejected";
@@ -535,6 +538,7 @@ export function ToolFlow({
         pages = await readPageSizes(pdf.doc);
       } catch {
         void pdf.task.destroy();
+        if (flow.acceptDamaged) return takeDamaged();
         problems.push(copy.errorCorrupt(entry.name));
         removeFile(id);
         return "rejected";
@@ -554,7 +558,7 @@ export function ToolFlow({
           .catch(() => {});
       return "ok";
     },
-    [announce, flow.maxTotalPages, inTask, inspectPdf, patchFile, pushNotice, removeFile, renderer],
+    [announce, flow.acceptDamaged, flow.maxTotalPages, inTask, inspectPdf, patchFile, pushNotice, removeFile, renderer],
   );
 
   const flushProblems = useCallback(

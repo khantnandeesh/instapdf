@@ -19,6 +19,8 @@ export type LoadedFile = {
   password?: string;
   wasEncrypted: boolean;
   denied: Permission[];
+  /** The file could not be opened here; only a tool that takes damaged files (Repair) lets it in. It shows as one placeholder page. */
+  damaged?: boolean;
   /** "image" for picture inputs (one page per image, or per TIFF frame). */
   kind?: "pdf" | "image";
   /** The picked File's lastModified (0 when unknown). */

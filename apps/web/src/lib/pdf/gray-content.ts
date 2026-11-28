@@ -3,16 +3,18 @@
  * The stream is not rebuilt: only the colour operators (and small inline pictures) are replaced,
  * so text, paths and everything else stay byte for byte what they were.
  */
-import { CMYK, components, GRAY, RGB, toGray, type Space } from "./gray-color";
+import { CMYK, components, GRAY, initial, RGB, toGray, type Space } from "./gray-color";
 
 export type ContentEnv = {
   /** The colour space a `cs` operand names: a device name or an entry of the stream's resources. */
   space(name: string): Space | null;
   /** The resource name of `[/Pattern /DeviceGray]`, added to the stream's resources when first asked for; null when it has none to add to. */
   grayPattern(): string | null;
+  /** A form, pattern or glyph: until it sets a colour space of its own, it paints in whatever its caller had set. */
+  inherits?: boolean;
 };
 
-export type ContentResult = { bytes: Uint8Array; changed: boolean; /** Inline pictures that keep their colour (a packed form this tool does not unpack). */ inlineKept: number };
+export type ContentResult = { bytes: Uint8Array; changed: boolean; /** Inline pictures that keep their colour (a packed form this tool does not unpack). */ inlineKept: number; /** Colours set in a space that could not be read, or handed down from a caller that cannot be known: they stay as written. */ unknownKept: number };
 
 const WS = new Set([0, 9, 10, 12, 13, 32]);
 const DELIM = new Set([40, 41, 60, 62, 91, 93, 123, 125, 47, 37]);
@@ -39,10 +41,13 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
   const patches: { start: number; end: number; bytes: Uint8Array }[] = [];
   const put = (start: number, end: number, text: string) => patches.push({ start, end, bytes: enc.encode(text) });
   let inlineKept = 0;
+  let unknownKept = 0;
   let operands: Operand[] = [];
   // The colour spaces in force, saved and restored with the graphics state.
-  let fill: Space | null = GRAY;
-  let stroke: Space | null = GRAY;
+  let fill: Space | null = env.inherits ? null : GRAY;
+  let stroke: Space | null = env.inherits ? null : GRAY;
+  /** "Paints nothing": the pair of operators is left exactly as written. */
+  const isNone = (s: Space | null) => s?.kind === "tint" && s.none === true;
   const saved: [Space | null, Space | null][] = [];
   const n = src.length;
   let i = 0;
@@ -70,9 +75,12 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
       if (space?.kind === "pattern" && space.base && nums.length) put(start, end, `${level(toGray(space.base, nums))} /${last.name} ${op}`);
       return;
     }
-    if (!nums.length) return;
+    if (!nums.length || isNone(space)) return;
     // No `cs` seen in this stream (the space comes from whoever draws this form): the count tells.
-    if (!space || space.kind === "pattern" || components(space) !== nums.length) space = nums.length === 3 ? RGB : nums.length === 4 ? CMYK : null;
+    if (!space || space.kind === "pattern" || components(space) !== nums.length) {
+      space = nums.length === 3 ? RGB : nums.length === 4 ? CMYK : null;
+      if (!space) unknownKept++;
+    }
     if (!space || space.kind === "gray") return;
     put(start, end, `${level(toGray(space, nums))} ${isFill ? "g" : "G"}`);
   };
@@ -113,8 +121,9 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
         const space = name === undefined ? null : env.space(name);
         if (op === "cs") fill = space;
         else stroke = space;
-        if (name === undefined || !space || space.kind === "gray") break;
-        if (space.kind !== "pattern") put(start, opEnd, `/DeviceGray ${op}`);
+        if (name === undefined || !space || space.kind === "gray" || isNone(space)) break;
+        // Choosing a space also sets its first colour (full ink for a spot colour): say that colour in grey.
+        if (space.kind !== "pattern") put(start, opEnd, `${level(toGray(space, initial(space)))} ${op === "cs" ? "g" : "G"}`);
         else if (space.base && space.base.kind !== "gray") {
           const gray = env.grayPattern();
           if (gray) put(start, opEnd, `/${gray} ${op}`);
@@ -216,7 +225,7 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
     const eiEnd = eiAt + 2;
     i = eiEnd;
     if (mask || space?.kind === "gray") return;
-    if (!space || filter || bits !== 8 || dataEnd < 0 || space.kind === "pattern" || dict.has("D") || dict.has("Decode")) {
+    if (!space || filter || bits !== 8 || dataEnd < 0 || space.kind === "pattern" || space.kind === "lab" || dict.has("D") || dict.has("Decode")) {
       inlineKept++;
       return;
     }
@@ -226,7 +235,7 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
       for (let k = 0; k < comps; k++) c[k] = space.kind === "indexed" ? src[o++] : src[o++] / 255;
       grey[p] = Math.round(toGray(space, c) * 255);
     }
-    const head = enc.encode(`BI /W ${width} /H ${height} /BPC 8 /CS /G${dict.get("I") ?? dict.get("Interpolate") ? " /I true" : ""} ID\n`);
+    const head = enc.encode(`BI /W ${width} /H ${height} /BPC 8 /CS /G${(dict.get("I") ?? dict.get("Interpolate")) === "true" ? " /I true" : ""} ID\n`);
     const tail = enc.encode("\nEI");
     const bytes = new Uint8Array(head.length + grey.length + tail.length);
     bytes.set(head);
@@ -275,7 +284,7 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
     }
   }
 
-  if (!patches.length) return { bytes: src, changed: false, inlineKept };
+  if (!patches.length) return { bytes: src, changed: false, inlineKept, unknownKept };
   patches.sort((a, b) => a.start - b.start);
   let size = n;
   for (const p of patches) size += p.bytes.length - (p.end - p.start);
@@ -292,5 +301,5 @@ export function grayContent(src: Uint8Array, env: ContentEnv): ContentResult {
   }
   out.set(src.subarray(from), to);
   to += n - from;
-  return { bytes: to === size ? out : out.subarray(0, to), changed: true, inlineKept };
+  return { bytes: to === size ? out : out.subarray(0, to), changed: true, inlineKept, unknownKept };
 }

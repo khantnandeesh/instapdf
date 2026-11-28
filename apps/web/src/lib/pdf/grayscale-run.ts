@@ -16,11 +16,10 @@ import { runInWorker } from "./worker-client";
 export type GraySource = { name: string; source: Blob; password?: string; pageCount: number };
 /** Everything, or only the text and drawings, or only the pictures. */
 export type GrayWhat = "all" | "vector" | "pictures";
+type Wanted = { lossy: boolean; width: number; height: number };
 type Packed = { ref: string; width: number; height: number; jpeg: boolean; data: Blob };
 
 const MAX_PIXELS = 50_000_000;
-/** Rows are read back in bands: some engines cap one canvas near 16.7 megapixels. */
-const BAND_PIXELS = 4_000_000;
 /** Reading the pictures is most of the work when there are any. */
 const DRAWN = 0.7;
 const aborted = () => new DOMException("Cancelled", "AbortError");
@@ -49,34 +48,33 @@ export function grayPixels(img: DecodedImage): Uint8Array | null {
     }
     return out;
   }
-  if (!img.bitmap) return null;
-  const rows = Math.max(1, Math.min(height, Math.floor(BAND_PIXELS / width)));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = rows;
-  try {
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return null;
-    for (let y = 0, o = 0; y < height; y += rows) {
-      const h = Math.min(rows, height - y);
-      ctx.clearRect(0, 0, width, rows);
-      ctx.drawImage(img.bitmap, 0, y, width, h, 0, 0, width, h);
-      const d = ctx.getImageData(0, 0, width, h).data;
-      for (let i = 0; i < d.length; i += 4) out[o++] = lum(d[i], d[i + 1], d[i + 2]);
+  // A picture that only exists as a browser bitmap is not read back: a canvas may hand back
+  // falsified or shrunken pixels. The file is opened so that pdf.js gives plain data instead.
+  return null;
+}
+
+/** Shrinks a grey picture to the size its dictionary states (pdf.js decodes at the larger of picture and mask). Area average. */
+export function shrinkGray(px: Uint8Array, width: number, height: number, toWidth: number, toHeight: number): Uint8Array {
+  const out = new Uint8Array(toWidth * toHeight);
+  for (let y = 0; y < toHeight; y++) {
+    const y0 = Math.floor((y * height) / toHeight);
+    const y1 = Math.max(y0 + 1, Math.floor(((y + 1) * height) / toHeight));
+    for (let x = 0; x < toWidth; x++) {
+      const x0 = Math.floor((x * width) / toWidth);
+      const x1 = Math.max(x0 + 1, Math.floor(((x + 1) * width) / toWidth));
+      let sum = 0;
+      for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) sum += px[yy * width + xx];
+      out[y * toWidth + x] = Math.round(sum / ((y1 - y0) * (x1 - x0)));
     }
-    return out;
-  } catch {
-    return null;
-  } finally {
-    canvas.width = canvas.height = 0;
   }
+  return out;
 }
 
 type OpList = { fnArray: ArrayLike<number>; argsArray: ArrayLike<unknown[] | null> };
 
 /** Decodes the wanted pictures of one file and has each packed; a picture this device cannot read is left out (the worker says so in its result). */
-async function greyPictures(src: GraySource, want: Map<string, boolean>, signal: AbortSignal, onProgress: (fraction: number) => void): Promise<Packed[]> {
-  const opened = await openPdf(new Uint8Array(await src.source.arrayBuffer()), src.password);
+async function greyPictures(src: GraySource, want: Map<string, Wanted>, signal: AbortSignal, onProgress: (fraction: number) => void): Promise<Packed[]> {
+  const opened = await openPdf(new Uint8Array(await src.source.arrayBuffer()), src.password, { plainImages: true });
   if (!opened.ok) throw new Error(`${USER_ERROR}${src.name} could not be read.`);
   const { OPS } = await loadPdfjs();
   const { doc, task } = opened.pdf;
@@ -103,11 +101,13 @@ async function greyPictures(src: GraySource, want: Map<string, boolean>, signal:
           const ref = img ? refOf(img.ref) : null;
           if (!img || !ref || !want.has(ref) || tried.has(ref)) continue;
           tried.add(ref);
-          const grey = grayPixels(img);
-          if (!grey) continue;
-          const lossy = want.get(ref) === true;
-          const packed = await runInWorker({ kind: "grayEncode", pixels: new Blob([grey as Uint8Array<ArrayBuffer>]), width: img.width, height: img.height, lossy }, { signal });
-          images.push({ ref, width: img.width, height: img.height, jpeg: lossy, data: packed.blob });
+          const stated = want.get(ref)!;
+          let grey = grayPixels(img);
+          // Smaller than the file says (a device limit): left as it is rather than saved with less detail.
+          if (!grey || img.width < stated.width || img.height < stated.height) continue;
+          if (img.width !== stated.width || img.height !== stated.height) grey = shrinkGray(grey, img.width, img.height, stated.width, stated.height);
+          const packed = await runInWorker({ kind: "grayEncode", pixels: new Blob([grey as Uint8Array<ArrayBuffer>]), width: stated.width, height: stated.height, lossy: stated.lossy }, { signal });
+          images.push({ ref, width: stated.width, height: stated.height, jpeg: packed.blob.type === "image/jpeg", data: packed.blob });
         }
       } finally {
         page.cleanup();
@@ -140,7 +140,7 @@ export async function toGrayscale(sources: readonly GraySource[], what: GrayWhat
       images = [];
       if (found.length) {
         drawn = DRAWN;
-        images = await greyPictures(src, new Map(found.map((f) => [f.ref, f.lossy])), signal, (f) => within(0.05 + f * (DRAWN - 0.05)));
+        images = await greyPictures(src, new Map(found.map((f) => [f.ref, f])), signal, (f) => within(0.05 + f * (DRAWN - 0.05)));
       }
     }
     const out = await runInWorker({ kind: "grayscale", zipName: "", vector: what !== "pictures", files: [{ ...file, images }] }, { signal, onProgress: (f) => within(drawn + f * (1 - drawn)) });

@@ -73,7 +73,8 @@ export type BookmarksJob = { kind: "bookmarks"; files: JobFile[]; zipName: strin
 export type GrayScanJob = { kind: "grayScan"; file: JobFile };
 export type GrayEncodeJob = { kind: "grayEncode"; pixels: Blob; width: number; height: number; lossy: boolean };
 export type GrayscaleJob = { kind: "grayscale"; files: (JobFile & { images?: { ref: string; width: number; height: number; jpeg: boolean; data: Blob }[] })[]; zipName: string; vector: boolean };
-export type Job = GrayScanJob | GrayEncodeJob | GrayscaleJob | BookmarksJob | PicturesJob | AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
+export type RepairJob = { kind: "repair"; files: JobFile[]; zipName: string };
+export type Job = RepairJob | GrayScanJob | GrayEncodeJob | GrayscaleJob | BookmarksJob | PicturesJob | AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
 
 export type JobOutput = {
   name: string;
@@ -88,7 +89,7 @@ export type JobOutput = {
   /** Non-blocking notes for the user about the result. */
   warnings?: string[];
   /** grayScan only: the pictures that hold colour, by object reference as pdf.js writes it. */
-  found?: { ref: string; lossy: boolean }[];
+  found?: { ref: string; lossy: boolean; width: number; height: number }[];
 };
 
 /** `phase` "fonts" = a font download (indeterminate); "pages" = back to the fraction. */
@@ -141,6 +142,10 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       if (!removed) throw new Error(`${USER_ERROR}No annotations of the chosen kinds were found on ${job.files.length === 1 ? "these pages" : "the pages of these files"}, so there is nothing to remove.`);
       return out;
     }
+    case "repair": {
+      const { repairPdf } = await import("./repair");
+      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => repairPdf({ bytes, password: file.password, name: file.name }, progress));
+    }
     case "grayScan": {
       const { colourImages } = await import("./grayscale");
       const r = await colourImages({ bytes: new Uint8Array(await job.file.source.arrayBuffer()), password: job.file.password });
@@ -149,8 +154,10 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
     case "grayEncode": {
       const { encodeGrayFlate, encodeGrayJpeg } = await import("./gray-encode");
       const px = new Uint8Array(await job.pixels.arrayBuffer());
-      const data = job.lossy ? encodeGrayJpeg(px, job.width, job.height) : encodeGrayFlate(px, job.width, job.height);
-      return { name: "", type: "application/pdf", blob: new Blob([data as Uint8Array<ArrayBuffer>]), wasEncrypted: false };
+      // A JPEG holds at most 65,535 pixels a side.
+      const jpeg = job.lossy && job.width <= 65535 && job.height <= 65535;
+      const data = jpeg ? encodeGrayJpeg(px, job.width, job.height) : encodeGrayFlate(px, job.width, job.height);
+      return { name: "", type: "application/pdf", blob: new Blob([data as Uint8Array<ArrayBuffer>], { type: jpeg ? "image/jpeg" : "application/octet-stream" }), wasEncrypted: false };
     }
     case "grayscale": {
       const { grayscalePdf } = await import("./grayscale");

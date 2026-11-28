@@ -57,10 +57,19 @@ describe("content streams (spec F13 §1)", () => {
 
   it("AC-1411: named colour spaces are followed through q and Q", () => {
     const spot: Space = { kind: "tint", n: 1, alt: RGB, fns: [{ type: 2, domain: [0, 1], c0: [1, 1, 1], c1: [1, 0, 0], n: 1 }] };
-    expect(convert("/Cs1 cs 0 1 0 sc", { Cs1: RGB })).toBe("/DeviceGray cs 0.587 g");
-    expect(convert("/Spot CS q /Cs1 CS 1 1 1 SCN Q 1 SCN", { Cs1: RGB, Spot: spot })).toBe("/DeviceGray CS q /DeviceGray CS 1 G Q 0.299 G");
+    // Choosing a space sets its first colour too: black for RGB, full ink for a spot colour.
+    expect(convert("/Cs1 cs 0 1 0 sc", { Cs1: RGB })).toBe("0 g 0.587 g");
+    expect(convert("/Spot CS q /Cs1 CS 1 1 1 SCN Q 1 SCN", { Cs1: RGB, Spot: spot })).toBe("0.299 G q 0 G 1 G Q 0.299 G");
+    expect(convert("/Spot cs 0 0 10 10 re f", { Spot: spot })).toBe("0.299 g 0 0 10 10 re f");
+    // "None" paints nothing, and still must not.
+    const none: Space = { ...spot, none: true };
+    expect(convert("/Off cs 1 scn 0 0 10 10 re f", { Off: none })).toBe("/Off cs 1 scn 0 0 10 10 re f");
     // No `cs` in this stream: the number of values says what they are.
     expect(convert("0 0 1 sc 0 0 0 1 SC")).toBe("0.114 g 0 G");
+    // One value in a space that cannot be read, or handed down by an unknown caller, is counted, not guessed.
+    expect(grayContent(bytes("/X cs 0.7 scn"), env()).unknownKept).toBe(1);
+    expect(grayContent(bytes("1 scn"), { ...env(), inherits: true }).unknownKept).toBe(1);
+    expect(grayContent(bytes("1 sc"), env()).unknownKept).toBe(0);
   });
 
   it("AC-1412: an uncoloured pattern is painted in grey; a coloured one is left to its own definition", () => {
@@ -245,6 +254,7 @@ describe("pictures (spec F13 §1)", () => {
     const found = await colourImages({ bytes: file });
     expect(found.pageCount).toBe(1);
     expect(found.images.map((i) => i.ref).sort()).toEqual([key(colour), key(unused)].sort());
+    expect(found.images.find((i) => i.ref === key(colour))).toMatchObject({ width: 2, height: 2 });
     expect(found.images.every((i) => !i.lossy)).toBe(true);
   });
 
@@ -260,6 +270,25 @@ describe("pictures (spec F13 §1)", () => {
     expect(image.dict.has(N("Decode"))).toBe(false);
     expect((image.dict.lookup(N("DecodeParms"), PDFDict).lookup(N("Predictor")) as PDFNumber).asNumber()).toBe(15);
     expect([...unfilter(unzlibSync(image.contents), 2, 2)]).toEqual([...pixels]);
+  });
+
+  it("AC-1435: a soft mask that asked for its matte colour to be taken out no longer does", async () => {
+    const { bytes: file, colour } = await withPictures();
+    const before = await PDFDocument.load(file, { updateMetadata: false });
+    const ctx = before.context;
+    const mask = ctx.register(ctx.flateStream(Uint8Array.of(255, 128, 0, 255), { Type: "XObject", Subtype: "Image", Width: 2, Height: 2, BitsPerComponent: 8, ColorSpace: "DeviceGray", Matte: [1, 1, 1] }));
+    (ctx.lookup(colour) as PDFRawStream).dict.set(N("SMask"), mask);
+    const out = await grayscalePdf({ bytes: await before.save(), vector: true, images: [{ ref: key(colour), width: 2, height: 2, jpeg: false, predictor: true, data: encodeGrayFlate(Uint8Array.of(1, 2, 3, 4), 2, 2) }] });
+    const doc = await PDFDocument.load(out.bytes, { updateMetadata: false });
+    const image = doc.getPage(0).node.Resources()!.lookup(N("XObject"), PDFDict).lookup(N("Im0")) as PDFRawStream;
+    const soft = image.dict.lookup(N("SMask")) as PDFRawStream;
+    expect(soft.dict.has(N("Matte"))).toBe(false);
+    expect([...decodePDFRawStream(soft).decode()]).toEqual([255, 128, 0, 255]);
+  });
+
+  it("AC-1436: a picture decoded larger than its own size is brought back to it", async () => {
+    const { shrinkGray } = await import("./grayscale-run");
+    expect([...shrinkGray(Uint8Array.of(0, 100, 200, 255, 0, 100, 200, 255, 10, 10, 20, 20, 10, 10, 20, 20), 4, 4, 2, 2)]).toEqual([50, 228, 10, 20]);
   });
 
   it("AC-1432: a picture that was not handed over is named in the result", async () => {

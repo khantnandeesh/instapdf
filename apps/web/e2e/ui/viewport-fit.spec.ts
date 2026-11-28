@@ -13,7 +13,7 @@ import { fx, makeRunnable, toolFixtures } from "../support/flow";
 
 const usable = tools.filter((t) => isUsable(t) && t.flow);
 /** Tools with no options at all (F4/F5 §3e, §3g): their bar holds the status, history and primary only. */
-const NO_OPTIONS = new Set(["organize-pdf", "alternate-mix-pdf", "pdf-to-text", "extract-images", "unlock-pdf"]);
+const NO_OPTIONS = new Set(["organize-pdf", "alternate-mix-pdf", "pdf-to-text", "extract-images", "unlock-pdf", "repair-pdf"]);
 /** Settings tools (F25 §4): from 1024 px the options are a side panel beside the pages, under the top row. */
 const SIDE_PANEL = 340;
 /** Loads the test file (and a second one where the tool needs it). */

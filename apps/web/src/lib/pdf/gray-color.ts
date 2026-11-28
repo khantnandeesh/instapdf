@@ -46,6 +46,20 @@ export function components(space: Space): number {
   }
 }
 
+/** The colour a space starts with when it is chosen (PDF 32000-1 §8.6): black, the first palette entry, or full ink. */
+export function initial(space: Space): number[] {
+  switch (space.kind) {
+    case "cmyk":
+      return [0, 0, 0, 1];
+    case "tint":
+      return new Array<number>(space.n).fill(1);
+    case "lab":
+      return [0, Math.min(Math.max(0, space.range[0]), space.range[1]), Math.min(Math.max(0, space.range[2]), space.range[3])];
+    default:
+      return new Array<number>(components(space)).fill(0);
+  }
+}
+
 export const luminance = (r: number, g: number, b: number) => clamp(0.299 * r + 0.587 * g + 0.114 * b);
 
 /** The grey level of a colour: 0 black, 1 white. */

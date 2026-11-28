@@ -21,7 +21,7 @@ export function FileGrid({ files, onRemove }: { files: LoadedFile[]; onRemove: (
 
 export function FileCard({ file, onRemove }: { file: LoadedFile; onRemove: () => void }) {
   const meta =
-    file.status === "loading" ? "Reading…" : file.status === "locked" ? "Password needed" : `${copy.pages(file.pageCount)} · ${formatBytes(file.size)}`;
+    file.status === "loading" ? "Reading…" : file.status === "locked" ? "Password needed" : `${file.damaged ? copy.damaged : copy.pages(file.pageCount)} · ${formatBytes(file.size)}`;
   return (
     <div role="listitem" className="group/tile ip-tile flex min-w-0 flex-col gap-1" data-testid="file-card">
       <div className="ip-tile__box relative grid place-items-center">

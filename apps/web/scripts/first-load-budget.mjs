@@ -21,9 +21,10 @@ const BUDGET_KB = {
   // +1 kB preloads (F12): four more live tools in the catalogue and the registry.
   "/page": [121, 128],
   "/merge-pdf/page": [151, 161],
-  "/rotate-pdf/page": [141, 151],
+  "/rotate-pdf/page": [142, 152],
   // F5 page tools (spec F4/F5 UI P-12).
-  "/organize-pdf/page": [150, 160],
+  // +1 kB on four routes that sat at their limit: the registry every page carries grew by Grayscale and Repair (F13).
+  "/organize-pdf/page": [151, 161],
   "/combine-reorder-pdf/page": [151, 161],
   // +1 kB entry (F12, 27 Nov), as Extract below.
   "/alternate-mix-pdf/page": [150, 160],
@@ -44,7 +45,7 @@ const BUDGET_KB = {
   // +1 kB entry on Extract (F12, 27 Nov): three more tools in the registry every route loads, and the shared
   // LinkButton / IconButton variants.
   "/extract-pdf-pages/page": [145, 155],
-  "/delete-pdf-pages/page": [145, 154],
+  "/delete-pdf-pages/page": [145, 155],
   // F12 (spec f12-image-text-tools.md): PDF to image is Extract's page with two option groups; PDF to text is the
   // bare flow; Image to PDF is Organize's workspace. Their engines (page-images, page-text, tiff-write) are lazy.
   // F12 and F11 added six tools to the registry every route carries: the routes within that of their
@@ -59,14 +60,15 @@ const BUDGET_KB = {
   "/flatten-pdf/page": [143, 153],
   // F13 Grayscale: the bare flow with one select.
   "/grayscale-pdf/page": [143, 153],
+  "/repair-pdf/page": [143, 153],
   "/rename-pdf/page": [145, 155],
   "/pdf-bookmarks/page": [145, 155],
   "/edit-pdf-metadata/page": [144, 154],
-  "/pdf-to-jpg/page": [145, 155],
+  "/pdf-to-jpg/page": [146, 156],
   "/extract-images/page": [142, 152],
   // +1 kB: the tool registry every page carries grew by Grayscale (F13).
   "/pdf-to-text/page": [140, 150],
-  "/jpg-to-pdf/page": [151, 161],
+  "/jpg-to-pdf/page": [152, 162],
   // The editor's landing (F16 AC-86), measured 124 / 140 on 26 Nov plus ~2 kB (the landing tool cap is 150);
   // its shell, pdf.js and engine are the editor JS budget below.
   "/edit-pdf/page": [126, 142],
@@ -75,8 +77,8 @@ const BUDGET_KB = {
 const CLOUD_BUDGET_KB = {
   ...BUDGET_KB,
   "/merge-pdf/page": [152, 162],
-  "/rotate-pdf/page": [143, 153],
-  "/organize-pdf/page": [152, 162],
+  "/rotate-pdf/page": [144, 154],
+  "/organize-pdf/page": [153, 163],
   "/combine-reorder-pdf/page": [152, 162],
   // Alternate shares every first-load chunk with Organize but its page chunk (150.6 vs 150.8 kB after the
   // F4 + main tile-rule merge); 1 kB over its F5 budget, still under Organize's and Combine's 152.
@@ -100,13 +102,14 @@ const CLOUD_BUDGET_KB = {
   "/remove-pdf-annotations/page": [147, 157],
   "/flatten-pdf/page": [145, 155],
   "/grayscale-pdf/page": [145, 155],
+  "/repair-pdf/page": [145, 155],
   "/rename-pdf/page": [147, 157],
   "/pdf-bookmarks/page": [147, 157],
   "/edit-pdf-metadata/page": [146, 156],
-  "/pdf-to-jpg/page": [147, 157],
+  "/pdf-to-jpg/page": [148, 158],
   "/extract-images/page": [144, 154],
   "/pdf-to-text/page": [142, 152],
-  "/jpg-to-pdf/page": [153, 163],
+  "/jpg-to-pdf/page": [154, 164],
   // The editor's landing with the F23 caret, row and intake (E6): measured 128 / 144 on 26 Nov plus ~2 kB.
   "/edit-pdf/page": [130, 146],
 };
