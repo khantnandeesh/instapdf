@@ -20,3 +20,32 @@
   gap: 0.5rem;
   align-items: end;
 }
+/* Flatten in the bar: what to flatten and the picture quality share the row. */
+.ip-doc-two {
+  display: flex;
+  gap: 0.5rem;
+}
+.ip-doc-two > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.ip-doc-two > :first-child {
+  flex-grow: 1.9;
+}
+/* Rename: the line that shows the first file's new name keeps its one row whatever it says. */
+.ip-doc-line {
+  min-height: 1.4em;
+  overflow-wrap: anywhere;
+}
+/* Rename in the bar: the button, then the first file's new name on what is left of the row. */
+.ip-doc-next {
+  align-items: center;
+}
+.ip-doc-next > :first-child {
+  flex: none;
+}
+.ip-doc-next > p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

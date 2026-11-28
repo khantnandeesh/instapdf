@@ -927,11 +927,46 @@ export const seoContent: Record<string, ToolSeoContent> = {
     ],
     related: ["flatten-pdf", "edit-pdf-metadata", "edit-pdf", "protect-pdf", "merge-pdf", "organize-pdf"],
   },
+  "rename-pdf": {
+    howTo: "How to rename PDF files by their content",
+    steps: [
+      { name: "Add your PDFs", text: "Drop your PDFs on the page, or choose them from your device. Up to 20 at a time. Nothing is uploaded." },
+      { name: "Mark the text", text: "Select Choose text area and drag a box around the text to use, such as a title or an invoice number. The first file's new name is shown at once." },
+      { name: "Download", text: "Select Rename and download the files under their new names, together in one ZIP." },
+    ],
+    faq: [
+      {
+        q: "Where is the text read from?",
+        a: "From the first page of each file, inside the box you drew. Every file is named after what its own first page has there.",
+      },
+      {
+        q: "Can I keep part of the old name?",
+        a: "Yes. In the name pattern, {text} is the text found, {name} the old name and {n} the file's number. For example: {n} - {text}.",
+      },
+      {
+        q: "What if a file has no text there?",
+        a: "It keeps its old name, and you are told which files did. Scanned pages have no text to read until they have been through text recognition.",
+      },
+      {
+        q: "What if two files have the same text?",
+        a: "The second gets a number after its name, so no file replaces another.",
+      },
+      {
+        q: "Are the files themselves changed?",
+        a: "No. Only the names change. The contents stay exactly as they were.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The text is read in your browser, on your device. The files never leave it.",
+      },
+    ],
+    related: ["edit-pdf-metadata", "split-pdf-by-text", "merge-pdf", "organize-pdf", "extract-pdf-pages", "protect-pdf"],
+  },
   "flatten-pdf": {
     howTo: "How to flatten a PDF",
     steps: [
       { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. You can add several. Nothing is uploaded." },
-      { name: "Choose what to flatten", text: "Form fields and annotations together, or form fields only." },
+      { name: "Choose what to flatten", text: "Form fields and annotations together, form fields only, or whole pages as pictures." },
       { name: "Download", text: "Select Flatten PDF and download the file. What was filled in or added is now part of each page." },
     ],
     faq: [
@@ -941,7 +976,7 @@ export const seoContent: Record<string, ToolSeoContent> = {
       },
       {
         q: "Will the text still be selectable?",
-        a: "Yes. Pages are not turned into pictures, so text stays sharp, searchable and small in size.",
+        a: "Yes, unless you choose whole pages as pictures. Then each page becomes one picture and its text can no longer be selected, copied or edited.",
       },
       {
         q: "Does a flattened form keep what I typed?",

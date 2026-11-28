@@ -55,7 +55,7 @@ export function pageScale(
   return { scale: fit, reduced: fit < want - 1e-9 };
 }
 
-const toBlob = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
+export const canvasBlob = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
   new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
 
 /** A JPG of the canvas no longer than 1,600 px on a side, for the result card. */
@@ -66,7 +66,7 @@ async function previewOf(canvas: HTMLCanvasElement): Promise<Blob | undefined> {
   small.height = Math.max(1, Math.round(canvas.height * k));
   try {
     small.getContext("2d")?.drawImage(canvas, 0, 0, small.width, small.height);
-    return (await toBlob(small, "image/jpeg", 0.85)) ?? undefined;
+    return (await canvasBlob(small, "image/jpeg", 0.85)) ?? undefined;
   } finally {
     small.width = small.height = 0;
   }
@@ -83,6 +83,63 @@ function toGrey(ctx: CanvasRenderingContext2D, w: number, h: number) {
       d[i + 2] =
         (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29 + 128) >> 8;
   ctx.putImageData(img, 0, 0);
+}
+
+/** The parts of a pdf.js page the drawing needs. */
+type DrawablePage = {
+  getViewport(o: { scale: number }): { width: number; height: number };
+  render(o: { canvas: HTMLCanvasElement; viewport: never }): { promise: Promise<unknown>; cancel(): void };
+};
+export type DrawnPage = { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; blob: Blob; scale: number; reduced: boolean };
+
+/**
+ * Draws one page at `dpi` (lowered to the pixel caps) and encodes it. An engine with a smaller
+ * canvas limit (iOS) gives no context or no blob: the area is halved and the page drawn again.
+ * The caller frees the canvas (`width = height = 0`) when it is done with it.
+ */
+export async function drawPage(
+  page: DrawablePage,
+  dpi: number,
+  signal: AbortSignal,
+  encode: (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => Promise<Blob | null>,
+  what: string,
+  willReadFrequently = false,
+): Promise<DrawnPage> {
+  const base = page.getViewport({ scale: 1 });
+  let { scale, reduced } = pageScale(base.width, base.height, dpi);
+  for (let tries = 0; ; tries++) {
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(viewport.width));
+    canvas.height = Math.max(1, Math.round(viewport.height));
+    let keep = false;
+    try {
+      const ctx = canvas.getContext("2d", { willReadFrequently });
+      if (ctx) {
+        const render = page.render({ canvas, viewport: viewport as never });
+        const stop = () => render.cancel();
+        signal.addEventListener("abort", stop, { once: true });
+        try {
+          await render.promise;
+        } catch (e) {
+          if (signal.aborted) throw aborted();
+          throw e;
+        } finally {
+          signal.removeEventListener("abort", stop);
+        }
+        const blob = await encode(canvas, ctx);
+        if (blob) {
+          keep = true;
+          return { canvas, ctx, blob, scale, reduced };
+        }
+      }
+      if (tries >= 3) throw new Error(`${USER_ERROR}${what} is too large to draw on this device.`);
+    } finally {
+      if (!keep) canvas.width = canvas.height = 0;
+    }
+    scale /= Math.SQRT2;
+    reduced = true;
+  }
 }
 
 export async function pagesToImages(
@@ -121,58 +178,34 @@ export async function pagesToImages(
         if (signal.aborted) throw aborted();
         const page = await doc.getPage(index + 1);
         try {
-          const base = page.getViewport({ scale: 1 });
-          let { scale, reduced } = pageScale(base.width, base.height, opts.dpi);
           let canvas: HTMLCanvasElement | undefined;
-          let ctx: CanvasRenderingContext2D | null;
-          let blob: Blob | null = null;
           try {
-            // An engine with a smaller canvas limit (iOS) gives no context or no blob: halve the area and retry.
-            for (let tries = 0; ; tries++) {
-              const viewport = page.getViewport({ scale });
-              canvas = document.createElement("canvas");
-              canvas.width = Math.max(1, Math.round(viewport.width));
-              canvas.height = Math.max(1, Math.round(viewport.height));
-              ctx = canvas.getContext("2d", {
-                willReadFrequently: opts.grey || !!tiff,
-              });
-              if (ctx) {
-                const render = page.render({ canvas, viewport });
-                const stop = () => render.cancel();
-                signal.addEventListener("abort", stop, { once: true });
-                try {
-                  await render.promise;
-                } catch (e) {
-                  if (signal.aborted) throw aborted();
-                  throw e;
-                } finally {
-                  signal.removeEventListener("abort", stop);
-                }
-                if (opts.grey && !tiff)
-                  toGrey(ctx, canvas.width, canvas.height);
+            const drawn = await drawPage(
+              page,
+              opts.dpi,
+              signal,
+              async (c, cx) => {
+                if (opts.grey && !tiff) toGrey(cx, c.width, c.height);
                 // TIFF is written from the pixels; a small JPG of the canvas still proves the engine drew it.
-                blob = tiff
-                  ? await toBlob(canvas, "image/jpeg", 0.5)
-                  : await toBlob(
-                      canvas,
+                return tiff
+                  ? canvasBlob(c, "image/jpeg", 0.5)
+                  : canvasBlob(
+                      c,
                       MIME[opts.format],
                       opts.format === "jpg" ? JPG_QUALITY : undefined,
                     );
-              }
-              if (ctx && blob) break;
-              if (tries >= 3)
-                throw new Error(
-                  `${USER_ERROR}Page ${index + 1} of ${src.name} is too large to draw on this device.`,
-                );
-              canvas.width = canvas.height = 0;
-              scale /= Math.SQRT2;
-              reduced = true;
-            }
+              },
+              `Page ${index + 1} of ${src.name}`,
+              opts.grey || !!tiff,
+            );
+            canvas = drawn.canvas;
+            const { ctx, scale, reduced } = drawn;
+            let blob: Blob = drawn.blob;
             if (reduced) reducedPages++;
             const effectiveDpi = Math.round(scale * 72);
             if (tiff) {
               const data = tiff.packPixels(
-                ctx!.getImageData(0, 0, canvas.width, canvas.height).data,
+                ctx.getImageData(0, 0, canvas.width, canvas.height).data,
                 opts.grey,
               );
               // Compressed now: a file with every page keeps only the compressed strips.
@@ -200,7 +233,7 @@ export async function pagesToImages(
                   opts.format,
                 ),
                 pages: 1,
-                blob: blob!,
+                blob,
                 detail: `${canvas.width} × ${canvas.height} px`,
               });
           } finally {

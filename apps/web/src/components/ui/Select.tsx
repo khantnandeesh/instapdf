@@ -16,6 +16,7 @@ export function Select<T extends string>({
   onChange,
   hideLabel,
   showDescription,
+  disabled,
 }: {
   id: string;
   label: string;
@@ -25,6 +26,7 @@ export function Select<T extends string>({
   onChange: (value: T) => void;
   hideLabel?: boolean;
   showDescription?: boolean;
+  disabled?: boolean;
 }) {
   const descId = `${id}-desc`;
   return (
@@ -36,6 +38,7 @@ export function Select<T extends string>({
         <select
           id={id}
           value={value}
+          disabled={disabled}
           title={description}
           aria-describedby={description ? descId : undefined}
           onChange={(e) => onChange(e.target.value as T)}

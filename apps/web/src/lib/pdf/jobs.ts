@@ -66,7 +66,9 @@ export type AnnotationsJob = { kind: "annotations"; files: (JobFile & { pages: n
 export type FlattenJob = { kind: "flatten"; files: JobFile[]; zipName: string; annotations: boolean };
 export type MetadataJob = { kind: "metadata"; files: JobFile[]; zipName: string } & ({ mode: "remove" } | { mode: "update"; fields: MetadataField[]; remove: string[] });
 
-export type Job = AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
+/** Flatten to pictures: the pages were drawn in the tab (a canvas is needed); the worker puts each file's pictures into a PDF. */
+export type PicturesJob = { kind: "pictures"; files: { name: string; title?: string; encrypted: boolean; pages: { jpg: Blob; width: number; height: number }[] }[]; zipName: string };
+export type Job = PicturesJob | AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
 
 export type JobOutput = {
   name: string;
@@ -131,6 +133,11 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       });
       if (!removed) throw new Error(`${USER_ERROR}No annotations of the chosen kinds were found on ${job.files.length === 1 ? "these pages" : "the pages of these files"}, so there is nothing to remove.`);
       return out;
+    }
+    case "pictures": {
+      const { picturesPdf } = await import("./pictures-pdf");
+      // runPerFile reads `source`; the pictures are the real input.
+      return runPerFile(job.files.map((f) => ({ ...f, source: new Blob([]) })), job.zipName, onProgress, async (_bytes, file, progress) => ({ bytes: await picturesPdf(file.pages, file.title, progress), pageCount: file.pages.length, wasEncrypted: file.encrypted }));
     }
     case "flatten": {
       const { flattenPdf } = await import("./flatten");

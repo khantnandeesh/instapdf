@@ -31,6 +31,7 @@ export function AreaDialog({
   areaLabel,
   status,
   action,
+  maxPages = Infinity,
 }: {
   open: boolean;
   onClose: () => void;
@@ -43,11 +44,13 @@ export function AreaDialog({
   areaLabel: string;
   status: (index: number) => ReactNode;
   action?: (index: number) => ReactNode;
+  /** Show only the file's first pages (Rename reads the first page). */
+  maxPages?: number;
 }) {
   const [at, setAt] = useState(0);
   const host = useRef<HTMLSpanElement>(null);
   const done = useRef<HTMLButtonElement>(null);
-  const count = file?.pageCount ?? 0;
+  const count = Math.min(file?.pageCount ?? 0, maxPages);
   const index = Math.min(at, Math.max(0, count - 1));
   const size = file?.pages?.[index] ?? { width: 1, height: 1.414 };
   const id = file?.id;

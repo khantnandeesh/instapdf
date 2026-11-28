@@ -88,6 +88,61 @@ test.describe("Flatten", () => {
   });
 });
 
+test.describe("Flatten to pictures", () => {
+  test("AC-1242: whole pages become pictures: no text, no fields, no annotations, same page sizes", async ({ page }) => {
+    await open(page, "flatten-pdf", "annotated.pdf");
+    const where = wide(page) ? "side" : "bar";
+    await expect(page.locator(`#flatten-dpi-${where}`)).toBeDisabled();
+    await page.locator(`#flatten-what-${where}`).selectOption("pictures");
+    await page.locator(`#flatten-dpi-${where}`).selectOption("75");
+    await run(page);
+    const out = await downloadResult(page);
+    const doc = await PDFDocument.load(out.bytes, { updateMetadata: false });
+    expect(doc.getPageCount()).toBe(2);
+    expect(doc.catalog.has(PDFName.of("AcroForm"))).toBe(false);
+    for (const p of doc.getPages()) {
+      expect(p.node.lookupMaybe(PDFName.of("Annots"), PDFArray)?.size() ?? 0).toBe(0);
+      expect(Math.round(p.getWidth())).toBe(600);
+      expect(Math.round(p.getHeight())).toBe(800);
+      const res = p.node.Resources();
+      expect(res?.lookupMaybe(PDFName.of("Font"), PDFDict)?.keys().length ?? 0).toBe(0);
+      expect(res?.lookup(PDFName.of("XObject"), PDFDict).keys().length).toBe(1);
+    }
+  });
+});
+
+test.describe("Rename by content", () => {
+  test("AC-1270: files are named after the text in the box on their first page; a file with no text there keeps its name", async ({ page }) => {
+    await open(page, "rename-pdf", "invoices.pdf", "scanned.pdf");
+    await expect(primary(page)).toBeDisabled();
+    await page.getByTestId(`rename-area-${wide(page) ? "side" : "bar"}`).click();
+    const box = page.getByRole("dialog");
+    await expect(box.getByTestId("area-text")).toHaveText("Text here: Invoice 1001");
+    await expect(box.getByRole("button", { name: "Next page" })).toHaveCount(0);
+    await expectNoSeriousAxeViolations(page, "Rename, text area");
+    await box.getByRole("button", { name: "Done", exact: true }).click();
+    if (wide(page)) await expect(page.getByTestId("rename-preview")).toHaveText("First file becomes Invoice 1001.pdf");
+    await run(page);
+    await expect(page.getByText("scanned.pdf has no text there, so it keeps its name.")).toBeVisible();
+    const out = await downloadResult(page);
+    expect(out.name).toBe("berrypdf-rename.zip");
+    expect(Object.keys(unzip(out.bytes))).toEqual(["Invoice 1001.pdf", "scanned.pdf"]);
+  });
+
+  test("AC-1271: the pattern shapes the name, and one file downloads under its new name, unchanged", async ({ page }) => {
+    await open(page, "rename-pdf", "invoices.pdf");
+    await page.getByTestId(`rename-area-${wide(page) ? "side" : "bar"}`).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Done", exact: true }).click();
+    await inOptions(page, async (where) => {
+      await page.locator(`#rename-pattern-${where}`).fill("{n} {text} ({name})");
+    });
+    await run(page);
+    const out = await downloadResult(page);
+    expect(out.name).toBe("1 Invoice 1001 (invoices).pdf");
+    expect((await PDFDocument.load(out.bytes, { updateMetadata: false })).getPageCount()).toBe(6);
+  });
+});
+
 test.describe("Metadata", () => {
   const field = (page: Page, name: string, where: string) => page.locator(`#meta-${name}-${where}`);
 
