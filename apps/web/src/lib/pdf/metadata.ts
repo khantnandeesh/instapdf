@@ -3,10 +3,10 @@
  * program that made it, and any fields of the maker's own). Edit changes the fields; Remove all
  * leaves none, including the hidden XML copy and the dates.
  */
-import { PDFDict, PDFHexString, PDFName, PDFRef, PDFString } from "@cantoo/pdf-lib";
+import { PDFDict, PDFHexString, PDFName, PDFRawStream, PDFRef, PDFStream, PDFString, decodePDFRawStream, type PDFDocument } from "@cantoo/pdf-lib";
 import { loadForEdit } from "./rotate";
 
-import { fieldNameError, FIELD_LIMITS, NOT_FIELDS, STANDARD_FIELDS, type MetadataField } from "./metadata-options";
+import { fieldNameError, NOT_FIELDS, STANDARD_FIELDS, type MetadataField } from "./metadata-options";
 export { fieldNameError, FIELD_LIMITS, STANDARD_FIELDS, type MetadataField } from "./metadata-options";
 
 const N = PDFName.of;
@@ -20,14 +20,14 @@ const text = (v: unknown): string | undefined => {
   }
 };
 
-function infoOf(doc: import("@cantoo/pdf-lib").PDFDocument): PDFDict | undefined {
+function infoOf(doc: PDFDocument): PDFDict | undefined {
   const ref = doc.context.trailerInfo.Info;
   const info = ref ? doc.context.lookup(ref) : undefined;
   return info instanceof PDFDict ? info : undefined;
 }
 
 /** The text fields a file has: the standard ones first (those present), then the maker's own, in file order. */
-export function fieldsOf(doc: import("@cantoo/pdf-lib").PDFDocument): MetadataField[] {
+export function fieldsOf(doc: PDFDocument): MetadataField[] {
   const info = infoOf(doc);
   if (!info) return [];
   const all = new Map<string, string>();
@@ -48,10 +48,42 @@ export async function readMetadata(bytes: Uint8Array, password?: string): Promis
 export type MetadataInput = {
   bytes: Uint8Array;
   password?: string;
-} & ({ mode: "remove" } | { mode: "update"; /** The fields the file should have afterwards; a text field not listed here is removed, an empty value too. */ fields: readonly MetadataField[] });
+} & (
+  | { mode: "remove" }
+  | {
+      mode: "update";
+      /** Fields to write. A field with no value is left alone (list it in `remove` to take it out). */
+      fields: readonly MetadataField[];
+      /** Fields to take out. Every other field of the file stays as it is. */
+      remove?: readonly string[];
+    }
+);
 
-export async function writeMetadata(input: MetadataInput, now = new Date()): Promise<{ bytes: Uint8Array; pageCount: number; wasEncrypted: boolean }> {
+/** True when the XML copy of the details says the file follows PDF/A (an archive standard that requires that copy). */
+function claimsPdfA(doc: PDFDocument): boolean {
+  try {
+    const xml = doc.catalog.lookup(N("Metadata"));
+    if (!(xml instanceof PDFRawStream)) return false;
+    return new TextDecoder("latin1").decode(decodePDFRawStream(xml).decode()).includes("pdfaid:");
+  } catch {
+    return false;
+  }
+}
+
+/** Takes `key` out of every dictionary of the file; an entry that names an object of its own takes that object with it. */
+function sweep(doc: PDFDocument, key: PDFName, deleteTarget: boolean) {
+  for (const [, object] of doc.context.enumerateIndirectObjects()) {
+    const dict = object instanceof PDFDict ? object : object instanceof PDFStream ? object.dict : undefined;
+    const value = dict?.get(key);
+    if (!dict || value === undefined) continue;
+    if (deleteTarget && value instanceof PDFRef) doc.context.delete(value);
+    dict.delete(key);
+  }
+}
+
+export async function writeMetadata(input: MetadataInput, now = new Date()): Promise<{ bytes: Uint8Array; pageCount: number; wasEncrypted: boolean; warnings?: string[] }> {
   const { doc, wasEncrypted } = await loadForEdit(input.bytes, input.password);
+  const warnings = claimsPdfA(doc) ? ["This file was marked as PDF/A. That mark lives in the details that were removed, so the copy no longer claims the standard."] : [];
   // The XML copy of the same facts would contradict the new ones (some readers show it first), so it goes either way.
   const xml = doc.catalog.get(N("Metadata"));
   if (xml instanceof PDFRef) doc.context.delete(xml);
@@ -59,21 +91,34 @@ export async function writeMetadata(input: MetadataInput, now = new Date()): Pro
   if (input.mode === "remove") {
     const ref = doc.context.trailerInfo.Info;
     if (ref instanceof PDFRef) doc.context.delete(ref);
-    delete (doc.context.trailerInfo as { Info?: unknown }).Info;
+    const trailer = doc.context.trailerInfo as { Info?: unknown; ID?: unknown };
+    delete trailer.Info;
+    // The file's identifier is derived from its first details and dates: it goes too.
+    delete trailer.ID;
+    // Pages, pictures and fonts can carry XML details of their own, and programs leave private notes.
+    sweep(doc, N("Metadata"), true);
+    sweep(doc, N("PieceInfo"), false);
+    sweep(doc, N("LastModified"), false);
   } else {
     let info = infoOf(doc);
     if (!info) {
       info = doc.context.obj({});
       doc.context.trailerInfo.Info = doc.context.register(info);
     }
-    for (const key of info.keys()) if (!NOT_FIELDS.has(key.decodeText()) && text(info.lookup(key)) !== undefined) info.delete(key);
+    const found = new Map(info.keys().map((k) => [k.decodeText(), k] as [string, PDFName]));
+    for (const name of input.remove ?? []) {
+      const key = found.get(name.trim());
+      if (key && !NOT_FIELDS.has(name.trim())) info.delete(key);
+    }
     for (const f of input.fields) {
       const name = f.name.trim();
-      const value = f.value.trim().slice(0, FIELD_LIMITS.value);
+      const value = f.value.trim();
       if (!value || fieldNameError(name, []) !== null) continue;
-      info.set(N(name), PDFHexString.fromText(value));
+      // Unchanged text is left as the file wrote it.
+      const key = found.get(name) ?? N(name);
+      if (text(info.lookup(key)) !== value) info.set(key, PDFHexString.fromText(value));
     }
     info.set(N("ModDate"), PDFString.fromDate(now));
   }
-  return { bytes: await doc.save(), pageCount: doc.getPageCount(), wasEncrypted };
+  return { bytes: await doc.save(), pageCount: doc.getPageCount(), wasEncrypted, ...(warnings.length ? { warnings } : {}) };
 }

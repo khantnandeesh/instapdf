@@ -43,5 +43,5 @@ export const metadataCopy = {
   value: "Value",
   removeField: (name: string) => `Remove ${name}`,
   many: "The same details are written to every file.",
-  errors: { empty: "Name the field", characters: "Use letters, digits, spaces, dots and dashes", reserved: "This name is kept for the file's dates", taken: "There is already a field with this name" },
+  errors: { empty: "Name the field", characters: "This field name is too long", reserved: "This name is kept for the file's dates", taken: "There is already a field with this name" },
 };

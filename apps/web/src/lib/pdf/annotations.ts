@@ -47,8 +47,18 @@ function entriesOf(page: PDFPage): Entry[] {
   return out;
 }
 
-/** Writes the page's list back without `gone`; replies to and pop-ups of removed annotations go with them. */
-function dropEntries(page: PDFPage, all: Entry[], gone: Set<Entry>): number {
+/** How many page lists name each annotation object: a copied page shares its annotations with the first copy. */
+function listings(doc: PDFDocument): Map<PDFRef, number> {
+  const out = new Map<PDFRef, number>();
+  for (const page of doc.getPages()) for (const e of entriesOf(page)) if (e.raw instanceof PDFRef) out.set(e.raw, (out.get(e.raw) ?? 0) + 1);
+  return out;
+}
+
+/**
+ * Writes the page's list back without `gone`; replies to and pop-ups of removed annotations go with
+ * them. An object another page still lists is taken off this page only (`listed` keeps count).
+ */
+function dropEntries(page: PDFPage, all: Entry[], gone: Set<Entry>, listed: Map<PDFRef, number>): number {
   const refs = () => new Set([...gone].map((e) => e.raw).filter((r): r is PDFRef => r instanceof PDFRef));
   for (let pass = 0; pass < 8; pass++) {
     const removed = refs();
@@ -73,7 +83,11 @@ function dropEntries(page: PDFPage, all: Entry[], gone: Set<Entry>): number {
   }
   if (keep.length) page.node.set(N("Annots"), page.doc.context.obj(keep.map((e) => e.raw)));
   else page.node.delete(N("Annots"));
-  for (const ref of removed) page.doc.context.delete(ref);
+  for (const ref of removed) {
+    const left = (listed.get(ref) ?? 1) - 1;
+    listed.set(ref, left);
+    if (left <= 0) page.doc.context.delete(ref);
+  }
   return gone.size;
 }
 
@@ -99,14 +113,16 @@ export async function removeAnnotations({ bytes, password, pages, kinds }: Remov
   const picked = new Set(pages);
   const wanted = new Set(kinds);
   let removed = 0;
+  const listed = listings(doc);
   all.forEach((page, i) => {
     if (picked.has(i)) {
       const entries = entriesOf(page);
+      // A pop-up is never picked by kind: it is the window of its note or highlight and goes only with it.
       const gone = new Set(entries.filter((e) => {
         const kind = kindOf(e.subtype);
-        return kind !== null && wanted.has(kind);
+        return kind !== null && e.subtype !== "Popup" && wanted.has(kind);
       }));
-      removed += dropEntries(page, entries, gone);
+      removed += dropEntries(page, entries, gone, listed);
     }
     onProgress?.((0.6 * (i + 1)) / all.length);
   });
@@ -159,30 +175,36 @@ export function appearanceMatrix(rect: number[], bbox: number[], matrix: number[
 }
 
 const HIDDEN = 2;
+const PRINT = 4;
 const NO_VIEW = 32;
+/** Kinds Flatten leaves as they are: a link draws nothing, and drawing an attachment's icon would throw the attached file away. */
+const NOT_FLATTENED = new Set<AnnotationKind>(["link", "attachment"]);
 
 /**
  * Draws every annotation that has a drawn form into its page and removes it, so it can no longer
- * be moved, edited or deleted. Links stay links (they draw nothing), hidden notes go without being
- * drawn, and an annotation with nothing to draw stays as it is. Returns how many were drawn and
- * how many stay.
+ * be moved, edited or deleted. Links, attachments and redaction marks stay as they are; notes that
+ * are hidden on screen and on paper go without being drawn; an annotation with nothing to draw
+ * stays an annotation. Returns how many were drawn, how many stay undrawn, and how many went undrawn
+ * (hidden ones, and replies and pop-ups of drawn ones).
  */
-export function flattenAnnotations(doc: PDFDocument): { drawn: number; kept: number } {
+export function flattenAnnotations(doc: PDFDocument): { drawn: number; kept: number; dropped: number } {
   let drawn = 0;
   let kept = 0;
+  let dropped = 0;
+  const listed = listings(doc);
   for (const page of doc.getPages()) {
     const entries = entriesOf(page);
     const gone = new Set<Entry>();
+    const undrawn = new Set<Entry>();
+    let drawnHere = 0;
     for (const e of entries) {
       const kind = kindOf(e.subtype);
-      if (kind === null || kind === "link") continue;
-      if (e.subtype === "Popup") {
-        // A pop-up is the note's window, not page content: it goes with its note, or on its own.
-        gone.add(e);
-        continue;
-      }
+      // A pop-up goes only with the annotation it belongs to (dropEntries).
+      if (kind === null || NOT_FLATTENED.has(kind) || e.subtype === "Redact" || e.subtype === "Popup") continue;
       const flags = num(e.dict.lookup(N("F")));
-      if (Number.isFinite(flags) && (flags & (HIDDEN | NO_VIEW)) !== 0) {
+      const f = Number.isFinite(flags) ? flags : 0;
+      // Hidden everywhere, or off screen and not printed: nothing to draw. Off screen but printed is drawn.
+      if ((f & HIDDEN) !== 0 || ((f & NO_VIEW) !== 0 && (f & PRINT) === 0)) {
         gone.add(e);
         continue;
       }
@@ -192,15 +214,19 @@ export function flattenAnnotations(doc: PDFDocument): { drawn: number; kept: num
       const bbox = stream ? numbers(stream.dict, "BBox", 4) : null;
       const m = rect && bbox ? appearanceMatrix(rect, bbox, (stream && numbers(stream.dict, "Matrix", 6)) ?? [1, 0, 0, 1, 0, 0]) : null;
       if (!ref || !m) {
-        kept++;
+        undrawn.add(e);
         continue;
       }
       const name = page.node.newXObject("Flat", ref);
       page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...m), drawObject(name), popGraphicsState());
       gone.add(e);
-      drawn++;
+      drawnHere++;
     }
-    dropEntries(page, entries, gone);
+    dropEntries(page, entries, gone, listed);
+    drawn += drawnHere;
+    // Pop-ups are windows, not notes: they are not counted either way.
+    dropped += [...gone].filter((e) => e.subtype !== "Popup").length - drawnHere;
+    kept += [...undrawn].filter((e) => !gone.has(e)).length;
   }
-  return { drawn, kept };
+  return { drawn, kept, dropped };
 }

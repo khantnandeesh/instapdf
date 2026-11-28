@@ -72,7 +72,7 @@ test.describe("Flatten", () => {
     const doc = await PDFDocument.load(out.bytes, { updateMetadata: false });
     expect(doc.catalog.has(PDFName.of("AcroForm"))).toBe(false);
     // The notes and the drawing have no drawn form in this file: they stay, and the result says so.
-    expect(await subtypes(out.bytes, 0)).toEqual(["/Text", "/Text", "/Link"]);
+    expect(await subtypes(out.bytes, 0)).toEqual(["/Text", "/Popup", "/Text", "/Link"]);
     await expect(page.getByText(/annotations have no drawn form/)).toBeVisible();
   });
 
@@ -111,7 +111,7 @@ test.describe("Metadata", () => {
     expect(doc.getKeywords()).toBe("finance, 2026");
     expect(doc.getAuthor()).toBeUndefined();
     const info = doc.context.lookup(doc.context.trailerInfo.Info, PDFDict);
-    expect(String(info.lookup(PDFName.of("Project")) && doc.getTitle())).toBe("Annual report");
+    expect(info.has(PDFName.of("Project"))).toBe(true);
     expect(info.has(PDFName.of("Department"))).toBe(true);
     expect(doc.catalog.has(PDFName.of("Metadata"))).toBe(false);
   });

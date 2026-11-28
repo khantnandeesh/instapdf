@@ -79,7 +79,8 @@ describe("flatten (F10 AC-1210 to AC-1213)", () => {
   it("AC-1210: annotations with a drawn form become page content; links stay; what cannot be drawn stays, with a note", async () => {
     const r = await flattenPdf({ bytes: await annotated(), annotations: true });
     const doc = await PDFDocument.load(r.bytes);
-    expect(subtypes(doc, 0)).toEqual(["Text", "Text", "Link"]);
+    // The note has no drawn form: it stays, with its window and its reply.
+    expect(subtypes(doc, 0)).toEqual(["Text", "Popup", "Text", "Link"]);
     expect(subtypes(doc, 1)).toEqual(["Ink"]);
     expect(r.drawn).toBe(1);
     expect(r.warnings?.[0]).toContain("3 annotations have no drawn form");
@@ -106,6 +107,80 @@ describe("flatten (F10 AC-1210 to AC-1213)", () => {
   });
 });
 
+describe("review cases (F10 AC-1207 to AC-1209, AC-1213 to AC-1216)", () => {
+  /** A page with the given annotations (plain objects), a second page when `share` lists the first one's again. */
+  async function withAnnots(make: (ctx: PDFDocument["context"]) => PDFRef[], share = false) {
+    const doc = await PDFDocument.create();
+    const pages = [doc.addPage([600, 800]), ...(share ? [doc.addPage([600, 800])] : [])];
+    const refs = make(doc.context);
+    for (const page of pages) page.node.set(N("Annots"), doc.context.obj(refs));
+    return doc.save();
+  }
+  const drawnForm = (ctx: PDFDocument["context"]) => ctx.register(ctx.stream("1 1 0 rg 0 0 100 20 re f", { Type: "XObject", Subtype: "Form", BBox: [0, 0, 100, 20] }));
+  const flatCount = (doc: PDFDocument, page: number) => (doc.getPage(page).node.Resources()?.lookupMaybe(N("XObject"), PDFDict)?.keys() ?? []).filter((k) => k.decodeText().startsWith("Flat")).length;
+
+  it("AC-1207: an annotation two pages share is taken off one page and still works on the other", async () => {
+    const bytes = await withAnnots((ctx) => [ctx.register(ctx.obj({ Type: "Annot", Subtype: "Highlight", Rect: [50, 690, 250, 730], AP: { N: drawnForm(ctx) } }))], true);
+    const r = await removeAnnotations({ bytes, pages: [0], kinds: ["highlight"] });
+    const doc = await PDFDocument.load(r.bytes);
+    expect(subtypes(doc, 0)).toEqual([]);
+    expect(subtypes(doc, 1)).toEqual(["Highlight"]);
+    const flat = await PDFDocument.load((await flattenPdf({ bytes, annotations: true })).bytes);
+    expect([flatCount(flat, 0), flatCount(flat, 1)]).toEqual([1, 1]);
+    expect([subtypes(flat, 0), subtypes(flat, 1)]).toEqual([[], []]);
+  });
+  it("AC-1208: a pop-up is never picked by kind: it goes only with the annotation it belongs to", async () => {
+    const bytes = await withAnnots((ctx) => {
+      const highlight = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Highlight", Rect: [50, 690, 250, 730] }));
+      const popup = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Popup", Rect: [300, 600, 500, 700], Parent: highlight }));
+      ctx.lookup(highlight, PDFDict).set(N("Popup"), popup);
+      return [highlight, popup];
+    });
+    const r = await removeAnnotations({ bytes, pages: [0], kinds: ["note"] });
+    expect(r.removed).toBe(0);
+    expect(r.bytes).toBe(bytes);
+  });
+  it("AC-1213: flatten leaves attached files and redaction marks as they are", async () => {
+    const bytes = await withAnnots((ctx) => [
+      ctx.register(ctx.obj({ Type: "Annot", Subtype: "FileAttachment", Rect: [50, 690, 70, 710], AP: { N: drawnForm(ctx) } })),
+      ctx.register(ctx.obj({ Type: "Annot", Subtype: "Redact", Rect: [50, 600, 250, 620], AP: { N: drawnForm(ctx) } })),
+    ]);
+    const r = await flattenPdf({ bytes, annotations: true });
+    const doc = await PDFDocument.load(r.bytes);
+    expect(subtypes(doc, 0)).toEqual(["FileAttachment", "Redact"]);
+    expect(flatCount(doc, 0)).toBe(0);
+  });
+  it("AC-1214: what goes without being drawn is said: a reply to a drawn highlight, a hidden note; a print-only stamp is drawn", async () => {
+    const bytes = await withAnnots((ctx) => {
+      const highlight = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Highlight", Rect: [50, 690, 250, 730], AP: { N: drawnForm(ctx) } }));
+      const reply = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Text", Rect: [300, 700, 320, 720], IRT: highlight }));
+      const hidden = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Text", Rect: [300, 600, 320, 620], F: 2 }));
+      const printOnly = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Stamp", Rect: [50, 500, 250, 540], F: 36, AP: { N: drawnForm(ctx) } }));
+      return [highlight, reply, hidden, printOnly];
+    });
+    const r = await flattenPdf({ bytes, annotations: true });
+    const doc = await PDFDocument.load(r.bytes);
+    expect(subtypes(doc, 0)).toEqual([]);
+    expect(r.drawn).toBe(2);
+    expect(flatCount(doc, 0)).toBe(2);
+    expect(r.warnings).toEqual(["2 hidden notes or replies were removed without being drawn."]);
+  });
+  it("AC-1215: a file whose only annotation is hidden is not told nothing was found", async () => {
+    const bytes = await withAnnots((ctx) => [ctx.register(ctx.obj({ Type: "Annot", Subtype: "Text", Rect: [300, 600, 320, 620], F: 2 }))]);
+    expect((await flattenPdf({ bytes, annotations: true })).warnings).toEqual(["One hidden note or reply was removed without being drawn."]);
+  });
+  it("AC-1216: flattening a signed file says the signature can no longer be verified", async () => {
+    const src = await PDFDocument.create();
+    const page = src.addPage([600, 800]);
+    const field = src.getForm().createTextField("sig");
+    field.addToPage(page, { x: 50, y: 700, width: 200, height: 24 });
+    field.acroField.dict.set(N("FT"), N("Sig"));
+    field.acroField.dict.set(N("V"), src.context.obj({ Type: "Sig" }));
+    const r = await flattenPdf({ bytes: await src.save(), annotations: false });
+    expect(r.warnings?.some((w) => w.includes("can no longer be verified"))).toBe(true);
+  });
+});
+
 describe("metadata (F10 AC-1220 to AC-1225)", () => {
   async function described() {
     const doc = await PDFDocument.create();
@@ -125,11 +200,12 @@ describe("metadata (F10 AC-1220 to AC-1225)", () => {
     expect(fields.find((f) => f.name === "Department")?.value).toBe("Sales");
     expect(fields.some((f) => f.name === "CreationDate")).toBe(false);
   });
-  it("AC-1221: an update writes the listed fields, drops the rest, keeps the creation date and stamps the change", async () => {
+  it("AC-1221: an update writes the listed fields, takes out the named ones, leaves the rest, keeps the creation date and stamps the change", async () => {
     const now = new Date("2026-11-28T10:00:00Z");
-    const r = await writeMetadata({ bytes: await described(), mode: "update", fields: [{ name: "Title", value: "  New title  " }, { name: "Keywords", value: "invoice, 2026" }, { name: "Project", value: "Ünïcode ✓" }, { name: "Author", value: "" }] }, now);
+    const r = await writeMetadata({ bytes: await described(), mode: "update", fields: [{ name: "Title", value: "  New title  " }, { name: "Keywords", value: "invoice, 2026" }, { name: "Project", value: "Ünïcode ✓" }], remove: ["Author", "CreationDate"] }, now);
     const doc = await PDFDocument.load(r.bytes, { updateMetadata: false });
-    expect(fieldsOf(doc)).toEqual([{ name: "Title", value: "New title" }, { name: "Keywords", value: "invoice, 2026" }, { name: "Project", value: "Ünïcode ✓" }]);
+    const fields = fieldsOf(doc);
+    expect(fields.filter((f) => !["Creator", "Producer"].includes(f.name))).toEqual([{ name: "Title", value: "New title" }, { name: "Keywords", value: "invoice, 2026" }, { name: "Department", value: "Sales" }, { name: "Project", value: "Ünïcode ✓" }]);
     expect(doc.getCreationDate()?.toISOString()).toBe("2020-01-02T03:04:05.000Z");
     expect(doc.getModificationDate()?.toISOString()).toBe(now.toISOString());
     expect(doc.catalog.has(N("Metadata"))).toBe(false);
@@ -144,6 +220,33 @@ describe("metadata (F10 AC-1220 to AC-1225)", () => {
     expect(raw).not.toContain("xmpmeta");
     expect(doc.getPageCount()).toBe(1);
   });
+  it("AC-1225: fields the form never showed, odd names and long values come through an update untouched", async () => {
+    const src = await PDFDocument.load(await described(), { updateMetadata: false });
+    const info = src.context.lookup(src.context.trailerInfo.Info as PDFRef, PDFDict);
+    const long = "k".repeat(3000);
+    info.set(N("Company:Name"), PDFString.of("Berry"));
+    info.set(N("Société"), PDFString.of("SARL"));
+    info.set(N("Keywords"), PDFString.of(long));
+    const bytes = await src.save();
+    expect(fieldNameError("Company:Name", [])).toBeNull();
+    const shown = await readMetadata(bytes);
+    const r = await writeMetadata({ bytes, mode: "update", fields: shown.filter((f) => f.name !== "Société"), remove: [] });
+    const after = await readMetadata(r.bytes);
+    expect(after.find((f) => f.name === "Company:Name")?.value).toBe("Berry");
+    expect(after.find((f) => f.name === "Société")?.value).toBe("SARL");
+    expect(after.find((f) => f.name === "Keywords")?.value).toBe(long);
+  });
+  it("AC-1226: remove all also clears the pages' own XML details, programs' private notes and the file identifier; a PDF/A mark is called out", async () => {
+    const src = await PDFDocument.load(await described(), { updateMetadata: false });
+    const ctx = src.context;
+    src.getPage(0).node.set(N("Metadata"), ctx.register(ctx.stream("<x:xmpmeta>page-secret</x:xmpmeta>", { Type: "Metadata", Subtype: "XML" })));
+    src.getPage(0).node.set(N("PieceInfo"), ctx.obj({ Maker: { Private: PDFString.of("piece-secret") } }));
+    src.catalog.set(N("Metadata"), ctx.register(ctx.stream("<x:xmpmeta><pdfaid:part>1</pdfaid:part></x:xmpmeta>", { Type: "Metadata", Subtype: "XML" })));
+    const r = await writeMetadata({ bytes: await src.save({ useObjectStreams: false }), mode: "remove" });
+    const raw = new TextDecoder("latin1").decode(r.bytes);
+    for (const gone of ["page-secret", "piece-secret", "pdfaid", "/PieceInfo", "/ID"]) expect(raw).not.toContain(gone);
+    expect(r.warnings?.[0]).toContain("PDF/A");
+  });
   it("AC-1223: a file with no information at all gets one on update", async () => {
     const bare = await writeMetadata({ bytes: await described(), mode: "remove" });
     const r = await writeMetadata({ bytes: bare.bytes, mode: "update", fields: [{ name: "Title", value: "Fresh" }] });
@@ -151,7 +254,8 @@ describe("metadata (F10 AC-1220 to AC-1225)", () => {
   });
   it("AC-1224: field names are checked", () => {
     expect(fieldNameError("", [])).toBe("empty");
-    expect(fieldNameError("a/b", [])).toBe("characters");
+    expect(fieldNameError("a\u0007b", [])).toBe("characters");
+    expect(fieldNameError("n".repeat(121), [])).toBe("characters");
     expect(fieldNameError("ModDate", [])).toBe("reserved");
     expect(fieldNameError("title", ["Title"])).toBe("taken");
     expect(fieldNameError("Project code", ["Title"])).toBeNull();

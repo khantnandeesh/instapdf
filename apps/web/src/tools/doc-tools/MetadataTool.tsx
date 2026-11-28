@@ -23,8 +23,9 @@ const MODES: { value: Mode; label: string }[] = [
   { value: "edit", label: c.edit },
   { value: "remove", label: c.remove },
 ];
-type Form = { mode: Mode; standard: Record<string, string>; own: MetadataField[] };
-const empty: Form = { mode: "edit", standard: {}, own: [] };
+/** `loaded`: the names of the own fields the file came with, so one the reader deletes is taken out of the file. */
+type Form = { mode: Mode; standard: Record<string, string>; own: MetadataField[]; loaded: string[] };
+const empty: Form = { mode: "edit", standard: {}, own: [], loaded: [] };
 const isStandard = (name: string) => (STANDARD_FIELDS as readonly string[]).includes(name);
 /** Short fields share a row; the ones people write sentences in get the full width. */
 const WIDE = new Set(["Title", "Keywords"]);
@@ -70,9 +71,13 @@ export function MetadataTool() {
 
   const process: ProcessFn = async (files, signal, onProgress) => {
     const f = live.current;
-    const fields = [...STANDARD_FIELDS.map((name) => ({ name: name as string, value: f.standard[name] ?? "" })), ...f.own].filter((x) => x.name.trim() && x.value.trim());
+    const all = [...STANDARD_FIELDS.map((name) => ({ name: name as string, value: f.standard[name] ?? "" })), ...f.own].filter((x) => x.name.trim());
+    const fields = all.filter((x) => x.value.trim());
+    // Out go the fields the reader emptied and the file's own fields the reader deleted or renamed. Anything the form never showed stays.
+    const kept = new Set(fields.map((x) => x.name.trim()));
+    const remove = [...all.filter((x) => !x.value.trim()).map((x) => x.name.trim()), ...f.loaded].filter((name) => !kept.has(name));
     const out = await runInWorker(
-      { kind: "metadata", zipName: tool.flow.outputName?.(files.map((x) => x.name)) ?? "", files: files.map((x) => ({ name: x.name, source: x.source, password: x.password })), ...(f.mode === "remove" ? { mode: "remove" as const } : { mode: "update" as const, fields }) },
+      { kind: "metadata", zipName: tool.flow.outputName?.(files.map((x) => x.name)) ?? "", files: files.map((x) => ({ name: x.name, source: x.source, password: x.password })), ...(f.mode === "remove" ? { mode: "remove" as const } : { mode: "update" as const, fields, remove }) },
       { signal, onProgress },
     );
     return { name: out.name, type: out.type, blob: out.blob, size: out.blob.size, pageCount: out.pageCount, entries: out.entries, wasEncrypted: out.wasEncrypted, warnings: out.warnings };
@@ -120,7 +125,7 @@ export function MetadataTool() {
           <Prefill
             file={ctx.readyFiles[0]}
             onLoad={(found) => {
-              setForm((f) => ({ mode: f.mode, standard: Object.fromEntries(found.filter((x) => isStandard(x.name)).map((x) => [x.name, x.value])), own: found.filter((x) => !isStandard(x.name)).slice(0, FIELD_LIMITS.custom) }));
+              setForm((f) => ({ mode: f.mode, standard: Object.fromEntries(found.filter((x) => isStandard(x.name)).map((x) => [x.name, x.value])), own: found.filter((x) => !isStandard(x.name)).slice(0, FIELD_LIMITS.custom), loaded: found.filter((x) => !isStandard(x.name)).slice(0, FIELD_LIMITS.custom).map((x) => x.name) }));
               setLoaded(true);
             }}
           />
