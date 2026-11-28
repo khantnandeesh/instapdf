@@ -18,6 +18,8 @@ export const fx = (name: string) => `tests/fixtures/${name}`;
 export function toolFixtures(slug: string, pdf = "sixty-pages.pdf"): string[] {
   // Enough pictures to overflow the pages area, like the 60-page PDF does.
   if (slug === "jpg-to-pdf") return Array.from({ length: 30 }, (_, i) => fx(["delta.jpg", "charlie.png", "fox.tiff"][i % 3]));
+  // Compress needs a file with a picture to pack, or its run ends in "already as small".
+  if (slug === "compress-pdf") return [fx(pdf), fx("photo.pdf")];
   // Unlock needs a protected file, or its run ends in "nothing to remove".
   if (slug === "unlock-pdf") return [fx(pdf), fx("owner-restricted.pdf")];
   // Extract images needs a file that has images, or its run ends in "none found".

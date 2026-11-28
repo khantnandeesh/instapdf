@@ -60,7 +60,8 @@ const BUDGET_KB = {
   // F12 and F11 added six tools to the registry every route carries: the routes within that of their
   // budget (home, Split, Delete, PDF to JPG, JPG to PDF) move up 1 kB.
   // F11: Protect is the bare flow plus the password field and three switches; Unlock is the bare flow.
-  "/protect-pdf/page": [143, 153],
+  // +1 kB (F6, 28 Nov): it sat at its limit and Compress added its entry to the registry every route loads.
+  "/protect-pdf/page": [144, 154],
   // +1 kB entry (F10, 28 Nov): three more tools in the registry every route loads.
   "/unlock-pdf/page": [140, 150],
   // F10 document tools: the pick-pages flow with switches; the bare flow with one select; the bare flow with a form.
@@ -68,6 +69,8 @@ const BUDGET_KB = {
   // Flatten: +1 kB for the pictures choice (a second select and its copy).
   "/flatten-pdf/page": [144, 154],
   // F13 Grayscale: the bare flow with one select.
+  // F6 Compress: the settings flow with two selects and a switch.
+  "/compress-pdf/page": [146, 156],
   "/grayscale-pdf/page": [144, 154],
   "/repair-pdf/page": [143, 153],
   // +1 kB: it sat at its limit and the shared flow grew by the OCR job's registry entry (F15).
@@ -117,6 +120,7 @@ const CLOUD_BUDGET_KB = {
   "/unlock-pdf/page": [142, 152],
   "/remove-pdf-annotations/page": [147, 157],
   "/flatten-pdf/page": [145, 155],
+  "/compress-pdf/page": [147, 157],
   "/grayscale-pdf/page": [145, 155],
   "/repair-pdf/page": [145, 155],
   "/rename-pdf/page": [147, 157],

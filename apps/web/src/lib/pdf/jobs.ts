@@ -77,10 +77,14 @@ export type BookmarksJob = { kind: "bookmarks"; files: JobFile[]; zipName: strin
 export type GrayScanJob = { kind: "grayScan"; file: JobFile };
 export type GrayEncodeJob = { kind: "grayEncode"; pixels: Blob; width: number; height: number; lossy: boolean; /** JPEG quality, 1 to 100 (the engine's own when left out). */ quality?: number };
 export type GrayscaleJob = { kind: "grayscale"; files: (JobFile & { images?: { ref: string; width: number; height: number; jpeg: boolean; data: Blob }[] })[]; zipName: string; vector: boolean; blackText?: boolean };
+/** Compress (spec F6): which pictures could be smaller; one picture packed as a JPEG; the file written with the smaller pictures in place. */
+export type CompressScanJob = { kind: "compressScan"; file: JobFile };
+export type JpegEncodeJob = { kind: "jpegEncode"; /** One byte a pixel (grey) or three (red, green, blue). */ pixels: Blob; width: number; height: number; channels: 1 | 3; quality: number };
+export type CompressJob = { kind: "compress"; file: JobFile & { images: { ref: string; width: number; height: number; gray: boolean; data: Blob }[] } };
 export type RepairJob = { kind: "repair"; files: JobFile[]; zipName: string };
 /** OCR (F15): each layer is a text-only page from the recogniser, laid over the 0-based page it was read from. */
 export type OcrLayerJob = { kind: "ocrLayer"; files: (JobFile & { layers: { page: number; pdf: Blob }[] })[]; zipName: string; /** Take out the text an earlier OCR left, before anything is added. */ strip?: boolean };
-export type Job = OcrLayerJob | DeskewJob | RepairJob | GrayScanJob | GrayEncodeJob | GrayscaleJob | BookmarksJob | PicturesJob | AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
+export type Job = CompressScanJob | JpegEncodeJob | CompressJob | OcrLayerJob | DeskewJob | RepairJob | GrayScanJob | GrayEncodeJob | GrayscaleJob | BookmarksJob | PicturesJob | AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
 
 /** The code a job loads on first use, by kind: a tool that knows its job fetches it ahead (`warmWorker`), so the run does not wait for it. */
 const AHEAD: Partial<Record<Job["kind"], () => Promise<unknown>>> = {
@@ -88,6 +92,9 @@ const AHEAD: Partial<Record<Job["kind"], () => Promise<unknown>>> = {
   grayscale: () => import("./grayscale"),
   grayEncode: () => import("./gray-encode"),
   repair: () => import("./repair"),
+  compressScan: () => import("./compress"),
+  compress: () => import("./compress"),
+  jpegEncode: () => import("./jpeg"),
 };
 export function warmJobs(kinds: readonly Job["kind"][]): void {
   for (const kind of kinds) void AHEAD[kind]?.().catch(() => {});
@@ -109,6 +116,11 @@ export type JobOutput = {
   notes?: string[];
   /** grayScan only: the pictures that hold colour, by object reference as pdf.js writes it. */
   found?: { ref: string; lossy: boolean; width: number; height: number }[];
+  /** compressScan only: the pictures that could be packed smaller. */
+  pictures?: { ref: string; width: number; height: number; gray: boolean; bytes: number }[];
+  /** compress only: how many pictures were swapped, and whether the file came back as it was (no smaller). */
+  swapped?: number;
+  unchanged?: boolean;
 };
 
 /** `phase` "fonts" = a font download (indeterminate); "pages" = back to the fraction. */
@@ -182,6 +194,25 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
     case "repair": {
       const { repairPdf } = await import("./repair");
       return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => repairPdf({ bytes, password: file.password, name: file.name }, progress));
+    }
+    case "compressScan": {
+      const { compressiblePictures } = await import("./compress");
+      const r = await compressiblePictures({ bytes: new Uint8Array(await job.file.source.arrayBuffer()), password: job.file.password });
+      return { name: "", type: "application/pdf", blob: new Blob([]), pageCount: r.pageCount, wasEncrypted: false, pictures: r.pictures };
+    }
+    case "jpegEncode": {
+      const { encodeColourJpeg, encodeJpeg } = await import("./jpeg");
+      const px = new Uint8Array(await job.pixels.arrayBuffer());
+      const data = job.channels === 1 ? encodeJpeg(job.width, job.height, [{ plane: px, width: job.width, height: job.height, h: 1, v: 1, table: 0 }], job.quality) : encodeColourJpeg(px, job.width, job.height, job.quality);
+      return { name: "", type: "application/pdf", blob: new Blob([data as Uint8Array<ArrayBuffer>], { type: "image/jpeg" }), wasEncrypted: false };
+    }
+    case "compress": {
+      const { compressPdf } = await import("./compress");
+      onProgress(0);
+      const file = job.file;
+      const images = await Promise.all(file.images.map(async (i) => ({ ref: i.ref, width: i.width, height: i.height, gray: i.gray, data: new Uint8Array(await i.data.arrayBuffer()) })));
+      const r = await compressPdf({ bytes: new Uint8Array(await file.source.arrayBuffer()), password: file.password, images }, onProgress);
+      return { name: file.name, type: "application/pdf", blob: new Blob([r.bytes as Uint8Array<ArrayBuffer>], { type: "application/pdf" }), pageCount: r.pageCount, wasEncrypted: r.wasEncrypted, swapped: r.swapped, unchanged: r.unchanged };
     }
     case "grayScan": {
       const { colourImages } = await import("./grayscale");

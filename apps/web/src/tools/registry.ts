@@ -293,6 +293,8 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
   // F10. Document tools: settings tools (F25 §4).
   "remove-pdf-annotations": { status: "beta", flow: clientPdfFlow("remove-pdf-annotations", { title: "Clear annotations", actionLabel: "Clear annotations", progressLabel: "Removing" }, { layout: "settings" }) },
   "flatten-pdf": { status: "beta", flow: clientPdfFlow("flatten-pdf", { title: "Flatten PDF", actionLabel: "Flatten PDF", progressLabel: "Flattening" }, { layout: "settings" }) },
+  // F6 (spec f6-compress.md): pictures are scaled and packed again in the tab; nothing is uploaded.
+  "compress-pdf": { status: "beta", flow: clientPdfFlow("compress-pdf", { title: "Compress PDF", actionLabel: "Compress", progressLabel: "Compressing" }, { layout: "settings" }) },
   "grayscale-pdf": { status: "beta", flow: clientPdfFlow("grayscale-pdf", { title: "Grayscale PDF", actionLabel: "Convert to grayscale", progressLabel: "Converting" }, { layout: "settings" }) },
   "repair-pdf": { status: "beta", flow: clientPdfFlow("repair-pdf", { title: "Repair PDF", actionLabel: "Repair PDF", progressLabel: "Repairing" }, { defaultView: "files", acceptDamaged: true }) },
   // F15 (spec f15-deskew-ocr.md): Deskew measures each page in the tab and turns its content in place.
@@ -418,7 +420,7 @@ export const tools: Tool[] = [
   t("rename-pdf", "Rename by content", "Name files using text found inside them", "edit", "client", "text-aa"),
   t("remove-pdf-annotations", "Clear annotations", "Remove highlights, comments and markup", "edit", "client", "eraser", "delete-pdf-annotations"),
   t("flatten-pdf", "Flatten", "Lock form fields and annotations into the page", "edit", "client", "stack-simple"),
-  t("compress-pdf", "Compress", "Make your PDF smaller", "optimize", "server", "arrows-in"),
+  t("compress-pdf", "Compress", "Make your PDF smaller", "optimize", "client", "arrows-in"),
   t("grayscale-pdf", "Grayscale", "Convert colors to shades of gray", "optimize", "client", "circle-half"),
   t("repair-pdf", "Repair", "Recover content from a damaged file", "optimize", "client", "wrench"),
   t("protect-pdf", "Protect", "Add a password and permissions", "security", "client", "lock", "encrypt-pdf"),

@@ -206,9 +206,10 @@ export function ResultCard({
           {copy.resultTitle(output.type)}
         </h2>
         <div>
-          <p className="font-display text-[17px] leading-[1.3] font-semibold break-all text-ink-black" data-testid="result-name">
+          {/* A file's name is a value, not a heading over the line below it: not a paragraph, so no reader takes it for one. */}
+          <div className="font-display text-[17px] leading-[1.3] font-semibold break-all text-ink-black" data-testid="result-name">
             {output.name}
-          </p>
+          </div>
           <p id="ip-result-summary" className="text-sm text-muted tabular-nums">
             {summary}
           </p>
