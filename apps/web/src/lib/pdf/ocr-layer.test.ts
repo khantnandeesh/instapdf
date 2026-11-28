@@ -53,4 +53,20 @@ describe("OCR text layer", () => {
     expect(after.getPage(1).node.Resources()?.lookup(PDFName.of("XObject"))?.toString() ?? "").not.toContain("OcrText");
     expect(after.getPageCount()).toBe(before.getPageCount());
   });
+
+  it("AC-1543: two pages that share one list of content streams each get only their own layer", async () => {
+    const doc = await PDFDocument.create();
+    const first = doc.addPage([300, 300]);
+    first.drawText("shared", { x: 20, y: 20, size: 12 });
+    const second = doc.addPage([300, 300]);
+    const shared = doc.context.register(doc.context.obj([(first.node.Contents() as PDFArray).get(0)]));
+    first.node.set(PDFName.of("Contents"), shared);
+    second.node.set(PDFName.of("Contents"), shared);
+    second.node.set(PDFName.of("Resources"), first.node.get(PDFName.of("Resources"))!);
+    const out = await addTextLayers({ bytes: await doc.save(), layers: [{ page: 0, pdf: await layer(300, 300) }] });
+    const after = await PDFDocument.load(out.bytes);
+    expect(await placed(out.bytes, 0)).toEqual([1, 0, 0, 1, 0, 0]);
+    expect(after.getPage(0).node.lookup(PDFName.of("Contents"), PDFArray).size()).toBeGreaterThan(1);
+    expect(after.getPage(1).node.lookup(PDFName.of("Contents"), PDFArray).size()).toBe(1);
+  });
 });

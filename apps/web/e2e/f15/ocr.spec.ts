@@ -86,7 +86,9 @@ test.describe("OCR", () => {
     await page.getByRole("button", { name: "Back to editing" }).click();
     await side(page, "What to make").selectOption({ label: "Searchable PDF and text file" });
     await run(page);
-    const zip = unzip((await downloadResult(page)).bytes);
+    const both = await downloadResult(page);
+    expect(both.name).toBe("scan.zip");
+    const zip = unzip(both.bytes);
     expect(Object.keys(zip).sort()).toEqual(["scan.pdf", "scan.txt"]);
     expect((await textsOf(zip["scan.pdf"]))[0]).toContain("Harbour Lane Bakery");
   });
@@ -130,6 +132,33 @@ test.describe("OCR", () => {
     await expect(flow(page)).toHaveAttribute("data-state", "ready");
     release();
     await page.unroute(/\/ocr\/data-[^/]+\/eng\.traineddata\.gz$/);
+    await run(page);
+    await expect(page.getByTestId("result")).toContainText("scan.pdf");
+  });
+
+  test("AC-1535: a language file that cannot be fetched is said, and the tool is ready to try again", async ({ page }, info) => {
+    test.skip(!isDesktop(info.project.name), "the recogniser is the same on phones");
+    await load(page);
+    await page.route(/\/ocr\/data-[^/]+\/eng\.traineddata\.gz$/, (route) => route.fulfill({ status: 404, body: "" }));
+    await primary(page).click();
+    await expect(page.getByText("The text recogniser could not start. Check your connection and try again.")).toBeVisible();
+    await expect(flow(page)).toHaveAttribute("data-state", "error");
+    await page.unroute(/\/ocr\/data-[^/]+\/eng\.traineddata\.gz$/);
+    await page.getByTestId("action-slot").getByRole("button", { name: "Try again" }).click();
+    await expect(page.getByTestId("result")).toContainText("scan.pdf", { timeout: 60_000 });
+  });
+
+  test("AC-1536: Cancel while a page is being read stops the run, and the next run finishes", async ({ page }, info) => {
+    test.skip(!isDesktop(info.project.name), "the recogniser is the same on phones");
+    await load(page);
+    // The recogniser's own code arriving means it has started; the first page is on its way in.
+    const started = page.waitForResponse(/\/ocr\/engine-[^/]+\/core\/.+\.wasm\.js$/);
+    await primary(page).click();
+    await started;
+    await page.waitForTimeout(600);
+    const pill = page.getByTestId("processing");
+    await pill.getByRole("button", { name: "Cancel" }).click();
+    await expect(flow(page)).toHaveAttribute("data-state", "ready");
     await run(page);
     await expect(page.getByTestId("result")).toContainText("scan.pdf");
   });

@@ -5,7 +5,7 @@
  * text can be searched, selected and copied. Nothing on the page is redrawn or re-compressed.
  * Worker-only: this module pulls in the PDF library.
  */
-import { concatTransformationMatrix, drawObject, PDFDocument, popGraphicsState, pushGraphicsState } from "@cantoo/pdf-lib";
+import { concatTransformationMatrix, drawObject, PDFArray, PDFDocument, PDFName, popGraphicsState, pushGraphicsState } from "@cantoo/pdf-lib";
 import { shownBox, shownToPage } from "./page-geometry";
 import { loadForEdit } from "./rotate";
 
@@ -30,6 +30,10 @@ export async function addTextLayers({ bytes, password, layers }: OcrLayerInput, 
         const [ox, oy] = shownToPage(0, 1, box, rotate);
         const [rx, ry] = shownToPage(1, 1, box, rotate);
         const [tx, ty] = shownToPage(0, 0, box, rotate);
+        // Two pages may point at one list of content streams: this page gets its own list first, so the layer stays on it.
+        const contents = page.node.get(PDFName.of("Contents"));
+        const list = contents && doc.context.lookup(contents);
+        if (list instanceof PDFArray) page.node.set(PDFName.of("Contents"), doc.context.obj(list.asArray()));
         // Closes any graphics state the page left open, so the layer is not drawn through a stray matrix or clip.
         page.node.normalize();
         const name = page.node.newXObject("OcrText", embedded.ref);

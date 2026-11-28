@@ -1107,12 +1107,12 @@ export const seoContent: Record<string, ToolSeoContent> = {
     steps: [
       { name: "Add your PDF", text: "Drop the scanned PDF on the page, or choose it from your device. Nothing is uploaded." },
       { name: "Pick the language", text: "Choose the language the pages are written in, and a second one if the document mixes two. Choose a searchable PDF, a text file, or both." },
-      { name: "Download", text: "Select Recognize text and download the result. The pages look the same, and their text can now be searched, selected and copied." },
+      { name: "Download", text: "Select Read text and download the result. The pages look the same, and their text can now be searched, selected and copied." },
     ],
     faq: [
       {
         q: "How do I make a scanned PDF searchable?",
-        a: "Add the PDF, pick its language and select Recognize text. The text found on each page is laid over it, invisible, exactly where the words are, so search, select and copy work in any PDF reader.",
+        a: "Add the PDF, pick its language and select Read text. The text found on each page is laid over it, invisible, exactly where the words are, so search, select and copy work in any PDF reader.",
       },
       {
         q: "Does OCR change how my pages look?",

@@ -36,7 +36,6 @@ export const ocrCopy = {
   output: "What to make",
   outputs: { pdf: "Searchable PDF", text: "Text file", both: "Searchable PDF and text file" },
   /** The bar below 1024 px has room for short names only. */
-  outputsShort: { pdf: "Searchable PDF", text: "Text file", both: "PDF and text" },
   skipText: "Skip pages that already have text",
   resultNote: "The pages keep their look: the text found is laid over them, invisible, so it can be searched, selected and copied. Check the result, since no recogniser reads every character right.",
   more: "Options",

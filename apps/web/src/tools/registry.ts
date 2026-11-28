@@ -297,7 +297,7 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
   // F15 (spec f15-deskew-ocr.md): Deskew measures each page in the tab and turns its content in place.
   "deskew-pdf": { status: "beta", flow: clientPdfFlow("deskew-pdf", { title: "Deskew PDF", actionLabel: "Straighten", progressLabel: "Straightening" }) },
   // OCR reads the pages in the tab (Tesseract as WebAssembly, served from this site) and lays the text over them.
-  "ocr-pdf": { status: "beta", flow: clientPdfFlow("ocr-pdf", { title: "OCR PDF", actionLabel: "Recognize text", progressLabel: "Reading" }, { layout: "settings" }) },
+  "ocr-pdf": { status: "beta", flow: clientPdfFlow("ocr-pdf", { title: "OCR PDF", actionLabel: "Read text", progressLabel: "Reading" }, { layout: "settings" }) },
   "pdf-bookmarks": { status: "beta", flow: clientPdfFlow("pdf-bookmarks", { title: "Edit PDF bookmarks", actionLabel: "Save bookmarks", progressLabel: "Saving" }, { layout: "settings", multiFile: false, maxFiles: 1 }) },
   "rename-pdf": { status: "beta", flow: clientPdfFlow("rename-pdf", { title: "Rename PDF by content", actionLabel: "Rename", progressLabel: "Renaming" }, { layout: "settings" }) },
   "edit-pdf-metadata": { status: "beta", flow: clientPdfFlow("edit-pdf-metadata", { title: "Edit PDF metadata", actionLabel: "Save metadata", progressLabel: "Saving" }, { layout: "settings" }) },

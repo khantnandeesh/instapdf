@@ -40,18 +40,55 @@ function readers(pages: number): number {
   return Math.max(1, Math.min(3, Math.floor(cores / 2), pages));
 }
 
-async function startReaders(count: number, languages: readonly string[]): Promise<Reader[]> {
-  const { createWorker } = await import("tesseract.js");
+type CreateWorker = (langs: string[], oem: number, options: object) => Promise<unknown>;
+
+/**
+ * The language files are fetched here first (the recogniser then finds them in the browser's cache):
+ * a file that cannot be had fails the run with a message, where the recogniser itself would wait for ever.
+ */
+async function fetchLanguages(languages: readonly string[], signal: AbortSignal): Promise<void> {
+  await Promise.all(
+    languages.map(async (code) => {
+      const res = await fetch(`${OCR_PATHS.data}/${code}.traineddata.gz`, { signal });
+      if (!res.ok) throw new Error(`Language data ${code}: ${res.status}`);
+      await res.arrayBuffer();
+    }),
+  );
+}
+
+/** One recogniser. Settles whatever happens: started, failed to start, or cancelled (one that starts after a cancel is stopped). */
+function startReader(createWorker: CreateWorker, languages: readonly string[], signal: AbortSignal): Promise<Reader> {
+  return new Promise<Reader>((resolve, reject) => {
+    if (signal.aborted) return reject(aborted());
+    signal.addEventListener("abort", () => reject(aborted()), { once: true });
+    // The library reports a failed start here and nowhere else; later, a failed page rejects its own call as well.
+    const errorHandler = (e: unknown) => reject(new Error(String(e)));
+    createWorker([...languages], 1, { workerPath: OCR_PATHS.worker, corePath: OCR_PATHS.core, langPath: OCR_PATHS.data, workerBlobURL: false, gzip: true, errorHandler }).then(async (made) => {
+      const worker = made as Reader;
+      if (signal.aborted) return void worker.terminate().catch(() => {});
+      try {
+        await worker.setParameters({ user_defined_dpi: String(DPI) });
+        resolve(worker);
+      } catch (e) {
+        void worker.terminate().catch(() => {});
+        reject(e);
+      }
+    }, reject);
+  });
+}
+
+async function startReaders(count: number, languages: readonly string[], signal: AbortSignal): Promise<Reader[]> {
   const made: Reader[] = [];
   try {
-    // The first one fetches the language; the others then find it in the browser's cache.
-    for (let i = 0; i < count; i++) {
-      const worker = (await createWorker([...languages], 1, { workerPath: OCR_PATHS.worker, corePath: OCR_PATHS.core, langPath: OCR_PATHS.data, workerBlobURL: false, gzip: true })) as unknown as Reader;
-      made.push(worker);
-      await worker.setParameters({ user_defined_dpi: String(DPI) });
-    }
+    await fetchLanguages(languages, signal);
+    const { createWorker } = await import("tesseract.js");
+    const started = await Promise.allSettled(Array.from({ length: count }, () => startReader(createWorker as unknown as CreateWorker, languages, signal)));
+    for (const s of started) if (s.status === "fulfilled") made.push(s.value);
+    const lost = started.find((s) => s.status === "rejected");
+    if (lost) throw lost.reason;
   } catch (e) {
     await Promise.allSettled(made.map((w) => w.terminate()));
+    if (signal.aborted) throw aborted();
     throw new Error(`${USER_ERROR}The text recogniser could not start. Check your connection and try again.`, { cause: e });
   }
   return made;
@@ -71,6 +108,12 @@ async function readFile(src: OcrSource, opts: OcrOptions, pool: Reader[], signal
   const give = (r: Reader) => (waiting.length ? waiting.shift()!(r) : free.push(r));
   const running: Promise<void>[] = [];
   let failed: unknown;
+  // A stopped recogniser never answers the page it was reading, so every wait below also ends on Cancel.
+  let onAbort = () => {};
+  const cancelled = new Promise<never>((_, reject) => (onAbort = () => reject(aborted())));
+  cancelled.catch(() => {});
+  if (signal.aborted) onAbort();
+  else signal.addEventListener("abort", onAbort, { once: true });
   try {
     for (let n = 1; n <= doc.numPages && !failed; n++) {
       if (signal.aborted) throw aborted();
@@ -92,7 +135,7 @@ async function readFile(src: OcrSource, opts: OcrOptions, pool: Reader[], signal
         page.cleanup();
       }
       // Waits here while every recogniser is busy, so only that many pictures are held at once.
-      const reader = await take();
+      const reader = await Promise.race([take(), cancelled]);
       if (signal.aborted) throw aborted();
       const image = picture;
       running.push(
@@ -110,10 +153,11 @@ async function readFile(src: OcrSource, opts: OcrOptions, pool: Reader[], signal
           .finally(() => give(reader)),
       );
     }
-    await Promise.all(running);
+    await Promise.race([Promise.all(running), cancelled]);
     if (signal.aborted) throw aborted();
     if (failed) throw new Error(`${USER_ERROR}${src.name} could not be read by the text recogniser.`, { cause: failed });
   } finally {
+    signal.removeEventListener("abort", onAbort);
     void task.destroy();
   }
   return pages;
@@ -123,7 +167,7 @@ const wordsLead = (words: number) => (words === 1 ? "1 word" : `${words.toLocale
 
 export async function ocrPdfs(sources: readonly OcrSource[], opts: OcrOptions, zipName: string, signal: AbortSignal, onProgress: (fraction: number) => void): Promise<ToolOutput> {
   const total = sources.reduce((n, s) => n + s.pageCount, 0) || 1;
-  const pool = await startReaders(readers(total), opts.languages);
+  const pool = await startReaders(readers(total), opts.languages, signal);
   // Cancel stops the recognisers at once, mid-page.
   const stop = () => void Promise.allSettled(pool.map((w) => w.terminate()));
   signal.addEventListener("abort", stop, { once: true });
@@ -136,7 +180,6 @@ export async function ocrPdfs(sources: readonly OcrSource[], opts: OcrOptions, z
   let kept = 0;
   let wasEncrypted = false;
   let allText = "";
-  let firstPdf: Blob | undefined;
   try {
     if (signal.aborted) throw aborted();
     onProgress(READY);
@@ -154,7 +197,6 @@ export async function ocrPdfs(sources: readonly OcrSource[], opts: OcrOptions, z
         const layers = pages.flatMap((p, page) => (p.layer ? [{ page, pdf: p.layer }] : []));
         const out = await runInWorker({ kind: "ocrLayer", zipName: "", files: [{ name: src.name, source: src.source, password: src.password, layers }] }, { signal });
         wasEncrypted ||= out.wasEncrypted;
-        firstPdf ??= out.blob;
         files.push({ name: pdfNames[i], bytes: new Uint8Array(await out.blob.arrayBuffer()), pageCount: src.pageCount });
       }
     }
@@ -180,5 +222,7 @@ export async function ocrPdfs(sources: readonly OcrSource[], opts: OcrOptions, z
   const zip = createZipWriter();
   for (const f of files) zip.add(f.name, f.bytes);
   const blob = zip.finish();
-  return { name: zipName, type: "application/zip", blob, size: blob.size, entries: files.map((f) => ({ name: f.name, pageCount: f.pageCount, detail: f.detail })), ...rest };
+  // One file made into two: the ZIP takes the file's name, not the name its PDF alone would have had.
+  const name = sources.length === 1 ? derivedName(sources[0].name, ".zip") : zipName;
+  return { name, type: "application/zip", blob, size: blob.size, entries: files.map((f) => ({ name: f.name, pageCount: f.pageCount, detail: f.detail })), ...rest };
 }
