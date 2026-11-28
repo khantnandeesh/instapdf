@@ -250,9 +250,12 @@ test.describe("Bates numbering", () => {
     await panel.getByLabel("Line", { exact: true }).selectOption({ label: "Your own" });
     await panel.getByLabel("Your line", { exact: true }).fill("ACME {bates} Doc {doc}");
     await expect(panel.getByLabel("Files from", { exact: true })).toBeVisible();
+    // The result's name takes a prefix; what a file name cannot hold is dropped.
+    await panel.getByLabel("Result name starts with", { exact: true }).fill("ACME/-");
     expect(await panel.evaluate((e) => e.getBoundingClientRect().bottom)).toBeLessThanOrEqual(632);
     await run(page);
     const out = await downloadResult(page);
+    expect(out.name).toBe("ACME-scan.pdf");
     const doc = await PDFDocument.load(out.bytes);
     const text = doc.context
       .enumerateIndirectObjects()

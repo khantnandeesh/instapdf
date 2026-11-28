@@ -2,7 +2,7 @@
 /* Header and footer: the three places along an edge, side by side. */
 .ip-stamp-three {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.72fr) minmax(0, 1.13fr);
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr) minmax(0, 1fr);
   gap: 0.5rem;
 }
 .ip-stamp-hint {
@@ -14,7 +14,7 @@
 /* Line, Digits, Starts at: "Your own" is a short label, so the three share a row evenly. */
 .ip-bates-own {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.72fr) minmax(0, 1.13fr);
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr) minmax(0, 1fr);
   gap: 0.5rem;
   align-items: end;
 }

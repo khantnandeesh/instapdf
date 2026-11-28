@@ -68,7 +68,7 @@ export type StampImage = { bytes: Uint8Array; mime: "image/png" | "image/jpeg"; 
  * returns what to draw (from the live options) or a sentence saying what is missing.
  */
 /** What a tool that counts across files adds (Bates numbering): the run's settings, and the values a page's preview shows. */
-export type Counted = { job: () => { bates: BatesRun; room?: { top: number; bottom: number } } | null; preview: (spot: PageSpot) => Partial<TokenValues> };
+export type Counted = { job: () => { namePrefix?: string; bates: BatesRun; room?: { top: number; bottom: number } } | null; preview: (spot: PageSpot) => Partial<TokenValues> };
 
 export function stampFlow(tool: FlowTool, stamps: () => Stamp[] | string, first: () => number, image?: () => StampImage | null, counted?: Counted) {
   const decorate = (applies: boolean, spot: PageSpot): Partial<PageDecoration> => {

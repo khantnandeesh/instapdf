@@ -4,7 +4,7 @@ import { MoreOptions } from "@/components/page-select/MoreOptions";
 import { Step } from "@/components/page-select/Step";
 import { Select } from "@/components/ui/Select";
 import { TextInput } from "@/components/ui/TextInput";
-import { BATES_DIGITS, BATES_LIMITS, BATES_STYLES, batesNumber, batesTemplate, PLACES, STAMP_LINE_HEIGHT, type BatesRun, type BatesStyle, type Place, type Stamp } from "@/lib/pdf/stamp";
+import { BATES_DIGITS, BATES_LIMITS, BATES_STYLES, batesNumber, batesTemplate, cleanNamePrefix, PLACES, STAMP_LINE_HEIGHT, type BatesRun, type BatesStyle, type Place, type Stamp } from "@/lib/pdf/stamp";
 import { flowTool } from "@/tools/registry";
 import { PickPagesFlow } from "@/tools/to-image/PickPagesFlow";
 import { batesCopy as c, stampCopy as sc } from "./copy";
@@ -12,8 +12,8 @@ import { checkStyle, Group, MARGIN_OPTIONS, MARGINS, stampFlow, StyleFields, tex
 
 const tool = flowTool("bates-numbering");
 
-type Remembered = StyleState & { place: Place; margin: keyof typeof MARGINS | "room"; style: BatesStyle; digits: string; prefix: string; custom: string; start: string; doc: string };
-const defaults: Remembered = { place: "bottom-right", margin: "normal", style: "number", digits: "6", prefix: "", custom: "{bates}", start: "1", doc: "1", font: "arimo", size: "10", colour: "#000000", bold: false };
+type Remembered = StyleState & { place: Place; margin: keyof typeof MARGINS | "room"; style: BatesStyle; digits: string; prefix: string; custom: string; start: string; doc: string; name: string };
+const defaults: Remembered = { name: "", place: "bottom-right", margin: "normal", style: "number", digits: "6", prefix: "", custom: "{bates}", start: "1", doc: "1", font: "arimo", size: "10", colour: "#000000", bold: false };
 /** Text sizes in points: small print for a crowded margin up to a number read across a room. */
 const SIZES = ["6", "7", "8", "9", "10", "11", "12", "14", "16", "18", "20", "24", "28", "36", "48", "60"];
 const check = (s: Record<string, unknown>): Partial<Remembered> => ({
@@ -30,6 +30,8 @@ const PLACE_OPTIONS = PLACES.map((value) => ({ value, label: sc.place[value] }))
 const STYLE_OPTIONS = BATES_STYLES.map((b) => ({ value: b.value, label: c.styles[b.value] }));
 // The last choice gives the line a strip of its own: the page grows at that edge, and what is on it is not covered.
 const EDGE_OPTIONS = [...MARGIN_OPTIONS, { value: "room" as const, label: c.room }];
+// In the side panel the box stands without its label, so each choice names the edge itself.
+const EDGE_OPTIONS_SIDE = EDGE_OPTIONS.map((o) => (o.value === "room" ? o : { ...o, label: c.edges[o.value] }));
 const edge = (o: Remembered) => MARGINS[o.margin === "room" ? "normal" : o.margin];
 // Beside a line of the reader's own the box is narrow: the count alone.
 const DIGIT_COUNTS = BATES_DIGITS.map((d) => ({ value: String(d), label: String(d) }));
@@ -83,7 +85,7 @@ export function BatesTool() {
     {
       job: () => {
         const run = runOf(optsLive.current);
-        return run && { bates: run, room: optsLive.current.margin === "room" ? roomFor(optsLive.current) : undefined };
+        return run && { namePrefix: cleanNamePrefix(optsLive.current.name) || undefined, bates: run, room: optsLive.current.margin === "room" ? roomFor(optsLive.current) : undefined };
       },
       preview: (spot) => {
         const run = runOf(optsLive.current);
@@ -93,7 +95,7 @@ export function BatesTool() {
   );
   const changed = (Object.keys(defaults) as (keyof Remembered)[]).filter((k) => k !== "place" && opts[k] !== defaults[k]).length;
   const position = (where: string) => <Select id={`bates-place-${where}`} label={c.position} hideLabel={where === "bar"} value={opts.place} options={PLACE_OPTIONS} onChange={(place) => setOpts({ place })} />;
-  const margin = (where: string) => <Select id={`bates-margin-${where}`} label={sc.margin} value={opts.margin} options={EDGE_OPTIONS} onChange={(margin) => setOpts({ margin })} />;
+  const margin = (where: string) => <Select id={`bates-margin-${where}`} label={sc.margin} hideLabel={where === "side"} value={opts.margin} options={where === "side" ? EDGE_OPTIONS_SIDE : EDGE_OPTIONS} onChange={(margin) => setOpts({ margin })} />;
   // The file number shows only where the line uses it.
   const counts = countsFiles(opts);
   const own = opts.style === "custom";
@@ -123,6 +125,7 @@ export function BatesTool() {
         </div>
       )}
       <StyleFields where={`bates-${where}`} style={opts} sizes={SIZES} onChange={setOpts} oneRow />
+      <TextInput id={`bates-name-${where}`} label={c.name} hideLabel={where === "side"} placeholder={where === "side" ? c.namePlaceholder : undefined} value={opts.name} maxLength={60} onChange={(name) => setOpts({ name })} />
     </Group>
   );
   return (

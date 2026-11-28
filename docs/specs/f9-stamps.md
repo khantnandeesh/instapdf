@@ -40,7 +40,9 @@ Options, two groups so the panel fits the first screen at 1280×632: Where (posi
 
 The line takes a font, a size from 6 to 60 pt and a colour, on one row. With "Your own" the first row holds Line, Digits and Starts at, and Files from shows beside the line only when it uses `{doc}`, so the panel still ends above the fold at 1280×632.
 
-Not in this version: a name pattern for the result files (they keep their names), and a different line per file.
+Result name: an optional "File name starts with" field puts a prefix before each result's name (`ACME-alpha.pdf`); characters a file name cannot hold are dropped; the `{file}` token still gives the original name. Empty by default, never remembered (AC-1178, AC-1179; key check G-2).
+
+Not in this version: a different line per file.
 
 ## Acceptance checks
 

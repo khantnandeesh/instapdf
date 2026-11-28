@@ -63,7 +63,7 @@ export type CropJob = { kind: "crop"; files: (JobFile & { areas: Record<number, 
 export type NupJob = { kind: "nup"; files: JobFile[]; zipName: string; options: NupOptions };
 
 /** Stamps (F9): page numbers, headers and footers, watermarks, on the picked pages of each file. */
-export type StampJob = { kind: "stamp"; files: (JobFile & { pages: number[] })[]; zipName: string; stamps: Stamp[]; first: number; date: string; assets?: Record<string, { bytes: Uint8Array; mime: "image/png" | "image/jpeg" }>; /** Bates numbering: counted on from file to file, in order. */ bates?: BatesRun; room?: { top: number; bottom: number } };
+export type StampJob = { kind: "stamp"; files: (JobFile & { pages: number[] })[]; zipName: string; stamps: Stamp[]; first: number; date: string; assets?: Record<string, { bytes: Uint8Array; mime: "image/png" | "image/jpeg" }>; /** Bates numbering: counted on from file to file, in order. */ bates?: BatesRun; room?: { top: number; bottom: number }; /** Put before each result's name. The {file} token still gives the name the file came with. */ namePrefix?: string };
 
 /** Document tools (F10). */
 export type AnnotationsJob = { kind: "annotations"; files: (JobFile & { pages: number[] })[]; zipName: string; kinds: AnnotationKind[] };
@@ -173,7 +173,17 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
           if (f.pages.length) doc += 1;
         }
       }
-      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => {
+      const { cleanNamePrefix } = await import("./stamp");
+      const prefix = cleanNamePrefix(job.namePrefix ?? "");
+      // A result is named after its file: the prefix goes on a copy of the entry, which remembers the file it stands for.
+      const from = new Map<unknown, (typeof job.files)[number]>();
+      const named = job.files.map((f) => {
+        const copy = prefix ? { ...f, name: prefix + f.name } : f;
+        from.set(copy, f);
+        return copy;
+      });
+      return runPerFile(named, job.zipName, onProgress, (bytes, entry, progress) => {
+        const file = from.get(entry)!;
         const at = place.get(file);
         const bates = job.bates && at ? { ...job.bates, ...at } : undefined;
         return stampPdf({ bytes, password: file.password, pages: file.pages, stamps: job.stamps, first: job.first, file: file.name.replace(/\.pdf$/i, ""), date: job.date, assets: job.assets, bates, room: job.room }, runBuild, progress);
