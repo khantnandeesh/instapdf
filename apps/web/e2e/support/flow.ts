@@ -187,19 +187,22 @@ export async function cardAction(page: Page, file: string, action: "Remove" | "E
 /**
  * Gives a tool whose primary waits for a choice what it needs, for the guards that run every tool:
  * Protect a password; Extract and Delete the first toggle tile (spec F4/F5 UI decision 12). Other
- * tools run as loaded, some a moment after the file is in.
+ * tools run as loaded, some a moment after the file is in. Header and footer gets a line of text.
  */
 export async function makeRunnable(page: Page) {
   if (await primary(page).isEnabled()) return;
   const password = page.locator("#protect-open");
   const tile = page.locator("[data-tile-button][aria-pressed]").first();
   const area = page.getByTestId("choose-area");
+  // Header and footer: one of its six lines (the panel's field from 1024 px, the bar's below).
+  const header = page.locator("#hf-top-center-side, #hf-top-center-bar").locator("visible=true");
   if (await password.count()) await password.fill("correct horse battery");
   else if (await area.isVisible()) {
     // Split by text: the box starts over the top left of the page, where the fixture's text is.
     await area.click();
     await page.getByRole("dialog").getByRole("button", { name: "Done", exact: true }).click();
   }
+  else if (await header.count()) await header.first().fill("Page {n}");
   else if (await tile.count()) await tile.click();
   // Otherwise the tool is still reading the file (Split by bookmarks reads the outline): it enables itself.
   await expect(primary(page)).toBeEnabled();

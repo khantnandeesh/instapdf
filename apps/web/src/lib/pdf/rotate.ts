@@ -1,4 +1,4 @@
-import { PDFDict, PDFDocument, PDFName, PDFRef, PDFStream, degrees } from "@cantoo/pdf-lib";
+import { PDFDict, PDFDocument, PDFInvalidObject, PDFName, PDFRef, PDFStream, degrees } from "@cantoo/pdf-lib";
 import { finalRotation, normalizeRotation } from "./rotation";
 
 export type RotateInput = {
@@ -37,6 +37,17 @@ export async function loadForEdit(bytes: Uint8Array, password?: string) {
 export function dropOldSecurity(doc: PDFDocument) {
   const has = (dict: PDFDict, ...keys: string[]) => keys.every((k) => dict.has(PDFName.of(k)));
   for (const [ref, object] of doc.context.enumerateIndirectObjects()) {
+    // An old cross-reference stream the library could not read comes through as raw bytes, pointer and all.
+    if (object instanceof PDFInvalidObject) {
+      const raw = new Uint8Array(object.sizeInBytes());
+      object.copyBytesInto(raw, 0);
+      const text = new TextDecoder("latin1").decode(raw.subarray(0, 2048));
+      if (!(/\/Type\s*\/XRef\b/.test(text) && text.includes("/Encrypt"))) continue;
+      const kept = /\/Info\s+(\d+)\s+(\d+)\s+R/.exec(text);
+      if (kept && !doc.context.trailerInfo.Info) doc.context.trailerInfo.Info = PDFRef.of(Number(kept[1]), Number(kept[2]));
+      doc.context.delete(ref);
+      continue;
+    }
     const dict = object instanceof PDFDict ? object : object instanceof PDFStream ? object.dict : undefined;
     if (!dict) continue;
     const oldTrailer = has(dict, "Root", "Size", "Encrypt");
@@ -46,6 +57,8 @@ export function dropOldSecurity(doc: PDFDocument) {
     if (info instanceof PDFRef && !doc.context.trailerInfo.Info) doc.context.trailerInfo.Info = info;
     if (oldTrailer || oldEncrypt) doc.context.delete(ref);
   }
+  // The new trailer must not point at the dictionary that just went.
+  delete (doc.context.trailerInfo as { Encrypt?: unknown }).Encrypt;
 }
 
 /**

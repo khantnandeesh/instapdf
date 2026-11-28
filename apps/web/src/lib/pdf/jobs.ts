@@ -10,6 +10,7 @@
  * stay parsed next to the growing output.
  */
 export { USER_ERROR } from "./user-error";
+import type { Stamp } from "./stamp";
 import { buildDocuments } from "./build";
 import { mergePdf, type MergeEnv, type MergeInput } from "./merge";
 import { pdfOutputName, uniqueNames } from "./naming";
@@ -55,7 +56,10 @@ export type ResizeJob = { kind: "resize"; files: (JobFile & { pages: number[] })
 export type CropJob = { kind: "crop"; files: (JobFile & { areas: Record<number, Area> })[]; zipName: string };
 export type NupJob = { kind: "nup"; files: JobFile[]; zipName: string; options: NupOptions };
 
-export type Job = RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob;
+/** Stamps (F9): page numbers, headers and footers, watermarks, on the picked pages of each file. */
+export type StampJob = { kind: "stamp"; files: (JobFile & { pages: number[] })[]; zipName: string; stamps: Stamp[]; first: number; date: string; assets?: Record<string, { bytes: Uint8Array; mime: "image/png" | "image/jpeg" }> };
+
+export type Job = RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
 
 export type JobOutput = {
   name: string;
@@ -102,6 +106,13 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => resizePdf({ bytes, password: file.password, pages: file.pages, options: job.options }, progress));
     case "crop":
       return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => cropPdf({ bytes, password: file.password, areas: file.areas }, progress));
+    case "stamp": {
+      // The editor's build and its fonts are loaded only for these tools.
+      const [{ stampPdf }, { runBuild }] = await Promise.all([import("./stamp-run"), import("@/lib/editor/build-runtime")]);
+      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) =>
+        stampPdf({ bytes, password: file.password, pages: file.pages, stamps: job.stamps, first: job.first, file: file.name.replace(/\.pdf$/i, ""), date: job.date, assets: job.assets }, runBuild, progress),
+      );
+    }
     case "nup":
       return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => nupPdf({ bytes, password: file.password, options: job.options }, progress));
     case "split":

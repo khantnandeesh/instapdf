@@ -23,7 +23,7 @@ Status values: `todo` · `in-progress (step n)` · `done` · `deferred`. The orc
 | F6 | Compress (server worker + infra) | compress-pdf | todo — client-first compress (image downsampling in a worker) with server fallback; needs Q3 hard stop and the ≤2h cleaner (Cloud Task per job **and** 15-min sweep) before any upload code |
 | F7 | Split by outline / size / text / in half | split-pdf-by-* , split-pdf-down-the-middle | built — by bookmarks, by size, in half and by text (`docs/specs/f7-split-variants.md`); key checks against the reference pending |
 | F8 | Crop / Resize / Flip / N-up | crop-pdf, resize-pdf, flip-pdf, n-up-pdf | built in the browser (`docs/specs/f8-page-shape.md`); key checks against the reference pending |
-| F9 | Watermark / Page numbers / Header-footer / Bates | watermark-pdf, page-numbers-pdf, header-footer-pdf, bates-numbering-pdf | todo — Bates deferred; rendered-diff tests for Devanagari, Arabic, bidi before shipping |
+| F9 | Watermark / Page numbers / Header-footer / Bates | watermark-pdf, page-numbers-pdf, header-footer-pdf, bates-numbering-pdf | built (28 Nov): Page numbers, Header and footer, Watermark in the browser on the editor's text drawing, Hindi and Arabic checked; Bates deferred; key checks vs the reference pending |
 | F10 | Metadata / Bookmarks / Rename / Remove annotations / Flatten | edit-pdf-metadata, pdf-bookmarks, rename-pdf, delete-pdf-annotations, flatten-pdf | todo |
 | F13 | Grayscale / Repair | grayscale-pdf, repair-pdf | todo — repair client-side via qpdf-WASM |
 | F15 | OCR / Deskew | ocr-pdf, deskew-pdf | todo — OCR in the browser (tesseract.js) for small jobs; server (OCRmyPDF without Ghostscript) for large |
