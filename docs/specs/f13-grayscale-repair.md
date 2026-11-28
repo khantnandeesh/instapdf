@@ -25,7 +25,7 @@ Where we differ from the reference: it uploads the file, takes one file of up to
 - A file nothing can open is still taken. It shows as one placeholder page marked Damaged, with a notice that says so, instead of the usual "could not be read" refusal (ToolFlow `acceptDamaged`).
 - The ladder, each step only when the one before fails:
   1. Read the objects where they lie, without trusting the index, trailer or stream lengths. Text before `%PDF-` is dropped; a missing header is put on. This recovers a file cut short, shifted, or with a broken index.
-  2. Rebuild the page list: the pages the tree still reaches, or, when the tree is gone, every page object found, in file order. Each page gets what it inherited from lost parents (size, resources, rotation), a default size when it has none, and loses references to parts that no longer exist. The result is one flat page tree, written with a fresh index.
+  2. Rebuild the page list: the pages the tree still reaches, or, when the tree is gone, every page object found, in file order. When the tree reaches fewer pages than it counts, the page objects it missed are added after the ones it reached. A lost trailer's catalog and document information are found again among the objects. Each page gets what it inherited from lost parents (size, resources, rotation), a default size when it has none, and loses references to parts that no longer exist. The result is one flat page tree, written with a fresh index.
   3. When that fails but the file still renders, its pages are redrawn as pictures at 150 dpi, and the result says text is no longer selectable.
   4. When no page can be read, the tool says plainly that too little is left to repair.
 - The result says what was lost: "N of M pages were recovered", pages that lost their content and are blank.
@@ -41,7 +41,7 @@ Engine (`grayscale.test.ts`): AC-1400 a colour of any space becomes its luminanc
 
 Browser (`e2e/f13/grayscale.spec.ts`): AC-1440 everything turns grey, text stays text, the file is smaller; AC-1441 the two partial choices.
 
-Repair engine (`repair.test.ts`): AC-1450 text before the header is dropped, a missing header put on; AC-1451 a file with its end cut off keeps every page; AC-1452 junk in front, a shifted body and a wrong index; AC-1453 a stream with a wrong length; AC-1454 a file cut in the middle gives the whole pages and says how many are gone; AC-1455 a page list pointing at missing pages is rebuilt; AC-1456 a sound file comes back sound; AC-1457 a file with nothing left says so.
+Repair engine (`repair.test.ts`): AC-1450 text before the header is dropped, a missing header put on; AC-1451 a file with its end cut off keeps every page; AC-1452 junk in front, a shifted body and a wrong index; AC-1453 a stream with a wrong length; AC-1454 a file cut in the middle gives the whole pages and says how many are gone; AC-1455 a page list pointing at missing pages is rebuilt; AC-1456 a sound file comes back sound; AC-1457 a file with nothing left says so; AC-1458 a lost branch of the page list does not lose its pages; AC-1459 a password file opens with its password, and one that lost its key says so.
 
 Repair browser (`e2e/f13/repair.spec.ts`): AC-1460 a file whose end is missing comes back whole; AC-1461 a file nothing can open is taken, shown as damaged, and told plainly when nothing is left.
 
@@ -55,3 +55,4 @@ Repair browser (`e2e/f13/repair.spec.ts`): AC-1460 a file whose end is missing c
 - Rich-text notes (`/RC`) keep the colours written in their styling.
 - Repair: pages stored inside a packed object stream that is itself cut short are lost (the stream cannot be unpacked to its end); the result says how many pages are gone.
 - Repair: bookmarks, links and form fields that pointed at lost pages are dropped with them; a damaged font or picture inside a page is kept as it is.
+- Repair: a password file too damaged to open in the tab cannot be asked for its password, and a password file that lost its trailer lost its key. Both are refused with a message that says why, never written out as noise.

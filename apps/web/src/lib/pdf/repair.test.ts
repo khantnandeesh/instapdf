@@ -32,13 +32,15 @@ describe("repair (spec F13 §2)", () => {
   it("AC-1450: text before the header is dropped; a missing header is put on", () => {
     expect(latin(fromHeader(cat("Content-Type: x\r\n\r\n", "%PDF-1.4\nrest")))).toBe("%PDF-1.4\nrest");
     expect(latin(fromHeader(cat("1 0 obj\n")))).toBe("%PDF-1.7\n1 0 obj\n");
+    // A header that comes after the first object belongs to a file held inside, not to this one.
+    expect(latin(fromHeader(cat("1 0 obj\n<<>>\nendobj\n%PDF-1.4\ninner")))).toBe("%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%PDF-1.4\ninner");
     const whole = cat("%PDF-1.4\nrest");
     expect(fromHeader(whole)).toBe(whole);
   });
 
   it("AC-1451: a file whose end is cut off (no index, no trailer) keeps every page", async () => {
     const file = await sample(5);
-    const cut = file.subarray(0, latin(file).lastIndexOf("xref"));
+    const cut = file.subarray(0, latin(file).lastIndexOf("\nxref"));
     const out = await repairPdf({ bytes: cut });
     expect(out.warnings).toBeUndefined();
     expect((await sound(out.bytes, 5)).getTitle()).toBe("Sample");
@@ -88,6 +90,49 @@ describe("repair (spec F13 §2)", () => {
     expect(out.pageCount).toBe(5);
     expect(out.warnings).toEqual(["5 of 6 pages were recovered. The rest of the file is missing or cannot be read."]);
     await sound(out.bytes, 5);
+  });
+
+  it("AC-1458: a lost branch of the page list does not lose its pages", async () => {
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    for (let i = 1; i <= 4; i++) doc.addPage([300, 400]).drawText(`Page ${i}`, { x: 40, y: 300, size: 24, font });
+    // Two branches of two pages each; then one branch is blanked out, its pages left whole.
+    const { PDFDict, PDFName, PDFPageTree } = await import("@cantoo/pdf-lib");
+    const root = doc.catalog.Pages();
+    const rootRef = doc.catalog.get(PDFName.of("Pages"))!;
+    const kids = root.Kids().asArray();
+    const branches = [kids.slice(0, 2), kids.slice(2)].map((pair) => {
+      const branch = PDFPageTree.withContext(doc.context, rootRef as never);
+      const ref = doc.context.register(branch);
+      for (const kid of pair) {
+        branch.pushLeafNode(kid as never);
+        doc.context.lookup(kid, PDFDict).set(PDFName.of("Parent"), ref);
+      }
+      return ref;
+    });
+    root.set(PDFName.of("Kids"), doc.context.obj(branches));
+    root.set(PDFName.of("Count"), doc.context.obj(4));
+    const file = await doc.save({ useObjectStreams: false });
+    const text = latin(file);
+    const at = text.indexOf(`\n${branches[1].objectNumber} 0 obj`) + 1;
+    const to = text.indexOf("endobj", at) + 6;
+    const out = await repairPdf({ bytes: cat(file.subarray(0, at), " ".repeat(to - at), file.subarray(to)) });
+    expect(out.warnings).toBeUndefined();
+    await sound(out.bytes, 4);
+  });
+
+  it("AC-1459: a password file is opened with its password, and one that lost its key says so", async () => {
+    const doc = await PDFDocument.load(await sample(3));
+    doc.encrypt({ userPassword: "open", ownerPassword: "own" });
+    const file = await doc.save({ useObjectStreams: false });
+    const out = await repairPdf({ bytes: file, password: "open" });
+    expect(out.wasEncrypted).toBe(true);
+    await sound(out.bytes, 3);
+    await expect(repairPdf({ bytes: file, name: "a.pdf" })).rejects.toThrow("a.pdf is protected with a password, and is too damaged for the password to be asked for");
+    await expect(repairPdf({ bytes: file, password: "no" })).rejects.toThrow("the one given did not open it");
+    // The trailer, and with it the pointer to the encryption, is cut off.
+    const cut = file.subarray(0, latin(file).lastIndexOf("\nxref"));
+    await expect(repairPdf({ bytes: cut, password: "open" })).rejects.toThrow("the part that holds its key is missing");
   });
 
   it("AC-1456: a sound file comes back sound, with nothing to report", async () => {

@@ -8,8 +8,8 @@
  * (its size, its fonts and pictures) is copied onto it, and references to missing parts are dropped
  * so every reader opens the result. Worker-only: this module pulls in the PDF library.
  */
-import { PDFArray, PDFCatalog, PDFDict, PDFDocument, PDFName, PDFNumber, PDFPageLeaf, PDFPageTree, PDFRawStream, PDFRef, PDFWriter, type PDFContext, type PDFObject } from "@cantoo/pdf-lib";
-import { loadForEdit } from "./rotate";
+import { PDFArray, PDFCatalog, PDFDict, PDFDocument, PDFName, PDFNumber, PDFPageLeaf, PDFPageTree, PDFRawStream, PDFRef, PDFWriter, decodePDFRawStream, type PDFContext, type PDFObject } from "@cantoo/pdf-lib";
+import { dropOldSecurity } from "./rotate";
 import { USER_ERROR } from "./user-error";
 import { saveCompact } from "./write";
 
@@ -22,10 +22,12 @@ const INHERITED = ["Resources", "MediaBox", "CropBox", "Rotate"];
 /** US Letter, the size a reader assumes for a page that has lost its own. */
 const DEFAULT_BOX = [0, 0, 612, 792];
 
-/** The file from its "%PDF-" on (mail and download wrappers put text before it); with a header put on when it has none. */
+/** The file from its "%PDF-" on (mail and download wrappers put text before it); with a header put on when it has none before its first object. */
 export function fromHeader(bytes: Uint8Array): Uint8Array {
   const limit = bytes.length - HEADER.length;
   for (let i = 0; i <= limit; i++) {
+    // " obj" before any header: the file's own header is lost, and a later one belongs to a file held inside it.
+    if (bytes[i] === 0x20 && bytes[i + 1] === 0x6f && bytes[i + 2] === 0x62 && bytes[i + 3] === 0x6a) break;
     if (bytes[i] === 0x25 && HEADER.every((b, k) => bytes[i + k] === b)) return i ? bytes.subarray(i) : bytes;
   }
   const head = new TextEncoder().encode("%PDF-1.7\n");
@@ -36,17 +38,55 @@ export function fromHeader(bytes: Uint8Array): Uint8Array {
 }
 
 const cannot = (name?: string) => new Error(`${USER_ERROR}${name ?? "This file"} has too little left to repair: no page could be read from it.`);
+const locked = (name: string | undefined, asked: boolean) =>
+  new Error(`${USER_ERROR}${name ?? "This file"} is protected with a password${asked ? " and the one given did not open it" : ", and is too damaged for the password to be asked for"}. It cannot be repaired here.`);
+const keyLost = (name?: string) => new Error(`${USER_ERROR}${name ?? "This file"} is protected with a password and the part that holds its key is missing, so its pages cannot be read.`);
+
+/**
+ * A file that lost its trailer lost the pointer to its encryption with it: it reads as an open file
+ * whose every stream is noise. True when the file holds a password dictionary and none of the packed
+ * streams sampled can be unpacked (an old dictionary left behind in an open file fails the second test).
+ */
+function stillEncrypted(ctx: PDFContext): boolean {
+  let security = false;
+  const packed: PDFRawStream[] = [];
+  for (const [, obj] of ctx.enumerateIndirectObjects()) {
+    const d = obj instanceof PDFDict ? obj : obj instanceof PDFRawStream ? obj.dict : undefined;
+    if (!d) continue;
+    if (d.get(N("Filter")) === N("Standard") && ["O", "U", "P"].every((k) => d.has(N(k)))) security = true;
+    else if (obj instanceof PDFRawStream && packed.length < 6 && d.get(N("Filter")) === N("FlateDecode") && d.get(N("Type")) !== N("XRef")) packed.push(obj);
+  }
+  if (!security || !packed.length) return false;
+  return packed.every((stream) => {
+    try {
+      decodePDFRawStream(stream).decode();
+      return false;
+    } catch {
+      return true;
+    }
+  });
+}
 
 export async function repairPdf({ bytes, password, name }: RepairInput, onProgress?: (fraction: number) => void): Promise<RepairResult> {
+  const data = fromHeader(bytes);
   let ctx: PDFContext;
   let wasEncrypted: boolean;
   try {
-    const loaded = await loadForEdit(fromHeader(bytes), password);
-    ctx = loaded.doc.context;
-    wasEncrypted = loaded.wasEncrypted;
+    const probe = await PDFDocument.load(data, { ignoreEncryption: true, updateMetadata: false });
+    wasEncrypted = probe.isEncrypted;
+    ctx = probe.context;
   } catch {
     throw cannot(name);
   }
+  if (wasEncrypted) {
+    try {
+      const doc = await PDFDocument.load(data, { password: password ?? "", updateMetadata: false });
+      dropOldSecurity(doc);
+      ctx = doc.context;
+    } catch {
+      throw locked(name, password !== undefined);
+    }
+  } else if (stillEncrypted(ctx)) throw keyLost(name);
   onProgress?.(0.4);
   const look = (o: PDFObject | undefined) => (o instanceof PDFRef ? ctx.lookup(o) : o);
   const dict = (o: PDFObject | undefined) => {
@@ -54,6 +94,21 @@ export async function repairPdf({ bytes, password, name }: RepairInput, onProgre
     return v instanceof PDFDict ? v : undefined;
   };
   const isPage = (d: PDFDict) => d.get(N("Type")) === N("Page") || (d.get(N("Type")) === undefined && (d.has(N("Contents")) || d.has(N("MediaBox"))) && !d.has(N("Kids")));
+
+  // A lost trailer takes the way to the catalog and to the document information with it: the last of each in the file stands in.
+  if (!dict(ctx.trailerInfo.Root) || !dict(ctx.trailerInfo.Info)) {
+    const INFO = ["Title", "Author", "Producer", "Creator", "CreationDate", "ModDate"];
+    let catalog: PDFRef | undefined;
+    let info: PDFRef | undefined;
+    for (const [ref, obj] of ctx.enumerateIndirectObjects()) {
+      if (!(obj instanceof PDFDict) || obj instanceof PDFRawStream) continue;
+      const type = obj.get(N("Type"));
+      if (type === N("Catalog")) catalog = ref;
+      else if (type === undefined && !obj.has(N("Kids")) && INFO.some((k) => obj.has(N(k))) && [...obj.keys()].every((k) => INFO.includes(k.decodeText()) || ["Subject", "Keywords", "Trapped"].includes(k.decodeText()))) info = ref;
+    }
+    if (!dict(ctx.trailerInfo.Root) && catalog) ctx.trailerInfo.Root = catalog;
+    if (!dict(ctx.trailerInfo.Info) && info) ctx.trailerInfo.Info = info;
+  }
 
   // 1. The pages the tree still reaches, in reading order.
   const oldCatalog = dict(ctx.trailerInfo.Root);
@@ -75,9 +130,11 @@ export async function repairPdf({ bytes, password, name }: RepairInput, onProgre
     return count instanceof PDFNumber ? count.asNumber() : 0;
   })();
   // 2. No tree, or an empty one: every page object in the file, in the order it was written.
-  if (!pages.length) {
+  // The same when the tree reaches fewer pages than it counts: a lost branch does not lose its pages.
+  if (pages.length < Math.max(declared, 1)) {
+    const reached = new Set(pages.map((p) => p.tag));
     for (const [ref, obj] of ctx.enumerateIndirectObjects()) {
-      if (obj instanceof PDFDict && !(obj instanceof PDFRawStream) && obj.get(N("Type")) === N("Page")) pages.push(ref);
+      if (obj instanceof PDFDict && !(obj instanceof PDFRawStream) && obj.get(N("Type")) === N("Page") && !reached.has(ref.tag)) pages.push(ref);
     }
   }
   if (!pages.length) throw cannot(name);
