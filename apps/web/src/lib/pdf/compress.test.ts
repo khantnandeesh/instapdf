@@ -113,6 +113,50 @@ describe("compressPdf (F6)", () => {
   });
 });
 
+describe("review fixes (F6)", () => {
+  it("AC-1618: a profiled picture keeps its profile, a palette picture its base; a grey copy of a colour one is plain grey", async () => {
+    const base = await sample();
+    const ctx = base.doc.context;
+    const profile = ctx.register(PDFRawStream.of(ctx.obj({ N: 3 } as never) as unknown as PDFDict, noise(64)));
+    const space = ctx.register(ctx.obj(["ICCBased", profile]));
+    (ctx.lookup(base.image) as PDFRawStream).dict.set(N("ColorSpace"), space);
+    const bytes = await base.doc.save({ useObjectStreams: false });
+    const ref = `${base.image.objectNumber}R`;
+    const kept = await pictureOf((await compressPdf({ bytes, images: [{ ref, width: 40, height: 30, gray: false, data: small(40, 30) }] })).bytes);
+    const cs = kept.doc.context.lookup(kept.dict.get(N("ColorSpace"))) as PDFArray;
+    expect(cs.get(0)).toBe(N("ICCBased"));
+    const grey = await compressPdf({ bytes, images: [{ ref, width: 40, height: 30, gray: true, data: small(40, 30) }] });
+    const doc = await PDFDocument.load(grey.bytes);
+    const spaces = doc.context.enumerateIndirectObjects().flatMap(([, o]) => (o instanceof PDFRawStream && o.dict.get(N("Subtype")) === N("Image") ? [o.dict.get(N("ColorSpace"))] : []));
+    expect(spaces).toEqual([N("DeviceGray")]);
+  });
+  it("AC-1619: a JPEG 2000 picture that states no colour space is left alone", async () => {
+    const { doc, image } = await sample();
+    const dict = (doc.context.lookup(image) as PDFRawStream).dict;
+    dict.delete(N("ColorSpace"));
+    dict.set(N("Filter"), N("JPXDecode"));
+    expect((await compressiblePictures({ bytes: await doc.save() })).pictures).toEqual([]);
+  });
+  it("AC-1625: a picture in an annotation gets no size, so it is never scaled", () => {
+    const OPS = { save: 1, restore: 2, transform: 3, paintImageXObject: 4, beginAnnotation: 12, endAnnotation: 13 };
+    const ops = [[OPS.beginAnnotation, ["a", [0, 0, 360, 180], [360, 0, 0, 180, 0, 0], [1, 0, 0, 1, 0, 0], false]], [OPS.paintImageXObject, ["stamp"]], [OPS.endAnnotation, null], [OPS.transform, [50, 0, 0, 50, 0, 0]], [OPS.paintImageXObject, ["page"]]] as [number, unknown[] | null][];
+    const sizes = drawnSizes({ fnArray: ops.map((o) => o[0]), argsArray: ops.map((o) => o[1]) }, OPS);
+    expect(sizes.get("stamp")).toBeNull();
+    expect(sizes.get("page")).toEqual({ width: 50, height: 50 });
+    expect(scaleFor({ width: 400, height: 200 }, sizes.get("stamp")!, 72)).toBe(1);
+  });
+  it("AC-1626: what a mask hides never tints an edge: pixels count for as much as they show", () => {
+    // White that shows beside black that is fully hidden.
+    const rgba = Uint8Array.of(255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0);
+    expect([...scaledPixels({ width: 2, height: 2, kind: 3, data: rgba } as never, 1, 1, false)!]).toEqual([255, 255, 255]);
+    // Fully hidden: a plain average, nothing divided by zero.
+    expect([...scaledPixels({ width: 2, height: 1, kind: 3, data: Uint8Array.of(100, 0, 0, 0, 200, 0, 0, 0) } as never, 1, 1, false)!]).toEqual([150, 0, 0]);
+  });
+  it("AC-1627: the JPEG writer refuses a side it cannot state", () => {
+    expect(() => encodeColourJpeg(new Uint8Array(3), 70000, 1, 60)).toThrow(RangeError);
+  });
+});
+
 describe("picture sizes (F6)", () => {
   const OPS = { save: 1, restore: 2, transform: 3, paintImageXObject: 4, paintImageXObjectRepeat: 5, paintFormXObjectBegin: 6, paintFormXObjectEnd: 7, setFillColorN: 8, setStrokeColorN: 9, beginGroup: 10, endGroup: 11 };
   const list = (...ops: [number, unknown[] | null][]) => ({ fnArray: ops.map((o) => o[0]), argsArray: ops.map((o) => o[1]) });

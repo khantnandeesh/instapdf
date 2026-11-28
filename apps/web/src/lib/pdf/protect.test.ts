@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { PDFDocument } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
 import { runJob } from "./jobs";
-import { ALLOW_ALL, canProtect, passwordTooLong, PDFA_NOTE, protectPdf, unlockPdf } from "./protect";
+import { ALLOW_ALL, canProtect, passwordTooLong, passwordUnfit, PDFA_NOTE, protectPdf, unlockPdf } from "./protect";
 
 const fx = async (name: string) => new Uint8Array(await readFile(new URL(`../../../tests/fixtures/${name}`, import.meta.url)));
 const blob = (b: Uint8Array) => new Blob([b as Uint8Array<ArrayBuffer>], { type: "application/pdf" });
@@ -44,13 +44,13 @@ describe("protectPdf (F11 AC-800 to AC-804)", () => {
   });
 
   it("AC-802: restrictions without an open password: opens freely, with the rights switched off", async () => {
-    const out = await protectPdf({ bytes: await fx("alpha.pdf"), options: { openPassword: "", ownerPassword: "", allow: { print: false, copy: false, edit: true } } });
+    const out = await protectPdf({ bytes: await fx("alpha.pdf"), options: { openPassword: "", ownerPassword: "", allow: { print: "none" as const, copy: false, edit: "any" as const } } });
     const doc = await open(out.bytes);
     expect(doc).toMatchObject({ pages: 3, restricted: true, print: false, copy: false, edit: true });
   });
 
   it("AC-803: the open password opens with the rights switched off; the owner password is accepted too", async () => {
-    const out = await protectPdf({ bytes: await fx("alpha.pdf"), options: { openPassword: "open", ownerPassword: "owner", allow: { print: true, copy: true, edit: false } } });
+    const out = await protectPdf({ bytes: await fx("alpha.pdf"), options: { openPassword: "open", ownerPassword: "owner", allow: { print: "any" as const, copy: true, edit: "none" as const } } });
     expect(await open(out.bytes, "open")).toMatchObject({ edit: false, print: true });
     // pdf.js reports the stored rights whoever opens the file; that the owner password is accepted is what it can show.
     expect((await open(out.bytes, "owner")).pages).toBe(3);
@@ -123,7 +123,7 @@ describe("review fixes", () => {
   });
 
   it("AC-804: the engine itself refuses an owner password equal to the open one", async () => {
-    const options = { openPassword: "same", ownerPassword: "same", allow: { ...ALLOW_ALL, print: false } };
+    const options = { openPassword: "same", ownerPassword: "same", allow: { ...ALLOW_ALL, print: "none" as const } };
     await expect(protectPdf({ bytes: await fx("alpha.pdf"), options })).rejects.toThrow(/different password/);
   });
 
@@ -143,5 +143,35 @@ describe("review fixes", () => {
     const plain = await PDFDocument.load(again.bytes, { password: "second" });
     expect(plain.getPageCount()).toBe(3);
     expect(await needsPassword(again.bytes, "first")).toBe(true);
+  });
+  it("AC-812: finer rights: draft printing, forms without editing, pages alone", async () => {
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const F = pdfjs.PermissionFlag;
+    const rights = async (allow: Parameters<typeof protectPdf>[0]["options"]["allow"]) => {
+      const out = await protectPdf({ bytes: await fx("alpha.pdf"), options: { openPassword: "", ownerPassword: "", allow } });
+      const doc = await pdfjs.getDocument({ data: out.bytes.slice(), verbosity: 0 }).promise;
+      const has = new Set(await doc.getPermissions());
+      await doc.loadingTask.destroy();
+      return { print: has.has(F.PRINT), fine: has.has(F.PRINT_HIGH_QUALITY), copy: has.has(F.COPY), modify: has.has(F.MODIFY_CONTENTS), comment: has.has(F.MODIFY_ANNOTATIONS), forms: has.has(F.FILL_INTERACTIVE_FORMS), pages: has.has(F.ASSEMBLE) };
+    };
+    expect(await rights({ print: "low", copy: true, edit: "any" })).toEqual({ print: true, fine: false, copy: true, modify: true, comment: true, forms: true, pages: true });
+    expect(await rights({ print: "any", copy: true, edit: "forms" })).toEqual({ print: true, fine: true, copy: true, modify: false, comment: false, forms: true, pages: false });
+    expect(await rights({ print: "any", copy: false, edit: "comment" })).toEqual({ print: true, fine: true, copy: false, modify: false, comment: true, forms: true, pages: false });
+    expect(await rights({ print: "none", copy: true, edit: "pages" })).toEqual({ print: false, fine: false, copy: true, modify: false, comment: false, forms: false, pages: true });
+  });
+  it("AC-813: AES-128 for old readers: the password is needed and opens the file; long passwords are refused", async () => {
+    for (const pw of ["s3cret", "caf\u00e9-\u00fc"]) {
+      const out = await protectPdf({ bytes: await fx("alpha.pdf"), options: { openPassword: pw, ownerPassword: "", allow: ALLOW_ALL, strength: "aes128" } });
+      expect(new TextDecoder("latin1").decode(out.bytes)).toMatch(/\/V 4\b[\s\S]*\/AESV2/);
+      expect(await needsPassword(out.bytes)).toBe(true);
+      expect((await open(out.bytes, pw)).text).toContain("Alpha 1");
+    }
+    expect(passwordTooLong("a".repeat(33), "aes128")).toBe(true);
+    expect(passwordTooLong("\u00e9".repeat(32), "aes128")).toBe(false);
+    // The old scheme has no way to store letters outside Western European ones.
+    expect(passwordUnfit("ключ", "aes128")).toBe(true);
+    expect(passwordUnfit("ключ", "aes256")).toBe(false);
+    await expect(protectPdf({ bytes: await fx("alpha.pdf"), options: { openPassword: "ключ", ownerPassword: "", allow: ALLOW_ALL, strength: "aes128" } })).rejects.toThrow(/AES-256/);
+    expect(passwordTooLong("a".repeat(33))).toBe(false);
   });
 });

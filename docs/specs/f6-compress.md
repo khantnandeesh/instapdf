@@ -13,7 +13,7 @@ Screens: `designs/f6-compress/{picker,loaded,result}-{1280,390}.png`, `designs/f
   - Picture quality: Low (45), Regular (65, default), Good (80), Best (92).
   - Sharpness: 72 ppi (default), 100, 150, 220, 300, or Keep every pixel. A picture shown on several pages keeps enough pixels for the largest. A picture within a fifth of the target is not scaled.
   - Pictures in grey: off at first. Text and drawings keep their colours.
-- Left exactly as they are: text (still selectable and searchable), drawings, fonts, links, bookmarks, fields and metadata; pictures in print colours (CMYK), spot colours and Lab; stencils and one-bit line art; pictures with a colour key; pictures under 3 kB; a picture drawn inside a pattern is packed but never scaled. Soft masks are kept, so see-through edges stay.
+- Left exactly as they are: text (still selectable and searchable), drawings, fonts, links, bookmarks, fields and metadata; pictures in print colours (CMYK), spot colours and Lab; stencils and one-bit line art; pictures with a colour key; pictures under 3 kB; a picture drawn inside a pattern is packed but never scaled. Soft masks are kept, so see-through edges stay. A picture in an annotation (a stamp) is packed but never scaled. A picture with a colour profile keeps it. A picture over 65,535 pixels a side is left as it is.
 - The file is written by the compact writer: nothing unused, repeated objects stored once, old page thumbnails dropped.
 - The result says what was saved: "499 KB before, 98% smaller." A ZIP lists each file's before and after.
 - Never larger: a file that would not get smaller comes back byte for byte, and the result says it is already as small as this tool can make it.
@@ -28,6 +28,7 @@ Where we differ from the reference: it uploads the file, takes one file of up to
 - AC-1600…1603 (unit): the JPEG writer's tables are complete; a colour picture survives a round trip; higher quality gives a larger, closer picture; grey output is unchanged.
 - AC-1610…1612 (unit): which pictures are listed; print colours, stencils, one-bit, colour-keyed, tiny pictures and masks are not.
 - AC-1613…1617 (unit): a smaller picture is swapped in and the file shrinks; a picture not clearly smaller, larger in pixels or unknown is refused; a file with nothing to give comes back byte for byte; a matte mask gets its own plain copy; thumbnails are dropped.
+- AC-1618, AC-1619, AC-1625…1627 (unit): a colour profile is kept; JPEG 2000 without a stated colour space is left; an annotation picture is never scaled; hidden pixels never tint an edge; the JPEG writer refuses an oversize side.
 - AC-1620…1624 (unit): drawn sizes follow transforms, forms, repeats and patterns; the scale rule; averaging; the saved line never promises more than was saved.
 - AC-1630 (e2e): a 300 ppi photo comes back at 72 ppi as a JPEG, under a tenth of the size; the soft-edged picture keeps its mask; the icon is left; text is still text; the result states the saving; no serious axe finding.
 - AC-1631 (e2e): Low is smaller than Best; Keep every pixel keeps the pixels; grey pictures are grey.

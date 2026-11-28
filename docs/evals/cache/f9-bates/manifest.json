@@ -120,5 +120,113 @@
       }
     ],
     "axe_violations": 0
+  },
+  "ours_run2_2026-11-28_742ade4": {
+    "scope": "check 1 (options) only; reference side from the run 1 cache, 0 reference requests",
+    "raw_evidence": "/mnt/project-files/evals-cache/f9-bates/run2/",
+    "panel": {
+      "sizes": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        14,
+        16,
+        18,
+        20,
+        24,
+        28,
+        36,
+        48,
+        60
+      ],
+      "colours": [
+        "Black",
+        "Grey",
+        "Red",
+        "Blue",
+        "Green",
+        "White"
+      ],
+      "custom_colour": false,
+      "result_name_field": false,
+      "preset_words_editable": false,
+      "own_line_panel_bottom_y_1280x632": 617,
+      "sheet_last_row_bottom_y_390x664": 580
+    },
+    "outputs": {
+      "a-1280-red6-own/bravo.pdf": {
+        "bytes": 4118,
+        "sha256": "4e6bdc9d9f44d656fe2adda4188789721acfdce8d5a97cbec7cc0e1babc937bb",
+        "size_pt": 6,
+        "fill_rgb": [
+          192,
+          57,
+          43
+        ]
+      },
+      "b-1280-blue60/alpha.pdf": {
+        "bytes": 4594,
+        "sha256": "cacf0d79715964cda089a52a22bfb4dc8faf3db42fbd93b348cfe8414dcdc9f0",
+        "size_pt": 60,
+        "fill_rgb": [
+          31,
+          79,
+          191
+        ]
+      },
+      "c-390-green60-own/bravo.pdf": {
+        "bytes": 4174,
+        "sha256": "74ae4e5dfd413450f64c1b65c34b94d2af17ed3257dd1a06cc25b19dd248a3a4",
+        "size_pt": 60,
+        "fill_rgb": [
+          30,
+          125,
+          67
+        ],
+        "page": "792x717 (strip added)"
+      },
+      "d-390-grey6/alpha.pdf": {
+        "bytes": 4258,
+        "sha256": "171fb704005bf358e55836ea410339f81a8d75f0328d75a3c7ccbf74f976aee5",
+        "size_pt": 6,
+        "fill_rgb": [
+          95,
+          95,
+          95
+        ]
+      },
+      "d-390-grey6/bravo.pdf": {
+        "bytes": 3443,
+        "sha256": "11b2c670f9dc03328b1ea63bad7fc8aa281719bc0213125fda2140d319a2a6fa",
+        "size_pt": 6,
+        "fill_rgb": [
+          95,
+          95,
+          95
+        ]
+      },
+      "e-1280-white14-exhibit/bravo.pdf": {
+        "bytes": 4520,
+        "sha256": "6fd972bf2aacc6bc582f53df7bf9930787e8569440db713472f5f0b43c4cbcfd",
+        "size_pt": 14,
+        "fill_rgb": [
+          255,
+          255,
+          255
+        ]
+      }
+    },
+    "click_to_download_ms_alpha_cold": [
+      1717,
+      1547,
+      1604
+    ],
+    "non_get_requests": 0,
+    "off_origin_requests": 0,
+    "verdict": "options still lose: no result name field (reference has a prefix field, free). Colour and sizes closed. Overall FAIL pending a name field or an owner waiver."
   }
 }

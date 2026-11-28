@@ -42,3 +42,58 @@ Also seen on ours: a start number that is not a number keeps the button waiting;
 8. **G-8 (silent wait).** A bad start number disables the button with no message saying why that I could find.
 9. **G-9 (spec).** The spec's table says "Limits: none"; the product caps a run at 20 files, 500 MB and 1,000 pages. The page's copy is right; the spec is not.
 10. **G-10 (coverage).** Not compared: the reference's paid multi-file run, its error states, a turned or full-bleed page on both sides, and the long-file outputs page by page (only their timings were taken). `qpdf --check` not run. A re-check of our side needs no new reference tasks: the cache holds both tasks' outputs and the full option list.
+
+## Run 2 (options re-check)
+
+**Check 1, options: still FAIL (lose), now by a narrow margin. Overall verdict: FAIL.** Colour and the size range are fixed and proven in the output files; on those two alone the check would tie. What keeps it lost is the result name: the reference lets a free user set a prefix for the result file and ours has no naming at all. The spec lists it under "Not in this version", which is the builders' note, not an owner waiver. An owner waiver for G-2 written into this file, or a name field, turns this check into a tie or better and the overall verdict into PASS on the six key checks.
+
+- Run: 2026-11-28, by parity-evaluator. Scope set by the lead: check 1 only. Checks 2, 4, 5 and 6, Lighthouse, axe and SEO were **not** re-run on this version and stand as measured in run 1.
+- Candidate: staging, `/api/health` reported `742ade4af6ed2f938663167a1085f1508d93c350` (confirmed).
+- Reference: **0 requests, 0 tasks.** Reference side taken only from the cache of run 1 (captured 2026-11-28, inside 30 days): the options captures and the two task outputs.
+- Harness: Playwright (headless Chromium), 1280×632 and 390×664; `alpha.pdf` and `bravo.pdf` as input files only; no source read. Outputs read with pikepdf (fill colour and font size operators in the page content) and pypdfium2 (text, font size, character boxes, rendered ink at 3×).
+- Evidence (not in git): `/mnt/project-files/evals-cache/f9-bates/run2/` (`out/`, captures, `run.log`, `analysis.log`, `timing.log`, `scripts/`). Side by side, reference left: `/mnt/project-files/comparisons/f9-bates/07-options-run2-1280.png`, `08-options-run2-390.png`, `09-output-run2-colour.png`.
+
+### What the panel offers now
+
+| Option | Reference (cache) | Ours at `742ade4` | Result |
+|---|---|---|---|
+| Colour | A free picker, any colour | A list of six: black, grey, red, blue, green, white. No custom value | Fixed for the common cases; short of the reference for any other colour (G-11) |
+| Text size | 18 sizes, 6 to 60 pt | 16 sizes: 6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36, 48, 60 | Tie (same range) |
+| Result name | A prefix field for the result's name | None. The file keeps its name; several files come as `berrypdf-bates-numbering.zip` | **Lose** (G-2, open) |
+| Preset words | "Exhibit" and the case label are editable in place | Fixed; only by choosing "Your own" and retyping the line | Lose, minor (G-3, second half, open) |
+| Fonts | 3 | 6 (3 faces, each with bold) | Win |
+| Digits | 1, 3, 4, 5, 6 | 1, 3, 4, 5, 6, 8 | Win |
+| Line tokens | 2 | 5 | Win |
+| Room for the line | Margins grown by drawing the page at 90% | A strip added at that edge; the page is not shrunk | Win |
+| Pages, files | All pages; one file free | Click pages to number only those; 20 files counted through | Win |
+
+### Tasks run on staging
+
+| # | Width | Settings | In the downloaded file |
+|---|---|---|---|
+| a | 1280 | `bravo.pdf`; your own line `ACME {bates} Doc {doc}`; from 4, files from 2; top centre; Sans **6**; **Red** | `ACME 000004 Doc 2`, `ACME 000005 Doc 2`; font size 6.0; fill `0.753 0.224 0.169 rg`; rendered ink rgb(192, 57, 43); line 4.3 pt tall, centred (gaps 367.8 / 368.2 pt) |
+| b | 1280 | `alpha.pdf`; text before `ACME `; bottom right; Serif **60**; **Blue** | `ACME 000001`–`000003`; font size 60.0; fill `0.122 0.31 0.749 rg`; ink rgb(31, 79, 191); line 364 pt wide, 41 pt tall, wholly on the page (33 pt from the right) |
+| c | 390 | `bravo.pdf`; your own line as in (a); top centre; added strip; Sans **60**; **Green** | Same two lines; font size 60.0; fill `0.118 0.49 0.263 rg`; ink rgb(30, 125, 67); page grew 612 → 717 pt so the 60 pt line has its own strip; centred |
+| d | 390 | both files; text before `X-`; bottom left; Mono bold **6**; **Grey** | `X- 000001`–`000005` across both files in one ZIP; font size 6.0; fill `0.373 0.373 0.373 rg`; ink rgb(95, 95, 95) |
+| e | 1280 | `bravo.pdf`; Exhibit, page; bottom centre; Sans bold 14; **White** | `Exhibit 1 ACME 000001 Page 1`, `… 000002 Page 2`; font size 14.0; fill `1 1 1 rg` (invisible on a white page, as asked) |
+
+In all five: every page carries exactly one line, the text reads back as typed, the source's own text is intact, the files open cleanly in pikepdf and PDFium, the on-page preview showed the chosen colour before the run, 0 non-GET requests, 0 off-origin requests, no console errors, no sideways scroll (1280 and 390 wide).
+
+Layout: with "Your own" and `{doc}` in the line the panel's last row (Font, Text size, Colour) ends at y=617 on a 632 px screen, so G-4 is closed at 1280. At 390 the same row ends at y=580 with Done at y=608, all in view inside the sheet; run button at y=601 of 664.
+
+Speed, as a guard only (same method as run 1): click to Download, `alpha.pdf` with a colour set, first visit, 1.60 s median of 3 (1.72, 1.55, 1.60), against 1.53 s in run 1 and the reference's 1.92 s and 1.59 s. No change in standing.
+
+### Why this is still a lose
+
+The mission's options check compares what is offered with the reference's free and paid tiers, and one lost check blocks a pass unless the owner waives it in writing. Ours now offers more options than the reference in total, and the two gaps that mattered most to how the number looks are closed. But naming the result is a working control on the reference's free tier that ours does not have in any form, and no waiver is on record. I am not counting the missing custom colour or the fixed preset words as blocking on their own; with a name field (or a waiver for it) I would mark this check a tie at worst.
+
+### Gap list after run 2
+
+- **G-1: closed.** Colour works, in the preview and in the file. See G-11 for what is left.
+- **G-2: open, blocks.** No result name. A single "Name starts with" field (prefix, empty by default so names stay as they are) would match the reference; a token for the first number of each file would beat it. Otherwise an owner waiver, recorded here.
+- **G-3: sizes closed** (6 to 60 pt, proven at both ends). Still open, minor: the preset words "Exhibit" and "Page" cannot be changed without retyping the whole line.
+- **G-4: closed at 1280×632** (panel ends at y=617). Not re-measured at the other desktop sizes.
+- **G-11 (new, minor).** Colour is a fixed list of six; the reference takes any colour. A custom value (hex field or the browser's colour input) as a seventh entry closes it.
+- **G-12 (new, cosmetic).** At 1280 with "Your own" chosen, the Line box is 116 px wide and its own label is cut off ("Your owr" under the arrow).
+- **G-13 (note).** White is offered with no warning; on a white page the number is invisible in the file. A hint when white is chosen would save a wasted run.
+- G-5 to G-10: not re-checked in this run.

@@ -48,6 +48,7 @@ export type JpegPlane = { plane: Uint8Array; width: number; height: number; h: 1
 export const JPEG_MAX_SIDE = 65535;
 
 export function encodeJpeg(width: number, height: number, planes: readonly JpegPlane[], quality: number): Uint8Array {
+  if (!(width >= 1 && height >= 1) || width > JPEG_MAX_SIDE || height > JPEG_MAX_SIDE) throw new RangeError("A JPEG holds 1 to 65,535 pixels a side.");
   const scale = quality < 50 ? 5000 / quality : 200 - 2 * quality;
   const used = [...new Set(planes.map((p) => p.table))].sort();
   const q = JPEG_TABLES.map((t) => t.quant.map((v) => Math.min(255, Math.max(1, Math.floor((v * scale + 50) / 100)))));

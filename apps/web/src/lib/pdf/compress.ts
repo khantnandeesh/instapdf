@@ -69,6 +69,23 @@ class Pictures {
     if (kind === "Indexed" || kind === "I") return this.channels(v.get(1), depth + 1) ? 3 : null;
     return null;
   }
+  /**
+   * The colour space the new picture states. The decoder hands a profiled picture's own values over
+   * unconverted, so the new picture keeps the profile (a palette's base, for a palette picture):
+   * its colours then mean exactly what they meant. Anything else is plain grey or red-green-blue.
+   */
+  spaceFor(space: PDFObject | undefined, gray: boolean, depth = 0): PDFObject {
+    const plain = N(gray ? "DeviceGray" : "DeviceRGB");
+    const v = this.look(space);
+    if (!(v instanceof PDFArray) || v.size() < 2 || depth > 2) return plain;
+    const kind = this.name(v.get(0));
+    if (kind === "Indexed" || kind === "I") return this.spaceFor(v.get(1), gray, depth + 1);
+    if (kind !== "ICCBased") return plain;
+    const profile = this.look(v.get(1));
+    const n = profile instanceof PDFRawStream ? this.num(profile.dict.get(N("N"))) : undefined;
+    // In the file as it stands when it is referenced (the usual case), so nothing is copied.
+    return n === (gray ? 1 : 3) ? (space instanceof PDFRef ? space : v) : plain;
+  }
   /** The pictures worth packing again, by reference. */
   list(): Picture[] {
     const found: Picture[] = [];
@@ -95,10 +112,8 @@ class Pictures {
       if (bits !== undefined && bits !== 8) continue;
       if ((this.num(d.get(N("SMaskInData"))) ?? 0) > 0) continue;
       if (this.look(d.get(N("Mask"))) instanceof PDFArray) continue;
-      const filters = this.look(d.get(N("Filter")));
-      const last = filters instanceof PDFArray ? this.name(filters.get(filters.size() - 1)) : this.name(filters);
-      // JPEG 2000 states its colours inside its own data.
-      const channels = d.has(N("ColorSpace")) ? this.channels(d.get(N("ColorSpace"))) : last === "JPXDecode" ? 3 : null;
+      // A JPEG 2000 picture without a stated colour space keeps its colours inside its own data: left alone.
+      const channels = d.has(N("ColorSpace")) ? this.channels(d.get(N("ColorSpace"))) : null;
       if (!channels) continue;
       found.push({ ref: refKey(ref), width, height, gray: channels === 1, bytes: o.contents.length });
     }
@@ -116,7 +131,7 @@ class Pictures {
       if (!(img.width > 0 && img.height > 0) || img.width > was.width || img.height > was.height) continue;
       const entries: Record<string, unknown> = {};
       for (const [k, v] of old.dict.entries()) if (!REPLACED.has(k.decodeText())) entries[k.decodeText()] = v;
-      Object.assign(entries, { Width: img.width, Height: img.height, BitsPerComponent: 8, ColorSpace: N(img.gray ? "DeviceGray" : "DeviceRGB"), Filter: N("DCTDecode") });
+      Object.assign(entries, { Width: img.width, Height: img.height, BitsPerComponent: 8, ColorSpace: this.spaceFor(old.dict.get(N("ColorSpace")), img.gray), Filter: N("DCTDecode") });
       const next = PDFRawStream.of(this.doc.context.obj(entries as never) as unknown as PDFDict, img.data);
       this.doc.context.assign(ref, next);
       // The pixels arrive with a mask's matte colour already taken out, so the mask must not ask for that

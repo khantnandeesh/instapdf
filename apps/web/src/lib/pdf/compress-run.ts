@@ -27,6 +27,8 @@ const DRAWN = 0.8;
 const SCALE_FLOOR = 0.8;
 /** A picture met again, shown this much larger than the first time, is packed again at the larger size. */
 const LARGER = 1.15;
+/** A JPEG holds at most this many pixels a side: a longer picture is left as it is. */
+const JPEG_MAX_SIDE = 65535;
 /** A new picture must be this much smaller than the old one to be kept (the worker checks again). */
 const WORTH_IT = 0.9;
 const aborted = () => new DOMException("Cancelled", "AbortError");
@@ -43,8 +45,9 @@ function refOf(ref: unknown): string | null {
 
 /**
  * How large each picture of a page is drawn, in points (1/72 inch): the longer the side, the more
- * pixels it needs. A picture drawn in a way this does not follow (inside a pattern, or many times
- * in one go) gets no size, and is then never scaled down.
+ * pixels it needs. A picture drawn in a way this does not follow (inside a pattern, many times in
+ * one go, or in an annotation, which a reader fits to its own box) gets no size, and is then never
+ * scaled down.
  */
 export function drawnSizes(ops: OpList, OPS: Record<string, number>): Map<string, { width: number; height: number } | null> {
   const sizes = new Map<string, { width: number; height: number } | null>();
@@ -56,16 +59,19 @@ export function drawnSizes(ops: OpList, OPS: Record<string, number>): Map<string
   const walk = (list: OpList, known: boolean) => {
     let m: Matrix = [1, 0, 0, 1, 0, 0];
     const stack: Matrix[] = [];
+    let annotation = 0;
     for (let i = 0; i < list.fnArray.length; i++) {
       const fn = list.fnArray[i];
       const args = list.argsArray[i];
-      if (fn === OPS.save || fn === OPS.beginGroup) stack.push(m);
+      if (fn === OPS.beginAnnotation) annotation++;
+      else if (fn === OPS.endAnnotation) annotation = Math.max(0, annotation - 1);
+      else if (fn === OPS.save || fn === OPS.beginGroup) stack.push(m);
       else if (fn === OPS.restore || fn === OPS.endGroup || fn === OPS.paintFormXObjectEnd) m = stack.pop() ?? m;
       else if (fn === OPS.transform && isMatrix(args)) m = times(m, args);
       else if (fn === OPS.paintFormXObjectBegin) {
         stack.push(m);
         if (isMatrix(args?.[0])) m = times(m, args[0]);
-      } else if (fn === OPS.paintImageXObject && typeof args?.[0] === "string") note(args[0], known ? { width: Math.hypot(m[0], m[1]), height: Math.hypot(m[2], m[3]) } : null);
+      } else if (fn === OPS.paintImageXObject && typeof args?.[0] === "string") note(args[0], known && !annotation ? { width: Math.hypot(m[0], m[1]), height: Math.hypot(m[2], m[3]) } : null);
       else if (fn === OPS.paintImageXObjectRepeat && typeof args?.[0] === "string") note(args[0], null);
       // A tiling pattern carries its own list of operators, drawn at a size this does not work out.
       else if ((fn === OPS.setFillColorN || fn === OPS.setStrokeColorN) && args?.[0] === "TilingPattern" && args[2] && typeof args[2] === "object") walk(args[2] as OpList, false);
@@ -84,7 +90,9 @@ export function scaleFor(picture: { width: number; height: number }, drawn: { wi
 
 /**
  * A decoded picture scaled to `toWidth` × `toHeight` (each new pixel the average of the ones it
- * covers), as one grey byte a pixel or three colour bytes. Null when its pixels cannot be read here.
+ * covers), as one grey byte a pixel or three colour bytes. Where the picture has see-through parts,
+ * a pixel counts for as much as it shows, so what is hidden under the mask never tints an edge.
+ * Null when its pixels cannot be read here.
  */
 export function scaledPixels(img: DecodedImage, toWidth: number, toHeight: number, gray: boolean): Uint8Array | null {
   const { width, height } = img;
@@ -102,14 +110,30 @@ export function scaledPixels(img: DecodedImage, toWidth: number, toHeight: numbe
       let r = 0;
       let g = 0;
       let b = 0;
-      for (let yy = y0; yy < y1; yy++) {
-        for (let i = (yy * width + x0) * step, end = (yy * width + x1) * step; i < end; i += step) {
-          r += d[i];
-          g += d[i + 1];
-          b += d[i + 2];
+      let count = 0;
+      if (step === 4) {
+        for (let yy = y0; yy < y1; yy++) {
+          for (let i = (yy * width + x0) * 4, end = (yy * width + x1) * 4; i < end; i += 4) {
+            const a = d[i + 3];
+            r += d[i] * a;
+            g += d[i + 1] * a;
+            b += d[i + 2] * a;
+            count += a;
+          }
         }
       }
-      const count = (y1 - y0) * (x1 - x0);
+      // Nothing shows here at all (or there is no mask): every pixel counts the same.
+      if (count === 0) {
+        r = g = b = 0;
+        for (let yy = y0; yy < y1; yy++) {
+          for (let i = (yy * width + x0) * step, end = (yy * width + x1) * step; i < end; i += step) {
+            r += d[i];
+            g += d[i + 1];
+            b += d[i + 2];
+          }
+        }
+        count = (y1 - y0) * (x1 - x0);
+      }
       if (gray) out[o++] = Math.round((r * 77 + g * 150 + b * 29) / (256 * count));
       else {
         out[o++] = Math.round(r / count);
@@ -151,7 +175,7 @@ async function smallerPictures(src: CompressSource, want: Map<string, Picture>, 
           const width = Math.max(1, Math.round(stated.width * scale));
           const height = Math.max(1, Math.round(stated.height * scale));
           const gray = opts.gray || stated.gray;
-          const pixels = scaledPixels(img, width, height, gray);
+          const pixels = width > JPEG_MAX_SIDE || height > JPEG_MAX_SIDE ? null : scaledPixels(img, width, height, gray);
           if (!pixels) {
             packed.set(ref, null);
             continue;
