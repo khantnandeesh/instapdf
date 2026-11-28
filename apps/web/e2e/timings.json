@@ -48,10 +48,11 @@
     "e2e/smoke.spec.ts": 1,
     "e2e/ui/forced-colors.spec.ts": 4,
     "e2e/ui/modals.spec.ts": 20,
-    "e2e/ui/result-scroll.spec.ts": 5,
-    "e2e/ui/scroll-rules.spec.ts": 144,
+    "e2e/ui/result-scroll.spec.ts": 150,
+    "e2e/ui/scroll-rules.spec.ts": 800,
     "e2e/ui/sticky-search.spec.ts": 11,
-    "e2e/ui/viewport-fit.spec.ts": 65
+    "e2e/ui/viewport-fit.spec.ts": 1600,
+    "e2e/ui/tool-layout.spec.ts": 250
   },
   "mobile": {
     "e2e/f1/access.spec.ts": 49,
@@ -103,9 +104,10 @@
     "e2e/ui/forced-colors.spec.ts": 4,
     "e2e/ui/modals.spec.ts": 14,
     "e2e/ui/result-scroll.spec.ts": 0,
-    "e2e/ui/scroll-rules.spec.ts": 85,
+    "e2e/ui/scroll-rules.spec.ts": 500,
     "e2e/ui/sticky-search.spec.ts": 6,
-    "e2e/ui/viewport-fit.spec.ts": 18
+    "e2e/ui/viewport-fit.spec.ts": 500,
+    "e2e/ui/tool-layout.spec.ts": 250
   },
   "serial": {
     "e2e/f1/intake.spec.ts": 8,
@@ -148,10 +150,11 @@
     "e2e/seo/seo.spec.ts": 5,
     "e2e/ui/forced-colors.spec.ts": 5,
     "e2e/ui/modals.spec.ts": 18,
-    "e2e/ui/result-scroll.spec.ts": 5,
-    "e2e/ui/scroll-rules.spec.ts": 144,
+    "e2e/ui/result-scroll.spec.ts": 150,
+    "e2e/ui/scroll-rules.spec.ts": 800,
     "e2e/ui/sticky-search.spec.ts": 7,
-    "e2e/ui/viewport-fit.spec.ts": 59
+    "e2e/ui/viewport-fit.spec.ts": 1600,
+    "e2e/ui/tool-layout.spec.ts": 250
   },
   "cloud mobile": {
     "e2e/f1/access.spec.ts": 33,
@@ -180,9 +183,10 @@
     "e2e/ui/forced-colors.spec.ts": 6,
     "e2e/ui/modals.spec.ts": 19,
     "e2e/ui/result-scroll.spec.ts": 0,
-    "e2e/ui/scroll-rules.spec.ts": 96,
+    "e2e/ui/scroll-rules.spec.ts": 500,
     "e2e/ui/sticky-search.spec.ts": 5,
-    "e2e/ui/viewport-fit.spec.ts": 20
+    "e2e/ui/viewport-fit.spec.ts": 500,
+    "e2e/ui/tool-layout.spec.ts": 250
   },
   "cloud serial": {
     "e2e/f1/intake.spec.ts": 10,

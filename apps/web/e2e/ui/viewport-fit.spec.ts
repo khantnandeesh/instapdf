@@ -92,6 +92,10 @@ async function noHorizontalScroll(page: Page) {
   expect(overflow, "no horizontal page scroll").toBeLessThanOrEqual(0);
 }
 
+// One test per tool and screen size, each on a page of its own: the file's tests are shared out among the
+// workers, so the file does not take longer on one machine with every tool added.
+test.describe.configure({ mode: "parallel" });
+
 for (const tool of usable) {
   test.describe(`fold fit: ${tool.slug}`, () => {
     for (const [width, height] of DESKTOP) {
