@@ -3,7 +3,7 @@
 Reference pages: `docs/discovery/pages/delete-pdf-annotations.md`, `flatten-pdf.md`, `edit-pdf-metadata.md`.
 All three run in the browser; nothing is uploaded. Settings tools (F25 §4): options in the side panel from 1024 px, in the bar and the More options sheet below.
 
-## 1. Remove annotations (`/remove-pdf-annotations`)
+## 1. Remove annotations (`/remove-pdf-annotations`, shown as "Clear annotations": the longer name wraps in the All tools menu)
 
 - The pick-pages flow: click pages to clean only those; with none picked, every page.
 - Five switches, each a group of kinds: highlights and underlines (with strikeouts and squiggles); drawings and shapes; notes and text boxes (with their pop-ups and replies); stamps and attachments (and kinds we do not know); links.

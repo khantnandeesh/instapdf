@@ -897,7 +897,7 @@ export const seoContent: Record<string, ToolSeoContent> = {
     steps: [
       { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. Nothing is uploaded." },
       { name: "Choose what goes", text: "Highlights, drawings, notes and stamps are switched on. Switch off what you want to keep, and switch on Links if those should go too." },
-      { name: "Download", text: "Select Remove annotations and download the clean file. Click pages first to clean only those." },
+      { name: "Download", text: "Select Clean pages and download the clean file. Click pages first to clean only those." },
     ],
     faq: [
       {

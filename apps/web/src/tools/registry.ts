@@ -288,7 +288,7 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
   "pdf-header-footer": { status: "beta", flow: clientPdfFlow("pdf-header-footer", { title: "Header and footer", actionLabel: "Add header and footer", progressLabel: "Adding" }, { layout: "settings" }) },
   "watermark-pdf": { status: "beta", flow: clientPdfFlow("watermark-pdf", { title: "Watermark PDF", actionLabel: "Add watermark", progressLabel: "Watermarking" }, { layout: "settings" }) },
   // F10. Document tools: settings tools (F25 §4).
-  "remove-pdf-annotations": { status: "beta", flow: clientPdfFlow("remove-pdf-annotations", { title: "Remove annotations", actionLabel: "Remove annotations", progressLabel: "Removing" }, { layout: "settings" }) },
+  "remove-pdf-annotations": { status: "beta", flow: clientPdfFlow("remove-pdf-annotations", { title: "Clear annotations", actionLabel: "Clear annotations", progressLabel: "Removing" }, { layout: "settings" }) },
   "flatten-pdf": { status: "beta", flow: clientPdfFlow("flatten-pdf", { title: "Flatten PDF", actionLabel: "Flatten PDF", progressLabel: "Flattening" }, { layout: "settings" }) },
   "edit-pdf-metadata": { status: "beta", flow: clientPdfFlow("edit-pdf-metadata", { title: "Edit PDF metadata", actionLabel: "Save metadata", progressLabel: "Saving" }, { layout: "settings" }) },
   "extract-pdf-pages": {
@@ -405,7 +405,7 @@ export const tools: Tool[] = [
   t("edit-pdf-metadata", "Edit metadata", "Change title, author, keywords and more", "edit", "client", "tag", "edit-pdf-metadata"),
   t("pdf-bookmarks", "Bookmarks", "Create or edit the document outline", "edit", "client", "bookmarks", "pdf-bookmarks"),
   t("rename-pdf", "Rename by content", "Name files using text found inside them", "edit", "client", "text-aa"),
-  t("remove-pdf-annotations", "Remove annotations", "Strip highlights, comments and markup", "edit", "client", "eraser", "delete-pdf-annotations"),
+  t("remove-pdf-annotations", "Clear annotations", "Remove highlights, comments and markup", "edit", "client", "eraser", "delete-pdf-annotations"),
   t("flatten-pdf", "Flatten", "Lock form fields and annotations into the page", "edit", "client", "stack-simple"),
   t("compress-pdf", "Compress", "Make your PDF smaller", "optimize", "server", "arrows-in"),
   t("grayscale-pdf", "Grayscale", "Convert colors to shades of gray", "optimize", "server", "circle-half"),
