@@ -288,6 +288,7 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
   // F9. Stamping tools: settings tools (F25 §4), drawn by the editor's build.
   "add-page-numbers": { status: "beta", flow: clientPdfFlow("add-page-numbers", { title: "Add page numbers", actionLabel: "Add page numbers", progressLabel: "Numbering" }, { layout: "settings" }) },
   "pdf-header-footer": { status: "beta", flow: clientPdfFlow("pdf-header-footer", { title: "Header and footer", actionLabel: "Add header and footer", progressLabel: "Adding" }, { layout: "settings" }) },
+  "bates-numbering": { status: "beta", flow: clientPdfFlow("bates-numbering", { title: "Bates numbering", actionLabel: "Add Bates numbers", progressLabel: "Numbering" }, { layout: "settings" }) },
   "watermark-pdf": { status: "beta", flow: clientPdfFlow("watermark-pdf", { title: "Watermark PDF", actionLabel: "Add watermark", progressLabel: "Watermarking" }, { layout: "settings" }) },
   // F10. Document tools: settings tools (F25 §4).
   "remove-pdf-annotations": { status: "beta", flow: clientPdfFlow("remove-pdf-annotations", { title: "Clear annotations", actionLabel: "Clear annotations", progressLabel: "Removing" }, { layout: "settings" }) },

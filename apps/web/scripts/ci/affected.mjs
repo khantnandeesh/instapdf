@@ -80,7 +80,7 @@ export const AREAS = {
   f5: ["src/app/organize-pdf/", "src/app/combine-reorder-pdf/", "src/app/alternate-mix-pdf/", "src/app/merge-pdf/"],
   f4: ["src/app/split-pdf/", "src/app/extract-pdf-pages/", "src/app/delete-pdf-pages/"],
   f11: ["src/app/protect-pdf/", "src/app/unlock-pdf/"],
-  f9: ["src/app/add-page-numbers/", "src/app/pdf-header-footer/", "src/app/watermark-pdf/"],
+  f9: ["src/app/add-page-numbers/", "src/app/pdf-header-footer/", "src/app/watermark-pdf/", "src/app/bates-numbering/"],
   f10: ["src/app/remove-pdf-annotations/", "src/app/flatten-pdf/", "src/app/edit-pdf-metadata/", "src/app/rename-pdf/", "src/app/pdf-bookmarks/"],
   f13: ["src/app/grayscale-pdf/", "src/app/repair-pdf/"],
   f15: ["src/app/deskew-pdf/", "src/app/ocr-pdf/", "src/lib/ocr/", "scripts/copy-ocr.mjs"],

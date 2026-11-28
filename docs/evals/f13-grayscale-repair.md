@@ -1,5 +1,7 @@
 # Key checks: F13 Grayscale and Repair
 
+**Latest: Run 3 (2026-11-28, staging `bd8d90b`): PASS.** See [Run 3](#run-3). The verdicts below are kept as the record of runs 1 and 2.
+
 **Verdict: FAIL.** Two micro-checks are lost: M6 (Grayscale options) and M7 (speed to result, both tools). No owner waiver is on record. Everything else meets the bar.
 
 - Run: 2026-11-28, 07:00–07:20 UTC, by parity-evaluator. Lean key checks (workflow step 5), not an every-AC run.
@@ -95,3 +97,26 @@ One run each (task budget), so these are single values, not medians.
 - **G-2 (M6): closed.**
 - **G-3 (M8, does not block), still open.** With both switches on, `colours.pdf` comes out at 5,523 B (5,625 B with them off) against the reference's 4,032 B. Smaller photos saves 102 B here. The larger part is the lossless picture: ours is 1,002 B as one-channel Flate, larger than the 934 B three-channel original, where the reference stores the same picture in 441 B. The reference's compress tick is also on by default; ours is off.
 - G-4 to G-6 were not re-checked.
+
+## Run 3
+
+**Verdict: PASS.** No micro-check is lost any more. M7 is a tie on Grayscale and a win on Repair; M6 passed in run 2. No waiver was needed.
+
+- Run: 2026-11-28, 11:29–11:34 UTC, by parity-evaluator. Re-check of M7 only, on both tools (Repair's M7 was lost in run 1 and not re-run in run 2, so it is measured here too). Nothing else was re-run.
+- Candidate: staging `/grayscale-pdf` and `/repair-pdf`, `/api/health` reported `bd8d90b`.
+- Reference: **no new tasks.** Its side is the cached run-1 evidence (`docs/evals/cache/f13/manifest.json`).
+- Same files as before (`colours.pdf`, 6,348 B; `cut-short.pdf`, 5,374 B) and the same timing method (in-page observer, click on the main button → Download button present), 1280×632, a fresh browser context per run, **5 runs, median**.
+- Evidence (not in git): `/mnt/project-files/evals-cache/f13/run3/` (outputs and scripts).
+
+| # | Check | Reference (cached) | BerryPDF, run 3 | Result |
+|---|---|---|---|---|
+| M7 | Processing, Grayscale | 0.79 s, one run, read by polling every 250 ms, so the true value is 0.54–0.79 s | Median of 5: **0.59 s** (0.597, 0.563, 0.593, 0.576, 0.612). At 390: 0.58 s (0.582, 0.635, 0.562). Truthful % and Cancel. Was 0.99 s in run 2 and 1.68 s in run 1. Output unchanged (same SHA-256 as run 2, 5,625 B) | **PASS** (tie: 0.20 s faster than the recorded figure, and inside the reference's 0.54–0.79 s window) |
+| M7 | Processing, Repair | 0.86 s, one run, same polling, so 0.61–0.86 s | Median of 5: **0.50 s** (0.504, 0.456, 0.467, 0.515, 0.497). Was 1.43 s in run 1. Output 2,878 B, 12 pages, qpdf clean | **PASS** (win: faster than the reference's best possible value) |
+
+0 non-GET requests in all 13 runs.
+
+### Gaps, run 3
+
+- **G-1 (M7): closed.** The wait at 0% is gone (first progress at about 0.15 s on Grayscale, 0.03 s on Repair; one request after the click, down from four). What remains is a fixed hold of about 0.40 s on "Done" before Download appears (Done at 0.17–0.21 s, Download at 0.56–0.61 s): two thirds of the measured time. It does not block, but the Grayscale margin over the reference's best case is nil, so trimming the hold further would make the check safe against a faster reference run.
+- **G-3 (M8, does not block), still open.** `colours.pdf` still comes out at 5,625 B against the reference's 4,032 B.
+- G-4 to G-6 were not re-checked and stay open as written (none blocks).

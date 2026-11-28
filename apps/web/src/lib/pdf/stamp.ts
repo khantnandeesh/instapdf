@@ -49,14 +49,24 @@ export function roman(n: number): string {
   return out;
 }
 
-export type TokenValues = { /** This page's number. */ n: number; /** The last number. */ total: number; /** The file's name without ".pdf". */ file: string; /** Today, as the reader writes dates. */ date: string };
+export type TokenValues = {
+  /** This page's number. */ n: number;
+  /** The last number. */ total: number;
+  /** The file's name without ".pdf". */ file: string;
+  /** Today, as the reader writes dates. */ date: string;
+  /** Bates numbering: the page's number in the run across every file, already padded, and its file's number. */
+  bates?: string;
+  doc?: number;
+};
 
 /** What cannot be printed on a line: tabs and line breaks become spaces, other control characters and zero-width spaces go. */
 const printable = (text: string) => text.replace(/[\t\n\r]+/g, " ").replace(/[\u0000-\u001f\u007f-\u009f\u200b\ufeff]/g, "");
 
-/** Replaces {n}, {total}, {roman}, {ROMAN}, {file} and {date}; anything else in braces stays as typed. */
+/** Replaces {n}, {total}, {roman}, {ROMAN}, {file} and {date}, and {bates} and {doc} where the run gives them; anything else in braces stays as typed. */
 export function fillTokens(text: string, v: TokenValues): string {
-  return printable(text).replace(/\{(n|total|roman|ROMAN|file|date)\}/g, (_, key: string) => {
+  return printable(text).replace(/\{(n|total|roman|ROMAN|file|date|bates|doc)\}/g, (whole, key: string) => {
+    if (key === "bates") return v.bates ?? whole;
+    if (key === "doc") return v.doc === undefined ? whole : String(v.doc);
     if (key === "n") return String(v.n);
     if (key === "total") return String(v.total);
     if (key === "ROMAN") return roman(v.n);
@@ -219,4 +229,28 @@ export function numbering(pageCount: number, picked: readonly number[], first: n
   const start = Number.isFinite(first) ? Math.round(first) : 1;
   const pages = [...new Set(picked)].filter((i) => i >= 0 && i < pageCount).sort((a, b) => a - b);
   return { numbers: new Map(pages.map((p, k) => [p, start + k])), total: start + pages.length - 1 };
+}
+
+/** Bates numbering (spec F9 §4): where the count starts, how many digits each number is padded to, and the first file's number. */
+export type BatesRun = { start: number; digits: number; doc: number };
+export const BATES_DIGITS = [1, 3, 4, 5, 6, 8] as const;
+export const BATES_LIMITS = { start: 999_999_999, doc: 99_999 };
+/** 7 padded to six digits is 000007; a number longer than the padding is written whole. */
+export const batesNumber = (n: number, digits: number) => String(Math.max(0, Math.round(n))).padStart(clamp(digits, 1, 12), "0");
+
+/** The Bates lines the reader can pick. `{prefix}` is their own text (a case name), with a space after it when there is one. */
+export const BATES_STYLES = [
+  { value: "number", template: "{prefix}{bates}" },
+  { value: "number-page", template: "{prefix}{bates} Page {n}" },
+  { value: "exhibit", template: "Exhibit {doc} {prefix}{bates}" },
+  { value: "exhibit-page", template: "Exhibit {doc} {prefix}{bates} Page {n}" },
+  { value: "custom", template: "" },
+] as const;
+export type BatesStyle = (typeof BATES_STYLES)[number]["value"];
+/** The line for a style: the prefix goes in as typed (it may hold tokens too, such as {file}), or the reader's own line for "custom". */
+export function batesTemplate(style: BatesStyle, prefix: string, custom: string): string {
+  if (style === "custom") return custom;
+  const lead = prefix.trim() ? `${prefix.trim()} ` : "";
+  const template = BATES_STYLES.find((b) => b.value === style)?.template ?? "{bates}";
+  return template.split("{prefix}").join(lead);
 }
