@@ -15,6 +15,7 @@ export function TextInput({
   maxLength = 200,
   onEnter,
   className,
+  inputMode,
 }: {
   id: string;
   label: string;
@@ -26,6 +27,8 @@ export function TextInput({
   maxLength?: number;
   onEnter?: () => void;
   className?: string;
+  /** The on-screen keyboard to offer ("numeric" for a page number). */
+  inputMode?: "text" | "numeric";
 }) {
   return (
     <div className={cx("flex min-w-0 flex-col gap-1.5", className)}>
@@ -39,6 +42,7 @@ export function TextInput({
         placeholder={placeholder}
         disabled={disabled}
         maxLength={maxLength}
+        inputMode={inputMode}
         spellCheck={false}
         autoComplete="off"
         onChange={(e) => onChange(e.target.value)}

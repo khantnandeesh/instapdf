@@ -70,25 +70,3 @@ export const renameCopy = {
   nothing: "No text in the box",
   kept: (names: string[]) => (names.length === 1 ? `${names[0]} has no text there, so it keeps its name.` : `${names.length} files have no text there, so they keep their names.`),
 };
-
-/** Bookmarks copy (spec F10 §4). */
-export const bookmarksCopy = {
-  step: "Bookmarks",
-  edit: "Edit bookmarks",
-  reading: "Reading bookmarks…",
-  count: (n: number) => (n === 0 ? "No bookmarks yet" : n === 1 ? "1 bookmark" : `${n} bookmarks`),
-  needsChange: "Change a bookmark first",
-  needsOne: "Add a bookmark first",
-  errors: { title: "Give every bookmark a name", page: (n: number) => (n === 1 ? "This file has one page: every bookmark points at page 1" : `Page numbers go from 1 to ${n}`) },
-  dialogTitle: "Bookmarks",
-  dialogHelp: "Name each bookmark and give the page it opens. Use the menu on a row to add, move or nest bookmarks.",
-  empty: "This file has no bookmarks yet.",
-  add: "Add bookmark",
-  name: "Name",
-  page: "Page",
-  nameOf: (n: number) => `Name of bookmark ${n}`,
-  pageOf: (title: string, n: number) => `Page for ${title.trim() || `bookmark ${n}`}`,
-  more: (title: string, n: number) => `More for ${title.trim() || `bookmark ${n}`}`,
-  menu: { below: "Add below", inside: "Add inside", up: "Move up", down: "Move down", in: "Move in a level", out: "Move out a level", remove: "Delete" },
-  note: "Bookmarks are the clickable contents list a reader shows beside the pages.",
-};

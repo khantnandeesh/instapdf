@@ -5,36 +5,26 @@ import { Group } from "@/components/page-select/OptionGroup";
 import { ToolFlow } from "@/components/tool-flow/ToolFlow";
 import type { ProcessFn, ReadyFile } from "@/components/tool-flow/types";
 import { Button } from "@/components/ui/Button";
-import { rowsChanged, rowsError, rowsFromOutline, toTree, type BookmarkRow } from "@/lib/pdf/bookmark-edit";
-import type { OutlineEntry } from "@/lib/pdf/split-outline";
+import { outlineTooBig, rowsChanged, rowsError, rowsFromOutline, toTree, type BookmarkRow } from "@/lib/pdf/bookmark-edit";
 import { runInWorker } from "@/lib/pdf/worker-client";
 import { flowTool } from "@/tools/registry";
-import { bookmarksCopy as c } from "./copy";
+import { bookmarksCopy as c } from "./bookmarks-copy";
 import "./doc-tools.css";
 
 const tool = flowTool("pdf-bookmarks");
 // The list editor is loaded when first opened (it is no part of the first load).
-const loadDialog = () => import("./BookmarksDialog");
-type DialogModule = Awaited<ReturnType<typeof loadDialog>>;
+const loadEditor = () => import("./BookmarksDialog");
+type EditorModule = Awaited<ReturnType<typeof loadEditor>>;
 
-/** The file's bookmarks, read once per file. Renders nothing. */
-function ReadOutline({ file, onRead }: { file: ReadyFile | undefined; onRead: (file: ReadyFile | undefined, entries: OutlineEntry[] | null) => void }) {
-  const report = useRef(onRead);
-  report.current = onRead;
-  useEffect(() => {
-    let live = true;
-    report.current(file, null);
-    if (file)
-      void import("@/lib/pdf/split-outline")
-        .then((m) => m.readOutline(file.source, file.password))
-        .catch(() => [] as OutlineEntry[])
-        .then((entries) => live && report.current(file, entries));
-    return () => {
-      live = false;
-    };
-  }, [file]);
+/** Tells the tool which file is loaded. Renders nothing; the options it sits in come and go (result screen, 1024 px), the tool's list does not. */
+function TellFile({ file, onFile }: { file: ReadyFile | undefined; onFile: (file: ReadyFile | undefined) => void }) {
+  const tell = useRef(onFile);
+  tell.current = onFile;
+  useEffect(() => tell.current(file), [file]);
   return null;
 }
+
+type Read = "reading" | "ready" | "failed" | "tooBig";
 
 /**
  * Bookmarks (spec F10 §4): the file's outline in a list to edit: rename, send to another page,
@@ -42,10 +32,39 @@ function ReadOutline({ file, onRead }: { file: ReadyFile | undefined; onRead: (f
  */
 export function BookmarksTool() {
   const [file, setFile] = useState<ReadyFile | undefined>();
-  const [from, setFrom] = useState<OutlineEntry[] | null>(null);
+  const [read, setRead] = useState<Read>("reading");
+  // The rows as the file gave them: what "changed" is measured against.
+  const [base, setBase] = useState<BookmarkRow[]>([]);
   const [rows, setRows, rowsLive] = useLiveState<BookmarkRow[]>([]);
   const [open, setOpen] = useState(false);
-  const [editor, setEditor] = useState<DialogModule | null>(null);
+  const [editor, setEditor] = useState<EditorModule | null>(null);
+
+  // Read once per file: the list is only ever replaced when the file is.
+  const id = file?.id;
+  useEffect(() => {
+    let live = true;
+    setRead("reading");
+    setBase([]);
+    setRows([]);
+    setOpen(false);
+    if (!file) return;
+    void import("@/lib/pdf/bookmark-read")
+      .then((m) => m.readForEdit(file.source, file.password))
+      .catch(() => null)
+      .then((entries) => {
+        if (!live) return;
+        if (!entries) return setRead("failed");
+        if (outlineTooBig(entries)) return setRead("tooBig");
+        const first = rowsFromOutline(entries);
+        setBase(first);
+        setRows(first);
+        setRead("ready");
+      });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the file's id: the same file re-rendered is not a new file
+  }, [id]);
 
   const process: ProcessFn = async (files, signal, onProgress) => {
     const f = files[0];
@@ -54,20 +73,20 @@ export function BookmarksTool() {
   };
   const pageCount = file?.pageCount ?? 1;
   const canRun = () => {
-    if (!from) return c.reading;
+    if (read !== "ready") return c[read];
     const error = rowsError(rows, pageCount);
     if (error) return error === "title" ? c.errors.title : c.errors.page(pageCount);
-    if (!rowsChanged(rows, from)) return from.length ? c.needsChange : c.needsOne;
+    if (!rowsChanged(rows, base)) return base.length ? c.needsChange : c.needsOne;
     return true as const;
   };
   const edit = (where: string) => (
     <Button
       variant="line"
-      disabled={!from}
+      disabled={read !== "ready"}
       data-testid={`bm-edit-${where}`}
       onClick={() => {
         setOpen(true);
-        if (!editor) void loadDialog().then(setEditor);
+        if (!editor) void loadEditor().then(setEditor);
       }}
     >
       {c.edit}
@@ -75,7 +94,7 @@ export function BookmarksTool() {
   );
   const count = (
     <p className="ip-doc-note ip-doc-line" data-testid="bm-count">
-      {from ? c.count(rows.length) : c.reading}
+      {read === "ready" ? c.count(rows.length) : c[read]}
     </p>
   );
   return (
@@ -84,21 +103,10 @@ export function BookmarksTool() {
         tool={tool}
         process={process}
         canRun={canRun}
-        onReset={() => {
-          setFrom(null);
-          setRows([]);
-          setOpen(false);
-        }}
+        onReset={() => setFile(undefined)}
         renderOptions={(ctx) => (
           <div className="flex min-w-0 items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-bar:flex-1">
-            <ReadOutline
-              file={ctx.readyFiles[0]}
-              onRead={(f, entries) => {
-                setFile(f);
-                setFrom(entries);
-                setRows(entries ? rowsFromOutline(entries) : []);
-              }}
-            />
+            <TellFile file={ctx.readyFiles[0]} onFile={(f) => setFile((was) => (was?.id === f?.id ? was : f))} />
             <div className="ip-opt-bar ip-doc-two ip-doc-next min-w-0 dock-bar:flex-1">
               {edit("bar")}
               {count}

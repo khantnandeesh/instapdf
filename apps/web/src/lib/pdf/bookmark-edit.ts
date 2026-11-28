@@ -3,29 +3,33 @@
  * each (1 = top). Pure: every change returns a new list, and the list is always a valid tree
  * (the first row is at level 1, and no row is more than one level below the row before it).
  */
-import type { OutlineEntry } from "./split-outline";
 
 export const BOOKMARK_LIMITS = { rows: 2000, title: 300, depth: 12 };
+
+/** What a row was in the file: its place in outline order, its name and its page (-1 when it opens no page of the file). */
+export type RowSource = { index: number; title: string; page: number };
 
 export type BookmarkRow = {
   key: string;
   title: string;
-  /** The page number as typed (1-based). */
+  /** The page number as typed (1-based). Empty for a bookmark that opens no page (see `src`). */
   page: string;
   level: number;
-  /** What the row was in the file, so the saved bookmark can keep its colour, weight and view. */
-  src?: { title: string; page: number };
+  /** Set for a row that came from the file, so the saved bookmark can keep its colour, weight, view or other target. */
+  src?: RowSource;
 };
 
-/** A bookmark as the engine takes it: page is 0-based. */
-export type BookmarkNode = { title: string; page: number; src?: { title: string; page: number }; children: BookmarkNode[] };
+/** A bookmark as the engine takes it: page is 0-based, -1 for "keep the target it had". */
+export type BookmarkNode = { title: string; page: number; src?: RowSource; children: BookmarkNode[] };
 
 let seq = 0;
 const key = () => `b${++seq}`;
 
-export function rowsFromOutline(entries: readonly OutlineEntry[]): BookmarkRow[] {
-  const rows = entries.slice(0, BOOKMARK_LIMITS.rows).map((e) => ({ key: key(), title: e.title.slice(0, BOOKMARK_LIMITS.title), page: String(e.page + 1), level: e.level, src: { title: e.title, page: e.page } }));
-  return normalize(rows);
+/** Whether the file's outline is more than the editor holds: it is then not edited at all, rather than cut. */
+export const outlineTooBig = (entries: readonly { level: number }[]) => entries.length > BOOKMARK_LIMITS.rows || entries.some((e) => e.level > BOOKMARK_LIMITS.depth);
+
+export function rowsFromOutline(entries: readonly { index: number; level: number; page: number; title: string }[]): BookmarkRow[] {
+  return normalize(entries.map((e) => ({ key: key(), title: e.title, page: e.page < 0 ? "" : String(e.page + 1), level: e.level, src: { index: e.index, title: e.title, page: e.page } })));
 }
 
 /** Levels made valid: first row at 1, each row at most one below the row before it, never past the depth limit. */
@@ -65,7 +69,11 @@ export function addChild(rows: readonly BookmarkRow[], i: number): { rows: Bookm
 /** The row goes, and everything under it. */
 export const removeRow = (rows: readonly BookmarkRow[], i: number): BookmarkRow[] => [...rows.slice(0, i), ...rows.slice(subtreeEnd(rows, i))];
 
-export const canIndent = (rows: readonly BookmarkRow[], i: number) => i > 0 && rows[i - 1].level >= rows[i].level && rows.slice(i, subtreeEnd(rows, i)).every((r) => r.level < BOOKMARK_LIMITS.depth);
+export function canIndent(rows: readonly BookmarkRow[], i: number): boolean {
+  if (i === 0 || rows[i - 1].level < rows[i].level) return false;
+  for (let k = i, end = subtreeEnd(rows, i); k < end; k++) if (rows[k].level >= BOOKMARK_LIMITS.depth) return false;
+  return true;
+}
 export const canOutdent = (rows: readonly BookmarkRow[], i: number) => rows[i].level > 1;
 
 const shift = (rows: readonly BookmarkRow[], i: number, by: number): BookmarkRow[] => {
@@ -122,17 +130,20 @@ export const pageOf = (text: string, pageCount: number): number | null => {
   return n >= 1 && n <= pageCount ? n : null;
 };
 
+/** A row from the file that opens no page of it (a web link, a heading) and still has no page typed: it keeps the target it had. */
+export const keepsTarget = (r: BookmarkRow) => !!r.src && r.src.page < 0 && !r.page.trim();
+
 /** Why the list cannot be saved yet, or null. */
 export function rowsError(rows: readonly BookmarkRow[], pageCount: number): "title" | "page" | null {
   if (rows.some((r) => !r.title.trim())) return "title";
-  if (rows.some((r) => pageOf(r.page, pageCount) === null)) return "page";
+  if (rows.some((r) => !keepsTarget(r) && pageOf(r.page, pageCount) === null)) return "page";
   return null;
 }
 
-/** Whether the list differs from what the file had (order, nesting, names or pages). */
-export function rowsChanged(rows: readonly BookmarkRow[], from: readonly OutlineEntry[]): boolean {
-  if (rows.length !== from.length) return true;
-  return rows.some((r, i) => r.level !== from[i].level || r.title !== from[i].title || r.page.trim() !== String(from[i].page + 1) || !r.src);
+/** Whether the list differs from the rows the file gave (order, nesting, names or pages). */
+export function rowsChanged(rows: readonly BookmarkRow[], base: readonly BookmarkRow[]): boolean {
+  if (rows.length !== base.length) return true;
+  return rows.some((r, i) => r.key !== base[i].key || r.level !== base[i].level || r.title !== base[i].title || r.page.trim() !== base[i].page);
 }
 
 /** The rows as a tree (rows must be valid: see rowsError). */
@@ -141,7 +152,7 @@ export function toTree(rows: readonly BookmarkRow[]): BookmarkNode[] {
   const stack: { level: number; children: BookmarkNode[] }[] = [{ level: 0, children: root }];
   for (const r of normalize(rows)) {
     while (stack[stack.length - 1].level >= r.level) stack.pop();
-    const node: BookmarkNode = { title: r.title.replace(/\s+/g, " ").trim(), page: Number(r.page.trim()) - 1, children: [], ...(r.src ? { src: r.src } : {}) };
+    const node: BookmarkNode = { title: r.title.replace(/\s+/g, " ").trim(), page: keepsTarget(r) ? -1 : Number(r.page.trim()) - 1, children: [], ...(r.src ? { src: r.src } : {}) };
     stack[stack.length - 1].children.push(node);
     stack.push({ level: r.level, children: node.children });
   }

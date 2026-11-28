@@ -2,7 +2,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { PDFArray, PDFDict, PDFDocument, PDFName } from "pdf-lib";
 import { expectNoSeriousAxeViolations } from "../support/axe";
-import { downloadResult, flow, pick, primary, run, tiles, unzip } from "../support/flow";
+import { backToOptions, downloadResult, flow, pick, primary, run, tiles, unzip } from "../support/flow";
 
 async function open(page: Page, slug: string, ...names: string[]) {
   await page.goto(`/${slug}`);
@@ -222,6 +222,28 @@ test.describe("Bookmarks", () => {
     expect(got.length).toBe(before - 1);
     expect(got[0]).toBe("Renamed@1");
     expect(got.join(" ")).not.toContain(first);
+  });
+
+  test("AC-1302: edits stay after going back from the result; the keyboard keeps its place", async ({ page }) => {
+    await open(page, "pdf-bookmarks", "three-pages.pdf");
+    let box = await editor(page);
+    await box.getByTestId("bm-add").click();
+    await page.keyboard.type("One");
+    await box.getByTestId("bm-add").click();
+    await page.keyboard.type("Two");
+    await box.getByTestId("bm-more").last().click();
+    await page.getByRole("menuitem", { name: "Move in a level", exact: true }).click();
+    await expect(box.getByRole("textbox", { name: "Name of bookmark 2, level 2" })).toBeFocused();
+    await expect(box.getByTestId("bm-said")).toHaveText("Moved in, now level 2");
+    await box.getByTestId("bm-more").last().click();
+    await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+    await expect(box.getByRole("textbox", { name: "Name of bookmark 1" })).toBeFocused();
+    await box.getByRole("button", { name: "Done", exact: true }).click();
+    await run(page);
+    await backToOptions(page);
+    await expect(page.getByTestId("bm-count").locator("visible=true")).toHaveText("1 bookmark");
+    box = await editor(page);
+    await expect(box.getByRole("textbox", { name: "Name of bookmark 1" })).toHaveValue("One");
   });
 });
 

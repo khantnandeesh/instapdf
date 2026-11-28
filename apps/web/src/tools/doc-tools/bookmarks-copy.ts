@@ -1,0 +1,26 @@
+/** Bookmarks copy (spec F10 §4). */
+export const bookmarksCopy = {
+  step: "Bookmarks",
+  edit: "Edit bookmarks",
+  reading: "Reading bookmarks…",
+  failed: "The bookmarks of this file could not be read",
+  tooBig: "This file has more bookmarks, or deeper ones, than the editor holds",
+  count: (n: number) => (n === 0 ? "No bookmarks yet" : n === 1 ? "1 bookmark" : `${n.toLocaleString("en")} bookmarks`),
+  needsChange: "Change a bookmark first",
+  needsOne: "Add a bookmark first",
+  errors: { title: "Give every bookmark a name", page: (n: number) => (n === 1 ? "This file has one page: every bookmark points at page 1" : `Page numbers go from 1 to ${n}`) },
+  dialogTitle: "Bookmarks",
+  dialogHelp: "Name each bookmark and give the page it opens. Use the menu on a row to add, move or nest bookmarks.",
+  empty: "This file has no bookmarks yet.",
+  add: "Add bookmark",
+  name: "Name",
+  page: "Page",
+  /** A bookmark from the file that opens no page of it (a web link, a heading): shown in its empty page field. */
+  noPage: "–",
+  nameOf: (n: number, level: number) => `Name of bookmark ${n}${level > 1 ? `, level ${level}` : ""}`,
+  pageOf: (title: string, n: number) => `Page for ${title.trim() || `bookmark ${n}`}`,
+  more: (title: string, n: number) => `More for ${title.trim() || `bookmark ${n}`}`,
+  menu: { below: "Add below", inside: "Add inside", up: "Move up", down: "Move down", in: "Move in a level", out: "Move out a level", remove: "Delete" },
+  said: { added: "Bookmark added", up: "Moved up", down: "Moved down", in: (level: number) => `Moved in, now level ${level}`, out: (level: number) => `Moved out, now level ${level}`, removed: (n: number) => (n === 1 ? "Bookmark deleted" : `${n} bookmarks deleted`) },
+  note: "Bookmarks are the clickable contents list a reader shows beside the pages.",
+};
