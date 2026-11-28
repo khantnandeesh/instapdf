@@ -11,6 +11,8 @@
  */
 export { USER_ERROR } from "./user-error";
 import type { Stamp } from "./stamp";
+import type { AnnotationKind } from "./annotations";
+import type { MetadataField } from "./metadata";
 import { buildDocuments } from "./build";
 import { mergePdf, type MergeEnv, type MergeInput } from "./merge";
 import { pdfOutputName, uniqueNames } from "./naming";
@@ -59,7 +61,12 @@ export type NupJob = { kind: "nup"; files: JobFile[]; zipName: string; options: 
 /** Stamps (F9): page numbers, headers and footers, watermarks, on the picked pages of each file. */
 export type StampJob = { kind: "stamp"; files: (JobFile & { pages: number[] })[]; zipName: string; stamps: Stamp[]; first: number; date: string; assets?: Record<string, { bytes: Uint8Array; mime: "image/png" | "image/jpeg" }> };
 
-export type Job = RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
+/** Document tools (F10). */
+export type AnnotationsJob = { kind: "annotations"; files: (JobFile & { pages: number[] })[]; zipName: string; kinds: AnnotationKind[] };
+export type FlattenJob = { kind: "flatten"; files: JobFile[]; zipName: string; annotations: boolean };
+export type MetadataJob = { kind: "metadata"; files: JobFile[]; zipName: string } & ({ mode: "remove" } | { mode: "update"; fields: MetadataField[]; remove: string[] });
+
+export type Job = AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
 
 export type JobOutput = {
   name: string;
@@ -112,6 +119,26 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) =>
         stampPdf({ bytes, password: file.password, pages: file.pages, stamps: job.stamps, first: job.first, file: file.name.replace(/\.pdf$/i, ""), date: job.date, assets: job.assets }, runBuild, progress),
       );
+    }
+    case "annotations": {
+      const { removeAnnotations } = await import("./annotations");
+      let removed = 0;
+      const out = await runPerFile(job.files, job.zipName, onProgress, async (bytes, file, progress) => {
+        const r = await removeAnnotations({ bytes, password: file.password, pages: file.pages, kinds: job.kinds }, progress);
+        removed += r.removed;
+        // In a batch, a file that had nothing to remove is named: it comes back as it went in.
+        return !r.removed && job.files.length > 1 ? { ...r, warnings: [`${file.name} has no annotations of the chosen kinds, so it is unchanged.`] } : r;
+      });
+      if (!removed) throw new Error(`${USER_ERROR}No annotations of the chosen kinds were found on ${job.files.length === 1 ? "these pages" : "the pages of these files"}, so there is nothing to remove.`);
+      return out;
+    }
+    case "flatten": {
+      const { flattenPdf } = await import("./flatten");
+      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => flattenPdf({ bytes, password: file.password, annotations: job.annotations }, progress));
+    }
+    case "metadata": {
+      const { writeMetadata } = await import("./metadata");
+      return runPerFile(job.files, job.zipName, onProgress, (bytes, file) => writeMetadata(job.mode === "remove" ? { bytes, password: file.password, mode: "remove" } : { bytes, password: file.password, mode: "update", fields: job.fields, remove: job.remove }));
     }
     case "nup":
       return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => nupPdf({ bytes, password: file.password, options: job.options }, progress));

@@ -22,6 +22,8 @@ describe("zipName", () => {
     expect(zipName("rotate-pdf")).toBe("berrypdf-rotate.zip");
     expect(zipName("merge-pdf")).toBe("berrypdf-merge.zip");
     expect(zipName("n-up")).toBe("berrypdf-n-up.zip");
+    expect(zipName("remove-pdf-annotations")).toBe("berrypdf-remove-annotations.zip");
+    expect(zipName("pdf-header-footer")).toBe("berrypdf-pdf-header-footer.zip");
   });
 });
 

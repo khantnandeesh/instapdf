@@ -892,6 +892,111 @@ export const seoContent: Record<string, ToolSeoContent> = {
     ],
     related: ["add-page-numbers", "watermark-pdf", "edit-pdf", "resize-pdf", "merge-pdf", "organize-pdf"],
   },
+  "remove-pdf-annotations": {
+    howTo: "How to remove annotations from a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. Nothing is uploaded." },
+      { name: "Choose what goes", text: "Highlights, drawings, notes and stamps are switched on. Switch off what you want to keep, and switch on Links if those should go too." },
+      { name: "Download", text: "Select Clean pages and download the clean file. Click pages first to clean only those." },
+    ],
+    faq: [
+      {
+        q: "Which annotations can I remove?",
+        a: "Highlights, underlines and strikeouts; drawings and shapes; notes, comments and text boxes; stamps and attached files; and links. Each group has its own switch.",
+      },
+      {
+        q: "Will my links be removed?",
+        a: "Only if you switch Links on. Links are how readers move around a file, so they stay unless you ask.",
+      },
+      {
+        q: "Are form fields removed?",
+        a: "No. Fields you can fill in stay as they are. To lock what is typed in them, use Flatten.",
+      },
+      {
+        q: "Can I clean only some pages?",
+        a: "Yes. Click the pages to clean before you run the tool. With none picked, every page is cleaned.",
+      },
+      {
+        q: "Does it change the text or pictures on the page?",
+        a: "No. Only what was added on top of the page is taken off. The page itself is not redrawn.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The file is cleaned in your browser, on your device. It never leaves it.",
+      },
+    ],
+    related: ["flatten-pdf", "edit-pdf-metadata", "edit-pdf", "protect-pdf", "merge-pdf", "organize-pdf"],
+  },
+  "flatten-pdf": {
+    howTo: "How to flatten a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. You can add several. Nothing is uploaded." },
+      { name: "Choose what to flatten", text: "Form fields and annotations together, or form fields only." },
+      { name: "Download", text: "Select Flatten PDF and download the file. What was filled in or added is now part of each page." },
+    ],
+    faq: [
+      {
+        q: "What does flattening a PDF do?",
+        a: "It draws form fields, highlights, notes and stamps into the page itself. They look the same, but can no longer be filled in, moved or deleted.",
+      },
+      {
+        q: "Will the text still be selectable?",
+        a: "Yes. Pages are not turned into pictures, so text stays sharp, searchable and small in size.",
+      },
+      {
+        q: "Does a flattened form keep what I typed?",
+        a: "Yes. Each field is drawn with the value it shows. A field that cannot be drawn safely stays fillable, and you are told.",
+      },
+      {
+        q: "Can I undo flattening?",
+        a: "No. Keep your original file if you may need to change the form or the notes later.",
+      },
+      {
+        q: "Are links kept?",
+        a: "Yes. Links stay clickable. Everything else that sits on top of the page becomes part of it.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The file is flattened in your browser, on your device. It never leaves it.",
+      },
+    ],
+    related: ["remove-pdf-annotations", "protect-pdf", "edit-pdf", "create-fillable-pdf", "merge-pdf", "edit-pdf-metadata"],
+  },
+  "edit-pdf-metadata": {
+    howTo: "How to edit PDF metadata",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. Its details are filled in for you. Nothing is uploaded." },
+      { name: "Change the details", text: "Edit the title, author, subject and keywords, add fields of your own, or choose Remove all to clear everything." },
+      { name: "Download", text: "Select Save metadata and download the file. The pages are not changed." },
+    ],
+    faq: [
+      {
+        q: "What is PDF metadata?",
+        a: "Details stored inside the file: its title, author, subject, keywords, the program that made it and the dates it was made and changed. Readers show them under Properties.",
+      },
+      {
+        q: "How do I remove all metadata from a PDF?",
+        a: "Choose Remove all. The title, author, keywords, dates and the hidden XML copy of the same details are all taken out.",
+      },
+      {
+        q: "Can I add my own fields?",
+        a: "Yes. Select Add a field and give it a name and a value, for example a project code.",
+      },
+      {
+        q: "Can I set the same details on several files?",
+        a: "Yes. Add up to 20 PDFs and the same details are written to each one.",
+      },
+      {
+        q: "Does editing metadata change the pages?",
+        a: "No. Only the details about the file change. Pages, text and pictures stay as they are.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The details are read and written in your browser, on your device. The file never leaves it.",
+      },
+    ],
+    related: ["remove-pdf-annotations", "flatten-pdf", "protect-pdf", "merge-pdf", "edit-pdf", "organize-pdf"],
+  },
   "watermark-pdf": {
     howTo: "How to add a watermark to a PDF",
     steps: [

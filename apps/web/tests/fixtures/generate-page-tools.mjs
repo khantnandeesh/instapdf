@@ -6,7 +6,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { imagesPdf, labelledPdf, linksPdf, sharedResPdf } from "../../src/lib/pdf/page-tool-fixtures.ts";
+import { annotatedPdf, imagesPdf, labelledPdf, linksPdf, sharedResPdf } from "../../src/lib/pdf/page-tool-fixtures.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const range = (from, to, step = 1) => Array.from({ length: Math.floor((to - from) / step) + 1 }, (_, i) => from + i * step);
@@ -26,6 +26,8 @@ const files = {
   "duplex-scan.pdf": () => labelledPdf(["Front 1", "Front 2", "Front 3", "Back 3", "Back 2", "Back 1"]),
   "duplex-scan-odd.pdf": () => labelledPdf(["Front 1", "Front 2", "Front 3", "Back 2", "Back 1"]),
   // F12 Extract images: a JPEG and a PNG on page 1, the PNG again and a 1x1 dot on page 2, text only on page 3.
+  // F10: annotations (drawn and not), a filled field, a link, and details about the file.
+  "annotated.pdf": () => annotatedPdf(),
   "with-images.pdf": async () => imagesPdf(await readFile(join(here, "delta.jpg")), await readFile(join(here, "charlie.png"))),
 };
 

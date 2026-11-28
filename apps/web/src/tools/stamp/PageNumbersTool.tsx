@@ -66,12 +66,12 @@ export function PageNumbersTool() {
         <div className="flex min-w-0 items-center gap-3 dock-side:flex-col dock-side:items-stretch dock-side:gap-7 dock-bar:flex-1">
           <div className="flex min-w-0 flex-col gap-3.5 dock-bar:flex-1">
             <Step n={1}>{sc.stepWhere}</Step>
-            <div className="ip-stamp-pair">
+            <div className="ip-opt-pair">
               {position("bar")}
-              <div className="ip-stamp-side">{margin("side")}</div>
+              <div className="ip-opt-side">{margin("side")}</div>
             </div>
           </div>
-          <div className="ip-stamp-side">{look("side", 2)}</div>
+          <div className="ip-opt-side">{look("side", 2)}</div>
         </div>
       )}
     />

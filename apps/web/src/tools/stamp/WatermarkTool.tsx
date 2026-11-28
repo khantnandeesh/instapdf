@@ -131,7 +131,7 @@ export function WatermarkTool() {
                 {what("bar")}
               </div>
             </div>
-            <div className="ip-stamp-side">{rest("side")}</div>
+            <div className="ip-opt-side">{rest("side")}</div>
           </div>
         )}
       />

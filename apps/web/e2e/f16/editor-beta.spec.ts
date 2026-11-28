@@ -65,7 +65,8 @@ test("landing: noindex, Beta badge, no engine before a file with Data Saver on, 
   expect(requests.filter((p) => p.startsWith("/engine/"))).toEqual([]);
   await expectNoSeriousAxeViolations(page, "editor landing");
   const sitemap = await (await page.request.get("/sitemap.xml")).text();
-  expect(sitemap).not.toContain("/edit-pdf");
+  // The editor's own address, not the tools whose address starts the same way (/edit-pdf-metadata).
+  expect(sitemap).not.toMatch(/\/edit-pdf(?![\w-])/);
 });
 
 test("edits a line, undoes it, edits it again, and downloads a PDF with the new text and without the old", async ({ page }) => {

@@ -24,6 +24,8 @@ export function toolFixtures(slug: string, pdf = "sixty-pages.pdf"): string[] {
   if (slug === "extract-images") return [fx(pdf), fx("with-images.pdf")];
   // Split by bookmarks needs a file with bookmarks, or the button waits with "no bookmarks".
   if (slug === "split-pdf-by-bookmarks") return [fx(pdf), fx("bookmarks.pdf")];
+  // Remove annotations needs a file that has some, or its run ends in "nothing to remove".
+  if (slug === "remove-pdf-annotations") return [fx(pdf), fx("annotated.pdf")];
   // Split by text needs a file whose text changes from page to page.
   if (slug === "split-pdf-by-text") return [fx(pdf), fx("invoices.pdf")];
   return slug === "alternate-mix-pdf" ? [fx(pdf), fx("three-pages.pdf")] : [fx(pdf)];

@@ -75,9 +75,9 @@ export function pdfOutputName(inputName: string): string {
   return /\.pdf$/i.test(only) ? fitName(only) : `${fitStem(baseName(only), ".pdf")}.pdf`;
 }
 
-/** "berrypdf-<tool>.zip", with the tool slug's trailing "-pdf" removed. */
+/** "berrypdf-<tool>.zip", with the tool slug's "-pdf" removed (at its end, or in its middle: "remove-pdf-annotations"), so the name stays short. */
 export function zipName(toolSlug: string): string {
-  return `berrypdf-${toolSlug.replace(/-pdf$/, "")}.zip`;
+  return `berrypdf-${toolSlug.replace(/-pdf(?=-|$)/, "")}.zip`;
 }
 
 /**

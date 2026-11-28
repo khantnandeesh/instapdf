@@ -286,3 +286,38 @@ export async function imagesPdf(jpg: Uint8Array, png: Uint8Array): Promise<Uint8
   else pages[1].node.set(PDFName.of("Contents"), ctx.obj([pages[1].node.get(PDFName.of("Contents"))!, draw]));
   return doc.save({ useObjectStreams: false });
 }
+
+/**
+ * F10: two pages with things on top. Page 1: a highlight with a drawn form, a note with its pop-up
+ * and a reply, a link and a filled-in text field. Page 2: a drawing with no drawn form. The file
+ * says who made it (title, author, a field of its own) and carries an XML copy of that.
+ */
+export async function annotatedPdf(): Promise<Uint8Array> {
+  const N = PDFName.of;
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const [one, two] = [doc.addPage([600, 800]), doc.addPage([600, 800])];
+  one.drawText("Body one", { x: 50, y: 700, size: 20, font });
+  two.drawText("Body two", { x: 50, y: 700, size: 20, font });
+  const field = doc.getForm().createTextField("name");
+  field.setText("Asha Rao");
+  field.addToPage(one, { x: 50, y: 500, width: 200, height: 24 });
+  const ctx = doc.context;
+  const ap = ctx.register(ctx.stream("1 1 0 rg 0 0 100 20 re f", { Type: "XObject", Subtype: "Form", BBox: [0, 0, 100, 20] }));
+  const highlight = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Highlight", Rect: [50, 690, 250, 730], AP: { N: ap } }));
+  const note = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Text", Rect: [300, 700, 320, 720] }));
+  const popup = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Popup", Rect: [330, 600, 500, 700], Parent: note }));
+  ctx.lookup(note, PDFDict).set(N("Popup"), popup);
+  const reply = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Text", Rect: [300, 700, 320, 720], IRT: note }));
+  const link = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Link", Rect: [50, 600, 150, 620], A: { S: "URI", URI: PDFString.of("https://example.com") } }));
+  for (const ref of [highlight, note, popup, reply, link]) one.node.addAnnot(ref);
+  const ink = ctx.register(ctx.obj({ Type: "Annot", Subtype: "Ink", Rect: [50, 50, 150, 150] }));
+  two.node.addAnnot(ink);
+  doc.setTitle("Quarterly report");
+  doc.setAuthor("Asha Rao");
+  doc.setCreationDate(new Date("2020-01-02T03:04:05Z"));
+  doc.setModificationDate(new Date("2020-01-02T03:04:05Z"));
+  if (ctx.trailerInfo.Info) ctx.lookup(ctx.trailerInfo.Info, PDFDict).set(N("Department"), PDFString.of("Sales"));
+  doc.catalog.set(N("Metadata"), ctx.register(ctx.stream("<x:xmpmeta/>", { Type: "Metadata", Subtype: "XML" })));
+  return doc.save();
+}

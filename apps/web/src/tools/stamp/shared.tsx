@@ -3,7 +3,6 @@ import "./stamp.css";
 import type { ReactNode } from "react";
 import { StampLayer } from "@/components/page-edit/StampLayer";
 import type { PageDecoration, ToolOutput } from "@/components/tool-flow/types";
-import { Step } from "@/components/page-select/Step";
 import { Select } from "@/components/ui/Select";
 import { STAMP_FONTS, stampObjects, type Stamp, type StampFont, type TextStyle } from "@/lib/pdf/stamp";
 import { USER_ERROR } from "@/lib/pdf/user-error";
@@ -99,16 +98,4 @@ export function stampFlow(tool: FlowTool, stamps: () => Stamp[] | string, first:
   return { decorate, run };
 }
 
-/**
- * A group of options: a numbered step in the side panel, a small heading in the More options sheet.
- * The legend names the group for assistive tech in both.
- */
-export function Group({ n, title, children }: { n: number; title: string; children: ReactNode }) {
-  return (
-    <fieldset className="flex flex-col gap-2.5">
-      <legend className="ip-stamp-legend mb-2 text-sm font-semibold text-ink">{title}</legend>
-      <Step n={n}>{title}</Step>
-      {children}
-    </fieldset>
-  );
-}
+export { Group } from "@/components/page-select/OptionGroup";

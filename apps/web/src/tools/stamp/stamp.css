@@ -1,42 +1,9 @@
-/*
- * The stamping tools' options (spec F9). In the side panel (from 1024 px) every group shows, one
- * under the other; in the bar only the tool's key control does, and the rest is in More options.
- */
-.ip-stamp-side {
-  display: none;
-}
-@media (width >= 64rem) {
-  [data-ip-options="side"] .ip-stamp-side {
-    display: flex;
-    flex-direction: column;
-    gap: 1.75rem;
-  }
-  [data-ip-options="side"] .ip-stamp-bar {
-    display: none;
-  }
-  /* The numbered step shows the group's name there: the legend stays for assistive tech only. */
-  [data-ip-options="side"] .ip-stamp-legend {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-}
+/* The stamping tools' own pieces (spec F9); the groups are components/page-select/option-groups.css. */
 /* Header and footer: the three places along an edge, side by side. */
 .ip-stamp-three {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
-}
-/* A pair of controls in the panel; in the bar only the first shows. */
-@media (width >= 64rem) {
-  [data-ip-options="side"] .ip-stamp-pair {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.625rem;
-  }
 }
 .ip-stamp-hint {
   font-size: 0.8125rem;
