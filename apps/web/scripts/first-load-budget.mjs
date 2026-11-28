@@ -76,16 +76,17 @@ const BUDGET_KB = {
 /** Cloud-on builds carry the F23 source caret and row (~0.9 KB entry, ~2 KB phone), accepted by the lead 24 Nov. */
 const CLOUD_BUDGET_KB = {
   ...BUDGET_KB,
-  "/merge-pdf/page": [152, 162],
+  // +1 kB on six routes that sat at their limit (merge, combine, split, by bookmarks, by size, extract): the shared flow now takes damaged files for Repair (F13).
+  "/merge-pdf/page": [153, 163],
   "/rotate-pdf/page": [144, 154],
   "/organize-pdf/page": [153, 163],
-  "/combine-reorder-pdf/page": [152, 162],
+  "/combine-reorder-pdf/page": [153, 163],
   // Alternate shares every first-load chunk with Organize but its page chunk (150.6 vs 150.8 kB after the
   // F4 + main tile-rule merge); 1 kB over its F5 budget, still under Organize's and Combine's 152.
   "/alternate-mix-pdf/page": [152, 161],
-  "/split-pdf/page": [150, 160],
-  "/split-pdf-by-bookmarks/page": [150, 160],
-  "/split-pdf-by-size/page": [144, 154],
+  "/split-pdf/page": [151, 161],
+  "/split-pdf-by-bookmarks/page": [151, 161],
+  "/split-pdf-by-size/page": [145, 155],
   "/split-pdf-by-text/page": [151, 161],
   "/split-pdf-in-half/page": [146, 156],
   "/crop-pdf/page": [147, 157],
@@ -95,7 +96,7 @@ const CLOUD_BUDGET_KB = {
   "/add-page-numbers/page": [151, 161],
   "/pdf-header-footer/page": [151, 161],
   "/watermark-pdf/page": [152, 162],
-  "/extract-pdf-pages/page": [146, 156],
+  "/extract-pdf-pages/page": [147, 157],
   "/delete-pdf-pages/page": [146, 156],
   "/protect-pdf/page": [144, 154],
   "/unlock-pdf/page": [141, 151],
