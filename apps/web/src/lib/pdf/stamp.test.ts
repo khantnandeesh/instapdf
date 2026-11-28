@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { buildPdf } from "@/lib/editor/build";
 import { nodeFonts } from "@/lib/editor/node-fonts";
 import { LINE_HEIGHT, type ImageObj, type TextObj } from "@/lib/editor/model";
-import { fillTokens, fittedSize, numbering, roman, stampObjects, STAMP_LINE_HEIGHT, type LineStamp, type PageShape, type TextMark } from "./stamp";
+import { batesNumber, batesTemplate, fillTokens, fittedSize, numbering, roman, stampObjects, STAMP_LINE_HEIGHT, type LineStamp, type PageShape, type TextMark } from "./stamp";
 import { stampPdf, type StampBuild } from "./stamp-run";
 
 const style = { font: "arimo", size: 12, color: "#000000", bold: false } as const;
@@ -189,5 +189,52 @@ describe("stamped files (F9 AC-1120 to AC-1123)", () => {
     expect(out.isEncrypted).toBe(false);
     expect(new TextDecoder("latin1").decode(r.bytes)).not.toContain("/Encrypt");
     expect((await items(r.bytes))[0].map((t) => t.str)).toContain("Page 7 of 7");
+  });
+  it("AC-1160: a Bates number is padded to its digits, and a longer number is written whole", () => {
+    expect(batesNumber(7, 6)).toBe("000007");
+    expect(batesNumber(123456, 3)).toBe("123456");
+    expect(batesNumber(0, 1)).toBe("0");
+  });
+  it("AC-1161: the Bates line is built from the style and the text before the number; tokens are filled only where the run gives them", () => {
+    expect(batesTemplate("number", "", "")).toBe("{bates}");
+    expect(batesTemplate("exhibit-page", " Case XYZ ", "")).toBe("Exhibit {doc} Case XYZ {bates} Page {n}");
+    expect(batesTemplate("custom", "ignored", "ABC-{bates}")).toBe("ABC-{bates}");
+    expect(fillTokens("Exhibit {doc} Case XYZ {bates} Page {n}", { ...values, bates: "000041", doc: 3 })).toBe("Exhibit 3 Case XYZ 000041 Page 4");
+    // Page numbers and headers have no Bates run: the braces stay as typed.
+    expect(fillTokens("{bates} {doc}", values)).toBe("{bates} {doc}");
+  });
+  it("AC-1162: a file's pages count on from where its run starts, and carry the file's number", async () => {
+    const line: LineStamp = { ...footer, text: "Ex {doc} {bates} p{n}" };
+    const r = await stampPdf({ bytes: await source(), pages: [0, 1, 2], stamps: [line], first: 1, file: "f", date: "", bates: { start: 13, digits: 4, doc: 2 } }, await build());
+    expect((await items(r.bytes)).map((page) => page.map((t) => t.str).find((t) => t.startsWith("Ex")))).toEqual(["Ex 2 0013 p1", "Ex 2 0014 p2", "Ex 2 0015 p3"]);
+  });
+  it("AC-1163: with room asked for, the stamped pages grow at that edge and the line sits in the new strip", async () => {
+    const bytes = await source();
+    const before = (await PDFDocument.load(bytes)).getPage(0).getSize();
+    const r = await stampPdf({ bytes, pages: [0], stamps: [{ ...footer, text: "{bates}" }], first: 1, file: "f", date: "", bates: { start: 1, digits: 6, doc: 1 }, room: { top: 0, bottom: 40 } }, await build());
+    const out = await PDFDocument.load(r.bytes);
+    expect(out.getPage(0).getSize().height).toBeCloseTo(before.height + 40, 3);
+    expect(out.getPage(0).getSize().width).toBeCloseTo(before.width, 3);
+    expect(out.getPage(1).getSize().height).toBeCloseTo(before.height, 3);
+    expect((await items(r.bytes))[0].map((t) => t.str)).toContain("000001");
+  });
+  it("AC-1164: the added strip on a locked file and on a page shown turned: no password left, the strip at the edge the reader sees, the line inside it", async () => {
+    const plain = await PDFDocument.load(await source());
+    plain.getPage(0).setRotation(degrees(90));
+    const before = plain.getPage(0).getSize();
+    plain.encrypt({ userPassword: "pw", ownerPassword: "owner" });
+    const r = await stampPdf({ bytes: await plain.save(), password: "pw", pages: [0], stamps: [{ ...footer, text: "{bates}" }], first: 1, file: "f", date: "", bates: { start: 5, digits: 3, doc: 1 }, room: { top: 0, bottom: 40 } }, await build());
+    expect(r.wasEncrypted).toBe(true);
+    expect(new TextDecoder("latin1").decode(r.bytes)).not.toContain("/Encrypt");
+    const page = (await PDFDocument.load(r.bytes)).getPage(0);
+    // Shown turned a quarter: the reader's bottom edge is a side of the stored page, so the stored width grows.
+    expect(page.getSize().width).toBeCloseTo(before.width + 40, 3);
+    expect(page.getSize().height).toBeCloseTo(before.height, 3);
+    const line = (await items(r.bytes))[0].find((t) => t.str === "005")!;
+    expect(line).toBeDefined();
+    const box = page.getCropBox();
+    const x = line.x;
+    // Inside the strip: within 40 points of one of the stored page's side edges.
+    expect(Math.min(x - box.x, box.x + box.width - x)).toBeLessThan(40);
   });
 });

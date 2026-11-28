@@ -1,5 +1,5 @@
 "use client";
-import { useRef, type ReactNode } from "react";
+import { useCallback, useRef, type ReactNode } from "react";
 import { formatCount as n } from "@/components/page-select/copy";
 import { useDebouncedAnnounce } from "@/components/page-select/hooks";
 import { usePageSelection } from "@/components/page-select/usePageSelection";
@@ -31,7 +31,15 @@ export const pickCopy = {
  * spec F12 §2, §5): click pages to pick them, Escape clears, Ctrl+A picks all, none picked means all.
  */
 /** Where a page stands: its file, and its place among the pages of that file the run will change. */
-export type PageSpot = { file: LoadedFile; index: number; order: number; count: number };
+export type PageSpot = {
+  file: LoadedFile;
+  index: number;
+  order: number;
+  count: number;
+  /** For tools that count on from file to file: the file's place among the files the run will change, and how many pages it changes in the files before this one. */
+  fileOrder: number;
+  before: number;
+};
 
 export function PickPagesFlow({
   tool,
@@ -61,11 +69,20 @@ export function PickPagesFlow({
   decorate?: (applies: boolean, at: PageSpot) => Partial<PageDecoration>;
 }) {
   const apiRef = useRef<FlowApi | null>(null);
+  const filesRef = useRef<readonly LoadedFile[]>([]);
   const announce = useDebouncedAnnounce(apiRef);
   const s = usePageSelection((state, files) => {
     const picked = files.reduce((k, f) => k + (state.sets[f.id]?.length ?? 0), 0);
     if (files.length) announce(pickCopy.live(picked, files.reduce((k, f) => k + f.pageCount, 0), verb));
   });
+  const keepFiles = s.onFilesChange;
+  const onFiles = useCallback(
+    (files: LoadedFile[]) => {
+      filesRef.current = files;
+      keepFiles(files);
+    },
+    [keepFiles],
+  );
   // Nothing picked means every page.
   const pages = s.count || s.total;
   return (
@@ -78,7 +95,7 @@ export function PickPagesFlow({
       }}
       canRun={canRun}
       warm={warm}
-      onFilesChange={s.onFilesChange}
+      onFilesChange={onFiles}
       onReset={s.reset}
       readyStatus={() => pickCopy.status(pages, s.total)}
       primaryLabel={primaryLabel && (() => primaryLabel(pages))}
@@ -88,7 +105,16 @@ export function PickPagesFlow({
         const picked = set.includes(index);
         const all = s.count === 0;
         // The page's place among the pages the run will change in this file (in page order), for tools that count them.
-        const spot: PageSpot = { file, index, order: all ? index : set.filter((i) => i < index).length, count: all ? file.pageCount : set.length };
+        const changed = (f: LoadedFile) => (all ? f.pageCount : (s.state.sets[f.id]?.length ?? 0));
+        const earlier = filesRef.current.slice(0, Math.max(0, filesRef.current.findIndex((f) => f.id === file.id)));
+        const spot: PageSpot = {
+          file,
+          index,
+          order: all ? index : set.filter((i) => i < index).length,
+          count: all ? file.pageCount : set.length,
+          fileOrder: earlier.filter((f) => changed(f) > 0).length,
+          before: earlier.reduce((k, f) => k + changed(f), 0),
+        };
         return { pendingDelta: 0, inScope: picked, picked, pressed: picked, label: pickCopy.tile(index + 1, file.pageCount), ...decorate?.(picked || all, spot) };
       }}
       onTileActivate={(file, index, mods) => s.activate(file.id, index, mods.shift)}

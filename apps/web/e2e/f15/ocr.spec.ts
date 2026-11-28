@@ -93,7 +93,7 @@ test.describe("OCR", () => {
     expect((await textsOf(zip["scan.pdf"]))[0]).toContain("Harbour Lane Bakery");
   });
 
-  test("AC-1532: a second language is fetched with the first, the choices are remembered, and a page that has text can be read again", async ({ page }, info) => {
+  test("AC-1532: a second language is fetched with the first, and the choices are remembered", async ({ page }, info) => {
     test.skip(!isDesktop(info.project.name), "the recogniser is the same on phones");
     const data: string[] = [];
     page.on("request", (r) => {
@@ -102,18 +102,43 @@ test.describe("OCR", () => {
     });
     await load(page);
     await expect(side(page, "Language of the document")).toHaveValue("eng");
+    expect(await side(page, "Language of the document").locator("option").count()).toBe(72);
     await side(page, "Second language").selectOption({ label: "French" });
-    await page.locator(".ip-opt-side").getByRole("switch", { name: "Skip pages that already have text" }).click();
     await run(page);
     expect(new Set(data)).toEqual(new Set(["eng", "fra"]));
-    // Every page was read this time, the typed one too.
-    await expect(page.getByText(/Text was recognised on/)).toHaveCount(0);
-    const out = await downloadResult(page);
-    const made = await PDFDocument.load(out.bytes);
-    expect(made.getPages().map((p) => (p.node.Resources()?.lookup(PDFName.of("XObject"))?.toString() ?? "").includes("OcrText"))).toEqual([true, true, true]);
     await page.reload();
     await page.getByTestId("file-input").setInputFiles(fx("scan.pdf"));
     await expect(side(page, "Second language")).toHaveValue("fra");
+  });
+
+  test("AC-1537: a file read before is left alone, or read afresh with its old text replaced, never doubled", async ({ page }, info) => {
+    test.skip(!isDesktop(info.project.name), "the recogniser is the same on phones");
+    await load(page);
+    await run(page);
+    const first = await downloadResult(page);
+    const again = async (replace: boolean) => {
+      await page.goto("/ocr-pdf");
+      await page.getByTestId("file-input").setInputFiles({ name: "read.pdf", mimeType: "application/pdf", buffer: Buffer.from(first.bytes) });
+      await expect(flow(page)).toHaveAttribute("data-state", "ready");
+      const sw = page.locator(".ip-opt-side").getByRole("switch", { name: "Replace text from an earlier OCR" });
+      if ((await sw.getAttribute("aria-checked")) !== String(replace)) await sw.click();
+      await run(page);
+      return downloadResult(page);
+    };
+    const count = (text: string, word: string) => text.split(word).length - 1;
+    const layers = async (bytes: Uint8Array) => (await PDFDocument.load(bytes)).getPages().map((p) => (p.node.Resources()?.lookup(PDFName.of("XObject"))?.toString() ?? "").split("OcrText").length - 1);
+    // Left alone: every page has text now, so nothing is read and the file comes back as it was.
+    const kept = await again(false);
+    expect(await layers(kept.bytes)).toEqual([1, 0, 1]);
+    expect(count((await textsOf(kept.bytes))[0], "Harbour Lane Bakery")).toBe(1);
+    // Replaced: the old layer goes, a new one comes, the typed page keeps its own text.
+    const fresh = await again(true);
+    expect(await layers(fresh.bytes)).toEqual([1, 0, 1]);
+    const texts = await textsOf(fresh.bytes);
+    expect(count(texts[0], "Harbour Lane Bakery")).toBe(1);
+    expect(texts[1]).toContain("This page was typed, not scanned.");
+    expect(count(texts[2], "Delivery note")).toBe(1);
+    expect(fresh.bytes.length).toBeLessThan(first.bytes.length + 2_000);
   });
 
   test("AC-1534: Cancel stops the reading at once and the tool is ready again; the phone layout fits", async ({ page }) => {

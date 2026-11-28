@@ -10,7 +10,7 @@
  * stay parsed next to the growing output.
  */
 export { USER_ERROR } from "./user-error";
-import type { Stamp } from "./stamp";
+import type { BatesRun, Stamp } from "./stamp";
 import type { AnnotationKind } from "./annotations";
 import type { MetadataField } from "./metadata";
 import { buildDocuments } from "./build";
@@ -63,7 +63,7 @@ export type CropJob = { kind: "crop"; files: (JobFile & { areas: Record<number, 
 export type NupJob = { kind: "nup"; files: JobFile[]; zipName: string; options: NupOptions };
 
 /** Stamps (F9): page numbers, headers and footers, watermarks, on the picked pages of each file. */
-export type StampJob = { kind: "stamp"; files: (JobFile & { pages: number[] })[]; zipName: string; stamps: Stamp[]; first: number; date: string; assets?: Record<string, { bytes: Uint8Array; mime: "image/png" | "image/jpeg" }> };
+export type StampJob = { kind: "stamp"; files: (JobFile & { pages: number[] })[]; zipName: string; stamps: Stamp[]; first: number; date: string; assets?: Record<string, { bytes: Uint8Array; mime: "image/png" | "image/jpeg" }>; /** Bates numbering: counted on from file to file, in order. */ bates?: BatesRun; room?: { top: number; bottom: number } };
 
 /** Document tools (F10). */
 export type AnnotationsJob = { kind: "annotations"; files: (JobFile & { pages: number[] })[]; zipName: string; kinds: AnnotationKind[] };
@@ -79,7 +79,7 @@ export type GrayEncodeJob = { kind: "grayEncode"; pixels: Blob; width: number; h
 export type GrayscaleJob = { kind: "grayscale"; files: (JobFile & { images?: { ref: string; width: number; height: number; jpeg: boolean; data: Blob }[] })[]; zipName: string; vector: boolean; blackText?: boolean };
 export type RepairJob = { kind: "repair"; files: JobFile[]; zipName: string };
 /** OCR (F15): each layer is a text-only page from the recogniser, laid over the 0-based page it was read from. */
-export type OcrLayerJob = { kind: "ocrLayer"; files: (JobFile & { layers: { page: number; pdf: Blob }[] })[]; zipName: string };
+export type OcrLayerJob = { kind: "ocrLayer"; files: (JobFile & { layers: { page: number; pdf: Blob }[] })[]; zipName: string; /** Take out the text an earlier OCR left, before anything is added. */ strip?: boolean };
 export type Job = OcrLayerJob | DeskewJob | RepairJob | GrayScanJob | GrayEncodeJob | GrayscaleJob | BookmarksJob | PicturesJob | AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
 
 /** The code a job loads on first use, by kind: a tool that knows its job fetches it ahead (`warmWorker`), so the run does not wait for it. */
@@ -138,7 +138,7 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => splitHalfPdf({ bytes, password: file.password, cut: file.cut, options: job.options }, progress));
     case "ocrLayer":
       return runPerFile(job.files, job.zipName, onProgress, async (bytes, file, progress) =>
-        addTextLayers({ bytes, password: file.password, layers: await Promise.all(file.layers.map(async (l) => ({ page: l.page, pdf: new Uint8Array(await l.pdf.arrayBuffer()) }))) }, progress),
+        addTextLayers({ bytes, password: file.password, strip: job.strip, layers: await Promise.all(file.layers.map(async (l) => ({ page: l.page, pdf: new Uint8Array(await l.pdf.arrayBuffer()) }))) }, progress),
       );
     case "deskew":
       return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => deskewPdf({ bytes, password: file.password, turns: file.turns }, progress));
@@ -151,9 +151,21 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
     case "stamp": {
       // The editor's build and its fonts are loaded only for these tools.
       const [{ stampPdf }, { runBuild }] = await Promise.all([import("./stamp-run"), import("@/lib/editor/build-runtime")]);
-      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) =>
-        stampPdf({ bytes, password: file.password, pages: file.pages, stamps: job.stamps, first: job.first, file: file.name.replace(/\.pdf$/i, ""), date: job.date, assets: job.assets }, runBuild, progress),
-      );
+      // Where each file's count starts: after the pages of the files before it; a file with no page to stamp takes no file number.
+      const place = new Map<unknown, { start: number; doc: number }>();
+      if (job.bates) {
+        let { start, doc } = job.bates;
+        for (const f of job.files) {
+          place.set(f, { start, doc });
+          start += f.pages.length;
+          if (f.pages.length) doc += 1;
+        }
+      }
+      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => {
+        const at = place.get(file);
+        const bates = job.bates && at ? { ...job.bates, ...at } : undefined;
+        return stampPdf({ bytes, password: file.password, pages: file.pages, stamps: job.stamps, first: job.first, file: file.name.replace(/\.pdf$/i, ""), date: job.date, assets: job.assets, bates, room: job.room }, runBuild, progress);
+      });
     }
     case "annotations": {
       const { removeAnnotations } = await import("./annotations");

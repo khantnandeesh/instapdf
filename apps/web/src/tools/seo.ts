@@ -289,7 +289,7 @@ export const toolSeo: Record<string, ToolSeo> = {
   "ocr-pdf": {
     keyword: "ocr pdf",
     title: "OCR PDF: Make Scanned PDFs Searchable Free",
-    description: `OCR scanned PDFs to make their text searchable and copyable, in 12 languages. Free, no sign-up, no page limit. ${privateNote}`,
+    description: `OCR scanned PDFs to make their text searchable and copyable, in 72 languages. Free, no sign-up, no daily limit. ${privateNote}`,
     also: ["searchable pdf", "pdf ocr online", "scanned pdf to text", "image to text pdf"],
   },
   "deskew-pdf": {
@@ -857,6 +857,45 @@ export const seoContent: Record<string, ToolSeoContent> = {
     ],
     related: ["pdf-header-footer", "watermark-pdf", "organize-pdf", "merge-pdf", "resize-pdf", "edit-pdf"],
   },
+  "bates-numbering": {
+    howTo: "How to add Bates numbers to PDF files",
+    steps: [
+      { name: "Add your PDFs", text: "Drop one PDF or a whole set on the page, in the order they should be numbered. Nothing is uploaded." },
+      { name: "Set the number", text: "Choose the line, the number of digits, the text before the number and the first number. The pages on screen show their numbers." },
+      { name: "Download", text: "Select Add Bates numbers and download the files. The count runs on from each file to the next." },
+    ],
+    faq: [
+      {
+        q: "What is Bates numbering?",
+        a: "One running number stamped on every page of a set of documents, so any page can be cited by its number alone. Law firms use it for disclosure and exhibits; it works for any large set of papers.",
+      },
+      {
+        q: "Does the count continue from one file to the next?",
+        a: "Yes. If the first file has 12 pages and you start at 1, the second file starts at 13. Drag the files into the order you need before you run it.",
+      },
+      {
+        q: "Can I pick up where an earlier set stopped?",
+        a: "Yes. Set First number to the next number in your sequence, and First file number if your line counts the files as exhibits.",
+      },
+      {
+        q: "Can I write my own line?",
+        a: "Yes. Choose Your own line and type it, with {bates} where the number goes. You can also use {doc} for the file number, {n} for the page in its file, {file} for the file name and {date} for today.",
+      },
+      {
+        q: "Will the number cover what is on the page?",
+        a: "It sits in the margin, at the distance from the edge you choose. For pages printed to the edge, set From the edge to Added strip: the page grows by a strip at that edge and nothing on it is covered or shrunk.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The numbers are added in your browser, on your device. The files never leave it.",
+      },
+      {
+        q: "Is there a limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up and no cap on tasks per hour.",
+      },
+    ],
+    related: ["add-page-numbers", "pdf-header-footer", "watermark-pdf", "merge-pdf", "organize-pdf", "protect-pdf"],
+  },
   "pdf-header-footer": {
     howTo: "How to add a header and footer to a PDF",
     steps: [
@@ -1120,15 +1159,15 @@ export const seoContent: Record<string, ToolSeoContent> = {
       },
       {
         q: "Is there a page limit?",
-        a: "No. Every page is read on your own device, so there is no page count or daily limit. Long documents take longer, and you can cancel at any time.",
+        a: "Up to 20 files and 1,000 pages at a time, and there is no daily limit: every page is read on your own device. Long documents take longer, and you can cancel at any time.",
       },
       {
         q: "Which languages can it read?",
-        a: "English, Hindi, Spanish, French, German, Portuguese, Italian, Dutch, Russian, Arabic, Simplified Chinese and Japanese. You can pick two at once for a mixed document.",
+        a: "72 languages, among them English, Hindi, Spanish, French, German, Portuguese, Arabic, Russian, Chinese, Japanese and Korean. You can pick two at once for a mixed document.",
       },
       {
         q: "What about pages that already have text?",
-        a: "They are left as they are, so a file that mixes typed and scanned pages does not end up with doubled text. Turn Skip pages that already have text off to read every page again.",
+        a: "They are left as they are, so a file that mixes typed and scanned pages does not end up with doubled text. If the text came from an earlier OCR, turn on Replace text from an earlier OCR: the old hidden text is taken out and the pages are read afresh.",
       },
       {
         q: "How accurate is it?",

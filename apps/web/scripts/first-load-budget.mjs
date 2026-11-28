@@ -41,13 +41,16 @@ const BUDGET_KB = {
   // +1 kB on Resize, Clear annotations and Metadata, which sat at their limit: the registry every page carries grew by Deskew (F15).
   // F15 Deskew: the flow and its "Only these pages" field (+2 kB, key check G-1); the skew detector and the dialog load on demand.
   "/deskew-pdf/page": [147, 157],
-  "/ocr-pdf/page": [145, 155],
+  // +1 kB: the names of 72 languages for the two lists (key check G-1); the data itself is fetched on use.
+  "/ocr-pdf/page": [146, 156],
   "/resize-pdf/page": [146, 156],
   "/flip-pdf/page": [145, 155],
   "/n-up-pdf/page": [145, 155],
   "/add-page-numbers/page": [150, 160],
-  "/pdf-header-footer/page": [149, 159],
-  "/watermark-pdf/page": [150, 160],
+  "/bates-numbering/page": [151, 161],
+  // +1 kB with Bates numbering: the pick-pages flow tells a page its place across files, and the stamp tokens grew.
+  "/pdf-header-footer/page": [150, 160],
+  "/watermark-pdf/page": [151, 161],
   // +1 kB entry on Extract (F12, 27 Nov): three more tools in the registry every route loads, and the shared
   // LinkButton / IconButton variants.
   "/extract-pdf-pages/page": [146, 156],
@@ -103,8 +106,10 @@ const CLOUD_BUDGET_KB = {
   "/resize-pdf/page": [147, 157],
   "/flip-pdf/page": [147, 157],
   "/n-up-pdf/page": [147, 157],
-  "/add-page-numbers/page": [151, 161],
-  "/pdf-header-footer/page": [151, 161],
+  // +1 kB entry with Bates numbering (see the note in the table above).
+  "/add-page-numbers/page": [152, 161],
+  "/bates-numbering/page": [152, 162],
+  "/pdf-header-footer/page": [152, 161],
   "/watermark-pdf/page": [152, 162],
   "/extract-pdf-pages/page": [147, 157],
   "/delete-pdf-pages/page": [147, 157],

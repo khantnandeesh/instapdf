@@ -13,7 +13,9 @@ describe("OCR languages", () => {
     expect(languageForLocale("pt-BR")).toBe("por");
     expect(languageForLocale("hi")).toBe("hin");
     expect(languageForLocale("zh-Hans-CN")).toBe("chi_sim");
-    expect(languageForLocale("sv-SE")).toBe("eng");
+    expect(languageForLocale("sv-SE")).toBe("swe");
+    expect(languageForLocale("nb-NO")).toBe("nor");
+    expect(languageForLocale("xx-XX")).toBe("eng");
     expect(languageForLocale(undefined)).toBe("eng");
     expect(isOcrLanguage("fra")).toBe(true);
     expect(isOcrLanguage("xxx")).toBe(false);
@@ -23,8 +25,9 @@ describe("OCR languages", () => {
     for (const { code } of OCR_LANGUAGES) {
       const dir = dirname(require.resolve(`@tesseract.js-data/${code}/package.json`));
       expect(require(`@tesseract.js-data/${code}/package.json`).version, code).toBe(config.data);
-      expect(existsSync(join(dir, "4.0.0_best_int", `${code}.traineddata.gz`)), code).toBe(true);
+      expect(["4.0.0_best_int", "4.0.0"].some((d) => existsSync(join(dir, d, `${code}.traineddata.gz`))), code).toBe(true);
     }
+    expect(OCR_LANGUAGES.length).toBe(72);
     expect(require("tesseract.js/package.json").version).toBe(config.engine);
     for (const path of Object.values(OCR_PATHS)) expect(path).toMatch(/^\/ocr\//);
   });

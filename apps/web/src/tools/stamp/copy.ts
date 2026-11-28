@@ -1,5 +1,5 @@
 import { formatCount as n } from "@/components/page-select/copy";
-import type { Place, WatermarkLayout } from "@/lib/pdf/stamp";
+import type { BatesStyle, Place, WatermarkLayout } from "@/lib/pdf/stamp";
 
 /** Words shared by the stamping tools (spec F9): Page numbers, Header and footer, Watermark. */
 export const stampCopy = {
@@ -63,4 +63,30 @@ export const watermarkCopy = {
   needsText: "Type the watermark text",
   needsImage: "Choose a picture",
   badImage: "That file is not a picture we can read. Try a PNG or a JPG.",
+};
+
+export const batesCopy = {
+  primary: (pages: number) => `Number ${n(pages)} ${pages === 1 ? "page" : "pages"}`,
+  gridHint: "Numbers count on from file to file, in the order shown. Click pages to number only those.",
+  position: "Position",
+  stepNumber: "Number",
+  style: "Line",
+  styles: {
+    number: "Number",
+    "number-page": "With page",
+    exhibit: "Exhibit",
+    "exhibit-page": "Exhibit, page",
+    custom: "Your own",
+  } satisfies Record<BatesStyle, string>,
+  digits: "Digits",
+  prefix: "Text before",
+  prefixPlaceholder: "Case name",
+  start: "Starts at",
+  doc: "Files from",
+  custom: "Your line",
+  tokens: "{bates} number, {doc} file, {n} page, {file} name, {date}",
+  room: "Added strip",
+  needsStart: "Enter the first number",
+  needsDoc: "Enter the first file number",
+  needsLine: "Type your line, with {bates} where the number goes",
 };
