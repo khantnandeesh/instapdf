@@ -1,7 +1,7 @@
-# F10: Remove annotations, Flatten, Metadata, Rename (Bookmarks follows)
+# F10: Remove annotations, Flatten, Metadata, Bookmarks, Rename
 
-Reference pages: `docs/discovery/pages/delete-pdf-annotations.md`, `flatten-pdf.md`, `edit-pdf-metadata.md`, `rename-pdf.md`.
-All four run in the browser; nothing is uploaded. Settings tools (F25 §4): options in the side panel from 1024 px, in the bar and the More options sheet below.
+Reference pages: `docs/discovery/pages/delete-pdf-annotations.md`, `flatten-pdf.md`, `edit-pdf-metadata.md`, `pdf-bookmarks.md`, `rename-pdf.md`.
+All five run in the browser; nothing is uploaded. Settings tools (F25 §4): options in the side panel from 1024 px, in the bar and the More options sheet below.
 
 ## 1. Remove annotations (`/remove-pdf-annotations`, shown as "Clear annotations": the longer name wraps in the All tools menu)
 
@@ -36,6 +36,17 @@ Where we differ from the reference: it lists thirteen kinds one by one and remov
 - On edit the XML copy is removed as well, since readers that prefer it would show the old values. The creation date is kept and the change date is set.
 - Several files get the same details (the reference's free tier takes one file).
 
+## 4. Bookmarks (`/pdf-bookmarks`)
+
+- One file. Its bookmarks are read when it opens; the side panel (the bar below 1024 px) says how many and has "Edit bookmarks".
+- The list opens in the shared dialog, the same at every width: one row per bookmark with its name, its page and a menu (Add below, Add inside, Move up, Move down, Move in a level, Move out a level, Delete). Nesting shows as an indent. "Add bookmark" adds one at the end; a new row takes the page of the row before it and its name gets the focus.
+- Moving a bookmark moves what is under it; deleting it deletes what is under it. Up to 12 levels and 2,000 bookmarks.
+- The button waits, and says why, until something changed, every bookmark has a name and every page is a page of the file.
+- A bookmark the file already had keeps its colour, bold or italic style and open state, and the exact place it jumps to while its page is unchanged. The old outline's objects are deleted, so a removed bookmark's name is nowhere in the file.
+- A file that gets bookmarks opens with the bookmarks panel unless it asks for another view; a file left with none has no outline.
+
+Where we differ from the reference: it uploads the file and edits through right-click menus and drag and drop on a tree beside a page preview. Ours stays on the device and every action is in a menu a keyboard or a phone can reach. Not in this version: making a bookmark by clicking text on the page, and drag and drop.
+
 ## 5. Rename by content (`/rename-pdf`)
 
 - Up to 20 files. "Choose text area" opens the shared area dialog on the first file's first page; the box starts across the top of the page, where a title usually is. The line under the page says what text the box catches.
@@ -50,9 +61,11 @@ Where we differ from the reference: it uploads the files and takes 5 per task on
 
 Engine (`f10.test.ts`): AC-1200 kinds group subtypes, fields are never a kind; AC-1201 counts by kind; AC-1202 chosen kinds on chosen pages only; AC-1203 a note takes its pop-up and replies; AC-1204 an emptied list leaves no `/Annots`; AC-1205 nothing to remove returns the file unchanged; AC-1206 an appearance is fitted to its rectangle through its matrix; AC-1210 annotations with a drawn form become content, links stay, the rest stays with a note; AC-1211 fields are drawn and the form goes; AC-1212 fields only leaves annotations; AC-1220 fields are read, standard first, no dates; AC-1221 update writes listed fields, drops the rest, keeps the creation date; AC-1222 remove all leaves nothing, not even in unreachable objects; AC-1223 a bare file gets its details; AC-1224 names are checked; AC-1225 fields the form never showed, odd names and long values survive an update; AC-1226 remove all clears page-level details, private notes and the identifier, and calls out PDF/A. Review cases: AC-1207 shared annotations; AC-1208 pop-ups never by kind; AC-1213 attachments and redaction marks are not flattened; AC-1214, AC-1215 what goes undrawn is said, print-only stamps are drawn; AC-1216 signed files.
 
+Bookmarks (`bookmarks.test.ts`): AC-1280 rows from the outline; AC-1281 add below or inside; AC-1282 delete with children; AC-1283 move in and out; AC-1284 move up and down; AC-1285 names and pages checked; AC-1290 edits written, style kept; AC-1291 a new page drops the old view; AC-1292 deleted names leave the file; AC-1293 opens with the panel.
+
 Rename (`rename.test.ts`): AC-1260 text becomes a safe name; AC-1261 pattern tokens; AC-1262 no text keeps the old name; AC-1263 equal texts get different names; AC-1264 long text is cut at a word; AC-1265 unseen characters are dropped.
 
-Browser (`e2e/f10/doc-tools.spec.ts`): AC-1230 to AC-1232 Remove annotations; AC-1240, AC-1241 Flatten; AC-1242, AC-1243 Flatten to pictures; AC-1250 to AC-1253 Metadata; AC-1270, AC-1271 Rename.
+Browser (`e2e/f10/doc-tools.spec.ts`): AC-1230 to AC-1232 Remove annotations; AC-1240, AC-1241 Flatten; AC-1242, AC-1243 Flatten to pictures; AC-1250 to AC-1253 Metadata; AC-1270, AC-1271 Rename; AC-1300, AC-1301 Bookmarks.
 
 ## Known limits
 

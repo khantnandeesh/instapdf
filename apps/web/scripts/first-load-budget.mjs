@@ -58,6 +58,7 @@ const BUDGET_KB = {
   // Flatten: +1 kB for the pictures choice (a second select and its copy).
   "/flatten-pdf/page": [143, 153],
   "/rename-pdf/page": [145, 155],
+  "/pdf-bookmarks/page": [145, 155],
   "/edit-pdf-metadata/page": [144, 154],
   "/pdf-to-jpg/page": [145, 155],
   "/extract-images/page": [142, 152],
@@ -96,6 +97,7 @@ const CLOUD_BUDGET_KB = {
   "/remove-pdf-annotations/page": [147, 157],
   "/flatten-pdf/page": [145, 155],
   "/rename-pdf/page": [147, 157],
+  "/pdf-bookmarks/page": [147, 157],
   "/edit-pdf-metadata/page": [146, 156],
   "/pdf-to-jpg/page": [147, 157],
   "/extract-images/page": [144, 154],

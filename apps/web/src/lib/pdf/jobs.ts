@@ -68,7 +68,8 @@ export type MetadataJob = { kind: "metadata"; files: JobFile[]; zipName: string 
 
 /** Flatten to pictures: the pages were drawn in the tab (a canvas is needed); the worker puts each file's pictures into a PDF. */
 export type PicturesJob = { kind: "pictures"; files: { name: string; title?: string; encrypted: boolean; pages: { jpg: Blob; width: number; height: number }[] }[]; zipName: string };
-export type Job = PicturesJob | AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
+export type BookmarksJob = { kind: "bookmarks"; files: JobFile[]; zipName: string; items: import("./bookmark-edit").BookmarkNode[] };
+export type Job = BookmarksJob | PicturesJob | AnnotationsJob | FlattenJob | MetadataJob | RotateJob | MergeJob | DocumentsJob | ProtectJob | UnlockJob | SplitSizeJob | SplitHalfJob | FlipJob | ResizeJob | CropJob | NupJob | StampJob;
 
 export type JobOutput = {
   name: string;
@@ -133,6 +134,10 @@ export async function runJob(job: Job, onProgress: ProgressFn, env: JobEnv = {})
       });
       if (!removed) throw new Error(`${USER_ERROR}No annotations of the chosen kinds were found on ${job.files.length === 1 ? "these pages" : "the pages of these files"}, so there is nothing to remove.`);
       return out;
+    }
+    case "bookmarks": {
+      const { writeBookmarks } = await import("./bookmarks");
+      return runPerFile(job.files, job.zipName, onProgress, (bytes, file, progress) => writeBookmarks({ bytes, password: file.password, items: job.items }, progress));
     }
     case "pictures": {
       const { picturesPdf } = await import("./pictures-pdf");

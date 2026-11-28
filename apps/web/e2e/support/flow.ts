@@ -190,7 +190,7 @@ export async function cardAction(page: Page, file: string, action: "Remove" | "E
 
 /**
  * Gives a tool whose primary waits for a choice what it needs, for the guards that run every tool:
- * Protect a password; Split by text and Rename a text area; Extract and Delete the first toggle tile (spec F4/F5 UI decision 12). Other
+ * Protect a password; Split by text and Rename a text area; Bookmarks a new bookmark; Extract and Delete the first toggle tile (spec F4/F5 UI decision 12). Other
  * tools run as loaded, some a moment after the file is in. Header and footer gets a line of text.
  */
 export async function makeRunnable(page: Page) {
@@ -201,7 +201,16 @@ export async function makeRunnable(page: Page) {
   const area = page.locator('[data-testid="choose-area"], [data-testid^="rename-area-"]').locator("visible=true").first();
   // Header and footer: one of its six lines (the panel's field from 1024 px, the bar's below).
   const header = page.locator("#hf-top-center-side, #hf-top-center-bar").locator("visible=true");
-  if (await password.count()) await password.fill("correct horse battery");
+  // Bookmarks: one new bookmark (the button is in the bar or the side panel; the shown one).
+  const bookmarks = page.locator('[data-testid^="bm-edit-"]').locator("visible=true").first();
+  if (await bookmarks.isVisible()) {
+    await expect(bookmarks).toBeEnabled();
+    await bookmarks.click();
+    const box = page.getByRole("dialog");
+    await box.getByTestId("bm-add").click();
+    await box.getByRole("textbox", { name: /^Name of bookmark/ }).last().fill("Start");
+    await box.getByRole("button", { name: "Done", exact: true }).click();
+  } else if (await password.count()) await password.fill("correct horse battery");
   else if (await area.isVisible()) {
     // Split by text: the box starts over the top left of the page, where the fixture's text is.
     await area.click();
