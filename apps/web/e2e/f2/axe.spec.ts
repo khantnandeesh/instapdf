@@ -27,9 +27,9 @@ test.describe("AC-56 at 1366x900", () => {
     await page.keyboard.press("Escape");
     await expect(menu(page)).toHaveCount(0);
 
-    await openHydrated(page, "/split-pdf-by-bookmarks");
+    await openHydrated(page, "/pdf-to-word");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expectNoSeriousAxeViolations(page, "coming-soon page /split-pdf-by-bookmarks");
+    await expectNoSeriousAxeViolations(page, "coming-soon page /pdf-to-word");
 
     const notFound = await page.goto("/does-not-exist");
     expect(notFound?.status()).toBe(404);
@@ -81,9 +81,9 @@ test.describe("AC-56 with the OS in dark mode at 1366x900 (light only until Berr
     await page.keyboard.press("Escape");
     await expect(menu(page)).toHaveCount(0);
 
-    await openHydrated(page, "/split-pdf-by-bookmarks");
+    await openHydrated(page, "/pdf-to-word");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expectNoSeriousAxeViolations(page, "dark, coming-soon page /split-pdf-by-bookmarks");
+    await expectNoSeriousAxeViolations(page, "dark, coming-soon page /pdf-to-word");
 
     const notFound = await page.goto("/does-not-exist");
     expect(notFound?.status()).toBe(404);

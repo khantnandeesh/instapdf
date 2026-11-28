@@ -628,6 +628,270 @@ export const seoContent: Record<string, ToolSeoContent> = {
     ],
     related: ["split-pdf", "delete-pdf-pages", "organize-pdf", "merge-pdf", "rotate-pdf"],
   },
+  "split-pdf-by-bookmarks": {
+    howTo: "How to split a PDF by bookmarks",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF that has bookmarks on the page, or choose it from your device. Nothing is uploaded." },
+      { name: "Pick the bookmark level", text: "Level 1 gives one file per chapter; a deeper level gives one per section. The pages show where each file starts, and you can move any split." },
+      { name: "Download", text: "Select Split and download the files, each named after its bookmark." },
+    ],
+    faq: [
+      {
+        q: "How do I split a PDF into chapters?",
+        a: "Add the PDF and keep Level 1. A new file starts at every top-level bookmark, so each chapter becomes its own PDF, named after the chapter.",
+      },
+      {
+        q: "Can I split at only some bookmarks?",
+        a: "Yes. Type part of a title, such as Chapter or Appendix, and only bookmarks with that text start a new file. You can also click between two pages to add or remove a split.",
+      },
+      {
+        q: "What happens to pages before the first bookmark?",
+        a: "They are kept as a file of their own, so no page is lost.",
+      },
+      {
+        q: "What if my PDF has no bookmarks?",
+        a: "The page tells you so. Use Split to cut by page ranges, or every few pages, instead.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. Splitting runs in your browser, so your files stay on your device.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up and no watermark.",
+      },
+    ],
+    related: ["split-pdf", "extract-pdf-pages", "organize-pdf", "merge-pdf", "delete-pdf-pages", "compress-pdf"],
+  },
+  "split-pdf-by-size": {
+    howTo: "How to split a PDF by file size",
+    steps: [
+      { name: "Add your PDF", text: "Drop a large PDF on the page, or choose it from your device. Nothing is uploaded." },
+      { name: "Set the largest file size", text: "Type the limit in MB or KB, for example 10 MB for an email attachment." },
+      { name: "Download", text: "Select Split and download the parts. Each one is under your limit and the pages stay in order." },
+    ],
+    faq: [
+      {
+        q: "How do I split a PDF into smaller files for email?",
+        a: "Add the PDF, set the largest size your email allows, such as 10 or 20 MB, and select Split. You get the fewest files that each stay under that size.",
+      },
+      {
+        q: "Does splitting by size lower the quality?",
+        a: "No. Pages are copied as they are, with the same text, images and fonts. Only the number of pages per file changes.",
+      },
+      {
+        q: "What if a single page is bigger than my limit?",
+        a: "That page becomes a file of its own and the result tells you which page it is. Compressing the PDF first can bring it under the limit.",
+      },
+      {
+        q: "Will the parts be the same size?",
+        a: "Each part takes as many pages as fit under the limit, so most parts are close to it and the last one is usually smaller.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. Splitting runs in your browser, so even very large files stay on your device.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up and no watermark.",
+      },
+    ],
+    related: ["compress-pdf", "split-pdf", "split-pdf-by-bookmarks", "extract-pdf-pages", "merge-pdf", "delete-pdf-pages"],
+  },
+  "split-pdf-by-text": {
+    howTo: "How to split a PDF by text",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, such as a batch of invoices or statements, or choose it from your device. Nothing is uploaded." },
+      { name: "Mark the text that changes", text: "Select Choose text area and drag a box around the text that is different in each document, such as an invoice number or a customer name." },
+      { name: "Download", text: "The pages show where each file starts. Select Split and download the files, each named after its text." },
+    ],
+    faq: [
+      {
+        q: "How do I split a PDF of invoices into one file per invoice?",
+        a: "Add the PDF, select Choose text area and drag a box around the invoice number. A new file starts on every page where that number changes, so each invoice becomes its own PDF.",
+      },
+      {
+        q: "What happens to pages where the box has no text?",
+        a: "They stay with the document before them. A second or third page with no number in that spot is kept with its first page.",
+      },
+      {
+        q: "Does it work on scanned PDFs?",
+        a: "The pages need real text. A scan is a picture of text, so run OCR on it first; after that the text can be read and the PDF split.",
+      },
+      {
+        q: "Can I change where the files start?",
+        a: "Yes. The lines between pages show each split, and you can click between two pages to add or remove one before you download.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The text is read and the PDF is split in your browser, on your device. The file never leaves it.",
+      },
+    ],
+    related: ["split-pdf", "split-pdf-by-bookmarks", "split-pdf-by-size", "extract-pdf-pages", "organize-pdf", "merge-pdf"],
+  },
+  "crop-pdf": {
+    howTo: "How to crop a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. Nothing is uploaded." },
+      { name: "Trim the margins or choose an area", text: "Trim margins finds the white edges of every page for you. Choose area lets you drag a box around the part to keep." },
+      { name: "Download", text: "The pages show what will be left. Select Crop PDF and download the file." },
+    ],
+    faq: [
+      {
+        q: "How do I remove the white margins from a PDF?",
+        a: "Add the PDF and keep Trim margins. Every page is measured and the white edges are cut away, so the text fills the page. It helps most on phones and e-readers.",
+      },
+      {
+        q: "Can I crop every page to the same size?",
+        a: "Yes. Same crop on every page is on to begin with: one box is used that keeps the content of all pages. Switch it off in More options to trim each page as far as it goes.",
+      },
+      {
+        q: "Is the cropped part deleted from the file?",
+        a: "Cropping changes what a page shows and prints. The part outside the box is hidden, not erased, so do not use cropping to hide private details.",
+      },
+      {
+        q: "Does cropping lower the quality?",
+        a: "No. Nothing is redrawn: text stays sharp and selectable, and pictures keep their resolution.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The PDF is measured and cropped in your browser, on your device. The file never leaves it.",
+      },
+    ],
+    related: ["resize-pdf", "split-pdf-in-half", "rotate-pdf", "delete-pdf-pages", "organize-pdf", "compress-pdf"],
+  },
+  "resize-pdf": {
+    howTo: "How to resize PDF pages",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. Nothing is uploaded." },
+      { name: "Pick a page size or margins", text: "Choose a paper size such as A4 or Letter, or switch to Margins and type how much space to add around each page." },
+      { name: "Download", text: "Select Resize and download the file. Click pages first if only some of them should change." },
+    ],
+    faq: [
+      {
+        q: "How do I change a PDF from Letter to A4?",
+        a: "Add the PDF, keep Page size and pick A4. Each page is scaled to fit the new paper and centred, so nothing is cut off.",
+      },
+      {
+        q: "How do I add margins to a PDF?",
+        a: "Switch to Margins and type a size in millimetres or inches. The page grows by that much on every side and the content keeps its size. More options lets you set each side on its own.",
+      },
+      {
+        q: "Does resizing stretch the page?",
+        a: "No. The content keeps its proportions. When the new paper has a different shape, the page is centred with space on two sides.",
+      },
+      {
+        q: "What happens to pages that lie on their side?",
+        a: "A page that is wider than tall gets the paper on its side too, so a landscape slide stays landscape.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up and no watermark.",
+      },
+    ],
+    related: ["crop-pdf", "n-up-pdf", "rotate-pdf", "compress-pdf", "organize-pdf", "merge-pdf"],
+  },
+  "flip-pdf": {
+    howTo: "How to flip a PDF",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. Nothing is uploaded." },
+      { name: "Choose the direction", text: "Left to right mirrors each page like a reflection. Top to bottom turns it over the other way. The pages on screen show the result." },
+      { name: "Download", text: "Select Flip and download the mirrored file. Click pages first to flip only those." },
+    ],
+    faq: [
+      {
+        q: "How do I mirror a PDF for iron-on transfer printing?",
+        a: "Add the PDF, keep Left to right and select Flip. The text reads backwards on paper and the right way round once it is pressed onto fabric.",
+      },
+      {
+        q: "What is the difference between flipping and rotating?",
+        a: "Flipping mirrors the page, so text reads backwards. Rotating turns the page in quarter turns and the text stays readable. To turn pages, use Rotate.",
+      },
+      {
+        q: "Can I flip only some pages?",
+        a: "Yes. Click the pages to flip; the others stay as they are. With no page picked, every page is flipped.",
+      },
+      {
+        q: "Does flipping lower the quality?",
+        a: "No. The page is mirrored as it is, not turned into a picture, so text and drawings stay sharp at any zoom.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The PDF is flipped in your browser, on your device. The file never leaves it.",
+      },
+    ],
+    related: ["rotate-pdf", "crop-pdf", "resize-pdf", "organize-pdf", "n-up-pdf", "merge-pdf"],
+  },
+  "n-up-pdf": {
+    howTo: "How to put several PDF pages on one sheet",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF on the page, or choose it from your device. Nothing is uploaded." },
+      { name: "Choose the pages per sheet", text: "Pick 2, 4, 8 or 16. More options sets the order, and whether the paper keeps its size." },
+      { name: "Download", text: "Select Arrange pages and download the file, ready to print on fewer sheets." },
+    ],
+    faq: [
+      {
+        q: "How do I print two pages per sheet?",
+        a: "Add the PDF and keep 2. Each sheet holds two pages side by side. Print the new file as usual, or switch on Keep the paper size to get the same paper with smaller pages.",
+      },
+      {
+        q: "Will the pages become smaller?",
+        a: "Not unless you ask. By default the sheet grows, so two A4 pages make one A3 sheet at full size. With Keep the paper size the pages shrink to share one sheet.",
+      },
+      {
+        q: "Can I change the order of the pages on the sheet?",
+        a: "Yes. Pages go across, then down. More options can fill each column first, or start from the right for documents that read right to left.",
+      },
+      {
+        q: "Does the text stay sharp?",
+        a: "Yes. Pages are placed as they are, not as pictures, so text stays text and prints crisply at any size.",
+      },
+      {
+        q: "Do links still work?",
+        a: "Web links keep working on the new sheets. Links that jump to another page, and form fields, are left out, because the pages they belonged to are now parts of a sheet.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Up to 20 PDFs at a time, up to 100 MB each and 1,000 pages in total. It is free, with no sign-up and no watermark.",
+      },
+    ],
+    related: ["resize-pdf", "merge-pdf", "organize-pdf", "split-pdf-in-half", "compress-pdf", "rotate-pdf"],
+  },
+  "split-pdf-in-half": {
+    howTo: "How to split PDF pages in half",
+    steps: [
+      { name: "Add your PDF", text: "Drop a PDF with two pages on each sheet, such as a scanned book. Nothing is uploaded." },
+      { name: "Choose the cut", text: "Auto cuts wide sheets into left and right pages and tall sheets into top and bottom. Click a cover or a fold-out to keep it whole." },
+      { name: "Download", text: "Select Split in half and download a PDF with one page per page." },
+    ],
+    faq: [
+      {
+        q: "How do I split an A3 scan into two A4 pages?",
+        a: "Add the PDF and select Split in half. Each A3 sheet is cut down the middle into two A4 pages, left page first.",
+      },
+      {
+        q: "Does cutting pages in half reduce quality?",
+        a: "No. Nothing is redrawn or recompressed. Each half is the same page shown through a smaller frame, so text stays sharp and searchable.",
+      },
+      {
+        q: "Can I keep the cover as one page?",
+        a: "Yes. Click the pages you want cut and leave the cover unpicked. Pages you do not pick stay whole and keep their place.",
+      },
+      {
+        q: "My book reads right to left. Can the right page come first?",
+        a: "Yes. Open More options and switch on Right page first.",
+      },
+      {
+        q: "I scanned an unstapled booklet. Can the pages be put back in order?",
+        a: "Yes. Switch on Booklet scan in More options. Sheets scanned as 12-1, 2-11, 10-3 and so on come out as pages 1 to 12.",
+      },
+      {
+        q: "Are my files uploaded?",
+        a: "No. The pages are cut in your browser, so your scans stay on your device.",
+      },
+    ],
+    related: ["split-pdf", "crop-pdf", "organize-pdf", "rotate-pdf", "extract-pdf-pages", "split-pdf-by-size"],
+  },
   "delete-pdf-pages": {
     howTo: "How to delete pages from a PDF",
     steps: [

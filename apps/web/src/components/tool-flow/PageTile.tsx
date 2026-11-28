@@ -91,7 +91,15 @@ export function PageTile({
     >
       <div className="ip-tile__box relative grid place-items-center" data-testid="page-tile" data-rotation={pendingDelta}>
         <TilePage size={size} rotation={pendingDelta} data-testid="page-visual">
-          <PageThumb fileId={fileId} index={index} scale={pageTurnScale(size, pendingDelta)} />
+          <PageThumb fileId={fileId} index={index} scale={pageTurnScale(size, pendingDelta)} className={decor?.flip && `ip-flip ip-flip--${decor.flip}`} />
+          {decor?.keep && (
+            <span
+              aria-hidden="true"
+              className="ip-keep"
+              data-testid="keep-area"
+              style={{ left: `${decor.keep.x * 100}%`, top: `${decor.keep.y * 100}%`, width: `${decor.keep.w * 100}%`, height: `${decor.keep.h * 100}%` }}
+            />
+          )}
         </TilePage>
         <TileHit
           tabIndex={active ? 0 : -1}

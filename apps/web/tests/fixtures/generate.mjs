@@ -15,6 +15,7 @@ import {
   PDFString,
   StandardFonts,
   degrees,
+  rgb,
 } from "@cantoo/pdf-lib";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -139,6 +140,30 @@ function grayPng(width, height, pixel) {
   agree.check();
   agree.addToPage(doc.getPage(0), { x: 72, y: 550, width: 20, height: 20 });
   await save("form.pdf", doc);
+}
+
+{
+  // Crop: a page inked to its edges, so there is no white margin to trim.
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([300, 400]);
+  page.drawRectangle({ x: 0, y: 0, width: 300, height: 400, color: rgb(0.2, 0.3, 0.6) });
+  doc.setCreationDate(FIXED_DATE);
+  doc.setModificationDate(FIXED_DATE);
+  await save("full-bleed.pdf", doc);
+}
+
+{
+  // Split by text: an invoice number at the top left that changes from page to page; page 4 has none.
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  ["Invoice 1001", "Invoice 1001", "Invoice 1002", "", "Invoice 1003", "Invoice 1003"].forEach((head, i) => {
+    const page = doc.addPage([420, 595]);
+    if (head) page.drawText(head, { x: 40, y: 540, size: 16, font });
+    page.drawText(`Sheet ${i + 1}`, { x: 40, y: 300, size: 28, font });
+  });
+  doc.setCreationDate(FIXED_DATE);
+  doc.setModificationDate(FIXED_DATE);
+  await save("invoices.pdf", doc);
 }
 
 {

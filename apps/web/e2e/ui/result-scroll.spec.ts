@@ -45,5 +45,13 @@ for (const tool of usable) {
       const b = (await page.getByRole("button", { name }).boundingBox())!;
       expect(b.y + b.height, `${name} is on screen`).toBeLessThanOrEqual(657);
     }
+    // The chips past the first eight wait behind "More tools"; pressing it shows them and moves focus to the first.
+    if (tool.slug === "rotate-pdf") {
+      await expect(page.getByRole("button", { name: "Protect", exact: true })).toHaveCount(0);
+      await page.getByTestId("continue-more").click();
+      await expect(page.getByRole("button", { name: "Protect", exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Split by bookmarks", exact: true })).toBeFocused();
+      await expect(page.getByTestId("continue-more")).toHaveCount(0);
+    }
   });
 }

@@ -116,7 +116,7 @@ test.describe("desktop menu (1366x900)", () => {
     expect(new Set(seen)).toEqual(new Set(tools.map((t) => `/${t.slug}`)));
   });
 
-  test("AC-31: at most 5 header shortcuts, none to a planned tool (today: Rotate, Delete pages, Merge, Split, Extract pages)", async ({ page }) => {
+  test("AC-31: at most 5 header shortcuts, none to a planned tool (today: Rotate, Delete pages, Merge, Split, Crop)", async ({ page }) => {
     const shortcuts = page.getByRole("navigation", { name: "Quick links" }).getByRole("link");
     const hrefs = await shortcuts.evaluateAll((as) => as.map((a) => a.getAttribute("href")));
     expect(hrefs.length).toBeLessThanOrEqual(5);
@@ -124,7 +124,7 @@ test.describe("desktop menu (1366x900)", () => {
     expect(hrefs.filter((h) => planned.has(h!))).toEqual([]);
     // The first 5 usable tools in popular order (registry shortcutTools), so a new ready tool shows up here.
     expect(hrefs).toEqual(shortcutTools(5).map((t) => `/${t.slug}`));
-    expect(hrefs).toEqual(["/rotate-pdf", "/delete-pdf-pages", "/merge-pdf", "/split-pdf", "/extract-pdf-pages"]);
+    expect(hrefs).toEqual(["/rotate-pdf", "/delete-pdf-pages", "/merge-pdf", "/split-pdf", "/crop-pdf"]);
   });
 
   test("AC-32: opening the menu keeps the scroll position", async ({ page }) => {

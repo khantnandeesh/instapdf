@@ -24,4 +24,50 @@ export const splitCopy = {
   statusLeftOut: (used: number, total: number, files: number) => `${n(used)} of ${n(total)} pages in ${n(files)} ${files === 1 ? "file" : "files"}`,
   statusPages: (pages: number) => `${n(pages)} ${pages === 1 ? "page" : "pages"}`,
   live: (files: number) => (files === 1 ? "1 file" : `${n(files)} files`),
+  // Split by bookmarks (spec F7 §2).
+  level: "Bookmark level",
+  levelOption: (level: number, count: number) => `Level ${n(level)} · ${n(count)} ${count === 1 ? "bookmark" : "bookmarks"}`,
+  contains: "Title contains",
+  containsPlaceholder: "Any title (optional)",
+  reading: "Reading bookmarks…",
+  noBookmarks: (files: number) => (files === 1 ? "This PDF has no bookmarks" : "These PDFs have no bookmarks"),
+  noMatch: "No bookmark matches",
+};
+
+/** Split by size copy (spec F7 §3). */
+export const splitSizeCopy = {
+  size: "Largest file size",
+  smaller: "Smaller files",
+  larger: "Larger files",
+  unit: "Unit",
+  error: "Use a whole number, at least 20 KB",
+  needs: "Enter a size",
+  status: (pages: number, text: string, unit: string) => `${n(pages)} ${pages === 1 ? "page" : "pages"} · files up to ${text} ${unit}`,
+};
+
+/** Split in half copy (spec F7 §4). */
+export const splitHalfCopy = {
+  direction: "Cut",
+  auto: "Auto",
+  sideBySide: "Left / right",
+  topBottom: "Top / bottom",
+  rightToLeft: "Right page first",
+  booklet: "Booklet scan (reorder pages)",
+  gridHint: "Click pages to cut only those. With none picked, every page is cut.",
+  primary: (pages: number) => `Split ${n(pages)} ${pages === 1 ? "page" : "pages"} in half`,
+};
+
+/** Split by text copy (spec F7 §5). */
+export const splitTextCopy = {
+  choose: "Choose text area",
+  change: "Change text area",
+  needsArea: "Choose the text area",
+  reading: "Reading text…",
+  noText: "No text in that area",
+  same: "The text there never changes",
+  dialogTitle: "Where does the text change?",
+  dialogHelp: "Drag a box around the text that is different in each document, such as an invoice number.",
+  areaLabel: "Text area. Arrow keys move it, Shift with arrow keys resizes it.",
+  found: "Text here:",
+  nothing: "No text in the box on this page",
 };

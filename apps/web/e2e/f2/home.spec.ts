@@ -162,17 +162,17 @@ test.describe("catalogue", () => {
       "/delete-pdf-pages",
       "/merge-pdf",
       "/split-pdf",
+      "/crop-pdf",
       "/extract-pdf-pages",
       "/compress-pdf",
-      "/crop-pdf",
       "/sign-pdf",
       "/pdf-to-word",
     ]);
     const popY = (await popular.boundingBox())!.y;
     const firstCat = (await page.locator("[data-testid=category]").first().boundingBox())!.y;
     expect(popY).toBeLessThan(firstCat);
-    // F3 AC-77, F4: Merge and Split are usable now; Crop is the example planned tool in Popular.
-    await expect(popular.locator('a[href="/crop-pdf"]')).toContainText("Coming soon");
+    // F3 AC-77, F4: Merge and Split are usable now; PDF to Word is the example planned tool in Popular.
+    await expect(popular.locator('a[href="/pdf-to-word"]')).toContainText("Coming soon");
     await expect(popular.locator('a[href="/split-pdf"]')).toContainText("Beta");
     await expect(popular.locator('a[href="/merge-pdf"]')).toContainText("Beta");
     await expect(popular.locator('a[href="/merge-pdf"]')).not.toContainText("Coming soon");
@@ -386,8 +386,8 @@ test.describe("improvements", () => {
   test("AC-56/AC-59: card, Popular tile and menu entry names are the content in order, comma-separated", async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await openHydrated(page);
-    // F3 AC-77, F4: Split by bookmarks is the example planned tool now that Merge and Split are usable.
-    const split = tools.find((t) => t.slug === "split-pdf-by-bookmarks")!;
+    // F3 AC-77, F4: PDF to Word is the example planned tool (a server tool, built late).
+    const split = tools.find((t) => t.slug === "pdf-to-word")!;
     const merge = tools.find((t) => t.slug === "merge-pdf")!;
     const rotate = tools.find((t) => t.slug === "rotate-pdf")!;
     expect(split.status).toBe("planned");
@@ -398,11 +398,11 @@ test.describe("improvements", () => {
     const exact = (...parts: (string | false)[]) => new RegExp(`^${parts.filter((p): p is string => !!p).map((p) => esc(p.trim())).join("\\s*,\\s*")}$`);
     const rt = (t: typeof merge) => t.runtime === "client" && "Runs in your browser";
 
-    await expect(page.locator('[data-testid=category] a[href="/split-pdf-by-bookmarks"]')).toHaveAccessibleName(exact(split.name, split.summary, "Coming soon", rt(split)));
+    await expect(page.locator('[data-testid=category] a[href="/pdf-to-word"]')).toHaveAccessibleName(exact(split.name, split.summary, "Coming soon", rt(split)));
     await expect(page.locator('[data-testid=category] a[href="/merge-pdf"]')).toHaveAccessibleName(exact(merge.name, merge.summary, "Beta", rt(merge)));
     await expect(page.getByTestId("popular").locator('a[href="/rotate-pdf"]')).toHaveAccessibleName(exact(rotate.name, rotate.summary, "Beta", rt(rotate)));
     await openMenu(page);
-    await expect(menuLinks(page).and(page.locator('[href="/split-pdf-by-bookmarks"]'))).toHaveAccessibleName(exact(split.name, "Coming soon", rt(split)));
+    await expect(menuLinks(page).and(page.locator('[href="/pdf-to-word"]'))).toHaveAccessibleName(exact(split.name, "Coming soon", rt(split)));
     await expect(menuLinks(page).and(page.locator('[href="/merge-pdf"]'))).toHaveAccessibleName(exact(merge.name, "Beta", rt(merge)));
     await expect(menuLinks(page).and(page.locator('[href="/rotate-pdf"]'))).toHaveAccessibleName(exact(rotate.name, "Beta", rt(rotate)));
   });

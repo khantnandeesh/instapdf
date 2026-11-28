@@ -20,19 +20,27 @@ import { gzipSync } from "node:zlib";
 const BUDGET_KB = {
   // +1 kB preloads (F12): four more live tools in the catalogue and the registry.
   "/page": [121, 128],
-  "/merge-pdf/page": [150, 160],
+  "/merge-pdf/page": [151, 161],
   "/rotate-pdf/page": [141, 151],
   // F5 page tools (spec F4/F5 UI P-12).
   "/organize-pdf/page": [150, 160],
-  "/combine-reorder-pdf/page": [150, 160],
+  "/combine-reorder-pdf/page": [151, 161],
   // +1 kB entry (F12, 27 Nov), as Extract below.
-  "/alternate-mix-pdf/page": [149, 159],
+  "/alternate-mix-pdf/page": [150, 160],
   // F4 page tools (spec F4/F5 UI P-12): Rotate + the range parser, field and stepper (+ marks on Split).
   // +1 kB entry on Split and Delete (F12 Extract images): each live tool adds its flow entry to the registry every route loads.
-  "/split-pdf/page": [147, 156],
+  "/split-pdf/page": [149, 159],
+  "/split-pdf-by-bookmarks/page": [149, 159],
+  "/split-pdf-by-size/page": [143, 153],
+  "/split-pdf-by-text/page": [149, 159],
+  "/split-pdf-in-half/page": [144, 154],
+  "/crop-pdf/page": [145, 155],
+  "/resize-pdf/page": [145, 155],
+  "/flip-pdf/page": [145, 155],
+  "/n-up-pdf/page": [145, 155],
   // +1 kB entry on Extract (F12, 27 Nov): three more tools in the registry every route loads, and the shared
   // LinkButton / IconButton variants.
-  "/extract-pdf-pages/page": [144, 154],
+  "/extract-pdf-pages/page": [145, 155],
   "/delete-pdf-pages/page": [145, 154],
   // F12 (spec f12-image-text-tools.md): PDF to image is Extract's page with two option groups; PDF to text is the
   // bare flow; Image to PDF is Organize's workspace. Their engines (page-images, page-text, tiff-write) are lazy.
@@ -58,8 +66,16 @@ const CLOUD_BUDGET_KB = {
   "/combine-reorder-pdf/page": [152, 162],
   // Alternate shares every first-load chunk with Organize but its page chunk (150.6 vs 150.8 kB after the
   // F4 + main tile-rule merge); 1 kB over its F5 budget, still under Organize's and Combine's 152.
-  "/alternate-mix-pdf/page": [151, 160],
-  "/split-pdf/page": [148, 158],
+  "/alternate-mix-pdf/page": [152, 161],
+  "/split-pdf/page": [150, 160],
+  "/split-pdf-by-bookmarks/page": [150, 160],
+  "/split-pdf-by-size/page": [144, 154],
+  "/split-pdf-by-text/page": [151, 161],
+  "/split-pdf-in-half/page": [146, 156],
+  "/crop-pdf/page": [147, 157],
+  "/resize-pdf/page": [147, 157],
+  "/flip-pdf/page": [147, 157],
+  "/n-up-pdf/page": [147, 157],
   "/extract-pdf-pages/page": [146, 156],
   "/delete-pdf-pages/page": [146, 156],
   "/protect-pdf/page": [144, 154],

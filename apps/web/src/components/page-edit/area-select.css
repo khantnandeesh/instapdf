@@ -1,0 +1,48 @@
+/* AreaSelect: one rectangle drawn on a page (Split by text; Crop next). */
+.ip-area {
+  position: relative;
+  touch-action: none;
+  user-select: none;
+  cursor: crosshair;
+}
+.ip-area__box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--brand);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  cursor: move;
+  outline: none;
+}
+.ip-area__box:focus-visible {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand);
+}
+/* The resize grip: a 12px dot on the corner inside a 28px touch target. */
+.ip-area__grip {
+  position: absolute;
+  right: -14px;
+  bottom: -14px;
+  width: 28px;
+  height: 28px;
+  cursor: nwse-resize;
+}
+.ip-area__grip::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--brand);
+}
+/* In the area dialog: the page as a sheet of paper with a hairline, and the "3 / 12" counter between the arrows. */
+.ip-area--page {
+  overflow: hidden;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.ip-area__count {
+  min-width: 4.5ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

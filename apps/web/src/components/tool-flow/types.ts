@@ -82,6 +82,10 @@ export type PageDecoration = {
   label?: string;
   /** Toggle tiles (Extract, Delete): `aria-pressed` on the tile button. */
   pressed?: boolean;
+  /** Flip: the page picture is shown mirrored ("none" keeps the turn animated back). */
+  flip?: "horizontal" | "vertical" | "none";
+  /** Crop: the part of the page that stays, in fractions of the page; the rest is dimmed. */
+  keep?: { x: number; y: number; w: number; h: number };
 };
 
 /** Context handed to the tool's options and page actions. */
@@ -107,6 +111,8 @@ export type FlowApi = {
   announce: (message: string) => void;
   openPreview: (items: PreviewItem[], at: number) => void;
   setView: (view: "pages" | "files") => void;
+  /** Draws a page with the shared renderer, `size` CSS px on its longer side; returns a cancel. `background`: after every page on screen. */
+  renderPage: (fileId: string, index: number, size: number, onDone: (canvas: HTMLCanvasElement) => void, background?: boolean) => () => void;
   /** Opens the toolbar's file picker (Add files). */
   openPicker: () => void;
   /** Focus target when nothing better exists (the toolbar picker, else the heading). */

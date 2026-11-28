@@ -46,11 +46,11 @@ test("H-11: Escape on the dialog stays; a menu entry and a footer link are guard
   expect(new URL(page.url()).pathname).toBe("/rotate-pdf");
 
   await menuButton(page).click();
-  await menu(page).locator('nav a[href="/split-pdf-by-bookmarks"]').click();
+  await menu(page).locator('nav a[href="/pdf-to-word"]').click();
   await expect(leaveDialog(page)).toBeVisible();
   await leaveDialog(page).getByRole("button", { name: "Leave" }).click();
-  await expect(page).toHaveURL(/\/split-pdf-by-bookmarks$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Split by bookmarks");
+  await expect(page).toHaveURL(/\/pdf-to-word$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("PDF to Word");
 });
 
 test("H-11: same-page links (skip link) are not guarded", async ({ page }) => {

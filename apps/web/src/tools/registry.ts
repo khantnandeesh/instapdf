@@ -117,6 +117,7 @@ const keywordsBySlug: Record<string, string[]> = {
   "alternate-mix-pdf": ["interleave", "collate"],
   "split-pdf-by-bookmarks": ["outline", "chapters"],
   "split-pdf-by-size": ["file size", "email"],
+  "split-pdf-by-text": ["invoices", "statements", "content"],
   "split-pdf-in-half": ["booklet", "two up"],
   "crop-pdf": ["margins", "trim"],
   "resize-pdf": ["page size", "a4", "letter", "scale"],
@@ -247,6 +248,41 @@ const flows: Record<string, { status: Tool["status"]; flow: ToolFlowConfig }> = 
       { outputName: splitZipName },
     ),
   },
+  // F7 (spec f7-split-variants.md): Split's workspace with the parts worked out from the bookmarks.
+  "split-pdf-by-bookmarks": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "split-pdf-by-bookmarks",
+      { title: "Split PDF by bookmarks", actionLabel: "Split PDF", progressLabel: "Splitting" },
+      { outputName: splitZipName },
+    ),
+  },
+  "split-pdf-by-size": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "split-pdf-by-size",
+      { title: "Split PDF by size", actionLabel: "Split PDF", progressLabel: "Splitting" },
+      { outputName: splitZipName },
+    ),
+  },
+  // Split's workspace again, with the parts worked out from the text inside one area of the page.
+  "split-pdf-by-text": {
+    status: "beta",
+    flow: clientPdfFlow(
+      "split-pdf-by-text",
+      { title: "Split PDF by text", actionLabel: "Split PDF", progressLabel: "Splitting" },
+      { outputName: splitZipName },
+    ),
+  },
+  "split-pdf-in-half": {
+    status: "beta",
+    flow: clientPdfFlow("split-pdf-in-half", { title: "Split PDF pages in half", actionLabel: "Split in half", progressLabel: "Splitting" }),
+  },
+  // F8 (spec f8-page-shape.md): Flip and Resize on the pick-pages flow; Crop and N-up on whole files.
+  "crop-pdf": { status: "beta", flow: clientPdfFlow("crop-pdf", { title: "Crop PDF", actionLabel: "Crop PDF", progressLabel: "Cropping" }) },
+  "resize-pdf": { status: "beta", flow: clientPdfFlow("resize-pdf", { title: "Resize PDF", actionLabel: "Resize PDF", progressLabel: "Resizing" }) },
+  "flip-pdf": { status: "beta", flow: clientPdfFlow("flip-pdf", { title: "Flip PDF", actionLabel: "Flip PDF", progressLabel: "Flipping" }) },
+  "n-up-pdf": { status: "beta", flow: clientPdfFlow("n-up-pdf", { title: "N-up PDF", actionLabel: "Arrange pages", progressLabel: "Arranging" }) },
   "extract-pdf-pages": {
     status: "beta",
     flow: clientPdfFlow(
