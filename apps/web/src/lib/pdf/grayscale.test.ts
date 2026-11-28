@@ -13,6 +13,51 @@ const bytes = (s: string) => Uint8Array.from(s, (c) => c.charCodeAt(0));
 const env = (spaces: Record<string, Space> = {}): ContentEnv => ({ space: (n) => spaces[n] ?? ({ DeviceRGB: RGB, DeviceCMYK: CMYK, DeviceGray: GRAY } as Record<string, Space>)[n] ?? null, grayPattern: () => "GP" });
 const convert = (s: string, spaces?: Record<string, Space>) => text(grayContent(bytes(s), env(spaces)).bytes);
 
+describe("black text (spec F13 §1, the Make text black option)", () => {
+  const black = (s: string, how: "objects" | "all" = "objects", inherits = false) => text(grayContent(bytes(s), { ...env(), blackText: how, inherits }).bytes);
+
+  it("AC-1437: dark text becomes black, and what is drawn after it keeps its own grey", () => {
+    // A colour set before the text object: black inside it, its grey again after it.
+    expect(black("0 0 1 rg 0 0 5 5 re f BT (a) Tj ET 0 0 9 9 re f")).toBe("0.114 g 0 0 5 5 re f BT 0 g (a) Tj ET 0.114 g 0 0 9 9 re f");
+    // Colours set inside it: black there, the last one restored after it.
+    expect(black("BT 1 0 0 rg (a) Tj 0.2 g (b) Tj ET")).toBe("BT 0 g (a) Tj 0 g (b) Tj ET 0.2 g");
+    // Stroked text too.
+    expect(black("0 0 1 RG BT (a) Tj ET")).toBe("0.114 G BT 0 G (a) Tj ET 0.114 G");
+    // Text that is black already is left byte for byte.
+    expect(black("BT 0 g (a) Tj ET")).toBe("BT 0 g (a) Tj ET");
+  });
+
+  it("AC-1438: light text stays light, drawings are never blackened, and an unknown colour is left alone", () => {
+    expect(black("BT 1 1 1 rg (white on dark) Tj ET")).toBe("BT 1 g (white on dark) Tj ET");
+    expect(black("1 0 0 rg 0 0 5 5 re f")).toBe("0.299 g 0 0 5 5 re f");
+    // A form's text in the colour of whoever draws the form: that colour cannot be put back, so it stays.
+    expect(black("BT (a) Tj ET", "objects", true)).toBe("BT (a) Tj ET");
+    // The graphics state is followed through q and Q.
+    expect(black("0.3 g q 1 g Q BT (a) Tj ET")).toBe("0.3 g q 1 g Q BT 0 g (a) Tj ET 0.3 g");
+    // A form field's default appearance is all text.
+    expect(black("0 0 1 rg /Helv 12 Tf", "all")).toBe("0 g /Helv 12 Tf");
+  });
+
+  it("AC-1439: the option reaches a real file, and photos can be packed smaller", async () => {
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    doc.addPage([200, 200]).drawText("Blue", { x: 20, y: 100, size: 20, font, color: rgb(0, 0, 1) });
+    const src = await doc.save({ useObjectStreams: false });
+    const page = async (blackText: boolean) => {
+      const out = await grayscalePdf({ bytes: src, vector: true, blackText });
+      const made = await PDFDocument.load(out.bytes);
+      const contents = made.getPage(0).node.Contents()!;
+      const first = contents instanceof PDFArray ? made.context.lookup(contents.get(0)) : contents;
+      return text(decodePDFRawStream(first as PDFRawStream).decode());
+    };
+    expect(await page(false)).toMatch(/BT\s+0\.114 g/);
+    // Black inside the text object; the file's own grey is set again once it ends.
+    expect(await page(true)).toMatch(/BT\s+0 g[\s\S]*ET 0\.114 g/);
+    const px = new Uint8Array(64 * 64).map((_, i) => (i * 37) % 256);
+    expect(encodeGrayJpeg(px, 64, 64, 60).length).toBeLessThan(encodeGrayJpeg(px, 64, 64).length);
+  });
+});
+
 describe("grey levels (spec F13 §1)", () => {
   it("AC-1400: a colour of any space becomes its luminance", () => {
     expect(toGray(RGB, [1, 0, 0])).toBeCloseTo(0.299);

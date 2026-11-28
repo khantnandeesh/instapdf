@@ -65,4 +65,24 @@ test.describe("Grayscale", () => {
     expect(got.shading).toBe("/DeviceRGB");
     expect(Object.values(got.pictures)).toEqual(["/DeviceGray", "/DeviceGray", "/DeviceGray"]);
   });
+
+  test("AC-1442: the extras: text made black, photos packed smaller", async ({ page }, info) => {
+    await open(page, "colours.pdf");
+    await run(page);
+    const plain = (await downloadResult(page)).bytes;
+
+    await open(page, "colours.pdf");
+    // From 1024 px the switches are in the side panel; below, behind More options.
+    if (info.project.name === "mobile") await page.getByTestId("more-options").click();
+    await page.getByRole("switch", { name: "Make text black" }).check({ force: true });
+    await page.getByRole("switch", { name: "Smaller photos" }).check({ force: true });
+    if (info.project.name === "mobile") await page.keyboard.press("Escape");
+    await run(page);
+    const out = (await downloadResult(page)).bytes;
+    expect(out.length).toBeLessThan(plain.length);
+    const text = (b: Uint8Array) => inspect(b).then((r) => r.content);
+    // The coloured text of the plain run has a grey of its own inside a text object; here every text colour is black.
+    expect(await text(plain)).toMatch(/BT[^E]*?\b0\.\d+ g/);
+    expect(await text(out)).not.toMatch(/BT[^E]*?\b0\.[0-5]\d* g/);
+  });
 });

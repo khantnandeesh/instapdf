@@ -1,0 +1,43 @@
+{
+  "feature": "f13-grayscale-repair",
+  "captured": "2026-11-28T07:03:00Z/07:08:00Z",
+  "expires": "2026-12-28",
+  "raw_evidence": "/mnt/project-files/evals-cache/f13/ (ref/, shots/, out/, lh/, micro/, scripts/)",
+  "reference_tasks_used": 2,
+  "harness": "Playwright headless Chromium, 1280x632; 390x664 captured by resizing the same session",
+  "reference": {
+    "grayscale": {
+      "input": "colours.pdf (6348 B, 1 page)",
+      "file_chosen_to_button_ms": 568,
+      "click_to_result_ms": 794,
+      "runs": 1,
+      "output_bytes": 4032,
+      "output_sha256": "355b22c49e50259d373e866311e75ff5bed830fbf4e701e64f01ef0a085dd93b",
+      "observations": [
+        "Choosing the file uploads it at once (POST /api/files/upload); no page preview, only the file name.",
+        "Options behind a 'More options' button: text to grey or black, pictures to grey or left alone, a compress-pictures tick (on by default).",
+        "Output: 1 page 595x842, text identical to source, qpdf check clean, three pictures stored as one-channel lossless.",
+        "The gradient box kept its full colour (14000 coloured pixels at 72 dpi, channel spread 204). Mean luminance error against source 3.03.",
+        "Primary button y=310 of 632 at 1280, y=407 of 664 at 390; result Download y=215 and y=244."
+      ]
+    },
+    "repair": {
+      "input": "cut-short.pdf (5374 B, 12 pages, end missing)",
+      "file_chosen_to_button_ms": 301,
+      "click_to_result_ms": 861,
+      "runs": 1,
+      "output_bytes": 3721,
+      "output_sha256": "e515985cb0c453a2b66e317eed79e4693e5dd2a33df27ba15e22ecac03ef0a66",
+      "observations": [
+        "No options. Result says 12 pages were recovered and warns that errors were found while reading.",
+        "Output: 12 pages 595x842, text identical to source, qpdf check clean.",
+        "Primary button y=323 of 632 at 1280, y=376 of 664 at 390; result Download y=307 and y=411."
+      ]
+    },
+    "landing": {
+      "load_ms": {"grayscale_1280": 2233, "repair_1280": 1000, "grayscale_390": 846, "repair_390": 943},
+      "stated_free_limits": "200 pages or 50 MB, 3 tasks per hour"
+    },
+    "not_captured": "Reference error states (password, corrupt, wrong type) and its cloud/URL import menu were not exercised: no task budget."
+  }
+}

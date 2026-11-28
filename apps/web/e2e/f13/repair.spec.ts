@@ -11,6 +11,8 @@ test.describe("Repair", () => {
     await expectNoSeriousAxeViolations(page, "Repair, loaded");
     await run(page);
     const out = await downloadResult(page);
+    // The result says something was mended, not just "ready".
+    await expect(page.getByText("The file was damaged. All 12 pages were recovered.")).toBeVisible();
     expect(out.name).toBe("cut-short.pdf");
     expect(new TextDecoder("latin1").decode(out.bytes.subarray(out.bytes.length - 40))).toMatch(/startxref\s+\d+\s+%%EOF\s*$/);
     expect((await PDFDocument.load(out.bytes, { updateMetadata: false })).getPageCount()).toBe(12);
@@ -23,9 +25,17 @@ test.describe("Repair", () => {
     await expect(primary(page)).toBeEnabled();
     await primary(page).click();
     await expect(page.getByText("no-pages.pdf has too little left to repair: no page could be read from it.")).toBeVisible();
+    // The promise made at intake is withdrawn, and the button that could only fail again starts over instead.
+    await expect(page.getByText("no-pages.pdf is damaged. It can still be repaired.")).toHaveCount(0);
+    await expect(page.getByTestId("process-error").getByRole("button", { name: "Start over" })).toBeVisible();
+    await expect(page.getByTestId("process-error").getByRole("button", { name: "Try again" })).toHaveCount(0);
     // Every other tool still turns the file away.
     await page.goto("/flatten-pdf");
     await page.getByTestId("file-input").setInputFiles(fx("no-pages.pdf"));
     await expect(page.getByText("no-pages.pdf couldn't be opened. It may be damaged or not really a PDF.")).toBeVisible();
+    // ... and offers Repair, which takes it along.
+    await page.getByRole("button", { name: "Repair PDF" }).click();
+    await expect(page).toHaveURL(/\/repair-pdf$/);
+    await expect(page.getByText("no-pages.pdf is damaged. It can still be repaired.")).toBeVisible();
   });
 });

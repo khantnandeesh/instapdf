@@ -7,6 +7,8 @@ test.describe("AC-56 at 1366x900", () => {
   test.use({ viewport: { width: 1366, height: 900 } });
 
   test("AC-56: axe (default ruleset + WCAG 2.0/2.1/2.2 A and AA) finds no serious or critical violations on home, desktop menu, menu search with no results, coming-soon, 404 and /rotate-pdf", async ({ page }, info) => {
+    // Six pages, two axe passes each, over every tool card: about 35s alone, past the default 60s on a shared runner.
+    test.setTimeout(180_000);
     test.skip(!isDesktop(info.project.name), "desktop states");
 
     await openHydrated(page);
@@ -57,6 +59,8 @@ test.describe("AC-56 with the OS in dark mode at 1366x900 (light only until Berr
   test.use({ viewport: { width: 1366, height: 900 }, colorScheme: "dark" });
 
   test("AC-56: with the OS in dark mode the page stays on the light palette and axe finds no serious or critical violations on home, catalogue and menu no-results, desktop menu, coming-soon, 404 and /rotate-pdf", async ({ page }, info) => {
+    // Six pages, two axe passes each, over every tool card: about 35s alone, past the default 60s on a shared runner.
+    test.setTimeout(180_000);
     test.skip(!isDesktop(info.project.name), "desktop states");
 
     await openHydrated(page);

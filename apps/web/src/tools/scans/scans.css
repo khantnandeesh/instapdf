@@ -1,0 +1,22 @@
+/* Deskew dialog: the page turns inside a fixed frame; level guide lines lie over it. */
+.ip-straighten {
+  position: relative;
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.ip-straighten__page {
+  display: block;
+  will-change: transform;
+}
+.ip-straighten__lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(to bottom, color-mix(in srgb, var(--brand) 38%, transparent) 1px, transparent 1px);
+  background-size: 100% 12.5%;
+  background-position: 0 6.25%;
+}

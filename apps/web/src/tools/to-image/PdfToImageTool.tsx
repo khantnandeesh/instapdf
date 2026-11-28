@@ -35,6 +35,7 @@ export function PdfToImageTool() {
       verb="converted"
       gridHint={c.gridHint}
       primaryLabel={c.primary}
+      warm={() => void import("@/lib/pdf/page-images")}
       run={async (sources, signal, onProgress) => (await import("@/lib/pdf/page-images")).pagesToImages(sources, optsLive.current, signal, onProgress)}
       renderMore={(ctx) => (
         <MoreOptions

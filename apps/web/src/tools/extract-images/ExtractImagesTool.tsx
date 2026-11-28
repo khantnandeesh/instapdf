@@ -11,6 +11,7 @@ export function ExtractImagesTool() {
       tool={tool}
       verb="searched"
       gridHint="Click pages to take the images of only those. With none picked, every page is searched."
+      warm={() => void import("@/lib/pdf/embedded-images")}
       run={async (sources, signal, onProgress) => (await import("@/lib/pdf/embedded-images")).extractImages(sources, signal, onProgress)}
     />
   );

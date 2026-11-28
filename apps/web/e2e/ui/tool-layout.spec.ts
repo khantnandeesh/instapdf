@@ -622,6 +622,9 @@ test.describe("shots", () => {
         await shot(page, `${t.name}-empty`, vp);
         // Loading: hold the file scanner.
         const scan = await hold(page, /instapdf-scan\.[^/]*\.js/);
+        // For "working, then cancelled": the processing worker is held too, before the file is in
+        // (the flow fetches it ahead once a file is ready; the fixture's stub is slow on its own).
+        const work = await hold(page, /instapdf-processing\.[^/]*\.js/);
         await page.getByTestId("file-input").setInputFiles(t.files.map(fx));
         await expect(flow(page)).toHaveAttribute("data-state", "loading");
         await shot(page, `${t.name}-loading`, vp);
@@ -636,8 +639,6 @@ test.describe("shots", () => {
           await shot(page, `${t.name}-more-options`, vp);
           await closeMore(page);
         }
-        // Working, then cancelled: hold the processing worker (the fixture's stub is slow on its own).
-        const work = await hold(page, /instapdf-processing\.[^/]*\.js/);
         await primary(page).click();
         await expect(page.getByTestId("processing")).toBeVisible();
         if (t.name === "settings") await expect(page.getByTestId("processing")).toContainText(/[1-9]\d?%/);

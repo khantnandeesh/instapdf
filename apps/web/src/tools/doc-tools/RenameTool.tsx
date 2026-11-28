@@ -124,6 +124,8 @@ export function RenameTool() {
         tool={tool}
         process={process}
         apiRef={apiRef}
+        // Renaming reads the pages in the tab: nothing to fetch ahead.
+        warm={() => {}}
         canRun={() => (area ? true : c.needsArea)}
         onReset={() => {
           setArea(null);

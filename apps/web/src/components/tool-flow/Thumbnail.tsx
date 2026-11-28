@@ -1,5 +1,5 @@
 "use client";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState, type CSSProperties } from "react";
 import { ThumbContext } from "./thumb-context";
 import { rendererScale, thumbRenderSize } from "./thumb-size";
 import { cx } from "../ui/cx";
@@ -63,7 +63,7 @@ function watchRatio(cb: () => void): () => void {
  * stays until the new one is ready, so nothing flashes. `scale` is any CSS scale on top of the box
  * (a turned page fitted in its tile).
  */
-export function PageThumb({ fileId, index, className, scale = 1 }: { fileId: string; index: number; className?: string; scale?: number }) {
+export function PageThumb({ fileId, index, className, style, scale = 1 }: { fileId: string; index: number; className?: string; style?: CSSProperties; scale?: number }) {
   const { renderer, watch } = useContext(ThumbContext);
   const host = useRef<HTMLSpanElement>(null);
   const [rendered, setRendered] = useState(false);
@@ -156,6 +156,7 @@ export function PageThumb({ fileId, index, className, scale = 1 }: { fileId: str
       ref={host}
       data-rendered={rendered || undefined}
       className={cx("relative block h-full w-full", rendered ? "bg-paper" : "ip-pulse bg-paper", className)}
+      style={style}
     />
   );
 }

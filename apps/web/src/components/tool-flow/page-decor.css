@@ -266,6 +266,13 @@
   }
 }
 
+/* Deskew: the page picture turned inside its frame (the frame clips it), as the result will be. */
+@media (prefers-reduced-motion: no-preference) {
+  .ip-tilt {
+    transition: transform var(--dur-move) var(--ease-standard);
+  }
+}
+
 /* Crop: the part that stays is clear inside a berry line; everything else on the page is dimmed. */
 .ip-keep {
   position: absolute;

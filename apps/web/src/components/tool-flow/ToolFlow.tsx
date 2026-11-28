@@ -9,7 +9,7 @@ import { setHandoff, takeHandoff } from "@/lib/pdf/handoff";
 import { openPdf, readPageSizes, type OpenedPdf } from "@/lib/pdf/pdfjs";
 import { LazyThumbnails } from "@/lib/pdf/thumbs-lazy";
 import { USER_ERROR } from "@/lib/pdf/user-error";
-import { disposeWorker } from "@/lib/pdf/worker-client";
+import { disposeWorker, warmWorker } from "@/lib/pdf/worker-client";
 import { acceptAttribute, fitsPageBudget, screenFiles } from "@/lib/pdf/validation";
 import { imageFormatOfName } from "@/lib/pdf/image-names";
 import { continueTargets, toolBySlug, isUsable, type FlowTool } from "@/tools/registry";
@@ -97,9 +97,10 @@ const LeaveGuard = dynamic(() => lazyParts.leave().then((m) => m.LeaveGuard), { 
 
 type Phase = "idle" | "processing" | "done" | "error";
 
-/** Once shown, the progress pill stays at least this long, so a fast run does not flash (motion.md T11). */
-const MIN_PROCESSING_MS = 400;
-/** The pill's done tick holds this long before the result swap starts (F25 §6 "Done", AC-639). */
+/**
+ * The pill's done tick holds this long before the result swap starts (F25 §6 "Done", AC-639). It is also
+ * the pill's floor: once shown it stays at least this long, so a fast run does not flash (motion.md T11).
+ */
 const DONE_HOLD_MS = 400;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const THUMB_MIN = 80;
@@ -125,6 +126,11 @@ export type ToolFlowProps = {
   readyNote?: string;
   /** Reason the primary is disabled in the ready state, if any. */
   canRun?: () => true | string;
+  /**
+   * What the run will need, fetched while the person looks at their file (key check M7: the click must
+   * not wait for code). By default the processing worker; a tool that runs elsewhere names its own parts.
+   */
+  warm?: () => void;
   process: ProcessFn;
   /** Called on Start over so the tool clears its own option state. */
   onReset?: () => void;
@@ -225,6 +231,7 @@ export function ToolFlow({
   onPageKey,
   readyNote,
   canRun,
+  warm,
   process: processFiles, // renamed: `process.env` checks below must reach the real global
   onReset,
   renderWorkspace,
@@ -312,6 +319,10 @@ export function ToolFlow({
   // The parts needed once a file is in: fetched at the first sign of intent (the file chooser or
   // the drag hides the load), when files arrive without one (a hand-off), or after 4 s (intent.ts).
   const stopIntent = useRef<() => void>(() => {});
+  /** Files turned away as unreadable in the intake under way, by the message that says so: Repair may still take them. */
+  const unopened = useRef(new Map<string, File>());
+  /** The "is damaged, can still be repaired" notices on screen (Repair). */
+  const damagedNotices = useRef<string[]>([]);
   useEffect(() => {
     const parts = onIntent(loadLazyParts);
     const warm = onIntent(warmWorkers, 0);
@@ -323,6 +334,20 @@ export function ToolFlow({
     stopIntent.current();
     loadLazyParts();
   }, [hasFiles]);
+  // Once a file is ready and the tab has a quiet moment, the run's code is fetched: never before a file, never in the first load.
+  const anyReady = files.some((f) => f.status === "ready");
+  const warmRef = useRef(warm);
+  warmRef.current = warm;
+  useEffect(() => {
+    if (!anyReady) return;
+    const go = () => (warmRef.current ?? warmWorker)();
+    if (typeof requestIdleCallback === "function") {
+      const id = requestIdleCallback(go, { timeout: 1500 });
+      return () => cancelIdleCallback(id);
+    }
+    const id = setTimeout(go, 300);
+    return () => clearTimeout(id);
+  }, [anyReady]);
   // Set once listeners (drop, paste, hand-off) are live: tests wait for data-hydrated.
   // From 1024 px the pages scroll inside their own area (fold fit), so thumbnails are watched
   // against that area; below, the page itself scrolls and the viewport is the root.
@@ -504,7 +529,7 @@ export function ToolFlow({
         return "ok";
       }
       // Repair takes a file nothing here can open: it stands in the task as one placeholder page.
-      const takeDamaged = async () => (await import("@/lib/pdf/damaged-page")).takeDamaged(id, renderer, () => filesRef.current.some((f) => f.id === id), patchFile, () => pushNotice({ tone: "warning", title: copy.fileDamaged(entry.name), sticky: true }));
+      const takeDamaged = async () => (await import("@/lib/pdf/damaged-page")).takeDamaged(id, renderer, () => filesRef.current.some((f) => f.id === id), patchFile, () => void damagedNotices.current.push(pushNotice({ tone: "warning", title: copy.fileDamaged(entry.name), sticky: true })));
       // The inspector loads beside pdf.js, never before it (eval G-11); its scan runs in a worker.
       const inspection = inspectPdf?.().then((i) => [i, i.scan(entry.source)] as const, () => null);
       const result = await openPdf(bytes, password);
@@ -516,6 +541,7 @@ export function ToolFlow({
         if (result.reason === "corrupt") {
           if (flow.acceptDamaged) return takeDamaged();
           problems.push(copy.errorCorrupt(entry.name));
+          unopened.current.set(copy.errorCorrupt(entry.name), new File([entry.source], entry.name, { type: "application/pdf" }));
           removeFile(id);
           return "rejected";
         }
@@ -540,6 +566,7 @@ export function ToolFlow({
         void pdf.task.destroy();
         if (flow.acceptDamaged) return takeDamaged();
         problems.push(copy.errorCorrupt(entry.name));
+        unopened.current.set(copy.errorCorrupt(entry.name), new File([entry.source], entry.name, { type: "application/pdf" }));
         removeFile(id);
         return "rejected";
       }
@@ -564,9 +591,31 @@ export function ToolFlow({
   const flushProblems = useCallback(
     (problems: string[]) => {
       if (!problems.length) return;
-      pushNotice(problems.length === 1 ? { tone: "danger", title: problems[0] } : { tone: "danger", title: copy.problemsTitle(problems.length), items: problems });
+      // One file that would not open: the notice offers the tool that may mend it.
+      const mend = problems.length === 1 ? unopened.current.get(problems[0]) : undefined;
+      const repair = mend && toolBySlug("repair-pdf");
+      unopened.current.clear();
+      pushNotice(
+        problems.length === 1
+          ? {
+              tone: "danger",
+              title: problems[0],
+              ...(mend && repair && isUsable(repair)
+                ? {
+                    action: {
+                      label: repair.flow?.title ?? repair.name,
+                      onClick: () => {
+                        setHandoff(repair.slug, [mend]);
+                        router.push(`/${repair.slug}`);
+                      },
+                    },
+                  }
+                : {}),
+            }
+          : { tone: "danger", title: copy.problemsTitle(problems.length), items: problems },
+      );
     },
-    [pushNotice],
+    [pushNotice, router],
   );
 
   // How the visitor last interacted (pointer or keys), for focus moves the page makes itself.
@@ -725,7 +774,6 @@ export function ToolFlow({
     setPagesDim(false);
     setPhase("processing");
     announce(tool.flow.progressLabel);
-    const started = performance.now();
     try {
       // The pill shows on the click (F25 §6, eval G-13): let it paint before the work starts.
       await new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 0)));
@@ -749,8 +797,8 @@ export function ToolFlow({
           onCancel: (fn) => (serverCancel.current = fn),
         },
       );
-      const wait = MIN_PROCESSING_MS - (performance.now() - started);
-      if (wait > 0) await sleep(wait);
+      // The pill's floor (motion.md T11) is its done tick: a fast run shows "Done" for DONE_HOLD_MS and
+      // waits no longer than that (key check M7: a second floor used to stack on it).
       if (controller.signal.aborted) return;
       setProgress(1);
       // The done tick (leaf, "Done") holds, then the stage becomes the result (T12).
@@ -765,6 +813,7 @@ export function ToolFlow({
       if (controller.signal.aborted) return settle(workArea.current);
       setOutput(out);
       for (const w of out.warnings ?? []) pushNotice({ tone: "warning", title: w });
+      for (const w of out.notes ?? []) pushNotice({ tone: "success", title: w, sticky: true });
       setPagesDim(false);
       setPhase("done");
       setPillDone(false);
@@ -777,6 +826,9 @@ export function ToolFlow({
       setProcessMessage(shown);
       setPagesDim(false);
       setPhase("error");
+      // "It can still be repaired" is no longer true of a file the repair just gave up on.
+      for (const id of damagedNotices.current) dismissNotice(id);
+      damagedNotices.current = [];
       // The full reason and what to do go in NoticeStack (assertive, never auto-dismissed), with Start over.
       errorNotice.current = pushNotice({ tone: "danger", title: shown ?? copy.errorProcess(tool.flow.progressLabel), action: { label: copy.startOver, onClick: () => startOverRef.current() } });
     }
@@ -1109,7 +1161,9 @@ export function ToolFlow({
     <C.SlotError
       ref={retryButton}
       line={C.shortError(processMessage ?? copy.errorProcess(flow.progressLabel))}
-      onRetry={run}
+      // A repair that failed fails the same way again: the button starts over instead.
+      onRetry={flow.acceptDamaged ? startOver : run}
+      retryLabel={flow.acceptDamaged ? copy.startOver : undefined}
       fix={fix ? { label: fix.name, onClick: () => continueWithFiles(fix) } : undefined}
     />
   ) : state === "done" && output ? (

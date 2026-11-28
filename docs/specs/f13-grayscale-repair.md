@@ -13,6 +13,7 @@ Screens: `designs/f13/grayscale-{empty,loaded,result}-{1280,390}.png`, `designs/
   - Gradients keep their geometry and get a grey colour function; mesh gradients get a grey value at each corner.
   - Pictures are decoded in the tab and written back as one-channel pictures: a photo (JPEG, JPEG 2000) as a grey JPEG, anything else lossless. Transparency (soft masks) is kept. Pictures already grey, and stencils, are left untouched.
   - Annotation colours, form field text colours and bookmark colours turn grey too.
+- Extras, both off at first: "Make text black" writes dark text (grey level 0.6 or darker) in pure black, for crisper print; light text on a dark ground keeps its grey, and drawings are never blackened. "Smaller photos" packs photos harder (JPEG quality 60 instead of 88) for a lighter file.
 - Text stays selectable and searchable; links, bookmarks, fields, tags and metadata are kept.
 - What cannot be converted is never hidden: the result names how many pictures, gradients or page parts kept their colour.
 - A file that opened with a password is saved without one, as in every tool.
@@ -28,6 +29,7 @@ Where we differ from the reference: it uploads the file, takes one file of up to
   2. Rebuild the page list: the pages the tree still reaches, or, when the tree is gone, every page object found, in file order. When the tree reaches fewer pages than it counts, the page objects it missed are added after the ones it reached. A lost trailer's catalog and document information are found again among the objects. Each page gets what it inherited from lost parents (size, resources, rotation), a default size when it has none, and loses references to parts that no longer exist. The result is one flat page tree, written with a fresh index.
   3. When that fails but the file still renders, its pages are redrawn as pictures at 150 dpi, and the result says text is no longer selectable.
   4. When no page can be read, the tool says plainly that too little is left to repair.
+- The result says what was done: a damaged file that lost nothing gets "The file was damaged. All N pages were recovered." A failed repair withdraws the "can still be repaired" notice and offers Start over, not Try again. Every other tool's "couldn't be opened" notice offers Repair and takes the file along.
 - The result says what was lost: "N of M pages were recovered", pages that lost their content and are blank.
 - A sound file comes back sound with nothing to report. A password file is asked for its password and saved without one.
 
@@ -37,9 +39,9 @@ Where we differ from the reference: it uploads the file and takes one at a time.
 
 ## Acceptance criteria
 
-Engine (`grayscale.test.ts`): AC-1400 a colour of any space becomes its luminance; AC-1401 the four kinds of PDF function; AC-1410 colour operators become grey ones and nothing else changes; AC-1411 named colour spaces followed through q and Q; AC-1412 uncoloured and coloured patterns; AC-1413 small pictures inside the content; AC-1420 page, forms, patterns and annotation looks hold no colour operator; AC-1421 a gradient keeps its shape; AC-1422 annotation and field colours; AC-1423 pictures only leaves text; AC-1424 mesh gradients; AC-1425 every fixture converts; AC-1430 colour pictures are found; AC-1431 a grey picture takes the colour one's place; AC-1432 a picture left over is named; AC-1433 lossless packing gives back every pixel; AC-1434 a photo becomes a one-channel JPEG any reader decodes; AC-1435 a soft mask's matte is not applied twice; AC-1436 a picture decoded larger than its own size is brought back to it.
+Engine (`grayscale.test.ts`): AC-1400 a colour of any space becomes its luminance; AC-1401 the four kinds of PDF function; AC-1410 colour operators become grey ones and nothing else changes; AC-1411 named colour spaces followed through q and Q; AC-1412 uncoloured and coloured patterns; AC-1413 small pictures inside the content; AC-1420 page, forms, patterns and annotation looks hold no colour operator; AC-1421 a gradient keeps its shape; AC-1422 annotation and field colours; AC-1423 pictures only leaves text; AC-1424 mesh gradients; AC-1425 every fixture converts; AC-1430 colour pictures are found; AC-1431 a grey picture takes the colour one's place; AC-1432 a picture left over is named; AC-1433 lossless packing gives back every pixel; AC-1434 a photo becomes a one-channel JPEG any reader decodes; AC-1435 a soft mask's matte is not applied twice; AC-1436 a picture decoded larger than its own size is brought back to it; AC-1437 dark text becomes black and what follows keeps its grey; AC-1438 light text, drawings and unknown colours are left alone; AC-1439 the option reaches a real file, and photos can be packed smaller.
 
-Browser (`e2e/f13/grayscale.spec.ts`): AC-1440 everything turns grey, text stays text, the file is smaller; AC-1441 the two partial choices.
+Browser (`e2e/f13/grayscale.spec.ts`): AC-1440 everything turns grey, text stays text, the file is smaller; AC-1441 the two partial choices; AC-1442 the extras.
 
 Repair engine (`repair.test.ts`): AC-1450 text before the header is dropped, a missing header put on; AC-1451 a file with its end cut off keeps every page; AC-1452 junk in front, a shifted body and a wrong index; AC-1453 a stream with a wrong length; AC-1454 a file cut in the middle gives the whole pages and says how many are gone; AC-1455 a page list pointing at missing pages is rebuilt; AC-1456 a sound file comes back sound; AC-1457 a file with nothing left says so; AC-1458 a lost branch of the page list does not lose its pages; AC-1459 a password file opens with its password, and one that lost its key says so.
 
@@ -56,3 +58,4 @@ Repair browser (`e2e/f13/repair.spec.ts`): AC-1460 a file whose end is missing c
 - Repair: pages stored inside a packed object stream that is itself cut short are lost (the stream cannot be unpacked to its end); the result says how many pages are gone.
 - Repair: bookmarks, links and form fields that pointed at lost pages are dropped with them; a damaged font or picture inside a page is kept as it is.
 - Repair: a password file too damaged to open in the tab cannot be asked for its password, and a password file that lost its trailer lost its key. Both are refused with a message that says why, never written out as noise.
+- Grayscale, Make text black: text inside a form or pattern that is drawn in its caller's colour keeps its grey (the colour to go back to after the text cannot be known).
